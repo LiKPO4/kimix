@@ -510,6 +510,7 @@ function installBrowserPreviewApi() {
     setKimiCodePlanMode: (): Promise<VoidResponse> => fail("切换 Kimi Code Plan 模式"),
     compactKimiCodeSession: () => fail("压缩 Kimi Code 会话"),
     setKimiCodeModel: (): Promise<VoidResponse> => fail("切换 Kimi Code 会话模型"),
+    setKimiCodeThinking: (): Promise<VoidResponse> => fail("切换 Kimi Code 思考强度"),
     setKimiCodeSubagentRouting: (): Promise<KimiCodeSubagentRoutingResponse> => fail("配置 Kimi Code 子 Agent"),
     setKimiCodePermission: (): Promise<VoidResponse> => fail("切换 Kimi Code 权限"),
     archiveKimiCodeSession: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),

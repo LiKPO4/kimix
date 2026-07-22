@@ -1275,6 +1275,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
     autoMode: appState.permissionMode === "auto",
     planMode: appState.defaultPlanMode,
     thinking: appState.defaultThinking,
+    thinkingEffort: appState.defaultThinkingEffort,
   });
   if (!sessionRes.success) throw new Error(sessionRes.error);
 
@@ -1325,6 +1326,7 @@ function App() {
   const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
+  const setDefaultThinkingEffort = useAppStore((s) => s.setDefaultThinkingEffort);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
   const setFontSize = useAppStore((s) => s.setFontSize);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
@@ -1426,6 +1428,7 @@ function App() {
       setKimiThemePalettes,
       setPermissionMode,
       setDefaultThinking,
+      setDefaultThinkingEffort,
       setDefaultPlanMode,
       setFontSize,
       setAdditionalWorkDirs,
@@ -1440,7 +1443,7 @@ function App() {
       setRecentProjects,
     }), [
       setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
-      setPermissionMode, setDefaultThinking, setDefaultPlanMode, setFontSize,
+      setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,
@@ -1936,6 +1939,7 @@ function App() {
             recoveryRes = await window.api.createKimiCodeSession({
               workDir: latestSession.projectPath,
               model: getPrimaryRoomAgent(latestSession).modelAlias ?? undefined,
+              thinking: useAppStore.getState().defaultThinkingEffort === "on" ? undefined : useAppStore.getState().defaultThinkingEffort,
               permission: useAppStore.getState().permissionMode,
               planMode: useAppStore.getState().defaultPlanMode,
               additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
@@ -2480,6 +2484,7 @@ function App() {
           autoMode: appState.permissionMode === "auto",
           planMode: appState.defaultPlanMode,
           thinking: appState.defaultThinking,
+          thinkingEffort: appState.defaultThinkingEffort,
         });
         if (!startRes.success) throw new Error(startRes.error);
         rememberHiddenHandoffSession(startRes.data.sessionId);

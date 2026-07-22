@@ -78,6 +78,7 @@ export interface AppState {
   roomAgentActivities: Record<string, RoomAgentActivity>;
   creatingSessionProjectPath: string | null;
   defaultThinking: boolean;
+  defaultThinkingEffort: string;
   defaultPlanMode: boolean;
   fontSize: number;
   additionalWorkDirs: string[];

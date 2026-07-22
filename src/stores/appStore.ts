@@ -97,6 +97,7 @@ export interface AppStore extends AppState {
   clearRoomAgentActivities: (roomId?: string) => void;
   setCreatingSessionProjectPath: (projectPath: string | null) => void;
   setDefaultThinking: (thinking: boolean) => void;
+  setDefaultThinkingEffort: (effort: string) => void;
   setDefaultPlanMode: (enabled: boolean) => void;
   setFontSize: (size: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
@@ -143,6 +144,7 @@ export const useAppStore = create<AppStore>((set) => ({
   roomAgentActivities: {},
   creatingSessionProjectPath: null,
   defaultThinking: true,
+  defaultThinkingEffort: "on",
   defaultPlanMode: false,
   fontSize: 15,
   additionalWorkDirs: [],
@@ -200,7 +202,11 @@ export const useAppStore = create<AppStore>((set) => ({
       : {},
   })),
   setCreatingSessionProjectPath: (projectPath) => set({ creatingSessionProjectPath: projectPath }),
-  setDefaultThinking: (thinking) => set({ defaultThinking: thinking }),
+  setDefaultThinking: (thinking) => set({ defaultThinking: thinking, defaultThinkingEffort: thinking ? "on" : "off" }),
+  setDefaultThinkingEffort: (effort) => set({
+    defaultThinkingEffort: effort.trim() || "on",
+    defaultThinking: effort.trim().toLowerCase() !== "off",
+  }),
   setDefaultPlanMode: (enabled) => set({ defaultPlanMode: enabled }),
   setFontSize: (size) => set({ fontSize: Math.max(11, Math.min(20, Math.round(size))) }),
   setAdditionalWorkDirs: (dirs) => set({ additionalWorkDirs: dirs }),

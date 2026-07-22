@@ -175,6 +175,7 @@ import type {
   KimiCodeSetPlanModeRequest,
   KimiCodeSetModelRequest,
   KimiCodeSetSubagentRoutingRequest,
+  KimiCodeSetThinkingRequest,
   KimiCodeSubagentRoutingResponse,
   KimiCodeStatusPayload,
   KimiCodeStatusResponse,
@@ -397,6 +398,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:setPlanMode", req),
   setKimiCodeModel: (req: KimiCodeSetModelRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setModel", req),
+  setKimiCodeThinking: (req: KimiCodeSetThinkingRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:setThinking", req),
   setKimiCodeSubagentRouting: (req: KimiCodeSetSubagentRoutingRequest): Promise<KimiCodeSubagentRoutingResponse> =>
     ipcRenderer.invoke("kimi-code:setSubagentRouting", req),
   setKimiCodePermission: (req: KimiCodeSetPermissionRequest): Promise<KimiCodeVoidResponse> =>

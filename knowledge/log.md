@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Main-Agent thinking follows official model effort capabilities**: the composer now offers the current model's declared thinking levels, never invents an off state for always-thinking models, keeps legacy off/on fallback, and applies the persisted idle selection through the official session profile. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Experimental SDK features are rebased onto official release tags**: Kimix now builds subagent routing from the official Kimi Code `0.29.0` / Node SDK `0.14.0` tag and ports only PR #1996's targeted commits, avoiding unrelated drift and stale package metadata from the open PR branch. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Official Markdown agents belong to the v2 Server route**: Kimi Code `0.29.0` discovers project/user agent files and makes them available to Agent/Swarm without a Kimix dispatcher. Inherited subagent routing now remains on Server; selecting a dedicated model is an explicit legacy SDK compatibility tradeoff. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

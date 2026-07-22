@@ -344,6 +344,7 @@ export function LongTaskInspectorPanel({
   const setWorkspaceView = useAppStore((state) => state.setWorkspaceView);
   const setCurrentSession = useAppStore((state) => state.setCurrentSession);
   const defaultThinking = useAppStore((state) => state.defaultThinking);
+  const defaultThinkingEffort = useAppStore((state) => state.defaultThinkingEffort);
   const defaultPlanModeSetting = useAppStore((state) => state.defaultPlanMode);
   const permissionMode = useAppStore((state) => state.permissionMode);
   const additionalWorkDirs = useAppStore((state) => state.additionalWorkDirs);
@@ -596,6 +597,7 @@ export function LongTaskInspectorPanel({
       workDir: projectPathForKimi,
       sessionId: liveCurrentSession.officialSessionId ?? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.id,
       thinking: defaultThinking,
+      thinkingEffort: defaultThinkingEffort,
       yoloMode: permissionMode === "yolo",
       autoMode: permissionMode === "auto",
       planMode: defaultPlanModeSetting,

@@ -9,6 +9,7 @@ interface BootstrapSetters {
   setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
   setPermissionMode: (mode: PermissionMode) => void;
   setDefaultThinking: (v: boolean) => void;
+  setDefaultThinkingEffort: (v: string) => void;
   setDefaultPlanMode: (v: boolean) => void;
   setFontSize: (v: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
@@ -41,7 +42,7 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setCustomThemePalette(res.data.customThemePalette);
           setters.setKimiThemePalettes(res.data.kimiThemePalettes ?? []);
           setters.setPermissionMode(res.data.defaultPermissionMode);
-          setters.setDefaultThinking(res.data.defaultThinking);
+          setters.setDefaultThinkingEffort(res.data.defaultThinkingEffort ?? (res.data.defaultThinking ? "on" : "off"));
           setters.setDefaultPlanMode(res.data.defaultPlanMode);
           setters.setFontSize(res.data.fontSize);
           setters.setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);

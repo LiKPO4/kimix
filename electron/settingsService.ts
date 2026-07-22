@@ -9,6 +9,7 @@ const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: "kimi-code/kimi-for-coding",
   defaultThinking: true,
+  defaultThinkingEffort: "on",
   defaultPlanMode: false,
   maxTurns: 50,
   enableCompaction: true,
@@ -102,6 +103,8 @@ export function loadSettings(): AppSettings {
     const settings = {
       ...DEFAULT_SETTINGS,
       ...sanitizedRawSettings,
+      defaultThinkingEffort: sanitizedRawSettings.defaultThinkingEffort
+        ?? ((sanitizedRawSettings.defaultThinking ?? DEFAULT_SETTINGS.defaultThinking) ? "on" : "off"),
       fontSize: shouldMigrateLegacyFontSize ? 15 : sanitizedRawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
       fontSizeBaselineVersion: 1,
     };

@@ -158,6 +158,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultThinkingEffort = useAppStore((s) => s.defaultThinkingEffort);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
@@ -316,6 +317,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       const runtimeRes = await window.api.startKimiCodeRuntime({
         workDir: project.path,
         thinking: defaultThinking,
+        thinkingEffort: defaultThinkingEffort,
         yoloMode: permissionMode === "yolo",
         autoMode: permissionMode === "auto",
         planMode: defaultPlanMode,

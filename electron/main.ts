@@ -5977,6 +5977,19 @@ ipcMain.handle("kimi-code:setModel", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:setThinking", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const effort = typeof req.effort === "string" ? req.effort.trim() : "";
+    if (!sessionId || !effort) return { success: false, error: "Missing sessionId or effort" };
+    await kimiCodeHost.setThinking(sessionId, effort);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:setSubagentRouting", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
@@ -6578,7 +6591,7 @@ ipcMain.handle("kimi-code:setPluginMcpServerEnabled", async (_, request: unknown
   }
 });
 
-ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string; additionalWorkDirs?: string[]; additionalDirs?: string[] }) => {
+ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; sessionId?: string; model?: string; thinking?: boolean; thinkingEffort?: string; yoloMode?: boolean; autoMode?: boolean; planMode?: boolean; skillsDir?: string; agentFile?: string; additionalWorkDirs?: string[]; additionalDirs?: string[] }) => {
   try {
     const additionalDirs = normalizeAdditionalDirs(request.additionalDirs ?? request.additionalWorkDirs);
     const permission = request.yoloMode ? "yolo" as const : request.autoMode ? "auto" as const : "manual" as const;
@@ -6586,11 +6599,13 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
       normalizePathForComparison(path.resolve(a)) === normalizePathForComparison(path.resolve(b));
     const modelSummary = await readKimiModelConfigWithSdk().catch(() => readKimiModelConfig());
     const selectedModelAlias = request.model || modelSummary.defaultModel || undefined;
-    const thinking = isDeepSeekModelConfig(modelSummary, selectedModelAlias)
+    const rawThinkingEffort = typeof request.thinkingEffort === "string" ? request.thinkingEffort.trim() : "";
+    const requestedThinkingEffort = rawThinkingEffort && rawThinkingEffort !== "on" ? rawThinkingEffort : undefined;
+    const thinking = requestedThinkingEffort ?? (isDeepSeekModelConfig(modelSummary, selectedModelAlias)
       ? "off"
       : request.thinking === false
         ? "off"
-        : undefined;
+        : undefined);
     const createFresh = () => kimiCodeHost.createSession({
       workDir: request.workDir,
       model: selectedModelAlias,
@@ -7142,6 +7157,7 @@ const ThemePaletteColorsSchema = z.object({
 const SettingsSchema = z.object({
   defaultModel: z.string().optional(),
   defaultThinking: z.boolean().optional(),
+  defaultThinkingEffort: z.string().trim().min(1).max(40).optional(),
   defaultPlanMode: z.boolean().optional(),
   maxTurns: z.number().int().min(1).max(1000).optional(),
   enableCompaction: z.boolean().optional(),

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
+import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -30,6 +31,8 @@ import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/ut
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
+import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
+import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel } from "@/utils/thinkingEffort";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
 import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
@@ -486,8 +489,8 @@ export function Composer() {
   const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
-  const defaultThinking = useAppStore((s) => s.defaultThinking);
-  const setDefaultThinking = useAppStore((s) => s.setDefaultThinking);
+  const defaultThinkingEffort = useAppStore((s) => s.defaultThinkingEffort);
+  const setDefaultThinkingEffort = useAppStore((s) => s.setDefaultThinkingEffort);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
@@ -515,6 +518,11 @@ export function Composer() {
   const liveSession = useLiveSession(currentSession?.id);
 
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
+  const [showThinkingMenu, setShowThinkingMenu] = useState(false);
+  const [thinkingModelConfig, setThinkingModelConfig] = useState<KimiModelConfigSummary | null>(null);
+  const [thinkingServerCatalog, setThinkingServerCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
+  const [activeThinkingEffort, setActiveThinkingEffort] = useState(defaultThinkingEffort);
+  const [thinkingMenuLoading, setThinkingMenuLoading] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -533,6 +541,7 @@ export function Composer() {
   const [roomControlRequest, setRoomControlRequest] = useState<RoomControlRequest | null>(null);
 
   const permissionBtnRef = useRef<HTMLDivElement>(null);
+  const thinkingBtnRef = useRef<HTMLDivElement>(null);
   const addBtnRef = useRef<HTMLDivElement>(null);
   const roomControlMenuRef = useRef<HTMLDivElement>(null);
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -615,6 +624,27 @@ export function Composer() {
   const mutationPlanMode = activeSession?.collaboration
     ? activeMutationOwner?.agent.planMode ?? defaultPlanMode
     : activeSession?.planMode ?? defaultPlanMode;
+  const thinkingModelOptions = useMemo(
+    () => buildSessionModelOptions(thinkingModelConfig, thinkingServerCatalog),
+    [thinkingModelConfig, thinkingServerCatalog],
+  );
+  const mutationModelAlias = activeMutationOwner?.agent.switchedToModel
+    ?? activeMutationOwner?.agent.modelAlias
+    ?? activeSession?.switchedToModel
+    ?? (activeSession?.model && activeSession.model !== "Kimi Code SDK" ? activeSession.model : null)
+    ?? thinkingModelConfig?.defaultModel
+    ?? null;
+  const thinkingModelOption = thinkingModelOptions.find((option) => option.id === mutationModelAlias) ?? null;
+  const thinkingEffortOptions = useMemo(
+    () => buildThinkingEffortOptions(thinkingModelOption?.supportEfforts),
+    [thinkingModelOption?.supportEfforts],
+  );
+  const selectedThinkingEffort = resolveThinkingEffort(
+    activeThinkingEffort,
+    thinkingEffortOptions,
+    thinkingModelOption?.defaultEffort,
+  );
+  const thinkingEffortForSessionCreate = activeThinkingEffort === "on" ? undefined : activeThinkingEffort;
   const swarmModeEnabled = displayedSwarmMode(mutationSessionView);
   const swarmModePending = hasPendingSwarmMode(mutationSessionView);
   const canSteerActiveTurn = Boolean(
@@ -645,6 +675,9 @@ export function Composer() {
       if (permissionBtnRef.current && !permissionBtnRef.current.contains(e.target as Node)) {
         setShowPermissionMenu(false);
       }
+      if (thinkingBtnRef.current && !thinkingBtnRef.current.contains(e.target as Node)) {
+        setShowThinkingMenu(false);
+      }
       if (addBtnRef.current && !addBtnRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
@@ -662,7 +695,13 @@ export function Composer() {
 
   useEffect(() => {
     setRoomControlRequest(null);
+    setShowThinkingMenu(false);
+    setActiveThinkingEffort(defaultThinkingEffort);
   }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (!showThinkingMenu) setActiveThinkingEffort(defaultThinkingEffort);
+  }, [defaultThinkingEffort, showThinkingMenu]);
 
   useEffect(() => {
     if (!roomControlRequest) return;
@@ -1400,7 +1439,7 @@ export function Composer() {
       type: "assistant_message",
       timestamp: Date.now(),
       content: "",
-      isThinking: defaultThinking,
+      isThinking: activeThinkingEffort !== "off",
       isComplete: false,
       roomAgentId: primaryAgentId,
       roomMessageId: userEvent.id,
@@ -1572,6 +1611,13 @@ export function Composer() {
             if (!permissionRes.success) {
               throw new Error(`应用权限模式失败：${permissionRes.error}`);
             }
+            const thinkingRes = await window.api.setKimiCodeThinking({
+              sessionId: resumeRes.data.sessionId,
+              effort: activeThinkingEffort,
+            });
+            if (!thinkingRes.success) {
+              throw new Error(`应用思考强度失败：${thinkingRes.error}`);
+            }
             updateLinkStatus("消息发送中", "info");
             await applyDesiredSwarmMode(resumeRes.data.sessionId);
             await applyDesiredPrimarySubagentRouting(resumeRes.data.sessionId);
@@ -1585,6 +1631,7 @@ export function Composer() {
         const createRes = await window.api.createKimiCodeSession({
           workDir: targetSession.projectPath,
           model: targetSession.switchedToModel ?? targetSession.model ?? undefined,
+          thinking: thinkingEffortForSessionCreate,
           permission: permissionMode,
           planMode: defaultPlanMode,
           additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
@@ -1847,6 +1894,7 @@ export function Composer() {
     const createRes = await window.api.createKimiCodeSession({
       workDir: targetSession.projectPath,
       model: owner.agent.modelAlias ?? undefined,
+      thinking: thinkingEffortForSessionCreate,
       permission: owner.agent.permissionMode,
       planMode: owner.agent.planMode ?? defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
@@ -1885,6 +1933,7 @@ export function Composer() {
         id: agent.id,
         workDir: latest.projectPath,
         model: agent.modelAlias ?? undefined,
+        thinking: thinkingEffortForSessionCreate,
         permission: agent.permissionMode,
         planMode: agent.planMode ?? defaultPlanMode,
         additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
@@ -3430,6 +3479,64 @@ export function Composer() {
     void applyPermissionMode(pending.mode, pending.runtimeSessionId, pending.roomAgentId, traceId);
   }), [applyPermissionMode]);
 
+  const loadThinkingMenu = async () => {
+    setThinkingMenuLoading(true);
+    try {
+      const [configResult, catalogResult, statusResult] = await Promise.all([
+        window.api.getKimiModelConfig(),
+        window.api.getKimiCodeServerModelCatalog(),
+        activeRuntimeSessionId
+          ? window.api.getKimiCodeStatus({ sessionId: activeRuntimeSessionId })
+          : Promise.resolve(null),
+      ]);
+      if (configResult.success) setThinkingModelConfig(configResult.data);
+      if (catalogResult.success) setThinkingServerCatalog(catalogResult.data);
+      if (statusResult?.success && statusResult.data.thinkingLevel) {
+        setActiveThinkingEffort(statusResult.data.thinkingLevel);
+      } else {
+        setActiveThinkingEffort(defaultThinkingEffort);
+      }
+    } catch {
+      setActiveThinkingEffort(defaultThinkingEffort);
+    } finally {
+      setThinkingMenuLoading(false);
+    }
+  };
+
+  const toggleThinkingMenu = () => {
+    if (!hasUniqueMutationOwner && activeSession) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
+      return;
+    }
+    const next = !showThinkingMenu;
+    setShowPermissionMenu(false);
+    setShowAddMenu(false);
+    setShowThinkingMenu(next);
+    if (next) void loadThinkingMenu();
+  };
+
+  const handleSetThinkingEffort = async (requestedEffort: string) => {
+    if (isMutationOwnerRunning) return;
+    const effort = resolveThinkingEffort(requestedEffort, thinkingEffortOptions, thinkingModelOption?.defaultEffort);
+    const previousEffort = activeThinkingEffort;
+    setShowThinkingMenu(false);
+    setActiveThinkingEffort(effort);
+    setDefaultThinkingEffort(effort);
+    if (activeRuntimeSessionId) {
+      const result = await window.api.setKimiCodeThinking({ sessionId: activeRuntimeSessionId, effort });
+      if (!result.success) {
+        setActiveThinkingEffort(previousEffort);
+        setDefaultThinkingEffort(previousEffort);
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `思考强度切换失败：${result.error}` }));
+        return;
+      }
+    }
+    const ownerLabel = activeMutationOwner?.displayName;
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: `${ownerLabel ? `${ownerLabel} · ` : ""}思考强度已设为${thinkingEffortLabel(effort)}`,
+    }));
+  };
+
   const handleTogglePlanMode = async () => {
     if (!canTogglePlanMode) return;
     const owner = activeMutationOwner;
@@ -4365,36 +4472,80 @@ export function Composer() {
               <ClipboardList size={14} className="shrink-0" />
               <span>Plan</span>
             </button>
-            <button
-              disabled={!canUseComposer}
-              onClick={() => {
-                if (!canUseComposer) return;
-                const next = !defaultThinking;
-                setDefaultThinking(next);
-                window.dispatchEvent(new CustomEvent("kimix:toast", {
-                  detail: next ? "思考 开" : "思考 关",
-                }));
-              }}
-              className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
-              style={{
-                width: 76,
-                minWidth: 76,
-                fontSize: 13,
-                lineHeight: "20px",
-                gap: 6,
-                paddingLeft: 12,
-                paddingRight: 12,
-                borderColor: defaultThinking ? "var(--accent-primary-soft)" : "transparent",
-                backgroundColor: defaultThinking ? "var(--accent-primary-light)" : "transparent",
-                color: defaultThinking ? "var(--accent-primary-dark)" : undefined,
-                boxShadow: defaultThinking ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
-              }}
-              title={defaultThinking ? "关闭思考" : "开启思考"}
-              aria-pressed={defaultThinking}
-            >
-              <Brain size={14} className="shrink-0" />
-              <span>思考</span>
-            </button>
+            <div ref={thinkingBtnRef} className="relative shrink-0" style={{ width: 108 }}>
+              <button
+                disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
+                onClick={toggleThinkingMenu}
+                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden border disabled:cursor-not-allowed disabled:opacity-35"
+                style={{
+                  width: "100%",
+                  height: 34,
+                  minHeight: 34,
+                  fontSize: 13,
+                  lineHeight: "20px",
+                  gap: 6,
+                  paddingLeft: 12,
+                  paddingRight: 10,
+                  borderColor: activeThinkingEffort !== "off" ? "var(--accent-primary-soft)" : "transparent",
+                  backgroundColor: activeThinkingEffort !== "off" ? "var(--accent-primary-light)" : "transparent",
+                  color: activeThinkingEffort !== "off" ? "var(--accent-primary-dark)" : undefined,
+                  boxShadow: activeThinkingEffort !== "off" ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
+                }}
+                title={isMutationOwnerRunning
+                  ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可调整思考强度`
+                  : `思考强度：${thinkingEffortLabel(activeThinkingEffort)}`}
+                aria-haspopup="menu"
+                aria-expanded={showThinkingMenu}
+              >
+                <Brain size={14} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate">思考 · {thinkingEffortLabel(activeThinkingEffort)}</span>
+                <ChevronDown size={12} className="shrink-0" />
+              </button>
+              {showThinkingMenu && (
+                <ComposerToolbarPopover align="end" width={244} role="menu" aria-label="思考强度">
+                  <div className="flex flex-col" style={{ gap: 8 }}>
+                    {thinkingMenuLoading && thinkingModelOptions.length === 0 ? (
+                      <div className="flex min-h-10 items-center text-[13px] text-[var(--kimix-panel-text-muted)]" style={{ gap: 10, paddingLeft: 12, paddingRight: 12 }}>
+                        <Loader2 size={14} className="shrink-0 animate-spin" />
+                        <span>正在读取模型能力…</span>
+                      </div>
+                    ) : thinkingEffortOptions.map((option) => {
+                      const selected = selectedThinkingEffort === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={selected}
+                          onClick={() => void handleSetThinkingEffort(option.value)}
+                          className={`grid w-full items-center text-left hover:bg-[var(--kimix-panel-hover)] active:scale-[0.96] ${selected ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}
+                          style={{
+                            gridTemplateColumns: "16px minmax(0, 1fr) 16px",
+                            gap: 10,
+                            minHeight: 52,
+                            paddingLeft: 12,
+                            paddingRight: 12,
+                            paddingTop: 8,
+                            paddingBottom: 8,
+                            borderRadius: 10,
+                            transitionProperty: "background-color, scale",
+                            transitionDuration: "150ms",
+                            transitionTimingFunction: "ease-out",
+                          }}
+                        >
+                          <Brain size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-medium leading-5">{option.label}</span>
+                            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{option.description}</span>
+                          </span>
+                          {selected ? <Check size={14} className="shrink-0 text-[var(--kimix-panel-text)]" /> : <span aria-hidden="true" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </ComposerToolbarPopover>
+              )}
+            </div>
 
             <ContextRing />
             {isWindows() && (

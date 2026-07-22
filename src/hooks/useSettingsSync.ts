@@ -12,6 +12,7 @@ export function useSettingsSync() {
         state.kimiThemePalettes !== prev.kimiThemePalettes ||
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
+        state.defaultThinkingEffort !== prev.defaultThinkingEffort ||
         state.defaultPlanMode !== prev.defaultPlanMode ||
         state.fontSize !== prev.fontSize ||
         state.additionalWorkDirs !== prev.additionalWorkDirs ||
@@ -36,6 +37,7 @@ export function useSettingsSync() {
           kimiThemePalettes: state.kimiThemePalettes,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
+          defaultThinkingEffort: state.defaultThinkingEffort,
           defaultPlanMode: state.defaultPlanMode,
           fontSize: state.fontSize,
           additionalWorkDirs: state.additionalWorkDirs,

@@ -57,6 +57,7 @@ export function EmptyState() {
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const defaultThinking = useAppStore((s) => s.defaultThinking);
+  const defaultThinkingEffort = useAppStore((s) => s.defaultThinkingEffort);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
@@ -186,6 +187,7 @@ export function EmptyState() {
         updateLinkStatus("消息发送中", "info");
         const createRes = await window.api.createKimiCodeSession({
           workDir: targetSession.projectPath,
+          thinking: defaultThinkingEffort === "on" ? undefined : defaultThinkingEffort,
           permission: permissionMode,
           planMode: defaultPlanMode,
           additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),

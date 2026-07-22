@@ -173,6 +173,7 @@ export type StartSessionRequest = {
   sessionId?: string;
   model?: string;
   thinking?: boolean;
+  thinkingEffort?: string;
   yoloMode?: boolean;
   autoMode?: boolean;
   planMode?: boolean;
@@ -1463,6 +1464,7 @@ export type VoidResponse = {
 export type AppSettings = {
   defaultModel: string;
   defaultThinking: boolean;
+  defaultThinkingEffort?: string;
   defaultPlanMode: boolean;
   maxTurns: number;
   enableCompaction: boolean;
@@ -1892,6 +1894,11 @@ export type KimiCodeSetPlanModeRequest = {
 export type KimiCodeSetModelRequest = {
   sessionId: string;
   model: string;
+};
+
+export type KimiCodeSetThinkingRequest = {
+  sessionId: string;
+  effort: string;
 };
 
 export type KimiCodeSetSubagentRoutingRequest = {

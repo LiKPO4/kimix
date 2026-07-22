@@ -577,6 +577,8 @@ export function AppShell() {
       const sessionRes = await window.api.startKimiCodeRuntime({
         workDir: project.path,
         additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
+        thinking: useAppStore.getState().defaultThinking,
+        thinkingEffort: useAppStore.getState().defaultThinkingEffort,
       });
       if (!sessionRes.success) {
         deleteSession(placeholder.id);
@@ -1698,6 +1700,7 @@ ${isFinalStep
     const res = await window.api.createKimiCodeSession({
       workDir: targetSession.projectPath,
       model: owner.agent.modelAlias ?? undefined,
+      thinking: useAppStore.getState().defaultThinkingEffort === "on" ? undefined : useAppStore.getState().defaultThinkingEffort,
       permission: owner.agent.permissionMode,
       planMode: owner.agent.planMode ?? defaultPlanMode,
       additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
