@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Replay-derived file changes stay with their source tool turn**: snapshot replay previously regenerated random IDs for `change_summary` / `diff` and appended them at the timeline tail, so an older file-change card could appear under a newer provider-failed turn. Derived events now use source-stable IDs, inherit turn identity, and upsert beside the source tool; render grouping also repairs already-persisted legacy summaries by timestamped user boundaries. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **In-app update package list falls back to electron-builder latest.yml on API rate limits**: GitHub Releases Atom has no enclosure assets, so rate-limited clients previously reported that the update source had no installer list even when the Release page had Setup/exe packages. After API/Atom, Kimix merges `latest.yml` / `latest-mac.yml` / `latest-linux.yml` installer metadata (url, size, sha512) and accepts sha512 verification beside `SHA256SUMS.txt` sha256. See [/project/kimix.md](/project/kimix.md).
 
 * **Running-sample reconciliation must not fire on normal thinking silence**: the 4s-silence trigger fetched the entire official history over IPC and reconciled it on the main thread every ~4s during long thinking — the multi-second UI freeze and the burst body reveal. Now 30s silence with running status, with `runningSample.*` timeSync attribution. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

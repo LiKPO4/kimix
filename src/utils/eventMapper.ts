@@ -3,6 +3,7 @@ import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, is
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 import { logEvent } from "@/utils/reportError";
+import { normalizePathForComparison } from "./pathCase";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -464,11 +465,18 @@ function countTextLines(value: string): number {
   return value.split(/\r?\n/).filter((line) => line.length > 0).length;
 }
 
-function createChangeSummaryFromDiff(diff: Extract<TimelineEvent, { type: "diff" }>): TimelineEvent {
+function derivedEventId(sourceId: string, kind: string): string {
+  return `${sourceId}:${kind}`;
+}
+
+function createChangeSummaryFromDiff(
+  diff: Extract<TimelineEvent, { type: "diff" }>,
+  sourceId = diff.id,
+): TimelineEvent {
   const additions = Math.max(0, countTextLines(diff.newText) - countTextLines(diff.oldText));
   const deletions = Math.max(0, countTextLines(diff.oldText) - countTextLines(diff.newText));
   return {
-    id: generateId(),
+    id: derivedEventId(sourceId, "change-summary"),
     type: "change_summary",
     timestamp: diff.timestamp,
     files: [{ path: diff.filePath, additions, deletions }],
@@ -554,6 +562,7 @@ function extractDeletedPaths(toolName: string, args: Record<string, unknown>): s
 function createChangeSummaryFromToolCall(
   call: Extract<TimelineEvent, { type: "tool_call" }>,
   timestamp: number,
+  sourceId: string,
 ): TimelineEvent | null {
   const toolName = call.toolName.toLowerCase();
   const args = call.arguments ?? {};
@@ -567,30 +576,79 @@ function createChangeSummaryFromToolCall(
     const deletions = oldText ? Math.max(0, countTextLines(oldText) - countTextLines(newText ?? "")) : 0;
 
     return {
-      id: generateId(),
+      id: derivedEventId(sourceId, "change-summary"),
       type: "change_summary",
       timestamp,
       projectPath: call.display?.cwd,
       files: [{ path, additions, deletions }],
       additions,
       deletions,
+      roomAgentId: call.roomAgentId,
+      roomMessageId: call.roomMessageId,
+      agentTurnId: call.agentTurnId,
+      dispatchAttemptId: call.dispatchAttemptId,
     };
   }
 
   const deletedPaths = extractDeletedPaths(toolName, args);
   if (deletedPaths.length > 0) {
     return {
-      id: generateId(),
+      id: derivedEventId(sourceId, "change-summary"),
       type: "change_summary",
       timestamp,
       projectPath: call.display?.cwd,
       files: deletedPaths.map((path) => ({ path, additions: 0, deletions: 1 })),
       additions: 0,
       deletions: deletedPaths.length,
+      roomAgentId: call.roomAgentId,
+      roomMessageId: call.roomMessageId,
+      agentTurnId: call.agentTurnId,
+      dispatchAttemptId: call.dispatchAttemptId,
     };
   }
 
   return null;
+}
+
+function sameDerivedToolEvent(left: TimelineEvent, right: TimelineEvent): boolean {
+  if (left.id === right.id) return true;
+  if (left.type !== right.type || left.timestamp !== right.timestamp) return false;
+  if (left.type === "change_summary" && right.type === "change_summary") {
+    const signature = (event: typeof left) => event.files
+      .map((file) => `${normalizePathForComparison(file.path)}\u0000${file.additions ?? 0}\u0000${file.deletions ?? 0}`)
+      .sort()
+      .join("\u0001");
+    return signature(left) === signature(right);
+  }
+  if (left.type === "diff" && right.type === "diff") {
+    return normalizePathForComparison(left.filePath) === normalizePathForComparison(right.filePath) &&
+      left.oldText === right.oldText && left.newText === right.newText;
+  }
+  if (left.type === "todo" && right.type === "todo") {
+    return JSON.stringify(left.items) === JSON.stringify(right.items);
+  }
+  return false;
+}
+
+function upsertDerivedToolEvents(
+  existing: TimelineEvent[],
+  toolCallId: string,
+  additions: TimelineEvent[],
+): TimelineEvent[] {
+  if (additions.length === 0) return existing;
+  const result = existing.filter((event) => !additions.some((addition) => sameDerivedToolEvent(event, addition)));
+  const callIndex = result.findLastIndex((event) => event.type === "tool_call" && event.toolCallId === toolCallId);
+  if (callIndex === -1) {
+    const earliestTimestamp = Math.min(...additions.map((event) => event.timestamp));
+    const laterUserIndex = result.findIndex((event) => (
+      event.type === "user_message" && event.timestamp > earliestTimestamp
+    ));
+    if (laterUserIndex === -1) return appendAroundTrailingSteer(result, additions);
+    result.splice(laterUserIndex, 0, ...additions);
+    return result;
+  }
+  result.splice(callIndex + 1, 0, ...additions);
+  return result;
 }
 
 function appendAroundTrailingSteer(existing: TimelineEvent[], additions: TimelineEvent[]): TimelineEvent[] {
@@ -1873,15 +1931,19 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     );
     const diffEvent = incoming.display?.diff
       ? {
-          id: generateId(),
+          id: derivedEventId(incoming.id, "diff"),
           type: "diff" as const,
           timestamp: incoming.timestamp,
           filePath: incoming.display.diff.path,
           oldText: incoming.display.diff.oldText,
           newText: incoming.display.diff.newText,
+          roomAgentId: incoming.roomAgentId,
+          roomMessageId: incoming.roomMessageId,
+          agentTurnId: incoming.agentTurnId,
+          dispatchAttemptId: incoming.dispatchAttemptId,
         }
       : null;
-    const changeEvent = diffEvent ? createChangeSummaryFromDiff(diffEvent) : null;
+    const changeEvent = diffEvent ? createChangeSummaryFromDiff(diffEvent, incoming.id) : null;
     const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
     const displayEvents = [...(changeEvent ? [changeEvent] : []), ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
     if (callIndex !== -1) {
@@ -1903,10 +1965,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         result: incoming.result,
         durationMs: isRecoveryInterruption ? undefined : Math.max(0, incoming.timestamp - call.timestamp),
       };
-      const fallbackChangeEvent = displayEvents.length === 0 ? createChangeSummaryFromToolCall(call, incoming.timestamp) : null;
-      return appendAroundTrailingSteer(result, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
+      const fallbackChangeEvent = displayEvents.length === 0
+        ? createChangeSummaryFromToolCall(call, incoming.timestamp, incoming.id)
+        : null;
+      return upsertDerivedToolEvents(result, incoming.toolCallId, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
     }
-    if (displayEvents.length > 0) return appendAroundTrailingSteer(existing, displayEvents);
+    if (displayEvents.length > 0) return upsertDerivedToolEvents(existing, incoming.toolCallId, displayEvents);
   }
 
   if (incoming.type === "subagent") {

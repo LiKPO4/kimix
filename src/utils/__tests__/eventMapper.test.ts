@@ -1324,6 +1324,71 @@ describe("mergeEvents", () => {
     expect(change.additions).toBe(2);
   });
 
+  it("keeps replayed changes beside their original tool instead of attaching them to a later failed turn", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user-old", type: "user_message", timestamp: 1, content: "修改文件", agentTurnId: "turn-old" },
+      {
+        id: "snapshot:tool-call-old",
+        type: "tool_call",
+        timestamp: 2,
+        toolCallId: "tc-old",
+        toolName: "Edit",
+        status: "success",
+        arguments: { path: "TASK_STATE.md", old_string: "a", new_string: "a\nb" },
+        agentTurnId: "turn-old",
+      },
+      { id: "assistant-old", type: "assistant_message", timestamp: 4, content: "完成", isThinking: false, isComplete: true, agentTurnId: "turn-old" },
+      { id: "user-failed", type: "user_message", timestamp: 10, content: "继续检查", agentTurnId: "turn-failed" },
+      { id: "error-failed", type: "error", timestamp: 11, message: "503 auth_unavailable", source: "sdk", agentTurnId: "turn-failed" },
+    ];
+    const replayedResult: TimelineEvent = {
+      id: "snapshot:tool-result-old",
+      type: "tool_result",
+      timestamp: 3,
+      toolCallId: "tc-old",
+      toolName: "Edit",
+      result: "Replaced 1 occurrence",
+      agentTurnId: "turn-old",
+    };
+
+    const once = mergeEvents(existing, replayedResult);
+    const twice = mergeEvents(once, replayedResult);
+    const changeIndexes = twice.flatMap((event, index) => event.type === "change_summary" ? [index] : []);
+    const failedUserIndex = twice.findIndex((event) => event.id === "user-failed");
+
+    expect(changeIndexes).toHaveLength(1);
+    expect(changeIndexes[0]).toBeLessThan(failedUserIndex);
+    expect(twice[changeIndexes[0]]).toMatchObject({
+      agentTurnId: "turn-old",
+      files: [{ path: "TASK_STATE.md" }],
+    });
+  });
+
+  it("keeps an orphaned historical diff before a later user boundary", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user-old", type: "user_message", timestamp: 1, content: "修改文件" },
+      { id: "assistant-old", type: "assistant_message", timestamp: 4, content: "完成", isThinking: false, isComplete: true },
+      { id: "user-new", type: "user_message", timestamp: 10, content: "继续检查" },
+      { id: "error-new", type: "error", timestamp: 11, message: "503 auth_unavailable", source: "sdk" },
+    ];
+    const replayedResult: TimelineEvent = {
+      id: "snapshot:orphan-result",
+      type: "tool_result",
+      timestamp: 3,
+      toolCallId: "missing-call",
+      toolName: "Edit",
+      result: "Replaced 1 occurrence",
+      display: { diff: { path: "TASK_STATE.md", oldText: "a", newText: "a\nb" } },
+    };
+
+    const merged = mergeEvents(existing, replayedResult);
+    const changeIndex = merged.findIndex((event) => event.type === "change_summary");
+    const newUserIndex = merged.findIndex((event) => event.id === "user-new");
+
+    expect(changeIndex).toBeGreaterThanOrEqual(0);
+    expect(changeIndex).toBeLessThan(newUserIndex);
+  });
+
   it("only records quoted deletion paths before shell chaining", () => {
     const existing: TimelineEvent[] = [
       {

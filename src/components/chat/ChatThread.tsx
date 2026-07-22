@@ -654,6 +654,28 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
   };
 }
 
+function restoreLateHistoricalChangePlacement(events: TimelineEvent[]): TimelineEvent[] {
+  let repaired: TimelineEvent[] | null = null;
+  for (let sourceIndex = 0; sourceIndex < events.length; sourceIndex += 1) {
+    const event = events[sourceIndex];
+    const target: TimelineEvent[] = repaired ?? events.slice(0, sourceIndex);
+    if (event.type !== "change_summary") {
+      if (repaired) repaired.push(event);
+      continue;
+    }
+    const laterUserIndex = target.findIndex((candidate) => (
+      candidate.type === "user_message" && candidate.timestamp > event.timestamp
+    ));
+    if (laterUserIndex === -1) {
+      if (repaired) repaired.push(event);
+      continue;
+    }
+    target.splice(laterUserIndex, 0, event);
+    repaired = target;
+  }
+  return repaired ?? events;
+}
+
 function assistantFailureContent(message: string): string {
   if (/insufficient balance|余额不足/i.test(message)) {
     return "模型请求失败：第三方模型账户余额不足。请充值该 Provider 账户，或切换到其他可用模型后重试。";
@@ -673,6 +695,7 @@ export function buildRenderItems(
   completedTurnCache?: Map<string, CompletedTurnRenderCacheEntry>,
   primaryRoomAgentId?: string,
 ): RenderItem[] {
+  events = restoreLateHistoricalChangePlacement(events);
   const items: RenderItem[] = [];
   const usedCompletedTurnCacheKeys = new Set<string>();
 

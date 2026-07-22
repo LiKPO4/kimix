@@ -365,6 +365,63 @@ describe("buildRenderItems usage footer", () => {
     expect(items.some((item) => item.type === "event" && item.event.type === "error")).toBe(false);
   });
 
+  it("keeps a late-replayed historical change summary out of a newer failed turn", () => {
+    const items = buildRenderItems([{
+      id: "user-old-change",
+      type: "user_message",
+      timestamp: 1,
+      content: "修改文件",
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "assistant-old-change",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "修改完成",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "user-new-failure",
+      type: "user_message",
+      timestamp: 10,
+      content: "继续检查",
+      agentTurnId: "turn-new-failure",
+    }, {
+      id: "error-new-failure",
+      type: "error",
+      timestamp: 11,
+      message: "503 auth_unavailable",
+      source: "sdk",
+      agentTurnId: "turn-new-failure",
+    }, {
+      // Legacy snapshot replay used to append this old derived event at the
+      // physical tail without turn identity, despite its historical timestamp.
+      id: "legacy-random-change-summary",
+      type: "change_summary",
+      timestamp: 3,
+      files: [{ path: "TASK_STATE.md", additions: 23, deletions: 0 }],
+      additions: 23,
+      deletions: 0,
+    }], "kimi-code");
+
+    const oldAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "修改完成"
+    ));
+    const failedAssistant = items.find((item) => (
+      item.type === "event" && item.event.id === "assistant-failed-user-new-failure"
+    ));
+
+    expect(oldAssistant?.type).toBe("event");
+    expect(failedAssistant?.type).toBe("event");
+    if (oldAssistant?.type !== "event" || failedAssistant?.type !== "event") return;
+    expect(oldAssistant.changeSummary?.files).toEqual([{
+      path: "TASK_STATE.md",
+      additions: 23,
+      deletions: 0,
+    }]);
+    expect(failedAssistant.changeSummary).toBeUndefined();
+  });
+
   it("keeps the Assistant header during the primary room send-to-first-model-event gap", () => {
     const primaryAgentId = "room-agent:primary";
     const items = buildRenderItems([{
