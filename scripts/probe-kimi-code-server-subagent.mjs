@@ -3,7 +3,7 @@
 // 证据写入 docs/kimi-code-subagent-probe-result.md。
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -34,6 +34,7 @@ const authHeaders = { authorization: `Bearer ${token}`, "x-kimi-server-token": t
 let server;
 let ownsServer = false;
 let serverVersion = existingServerLock?.host_version;
+let probeWorkspace;
 
 async function req(p, options = {}) {
   const r = await fetch(`${baseUrl}/api/v1${p}`, {
@@ -62,7 +63,7 @@ async function startServer() {
   }
 
   ownsServer = true;
-  server = spawn(kimi, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
+  server = spawn(kimi, ["web", "--no-open", "--port", String(port), "--log-level", "warn"], {
     stdio: ["ignore", "ignore", "pipe"], windowsHide: true, shell: false,
   });
   check("server startup mode", true, { mode: "spawned", pid: server.pid, port });
@@ -79,6 +80,18 @@ async function waitMainCompleted(sessionId, promptId, timeoutMs = 240_000) {
 }
 
 async function main() {
+  probeWorkspace = await mkdtemp(path.join(os.tmpdir(), "kimix-custom-agent-probe-"));
+  const agentDir = path.join(probeWorkspace, ".kimi-code", "agents");
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(path.join(agentDir, "kimix-probe.md"), `---
+name: kimix-probe
+description: Kimix custom-agent discovery probe
+whenToUse: Only when explicitly requested by the Kimix probe
+tools: []
+---
+
+You are the Kimix custom-agent discovery probe. Your final response must be exactly CUSTOM_AGENT_PROBE_OK.
+`, "utf8");
   await startServer();
   for (let i = 0; i < 40; i++) {
     if (server?.exitCode !== null && server?.exitCode !== undefined) {
@@ -97,7 +110,7 @@ async function main() {
 
   const session = await req("/sessions", {
     method: "POST",
-    body: JSON.stringify({ title: "subagent probe", metadata: { cwd: repoRoot, source: "kimix-subagent-probe" } }),
+    body: JSON.stringify({ title: "subagent probe", metadata: { cwd: probeWorkspace, source: "kimix-subagent-probe" } }),
   });
   await req(`/sessions/${session.id}/profile`, { method: "POST", body: JSON.stringify({ agent_config: { model, permission_mode: "yolo" } }) });
 
@@ -160,6 +173,21 @@ async function main() {
     subagentsType: Array.isArray(snapshot?.subagents) ? `array(${snapshot.subagents.length})` : typeof snapshot?.subagents,
   });
 
+  // 阶段 3：验证 0.29.0 的 Markdown 自定义 Agent 能被主 Agent 自动发现并作为子代理调用。
+  const customPrompt = await req(`/sessions/${session.id}/prompts`, {
+    method: "POST",
+    body: JSON.stringify({
+      content: [{ type: "text", text: "Use the Agent tool exactly once with subagent_type kimix-probe. Ask it to follow its system prompt. After it completes, reply with the single word CUSTOM_MAIN_DONE." }],
+    }),
+  });
+  check("custom-agent prompt completed", await waitMainCompleted(session.id, customPrompt.prompt_id), {});
+  const customSpawned = frames.find((f) => f.type === "subagent.spawned" && f.payload?.subagentName === "kimix-probe")?.payload;
+  check("custom Markdown agent discovered and spawned", Boolean(customSpawned), customSpawned ? {
+    subagentId: customSpawned.subagentId,
+    subagentName: customSpawned.subagentName,
+    parentAgentId: customSpawned.parentAgentId,
+  } : undefined);
+
   await req(`/sessions/${session.id}:archive`, { method: "POST", body: "{}" });
   ws.close();
 }
@@ -175,6 +203,7 @@ try {
     await new Promise((r) => setTimeout(r, 1_500));
     server?.kill();
   }
+  if (probeWorkspace) await rm(probeWorkspace, { recursive: true, force: true });
   const lines = [
     `# Kimi Code ${serverVersion ?? "unknown"} 子代理/工具事件探针`,
     "",

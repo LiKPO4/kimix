@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-22T18:12:00+08:00"
+timestamp: "2026-07-22T18:39:00+08:00"
 ---
 
 # Runtime Routing
@@ -114,6 +114,8 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 69. One official runtime identity has at most one visible local owner. Model switching, resume, creation, migration, queued-prompt recovery, and inspector recovery bind the intended conversation and archive an exact empty same-project catalog mirror in one state transaction. Catalog reconciliation prefers the stable content-bearing local conversation over that empty mirror, but never archives or selects between multiple content-bearing owners by array order. Incoming events and statuses route only to a unique owner, or to the unique owner with an active matching turn; unresolved ambiguity is logged and rejected instead of filling another conversation's timeline. This preserves the original pending Assistant, model metadata, timer, and stop lifecycle while preventing a duplicate empty conversation from receiving the completion.
 70. External model configuration has split read authority. `config.toml` is authoritative for the existence and fields of user-managed OpenAI-compatible Providers and model aliases because a Server/SDK reload may temporarily return its pre-write in-memory snapshot even after persistence succeeds. Runtime configuration may enrich matching external entries with dynamic credential capabilities and may add official managed Providers/models that are intentionally absent from TOML. It must not reintroduce an external Provider or model removed from disk. Save responses and ordinary refreshes use this same merge so additions appear immediately and deletions remain deleted.
 71. Subagent routing is owned by one concrete conversation Agent. The selected owner stores a session-level default model and thinking effort for newly spawned Agent and AgentSwarm children; an active turn records a desired value and applies it immediately before the next prompt. `/btw` continues to inherit the main model. Existing children keep the model and effort captured at their original spawn across resume and retry, so changing the default never mutates an established child conversation. A Server-backed owner migrates the same official session ID to the SDK route before applying this SDK-only capability, and the one-runtime/one-visible-owner invariant still applies. The setter is atomic from the renderer's perspective: if either model or effort fails, both values roll back. `subagent.spawned` records the effective model and effort for historical audit, and a deleted configured model becomes an explicit unavailable selection rather than silently falling back.
+72. Vendored SDK refreshes start from an official release tag, never from the head tree of an open feature PR. For `0.29.0`, the official Node SDK is `0.14.0`, while PR #1996 still reports `0.13.4` and contains unrelated branch-tree drift. Kimix therefore ports only the six dual-model-routing commits onto tag `8bf5bacb`, then applies its sticky resume/retry and spawn-audit patch. This keeps official release fixes and package metadata authoritative while retaining the experimental capability until upstream merges it.
+73. Kimi Code `0.29.0` Markdown custom agents are a v2 Server capability, distinct from dual-model routing. The Server automatically discovers user/project `agents/*.md` profiles and exposes them to `Agent` and `AgentSwarm`; Kimix must not build a second dispatcher. The legacy Node SDK compatibility route does not expose that v2 profile catalog. Clearing or inheriting subagent model/effort therefore stays on the official Server route, while an explicit dedicated model/effort remains an opt-in compatibility route and the UI must disclose that Markdown custom agents are unavailable there.
 
 # Main Components
 
@@ -137,6 +139,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 * [Kimi Code 0.27 Server probe](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-server-probe-result.md)
 * [Kimi Code 0.27 subagent probe](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-subagent-probe-result.md)
 * [Kimi Code dual-model-routing PR #1996](https://github.com/MoonshotAI/kimi-code/pull/1996)
+* [Kimi Code custom agent files PR #1735](https://github.com/MoonshotAI/kimi-code/pull/1735)
 * [Kimi Code slash commands](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/slash-commands.html)
 * [Kimi Code custom themes](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/themes.html)
 * [Kimi Web subagent activity component](https://github.com/MoonshotAI/kimi-cli/blob/main/web/src/components/ai-elements/subagent-steps.tsx)

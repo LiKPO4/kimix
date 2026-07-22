@@ -1914,7 +1914,9 @@ export function LongTaskInspectorPanel({
                           ? "正在读取模型目录…"
                           : subagentCatalogError
                             ? "模型目录读取失败"
-                            : "用于 Agent 与 Swarm 的新任务；BTW 继续使用主模型。"}
+                            : subagentModelDraft || subagentThinkingDraft
+                              ? "独立模型使用兼容路由；官方 Markdown Agent 请保持跟随主 Agent。"
+                              : "官方 0.29 会自动发现项目与用户目录中的 Markdown Agent。"}
                       </div>
                       <button
                         type="button"

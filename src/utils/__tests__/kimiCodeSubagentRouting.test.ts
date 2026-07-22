@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { applySubagentRoutingAtomic } from "../../../electron/kimiCodeHost";
+import { applySubagentRoutingAtomic, hasExplicitSubagentRouting } from "../../../electron/kimiCodeHost";
+
+describe("hasExplicitSubagentRouting", () => {
+  it("keeps inherited routing on the official Server path", () => {
+    expect(hasExplicitSubagentRouting({})).toBe(false);
+    expect(hasExplicitSubagentRouting({ modelAlias: "  ", thinkingEffort: "" })).toBe(false);
+    expect(hasExplicitSubagentRouting({ modelAlias: "glm-5.2" })).toBe(true);
+    expect(hasExplicitSubagentRouting({ thinkingEffort: "high" })).toBe(true);
+  });
+});
 
 describe("applySubagentRoutingAtomic", () => {
   it("applies model and thinking effort and returns the refreshed status", async () => {

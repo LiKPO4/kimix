@@ -1,5 +1,9 @@
 # Kimix Knowledge Update Log
 
+* **Experimental SDK features are rebased onto official release tags**: Kimix now builds subagent routing from the official Kimi Code `0.29.0` / Node SDK `0.14.0` tag and ports only PR #1996's targeted commits, avoiding unrelated drift and stale package metadata from the open PR branch. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Official Markdown agents belong to the v2 Server route**: Kimi Code `0.29.0` discovers project/user agent files and makes them available to Agent/Swarm without a Kimix dispatcher. Inherited subagent routing now remains on Server; selecting a dedicated model is an explicit legacy SDK compatibility tradeoff. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Subagent defaults are session/Agent-owned, next-turn aware, and auditable**: the selected conversation Agent can route newly spawned Agent and AgentSwarm children to a dedicated model and thinking effort; active turns queue the change, existing children keep their original model on resume/retry, `/btw` stays on the main model, and spawn events record the effective choice. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **External model existence follows persisted TOML, not a stale runtime snapshot**: Server/SDK config writes can reach disk before reload updates the in-memory model map. Settings reads now merge disk-authoritative external Providers/models with runtime-only managed models and dynamic credential capabilities, without reviving deleted external entries. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

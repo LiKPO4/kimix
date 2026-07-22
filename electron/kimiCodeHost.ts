@@ -1169,6 +1169,10 @@ export async function setSubagentRouting(
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
+    // Keeping both values inherited must stay on the official v2 Server route:
+    // Kimi Code 0.29 discovers Markdown custom agents there automatically,
+    // while the Node SDK compatibility route still runs the legacy engine.
+    if (!hasExplicitSubagentRouting(routing)) return getStatus(sessionId);
     await migrateServerSessionToSdk(sessionId, serverManaged, {
       pinToSdk: true,
       runningMessage: "当前轮正在运行，子 Agent 配置将在下一轮应用。",
@@ -1183,6 +1187,10 @@ export async function setSubagentRouting(
   const status = await applySubagentRoutingAtomic(managed.session, routing);
   sdkPinnedSessionIds.add(sessionId);
   return normalizeSdkSessionStatus(status, managed.status);
+}
+
+export function hasExplicitSubagentRouting(routing: { modelAlias?: string; thinkingEffort?: string }): boolean {
+  return Boolean(routing.modelAlias?.trim() || routing.thinkingEffort?.trim());
 }
 
 export async function applySubagentRoutingAtomic(

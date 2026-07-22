@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 v2.16.103 子 Agent 路由切换到官方 0.29.0 底座
+
+- 核对：本机官方 CLI 已升级到 `0.29.0`；Release 新增 v2 自定义 Agent、委派约束与工具门禁，但未合并仍为 Open 的 dual-model-routing PR #1996。
+- 修正：vendored Node SDK 不再直接取 PR 分支的 `0.13.4` 树，而是以官方 `0.29.0` tag（Node SDK `0.14.0`）为干净底座，仅移植 PR #1996 的 6 个功能提交。
+- 保留：Kimix 的旧子 Agent sticky resume/retry 与 `subagent.spawned` 实际模型/思考强度审计补丁继续叠加。
+- 官方验证：legacy agent-core 66 项、agent-core-v2 45 项、Node SDK 15 项定向测试通过；Node SDK 完整构建通过。
+- 自定义 Agent：官方 Server 真实探针 14/14 通过，临时项目中的 `.kimi-code/agents/kimix-probe.md` 被自动发现并以 `subagentName=kimix-probe` 启动。
+- 路由边界：保持“跟随主 Agent”不会再迁移到 legacy SDK，继续保留官方 v2 Markdown Agent；只有明确选择独立模型/思考强度才进入兼容路由，侧栏会提示这一取舍。
+
 ## 2026-07-22 v2.16.102 会话级子 Agent 模型配置
 
 - 新增：会话侧栏在 Kimi Code 与 Git 之间提供“子 Agent”卡片，可为当前单一会话 Agent 设置新子 Agent 默认模型与思考强度。
