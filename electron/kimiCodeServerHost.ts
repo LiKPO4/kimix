@@ -92,7 +92,7 @@ function readServerToken() {
   }
 }
 
-function serverAuthHeaders(): Record<string, string> {
+export function serverAuthHeaders(): Record<string, string> {
   const token = readServerToken();
   return token ? { authorization: `Bearer ${token}`, "x-kimi-server-token": token } : {};
 }

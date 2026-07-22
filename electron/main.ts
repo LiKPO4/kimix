@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, protocol, session, shell } from "electron";
 import type { MessageBoxOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -11,7 +11,7 @@ import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { loadSessionHistoryWithFallback } from "./sessionHistoryFallback";
-import { kimiCodeServerHost } from "./kimiCodeServerHost";
+import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
@@ -4247,8 +4247,8 @@ function createWindow() {
         ...details.responseHeaders,
         "Content-Security-Policy": [
           DEV_SERVER_URL
-            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline' data:; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*;"
-            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline' data:; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';"
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline' data:; img-src 'self' data: blob:; media-src 'self' kimix-media: data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*;"
+            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline' data:; img-src 'self' data: blob:; media-src 'self' kimix-media: data: blob:; font-src 'self' data:; connect-src 'self';"
         ],
       },
     });
@@ -7665,7 +7665,51 @@ if (!app.isPackaged || process.env.KIMIX_REMOTE_DEBUGGING === "1") {
   app.commandLine.appendSwitch("remote-allow-origins", "http://127.0.0.1:9222");
 }
 
+
+const KIMIX_MEDIA_FILE_ID = /^f_[A-Za-z0-9-]+$/;
+const KIMIX_MEDIA_MIME = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i;
+
+// 历史官方文件流式代理：fileId → ~/.kimi-code/files/<fileId> → 官方 fs:content（ETag + Range）。
+// 仅 Server 路由可用；渲染进程保留整段 dataUrl 加载作为回退路径（SDK 路由不受影响）。
+async function handleKimixMediaRequest(request: Request): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    if (url.hostname !== "server-file") return new Response("Unknown kimix-media host", { status: 404 });
+    const fileId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    if (!KIMIX_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
+    const filesDir = path.join(os.homedir(), ".kimi-code", "files");
+    const filePath = path.join(filesDir, fileId);
+    if (path.dirname(filePath) !== filesDir || !fs.existsSync(filePath)) return new Response("File not found", { status: 404 });
+    if (!kimiCodeServerHost.isReady()) return new Response("Kimi Server 未就绪", { status: 503 });
+    const endpoint = kimiCodeServerHost.getStatus().endpoint;
+    const range = request.headers.get("range");
+    const upstream = await net.fetch(`${endpoint}/api/v1/fs:content?path=${encodeURIComponent(filePath)}`, {
+      headers: { ...serverAuthHeaders(), ...(range ? { range } : {}) },
+    });
+    if (!upstream.ok && upstream.status !== 206) {
+      return new Response(`fs:content upstream HTTP ${upstream.status}`, { status: upstream.status === 404 ? 404 : 502 });
+    }
+    const mimeHint = url.searchParams.get("mime") ?? "";
+    const headers = new Headers();
+    headers.set("Content-Type", KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : upstream.headers.get("content-type") ?? "application/octet-stream");
+    for (const key of ["content-length", "content-range", "etag", "last-modified"]) {
+      const value = upstream.headers.get(key);
+      if (value) headers.set(key, value);
+    }
+    headers.set("Accept-Ranges", "bytes");
+    return new Response(upstream.body, { status: upstream.status, headers });
+  } catch (error) {
+    return new Response(`media proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 502 });
+  }
+}
+
+// kimix-media 协议：历史官方文件（视频等）经官方 fs:content 端点流式播放（ETag + Range，支持拖动）
+protocol.registerSchemesAsPrivileged([
+  { scheme: "kimix-media", privileges: { standard: true, secure: true, stream: true, bypassCSP: true } },
+]);
+
 app.whenReady().then(() => {
+  protocol.handle("kimix-media", (request) => handleKimixMediaRequest(request));
   logMainStartup("app-ready");
   cleanupStaleScheduledShutdown();
   createWindow();

@@ -67,9 +67,30 @@
 - `pnpm typecheck` 通过；vitest 全量通过。
 - 释放态展示依赖 `agent.disposed` 实际到达（多在会话收尾），按类型与条件渲染静态自查；待用户截图验收。
 
-## 项 3：`fs:content` Range 播放（待处理）
+## 项 3：`fs:content` Range 播放（已完成）
 
-计划：历史视频/文件播放改用 `GET /api/v1/fs:content`（ETag + Range），替换"整段读取转 data URL"；仅 Server 路由，SDK 路由保持现有行为。
+### 探针实测（0.29.0 真实 Server）
+
+- `GET /api/v1/fs:content?path=<绝对路径>`：200 + ETag，扩展名缺失的存储文件返回 `application/octet-stream`。
+- Range 请求 `bytes=0-1023` → **206 + Content-Range**，真实可用（实测 20MB MP4 只回 1024 字节）。
+- 官方文件存储布局实测为 `~/.kimi-code/files/<file_id>`（无扩展名），fileId → 绝对路径映射稳定。
+- 对照：`/api/v1/files/<file_id>` 对历史存储文件返回 404（code 40407），覆盖不如 fs:content。
+
+### 改动
+
+- `electron/kimiCodeServerHost.ts`：`serverAuthHeaders` 导出复用。
+- `electron/main.ts`：注册特权协议 `kimix-media`（`standard/secure/stream/bypassCSP`）；`protocol.handle` 新增流式代理——校验 fileId（`^f_[A-Za-z0-9-]+$`）与存储目录边界后，经 `net.fetch` 转发官方 `fs:content?path=…`（携带 bearer token 与原始 Range 头），透传 206/Content-Range/ETag/Content-Length，补 `Accept-Ranges: bytes`；Content-Type 优先取渲染进程附件元数据里的 `?mime=` 提示（正则校验），回退上游 octet-stream。CSP dev/prod 两条均加 `media-src 'self' kimix-media: data: blob:`。
+- `index.html`：meta CSP 同步加 `media-src`。
+- `src/components/chat/MessageBubble.tsx`：`VideoAttachmentThumb` 在 fileId 存在时直接挂载 `kimix-media://server-file/<fileId>?mime=…`（保留点击加载门槛，不预加载）；`<video>` 播放失败自动回退原整段 dataUrl IPC 路径一次。SDK 路由（无 fileId）行为不变。
+
+### 验证（生产构建 + CDP 实测）
+
+- `pnpm build` 后以 `--fast` 启动生产应用，CDP 在真实渲染进程内创建 `<video>` 挂载流式地址：
+  - `loadedmetadata`：duration 11.92s、1920×1080、readyState 4、无错误（代理与 Content-Type hint 生效）。
+  - seek 至中点 5.96s：`seeked` 成功——未缓冲区域 seek 必须靠 Range 请求取回，流式拖动链路实证可用。
+- 期间发现并修正：fetch() 走 `connect-src` 且自定义 scheme 需 `supportFetchAPI`，但 `<video>` 媒体元素走 `media-src` 且不受 CORS 限制——最终仅保留 `media-src` 增量，`connect-src` 已回滚并复测通过。
+- `pnpm typecheck` 通过；vitest 全量通过。
+- 待用户截图验收：历史视频点击后的播放器表现与拖动。
 
 ## 项 4：Provider 配置兼容验证（待处理）
 

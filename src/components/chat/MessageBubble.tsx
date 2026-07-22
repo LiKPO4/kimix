@@ -380,10 +380,21 @@ function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index
     if (nextSource) setSource(nextSource);
   }, [image.dataUrl, image.url]);
 
-  const loadVideo = async () => {
-    if (source || loading || !image.fileId) return;
-    setLoading(true);
+  // Server 路由：挂载 kimix-media 流式地址，由主进程经官方 fs:content 按 Range 拉取；失败回退整段 dataUrl
+  const streamUrl = image.fileId
+    ? `kimix-media://server-file/${encodeURIComponent(image.fileId)}?mime=${encodeURIComponent(image.mediaType ?? "")}`
+    : "";
+
+  const loadVideo = async (useFallback = false) => {
+    if (loading || !image.fileId) return;
+    if (!useFallback && source) return;
+    if (useFallback && !source.startsWith("kimix-media://")) return;
     setError("");
+    if (!useFallback && streamUrl) {
+      setSource(streamUrl);
+      return;
+    }
+    setLoading(true);
     try {
       const response = await window.api.loadKimiCodeFile({ fileId: image.fileId });
       if (!response.success) {
@@ -411,6 +422,12 @@ function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index
           preload="metadata"
           className="kimix-media-preview h-full w-full bg-black object-contain"
           aria-label={`播放视频 ${image.name}`}
+          onError={() => {
+            if (source.startsWith("kimix-media://")) {
+              setSource("");
+              void loadVideo(true);
+            }
+          }}
         />
       ) : (
         <button
