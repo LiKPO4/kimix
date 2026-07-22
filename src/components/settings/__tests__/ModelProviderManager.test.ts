@@ -1,4 +1,4 @@
-import { act, createElement } from "react";
+import { act, createElement, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { KimiModelConfigSummary } from "@electron/types/ipc";
@@ -37,6 +37,20 @@ async function renderManager(config: KimiModelConfigSummary, onConfigChange = vi
 
 function buttonByText(container: HTMLElement, text: string) {
   return Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === text);
+}
+
+function StatefulManager({ initialConfig, onConfigChange }: {
+  initialConfig: KimiModelConfigSummary;
+  onConfigChange: (config: KimiModelConfigSummary, message: string) => void;
+}) {
+  const [config, setConfig] = useState(initialConfig);
+  return createElement(ModelProviderManager, {
+    config,
+    onConfigChange: (next, message) => {
+      setConfig(next);
+      onConfigChange(next, message);
+    },
+  });
 }
 
 describe("ModelProviderManager", () => {
@@ -137,6 +151,47 @@ describe("ModelProviderManager", () => {
     });
     expect(getKimiModelConfig).toHaveBeenCalledTimes(1);
     expect(onConfigChange).toHaveBeenCalledWith(createdConfig, "已保存 Provider 连接配置");
+    await act(async () => root.unmount());
+  });
+
+  it("keeps a successful model deletion visible when the immediate SDK reload is stale", async () => {
+    const modelA = {
+      alias: "gateway/model-a",
+      provider: "gateway",
+      model: "model-a",
+      displayName: "gateway/model-a",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+    };
+    const modelB = { ...modelA, alias: "gateway/model-b", model: "model-b", displayName: "gateway/model-b", isDefault: false };
+    const beforeDelete: KimiModelConfigSummary = { ...emptyProviderConfig, defaultModel: modelA.alias, models: [modelA, modelB] };
+    const afterDelete: KimiModelConfigSummary = { ...beforeDelete, models: [modelA] };
+    const removeKimiModelConfig = vi.fn().mockResolvedValue({
+      success: true,
+      data: { ...afterDelete, message: "已删除模型配置" },
+    });
+    const getKimiModelConfig = vi.fn().mockResolvedValue({ success: true, data: beforeDelete });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { removeKimiModelConfig, getKimiModelConfig },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onConfigChange = vi.fn();
+    await act(async () => root.render(createElement(StatefulManager, { initialConfig: beforeDelete, onConfigChange })));
+
+    const removeButton = container.querySelector('button[aria-label="删除 gateway/model-b"]') as HTMLButtonElement;
+    await act(async () => removeButton.click());
+
+    expect(removeKimiModelConfig).toHaveBeenCalledWith({ modelAlias: "gateway/model-b" });
+    expect(getKimiModelConfig).toHaveBeenCalledTimes(1);
+    expect(onConfigChange).toHaveBeenCalledTimes(1);
+    expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ models: [modelA] }), "已删除模型配置");
+    expect(container.textContent).not.toContain("gateway/model-b");
+    expect(container.textContent).toContain("后台配置仍在同步");
     await act(async () => root.unmount());
   });
 });

@@ -57,6 +57,14 @@ function providerDisplayName(name: string) {
   return name;
 }
 
+function modelConfigFingerprint(config: KimiModelConfigSummary) {
+  return JSON.stringify({
+    defaultModel: config.defaultModel,
+    providers: [...config.providers].sort((left, right) => left.name.localeCompare(right.name)),
+    models: [...config.models].sort((left, right) => left.alias.localeCompare(right.alias)),
+  });
+}
+
 export function ModelProviderManager({ config, onConfigChange }: Props) {
   const groups = useMemo(() => groupModelsByProvider(config), [config]);
   const [selectedProviderName, setSelectedProviderName] = useState(() => chooseInitialModelProvider(config));
@@ -106,13 +114,19 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const applyConfigResult = async (next: KimiModelConfigSummary & { message?: string }, fallbackMessage: string) => {
     const savedMessage = next.message || fallbackMessage;
+    const { message: _message, ...writtenConfig } = next;
+    // 写入响应来自刚完成的持久化操作，必须先显示；SDK/Server 的 reload 可能短暂返回旧缓存。
+    onConfigChange(writtenConfig, savedMessage);
+    setMessage(savedMessage);
     const refreshed = await window.api.getKimiModelConfig().catch((error) => ({
       success: false as const,
       error: error instanceof Error ? error.message : String(error),
     }));
-    const nextConfig = refreshed.success ? refreshed.data : next;
-    const nextMessage = refreshed.success ? savedMessage : `${savedMessage}；即时刷新失败：${refreshed.error}`;
-    onConfigChange(nextConfig, nextMessage);
+    const refreshMatchesWrite = refreshed.success
+      && modelConfigFingerprint(refreshed.data) === modelConfigFingerprint(next);
+    const nextMessage = refreshed.success
+      ? (refreshMatchesWrite ? savedMessage : `${savedMessage}；后台配置仍在同步`)
+      : `${savedMessage}；即时刷新失败：${refreshed.error}`;
     setMessage(nextMessage);
     window.dispatchEvent(new CustomEvent("kimix:kimi-model-config-changed"));
   };

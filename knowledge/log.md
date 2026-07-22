@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Model-config mutation results outrank an immediately stale SDK reload**: Provider/model writes update the settings view before the convergence read. If SDK/Server briefly returns the pre-mutation snapshot, Kimix retains the successful write result instead of restoring deleted models or hiding additions. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **External Provider models are discovered from the authenticated OpenAI-compatible endpoint**: Kimix derives a bounded `/models` or `/v1/models` candidate from the configured Base URL, parses only real returned IDs, and keeps the request plus API Key in the main process. Provider/model saves are followed by a fresh SDK/disk read before UI broadcast. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **File-change cards preserve real statistics and immutable preview ownership**: equal-line replacements now use an exact line edit path, missing upstream counts remain unknown, and clicking a file row expands its stable structured diff or a uniquely matched Git commit patch. Same-path diffs from later turns and ambiguous commit windows are rejected rather than guessed. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
