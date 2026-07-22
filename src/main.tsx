@@ -302,6 +302,16 @@ function installBrowserPreviewApi() {
     }),
     saveKimiProvider: () => previewModelConfigMutation("浏览器预览已模拟保存 Provider"),
     saveKimiProviderModel: () => previewModelConfigMutation("浏览器预览已模拟保存模型"),
+    discoverKimiProviderModels: () => Promise.resolve({
+      success: true as const,
+      data: {
+        endpoint: "https://api.deepseek.com/v1/models",
+        models: [
+          { id: "deepseek-chat", ownedBy: "deepseek" },
+          { id: "deepseek-reasoner", ownedBy: "deepseek" },
+        ],
+      },
+    }),
     setKimiDefaultModel: () => Promise.resolve({
       success: true,
       data: {

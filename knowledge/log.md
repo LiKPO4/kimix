@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **External Provider models are discovered from the authenticated OpenAI-compatible endpoint**: Kimix derives a bounded `/models` or `/v1/models` candidate from the configured Base URL, parses only real returned IDs, and keeps the request plus API Key in the main process. Provider/model saves are followed by a fresh SDK/disk read before UI broadcast. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **File-change cards preserve real statistics and immutable preview ownership**: equal-line replacements now use an exact line edit path, missing upstream counts remain unknown, and clicking a file row expands its stable structured diff or a uniquely matched Git commit patch. Same-path diffs from later turns and ambiguous commit windows are rejected rather than guessed. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Active retries reject older history replay and preserve complete turn metrics**: snapshot recovery replays full history before live frames; older or unowned history can no longer attach to the active retry, completed tools are idempotent by official call ID, and cache v14 safely removes persisted duplicates only with complete canonical identity coverage. Retry placeholders carry the requested model. Footer usage dimensions merge within one user turn, so a context-only update no longer erases model/input/output. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

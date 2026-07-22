@@ -433,6 +433,28 @@ export type SaveKimiProviderModelRequest = {
   makeDefault?: boolean;
 };
 
+export type DiscoverKimiProviderModelsRequest = {
+  providerName: string;
+  baseUrl: string;
+  apiKey?: string;
+};
+
+export type DiscoveredKimiProviderModel = {
+  id: string;
+  ownedBy: string | null;
+};
+
+export type DiscoverKimiProviderModelsResponse = {
+  success: true;
+  data: {
+    endpoint: string;
+    models: DiscoveredKimiProviderModel[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type SetKimiDefaultModelRequest = {
   modelAlias: string;
 };

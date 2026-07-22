@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import type {
+  DiscoveredKimiProviderModel,
   KimiModelAliasSummary,
   KimiModelConfigSummary,
   KimiProviderCatalogEntrySummary,
@@ -64,7 +65,9 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createModelDraft());
   const [catalog, setCatalog] = useState<KimiProviderCatalogEntrySummary[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
-  const [busyAction, setBusyAction] = useState<"provider" | "model" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
+  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredKimiProviderModel[]>([]);
+  const [discoveredEndpoint, setDiscoveredEndpoint] = useState("");
+  const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
   const [message, setMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -96,14 +99,20 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         ?? selectedGroup.models.find((model) => model.isDefault)
         ?? selectedGroup.models[0]
         ?? null;
-      setModelDraft(createModelDraft(nextModel));
+      setModelDraft((currentDraft) => nextModel ? createModelDraft(nextModel) : (currentDraft.model ? currentDraft : createModelDraft()));
       return nextModel?.alias ?? "";
     });
   }, [isCreatingProvider, selectedGroup]);
 
-  const applyConfigResult = (next: KimiModelConfigSummary & { message?: string }, fallbackMessage: string) => {
-    const nextMessage = next.message || fallbackMessage;
-    onConfigChange(next, nextMessage);
+  const applyConfigResult = async (next: KimiModelConfigSummary & { message?: string }, fallbackMessage: string) => {
+    const savedMessage = next.message || fallbackMessage;
+    const refreshed = await window.api.getKimiModelConfig().catch((error) => ({
+      success: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    const nextConfig = refreshed.success ? refreshed.data : next;
+    const nextMessage = refreshed.success ? savedMessage : `${savedMessage}；即时刷新失败：${refreshed.error}`;
+    onConfigChange(nextConfig, nextMessage);
     setMessage(nextMessage);
     window.dispatchEvent(new CustomEvent("kimix:kimi-model-config-changed"));
   };
@@ -111,6 +120,9 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleSelectProvider = (providerName: string) => {
     setSelectedProviderName(providerName);
     setSelectedModelAlias("");
+    setModelDraft(createModelDraft());
+    setDiscoveredModels([]);
+    setDiscoveredEndpoint("");
     setMessage("");
   };
 
@@ -119,6 +131,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setSelectedModelAlias("");
     setProviderDraft({ providerName: "", baseUrl: "", apiKey: "" });
     setModelDraft(createModelDraft());
+    setDiscoveredModels([]);
+    setDiscoveredEndpoint("");
     setMessage("先保存供应商连接配置，再在下方添加一个或多个模型。");
   };
 
@@ -143,6 +157,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       providerName: provider.providerId,
       baseUrl: provider.baseUrl ?? current.baseUrl,
     }));
+    setDiscoveredModels([]);
+    setDiscoveredEndpoint("");
     const firstModel = provider.models[0];
     if (firstModel) {
       setModelDraft({
@@ -169,6 +185,40 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     return Number.isInteger(value) && value >= 1 && value <= 1048576 ? value : null;
   };
 
+  const handleDiscoverModels = async () => {
+    if (!providerDraft.providerName.trim() || !providerDraft.baseUrl.trim()) {
+      setMessage("请先填写供应商名称和 Base URL。");
+      return;
+    }
+    setBusyAction("discover");
+    setMessage("正在从 Base URL 探测可用模型...");
+    const res = await window.api.discoverKimiProviderModels({
+      providerName: providerDraft.providerName.trim(),
+      baseUrl: providerDraft.baseUrl.trim(),
+      apiKey: providerDraft.apiKey.trim() || undefined,
+    });
+    setBusyAction(null);
+    if (!res.success) {
+      setDiscoveredModels([]);
+      setDiscoveredEndpoint("");
+      setMessage(`模型探测失败：${res.error}`);
+      return;
+    }
+    setDiscoveredModels(res.data.models);
+    setDiscoveredEndpoint(res.data.endpoint);
+    setMessage(`已从接口发现 ${res.data.models.length} 个模型，请直接选择。`);
+  };
+
+  const handleDiscoveredModel = (modelId: string) => {
+    if (!modelId) return;
+    setSelectedModelAlias("");
+    setModelDraft((current) => ({
+      modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
+      model: modelId,
+      maxContextSize: current.maxContextSize || String(DEFAULT_CONTEXT_SIZE),
+    }));
+  };
+
   const handleSaveProvider = async () => {
     if (!providerDraft.providerName.trim() || !providerDraft.baseUrl.trim()) {
       setMessage("请填写供应商名称和 Base URL。");
@@ -181,14 +231,15 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       baseUrl: providerDraft.baseUrl.trim(),
       apiKey: providerDraft.apiKey.trim() || undefined,
     });
-    setBusyAction(null);
     if (!res.success) {
+      setBusyAction(null);
       setMessage(`保存失败：${res.error}`);
       return;
     }
     const providerName = providerDraft.providerName.trim();
     setSelectedProviderName(providerName);
-    applyConfigResult(res.data, "已保存 Provider 连接配置");
+    await applyConfigResult(res.data, "已保存 Provider 连接配置");
+    setBusyAction(null);
   };
 
   const handleSaveModel = async () => {
@@ -209,13 +260,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       model: modelDraft.model.trim(),
       maxContextSize: contextSize,
     });
-    setBusyAction(null);
     if (!res.success) {
+      setBusyAction(null);
       setMessage(`模型保存失败：${res.error}`);
       return;
     }
     setSelectedModelAlias(modelDraft.modelAlias.trim());
-    applyConfigResult(res.data, "已保存 Provider 模型");
+    await applyConfigResult(res.data, "已保存 Provider 模型");
+    setBusyAction(null);
   };
 
   const handleTestProvider = async () => {
@@ -249,7 +301,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       setMessage(`切换失败：${res.error}`);
       return;
     }
-    applyConfigResult(res.data, "已切换使用模型");
+    await applyConfigResult(res.data, "已切换使用模型");
   };
 
   const handleToggleThinking = async (model: KimiModelAliasSummary) => {
@@ -263,7 +315,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       setMessage(`更新思考设置失败：${res.error}`);
       return;
     }
-    applyConfigResult(res.data, "已更新自适应思考");
+    await applyConfigResult(res.data, "已更新自适应思考");
   };
 
   const handleRemoveModel = async (model: KimiModelAliasSummary) => {
@@ -276,7 +328,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       return;
     }
     setSelectedModelAlias("");
-    applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
+    await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
   };
 
   const handleRemoveProvider = async () => {
@@ -291,7 +343,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       return;
     }
     setSelectedProviderName(chooseInitialModelProvider(res.data));
-    applyConfigResult(res.data, "已删除 Provider 及其模型");
+    await applyConfigResult(res.data, "已删除 Provider 及其模型");
   };
 
   const handleSelectModel = (model: KimiModelAliasSummary) => {
@@ -388,7 +440,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 <input
                   value={providerDraft.providerName}
                   disabled={!isCreatingProvider}
-                  onChange={(event) => setProviderDraft((current) => ({ ...current, providerName: event.target.value }))}
+                  onChange={(event) => {
+                    setProviderDraft((current) => ({ ...current, providerName: event.target.value }));
+                    setDiscoveredModels([]);
+                    setDiscoveredEndpoint("");
+                  }}
                   className="kimix-settings-input h-9 w-full text-[13px] outline-none"
                   style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }}
                   placeholder="例如 openai"
@@ -408,7 +464,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
               <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Base URL</span>
               <input
                 value={providerDraft.baseUrl}
-                onChange={(event) => setProviderDraft((current) => ({ ...current, baseUrl: event.target.value }))}
+                onChange={(event) => {
+                  setProviderDraft((current) => ({ ...current, baseUrl: event.target.value }));
+                  setDiscoveredModels([]);
+                  setDiscoveredEndpoint("");
+                }}
                 className="kimix-settings-input h-9 w-full text-[13px] outline-none"
                 style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }}
                 placeholder="https://api.example.com/v1"
@@ -435,6 +495,37 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 </button>
               </div>
             </label>
+
+            <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
+              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[12.5px] font-medium text-text-primary">从 Base URL 探测模型</div>
+                  <div className="kimix-settings-permission-desc">调用 OpenAI-compatible models 接口，返回当前 Key 实际可用的模型</div>
+                </div>
+                <button type="button" onClick={() => void handleDiscoverModels()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:opacity-55">
+                  <RefreshCw size={13} className={busyAction === "discover" ? "kimix-spin" : ""} />
+                  {discoveredModels.length ? "重新探测" : "探测模型"}
+                </button>
+              </div>
+              {discoveredModels.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <select
+                    value={discoveredModels.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""}
+                    onChange={(event) => handleDiscoveredModel(event.target.value)}
+                    className="kimix-settings-input h-9 w-full text-[13px] outline-none"
+                    style={{ paddingLeft: 12, paddingRight: 12 }}
+                  >
+                    <option value="">选择探测到的模型（{discoveredModels.length}）</option>
+                    {discoveredModels.map((model) => (
+                      <option key={model.id} value={model.id}>{model.id}{model.ownedBy ? ` · ${model.ownedBy}` : ""}</option>
+                    ))}
+                  </select>
+                  <div className="truncate text-[11px] leading-5 text-text-muted" style={{ marginTop: 6, paddingLeft: 2, paddingRight: 2 }} title={discoveredEndpoint}>
+                    来源：{discoveredEndpoint}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {isCreatingProvider && (
               <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>

@@ -31,6 +31,7 @@ import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import { activateWindow } from "./windowActivation";
+import { discoverOpenAiModels } from "./providerModelDiscovery";
 import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
 import {
   createDeferredOnceTask,
@@ -1397,6 +1398,12 @@ const SaveProviderModelConfigSchema = z.object({
   makeDefault: z.boolean().optional(),
 });
 
+const DiscoverProviderModelsSchema = z.object({
+  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  baseUrl: z.string().trim().url(),
+  apiKey: z.string().trim().max(4096).optional(),
+});
+
 async function saveProviderConfigWithSdk(input: unknown) {
   const config = SaveProviderConfigSchema.parse(input);
   ensureKimiCodeMigratedConfig();
@@ -1761,6 +1768,19 @@ async function testOpenAiProviderConfig(input: unknown) {
       // 临时目录清理失败不影响测试结果
     }
   }
+}
+
+async function discoverProviderModels(input: unknown) {
+  const config = DiscoverProviderModelsSchema.parse(input);
+  const configPath = getKimiPaths().config;
+  const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  let apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(current, config.providerName);
+  if (!apiKey) {
+    const savedProvider = (await kimiCodeHost.getConfig({ reload: true }).catch(() => null))?.providers?.[config.providerName];
+    apiKey = savedProvider?.apiKey?.trim() || savedProvider?.env?.OPENAI_API_KEY?.trim() || null;
+  }
+  if (!apiKey) throw new Error("API Key 为空，无法探测模型列表。");
+  return discoverOpenAiModels({ baseUrl: config.baseUrl, apiKey });
 }
 
 function summarizeKimiPromptOutput(output: string) {
@@ -5479,6 +5499,14 @@ ipcMain.handle("kimi:doctorConfig", async () => {
 ipcMain.handle("kimi:listProviderCatalog", async () => {
   try {
     return { success: true, data: { providers: await kimiCodeHost.listProviderCatalog() } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:discoverProviderModels", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await discoverProviderModels(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

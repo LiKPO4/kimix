@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-22T15:40:00+08:00"
+timestamp: "2026-07-22T16:00:00+08:00"
 ---
 
 # Runtime Routing
@@ -110,6 +110,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 65. A prompt owns one immutable model from dispatch through retries. The renderer sends `switchedToModel ?? modelAlias` with the prompt, including the interval while an explicit model mutation is still in flight; the Host serializes session model mutations before dispatch and uses that expected model for output-limit checks and Server prompt controls. Background `/status` reads capture a model revision before I/O and may update or expose their model only if no newer mutation started. A stale response that returns during a mutation exposes no model, and one that returns after the mutation uses the committed managed model, preventing an old Flash status from overriding or routing a newly selected Pro turn.
 66. Events derived from a replayed tool result are owned by that source tool, not by replay arrival order. `diff`, `change_summary`, and similar presentation events use deterministic IDs derived from the stable tool-result ID, inherit its room/message/turn/dispatch identity, and are idempotently upserted beside the matching tool call. They must never be blindly appended after a later user boundary. For timelines already persisted by older builds, a legacy identity-less change summary whose timestamp predates a later user message is moved before that boundary for render grouping only; the historical body and other causal order remain untouched. A provider-failed turn with no tool call therefore cannot inherit file changes from an earlier successful turn.
 67. A file-change summary is an immutable turn record, not a view of the current worktree. Equal-line replacements use a real line edit path and count as both additions and deletions; absent upstream statistics remain unknown instead of becoming zero. A structured summary references its exact diff event identity. When only a historical path summary survives, preview recovery accepts an explicit commit or one unique commit touching that path inside the bounded event window, then reads its patch and numstat from that commit. Ambiguous history never falls back to another turn's same-path diff; current-worktree fallback is limited to a newly created event. Turn aggregation retains source summary IDs so preview persistence and revert target the owning events without parsing composite display IDs.
+68. External OpenAI-compatible Provider discovery uses the authenticated models endpoint instead of a hard-coded model list. The main process requests `{base}/models` and only adds `{base}/v1/models` as a bounded fallback when the configured path has no version segment; it accepts only returned model IDs, caps response size and count, and never guesses capability or context metadata. After Provider or model mutations, the renderer re-reads the SDK/disk configuration before broadcasting a model-config change, so settings and session selectors converge on persisted state rather than a mutation echo.
 
 # Main Components
 
@@ -135,3 +136,5 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 * [Kimi Code slash commands](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/slash-commands.html)
 * [Kimi Code custom themes](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/themes.html)
 * [Kimi Web subagent activity component](https://github.com/MoonshotAI/kimi-cli/blob/main/web/src/components/ai-elements/subagent-steps.tsx)
+* [OpenAI Models API](https://platform.openai.com/docs/api-reference/models/list)
+* [Ollama OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility)

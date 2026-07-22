@@ -26,6 +26,8 @@ import type {
   KimiOpenAiProviderConfigRequest,
   SaveKimiProviderRequest,
   SaveKimiProviderModelRequest,
+  DiscoverKimiProviderModelsRequest,
+  DiscoverKimiProviderModelsResponse,
   CheckKimiCliUpdateResponse,
   KimiLoginResponse,
   KimiLogoutResponse,
@@ -283,6 +285,8 @@ const api = {
     ipcRenderer.invoke("kimi:saveProvider", req),
   saveKimiProviderModel: (req: SaveKimiProviderModelRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:saveProviderModel", req),
+  discoverKimiProviderModels: (req: DiscoverKimiProviderModelsRequest): Promise<DiscoverKimiProviderModelsResponse> =>
+    ipcRenderer.invoke("kimi:discoverProviderModels", req),
   setKimiDefaultModel: (req: SetKimiDefaultModelRequest): Promise<SaveKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:setDefaultModel", req),
   setKimiModelAdaptiveThinking: (req: SetKimiModelAdaptiveThinkingRequest): Promise<SaveKimiModelConfigResponse> =>
