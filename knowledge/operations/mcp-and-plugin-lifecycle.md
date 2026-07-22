@@ -4,7 +4,7 @@ title: MCP and Plugin Lifecycle
 description: Safe rules for configuring ordinary MCP servers and updating plugin-provided MCP servers without self-locking managed directories.
 resource: https://github.com/LiKPO4/kimix/blob/master/src/components/layout/McpPanel.tsx
 tags: [mcp, plugins, operations, troubleshooting]
-timestamp: "2026-06-19T00:00:00+08:00"
+timestamp: "2026-07-22T23:30:00+08:00"
 ---
 
 # MCP and Plugin Lifecycle
@@ -16,6 +16,7 @@ Kimix distinguishes ordinary MCP configuration from MCP servers bundled inside a
 * Ordinary entries are maintained in the Kimi Code `mcp.json` file with a backup before mutation.
 * Writing a plugin MCP into `mcp.json` is a legacy compatibility action, not a prerequisite for Kimix or Kimi Code to use the plugin-provided server.
 * The Kimi Code 0.18.0 CLI does not expose supported `kimi mcp ...` management subcommands, so Kimix must not fabricate that command path.
+* Since Kimi Code 0.29, a dropped MCP connection is reconnected automatically when one of its tools is called, with a single retry of the call; Kimix treats that brief reconnect as ordinary tool activity, not a startup failure.
 
 # Plugin-Provided MCP Servers
 

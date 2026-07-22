@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 Kimi Code 0.29.0 全量跟进（目标驱动）
+
+- 范围：0.29 剩余跟进六项（思考强度 v2.16.104、视频 v2.16.105 已完成在先）。全程记录 `docs/kimi-code-0.29-followup.md`。
+- 项1：`ServerTool`/`KimiCodeServerToolInfo` 接入 `/api/v1/tools` 的 `active`；MCP 面板工具目录区分"被策略禁用"（徽标+置灰+计数）；字段缺省按可用。
+- 项2：`agent.created/disposed` 帧按会话跟踪（本地观测时间）+ 快照 `subagents`（官方时间）合并进运行时诊断 `agents`；MCP 面板新增 Agent 生命周期卡；不渲染聊天卡片。
+- 项3：新增 `kimix-media` 特权协议，历史官方视频经 0.29 `fs:content`（ETag+Range）流式播放，替换整段 dataUrl；播放失败回退原 IPC 一次；CSP 增 `media-src kimix-media:`。生产构建 CDP 实测 loadedmetadata 与中点 seeked 成功。
+- 项4：隔离临时 home 验证 0.29 v2 配置层重构与 Kimix 直写 config.toml 双向兼容（官方解析 Kimix 形状、目录列出别名、官方写入可复扫、无 [platforms]/platformId、merge 不破坏托管块）；无需代码改动。
+- 项5：goal 续跑 prompt 泄漏三层证据齐全（SDK 解析跳过无 type 记录、0.29 快照对真实污染会话零泄漏、transcript 续跑 turn 标记 origin.kind=other 且文本消失），结论不需要兜底。
+- 项6：#1970 双路由验证通过（Server :abort 20ms 结算零重试帧；SDK cancel reason=cancelled 零 retry 事件）。立项观察：`prompt()` 等待器不认 `prompt.aborted` 拼写，Esc 后 dispatch promise 延迟至 180s 空闲恢复才收场（无用户可见阻塞），建议后续单独修复。
+- 知识库：runtime-routing 不变量 39 底座更正为 0.29.0/0.14.0，新增 74-76（kimix-media 流式、工具 active、Agent 生命周期诊断）；MCP 生命周期补 0.29 自动重连说明。
+
 ## 2026-07-22 v2.16.105 视频直接输入
 
 - 目标：让粘贴、选择和拖入的视频作为官方多模态内容发送，不再把视频伪装成需要 Agent 自行读取的普通文件路径。

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Kimi Code 0.29 follow-up adds streaming media and diagnostics surfaces**: historical official file media now plays through the `kimix-media` protocol backed by the official `fs:content` Range endpoint with a one-shot whole-file fallback; runtime diagnostics expose each tool's `active` policy flag and an Agent lifecycle list (snapshot subagent times plus observed `agent.created`/`agent.disposed`); the vendored runtime baseline is pinned to the official `0.29.0` tag. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Video prompts stay on the official multimodal content path**: local video bytes are uploaded once and sent as official file-backed video parts; snapshot replay preserves video-only turns, and historical file references download lazily only when playback is requested. SDK compatibility routes materialize those references only when needed. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Main-Agent thinking follows official model effort capabilities**: the composer now offers the current model's declared thinking levels, never invents an off state for always-thinking models, keeps legacy off/on fallback, and applies the persisted idle selection through the official session profile. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
