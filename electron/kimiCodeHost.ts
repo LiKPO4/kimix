@@ -226,6 +226,7 @@ export type KimiCodeServerRuntimeDiagnostics = {
     source: "builtin" | "skill" | "mcp";
     mcpServerId?: string;
     inputSchema: unknown;
+    active?: boolean;
   }>;
   mcpServers: KimiCodeMcpServerInfo[];
   connections: Array<{
@@ -1735,6 +1736,7 @@ export async function getServerRuntimeDiagnostics(sessionId: string): Promise<Ki
       source: tool.source,
       mcpServerId: tool.mcp_server_id,
       inputSchema: tool.input_schema,
+      active: tool.active,
     })),
     mcpServers: mcpServers.map(toKimiCodeMcpServerInfo),
     connections: connections.map((connection) => ({

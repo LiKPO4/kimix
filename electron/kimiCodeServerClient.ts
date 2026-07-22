@@ -187,6 +187,8 @@ export type ServerTool = {
   input_schema: unknown;
   source: "builtin" | "skill" | "mcp";
   mcp_server_id?: string;
+  // Kimi Code 0.29+：false 表示已注册但被 Agent 工具策略禁用；旧 Server 无此字段，按可用处理
+  active?: boolean;
 };
 
 export type ServerConnection = {

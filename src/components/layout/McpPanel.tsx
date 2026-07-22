@@ -272,6 +272,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     counts[tool.source] += 1;
     return counts;
   }, { builtin: 0, skill: 0, mcp: 0 }) ?? { builtin: 0, skill: 0, mcp: 0 };
+  const disabledToolCount = runtimeDiagnostics?.tools.reduce((count, tool) => count + (tool.active === false ? 1 : 0), 0) ?? 0;
   const subscribedConnectionCount = runtimeDiagnostics?.connections.filter((connection) => connection.subscribedToCurrentSession).length ?? 0;
   const visibleRuntimeTools = toolsExpanded ? runtimeDiagnostics?.tools ?? [] : runtimeDiagnostics?.tools.slice(0, 8) ?? [];
 
@@ -709,7 +710,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                           <div className="min-w-0">
                             <div className="text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">会话有效工具目录</div>
                             <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 3 }}>
-                              共 {runtimeDiagnostics.tools.length} 个工具 · {runtimeDiagnostics.connections.length} 个活跃客户端
+                              共 {runtimeDiagnostics.tools.length} 个工具{disabledToolCount > 0 ? ` · ${disabledToolCount} 个被策略禁用` : ""} · {runtimeDiagnostics.connections.length} 个活跃客户端
                             </div>
                           </div>
                           {runtimeDiagnostics.tools.length > 8 && (
@@ -728,10 +729,17 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                             {visibleRuntimeTools.map((tool) => (
                               <div key={`${tool.source}:${tool.mcpServerId ?? ""}:${tool.name}`} className="rounded-lg bg-surface-base" style={{ padding: "10px 12px" }}>
                                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8 }}>
-                                  <div className="truncate text-[12.5px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={tool.name}>{tool.name}</div>
-                                  <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                    {tool.source === "builtin" ? "内置" : tool.source === "skill" ? "Skill" : "MCP"}
-                                  </span>
+                                  <div className={`truncate text-[12.5px] font-medium leading-5 ${tool.active === false ? "text-[var(--kimix-panel-text-muted)]" : "text-[var(--kimix-panel-text)]"}`} title={tool.name}>{tool.name}</div>
+                                  <div className="flex items-center" style={{ gap: 6 }}>
+                                    {tool.active === false && (
+                                      <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }} title="已注册但被当前 Agent 工具策略禁用">
+                                        已禁用
+                                      </span>
+                                    )}
+                                    <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                      {tool.source === "builtin" ? "内置" : tool.source === "skill" ? "Skill" : "MCP"}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="line-clamp-2 text-[11.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }} title={tool.description}>
                                   {tool.description || "无说明"}

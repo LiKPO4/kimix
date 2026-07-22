@@ -1619,6 +1619,8 @@ export type KimiCodeServerToolInfo = {
   source: "builtin" | "skill" | "mcp";
   mcpServerId?: string;
   inputSchema: unknown;
+  // Kimi Code 0.29+；false = 已注册但被 Agent 工具策略禁用，缺省按可用处理
+  active?: boolean;
 };
 
 export type KimiCodeServerConnectionInfo = {
