@@ -154,6 +154,36 @@ function isAbandonedEmptyMirror(session: Session, projectPath: string) {
     Date.now() - session.createdAt >= EMPTY_SESSION_CREATION_GRACE_MS;
 }
 
+function isExactEmptyRuntimeMirror(session: Session, runtimeSessionId: string, projectPath: string | undefined) {
+  return !session.archivedAt &&
+    !session.collaboration &&
+    !session.longTask &&
+    session.id === runtimeSessionId &&
+    normalizeProjectPath(session.projectPath) === normalizeProjectPath(projectPath) &&
+    officialSessionIds(session).includes(runtimeSessionId) &&
+    session.events.length === 0;
+}
+
+export function claimRuntimeSessionOwnership(
+  sessions: Session[],
+  ownerSessionId: string,
+  runtimeSessionId: string,
+  updateOwner: (session: Session) => Session,
+  now = Date.now(),
+): Session[] {
+  const ownerIndex = sessions.findIndex((session) => session.id === ownerSessionId && !session.archivedAt);
+  if (ownerIndex < 0) return sessions;
+  const updatedOwner = updateOwner(sessions[ownerIndex]);
+  let changed = updatedOwner !== sessions[ownerIndex];
+  const next = sessions.map((session, index) => {
+    if (index === ownerIndex) return updatedOwner;
+    if (!isExactEmptyRuntimeMirror(session, runtimeSessionId, updatedOwner.projectPath)) return session;
+    changed = true;
+    return { ...session, archivedAt: now, updatedAt: Math.max(session.updatedAt, now) };
+  });
+  return changed ? next : sessions;
+}
+
 export function isUnconfirmedOfficialSessionPlaceholder(session: Session) {
   return session.engine === "kimi-code" &&
     !session.longTask &&
@@ -309,11 +339,39 @@ export function reconcileOfficialSessionCatalog(
       changed = true;
       continue;
     }
-    const existingIndex = next.findIndex((session, index) => (
+    const existingCandidates = next.flatMap((session, index) => (
       !session.archivedAt && !claimedSessionIndexes.has(index) && belongsToOfficialLineage(session, lineageIds)
+        ? [index]
+        : []
     ));
+    const nonEmptyCandidates = existingCandidates.filter((index) => (
+      !isExactEmptyRuntimeMirror(next[index], official.id, projectPath)
+    ));
+    const stableLocalCandidates = nonEmptyCandidates.filter((index) => !lineageIds.has(next[index].id));
+    const preferredCandidates = stableLocalCandidates.length > 0
+      ? stableLocalCandidates
+      : nonEmptyCandidates.length > 0
+        ? nonEmptyCandidates
+        : existingCandidates;
+    if (preferredCandidates.length > 1) {
+      // Two content-bearing owners are real ambiguity. Preserve both and wait
+      // for an identity-aware repair instead of selecting by array order.
+      preferredCandidates.forEach((index) => claimedSessionIndexes.add(index));
+      continue;
+    }
+    const existingIndex = preferredCandidates[0] ?? -1;
     if (existingIndex >= 0) {
       claimedSessionIndexes.add(existingIndex);
+      for (const duplicateIndex of existingCandidates) {
+        if (duplicateIndex === existingIndex || !isExactEmptyRuntimeMirror(next[duplicateIndex], official.id, projectPath)) continue;
+        if (next === sessions) next = [...sessions];
+        next[duplicateIndex] = {
+          ...next[duplicateIndex],
+          archivedAt: catalogConfirmedAt,
+          updatedAt: Math.max(next[duplicateIndex].updatedAt, catalogConfirmedAt),
+        };
+        changed = true;
+      }
       const existing = next[existingIndex];
       if (existing.archivedAt) continue;
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);

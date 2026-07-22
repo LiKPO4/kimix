@@ -16,6 +16,7 @@ import { normalizePathForComparison } from "@/utils/pathCase";
 import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
 import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
 import { roomHasExecutingAgentWork } from "@/utils/sessionArchive";
+import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
 
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
@@ -630,15 +631,23 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       showToast(`切换模型失败：${result.error}`);
       return;
     }
-    updateSession(activeSession.id, (current) => ({
-      ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
-        ...agent,
-        modelAlias: model,
-        runtimeSessionId: result.sessionId,
-        officialSessionId: result.sessionId,
-        switchedToModel: undefined,
-      }), permissionMode),
-      updatedAt: switchedAt,
+    useSessionStore.setState((state) => ({
+      sessions: claimRuntimeSessionOwnership(
+        state.sessions,
+        activeSession.id,
+        result.sessionId,
+        (current) => ({
+          ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
+            ...agent,
+            modelAlias: model,
+            runtimeSessionId: result.sessionId,
+            officialSessionId: result.sessionId,
+            switchedToModel: undefined,
+          }), permissionMode),
+          updatedAt: switchedAt,
+        }),
+        switchedAt,
+      ),
     }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);

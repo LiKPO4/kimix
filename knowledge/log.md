@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Official runtime identity now has one visible local owner**: runtime recovery and model switching atomically bind the intended conversation while archiving only an exact empty catalog mirror. Catalog and event routing preserve content-bearing duplicates for explicit repair and reject unresolved ambiguity instead of selecting the first path match. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Model deletion uses an asynchronous renderer dialog instead of `window.confirm`**: the synchronous native modal could leave Windows/Electron IME character commits disabled globally after closing, while focus and Backspace still appeared functional. Model and Provider deletion now keep confirmation and focus lifecycle inside the renderer. See [/project/kimix.md](/project/kimix.md).
 
 * **Model-config mutation results outrank an immediately stale SDK reload**: Provider/model writes update the settings view before the convergence read. If SDK/Server briefly returns the pre-mutation snapshot, Kimix retains the successful write result instead of restoring deleted models or hiding additions. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

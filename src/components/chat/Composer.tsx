@@ -53,6 +53,7 @@ import {
   roomAgentCanResume,
 } from "@/utils/roomAgentRecovery";
 import { persistLocalConversationState } from "@/utils/persistence";
+import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
 import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
@@ -1068,6 +1069,24 @@ export function Composer() {
     return session;
   };
 
+  const claimRecoveredRoomAgentRuntime = (
+    roomId: string,
+    roomAgentId: string,
+    recovered: { sessionId: string; model?: string | null },
+  ) => {
+    useSessionStore.setState((state) => ({
+      sessions: claimRuntimeSessionOwnership(
+        state.sessions,
+        roomId,
+        recovered.sessionId,
+        (session) => ({
+          ...bindRecoveredRoomAgentRuntime(session, roomAgentId, recovered),
+          engine: "kimi-code",
+        }),
+      ),
+    }));
+  };
+
   const resumeRoomAgentForPrompt = async (roomId: string, roomAgentId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
     if (!latest) throw new Error("房间会话不存在");
@@ -1083,10 +1102,10 @@ export function Composer() {
       resume: (request) => window.api.resumeKimiCodeSession(request),
     });
     if (!resumed.success) throw new Error(resumed.error);
-    updateSession(roomId, (session) => bindRecoveredRoomAgentRuntime(session, roomAgentId, {
+    claimRecoveredRoomAgentRuntime(roomId, roomAgentId, {
       sessionId: resumed.data.sessionId,
       model: resumed.data.model,
-    }));
+    });
     syncCurrentSessionFromStore(roomId);
     const persisted = await persistLocalConversationState();
     if (!persisted.success) throw new Error(`保存 Agent runtime 绑定失败：${persisted.error}`);
@@ -1504,7 +1523,14 @@ export function Composer() {
               ...targetSession,
               engine: "kimi-code",
             };
-            updateSession(targetSession.id, () => targetSession);
+            useSessionStore.setState((state) => ({
+              sessions: claimRuntimeSessionOwnership(
+                state.sessions,
+                targetSession.id,
+                resumeRes.data.sessionId,
+                () => targetSession,
+              ),
+            }));
             targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
             // Re-apply the current UI permission mode so a resumed session honours
             // full-access (yolo) instead of keeping its persisted permission.
@@ -1542,7 +1568,14 @@ export function Composer() {
           ...targetSession,
           engine: "kimi-code",
         };
-        updateSession(targetSession.id, () => targetSession);
+        useSessionStore.setState((state) => ({
+          sessions: claimRuntimeSessionOwnership(
+            state.sessions,
+            targetSession.id,
+            createRes.data.sessionId,
+            () => targetSession,
+          ),
+        }));
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
         await applyDesiredSwarmMode(createRes.data.sessionId);
@@ -1762,13 +1795,10 @@ export function Composer() {
         resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (resumeRes.success) {
-        updateSession(targetSession.id, (session) => ({
-          ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
-            sessionId: resumeRes.data.sessionId,
-            model: resumeRes.data.model,
-          }),
-          engine: "kimi-code",
-        }));
+        claimRecoveredRoomAgentRuntime(targetSession.id, owner.roomAgentId, {
+          sessionId: resumeRes.data.sessionId,
+          model: resumeRes.data.model,
+        });
         const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
         if (updated && useAppStore.getState().currentSession?.id === targetSession.id) setCurrentSession(updated);
         return {
@@ -1790,13 +1820,10 @@ export function Composer() {
       additionalWorkDirs: normalizeAdditionalWorkDirs(additionalWorkDirs),
     });
     if (!createRes.success) throw new Error(createRes.error);
-    updateSession(targetSession.id, (session) => ({
-      ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
-        sessionId: createRes.data.sessionId,
-        model: createRes.data.model,
-      }),
-      engine: "kimi-code",
-    }));
+    claimRecoveredRoomAgentRuntime(targetSession.id, owner.roomAgentId, {
+      sessionId: createRes.data.sessionId,
+      model: createRes.data.model,
+    });
     const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
     if (updated && useAppStore.getState().currentSession?.id === targetSession.id) setCurrentSession(updated);
     return {

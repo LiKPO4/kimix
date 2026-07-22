@@ -13,6 +13,7 @@ import {
   repairMissingRoomDeliveryAttemptIds,
   replaceRoomAgentEvents,
   resolveRoomRuntimeOwner,
+  roomAgentActivityKey,
   scopeEventToRoomAgent,
 } from "../collaborationRooms";
 import { getRuntimeSessionId } from "../runtimeSession";
@@ -408,6 +409,36 @@ describe("collaborationRooms", () => {
       roomAgentId: "agent-secondary",
     });
     expect(getRoomAgentRuntimeId(room, "agent-secondary")).toBe("runtime-secondary");
+  });
+
+  it("rejects two visible local owners for the same runtime instead of taking the first match", () => {
+    const runtimeSessionId = "runtime-migrated";
+    const original = legacySession([
+      { id: "user-live", type: "user_message", timestamp: 30, content: "你好呀" },
+      { id: "assistant-live", type: "assistant_message", timestamp: 31, content: "", isThinking: false, isComplete: false },
+    ]);
+    original.id = "local-old-conversation";
+    original.runtimeSessionId = runtimeSessionId;
+    original.officialSessionId = runtimeSessionId;
+    const emptyCatalogMirror: Session = {
+      ...legacySession(),
+      id: runtimeSessionId,
+      runtimeSessionId: undefined,
+      officialSessionId: runtimeSessionId,
+      events: [],
+    };
+
+    expect(resolveRoomRuntimeOwner([emptyCatalogMirror, original], runtimeSessionId)).toBeNull();
+    const originalAgentId = getPrimaryRoomAgent(original).id;
+    expect(resolveRoomRuntimeOwner([emptyCatalogMirror, original], runtimeSessionId, undefined, {
+      [roomAgentActivityKey(original.id, originalAgentId)]: {
+        roomId: original.id,
+        roomAgentId: originalAgentId,
+        runtimeSessionId,
+        status: "running",
+        updatedAt: 40,
+      },
+    })?.roomId).toBe(original.id);
   });
 
   it("treats unscoped events as primary and does not overwrite an explicit owner", () => {

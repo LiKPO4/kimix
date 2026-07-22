@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoomAgent, Session } from "@/types/ui";
 import { createCollaborationStateFromSession } from "@/utils/collaborationRooms";
 import { buildOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
-import { isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, selectStartupOfficialSession, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
+import { claimRuntimeSessionOwnership, isUnconfirmedOfficialSessionPlaceholder, reconcileOfficialSessionCatalog, selectStartupOfficialSession, shouldHideOfficialSessionPlaceholder } from "../sessionCatalog";
 
 function localSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -380,6 +380,93 @@ describe("reconcileOfficialSessionCatalog", () => {
     expect(result[0].title).toBe("官方标题");
     expect(result[0].events).toEqual(existing.events);
     expect(result[0].updatedAt).toBe(200);
+  });
+
+  it("迁移后的 runtime 已被旧会话认领时归档抢先创建的空目录镜像", () => {
+    const runtimeSessionId = "runtime-migrated";
+    const original = localSession({
+      id: "local-old-conversation",
+      runtimeSessionId,
+      officialSessionId: runtimeSessionId,
+      events: [
+        { id: "user-live", type: "user_message", timestamp: 30, content: "你好呀" },
+        { id: "assistant-live", type: "assistant_message", timestamp: 31, content: "", isThinking: false, isComplete: false },
+      ],
+    });
+    const emptyCatalogMirror = localSession({
+      id: runtimeSessionId,
+      runtimeSessionId: undefined,
+      officialSessionId: runtimeSessionId,
+      events: [],
+    });
+
+    const result = reconcileOfficialSessionCatalog([emptyCatalogMirror, original], [{
+      id: runtimeSessionId,
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      title: "你好呀",
+      source: "server",
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result.filter((session) => !session.archivedAt).map((session) => session.id)).toEqual([original.id]);
+    expect(result.find((session) => session.id === original.id)?.events).toEqual(original.events);
+    expect(result.find((session) => session.id === runtimeSessionId)?.archivedAt).toBeTypeOf("number");
+  });
+
+  it("恢复操作原子绑定新 runtime 并收口同 ID 空镜像", () => {
+    const runtimeSessionId = "runtime-migrated";
+    const original = localSession({
+      id: "local-old-conversation",
+      runtimeSessionId: "runtime-old",
+      officialSessionId: "runtime-old",
+      events: [{ id: "user-old", type: "user_message", timestamp: 10, content: "旧会话" }],
+    });
+    const emptyCatalogMirror = localSession({
+      id: runtimeSessionId,
+      officialSessionId: runtimeSessionId,
+      events: [],
+    });
+
+    const result = claimRuntimeSessionOwnership(
+      [emptyCatalogMirror, original],
+      original.id,
+      runtimeSessionId,
+      (session) => ({ ...session, runtimeSessionId, officialSessionId: runtimeSessionId }),
+      300,
+    );
+
+    expect(result.find((session) => session.id === original.id)).toMatchObject({
+      runtimeSessionId,
+      officialSessionId: runtimeSessionId,
+    });
+    expect(result.find((session) => session.id === original.id)?.archivedAt).toBeUndefined();
+    expect(result.find((session) => session.id === runtimeSessionId)?.archivedAt).toBe(300);
+  });
+
+  it("恢复操作不会自动归档已有正文的重复会话", () => {
+    const runtimeSessionId = "runtime-migrated";
+    const original = localSession({
+      id: "local-old-conversation",
+      runtimeSessionId: "runtime-old",
+      officialSessionId: "runtime-old",
+      events: [{ id: "user-old", type: "user_message", timestamp: 10, content: "旧会话" }],
+    });
+    const contentBearingDuplicate = localSession({
+      id: runtimeSessionId,
+      officialSessionId: runtimeSessionId,
+      events: [{ id: "assistant-duplicate", type: "assistant_message", timestamp: 20, content: "需要人工处理的正文", isThinking: false, isComplete: true }],
+    });
+
+    const result = claimRuntimeSessionOwnership(
+      [contentBearingDuplicate, original],
+      original.id,
+      runtimeSessionId,
+      (session) => ({ ...session, runtimeSessionId, officialSessionId: runtimeSessionId }),
+      300,
+    );
+
+    expect(result.find((session) => session.id === runtimeSessionId)?.archivedAt).toBeUndefined();
+    expect(result.find((session) => session.id === runtimeSessionId)?.events).toEqual(contentBearingDuplicate.events);
   });
 
   it("把 Kimix Skill 注册表刷新产生的 fork 链折叠到同一个本地会话", () => {

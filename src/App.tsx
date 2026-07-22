@@ -9,7 +9,7 @@ import { mapHistoryEvents, mapStreamEvent, mergeEvents, preserveLocalUserMediaIn
 import { mapKimiCodeApprovalRequest, mapKimiCodeEvent, mapKimiCodeQuestionRequest } from "@/utils/kimiCodeEventMapper";
 import { deriveSessionTitle, isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { getLastUsedModelFromEvents, resolveAuthoritativeSessionModel } from "@/utils/modelDisplay";
-import { reconcileOfficialSessionCatalog, selectStartupOfficialSession } from "@/utils/sessionCatalog";
+import { claimRuntimeSessionOwnership, reconcileOfficialSessionCatalog, selectStartupOfficialSession } from "@/utils/sessionCatalog";
 import { recoverOrphanRoomsFromOfficialCatalog } from "@/utils/orphanRoomSessions";
 import { countUserTurns, shouldRecommendNewSession } from "@/utils/sessionMetrics";
 import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -75,6 +75,7 @@ import {
   getRoomAgentRuntimeId,
   getRoomAgentEvents,
   getRoomAgentSessionView,
+  findRoomRuntimeOwners,
   isPrimaryRoomAgent,
   resolveRoomRuntimeOwner,
   roomAgentActivityKey,
@@ -818,18 +819,31 @@ ${visibleHistory}
 --- 可见会话记录结束 ---`;
 }
 
-function resolveUiSessionId(sessionId: string, officialSessionId?: string | null): string {
+function resolveUiSessionId(sessionId: string, officialSessionId?: string | null): string | null {
   const roomOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, sessionId, officialSessionId);
   if (roomOwner) return roomOwner.roomId;
   const ids = new Set([sessionId, officialSessionId ?? undefined].filter((id): id is string => Boolean(id)));
-  const owner = useSessionStore.getState().sessions.find((session) => (
-    ids.has(session.id) ||
-    Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
-    Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
-    Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
-    Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
+  const owners = useSessionStore.getState().sessions.filter((session) => (
+    !session.archivedAt && (
+      ids.has(session.id) ||
+      Boolean(session.runtimeSessionId && ids.has(session.runtimeSessionId)) ||
+      Boolean(session.officialSessionId && ids.has(session.officialSessionId)) ||
+      Boolean(session.longTask?.executorSessionId && ids.has(session.longTask.executorSessionId)) ||
+      Boolean(session.longTask?.reviewerSessionId && ids.has(session.longTask.reviewerSessionId))
+    )
   ));
-  return owner?.id ?? sessionId;
+  return owners.length === 1 ? owners[0].id : null;
+}
+
+function reportAmbiguousRuntimeOwners(
+  sessionId: string,
+  channel: "event" | "status",
+  ownerRoomIds: string[],
+  status?: string,
+) {
+  const data = { sessionId, channel, ownerRoomIds, ...(status ? { status } : {}) };
+  console.error("[kimiRuntimeOwner.ambiguous]", data);
+  void window.api.writeDiag?.({ message: "[kimiRuntimeOwner.ambiguous]", data }).catch(logError("writeDiag"));
 }
 
 function resolveRuntimeSessionId(sessionId: string): string {
@@ -1928,12 +1942,19 @@ function App() {
             });
           }
           if (recoveryRes.success && primaryAgentId) {
-            updateSession(uiSessionId, (session) => ({
-              ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
-                sessionId: recoveryRes.data.sessionId,
-                model: recoveryRes.data.model,
-              }),
-              engine: "kimi-code" as const,
+            useSessionStore.setState((state) => ({
+              sessions: claimRuntimeSessionOwnership(
+                state.sessions,
+                uiSessionId,
+                recoveryRes.data.sessionId,
+                (session) => ({
+                  ...bindRecoveredRoomAgentRuntime(session, primaryAgentId, {
+                    sessionId: recoveryRes.data.sessionId,
+                    model: recoveryRes.data.model,
+                  }),
+                  engine: "kimi-code" as const,
+                }),
+              ),
             }));
             syncCurrentSessionFromStore(uiSessionId);
             const retryRes = await sendKimiCodePromptWithRetry({
@@ -2506,8 +2527,16 @@ function App() {
         if (terminalStatus) void finishHandoffJob(currentHandoffJob, terminalStatus);
         return;
       }
-      const roomOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, payload.sessionId);
+      const sessionState = useSessionStore.getState().sessions;
+      const activityState = useAppStore.getState().roomAgentActivities;
+      const runtimeOwners = findRoomRuntimeOwners(sessionState, payload.sessionId);
+      const roomOwner = resolveRoomRuntimeOwner(sessionState, payload.sessionId, undefined, activityState);
+      if (runtimeOwners.length > 1 && !roomOwner) {
+        reportAmbiguousRuntimeOwners(payload.sessionId, "event", runtimeOwners.map((owner) => owner.roomId));
+        return;
+      }
       const uiSessionId = roomOwner?.roomId ?? resolveUiSessionId(payload.sessionId);
+      if (!uiSessionId) return;
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
       const roomAgentId = roomOwner?.roomAgentId ?? (targetSession ? getPrimaryRoomAgent(targetSession).id : undefined);
@@ -2685,8 +2714,16 @@ function App() {
         }
       }
 
-      const statusOwner = resolveRoomRuntimeOwner(useSessionStore.getState().sessions, payload.sessionId);
+      const sessionState = useSessionStore.getState().sessions;
+      const activityState = useAppStore.getState().roomAgentActivities;
+      const runtimeOwners = findRoomRuntimeOwners(sessionState, payload.sessionId);
+      const statusOwner = resolveRoomRuntimeOwner(sessionState, payload.sessionId, undefined, activityState);
+      if (runtimeOwners.length > 1 && !statusOwner) {
+        reportAmbiguousRuntimeOwners(payload.sessionId, "status", runtimeOwners.map((owner) => owner.roomId), payload.status);
+        return;
+      }
       const uiSessionId = statusOwner?.roomId ?? resolveUiSessionId(payload.sessionId);
+      if (!uiSessionId) return;
       const roomAgentId = statusOwner?.roomAgentId
         ?? (() => {
           const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
@@ -2696,6 +2733,7 @@ function App() {
 
       // Server 会话 mid-turn 失败后已迁移到新的 SDK 会话：更新本地 runtime id。
       if (payload.migratedTo) {
+        const migratedRuntimeSessionId = payload.migratedTo;
         const turnStart = runtimeTurnStartRef.current.get(payload.sessionId);
         if (turnStart) {
           runtimeTurnStartRef.current.set(payload.migratedTo, turnStart);
@@ -2706,24 +2744,33 @@ function App() {
           runtimeLastStreamEventAtRef.current.set(payload.migratedTo, lastStreamEventAt);
           runtimeLastStreamEventAtRef.current.delete(payload.sessionId);
         }
-        updateSession(uiSessionId, (session) => {
-          if (session.collaboration && roomAgentId) {
-            return {
-              ...updateRoomAgent(session, roomAgentId, (agent) => ({
-                ...agent,
-                runtimeSessionId: payload.migratedTo,
+        const migratedAt = Date.now();
+        useSessionStore.setState((state) => ({
+          sessions: claimRuntimeSessionOwnership(
+            state.sessions,
+            uiSessionId,
+            migratedRuntimeSessionId,
+            (session) => {
+              if (session.collaboration && roomAgentId) {
+                return {
+                  ...updateRoomAgent(session, roomAgentId, (agent) => ({
+                    ...agent,
+                    runtimeSessionId: migratedRuntimeSessionId,
+                    officialSessionId: undefined,
+                  })),
+                  updatedAt: migratedAt,
+                };
+              }
+              return {
+                ...session,
+                runtimeSessionId: migratedRuntimeSessionId,
                 officialSessionId: undefined,
-              })),
-              updatedAt: Date.now(),
-            };
-          }
-          return {
-            ...session,
-            runtimeSessionId: payload.migratedTo,
-            officialSessionId: undefined,
-            updatedAt: Date.now(),
-          };
-        });
+                updatedAt: migratedAt,
+              };
+            },
+            migratedAt,
+          ),
+        }));
         if (useAppStore.getState().currentSession?.id === uiSessionId) {
           const latest = useSessionStore.getState().sessions.find((s) => s.id === uiSessionId);
           if (latest) useAppStore.getState().setCurrentSession(latest);
@@ -2910,6 +2957,7 @@ function App() {
       }
 
       const statusUiSessionId = resolveUiSessionId(payload.sessionId);
+      if (!statusUiSessionId) return;
       const statusSession = useSessionStore.getState().sessions.find((session) => session.id === statusUiSessionId);
       if (statusSession?.engine === "kimi-code" && !statusSession.longTask) {
         return;
@@ -3201,9 +3249,16 @@ function App() {
           return;
         }
         if (resolvedRuntimeSessionId !== runtimeSessionId) {
-          updateSession(session.id, (item) => bindRecoveredRoomAgentRuntime(item, roomAgentId, {
-            sessionId: resolvedRuntimeSessionId,
-            model: response.success ? response.data.model : undefined,
+          useSessionStore.setState((state) => ({
+            sessions: claimRuntimeSessionOwnership(
+              state.sessions,
+              session.id,
+              resolvedRuntimeSessionId,
+              (item) => bindRecoveredRoomAgentRuntime(item, roomAgentId, {
+                sessionId: resolvedRuntimeSessionId,
+                model: response.success ? response.data.model : undefined,
+              }),
+            ),
           }));
           syncCurrentSessionFromStore(session.id);
         }

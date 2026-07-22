@@ -41,7 +41,7 @@ import { ToastSystem } from "./ToastSystem";
 import { LongTaskInspectorPanel, type BtwPanelState, type HiddenComposerCardEntry, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
-import { shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
+import { claimRuntimeSessionOwnership, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
 import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
@@ -1678,12 +1678,19 @@ ${isFinalStep
         resume: (request) => window.api.resumeKimiCodeSession(request),
       });
       if (!res.success) throw new Error(res.error);
-      updateSession(targetSession.id, (session) => ({
-        ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
-          sessionId: res.data.sessionId,
-          model: res.data.model,
-        }),
-        engine: "kimi-code",
+      useSessionStore.setState((state) => ({
+        sessions: claimRuntimeSessionOwnership(
+          state.sessions,
+          targetSession.id,
+          res.data.sessionId,
+          (session) => ({
+            ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
+              sessionId: res.data.sessionId,
+              model: res.data.model,
+            }),
+            engine: "kimi-code",
+          }),
+        ),
       }));
       return { uiSessionId: targetSession.id, roomAgentId: owner.roomAgentId, displayName: owner.displayName, runtimeSessionId: res.data.sessionId };
     }
@@ -1696,12 +1703,19 @@ ${isFinalStep
       additionalWorkDirs: normalizeAdditionalWorkDirs(useAppStore.getState().additionalWorkDirs),
     });
     if (!res.success) throw new Error(res.error);
-    updateSession(targetSession.id, (session) => ({
-      ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
-        sessionId: res.data.sessionId,
-        model: res.data.model,
-      }),
-      engine: "kimi-code",
+    useSessionStore.setState((state) => ({
+      sessions: claimRuntimeSessionOwnership(
+        state.sessions,
+        targetSession.id,
+        res.data.sessionId,
+        (session) => ({
+          ...bindRecoveredRoomAgentRuntime(session, owner.roomAgentId, {
+            sessionId: res.data.sessionId,
+            model: res.data.model,
+          }),
+          engine: "kimi-code",
+        }),
+      ),
     }));
     return { uiSessionId: targetSession.id, roomAgentId: owner.roomAgentId, displayName: owner.displayName, runtimeSessionId: res.data.sessionId };
   };

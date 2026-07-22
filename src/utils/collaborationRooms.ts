@@ -2,6 +2,7 @@ import type {
   CollaborationState,
   PermissionMode,
   RoomAgent,
+  RoomAgentActivity,
   RoomAgentDelivery,
   RoomAgentDeliveryStatus,
   RoomUserMessage,
@@ -221,6 +222,16 @@ export interface RoomRuntimeOwner {
   agent: RoomAgent;
 }
 
+const ACTIVE_RUNTIME_OWNER_STATUSES = new Set<RoomAgentActivity["status"]>([
+  "creating",
+  "queued",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
+
 export function roomAgentActivityKey(roomId: string, roomAgentId: string): string {
   return JSON.stringify([roomId, roomAgentId]);
 }
@@ -416,14 +427,15 @@ export function scopeEventToRoomAgent<T extends TimelineEvent>(
   return { ...event, roomAgentId };
 }
 
-export function resolveRoomRuntimeOwner(
+export function findRoomRuntimeOwners(
   sessions: Session[],
   runtimeSessionId: string,
   officialSessionId?: string | null,
-): RoomRuntimeOwner | null {
+): RoomRuntimeOwner[] {
   const identities = new Set(
     [runtimeSessionId, officialSessionId ?? undefined].filter((value): value is string => Boolean(value)),
   );
+  const owners: RoomRuntimeOwner[] = [];
 
   for (const session of sessions) {
     if (session.archivedAt || session.longTask) continue;
@@ -440,15 +452,35 @@ export function resolveRoomRuntimeOwner(
         || Boolean(session.officialSessionId && identities.has(session.officialSessionId))
       );
       if (!matchesAgent && !matchesLegacyPrimary) continue;
-      return {
+      owners.push({
         roomId: session.id,
         roomAgentId: agent.id,
         session,
         agent,
-      };
+      });
     }
   }
-  return null;
+  return owners;
+}
+
+export function resolveRoomRuntimeOwner(
+  sessions: Session[],
+  runtimeSessionId: string,
+  officialSessionId?: string | null,
+  activities?: Readonly<Record<string, RoomAgentActivity>>,
+): RoomRuntimeOwner | null {
+  const owners = findRoomRuntimeOwners(sessions, runtimeSessionId, officialSessionId);
+  if (owners.length === 1) return owners[0];
+  if (owners.length === 0 || !activities) return null;
+  const activeOwners = owners.filter((owner) => {
+    const activity = activities[roomAgentActivityKey(owner.roomId, owner.roomAgentId)];
+    return Boolean(
+      activity &&
+      ACTIVE_RUNTIME_OWNER_STATUSES.has(activity.status) &&
+      (!activity.runtimeSessionId || activity.runtimeSessionId === runtimeSessionId),
+    );
+  });
+  return activeOwners.length === 1 ? activeOwners[0] : null;
 }
 
 function inferDeliveryStatus(events: TimelineEvent[], userEventIndex: number): RoomAgentDeliveryStatus {
