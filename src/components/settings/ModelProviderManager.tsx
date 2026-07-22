@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
   defaultModelAliasForProvider,
   groupModelsByProvider,
 } from "@/utils/modelProviderConfig";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 const NEW_PROVIDER_ID = "__new_provider__";
 const DEFAULT_CONTEXT_SIZE = 262144;
@@ -42,6 +44,10 @@ type ModelDraft = {
   model: string;
   maxContextSize: string;
 };
+
+type RemovalTarget =
+  | { type: "model"; model: KimiModelAliasSummary }
+  | { type: "provider"; providerName: string; modelCount: number };
 
 function createModelDraft(model?: KimiModelAliasSummary | null): ModelDraft {
   return {
@@ -65,6 +71,63 @@ function modelConfigFingerprint(config: KimiModelConfigSummary) {
   });
 }
 
+function RemovalConfirmDialog({ target, busy, onCancel, onConfirm }: {
+  target: RemovalTarget;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(true);
+  const title = target.type === "model" ? "删除模型" : "删除供应商";
+  const name = target.type === "model" ? (target.model.displayName || target.model.alias) : target.providerName;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
+      style={{ padding: 20 }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !busy) onCancel();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="model-provider-removal-title"
+        className="kimix-modal-card w-full max-w-[430px] rounded-[18px]"
+        style={{ padding: "20px 22px" }}
+      >
+        <div id="model-provider-removal-title" className="text-[16px] font-semibold leading-6 text-text-primary">{title}</div>
+        <div className="text-[13.5px] leading-6 text-text-secondary" style={{ marginTop: 12 }}>
+          确认删除「{name}」？
+        </div>
+        <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 14, padding: "10px 12px" }}>
+          {target.type === "model"
+            ? "供应商连接配置会保留。"
+            : `将同时删除其下 ${target.modelCount} 个模型，config.toml 会先自动备份。`}
+        </div>
+        <div className="flex items-center justify-end" style={{ gap: 10, marginTop: 18 }}>
+          <button type="button" onClick={onCancel} disabled={busy} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:opacity-45">
+            取消
+          </button>
+          <button type="button" onClick={onConfirm} disabled={busy} className="kimix-icon-text-button is-compact bg-accent-danger text-white hover:opacity-90 disabled:opacity-45" style={{ minWidth: 86, justifyContent: "center" }}>
+            {busy ? "删除中" : "确认删除"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ModelProviderManager({ config, onConfigChange }: Props) {
   const groups = useMemo(() => groupModelsByProvider(config), [config]);
   const [selectedProviderName, setSelectedProviderName] = useState(() => chooseInitialModelProvider(config));
@@ -78,6 +141,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
   const [message, setMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
 
   const selectedGroup = groups.find((group) => group.provider.name === selectedProviderName) ?? null;
   const isCreatingProvider = selectedProviderName === NEW_PROVIDER_ID || !selectedGroup;
@@ -332,32 +396,45 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     await applyConfigResult(res.data, "已更新自适应思考");
   };
 
-  const handleRemoveModel = async (model: KimiModelAliasSummary) => {
-    if (!window.confirm(`删除模型「${model.displayName || model.alias}」？\n\n供应商连接配置会保留。`)) return;
-    setBusyAction("remove-model");
-    const res = await window.api.removeKimiModelConfig({ modelAlias: model.alias });
-    setBusyAction(null);
-    if (!res.success) {
-      setMessage(`删除失败：${res.error}`);
-      return;
-    }
-    setSelectedModelAlias("");
-    await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
+  const handleRemoveModel = (model: KimiModelAliasSummary) => {
+    setRemovalTarget({ type: "model", model });
   };
 
-  const handleRemoveProvider = async () => {
+  const handleRemoveProvider = () => {
     if (!selectedGroup || selectedProviderManaged) return;
-    const count = selectedGroup.models.length;
-    if (!window.confirm(`删除供应商「${selectedGroup.provider.name}」？\n\n将同时删除其下 ${count} 个模型，config.toml 会先自动备份。`)) return;
+    setRemovalTarget({ type: "provider", providerName: selectedGroup.provider.name, modelCount: selectedGroup.models.length });
+  };
+
+  const handleConfirmRemoval = async () => {
+    const target = removalTarget;
+    if (!target) return;
+    if (target.type === "model") {
+      setBusyAction("remove-model");
+      const res = await window.api.removeKimiModelConfig({ modelAlias: target.model.alias });
+      if (!res.success) {
+        setBusyAction(null);
+        setRemovalTarget(null);
+        setMessage(`删除失败：${res.error}`);
+        return;
+      }
+      setRemovalTarget(null);
+      setSelectedModelAlias("");
+      await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
+      setBusyAction(null);
+      return;
+    }
     setBusyAction("remove-provider");
-    const res = await window.api.removeKimiProviderConfig({ providerName: selectedGroup.provider.name });
-    setBusyAction(null);
+    const res = await window.api.removeKimiProviderConfig({ providerName: target.providerName });
     if (!res.success) {
+      setBusyAction(null);
+      setRemovalTarget(null);
       setMessage(`删除供应商失败：${res.error}`);
       return;
     }
+    setRemovalTarget(null);
     setSelectedProviderName(chooseInitialModelProvider(res.data));
     await applyConfigResult(res.data, "已删除 Provider 及其模型");
+    setBusyAction(null);
   };
 
   const handleSelectModel = (model: KimiModelAliasSummary) => {
@@ -709,6 +786,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
           </div>
         )}
       </section>
+      {removalTarget && (
+        <RemovalConfirmDialog
+          target={removalTarget}
+          busy={busyAction === "remove-model" || busyAction === "remove-provider"}
+          onCancel={() => setRemovalTarget(null)}
+          onConfirm={() => void handleConfirmRemoval()}
+        />
+      )}
     </div>
   );
 }

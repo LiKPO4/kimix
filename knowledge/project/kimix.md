@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-07-21T19:00:00+08:00"
+timestamp: "2026-07-22T16:18:00+08:00"
 ---
 
 # Kimix
@@ -49,6 +49,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 * Active project/session persistence is written by store changes and flushed again on the real `beforeunload` boundary. React effect cleanup must never write active context because Strict Mode and HMR run cleanup before startup restoration and can replace a valid saved session with `null`. Startup has one navigation owner: settings hydration may populate the recent-project catalog but cannot select a project, and active-context writes remain gated until persisted sessions and the frozen startup context have resolved. A saved project with no active session remains intentionally empty instead of falling through to another project's latest conversation; only the complete absence of saved context permits that recent-conversation fallback.
 * Sidebar expansion is a path-keyed user preference, separate from active project/session navigation. Restored expansion state, including an explicitly empty set, is authoritative on first startup paint; the active project is auto-expanded only when no preference has ever been saved. Later explicit session navigation may expand its project, while manually collapsing the active project remains stable across restart.
 * Theme presets imported from the active Kimi Code `themes` directory are a cached filesystem projection. A rescan must reconcile additions, updates, and deletions from that directory while preserving presets owned by other sources. Removing a Kimix record and deleting its source are separate actions; source deletion requires confirmation and a main-process path guard restricted to direct JSON children of the active themes directory.
+* Destructive confirmations inside the model Provider manager are renderer-owned asynchronous dialogs. They must never use synchronous `window.confirm`: on Windows/Electron, returning from that native modal can leave IME character composition unable to commit across every input even though focus and non-character keys such as Backspace still work. The in-app dialog owns focus trapping, Escape/backdrop cancellation, and busy-state locking, then unmounts before normal text input resumes.
 * Stable runtime choices are described by [Runtime Routing](/architecture/runtime-routing.md).
 * Operational MCP behavior is described by [MCP and Plugin Lifecycle](/operations/mcp-and-plugin-lifecycle.md).
 

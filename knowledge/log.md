@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Model deletion uses an asynchronous renderer dialog instead of `window.confirm`**: the synchronous native modal could leave Windows/Electron IME character commits disabled globally after closing, while focus and Backspace still appeared functional. Model and Provider deletion now keep confirmation and focus lifecycle inside the renderer. See [/project/kimix.md](/project/kimix.md).
+
 * **Model-config mutation results outrank an immediately stale SDK reload**: Provider/model writes update the settings view before the convergence read. If SDK/Server briefly returns the pre-mutation snapshot, Kimix retains the successful write result instead of restoring deleted models or hiding additions. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **External Provider models are discovered from the authenticated OpenAI-compatible endpoint**: Kimix derives a bounded `/models` or `/v1/models` candidate from the configured Base URL, parses only real returned IDs, and keeps the request plus API Key in the main process. Provider/model saves are followed by a fresh SDK/disk read before UI broadcast. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

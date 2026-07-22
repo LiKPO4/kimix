@@ -172,7 +172,7 @@ describe("ModelProviderManager", () => {
       data: { ...afterDelete, message: "已删除模型配置" },
     });
     const getKimiModelConfig = vi.fn().mockResolvedValue({ success: true, data: beforeDelete });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const nativeConfirm = vi.spyOn(window, "confirm");
     Object.defineProperty(window, "api", {
       configurable: true,
       value: { removeKimiModelConfig, getKimiModelConfig },
@@ -185,6 +185,11 @@ describe("ModelProviderManager", () => {
 
     const removeButton = container.querySelector('button[aria-label="删除 gateway/model-b"]') as HTMLButtonElement;
     await act(async () => removeButton.click());
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(removeKimiModelConfig).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-modal="true"]')?.textContent).toContain("删除模型");
+    const confirmButton = buttonByText(document.body, "确认删除");
+    await act(async () => confirmButton?.click());
 
     expect(removeKimiModelConfig).toHaveBeenCalledWith({ modelAlias: "gateway/model-b" });
     expect(getKimiModelConfig).toHaveBeenCalledTimes(1);
@@ -192,6 +197,15 @@ describe("ModelProviderManager", () => {
     expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ models: [modelA] }), "已删除模型配置");
     expect(container.textContent).not.toContain("gateway/model-b");
     expect(container.textContent).toContain("后台配置仍在同步");
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+
+    const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
+    await act(async () => {
+      modelInput.focus();
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "model-a-next");
+      modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(modelInput.value).toBe("model-a-next");
     await act(async () => root.unmount());
   });
 });
