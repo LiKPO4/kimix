@@ -92,9 +92,24 @@
 - `pnpm typecheck` 通过；vitest 全量通过。
 - 待用户截图验收：历史视频点击后的播放器表现与拖动。
 
-## 项 4：Provider 配置兼容验证（待处理）
+## 项 4：Provider 配置兼容验证（已完成——通过）
 
-计划：0.29 v2 配置层重构下冒烟 Provider 管理增删改与模型探测，确认 Kimix 直写 `config.toml`（`type`/`base_url`/`api_key`）与官方两层凭证解析一致。
+### 结论
+
+0.29 v2 配置层重构（`[platforms]`/`platformId` 移除、model→provider 两层凭证解析）与 Kimix 的 config.toml 直写路径**兼容，无需代码改动**。
+
+### 证据（隔离临时 `KIMI_CODE_HOME`，未触碰用户真实配置）
+
+1. 官方运行时解析 Kimix 精确写入形状（`# >>> Kimix managed models >>>` 块 + `[providers.x] type/base_url/api_key` + `[models.y] provider/model/max_context_size/display_name`）：`GET /api/v1/config` 正确返回 provider（type/base_url/has_api_key）与 model 条目。
+2. `GET /api/v1/models` 目录列出该配置模型：条目形状 `{ provider, model: <别名>, display_name, max_context_size }`——`model` 字段承载**别名**，两层解析工作正常。
+3. 官方 `POST /api/v1/config`（merge）写入新 provider+model 后，用 Kimix `readKimiModelConfig` 同款解析逻辑复扫文件：provider/model 全部可读。
+4. 官方写入未引入任何 `[platforms]`/`platformId`（正则全扫零命中）；Kimix 全仓零引用 `platformId`（全仓搜索确认）。
+5. 官方 merge 写入后 Kimix 托管块原样保留（追加语义不破坏既有段）。
+
+### 边界与说明
+
+- UI 层增删改未在用户真实 `config.toml` 上执行（避免污染真实配置）；写入形状已按 `buildKimixManagedModelBlock`（`electron/main.ts:1240`）逐字段复刻验证，建议用户验收时在设置页顺手增删一个测试 provider 复核。
+- 目录条目 `model` 字段承载别名这一形状与 Kimix 模型菜单对 `/models` 的消费方式一致（外部 provider 走认证 models endpoint 探测，不变量 68），无动作。
 
 ## 项 5：goal 泄漏历史兜底确认（待处理）
 
