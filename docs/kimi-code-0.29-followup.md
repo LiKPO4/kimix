@@ -45,9 +45,27 @@
 - `pnpm typecheck` 通过。
 - 禁用态展示无真实 gated 会话可验（需自定义 Agent 工具门禁），按类型与条件渲染静态自查；待用户截图验收。
 
-## 项 2：Agent 生命周期事件（待处理）
+## 项 2：Agent 生命周期事件（已完成）
 
-计划：`agent.created`/`agent.disposed` 纳入诊断快照与归属审计（含 transcript disposal time）；不渲染成聊天卡片。
+### 探针实测（0.29.0 真实 Server）
+
+- `agent.created` 帧载荷：`{ type, agentId, sessionId }`，无官方时间戳；子代理创建时触发（实测 seq 11）。
+- 正常轮次内未观察到 `agent.disposed`（等 3s 未到，应在会话收尾/归档阶段触发）。
+- transcript API 为按 Agent 查询：`GET /sessions/:id/transcript` 缺 `agent_id` 返回 40001（HTTP 200 信封）。官方 disposal time 需按 `?agent_id=` 逐个查，本轮不接入——快照 + 帧观测已覆盖审计面。
+- 快照 `subagents` 条目字段实测：`id/session_id/kind/description/status/subagent_phase/subagent_type/parent_tool_call_id/run_in_background/created_at/started_at/completed_at/output_preview`。
+
+### 改动
+
+- `electron/kimiCodeServerClient.ts`：`ServerSnapshot` 新增 `subagents?: ServerSubagentSummary[]`（字段按 0.29 实测，除 `id` 外可选防御）。
+- `electron/kimiCodeHost.ts`：`ServerManagedSession.agentLifecycle` 跟踪 `agent.created/disposed` 帧（主进程本地观测时间）；`getServerRuntimeDiagnostics` 合并快照 subagents（官方时间）与生命周期观测，输出 `agents`；仅观测到帧但快照未收录的 Agent 也保留记录。
+- `electron/types/ipc.ts`：新增 `KimiCodeServerAgentInfo`；`KimiCodeServerRuntimeDiagnostics` 新增 `agents`。
+- `src/components/layout/McpPanel.tsx`：运行态区新增"Agent 生命周期"卡（计数、已释放徽标、创建/启动/完成/释放时间线）。不渲染聊天卡片——渲染器 mapper 对未知事件类型默认返回 null，天然满足。
+
+### 验证
+
+- 真实 Server 探针（临时脚本，用后已删）抓到 `agent.created` 实测载荷、快照字段与 transcript 形态（上文）。
+- `pnpm typecheck` 通过；vitest 全量通过。
+- 释放态展示依赖 `agent.disposed` 实际到达（多在会话收尾），按类型与条件渲染静态自查；待用户截图验收。
 
 ## 项 3：`fs:content` Range 播放（待处理）
 

@@ -298,6 +298,23 @@ type ServerEnvelope<T> = { code: number; msg?: string; data: T };
 type FrameListener = (frame: ServerFrame) => void;
 type ServerCursor = { seq: number; epoch?: string };
 
+// 0.29 实测快照子代理条目（agent-0 样式）；字段除 id 外均按可选防御
+export type ServerSubagentSummary = {
+  id: string;
+  session_id?: string;
+  kind?: string;
+  description?: string;
+  status?: string;
+  subagent_phase?: string;
+  subagent_type?: string;
+  parent_tool_call_id?: string;
+  run_in_background?: boolean;
+  created_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  output_preview?: string;
+};
+
 export type ServerSnapshot = {
   as_of_seq: number;
   epoch?: string;
@@ -306,6 +323,7 @@ export type ServerSnapshot = {
   in_flight_turn?: unknown;
   pending_approvals?: unknown[];
   pending_questions?: unknown[];
+  subagents?: ServerSubagentSummary[];
 };
 
 const CONTROL_TIMEOUT_MS = 5_000;

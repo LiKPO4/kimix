@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
-import type { KimiCodeMarketplacePlugin, KimiCodeMcpServerInfo, KimiCodePluginSummary, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
+import type { KimiCodeMarketplacePlugin, KimiCodeMcpServerInfo, KimiCodePluginSummary, KimiCodeServerAgentInfo, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
 
 type KimiAuthStatus = {
   available: boolean;
@@ -273,6 +273,22 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
     return counts;
   }, { builtin: 0, skill: 0, mcp: 0 }) ?? { builtin: 0, skill: 0, mcp: 0 };
   const disabledToolCount = runtimeDiagnostics?.tools.reduce((count, tool) => count + (tool.active === false ? 1 : 0), 0) ?? 0;
+  const disposedAgentCount = runtimeDiagnostics?.agents.reduce((count, agent) => count + (agent.disposedObservedAt ? 1 : 0), 0) ?? 0;
+  const formatAgentTime = (value: string | null | undefined) => {
+    if (!value) return null;
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) return null;
+    return new Date(time).toLocaleTimeString("zh-CN", { hour12: false });
+  };
+  const agentTimelineText = (agent: KimiCodeServerAgentInfo) => {
+    const parts = [
+      agent.createdAt ? `创建 ${formatAgentTime(agent.createdAt)}` : null,
+      agent.startedAt ? `启动 ${formatAgentTime(agent.startedAt)}` : null,
+      agent.completedAt ? `完成 ${formatAgentTime(agent.completedAt)}` : null,
+      agent.disposedObservedAt ? `释放 ${formatAgentTime(agent.disposedObservedAt)}` : null,
+    ].filter((part): part is string => part !== null);
+    return parts.length > 0 ? parts.join(" · ") : "仅事件观测，暂无官方时间记录";
+  };
   const subscribedConnectionCount = runtimeDiagnostics?.connections.filter((connection) => connection.subscribedToCurrentSession).length ?? 0;
   const visibleRuntimeTools = toolsExpanded ? runtimeDiagnostics?.tools ?? [] : runtimeDiagnostics?.tools.slice(0, 8) ?? [];
 
@@ -751,6 +767,42 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 12 }}>当前会话没有可用工具。</div>
                         )}
                       </div>
+                      {runtimeDiagnostics.agents.length > 0 && (
+                        <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ marginTop: 12, padding: "13px 14px" }}>
+                          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                            <div className="min-w-0">
+                              <div className="text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">Agent 生命周期</div>
+                              <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 3 }}>
+                                共 {runtimeDiagnostics.agents.length} 个 Agent{disposedAgentCount > 0 ? ` · ${disposedAgentCount} 个已释放` : ""}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+                            {runtimeDiagnostics.agents.map((agent) => (
+                              <div key={agent.agentId} className="rounded-lg bg-surface-base" style={{ padding: "10px 12px" }}>
+                                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8 }}>
+                                  <div className="truncate text-[12.5px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={agent.description ?? agent.agentId}>
+                                    {agent.subagentType ? `${agent.subagentType} · ` : ""}{agent.agentId}
+                                  </div>
+                                  <div className="flex items-center" style={{ gap: 6 }}>
+                                    {agent.disposedObservedAt && (
+                                      <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                        已释放
+                                      </span>
+                                    )}
+                                    <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                                      {agent.status ?? "已观测"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-[11.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>
+                                  {agentTimelineText(agent)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {runtimeServers.length > 0 ? (

@@ -249,6 +249,19 @@ export type KimiCodeServerRuntimeDiagnostics = {
     activeStatus: string | null;
     queuedCount: number;
   };
+  agents: Array<{
+    agentId: string;
+    kind?: string;
+    subagentType?: string;
+    description?: string;
+    status?: string;
+    parentToolCallId?: string;
+    runInBackground?: boolean;
+    createdAt: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    disposedObservedAt: string | null;
+  }>;
 };
 
 export type KimiCodeServerModelCatalog = {
@@ -560,6 +573,12 @@ type ManagedSession = {
   btwRuns: Map<string, BtwRun>;
 };
 
+// agent.created/disposed 帧无官方时间戳，记录主进程本地观测时间用于归属审计
+type ServerAgentLifecycle = {
+  createdObservedAt?: string;
+  disposedObservedAt?: string;
+};
+
 type ServerManagedSession = {
   session: ServerSession;
   workDir: string;
@@ -574,6 +593,7 @@ type ServerManagedSession = {
   additionalDirs: readonly string[];
   metadata?: JsonObject;
   btwRuns: Map<string, BtwRun>;
+  agentLifecycle: Map<string, ServerAgentLifecycle>;
 };
 
 export type BtwRun = {
@@ -1720,13 +1740,15 @@ export async function reconnectMcpServer(sessionId: string, name: string): Promi
 export async function getServerRuntimeDiagnostics(sessionId: string): Promise<KimiCodeServerRuntimeDiagnostics> {
   if (!serverSessions.has(sessionId)) throw new Error("官方 Server 运行时诊断仅适用于 Server 会话。");
   const client = getServerClient();
-  const [status, tools, mcpServers, connections, messages, prompts] = await Promise.all([
+  const managed = serverSessions.get(sessionId);
+  const [status, tools, mcpServers, connections, messages, prompts, snapshot] = await Promise.all([
     client.getSessionStatus(sessionId),
     client.listTools(sessionId),
     client.listMcpServers(),
     client.listConnections(),
     client.listMessages(sessionId, 20),
     client.listPrompts(sessionId),
+    client.getSnapshot(sessionId),
   ]);
   return {
     session: serverStatusToKimiCodeStatus(status, serverSessions.get(sessionId)?.session.usage),
@@ -1764,6 +1786,34 @@ export async function getServerRuntimeDiagnostics(sessionId: string): Promise<Ki
       activeStatus: prompts.active?.status ?? null,
       queuedCount: prompts.queued.length,
     },
+    agents: (() => {
+      const snapshotAgents = Array.isArray(snapshot.subagents) ? snapshot.subagents : [];
+      const mapped: KimiCodeServerRuntimeDiagnostics["agents"] = snapshotAgents.map((agent) => ({
+        agentId: agent.id,
+        kind: agent.kind,
+        subagentType: agent.subagent_type,
+        description: agent.description,
+        status: agent.subagent_phase ?? agent.status,
+        parentToolCallId: agent.parent_tool_call_id,
+        runInBackground: agent.run_in_background === true,
+        createdAt: agent.created_at ?? null,
+        startedAt: agent.started_at ?? null,
+        completedAt: agent.completed_at ?? null,
+        disposedObservedAt: managed?.agentLifecycle.get(agent.id)?.disposedObservedAt ?? null,
+      }));
+      const known = new Set(mapped.map((agent) => agent.agentId));
+      for (const [agentId, lifecycle] of managed?.agentLifecycle ?? []) {
+        if (known.has(agentId)) continue;
+        mapped.push({
+          agentId,
+          createdAt: lifecycle.createdObservedAt ?? null,
+          startedAt: null,
+          completedAt: null,
+          disposedObservedAt: lifecycle.disposedObservedAt ?? null,
+        });
+      }
+      return mapped;
+    })(),
   };
 }
 
@@ -2572,6 +2622,7 @@ async function registerServerSession(
     additionalDirs: options.additionalDirs ?? [],
     metadata: session.metadata ?? options.metadata,
     btwRuns: new Map(),
+    agentLifecycle: new Map(),
   };
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
@@ -2623,6 +2674,16 @@ function handleServerFrame(frame: ServerFrame) {
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>
     : {};
+  if (frame.type === "agent.created" || frame.type === "agent.disposed") {
+    const agentId = typeof payload.agentId === "string" ? payload.agentId : undefined;
+    const managedForAgent = serverSessions.get(sessionId);
+    if (agentId && managedForAgent) {
+      const lifecycle = managedForAgent.agentLifecycle.get(agentId) ?? {};
+      if (frame.type === "agent.created") lifecycle.createdObservedAt ??= new Date().toISOString();
+      else lifecycle.disposedObservedAt = new Date().toISOString();
+      managedForAgent.agentLifecycle.set(agentId, lifecycle);
+    }
+  }
   if (frame.type === "kimix.server.snapshot") {
     const snapshot = payload as ServerSnapshot;
     const session = snapshot.session;

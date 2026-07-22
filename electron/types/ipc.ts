@@ -1623,6 +1623,21 @@ export type KimiCodeServerToolInfo = {
   active?: boolean;
 };
 
+// 官方 0.29+ Agent 生命周期：快照 subagents 提供官方时间，agent.created/disposed 帧提供主进程本地观测
+export type KimiCodeServerAgentInfo = {
+  agentId: string;
+  kind?: string;
+  subagentType?: string;
+  description?: string;
+  status?: string;
+  parentToolCallId?: string;
+  runInBackground?: boolean;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  disposedObservedAt: string | null;
+};
+
 export type KimiCodeServerConnectionInfo = {
   id: string;
   connectedAt: string;
@@ -1636,6 +1651,7 @@ export type KimiCodeServerConnectionInfo = {
 export type KimiCodeServerRuntimeDiagnostics = {
   session: KimiCodeSessionStatus;
   tools: KimiCodeServerToolInfo[];
+  agents: KimiCodeServerAgentInfo[];
   mcpServers: KimiCodeMcpServerInfo[];
   connections: KimiCodeServerConnectionInfo[];
   messages: {
