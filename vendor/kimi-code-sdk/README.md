@@ -23,10 +23,10 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Source commit | `a05228c67122c8233dc87226ce0ca7414780b680` (2026-07-20, "ci: release packages (#1868)", tag `@moonshot-ai/kimi-code@0.28.0`) |
+| Source commit | `30f7418c1402c9520af0dd10bb9f78d038ea44f1` (2026-07-21, PR #1996 `feat/dual-model-routing`) |
 | node-sdk version | `0.13.4` |
 | Validated against CLI | installed `0.28.0` / source tag `@moonshot-ai/kimi-code@0.28.0` |
-| Bundled on | 2026-07-20 |
+| Bundled on | 2026-07-22 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
@@ -36,6 +36,13 @@ Kimix changes the SDK fallback MCP startup timeout from 30 seconds to 4 seconds.
 Servers that declare `startupTimeoutMs` keep their own value. The fallback can be
 overridden with `KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS`. The vendor script applies
 this patch after every regeneration and fails loudly if the upstream marker changes.
+
+Kimix also enables PR #1996's `dual-model-routing` experiment for SDK sessions and
+keeps resumed/retried subagents on the model and thinking effort they were created
+with. New defaults apply only to newly spawned children. The bundled protocol adds
+the effective `modelAlias` and `thinkingEffort` to `subagent.spawned` events so the
+UI can audit the model actually used. These two semantics are Kimix patches on top
+of the referenced open upstream PR and must be re-applied when refreshing the bundle.
 
 ## How to refresh
 

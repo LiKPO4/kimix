@@ -471,6 +471,14 @@ function remapCollaborationForImportedCopy(collaboration: CollaborationState, ro
     swarmModeLockedAt: undefined,
     swarmMode: undefined,
     swarmModeDesired: undefined,
+    subagentRoutingDesired: agent.subagentRoutingDesired ?? (
+      agent.subagentModelAlias || agent.subagentThinkingEffort
+        ? {
+            modelAlias: agent.subagentModelAlias ?? null,
+            thinkingEffort: agent.subagentThinkingEffort ?? null,
+          }
+        : undefined
+    ),
     modelSwitchedAt: undefined,
     switchedToModel: undefined,
     officialGoal: undefined,
@@ -512,6 +520,14 @@ function createImportedSessionCopy(imported: Session, existingIds: Set<string>) 
     swarmModeLockedAt: undefined,
     swarmMode: undefined,
     swarmModeDesired: undefined,
+    subagentRoutingDesired: imported.subagentRoutingDesired ?? (
+      imported.subagentModelAlias || imported.subagentThinkingEffort
+        ? {
+            modelAlias: imported.subagentModelAlias ?? null,
+            thinkingEffort: imported.subagentThinkingEffort ?? null,
+          }
+        : undefined
+    ),
     modelSwitchedAt: undefined,
     switchedToModel: undefined,
     longTask: undefined,

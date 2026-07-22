@@ -5977,6 +5977,24 @@ ipcMain.handle("kimi-code:setModel", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:setSubagentRouting", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const modelAlias = typeof req.modelAlias === "string" && req.modelAlias.trim()
+      ? req.modelAlias.trim()
+      : undefined;
+    const thinkingEffort = typeof req.thinkingEffort === "string" && req.thinkingEffort.trim()
+      ? req.thinkingEffort.trim()
+      : undefined;
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const data = await kimiCodeHost.setSubagentRouting(sessionId, { modelAlias, thinkingEffort });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:setPermission", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

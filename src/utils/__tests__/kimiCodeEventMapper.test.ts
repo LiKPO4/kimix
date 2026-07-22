@@ -346,6 +346,8 @@ describe("mapKimiCodeEvent", () => {
       subagentId: "agent-1",
       parentToolCallId: "call-swarm",
       subagentName: "worker",
+      modelAlias: "glm-5.2",
+      thinkingEffort: "high",
       swarmIndex: 2,
       description: "检查样式",
     }, options) as Extract<TimelineEvent, { type: "subagent" }>;
@@ -376,6 +378,8 @@ describe("mapKimiCodeEvent", () => {
     expect(spawned.parentToolCallId).toBe("call-swarm");
     expect(spawned.swarmIndex).toBe(2);
     expect(spawned.description).toBe("检查样式");
+    expect(spawned.modelAlias).toBe("glm-5.2");
+    expect(spawned.thinkingEffort).toBe("high");
     expect(started.status).toBe("running");
     expect(suspended.status).toBe("suspended");
     expect(completed.status).toBe("completed");

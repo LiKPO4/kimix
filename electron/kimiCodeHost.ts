@@ -96,6 +96,8 @@ type KimiCodeSessionLike = {
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
   setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
+  setSubagentModel?(model: string): Promise<void>;
+  setSubagentThinkingEffort?(effort: string): Promise<void>;
   reloadSession?(options?: { forcePluginSessionStartReminder?: boolean }): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
@@ -192,6 +194,8 @@ export type KimiCodeSessionStatus = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   swarmMode?: boolean;
+  subagentModel?: string;
+  subagentThinkingEffort?: string;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -1156,6 +1160,50 @@ export async function setSwarmMode(sessionId: string, enabled: boolean, trigger:
   if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
   sdkPinnedSessionIds.add(sessionId);
+}
+
+export async function setSubagentRouting(
+  sessionId: string,
+  routing: { modelAlias?: string; thinkingEffort?: string },
+): Promise<KimiCodeSessionStatus> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    await migrateServerSessionToSdk(sessionId, serverManaged, {
+      pinToSdk: true,
+      runningMessage: "当前轮正在运行，子 Agent 配置将在下一轮应用。",
+    });
+  }
+
+  const managed = getManagedSession(sessionId);
+  if (!managed.session.setSubagentModel || !managed.session.setSubagentThinkingEffort) {
+    throw new Error("当前兼容链路不支持子 Agent 模型配置。");
+  }
+
+  const status = await applySubagentRoutingAtomic(managed.session, routing);
+  sdkPinnedSessionIds.add(sessionId);
+  return normalizeSdkSessionStatus(status, managed.status);
+}
+
+export async function applySubagentRoutingAtomic(
+  session: Pick<KimiCodeSessionLike, "getStatus" | "setSubagentModel" | "setSubagentThinkingEffort">,
+  routing: { modelAlias?: string; thinkingEffort?: string },
+): Promise<KimiCodeSessionStatus> {
+  const setModel = session.setSubagentModel;
+  const setThinkingEffort = session.setSubagentThinkingEffort;
+  if (!setModel || !setThinkingEffort) throw new Error("当前兼容链路不支持子 Agent 模型配置。");
+  const previous = await session.getStatus();
+  const modelAlias = routing.modelAlias?.trim() ?? "";
+  const thinkingEffort = routing.thinkingEffort?.trim() ?? "";
+  try {
+    await setModel.call(session, modelAlias);
+    await setThinkingEffort.call(session, thinkingEffort);
+  } catch (error) {
+    await setModel.call(session, previous.subagentModel ?? "").catch(() => undefined);
+    await setThinkingEffort.call(session, previous.subagentThinkingEffort ?? "").catch(() => undefined);
+    throw error;
+  }
+  return session.getStatus();
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
@@ -3046,6 +3094,7 @@ async function getHarness(): Promise<KimiHarnessLike> {
   if (harness) return harness;
   process.env.KIMI_CODE_NO_AUTO_UPDATE = process.env.KIMI_CODE_NO_AUTO_UPDATE || "1";
   process.env.KIMI_CLI_NO_AUTO_UPDATE = process.env.KIMI_CLI_NO_AUTO_UPDATE || "1";
+  process.env.KIMI_CODE_EXPERIMENTAL_DUAL_MODEL_ROUTING = "1";
   const sdk = await loadSdk();
   installNonVisionFetchInterceptor();
   const options = {

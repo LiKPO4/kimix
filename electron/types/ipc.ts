@@ -1589,6 +1589,8 @@ export type KimiCodeSessionStatus = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   swarmMode?: boolean;
+  subagentModel?: string;
+  subagentThinkingEffort?: string;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -1892,6 +1894,12 @@ export type KimiCodeSetModelRequest = {
   model: string;
 };
 
+export type KimiCodeSetSubagentRoutingRequest = {
+  sessionId: string;
+  modelAlias?: string;
+  thinkingEffort?: string;
+};
+
 export type KimiCodeSetPermissionRequest = {
   sessionId: string;
   mode: KimiCodePermissionMode;
@@ -2062,6 +2070,14 @@ export type KimiCodeVoidResponse = {
 };
 
 export type KimiCodeStatusResponse = {
+  success: true;
+  data: KimiCodeSessionStatus;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeSubagentRoutingResponse = {
   success: true;
   data: KimiCodeSessionStatus;
 } | {

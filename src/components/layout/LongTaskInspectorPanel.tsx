@@ -33,12 +33,13 @@ import {
   Trash2,
   LogIn,
   Wrench,
+  Bot,
   X,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { BtwRound, ComposerDockCard, RightSidebarCardId, Session } from "@/types/ui";
-import type { GitGraphEntry, GitStatusFile, KimiCodeBackgroundTaskInfo, KimiCodeSessionSummary, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
+import type { GitGraphEntry, GitStatusFile, KimiCodeBackgroundTaskInfo, KimiCodeServerModelCatalog, KimiCodeSessionSummary, KimiModelConfigSummary, LongTaskDetail, LongTaskSummary } from "@electron/types/ipc";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { settleInactiveEvents } from "@/utils/eventHelpers";
@@ -49,6 +50,10 @@ import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
+import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
+import { resolveRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
+import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import { queueSubagentRouting, recordAppliedSubagentRouting } from "@/utils/subagentRouting";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
 
@@ -365,6 +370,13 @@ export function LongTaskInspectorPanel({
     summary: string;
     details: string[];
   } | null>(null);
+  const [subagentModelConfig, setSubagentModelConfig] = useState<KimiModelConfigSummary | null>(null);
+  const [subagentServerCatalog, setSubagentServerCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
+  const [subagentCatalogLoading, setSubagentCatalogLoading] = useState(false);
+  const [subagentCatalogError, setSubagentCatalogError] = useState("");
+  const [subagentModelDraft, setSubagentModelDraft] = useState("");
+  const [subagentThinkingDraft, setSubagentThinkingDraft] = useState("");
+  const [subagentSaving, setSubagentSaving] = useState(false);
   const [gitBranch, setGitBranch] = useState<string | undefined>(undefined);
   const [gitStatus, setGitStatus] = useState("");
   const [gitUpstream, setGitUpstream] = useState<string | undefined>(undefined);
@@ -395,6 +407,38 @@ export function LongTaskInspectorPanel({
   const gitDetailsRequestIdRef = useRef(0);
   const gitGraphRequestIdRef = useRef(0);
   const projectPathForSession = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
+  let subagentOwner: RoomMutationOwner | null = null;
+  let subagentOwnerError = "";
+  if (liveCurrentSession) {
+    try {
+      subagentOwner = resolveRoomMutationOwner(
+        liveCurrentSession,
+        liveCurrentSession.collaboration?.defaultRecipientIds,
+        permissionMode,
+      );
+    } catch (error) {
+      subagentOwnerError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const subagentSessionView = subagentOwner?.sessionView ?? null;
+  const subagentDesired = subagentSessionView?.subagentRoutingDesired;
+  const subagentDisplayedModel = subagentDesired
+    ? subagentDesired.modelAlias ?? ""
+    : subagentSessionView?.subagentModelAlias ?? "";
+  const subagentDisplayedThinking = subagentDesired
+    ? subagentDesired.thinkingEffort ?? ""
+    : subagentSessionView?.subagentThinkingEffort ?? "";
+  const subagentModelOptions = useMemo(
+    () => buildSessionModelOptions(subagentModelConfig, subagentServerCatalog),
+    [subagentModelConfig, subagentServerCatalog],
+  );
+  const selectedSubagentModel = subagentModelDraft || subagentSessionView?.model || "";
+  const selectedSubagentModelOption = subagentModelOptions.find((option) => option.id === selectedSubagentModel);
+  const subagentThinkingOptions = useMemo(() => {
+    const configured = selectedSubagentModelOption?.supportEfforts ?? [];
+    const values = configured.length > 0 ? configured : ["off", "low", "medium", "high"];
+    return Array.from(new Set([...(subagentThinkingDraft ? [subagentThinkingDraft] : []), ...values]));
+  }, [selectedSubagentModelOption, subagentThinkingDraft]);
   const openFile = (filePath: string, projectPath = projectPathForSession) => {
     if (projectPath) void window.api.openFile({ projectPath, filePath });
   };
@@ -402,6 +446,90 @@ export function LongTaskInspectorPanel({
     rightCardDragCleanupRef.current?.();
     rightCardDragCleanupRef.current = null;
   }, []);
+  useEffect(() => {
+    setSubagentModelDraft(subagentDisplayedModel);
+    setSubagentThinkingDraft(subagentDisplayedThinking);
+  }, [subagentOwner?.roomAgentId, subagentDisplayedModel, subagentDisplayedThinking]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setSubagentCatalogLoading(true);
+      const [config, catalog] = await Promise.all([
+        window.api.getKimiModelConfig().catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) })),
+        window.api.getKimiCodeServerModelCatalog().catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (config.success) {
+        setSubagentModelConfig(config.data);
+        setSubagentCatalogError("");
+      } else {
+        setSubagentCatalogError(config.error);
+      }
+      setSubagentServerCatalog(catalog?.success ? catalog.data : null);
+      setSubagentCatalogLoading(false);
+    };
+    void load();
+    const handleConfigChanged = () => void load();
+    window.addEventListener("kimix:kimi-model-config-changed", handleConfigChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("kimix:kimi-model-config-changed", handleConfigChanged);
+    };
+  }, []);
+  const saveSubagentRouting = async () => {
+    const latest = liveCurrentSession
+      ? useSessionStore.getState().sessions.find((session) => session.id === liveCurrentSession.id) ?? liveCurrentSession
+      : null;
+    if (!latest) return;
+    let owner: RoomMutationOwner;
+    try {
+      owner = resolveRoomMutationOwner(latest, latest.collaboration?.defaultRecipientIds, permissionMode);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    const modelAlias = subagentModelDraft.trim() || null;
+    const thinkingEffort = subagentThinkingDraft.trim() || null;
+    if (modelAlias && !subagentModelOptions.some((option) => option.id === modelAlias)) {
+      showToast("所选子 Agent 模型已不可用，请重新选择。");
+      return;
+    }
+    const desired = { modelAlias, thinkingEffort };
+    const running = isSessionRuntimeRunning(owner.sessionView, runningSessionId);
+    const runtimeSessionId = owner.agent.runtimeSessionId ?? owner.agent.officialSessionId;
+    setSubagentSaving(true);
+    try {
+      if (running || !runtimeSessionId) {
+        updateSession(latest.id, (session) => ({
+          ...queueSubagentRouting(session, owner.roomAgentId, desired, permissionMode),
+          updatedAt: Date.now(),
+        }));
+        const updated = useSessionStore.getState().sessions.find((session) => session.id === latest.id);
+        if (updated) setCurrentSession(updated);
+        showToast(running ? "子 Agent 配置将在下一轮生效。" : "子 Agent 配置将在首次调用时生效。");
+        return;
+      }
+      const response = await window.api.setKimiCodeSubagentRouting({
+        sessionId: runtimeSessionId,
+        modelAlias: modelAlias ?? undefined,
+        thinkingEffort: thinkingEffort ?? undefined,
+      });
+      if (!response.success) throw new Error(response.error);
+      updateSession(latest.id, (session) => ({
+        ...recordAppliedSubagentRouting(session, owner.roomAgentId, response.data, permissionMode),
+        updatedAt: Date.now(),
+      }));
+      const updated = useSessionStore.getState().sessions.find((session) => session.id === latest.id);
+      if (updated) setCurrentSession(updated);
+      setSubagentModelDraft(response.data.subagentModel ?? "");
+      setSubagentThinkingDraft(response.data.subagentThinkingEffort ?? "");
+      showToast("子 Agent 配置已生效。");
+    } catch (error) {
+      showToast(`保存子 Agent 配置失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setSubagentSaving(false);
+    }
+  };
   const projectPathForKimi = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const loadKimiHealth = async () => {
     setKimiHealthLoading(true);
@@ -1716,6 +1844,91 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
               )}
+            </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagent", 3, { padding: "16px 16px 18px" })}>
+              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
+                <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+                  <Bot size={15} className="shrink-0 text-accent-primary" />
+                  <div className="truncate text-[13px] font-medium leading-5 text-text-muted">子 Agent</div>
+                  {subagentOwner && liveCurrentSession?.collaboration && (
+                    <div className="min-w-0 truncate text-[12px] leading-5 text-text-faint">· {subagentOwner.displayName}</div>
+                  )}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full text-[11.5px] leading-5 ${subagentDesired ? "bg-accent-warning-light text-accent-warning" : "bg-surface-base text-text-muted"}`}
+                  style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}
+                >
+                  {subagentDesired ? "待生效" : subagentDisplayedModel ? "已指定" : "跟随主 Agent"}
+                </span>
+                {rightCardDragHandle("subagent", "子 Agent")}
+              </div>
+              <div className="flex flex-col" style={{ gap: 14, marginTop: 14 }}>
+                {subagentOwnerError ? (
+                  <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[12.5px] leading-5 text-accent-warning" style={{ padding: "10px 12px" }}>
+                    {subagentOwnerError}
+                  </div>
+                ) : !liveCurrentSession ? (
+                  <div className="rounded-lg border border-border-subtle bg-surface-base text-[12.5px] leading-5 text-text-muted" style={{ padding: "10px 12px" }}>
+                    打开会话后可配置子 Agent。
+                  </div>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="block text-[12px] leading-5 text-text-muted" style={{ marginBottom: 8 }}>新子 Agent 模型</span>
+                      <select
+                        value={subagentModelDraft}
+                        onChange={(event) => {
+                          setSubagentModelDraft(event.target.value);
+                          const option = subagentModelOptions.find((candidate) => candidate.id === event.target.value);
+                          if (option?.defaultEffort) setSubagentThinkingDraft(option.defaultEffort);
+                        }}
+                        disabled={subagentCatalogLoading || subagentSaving}
+                        className="h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                        style={{ paddingLeft: 12, paddingRight: 12 }}
+                      >
+                        <option value="">跟随主 Agent{subagentSessionView?.model ? `（${subagentSessionView.model}）` : ""}</option>
+                        {subagentModelDraft && !subagentModelOptions.some((option) => option.id === subagentModelDraft) && (
+                          <option value={subagentModelDraft} disabled>{subagentModelDraft}（已不可用）</option>
+                        )}
+                        {subagentModelOptions.map((option) => (
+                          <option key={option.id} value={option.id}>{option.providerLabel} · {option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="block text-[12px] leading-5 text-text-muted" style={{ marginBottom: 8 }}>思考强度</span>
+                      <select
+                        value={subagentThinkingDraft}
+                        onChange={(event) => setSubagentThinkingDraft(event.target.value)}
+                        disabled={subagentSaving}
+                        className="h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                        style={{ paddingLeft: 12, paddingRight: 12 }}
+                      >
+                        <option value="">跟随主 Agent</option>
+                        {subagentThinkingOptions.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+                      </select>
+                    </label>
+                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                      <div className={`min-w-0 text-[12px] leading-5 ${subagentCatalogError ? "text-accent-danger" : "text-text-muted"}`}>
+                        {subagentCatalogLoading
+                          ? "正在读取模型目录…"
+                          : subagentCatalogError
+                            ? "模型目录读取失败"
+                            : "用于 Agent 与 Swarm 的新任务；BTW 继续使用主模型。"}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void saveSubagentRouting()}
+                        disabled={subagentSaving || subagentCatalogLoading || Boolean(subagentOwnerError)}
+                        className="kimix-icon-text-button is-compact shrink-0 justify-center bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        {subagentSaving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                        应用
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 96px) auto", columnGap: 10 }}>

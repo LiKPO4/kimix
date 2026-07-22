@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-22T16:54:00+08:00"
+timestamp: "2026-07-22T18:12:00+08:00"
 ---
 
 # Runtime Routing
@@ -113,6 +113,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 68. External OpenAI-compatible Provider discovery uses the authenticated models endpoint instead of a hard-coded model list. The main process requests `{base}/models` and only adds `{base}/v1/models` as a bounded fallback when the configured path has no version segment; it accepts only returned model IDs, caps response size and count, and never guesses capability or context metadata. After Provider or model mutations, the successful write response becomes the renderer's immediate authoritative state, then a background SDK/disk read checks convergence. A non-matching read is treated as stale runtime cache and must never restore a just-deleted model or hide a just-added one.
 69. One official runtime identity has at most one visible local owner. Model switching, resume, creation, migration, queued-prompt recovery, and inspector recovery bind the intended conversation and archive an exact empty same-project catalog mirror in one state transaction. Catalog reconciliation prefers the stable content-bearing local conversation over that empty mirror, but never archives or selects between multiple content-bearing owners by array order. Incoming events and statuses route only to a unique owner, or to the unique owner with an active matching turn; unresolved ambiguity is logged and rejected instead of filling another conversation's timeline. This preserves the original pending Assistant, model metadata, timer, and stop lifecycle while preventing a duplicate empty conversation from receiving the completion.
 70. External model configuration has split read authority. `config.toml` is authoritative for the existence and fields of user-managed OpenAI-compatible Providers and model aliases because a Server/SDK reload may temporarily return its pre-write in-memory snapshot even after persistence succeeds. Runtime configuration may enrich matching external entries with dynamic credential capabilities and may add official managed Providers/models that are intentionally absent from TOML. It must not reintroduce an external Provider or model removed from disk. Save responses and ordinary refreshes use this same merge so additions appear immediately and deletions remain deleted.
+71. Subagent routing is owned by one concrete conversation Agent. The selected owner stores a session-level default model and thinking effort for newly spawned Agent and AgentSwarm children; an active turn records a desired value and applies it immediately before the next prompt. `/btw` continues to inherit the main model. Existing children keep the model and effort captured at their original spawn across resume and retry, so changing the default never mutates an established child conversation. A Server-backed owner migrates the same official session ID to the SDK route before applying this SDK-only capability, and the one-runtime/one-visible-owner invariant still applies. The setter is atomic from the renderer's perspective: if either model or effort fails, both values roll back. `subagent.spawned` records the effective model and effort for historical audit, and a deleted configured model becomes an explicit unavailable selection rather than silently falling back.
 
 # Main Components
 
@@ -135,6 +136,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 * [Kimi Code 0.27.0 release](https://github.com/MoonshotAI/kimi-code/releases/tag/%40moonshot-ai%2Fkimi-code%400.27.0)
 * [Kimi Code 0.27 Server probe](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-server-probe-result.md)
 * [Kimi Code 0.27 subagent probe](https://github.com/LiKPO4/kimix/blob/master/docs/kimi-code-subagent-probe-result.md)
+* [Kimi Code dual-model-routing PR #1996](https://github.com/MoonshotAI/kimi-code/pull/1996)
 * [Kimi Code slash commands](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/slash-commands.html)
 * [Kimi Code custom themes](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/themes.html)
 * [Kimi Web subagent activity component](https://github.com/MoonshotAI/kimi-cli/blob/main/web/src/components/ai-elements/subagent-steps.tsx)

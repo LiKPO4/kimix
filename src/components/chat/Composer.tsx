@@ -54,6 +54,7 @@ import {
 } from "@/utils/roomAgentRecovery";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
+import { recordAppliedSubagentRouting } from "@/utils/subagentRouting";
 import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
@@ -1087,6 +1088,29 @@ export function Composer() {
     }));
   };
 
+  const applyDesiredSubagentRouting = async (
+    uiSessionId: string,
+    roomAgentId: string,
+    runtimeSessionId: string,
+  ) => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+    const agent = latest ? getRoomAgent(latest, roomAgentId, permissionMode) : null;
+    const desired = agent?.subagentRoutingDesired;
+    if (!latest || !agent || !desired) return;
+    const response = await window.api.setKimiCodeSubagentRouting({
+      sessionId: runtimeSessionId,
+      modelAlias: desired.modelAlias ?? undefined,
+      thinkingEffort: desired.thinkingEffort ?? undefined,
+    });
+    if (!response.success) throw new Error(`应用子 Agent 配置失败：${response.error}`);
+    const timestamp = Date.now();
+    updateSession(uiSessionId, (session) => ({
+      ...recordAppliedSubagentRouting(session, roomAgentId, response.data, permissionMode),
+      updatedAt: timestamp,
+    }));
+    syncCurrentSessionFromStore(uiSessionId);
+  };
+
   const resumeRoomAgentForPrompt = async (roomId: string, roomAgentId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
     if (!latest) throw new Error("房间会话不存在");
@@ -1106,6 +1130,7 @@ export function Composer() {
       sessionId: resumed.data.sessionId,
       model: resumed.data.model,
     });
+    await applyDesiredSubagentRouting(roomId, roomAgentId, resumed.data.sessionId);
     syncCurrentSessionFromStore(roomId);
     const persisted = await persistLocalConversationState();
     if (!persisted.success) throw new Error(`保存 Agent runtime 绑定失败：${persisted.error}`);
@@ -1142,6 +1167,7 @@ export function Composer() {
               return { success: false as const, certainty: "not-sent" as const, error: error instanceof Error ? error.message : String(error) };
             }
           }
+          await applyDesiredSubagentRouting(roomId, roomAgentId, runtimeSessionId);
           setRoomAgentActivity({
             roomId,
             roomAgentId,
@@ -1491,6 +1517,10 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
+        const applyDesiredPrimarySubagentRouting = async (runtimeSessionId: string) => {
+          await applyDesiredSubagentRouting(targetSession.id, primaryAgentId, runtimeSessionId);
+          targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+        };
         const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
         if (!roomAgentCanResume(targetSession, primaryAgentId)) {
           const issue = getPrimaryRoomAgent(targetSession).recoveryIssue;
@@ -1544,6 +1574,7 @@ export function Composer() {
             }
             updateLinkStatus("消息发送中", "info");
             await applyDesiredSwarmMode(resumeRes.data.sessionId);
+            await applyDesiredPrimarySubagentRouting(resumeRes.data.sessionId);
             return resumeRes.data.sessionId;
           }
           updateLinkStatus("消息发送中", "info");
@@ -1579,6 +1610,7 @@ export function Composer() {
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
         await applyDesiredSwarmMode(createRes.data.sessionId);
+        await applyDesiredPrimarySubagentRouting(createRes.data.sessionId);
         return createRes.data.sessionId;
       };
 
@@ -1894,6 +1926,7 @@ export function Composer() {
       response.data.sessionId,
       agent.modelAlias,
     ));
+    await applyDesiredSubagentRouting(roomId, roomAgentId, response.data.sessionId);
     syncCurrentSessionFromStore(roomId);
     setRoomAgentActivity({
       roomId,

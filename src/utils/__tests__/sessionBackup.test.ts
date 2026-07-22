@@ -303,8 +303,14 @@ describe("createSessionBackupImportPlan", () => {
 
   it("remaps every room identity and detaches official bindings for a forked imported copy", () => {
     const room = roomSession();
+    room.subagentModelAlias = "openai/gpt-5";
+    room.subagentThinkingEffort = "high";
     const primary = room.collaboration!.agents[0];
     const secondary = room.collaboration!.agents[1];
+    primary.subagentModelAlias = "openai/gpt-5";
+    primary.subagentThinkingEffort = "high";
+    secondary.subagentModelAlias = "anthropic/claude-sonnet";
+    secondary.subagentThinkingEffort = "medium";
     useSessionStore.setState({
       sessions: [session({
         id: "local-session",
@@ -348,11 +354,19 @@ describe("createSessionBackupImportPlan", () => {
 
     expect(copy.runtimeSessionId).toBeUndefined();
     expect(copy.officialSessionId).toBeUndefined();
+    expect(copy.subagentRoutingDesired).toEqual({
+      modelAlias: "openai/gpt-5",
+      thinkingEffort: "high",
+    });
     expect(copiedCollaboration.primaryAgentId).toBe(`room-agent:${copy.id}`);
     expect(copiedCollaboration.agents.every((agent) => (
       !agent.runtimeSessionId && !agent.officialSessionId && !agent.officialCatalogConfirmedAt && !agent.missingSince && !agent.recoveryIssue
     ))).toBe(true);
     expect(copiedSecondary.id).not.toBe(secondary.id);
+    expect(copiedSecondary.subagentRoutingDesired).toEqual({
+      modelAlias: "anthropic/claude-sonnet",
+      thinkingEffort: "medium",
+    });
     expect(copiedMessage.id).not.toBe(sourceMessage.id);
     expect(copiedMessage.recipientAgentIds).toEqual(Object.keys(copiedMessage.deliveries));
     expect(copiedDelivery.agentTurnId).not.toBe(sourceMessage.deliveries[secondary.id].agentTurnId);

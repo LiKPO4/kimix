@@ -851,6 +851,8 @@ function SubagentProcessItem({ subagent }: { subagent: SubagentEvent }) {
     : "暂无子事件详情";
   const detailText = [
     `子代理：${subagent.agentName || "subagent"}`,
+    ...(subagent.modelAlias ? [`模型：${subagent.modelAlias}`] : []),
+    ...(subagent.thinkingEffort ? [`思考强度：${subagent.thinkingEffort}`] : []),
     `状态：${statusText}`,
     `详情：${childSummary}`,
   ].join("\n");

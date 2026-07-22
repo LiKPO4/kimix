@@ -5,9 +5,17 @@ import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
-const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
+const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
+
+function placeNewSubagentCard(order: RightSidebarCardId[], source: readonly RightSidebarCardId[]) {
+  if (source.includes("subagent")) return order;
+  const withoutSubagent: RightSidebarCardId[] = order.filter((item) => item !== "subagent");
+  const kimiIndex = withoutSubagent.indexOf("kimi");
+  withoutSubagent.splice(kimiIndex >= 0 ? kimiIndex + 1 : 0, 0, "subagent");
+  return withoutSubagent;
+}
 
 function readCollapseProcessWhileRunning(): boolean {
   try {
@@ -53,13 +61,16 @@ function readRightSidebarCardOrder(): RightSidebarCardId[] {
     const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
     const filtered = parsed.filter((item): item is RightSidebarCardId => known.has(item));
     if (!filtered.includes("longTaskStatus")) {
-      return [
+      return placeNewSubagentCard([
         "longTaskStatus",
         ...filtered,
         ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => item !== "longTaskStatus" && !filtered.includes(item)),
-      ];
+      ], filtered);
     }
-    return [...filtered, ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !filtered.includes(item))];
+    return placeNewSubagentCard([
+      ...filtered,
+      ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !filtered.includes(item)),
+    ], filtered);
   } catch {
     return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
   }
@@ -231,10 +242,10 @@ export const useAppStore = create<AppStore>((set) => ({
   }),
   setRightSidebarCardOrder: (order) => {
     const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
-    const normalized = [
+    const normalized = placeNewSubagentCard([
       ...order.filter((item): item is RightSidebarCardId => known.has(item)),
       ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !order.includes(item)),
-    ];
+    ], order);
     writeRightSidebarCardOrder(normalized);
     set({ rightSidebarCardOrder: normalized });
   },

@@ -329,6 +329,8 @@ function mapSubagentEvent(
     swarmIndex: isNumber(event.swarmIndex) ? event.swarmIndex : undefined,
     description: isString(event.description) ? event.description : undefined,
     agentName: isString(event.subagentName) ? event.subagentName : "子代理",
+    modelAlias: isString(event.modelAlias) ? event.modelAlias : undefined,
+    thinkingEffort: isString(event.thinkingEffort) ? event.thinkingEffort : undefined,
     status,
     resultSummary: isString(event.resultSummary) ? event.resultSummary : undefined,
     error: isString(event.error) ? event.error : undefined,

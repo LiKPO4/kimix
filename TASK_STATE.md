@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 v2.16.102 会话级子 Agent 模型配置
+
+- 新增：会话侧栏在 Kimi Code 与 Git 之间提供“子 Agent”卡片，可为当前单一会话 Agent 设置新子 Agent 默认模型与思考强度。
+- 路由：普通 Agent 与 AgentSwarm 共享会话级默认值；BTW 继续使用主模型。运行中修改进入 desired 状态，在下一轮发送前应用。
+- 房间：配置归属当前唯一 mutation owner，不写入房间外壳或其他 Agent；Server 会话按同一官方 ID 迁移到 SDK，不创建重复 owner。
+- 稳定性：模型与思考强度原子应用，第二项失败会回滚两项；已存在的子 Agent 在 resume/retry 时保持创建时模型，不中途切换。
+- 审计：`subagent.spawned` 记录实际 `modelAlias` 与 `thinkingEffort`；配置模型被删除时 UI 明确标记不可用并拒绝静默回退。
+- 上游：vendored SDK 基于开放 PR #1996 commit `30f7418c`，叠加 Kimix sticky resume 与 spawn 审计字段补丁。
+
 ## 2026-07-22 v2.16.101 模型选择统一使用 URL 探测
 
 - 调整：删除模型编辑卡内的“从官方目录选择模型”按钮、目录模型下拉框和自动预填逻辑。

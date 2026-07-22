@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Subagent defaults are session/Agent-owned, next-turn aware, and auditable**: the selected conversation Agent can route newly spawned Agent and AgentSwarm children to a dedicated model and thinking effort; active turns queue the change, existing children keep their original model on resume/retry, `/btw` stays on the main model, and spawn events record the effective choice. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **External model existence follows persisted TOML, not a stale runtime snapshot**: Server/SDK config writes can reach disk before reload updates the in-memory model map. Settings reads now merge disk-authoritative external Providers/models with runtime-only managed models and dynamic credential capabilities, without reviving deleted external entries. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Official runtime identity now has one visible local owner**: runtime recovery and model switching atomically bind the intended conversation while archiving only an exact empty catalog mirror. Catalog and event routing preserve content-bearing duplicates for explicit repair and reject unresolved ambiguity instead of selecting the first path match. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

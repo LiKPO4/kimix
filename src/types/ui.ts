@@ -66,7 +66,7 @@ export interface RoomAgentActivity {
 
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm";
-export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
+export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "subagent" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 
 export interface AppState {
@@ -201,6 +201,12 @@ export interface RoomAgent {
   swarmModeLockedAt?: number;
   swarmMode?: boolean;
   swarmModeDesired?: boolean;
+  /** 新子 Agent 的默认模型；空值表示跟随当前主 Agent。 */
+  subagentModelAlias?: string;
+  /** 新子 Agent 的默认思考强度；空值表示跟随当前主 Agent。 */
+  subagentThinkingEffort?: string;
+  /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
+  subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
   modelSwitchedAt?: number;
   switchedToModel?: string;
   officialGoal?: OfficialGoalState;
@@ -262,6 +268,12 @@ export interface Session {
   swarmMode?: boolean;
   /** 运行中切换 Swarm 时记录的下一轮目标状态；应用成功后清除。 */
   swarmModeDesired?: boolean;
+  /** 新子 Agent 的默认模型；空值表示跟随当前主 Agent。 */
+  subagentModelAlias?: string;
+  /** 新子 Agent 的默认思考强度；空值表示跟随当前主 Agent。 */
+  subagentThinkingEffort?: string;
+  /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
+  subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
   titleLocked?: boolean;
   model?: string | null;
   permissionMode?: PermissionMode;
@@ -611,6 +623,8 @@ export interface SubagentEvent {
   swarmIndex?: number;
   description?: string;
   agentName: string;
+  modelAlias?: string;
+  thinkingEffort?: string;
   status: "queued" | "running" | "suspended" | "completed" | "error";
   resultSummary?: string;
   error?: string;
