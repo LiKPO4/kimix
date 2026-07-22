@@ -5,6 +5,7 @@ import {
   isEmptyStatusUpdate,
   getLatestMetricStatus,
   getLatestMeaningfulStatus,
+  mergeMetricStatusUpdates,
   getSessionContextUsages,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
@@ -113,6 +114,45 @@ describe("getLatestMetricStatus", () => {
       { id: "2", type: "status_update", timestamp: 2, message: "模型：kimi-for-coding" },
     ];
     expect(getLatestMetricStatus(events)?.contextSize).toBe(1200);
+  });
+});
+
+describe("mergeMetricStatusUpdates", () => {
+  it("keeps model and token usage when a later status only updates context", () => {
+    const merged = mergeMetricStatusUpdates([{
+      id: "usage",
+      type: "status_update",
+      timestamp: 1,
+      message: "模型：grok-4.5",
+      inputTokenCount: 136_110,
+      tokenCount: 1_220,
+    }, {
+      id: "context",
+      type: "status_update",
+      timestamp: 2,
+      contextSize: 101_116,
+      contextLimit: 500_000,
+    }]);
+
+    expect(merged).toMatchObject({
+      id: "context",
+      timestamp: 2,
+      message: "模型：grok-4.5",
+      inputTokenCount: 136_110,
+      tokenCount: 1_220,
+      contextSize: 101_116,
+      contextLimit: 500_000,
+    });
+  });
+
+  it("does not render a session-level context snapshot as turn usage by itself", () => {
+    expect(mergeMetricStatusUpdates([{
+      id: "context-only",
+      type: "status_update",
+      timestamp: 2,
+      contextSize: 101_116,
+      contextLimit: 500_000,
+    }])).toBeUndefined();
   });
 });
 

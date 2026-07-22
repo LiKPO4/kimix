@@ -1847,7 +1847,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const partialWithoutId = incoming.toolCallId === LATEST_TOOL_CALL;
     const sameCallIndex = partialWithoutId
       ? -1
-      : existing.findLastIndex((e) => e.type === "tool_call" && e.status === "running" && e.toolCallId === incoming.toolCallId);
+      : existing.findLastIndex((e) => e.type === "tool_call" && e.toolCallId === incoming.toolCallId);
     const sameEventIndex = partialWithoutId
       ? -1
       : existing.findLastIndex((e) => e.type === "tool_call" && e.id === incoming.id && e.toolCallId === incoming.toolCallId);

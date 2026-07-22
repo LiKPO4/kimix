@@ -5,6 +5,7 @@ import {
   hasCanonicalKimiThinkingHistory,
   hasKimiProcessHistoryRegression,
   hasLegacyKimiClarificationWrapper,
+  hasRepairableDuplicateKimiToolHistory,
   hasRicherKimiProcessHistory,
   kimiHistoryProcessEventCount,
 } from "@/utils/kimiHistoryCache";
@@ -375,6 +376,53 @@ function isVisibleTurnOutput(event: TimelineEvent): boolean {
     event.type === "diff";
 }
 
+export function removeIdentityCoveredDuplicateToolCalls(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): TimelineEvent[] {
+  const canonicalToolIds = new Set(flattenTimelineEvents(canonicalEvents)
+    .filter((event): event is Extract<TimelineEvent, { type: "tool_call" }> => (
+      event.type === "tool_call" && Boolean(event.toolCallId)
+    ))
+    .map((event) => event.toolCallId));
+  for (const event of flattenTimelineEvents(localEvents)) {
+    if (
+      event.type === "tool_call" &&
+      event.toolCallId &&
+      event.id.startsWith("snapshot:")
+    ) {
+      canonicalToolIds.add(event.toolCallId);
+    }
+  }
+  if (canonicalToolIds.size === 0) return localEvents;
+
+  const seenCoveredToolIds = new Set<string>();
+  const visit = (events: TimelineEvent[]): TimelineEvent[] => {
+    let changed = false;
+    const result: TimelineEvent[] = [];
+    for (const event of events) {
+      if (event.type === "tool_call" && canonicalToolIds.has(event.toolCallId)) {
+        if (seenCoveredToolIds.has(event.toolCallId)) {
+          changed = true;
+          continue;
+        }
+        seenCoveredToolIds.add(event.toolCallId);
+      }
+      if (event.type === "subagent") {
+        const nested = visit(event.events);
+        if (nested !== event.events) {
+          result.push({ ...event, events: nested });
+          changed = true;
+          continue;
+        }
+      }
+      result.push(event);
+    }
+    return changed ? result : events;
+  };
+  return visit(localEvents);
+}
+
 /**
  * When the complete canonical history is rejected by the monotonicity gate,
  * recover one otherwise invisible latest turn without touching older local
@@ -387,6 +435,7 @@ export function mergeMissingLatestCanonicalAssistant(
   canonicalEvents: TimelineEvent[],
   context?: { sessionId?: string; roomAgentId?: string; reason?: string },
 ): TimelineEvent[] {
+  localEvents = removeIdentityCoveredDuplicateToolCalls(localEvents, canonicalEvents);
   const canonicalUserIndex = canonicalEvents.findLastIndex((event) => event.type === "user_message");
   const localUserIndex = localEvents.findLastIndex((event) => event.type === "user_message");
   if (canonicalUserIndex < 0 || localUserIndex < 0) return localEvents;
@@ -501,7 +550,8 @@ export function shouldReplaceWithCanonicalKimiHistory(
   // Server snapshots can contain the newest assistant text/thinking while
   // omitting tool-call lifecycle frames. Never let such a partial snapshot
   // destructively replace a richer live/local process timeline.
-  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents)) {
+  const repairsDuplicateToolHistory = hasRepairableDuplicateKimiToolHistory(cachedEvents, canonicalEvents);
+  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents) && !repairsDuplicateToolHistory) {
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,
       reason: "process-history-regression",
@@ -550,6 +600,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
     (hasLegacyKimiClarificationWrapper(cachedEvents) && !hasLegacyKimiClarificationWrapper(canonicalEvents)) ||
+    repairsDuplicateToolHistory ||
     hasRicherKimiProcessHistory(cachedEvents, canonicalEvents) ||
     hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 

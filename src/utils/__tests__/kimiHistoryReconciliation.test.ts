@@ -4,6 +4,7 @@ import * as reportError from "@/utils/reportError";
 import {
   hasEquivalentKimiHistoryTurnBodies,
   mergeMissingLatestCanonicalAssistant,
+  removeIdentityCoveredDuplicateToolCalls,
   shouldReplaceWithCanonicalKimiHistory,
 } from "../kimiHistoryReconciliation";
 
@@ -332,6 +333,29 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
   });
 
+  it("replaces duplicated replayed tools when canonical covers every tool identity", () => {
+    const original = toolCall();
+    const replayed = {
+      ...original,
+      id: "tool-replayed-under-retry",
+      timestamp: 10_000,
+    };
+    const local = [userMessage, original, assistant("body"), replayed];
+    const canonical = [userMessage, original, assistant("body")];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
+  });
+
+  it("keeps duplicate repair closed when canonical misses a distinct local tool", () => {
+    const first = toolCall();
+    const replayed = { ...first, id: "tool-replayed", timestamp: 10_000 };
+    const localOnly = { ...first, id: "tool-local", toolCallId: "call-local" };
+    const local = [userMessage, first, localOnly, assistant("body"), replayed];
+    const canonical = [userMessage, first, assistant("body")];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
   it("replaces when canonical has subagent content that local lacks", () => {
     const local = [userMessage, assistant("")];
     const canonical = [userMessage, subagentWithContent("subagent body")];
@@ -548,6 +572,32 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
       snapshotMessageId: "msg-failed-assistant",
       content: "本轮请求未能开始生成：第三方模型余额不足。",
     });
+  });
+});
+
+describe("removeIdentityCoveredDuplicateToolCalls", () => {
+  it("removes only duplicated call ids covered by canonical history", () => {
+    const covered = toolCall();
+    const localOnly = { ...toolCall(), id: "local-only", toolCallId: "call-local" };
+    const local: TimelineEvent[] = [
+      covered,
+      localOnly,
+      { ...covered, id: "covered-replay", timestamp: 10_000 },
+      { ...localOnly, id: "local-replay", timestamp: 10_001 },
+    ];
+
+    const repaired = removeIdentityCoveredDuplicateToolCalls(local, [covered]);
+    expect(repaired.filter((event) => event.type === "tool_call" && event.toolCallId === "call-1")).toHaveLength(1);
+    expect(repaired.filter((event) => event.type === "tool_call" && event.toolCallId === "call-local")).toHaveLength(2);
+    expect(repaired[0]).toBe(covered);
+  });
+
+  it("uses an already persisted stable snapshot row to clean duplicates outside the current history page", () => {
+    const stable = { ...toolCall(), id: "snapshot:msg-old:tool%3Acall-1:0" };
+    const replayed = { ...stable, id: "late-replay", timestamp: 10_000 };
+
+    const repaired = removeIdentityCoveredDuplicateToolCalls([stable, replayed], []);
+    expect(repaired).toEqual([stable]);
   });
 });
 

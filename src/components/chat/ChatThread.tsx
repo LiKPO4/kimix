@@ -23,7 +23,7 @@ import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { reliableAssistantDurationMs } from "@/utils/duration";
-import { hasMetricStatus, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { hasMetricStatus, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
@@ -830,12 +830,14 @@ export function buildRenderItems(
           : mergedAssistantEvent
       : projectedFailureAssistant;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
-    const finalUsageStatus = settledStatusEvents.findLast(hasMetricStatus);
+    const finalUsageStatus = mergeMetricStatusUpdates(settledStatusEvents);
     const interruptedStatus = settledStatusEvents.findLast(isInterruptedStatusEvent);
     const trailingStatusEvents = turnSettled
       ? interruptedStatus
         ? [interruptedStatus, ...(finalUsageStatus && finalUsageStatus !== interruptedStatus ? [finalUsageStatus] : [])]
-        : (finalUsageStatus ? [finalUsageStatus] : settledStatusEvents.slice(-1))
+        : (finalUsageStatus
+            ? [finalUsageStatus]
+            : settledStatusEvents.filter((status) => !hasMetricStatus(status)).slice(-1))
       : [];
     const activeStatusEvent = turnSettled
       ? undefined
@@ -1362,6 +1364,8 @@ export const ChatThread = memo(function ChatThread() {
     if (!lastPrompt) throw new Error("没有找到上一条可重试的用户消息");
     const runtimeSessionId = getRuntimeSessionId(session);
     if (!runtimeSessionId) throw new Error("当前会话没有可用的运行时 session");
+    const primaryAgent = getPrimaryRoomAgent(session);
+    const retryModel = primaryAgent.switchedToModel ?? primaryAgent.modelAlias ?? session.model ?? undefined;
 
     const now = Date.now();
     const resentUserEvent: TimelineEvent = {
@@ -1385,6 +1389,7 @@ export const ChatThread = memo(function ChatThread() {
       type: "assistant_message",
       timestamp: now,
       content: "",
+      model: retryModel,
       isThinking: defaultThinking,
       isComplete: false,
     };
@@ -1410,7 +1415,7 @@ export const ChatThread = memo(function ChatThread() {
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
       images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],
-      model: getPrimaryRoomAgent(session).switchedToModel ?? getPrimaryRoomAgent(session).modelAlias ?? undefined,
+      model: retryModel,
     });
     if (!res.success) {
       setRunningSessionId(null);

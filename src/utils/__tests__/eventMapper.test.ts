@@ -721,6 +721,38 @@ describe("mergeEvents", () => {
     expect(tool.rawArguments).not.toBe(`${rawArguments}${rawArguments}`);
   });
 
+  it("does not append a replayed tool call after the local lifecycle already completed", () => {
+    const existing: TimelineEvent[] = [{
+      id: "original",
+      type: "tool_call",
+      timestamp: 100,
+      toolCallId: "call-history",
+      toolName: "ReadFile",
+      status: "success",
+      arguments: { path: "old.dart" },
+      result: "old content",
+    }];
+    const incoming: TimelineEvent = {
+      id: "replay",
+      type: "tool_call",
+      timestamp: 1_000,
+      toolCallId: "call-history",
+      toolName: "ReadFile",
+      status: "running",
+      arguments: { path: "old.dart" },
+    };
+
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "original",
+      timestamp: 100,
+      toolCallId: "call-history",
+      status: "success",
+      result: "old content",
+    });
+  });
+
   it("deduplicates user messages", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "Hi", isThinking: false, isComplete: true },

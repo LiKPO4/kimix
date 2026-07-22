@@ -2557,12 +2557,16 @@ function App() {
       const roomScopedEvent = targetSession?.longTask || !roomAgentId
         ? mappedWithRole
         : scopeEventToRoomAgent(mappedWithRole, roomAgentId);
+      // Historical snapshot frames retain their original chronological owner.
+      // Never borrow the currently active room turn merely because the replay
+      // arrived while a retry/reconnect was running.
+      const mayInheritActiveTurnIdentity = rawEvent?.snapshotReplay !== "history";
       const mappedForRoom = targetSession?.longTask || !roomAgentId
         ? roomScopedEvent
         : {
             ...roomScopedEvent,
-            roomMessageId: roomScopedEvent.roomMessageId ?? roomActivity?.roomMessageId,
-            agentTurnId: roomScopedEvent.agentTurnId ?? roomActivity?.activeTurnId,
+            roomMessageId: roomScopedEvent.roomMessageId ?? (mayInheritActiveTurnIdentity ? roomActivity?.roomMessageId : undefined),
+            agentTurnId: roomScopedEvent.agentTurnId ?? (mayInheritActiveTurnIdentity ? roomActivity?.activeTurnId : undefined),
           };
       if (mappedForRoom.type !== "status_update") {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());

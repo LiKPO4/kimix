@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { buildContentVersion, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots } from "@/components/chat/ChatThread";
+import { buildContentVersion, buildRenderItems, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots } from "@/components/chat/ChatThread";
 import type { RenderItem } from "@/types/chatRender";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
@@ -189,5 +189,42 @@ describe("buildContentVersion", () => {
     const session = sessionStub([assistantEvent("hello")]);
     const items: RenderItem[] = [{ type: "event", event: session.events[0] as Extract<TimelineEvent, { type: "assistant_message" }> }];
     expect(buildContentVersion(session, session.events, items)).toBe(buildContentVersion(session, session.events, items));
+  });
+});
+
+describe("buildRenderItems turn metrics", () => {
+  it("does not render a context-only recovery snapshot as an Assistant footer", () => {
+    const items = buildRenderItems([{
+      id: "user", type: "user_message", timestamp: 1, content: "retry",
+    }, assistantEvent("done", { timestamp: 2 }), {
+      id: "context", type: "status_update", timestamp: 3,
+      contextSize: 101_116, contextLimit: 500_000,
+    }], "kimi-code");
+    const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+
+    expect(assistantItem?.type === "event" ? assistantItem.trailingStatuses : undefined).toEqual([]);
+  });
+
+  it("merges a later context update into real usage from the same turn", () => {
+    const items = buildRenderItems([{
+      id: "user", type: "user_message", timestamp: 1, content: "normal",
+    }, assistantEvent("done", { timestamp: 2 }), {
+      id: "usage", type: "status_update", timestamp: 3,
+      message: "模型：grok-4.5", inputTokenCount: 136_110, tokenCount: 1_220,
+    }, {
+      id: "context", type: "status_update", timestamp: 4,
+      contextSize: 101_116, contextLimit: 500_000,
+    }], "kimi-code");
+    const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const status = assistantItem?.type === "event" ? assistantItem.trailingStatuses?.[0] : undefined;
+
+    expect(status).toMatchObject({
+      id: "context",
+      message: "模型：grok-4.5",
+      inputTokenCount: 136_110,
+      tokenCount: 1_220,
+      contextSize: 101_116,
+      contextLimit: 500_000,
+    });
   });
 });

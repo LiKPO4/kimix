@@ -1,6 +1,6 @@
 import type { TimelineEvent } from "@/types/ui";
 
-export const KIMI_HISTORY_CACHE_VERSION = 13;
+export const KIMI_HISTORY_CACHE_VERSION = 14;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 
@@ -33,6 +33,25 @@ export function hasRicherKimiProcessHistory(cached: TimelineEvent[], canonical: 
 
 export function hasKimiProcessHistoryRegression(cached: TimelineEvent[], canonical: TimelineEvent[]) {
   return kimiHistoryProcessEventCount(canonical) < kimiHistoryProcessEventCount(cached);
+}
+
+function toolCallIdentities(events: TimelineEvent[]) {
+  return flattenTimelineEvents(events)
+    .filter((event): event is Extract<TimelineEvent, { type: "tool_call" }> => (
+      event.type === "tool_call" && Boolean(event.toolCallId)
+    ))
+    .map((event) => event.toolCallId);
+}
+
+export function hasRepairableDuplicateKimiToolHistory(
+  cached: TimelineEvent[],
+  canonical: TimelineEvent[],
+) {
+  const cachedIds = toolCallIdentities(cached);
+  const uniqueCachedIds = new Set(cachedIds);
+  if (uniqueCachedIds.size === cachedIds.length || uniqueCachedIds.size === 0) return false;
+  const canonicalIds = new Set(toolCallIdentities(canonical));
+  return [...uniqueCachedIds].every((id) => canonicalIds.has(id));
 }
 
 function thinkingHistoryText(events: TimelineEvent[]) {

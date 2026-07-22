@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 v2.16.91 重试轮混入历史工具 / 统计气泡只剩 Context
+
+- 真实会话 `session_d2092d06-9027-4105-9240-3bc0bc0ca58d`：新 turn 12 实际只执行 10 个工具，UI 却瞬间显示 25 个；本地缓存共有 237 条 `tool_call`，同一官方 call ID 在重连快照中被重复追加。
+- 根因：`recoverSnapshot` 先重放完整 `history` 再交付 `in_flight`；活动重试轮只过滤本地已有结果，没有按最新用户时间边界拒绝旧历史帧，且已完成工具不参与 call-ID 去重。重试占位没有写入目标模型，导致“消息发送中”头缺模型名。
+- 修复：活动轮拒绝早于最新用户边界或无时间归属的 history 帧，历史帧不得继承当前 room turn identity；工具按官方 call ID 终身幂等；cache v14 整包替换仍要求 canonical 覆盖全部唯一 call ID，分页外旧工具则只在本地已有稳定 snapshot 行时清理同 call ID 副本；重试占位与请求共用同一目标模型。
+- 统计气泡：同一轮的 usage 与 context 事件可能被正文/工具隔开，旧逻辑只取最后一个 metric，故只剩 Context；现改为在单轮内部按字段合并模型、输入、输出与 Context。
+- 证据：官方 seq 503-532 对应 turn 12 的 10 个调用；IndexedDB 尾部在新用户事件后追加了 25 个时间戳更早的历史工具。详见 `docs/issue-retry-history-replay-snapshot.md`。
+- 实机：新构建 `index-CDYdIW8Y.js` 下，目标会话从 237 个工具收敛为 114/114 唯一；孤立 `Context: 20.22%` 气泡不再渲染，下一轮完整 usage 仍显示模型、输入、输出和 Context。
+
 ## 2026-07-22 v2.16.90 流式正文因草稿身份切换而局部倒序
 
 - 真实会话 `session_259f8e2c-6581-49fa-9f08-20a190878d03`：官方 wire 的首段始终是「你好霖江路。我会补上…」，终态正文也正确；Kimix 运行中曾显示「霖江路。我会你好补上…」。

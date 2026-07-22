@@ -92,6 +92,69 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
     }, events)).toBe(true);
   });
 
+  it("does not append an older historical tool into a newer active retry turn", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-new",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "重新发送的问题",
+    }, {
+      id: "status-new",
+      type: "status_update",
+      timestamp: 1_001,
+      message: "消息发送中",
+      source: "ipc",
+      parentEventId: "user-new",
+    }, {
+      id: "assistant-pending",
+      type: "assistant_message",
+      timestamp: 1_002,
+      content: "",
+      model: "grok-4.5",
+      isThinking: false,
+      isComplete: false,
+    }];
+
+    const historicalTool = {
+      type: "tool.call.started",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+      snapshotMessageId: "msg-old-assistant",
+      snapshotMessageIdStable: true,
+      snapshotMessageText: "",
+      created_at: 200,
+      toolCallId: "call-old",
+      name: "ReadFile",
+    };
+
+    expect(shouldSkipKimiCodeSnapshotReplay(historicalTool, events, true)).toBe(true);
+    expect(shouldSkipKimiCodeSnapshotReplay(historicalTool, events, false)).toBe(true);
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      ...historicalTool,
+      snapshotReplay: "in_flight",
+    }, events, true)).toBe(false);
+  });
+
+  it("drops identity-less historical replay while a local prompt placeholder is pending", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-new", type: "user_message", timestamp: 1_000, content: "重试",
+    }, {
+      id: "status-new", type: "status_update", timestamp: 1_001,
+      message: "消息发送中", source: "ipc", parentEventId: "user-new",
+    }, {
+      id: "assistant-pending", type: "assistant_message", timestamp: 1_002,
+      content: "", isThinking: false, isComplete: false,
+    }];
+
+    expect(shouldSkipKimiCodeSnapshotReplay({
+      type: "tool.call.started",
+      snapshotReplay: "history",
+      snapshotRole: "assistant",
+      snapshotMessageText: "",
+      toolCallId: "call-old-without-time",
+    }, events)).toBe(true);
+  });
+
   it("does not let a historical turn end close a new local assistant placeholder", () => {
     const events: TimelineEvent[] = [{
       id: "user-new",
@@ -146,7 +209,7 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
     expect(shouldSkipKimiCodeSnapshotReplay(historicalTurnEnd, events, false)).toBe(false);
   });
 
-  it("allows an older identified history turn to settle while a newer turn is active", () => {
+  it("keeps an older identified history terminal out of a newer active turn", () => {
     const events: TimelineEvent[] = [{
       id: "assistant-old",
       type: "assistant_message",
@@ -179,7 +242,7 @@ describe("shouldSkipKimiCodeSnapshotReplay", () => {
       snapshotMessageId: "msg-old",
       snapshotMessageIdStable: true,
       created_at: 220,
-    }, events, true)).toBe(false);
+    }, events, true)).toBe(true);
   });
 });
 

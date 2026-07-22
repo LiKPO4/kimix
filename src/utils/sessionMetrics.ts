@@ -65,6 +65,31 @@ export function hasMetricStatus(event: Extract<TimelineEvent, { type: "status_up
     event.contextLimit !== undefined;
 }
 
+export function mergeMetricStatusUpdates(
+  statuses: Extract<TimelineEvent, { type: "status_update" }>[],
+) {
+  const hasTurnUsage = statuses.some((status) => (
+    status.inputTokenCount !== undefined ||
+    status.tokenCount !== undefined ||
+    Boolean(status.message?.trim().startsWith("模型："))
+  ));
+  if (!hasTurnUsage) return undefined;
+  return statuses.filter(hasMetricStatus).reduce<Extract<TimelineEvent, { type: "status_update" }> | undefined>(
+    (merged, incoming) => merged
+      ? {
+          ...merged,
+          ...incoming,
+          message: incoming.message ?? merged.message,
+          inputTokenCount: incoming.inputTokenCount ?? merged.inputTokenCount,
+          tokenCount: incoming.tokenCount ?? merged.tokenCount,
+          contextSize: incoming.contextSize ?? merged.contextSize,
+          contextLimit: incoming.contextLimit ?? merged.contextLimit,
+        }
+      : incoming,
+    undefined,
+  );
+}
+
 export function getLatestMeaningfulStatus(events: TimelineEvent[]) {
   const statuses = events.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
   for (let index = statuses.length - 1; index >= 0; index -= 1) {

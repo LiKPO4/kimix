@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { hasCanonicalKimiThinkingHistory, hasKimiProcessHistoryRegression, hasLegacyKimiClarificationWrapper, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
+import { hasCanonicalKimiThinkingHistory, hasKimiProcessHistoryRegression, hasLegacyKimiClarificationWrapper, hasRepairableDuplicateKimiToolHistory, hasRicherKimiProcessHistory, KIMI_HISTORY_CACHE_VERSION, kimiHistoryProcessEventCount } from "../kimiHistoryCache";
 
 const assistant: TimelineEvent = {
   id: "assistant",
@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 13 for live failed-turn snapshot recovery migration", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(13);
+  it("uses cache version 14 for historical tool replay ownership migration", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(14);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {
@@ -47,6 +47,13 @@ describe("Kimi history cache migration", () => {
   it("detects a partial canonical snapshot that would remove live process history", () => {
     expect(hasKimiProcessHistoryRegression([assistant, tool], [assistant])).toBe(true);
     expect(hasKimiProcessHistoryRegression([assistant], [assistant, tool])).toBe(false);
+  });
+
+  it("recognizes duplicated cached tool calls only when canonical history covers every identity", () => {
+    const duplicate = { ...tool, id: "tool-replayed", timestamp: 3 };
+    expect(hasRepairableDuplicateKimiToolHistory([assistant, tool, duplicate], [assistant, tool])).toBe(true);
+    expect(hasRepairableDuplicateKimiToolHistory([assistant, tool, duplicate], [assistant])).toBe(false);
+    expect(hasRepairableDuplicateKimiToolHistory([assistant, tool], [assistant, tool])).toBe(false);
   });
 
   it("does not replace a richer local process timeline", () => {

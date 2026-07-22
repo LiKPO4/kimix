@@ -79,9 +79,31 @@ export function shouldSkipKimiCodeSnapshotReplay(
 ): boolean {
   if (rawEvent?.snapshotReplay !== "history") return false;
   const rawType = isString(rawEvent.type) ? rawEvent.type : "";
+  const localPromptPending = runtimeActive || hasPendingLocalPromptPlaceholder(events);
+  if (localPromptPending) {
+    const latestUserTimestamp = events.reduce<number | undefined>((latest, event) => (
+      event.type === "user_message" && (latest === undefined || event.timestamp > latest)
+        ? event.timestamp
+        : latest
+    ), undefined);
+    const replayTimestamp = snapshotTimestamp(rawEvent);
+    // recoverSnapshot emits the complete official history before the live
+    // in-flight frames. During retry/reconnect, those older frames arrive in a
+    // burst after the new optimistic user row. Appending them by arrival order
+    // assigns historical tools/body chunks to the active turn. Historical
+    // hydration is handled by canonical reconciliation; the live path may only
+    // consume history at/after the current user boundary. A history frame with
+    // no timestamp cannot prove that ownership and is therefore also rejected.
+    if (
+      latestUserTimestamp !== undefined &&
+      (replayTimestamp === undefined || replayTimestamp < latestUserTimestamp)
+    ) {
+      return true;
+    }
+  }
   if (
     (rawType === "turn.ended" || rawType === "TurnEnd") &&
-    (runtimeActive || hasPendingLocalPromptPlaceholder(events))
+    localPromptPending
   ) {
     const messageId = isString(rawEvent.snapshotMessageId) && rawEvent.snapshotMessageId
       ? rawEvent.snapshotMessageId
