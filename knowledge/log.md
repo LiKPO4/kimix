@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Video prompts stay on the official multimodal content path**: local video bytes are uploaded once and sent as official file-backed video parts; snapshot replay preserves video-only turns, and historical file references download lazily only when playback is requested. SDK compatibility routes materialize those references only when needed. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
 * **Main-Agent thinking follows official model effort capabilities**: the composer now offers the current model's declared thinking levels, never invents an off state for always-thinking models, keeps legacy off/on fallback, and applies the persisted idle selection through the official session profile. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **Experimental SDK features are rebased onto official release tags**: Kimix now builds subagent routing from the official Kimi Code `0.29.0` / Node SDK `0.14.0` tag and ports only PR #1996's targeted commits, avoiding unrelated drift and stale package metadata from the open PR branch. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).

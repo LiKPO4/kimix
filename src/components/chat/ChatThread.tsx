@@ -1424,7 +1424,8 @@ export const ChatThread = memo(function ChatThread() {
     const res = await window.api.sendKimiCodePrompt({
       sessionId: runtimeSessionId,
       content: lastPrompt.content,
-      images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).map((image) => ({ name: image.name, dataUrl: image.dataUrl ?? "" })).filter((image) => image.dataUrl) : [],
+      images: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).filter((image) => image.kind !== "video" && image.dataUrl?.startsWith("data:image/")).map((image) => ({ name: image.name, dataUrl: image.dataUrl! })) : [],
+      videos: lastPrompt.type === "user_message" ? (lastPrompt.images ?? []).filter((image) => image.kind === "video" && (image.dataUrl?.startsWith("data:video/") || image.fileId)).map((video) => ({ name: video.name, dataUrl: video.dataUrl, fileId: video.fileId, mediaType: video.mediaType })) : [],
       model: retryModel,
     });
     if (!res.success) {

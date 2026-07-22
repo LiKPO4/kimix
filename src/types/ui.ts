@@ -390,10 +390,13 @@ export interface UserMessageEvent {
 
 export interface UserMessageImage {
   id?: string;
-  kind?: "image" | "file";
+  kind?: "image" | "video" | "file";
   name: string;
   dataUrl?: string;
   filePath?: string;
+  fileId?: string;
+  mediaType?: string;
+  url?: string;
 }
 
 export interface SteerMessageEvent {

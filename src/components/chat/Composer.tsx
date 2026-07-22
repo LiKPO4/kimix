@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Target, Loader2 } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Target, Loader2, Film, Images } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -92,6 +92,10 @@ const MAX_IMAGE_ATTACHMENTS = 20;
 const MAX_SINGLE_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_IMAGE_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_CONCURRENT_IMAGE_READS = 3;
+const MAX_VIDEO_ATTACHMENTS = 4;
+const MAX_SINGLE_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_TOTAL_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_CONCURRENT_VIDEO_READS = 1;
 
 function hasDraggedFiles(event: React.DragEvent): boolean {
   return Array.from(event.dataTransfer.types).includes("Files");
@@ -303,10 +307,13 @@ function roomControlStatusLabel(status: RoomAgentControlTarget["status"]) {
 
 type ImageAttachment = {
   id: string;
-  kind?: "image" | "file";
+  kind?: "image" | "video" | "file";
   name: string;
   dataUrl?: string;
   filePath?: string;
+  fileId?: string;
+  mediaType?: string;
+  url?: string;
 };
 
 type RoomControlRequest =
@@ -315,7 +322,11 @@ type RoomControlRequest =
   | { action: "steer-pending"; pendingId: string };
 
 function isImageAttachment(attachment: ImageAttachment): attachment is ImageAttachment & { dataUrl: string } {
-  return Boolean(attachment.dataUrl);
+  return attachment.kind !== "video" && Boolean(attachment.dataUrl?.startsWith("data:image/"));
+}
+
+function isVideoAttachment(attachment: ImageAttachment): attachment is ImageAttachment & { dataUrl: string } {
+  return attachment.kind === "video" && Boolean(attachment.dataUrl?.startsWith("data:video/"));
 }
 
 function attachmentFilePath(attachment: ImageAttachment) {
@@ -323,7 +334,7 @@ function attachmentFilePath(attachment: ImageAttachment) {
 }
 
 function buildAttachmentPromptContent(content: string, attachments: ImageAttachment[]) {
-  const files = attachments.filter((attachment) => attachment.kind === "file" || Boolean(attachment.filePath));
+  const files = attachments.filter((attachment) => attachment.kind === "file");
   if (files.length === 0) return content;
   const fileLines = files.map((file, index) => {
     const filePath = attachmentFilePath(file);
@@ -344,6 +355,12 @@ function toPromptImages(attachments: ImageAttachment[]) {
     .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
 }
 
+function toPromptVideos(attachments: ImageAttachment[]) {
+  return attachments
+    .filter(isVideoAttachment)
+    .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
+}
+
 function toUserAttachments(attachments: ImageAttachment[]) {
   return attachments.map((attachment) => ({
     id: attachment.id,
@@ -351,6 +368,9 @@ function toUserAttachments(attachments: ImageAttachment[]) {
     name: attachment.name,
     dataUrl: attachment.dataUrl,
     filePath: attachment.filePath,
+    fileId: attachment.fileId,
+    mediaType: attachment.mediaType,
+    url: attachment.url,
   }));
 }
 
@@ -478,6 +498,7 @@ export function Composer() {
   const [fileItems, setFileItems] = useState<CompletionItem[]>([]);
   const [activeCompletionIndex, setActiveCompletionIndex] = useState(0);
   const inputRef = useRef<ComposerInputHandle>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
   const completionListRef = useRef<HTMLDivElement>(null);
   const completionItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const roomDispatchingRef = useRef(new Set<string>());
@@ -746,7 +767,7 @@ export function Composer() {
       const detail = (event as CustomEvent<{
         sessionId?: string;
         content?: string;
-        images?: Array<{ id?: string; kind?: "image" | "file"; name: string; dataUrl?: string; filePath?: string }>;
+        images?: Array<{ id?: string; kind?: "image" | "video" | "file"; name: string; dataUrl?: string; filePath?: string; fileId?: string; mediaType?: string; url?: string }>;
       }>).detail;
       if (!detail?.sessionId || useAppStore.getState().currentSession?.id !== detail.sessionId) return;
       setInput(detail.content ?? "");
@@ -756,6 +777,9 @@ export function Composer() {
         name: image.name,
         dataUrl: image.dataUrl,
         filePath: image.filePath,
+        fileId: image.fileId,
+        mediaType: image.mediaType,
+        url: image.url,
       })));
       window.requestAnimationFrame(() => inputRef.current?.focus());
     };
@@ -1023,6 +1047,53 @@ export function Composer() {
     setImageAttachments((prev) => [...prev, ...attachments]);
   };
 
+  const addVideoFiles = async (files: File[]) => {
+    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+    if (videoFiles.length === 0) return;
+    const currentVideos = imageAttachments.filter((attachment) => attachment.kind === "video");
+    const currentSize = currentVideos.reduce((sum, video) => sum + (video.dataUrl?.length ?? 0) * 0.75, 0);
+    if (currentVideos.length + videoFiles.length > MAX_VIDEO_ATTACHMENTS) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `最多只能附加 ${MAX_VIDEO_ATTACHMENTS} 个视频，当前已有 ${currentVideos.length} 个。`,
+      }));
+      return;
+    }
+    const oversized = videoFiles.filter((file) => file.size > MAX_SINGLE_VIDEO_SIZE_BYTES);
+    if (oversized.length > 0) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `单个视频不能超过 ${MAX_SINGLE_VIDEO_SIZE_BYTES / 1024 / 1024}MB，有 ${oversized.length} 个视频超出官方 Server 限制。`,
+      }));
+      return;
+    }
+    const batchTotal = videoFiles.reduce((sum, file) => sum + file.size, 0);
+    if (currentSize + batchTotal > MAX_TOTAL_VIDEO_SIZE_BYTES) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `视频总大小不能超过 ${MAX_TOTAL_VIDEO_SIZE_BYTES / 1024 / 1024}MB。`,
+      }));
+      return;
+    }
+    const attachments: ImageAttachment[] = [];
+    for (let i = 0; i < videoFiles.length; i += MAX_CONCURRENT_VIDEO_READS) {
+      const batch = videoFiles.slice(i, i + MAX_CONCURRENT_VIDEO_READS);
+      const batchAttachments = await Promise.all(batch.map((file) => new Promise<ImageAttachment>((resolve, reject) => {
+        const filePath = getDraggedFilePath(file);
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          id: genId(),
+          kind: "video",
+          name: file.name || filePath.split(/[\\/]/).pop() || "粘贴视频",
+          dataUrl: String(reader.result),
+          filePath,
+          mediaType: file.type || "video/mp4",
+        });
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      })));
+      attachments.push(...batchAttachments);
+    }
+    setImageAttachments((prev) => [...prev, ...attachments]);
+  };
+
   const getDraggedFilePath = (file: File) => {
     const electronPath = typeof window.api.getDraggedFilePath === "function"
       ? window.api.getDraggedFilePath(file)
@@ -1045,10 +1116,19 @@ export function Composer() {
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/"));
     if (files.length === 0) return;
     event.preventDefault();
-    void addImageFiles(files);
+    void addImageFiles(files.filter((file) => file.type.startsWith("image/")));
+    void addVideoFiles(files.filter((file) => file.type.startsWith("video/")));
+  };
+
+  const handleMediaFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    void addImageFiles(files.filter((file) => file.type.startsWith("image/")));
+    void addVideoFiles(files.filter((file) => file.type.startsWith("video/")));
   };
 
   const openBlankDrawingBoard = (ratio: DrawingBoardRequest["ratio"]) => {
@@ -1187,8 +1267,11 @@ export function Composer() {
       if (!initial || !message || !agent) return;
       let runtimeSessionId = agent.runtimeSessionId ?? agent.officialSessionId;
       const promptImages = (message.images ?? [])
-        .filter((image): image is typeof image & { dataUrl: string } => Boolean(image.dataUrl))
+        .filter((image): image is typeof image & { dataUrl: string } => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
         .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
+      const promptVideos = (message.images ?? [])
+        .filter((media): media is typeof media & { dataUrl: string } => media.kind === "video" && Boolean(media.dataUrl?.startsWith("data:video/")))
+        .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
       const result = await dispatchQueuedRoomDelivery({
         roomMessageId,
         roomAgentId,
@@ -1234,6 +1317,7 @@ export function Composer() {
             sessionId: runtimeSessionId,
             content: outboundPrompt,
             images: promptImages,
+            videos: promptVideos,
             model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
           });
           if (!response.success && /not active|not found|session/i.test(response.error)) {
@@ -1256,6 +1340,7 @@ export function Composer() {
               sessionId: runtimeSessionId,
               content: outboundPrompt,
               images: promptImages,
+              videos: promptVideos,
               model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
             });
           }
@@ -1521,6 +1606,7 @@ export function Composer() {
     setRunningSessionId(targetSession.id);
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
+      const videosForApi = toPromptVideos(images);
       const sameWorkDir = (a?: string, b?: string) => isSamePath(a, b);
       const updateLinkStatus = (message: string, tone: Extract<TimelineEvent, { type: "status_update" }>["tone"] = "info") => {
         const timestamp = Date.now();
@@ -1682,6 +1768,7 @@ export function Composer() {
           sessionId: kimiCodeSessionId,
           content: outboundContent,
           images: imagesForApi,
+          videos: videosForApi,
           model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
         });
         if (!res.success && /not active|not found|session/i.test(res.error)) {
@@ -1693,6 +1780,7 @@ export function Composer() {
             sessionId: kimiCodeSessionId,
             content: outboundContent,
             images: imagesForApi,
+            videos: videosForApi,
             model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
           });
         }
@@ -3100,6 +3188,7 @@ export function Composer() {
       sessionId: runtimeSessionId,
       content: buildAttachmentPromptContent(trimmed, imagesToSend),
       images: toPromptImages(imagesToSend),
+      videos: toPromptVideos(imagesToSend),
     });
     if (!res.success) {
       updateSteerStatus(activeSession.id, steerId, "failed", res.error, roomTarget);
@@ -3593,9 +3682,13 @@ export function Composer() {
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0 && canUseComposer) {
       const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-      const otherFiles = files.filter((file) => !file.type.startsWith("image/"));
+      const videoFiles = files.filter((file) => file.type.startsWith("video/"));
+      const otherFiles = files.filter((file) => !file.type.startsWith("image/") && !file.type.startsWith("video/"));
       if (imageFiles.length > 0) {
         void addImageFiles(imageFiles);
+      }
+      if (videoFiles.length > 0) {
+        void addVideoFiles(videoFiles);
       }
       if (otherFiles.length === 0) return;
       addFileAttachments(otherFiles);
@@ -3618,6 +3711,9 @@ export function Composer() {
       name: image.name,
       dataUrl: image.dataUrl,
       filePath: image.filePath,
+      fileId: image.fileId,
+      mediaType: image.mediaType,
+      url: image.url,
     }));
     await sendPromptContent(pending.content, {
       manualSubmitAutoScroll: false,
@@ -3666,6 +3762,9 @@ export function Composer() {
           name: image.name,
           dataUrl: image.dataUrl,
           filePath: image.filePath,
+          fileId: image.fileId,
+          mediaType: image.mediaType,
+          url: image.url,
         })),
       roomTarget,
     );
@@ -3678,10 +3777,16 @@ export function Composer() {
         name: image.name,
         dataUrl: image.dataUrl,
         filePath: image.filePath,
+        fileId: image.fileId,
+        mediaType: image.mediaType,
+        url: image.url,
       }))),
       images: (pending.images ?? [])
-        .filter((image) => Boolean(image.dataUrl))
+        .filter((image) => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
         .map((image) => ({ name: image.name, dataUrl: image.dataUrl as string })),
+      videos: (pending.images ?? [])
+        .filter((image) => image.kind === "video" && Boolean(image.dataUrl?.startsWith("data:video/") || image.fileId))
+        .map((video) => ({ name: video.name, dataUrl: video.dataUrl, fileId: video.fileId, mediaType: video.mediaType })),
     });
     if (!res.success) {
       if (/not active|not found|session/i.test(res.error) && activeSession) {
@@ -3731,6 +3836,9 @@ export function Composer() {
       name: image.name,
       dataUrl: image.dataUrl,
       filePath: image.filePath,
+      fileId: image.fileId,
+      mediaType: image.mediaType,
+      url: image.url,
     })));
     removePendingMessage(id);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -3817,6 +3925,16 @@ export function Composer() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <input
+        ref={mediaFileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={handleMediaFileSelection}
+      />
       {activeSession && visibleTodos.length > 0 && !todoHidden && (
         <TodoPanel
           events={activeSession.events}
@@ -4194,14 +4312,22 @@ export function Composer() {
         {imageAttachments.length > 0 && (
           <div className="flex flex-wrap" style={{ gap: 10, paddingTop: 2, paddingBottom: 12 }}>
             {imageAttachments.map((attachment) => {
-              const isImage = Boolean(attachment.dataUrl);
+              const isVideo = attachment.kind === "video";
+              const isImage = isImageAttachment(attachment);
               return (
                 <div
                   key={attachment.id}
-                  className={`kimix-media-thumb group relative overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors ${isImage ? "h-20 w-20" : "h-20 w-[176px]"}`}
+                  className={`kimix-media-thumb group relative overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors ${isImage ? "h-20 w-20" : isVideo ? "h-24 w-[176px]" : "h-20 w-[176px]"}`}
                   title={isImage ? undefined : attachment.filePath || attachment.name}
                 >
-                  {isImage ? (
+                  {isVideo && attachment.dataUrl ? (
+                    <div className="relative h-full w-full bg-black">
+                      <video src={attachment.dataUrl} muted preload="metadata" className="kimix-media-preview h-full w-full object-cover" />
+                      <span className="absolute flex items-center rounded-md bg-black/65 text-[11px] text-white" style={{ left: 8, bottom: 7, gap: 5, padding: "4px 7px" }}>
+                        <Film size={12} /> 视频
+                      </span>
+                    </div>
+                  ) : isImage ? (
                     <button
                       type="button"
                       onClick={() => setPreviewImage(attachment as ImageAttachment & { dataUrl: string })}
@@ -4209,7 +4335,7 @@ export function Composer() {
                       title="点击查看图片"
                       aria-label={`查看图片 ${attachment.name}`}
                     >
-                      <img src={attachment.dataUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                      <img src={attachment.dataUrl} alt={attachment.name} className="kimix-media-preview h-full w-full object-cover" />
                     </button>
                   ) : (
                     <div className="flex h-full min-w-0 flex-col justify-center text-[var(--kimix-panel-text)]" style={{ gap: 5, paddingLeft: 14, paddingRight: 34 }}>
@@ -4238,8 +4364,8 @@ export function Composer() {
                       height: 20,
                       lineHeight: 0,
                     }}
-                    title={isImage ? "移除图片" : "移除附件"}
-                    aria-label={isImage ? "移除图片" : "移除附件"}
+                    title={isImage ? "移除图片" : isVideo ? "移除视频" : "移除附件"}
+                    aria-label={isImage ? "移除图片" : isVideo ? "移除视频" : "移除附件"}
                   >
                     <X size={10} style={{ display: "block" }} />
                   </button>
@@ -4271,8 +4397,28 @@ export function Composer() {
               {showAddMenu && (
                 <ComposerToolbarPopover align="start" width={260}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
+                    <section>
+                      <button
+                        type="button"
+                        disabled={!canUseComposer}
+                        onClick={() => {
+                          setShowAddMenu(false);
+                          mediaFileInputRef.current?.click();
+                        }}
+                        className="grid w-full items-center rounded-xl text-left transition-[background-color,scale] duration-150 ease-out hover:bg-[var(--kimix-panel-hover)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
+                        style={{ gridTemplateColumns: "32px minmax(0, 1fr)", gap: 10, minHeight: 52, paddingLeft: 8, paddingRight: 12 }}
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text-secondary)]">
+                          <Images size={15} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[13.5px] font-medium text-[var(--kimix-panel-text)]">上传图片或视频</span>
+                          <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">视频将直接作为多模态内容发送</span>
+                        </span>
+                      </button>
+                    </section>
                     {multiAgentRoomUiAvailable && (
-                      <section>
+                      <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
                         <button
                           type="button"
                           disabled={!canUseComposer || activeRoomBusy || activeRoomAgents.length >= 4}

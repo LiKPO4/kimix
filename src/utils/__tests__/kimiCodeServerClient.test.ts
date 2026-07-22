@@ -79,6 +79,24 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(upload).toHaveBeenCalledWith({ name: "shot.png", mediaType: "image/png", data: "AA==" });
   });
 
+  it("maps inline, uploaded, and restored videos to the official video content shape", async () => {
+    await expect(toServerPromptContent([
+      { type: "video_url", videoUrl: { url: "data:video/mp4;base64,AA==", id: "clip.mp4" } },
+      { type: "video_url", videoUrl: { fileId: "file-restored" } },
+    ])).resolves.toEqual([
+      { type: "video", source: { kind: "base64", media_type: "video/mp4", data: "AA==" } },
+      { type: "video", source: { kind: "file", file_id: "file-restored" } },
+    ]);
+
+    const upload = vi.fn(async () => ({ id: "file-video" }));
+    await expect(toServerPromptContent([
+      { type: "video_url", videoUrl: { url: "data:video/webm;base64,AQ==", id: "clip.webm" } },
+    ], upload)).resolves.toEqual([
+      { type: "video", source: { kind: "file", file_id: "file-video" } },
+    ]);
+    expect(upload).toHaveBeenCalledWith({ name: "clip.webm", mediaType: "video/webm", data: "AQ==" });
+  });
+
   it("sniffs inline image bytes before sending base64 content or uploading files", async () => {
     const pngBytes = "iVBORw0KGgo=";
     await expect(toServerPromptContent([
@@ -108,6 +126,19 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(url).toBe("http://127.0.0.1:58627/api/v1/files");
     expect(init?.body).toBeInstanceOf(FormData);
     expect((init?.headers as Record<string, string>)["content-type"]).toBeUndefined();
+  });
+
+  it("downloads an official history file as a playable data URL", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array([0, 1, 2]), {
+      status: 200,
+      headers: { "content-type": "video/mp4" },
+    })));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.downloadFile("file-video")).resolves.toEqual({
+      fileId: "file-video",
+      data: Buffer.from([0, 1, 2]),
+      mediaType: "video/mp4",
+    });
   });
 
   it("notifies after repeated websocket reconnect failures", async () => {
@@ -1192,6 +1223,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
       content: "最终回答",
       isComplete: false,
     });
+  });
+
+  it("restores a video-only user message from official history", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 9,
+      epoch: "epoch-video",
+      session: { id: "session-video", status: "idle" },
+      messages: {
+        items: [{
+          id: "msg-video",
+          role: "user",
+          content: [{ type: "video", source: { kind: "file", file_id: "file-video" } }],
+        }],
+      },
+    }, "session-video");
+
+    expect(frames[0]).toMatchObject({
+      type: "TurnBegin",
+      payload: {
+        snapshotMessageId: "msg-video",
+        user_input: [{ type: "video", source: { kind: "file", file_id: "file-video" } }],
+      },
+    });
+    expect(mapHistoryEvents(frames)).toMatchObject([{
+      type: "user_message",
+      content: "",
+      images: [{ kind: "video", name: "视频 1", fileId: "file-video" }],
+    }]);
   });
 
   it("restores snapshot tool_use parts so tool results remain visible after reopening", () => {

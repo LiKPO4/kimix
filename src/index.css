@@ -2181,6 +2181,15 @@ button.bg-accent-primary:disabled:hover,
   border-color: var(--border-strong);
 }
 
+.kimix-media-preview {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+
+[data-theme="dark"] .kimix-media-preview {
+  outline-color: rgba(255, 255, 255, 0.1);
+}
+
 /* ── Preview ── */
 
 .kimix-preview-overlay {

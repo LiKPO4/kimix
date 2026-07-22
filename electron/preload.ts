@@ -153,6 +153,8 @@ import type {
   KimiCodeSetExperimentalFeatureResponse,
   KimiCodePluginResponse,
   KimiCodePromptResponse,
+  KimiCodeFileRequest,
+  KimiCodeFileResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
   KimiCodeCreateGoalRequest,
@@ -374,6 +376,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:reloadSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodePromptResponse> =>
     ipcRenderer.invoke("kimi-code:sendPrompt", req),
+  loadKimiCodeFile: (req: KimiCodeFileRequest): Promise<KimiCodeFileResponse> =>
+    ipcRenderer.invoke("kimi-code:loadFile", req),
   askKimiCodeBtw: (req: KimiCodeBtwRequest): Promise<KimiCodeBtwResponse> =>
     ipcRenderer.invoke("kimi-code:askBtw", req),
   swarmKimiCode: (req: KimiCodeSwarmRequest): Promise<KimiCodeVoidResponse> =>

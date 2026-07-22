@@ -1,4 +1,4 @@
-import type { TimelineEvent, TodoItem } from "@/types/ui";
+import type { TimelineEvent, TodoItem, UserMessageImage } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
@@ -28,7 +28,7 @@ const OFFICIAL_SYSTEM_REMINDER_PATTERN = /(?:^|\r?\n)[ \t]*<system-reminder\b[^>
 
 type ExtractedUserMessage = {
   content: string;
-  images: { name: string; dataUrl?: string }[];
+  images: UserMessageImage[];
   deliveryIdentity?: RoomDeliveryPromptIdentity;
 };
 
@@ -945,7 +945,7 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
   if (!Array.isArray(input)) return { content: "", images: [] };
 
   const textParts: string[] = [];
-  const images: { name: string; dataUrl?: string }[] = [];
+  const images: UserMessageImage[] = [];
   let deliveryIdentity: RoomDeliveryPromptIdentity | undefined;
   input.forEach((part, index) => {
     if (!isRecord(part)) return;
@@ -986,6 +986,39 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
           : undefined;
       images.push({ name: id || `图片 ${index + 1}`, dataUrl });
       if (!dataUrl) textParts.push("[图片]");
+      return;
+    }
+    if (part.type === "video_url") {
+      const videoUrl = isRecord(part.videoUrl)
+        ? part.videoUrl
+        : (isRecord(part.video_url) ? part.video_url : {});
+      const url = isString(videoUrl.url) ? videoUrl.url : undefined;
+      const id = isString(videoUrl.id) ? videoUrl.id : undefined;
+      images.push({
+        kind: "video",
+        name: id || `视频 ${index + 1}`,
+        dataUrl: url?.startsWith("data:video/") ? url : undefined,
+        url: url && !url.startsWith("data:") ? url : undefined,
+      });
+      return;
+    }
+    if (part.type === "video" && isRecord(part.source)) {
+      const mediaType = isString(part.source.media_type)
+        ? part.source.media_type
+        : isString(part.source.mediaType)
+          ? part.source.mediaType
+          : "video/mp4";
+      const data = isString(part.source.data) ? part.source.data : undefined;
+      const url = isString(part.source.url) ? part.source.url : undefined;
+      const fileId = isString(part.source.file_id) ? part.source.file_id : undefined;
+      images.push({
+        kind: "video",
+        name: isString(part.name) ? part.name : `视频 ${index + 1}`,
+        dataUrl: data ? (data.startsWith("data:video/") ? data : `data:${mediaType};base64,${data}`) : undefined,
+        fileId,
+        mediaType,
+        url: url && !url.startsWith("data:") ? url : undefined,
+      });
     }
   });
   return {
@@ -1001,23 +1034,26 @@ function normalizeUserContent(content: string): string {
   return visibleContent
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line && !/^\[图片(?::[^\]]*)?\]$/.test(line))
+    .filter((line) => line && !/^\[(?:图片|视频)(?::[^\]]*)?\]$/.test(line))
     .join("\n")
     .trim();
 }
 
 function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_message" }>): string {
   return (event.images ?? [])
-    .map((image) => image.dataUrl || image.name || "图片")
+    .map((image) => image.fileId || image.dataUrl || image.url || image.name || "媒体")
     .join("|");
 }
 
-function hasDisplayableImages(images?: { dataUrl?: string }[]) {
-  return Boolean(images?.some((image) => typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")));
+function hasDisplayableImages(images?: UserMessageImage[]) {
+  return Boolean(images?.some((image) => (
+    Boolean(image.fileId || image.url) ||
+    Boolean(image.dataUrl && /^(?:data:|blob:|https?:\/\/)/i.test(image.dataUrl))
+  )));
 }
 
-function hasLocalUserMedia(images?: { dataUrl?: string; filePath?: string }[]) {
-  return Boolean(images?.some((image) => Boolean(image.dataUrl || image.filePath)));
+function hasLocalUserMedia(images?: UserMessageImage[]) {
+  return Boolean(images?.some((image) => Boolean(image.dataUrl || image.filePath || image.fileId || image.url)));
 }
 
 function mergeUserMedia(
@@ -1031,10 +1067,14 @@ function mergeUserMedia(
     if (!local) return image;
     return {
       ...image,
+      name: image.kind === "video" && /^视频 \d+$/.test(image.name) ? local.name : image.name,
       id: image.id ?? local.id,
       kind: image.kind ?? local.kind,
       dataUrl: image.dataUrl ?? local.dataUrl,
       filePath: image.filePath ?? local.filePath,
+      fileId: image.fileId ?? local.fileId,
+      mediaType: image.mediaType ?? local.mediaType,
+      url: image.url ?? local.url,
     };
   });
 }
@@ -1308,7 +1348,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         id: generateId(),
         type: "steer_message",
         timestamp: eventTimestamp,
-        content: text || "[图片]",
+        content: text || (message.images.some((media) => media.kind === "video") ? "[视频]" : "[图片]"),
         images: message.images,
         status: "sent",
       };

@@ -1574,7 +1574,8 @@ export type KimiCodeEngineStatus =
 
 export type KimiCodePromptPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; imageUrl: { url: string; id?: string } };
+  | { type: "image_url"; imageUrl: { url: string; id?: string } }
+  | { type: "video_url"; videoUrl: { url?: string; id?: string; fileId?: string } };
 
 export type KimiCodeSessionInfo = {
   sessionId: string;
@@ -1805,8 +1806,25 @@ export type KimiCodePromptRequest = {
   sessionId: string;
   content: string;
   images?: { name: string; dataUrl: string }[];
+  videos?: { name: string; dataUrl?: string; fileId?: string; mediaType?: string }[];
   /** Renderer-selected session model; immutable for this prompt dispatch. */
   model?: string;
+};
+
+export type KimiCodeFileRequest = {
+  fileId: string;
+};
+
+export type KimiCodeFileResponse = {
+  success: true;
+  data: {
+    fileId: string;
+    mediaType: string;
+    dataUrl: string;
+  };
+} | {
+  success: false;
+  error: string;
 };
 
 export type KimiCodeBtwRequest = {

@@ -4,7 +4,8 @@ import path from "node:path";
 
 export type ServerPromptPart =
   | { type: "text"; text: string }
-  | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } };
+  | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } }
+  | { type: "video"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } };
 
 type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
 type ServerClientOptions = {
@@ -403,27 +404,43 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
 }
 
 export async function toServerPromptContent(
-  input: string | Array<{ type: string; text?: string; imageUrl?: { url: string; id?: string } }>,
+  input: string | Array<{
+    type: string;
+    text?: string;
+    imageUrl?: { url: string; id?: string };
+    videoUrl?: { url?: string; id?: string; fileId?: string };
+  }>,
   upload?: ServerPromptUpload,
 ): Promise<ServerPromptPart[]> {
   if (typeof input === "string") return [{ type: "text", text: input }];
   return Promise.all(input.map(async (part) => {
     if (part.type === "text") return { type: "text", text: part.text ?? "" };
-    const url = part.imageUrl?.url ?? "";
+    const isVideo = part.type === "video_url";
+    const media = isVideo ? part.videoUrl : part.imageUrl;
+    if (isVideo && part.videoUrl?.fileId) {
+      return { type: "video", source: { kind: "file", file_id: part.videoUrl.fileId } };
+    }
+    const url = media?.url ?? "";
     const dataUrl = url.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
     if (dataUrl) {
-      const mediaType = sniffImageMediaType(dataUrl[2]) ?? dataUrl[1];
+      const mediaType = isVideo ? dataUrl[1] : sniffImageMediaType(dataUrl[2]) ?? dataUrl[1];
       if (upload) {
         const file = await upload({
-          name: part.imageUrl?.id?.trim() || "image",
+          name: media?.id?.trim() || (isVideo ? "video" : "image"),
           mediaType,
           data: dataUrl[2],
         });
-        return { type: "image", source: { kind: "file", file_id: file.id } };
+        return isVideo
+          ? { type: "video", source: { kind: "file", file_id: file.id } }
+          : { type: "image", source: { kind: "file", file_id: file.id } };
       }
-      return { type: "image", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } };
+      return isVideo
+        ? { type: "video", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } }
+        : { type: "image", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } };
     }
-    return { type: "image", source: { kind: "url", url } };
+    return isVideo
+      ? { type: "video", source: { kind: "url", url } }
+      : { type: "image", source: { kind: "url", url } };
   }));
 }
 
@@ -732,6 +749,21 @@ export class KimiCodeServerClient {
     form.append("name", input.name);
     form.append("file", new Blob([Buffer.from(input.data, "base64")], { type: input.mediaType }), input.name);
     return this.request("/api/v1/files", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  }
+
+  async downloadFile(fileId: string): Promise<{ fileId: string; mediaType: string; data: Buffer }> {
+    const response = await fetch(`${this.endpoint}/api/v1/files/${encodeURIComponent(fileId)}`, {
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      headers: serverAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw Object.assign(new Error(`/api/v1/files/${fileId}: HTTP ${response.status}`), { statusCode: response.status });
+    }
+    return {
+      fileId,
+      mediaType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() || "application/octet-stream",
+      data: Buffer.from(await response.arrayBuffer()),
+    };
   }
 
   async listSkills(sessionId: string): Promise<ServerSkill[]> {
@@ -1563,7 +1595,8 @@ function snapshotMessageToServerFrames(
   const messageIdentity = snapshotMessageIdentity(message, role);
   if (role === "user") {
     const messageText = contentToText(message.content);
-    if (replayMode === "history" && messageText) {
+    const hasPromptContent = messageText.length > 0 || hasMediaContent(message.content);
+    if (replayMode === "history" && hasPromptContent) {
       return [{
         type: "TurnBegin",
         session_id: sessionId,
@@ -1606,6 +1639,12 @@ function snapshotMessageToServerFrames(
     }];
   }
   return [];
+}
+
+function hasMediaContent(content: unknown): boolean {
+  return Array.isArray(content) && content.some((part) => (
+    isRecord(part) && (part.type === "image" || part.type === "image_url" || part.type === "video" || part.type === "video_url")
+  ));
 }
 
 function contentPartsToFrames(

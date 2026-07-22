@@ -300,11 +300,17 @@ async function extractImages(
         kind: image.kind,
         dataUrl: image.dataUrl,
         filePath: image.filePath,
+        fileId: image.fileId,
+        mediaType: image.mediaType,
+        url: image.url,
       });
       out.push({
         name: image.name,
         kind: image.kind,
         filePath: image.filePath,
+        fileId: image.fileId,
+        mediaType: image.mediaType,
+        url: image.url,
         imageRef: id,
       });
     } else {
@@ -312,6 +318,9 @@ async function extractImages(
         name: image.name,
         kind: image.kind,
         filePath: image.filePath,
+        fileId: image.fileId,
+        mediaType: image.mediaType,
+        url: image.url,
       });
     }
   }

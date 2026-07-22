@@ -8,9 +8,12 @@
 export interface StoredImage {
   id: string;
   name: string;
-  kind?: "image" | "file";
+  kind?: "image" | "video" | "file";
   dataUrl: string;
   filePath?: string;
+  fileId?: string;
+  mediaType?: string;
+  url?: string;
 }
 
 const DB_NAME = "kimix-state";

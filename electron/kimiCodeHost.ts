@@ -140,7 +140,8 @@ export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 
 export type KimiCodePromptPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; imageUrl: { url: string; id?: string } };
+  | { type: "image_url"; imageUrl: { url: string; id?: string } }
+  | { type: "video_url"; videoUrl: { url?: string; id?: string; fileId?: string } };
 
 export type KimiCodeEngineStatus =
   | "idle"
@@ -978,6 +979,26 @@ export type KimiCodePromptRouteResult = {
   fallbackReason?: string;
 };
 
+export async function loadServerFile(fileId: string): Promise<{ fileId: string; mediaType: string; dataUrl: string }> {
+  const normalizedFileId = fileId.trim();
+  if (!normalizedFileId) throw new Error("Missing fileId");
+  const file = await getServerClient().downloadFile(normalizedFileId);
+  return {
+    fileId: file.fileId,
+    mediaType: file.mediaType,
+    dataUrl: `data:${file.mediaType};base64,${file.data.toString("base64")}`,
+  };
+}
+
+async function materializeVideoFileReferences(input: string | KimiCodePromptPart[]): Promise<string | KimiCodePromptPart[]> {
+  if (typeof input === "string" || !input.some((part) => part.type === "video_url" && part.videoUrl.fileId)) return input;
+  return Promise.all(input.map(async (part): Promise<KimiCodePromptPart> => {
+    if (part.type !== "video_url" || !part.videoUrl.fileId) return part;
+    const file = await loadServerFile(part.videoUrl.fileId);
+    return { type: "video_url", videoUrl: { url: file.dataUrl, id: part.videoUrl.id } };
+  }));
+}
+
 const normalizedModelOutputLimits = new Set<string>();
 
 export function missingOpenAiModelOutputLimitPatch(
@@ -1084,7 +1105,7 @@ export async function sendPrompt(
   scheduleServerRecovery();
   setStatus(sessionId, "running");
   try {
-    await managed.session.prompt(input);
+    await managed.session.prompt(await materializeVideoFileReferences(input));
     const serverStatus = kimiCodeServerHost.getStatus();
     return {
       route: "sdk",
@@ -1317,9 +1338,10 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
   }
   const managed = getManagedSession(sessionId);
   const startedAt = Date.now();
-  await managed.session.steer(input);
-  eventSink?.({ sessionId, event: syntheticSteerRecord(input, startedAt) });
-  void waitForOfficialSteerRecord(sessionId, managed.session.workDir, input, startedAt)
+  const materializedInput = await materializeVideoFileReferences(input);
+  await managed.session.steer(materializedInput);
+  eventSink?.({ sessionId, event: syntheticSteerRecord(materializedInput, startedAt) });
+  void waitForOfficialSteerRecord(sessionId, managed.session.workDir, materializedInput, startedAt)
     .then((officialSteer) => {
       if (officialSteer.source === "kimix-fallback") return;
       eventSink?.({ sessionId, event: officialSteer });

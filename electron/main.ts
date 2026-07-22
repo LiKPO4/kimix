@@ -5687,11 +5687,16 @@ ipcMain.handle("kimi:updateCli", async () => {
   }
 });
 
-function toKimiCodePromptInput(content: string, images: { name: string; dataUrl: string }[] = []) {
-  if (images.length === 0) return content;
+function toKimiCodePromptInput(
+  content: string,
+  images: { name: string; dataUrl: string }[] = [],
+  videos: { name: string; dataUrl?: string; fileId?: string }[] = [],
+) {
+  if (images.length === 0 && videos.length === 0) return content;
   return [
     ...(content ? [{ type: "text" as const, text: content }] : []),
     ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
+    ...videos.map((video) => ({ type: "video_url" as const, videoUrl: { url: video.dataUrl, fileId: video.fileId, id: video.name } })),
   ];
 }
 
@@ -5729,6 +5734,18 @@ function parseKimiCodeImages(value: unknown) {
         typeof (item as { name?: unknown }).name === "string" &&
         typeof (item as { dataUrl?: unknown }).dataUrl === "string" &&
         (item as { dataUrl: string }).dataUrl.startsWith("data:image/")
+      )
+    : [];
+}
+
+function parseKimiCodeVideos(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is { name: string; dataUrl?: string; fileId?: string } =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as { name?: unknown }).name === "string" &&
+        ((typeof (item as { dataUrl?: unknown }).dataUrl === "string" && (item as { dataUrl: string }).dataUrl.startsWith("data:video/")) ||
+          (typeof (item as { fileId?: unknown }).fileId === "string" && Boolean((item as { fileId: string }).fileId.trim())))
       )
     : [];
 }
@@ -5836,11 +5853,12 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
+    const videos = parseKimiCodeVideos(req.videos);
     const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
-    if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
+    if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
     const trySend = async (promptContent: string, promptImages: { name: string; dataUrl: string }[]) => {
-      const input = toKimiCodePromptInput(promptContent, promptImages);
+      const input = toKimiCodePromptInput(promptContent, promptImages, videos);
       const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
       const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
       return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);
@@ -5905,17 +5923,18 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
-    if (!sessionId || (!content && images.length === 0)) return { success: false, error: "Missing sessionId or content" };
+    const videos = parseKimiCodeVideos(req.videos);
+    if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const steerModel = kimiCodeHost.getSessionModel(sessionId);
     const steerAdapted = adaptPromptForModel(content, images, steerModel);
     try {
-      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images));
+      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, videos));
       return { success: true, data: undefined };
     } catch (err) {
       if (isImageUnsupportedError(err)) {
         markModelAsNonVision(steerModel);
         const fallback = adaptPromptForModel(content, images, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images));
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, videos));
         return { success: true, data: undefined };
       }
       throw err;
@@ -5985,6 +6004,17 @@ ipcMain.handle("kimi-code:setThinking", async (_, request: unknown) => {
     if (!sessionId || !effort) return { success: false, error: "Missing sessionId or effort" };
     await kimiCodeHost.setThinking(sessionId, effort);
     return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:loadFile", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const fileId = typeof req.fileId === "string" ? req.fileId.trim() : "";
+    if (!fileId) return { success: false, error: "Missing fileId" };
+    return { success: true, data: await kimiCodeHost.loadServerFile(fileId) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

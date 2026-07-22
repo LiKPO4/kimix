@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type ReactNode } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, GitBranch, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2, X } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, GitBranch, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2, X, Film, Play } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -107,7 +107,7 @@ function computeTimelineEventMemoKey(event: TimelineEvent): string {
         event.type,
         event.timestamp,
         event.content,
-        event.images?.map((image) => `${image.id ?? ""}:${image.name}:${image.filePath ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
       ].join("\u001e");
     case "steer_message":
       return [
@@ -116,7 +116,7 @@ function computeTimelineEventMemoKey(event: TimelineEvent): string {
         event.timestamp,
         event.content,
         event.status ?? "",
-        event.images?.map((image) => `${image.id ?? ""}:${image.name}:${image.filePath ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
       ].join("\u001e");
     case "tool_call":
       return [
@@ -323,6 +323,7 @@ function buildAssistantFullCopyText(event: Extract<TimelineEvent, { type: "assis
 
 function attachmentCopyText(images: UserMessageImage[] = []) {
   return images.map((image) => {
+    if (image.kind === "video") return `[视频: ${image.name}]`;
     if (image.dataUrl) return `[图片: ${image.name}]`;
     return `[附件: ${image.name}${image.filePath ? ` | ${image.filePath}` : ""}]`;
   }).join("\n");
@@ -337,6 +338,7 @@ function AttachmentThumb({
   index: number;
   onPreview: (image: PreviewImage) => void;
 }) {
+  if (image.kind === "video") return <VideoAttachmentThumb image={image} index={index} />;
   if (image.dataUrl) {
     const dataUrl = image.dataUrl;
     return (
@@ -348,7 +350,7 @@ function AttachmentThumb({
         title="点击查看图片"
         aria-label={`查看图片 ${image.name}`}
       >
-        <img src={dataUrl} alt={image.name} className="h-full w-full object-cover" />
+        <img src={dataUrl} alt={image.name} className="kimix-media-preview h-full w-full object-cover" />
       </button>
     );
   }
@@ -368,9 +370,73 @@ function AttachmentThumb({
   );
 }
 
+function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index: number }) {
+  const [source, setSource] = useState(image.dataUrl || image.url || "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const nextSource = image.dataUrl || image.url || "";
+    if (nextSource) setSource(nextSource);
+  }, [image.dataUrl, image.url]);
+
+  const loadVideo = async () => {
+    if (source || loading || !image.fileId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await window.api.loadKimiCodeFile({ fileId: image.fileId });
+      if (!response.success) {
+        setError(response.error);
+        return;
+      }
+      setSource(response.data.dataUrl);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : String(loadError));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      key={image.id ?? `${image.name}-${index}`}
+      className="kimix-media-thumb relative h-[135px] w-[240px] max-w-full overflow-hidden rounded-[14px] bg-black"
+      title={error || image.name}
+    >
+      {source ? (
+        <video
+          src={source}
+          controls
+          preload="metadata"
+          className="kimix-media-preview h-full w-full bg-black object-contain"
+          aria-label={`播放视频 ${image.name}`}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => void loadVideo()}
+          disabled={loading || !image.fileId}
+          className="flex h-full w-full flex-col items-center justify-center text-white transition-[background-color,scale] duration-150 ease-out hover:bg-white/10 active:scale-[0.96] disabled:cursor-not-allowed"
+          style={{ gap: 10, paddingLeft: 16, paddingRight: 16 }}
+          aria-label={`加载视频 ${image.name}`}
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15">
+            {loading ? <Loader2 size={19} className="kimix-spin" /> : <Play size={19} style={{ marginLeft: 2 }} />}
+          </span>
+          <span className="max-w-full truncate text-[12.5px]">{error ? "视频加载失败，点击重试" : image.name}</span>
+        </button>
+      )}
+      <span className="pointer-events-none absolute flex items-center rounded-md bg-black/65 text-[11px] text-white" style={{ left: 8, top: 8, gap: 5, padding: "4px 7px" }}>
+        <Film size={12} /> 视频
+      </span>
+    </div>
+  );
+}
+
 function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
   return images
-    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
+    .filter((image): image is UserMessageImage & { dataUrl: string } => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
     .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl }));
 }
 

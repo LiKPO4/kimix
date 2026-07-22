@@ -305,6 +305,39 @@ describe("persistLocalConversationState", () => {
     expect(loaded.events).toEqual(loaded.collaboration?.agentEvents[primary.id]);
   });
 
+  it("persists video bytes and restores their playback metadata", async () => {
+    const dataUrl = "data:video/mp4;base64,AAEC";
+    const video = {
+      name: "review.mp4",
+      kind: "video" as const,
+      dataUrl,
+      fileId: "file-video",
+      mediaType: "video/mp4",
+    };
+    const videoSession: Session = {
+      ...session,
+      events: [{
+        id: "user-video",
+        type: "user_message",
+        timestamp: 100,
+        content: "",
+        images: [video],
+      }],
+    };
+    useSessionStore.setState({ sessions: [videoSession], pendingMessages: [] });
+    const { loadLocalSessions, persistLocalConversationState } = await import("@/utils/persistence");
+    await persistLocalConversationState();
+
+    const [entries, storedImages] = commitStateMock.mock.calls.at(-1) as [Array<{ key: string; value: unknown }>, Array<{ id: string; dataUrl: string; kind?: string; fileId?: string; mediaType?: string }>];
+    const storedSessions = entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[];
+    expect(storedImages[0]).toMatchObject({ dataUrl, kind: "video", fileId: "file-video", mediaType: "video/mp4" });
+
+    getStateItemMock.mockResolvedValue(storedSessions);
+    loadImagesMock.mockResolvedValue(new Map([[storedImages[0].id, dataUrl]]));
+    const loadedVideo = (await loadLocalSessions())[0].events[0] as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(loadedVideo.images?.[0]).toMatchObject(video);
+  });
+
   it("restores user text from the retired clarification wrapper while hydrating local sessions", async () => {
     const wrapped = [
       "【Kimix 需求澄清：自动判断】",

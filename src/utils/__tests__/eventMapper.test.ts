@@ -72,6 +72,24 @@ describe("mapStreamEvent", () => {
     expect(event.images).toEqual([{ name: "图片 2", dataUrl: "data:image/png;base64,AA==" }]);
   });
 
+  it("restores base64 and file-backed videos from TurnBegin history", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "video", source: { kind: "base64", media_type: "video/webm", data: "AA==" } },
+          { type: "video", source: { kind: "file", file_id: "file-video" } },
+        ],
+      },
+    }) as Extract<TimelineEvent, { type: "user_message" }>;
+
+    expect(event.content).toBe("");
+    expect(event.images).toEqual([
+      { kind: "video", name: "视频 1", mediaType: "video/webm", dataUrl: "data:video/webm;base64,AA==" },
+      { kind: "video", name: "视频 2", mediaType: "video/mp4", fileId: "file-video" },
+    ]);
+  });
+
   it("ignores empty TurnBegin", () => {
     expect(mapStreamEvent({ type: "TurnBegin", payload: { user_input: "" } })).toBeNull();
   });

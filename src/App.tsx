@@ -110,12 +110,18 @@ function currentSessionPromptModel(sessionId: string): string | undefined {
 
 function promptImages(attachments: UserMessageImage[] = []) {
   return attachments
-    .filter((image): image is UserMessageImage & { dataUrl: string } => Boolean(image.dataUrl))
+    .filter((image): image is UserMessageImage & { dataUrl: string } => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
     .map((image) => ({ name: image.name, dataUrl: image.dataUrl }));
 }
 
+function promptVideos(attachments: UserMessageImage[] = []) {
+  return attachments
+    .filter((media): media is UserMessageImage & { dataUrl: string } => media.kind === "video" && Boolean(media.dataUrl?.startsWith("data:video/")))
+    .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
+}
+
 function contentWithFileAttachments(content: string, attachments: UserMessageImage[] = []) {
-  const files = attachments.filter((image) => image.kind === "file" || Boolean(image.filePath));
+  const files = attachments.filter((image) => image.kind === "file");
   if (files.length === 0) return content;
   const fileLines = files.map((file, index) => {
     const filePath = file.filePath?.trim();
@@ -1908,6 +1914,7 @@ function App() {
         sessionId: runtimeSessionId,
         content: contentWithFileAttachments(next.content, next.images),
         images: promptImages(next.images),
+        videos: promptVideos(next.images),
         model: currentSessionPromptModel(uiSessionId),
       }).then((res) => {
         if (res.success) return;
@@ -1965,6 +1972,7 @@ function App() {
               sessionId: recoveryRes.data.sessionId,
               content: contentWithFileAttachments(next.content, next.images),
               images: promptImages(next.images),
+              videos: promptVideos(next.images),
               model: currentSessionPromptModel(uiSessionId),
             });
             if (retryRes.success) return;
@@ -3109,6 +3117,7 @@ function App() {
               sessionId: runtimeSessionId,
               content: contentWithFileAttachments(next.content, next.images),
               images: promptImages(next.images),
+              videos: promptVideos(next.images),
               model: currentSessionPromptModel(uiSessionId),
             });
             sendPromise.then((res) => {

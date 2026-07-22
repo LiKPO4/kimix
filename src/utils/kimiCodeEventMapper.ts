@@ -1,4 +1,4 @@
-import type { TimelineEvent } from "../types/ui";
+import type { TimelineEvent, UserMessageImage } from "../types/ui";
 import { mergeEvents } from "./eventMapper";
 
 export interface KimiCodeEventMapperOptions {
@@ -243,12 +243,12 @@ function getContentPart(event: Record<string, unknown>): Record<string, unknown>
   return isRecord(event.part) ? event.part : event;
 }
 
-function extractPromptMessage(input: unknown): { content: string; images: { name: string; dataUrl?: string }[] } {
+function extractPromptMessage(input: unknown): { content: string; images: UserMessageImage[] } {
   if (isString(input)) return { content: input, images: [] };
   if (!Array.isArray(input)) return { content: "", images: [] };
 
   const textParts: string[] = [];
-  const images: { name: string; dataUrl?: string }[] = [];
+  const images: UserMessageImage[] = [];
   input.forEach((part, index) => {
     if (!isRecord(part)) return;
     if (part.type === "text" && isString(part.text)) {
@@ -285,6 +285,29 @@ function extractPromptMessage(input: unknown): { content: string; images: { name
           : undefined;
       images.push({ name: id || `图片 ${index + 1}`, dataUrl });
       if (!dataUrl) textParts.push("[图片]");
+      return;
+    }
+    if (part.type === "video_url") {
+      const videoUrl = isRecord(part.videoUrl)
+        ? part.videoUrl
+        : (isRecord(part.video_url) ? part.video_url : {});
+      const url = isString(videoUrl.url) ? videoUrl.url : undefined;
+      const id = isString(videoUrl.id) ? videoUrl.id : undefined;
+      images.push({ kind: "video", name: id || `视频 ${index + 1}`, dataUrl: url?.startsWith("data:video/") ? url : undefined, url: url && !url.startsWith("data:") ? url : undefined });
+      return;
+    }
+    if (part.type === "video" && isRecord(part.source)) {
+      const mediaType = isString(part.source.media_type) ? part.source.media_type : "video/mp4";
+      const data = isString(part.source.data) ? part.source.data : undefined;
+      const url = isString(part.source.url) ? part.source.url : undefined;
+      images.push({
+        kind: "video",
+        name: isString(part.name) ? part.name : `视频 ${index + 1}`,
+        dataUrl: data ? (data.startsWith("data:video/") ? data : `data:${mediaType};base64,${data}`) : undefined,
+        fileId: isString(part.source.file_id) ? part.source.file_id : undefined,
+        mediaType,
+        url: url && !url.startsWith("data:") ? url : undefined,
+      });
     }
   });
   return { content: textParts.filter(Boolean).join("\n"), images };
@@ -458,7 +481,7 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "steer_message",
         timestamp,
-        content: message.content || "[图片]",
+        content: message.content || (message.images.some((media) => media.kind === "video") ? "[视频]" : "[图片]"),
         images: message.images,
         status: isKimixFallbackSteer(event) ? "accepted" : "sent",
       };
