@@ -266,6 +266,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
+  const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
   const updateSession = useSessionStore((s) => s.updateSession);
   const session = useLiveSession(currentSession?.id);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
@@ -525,12 +526,23 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
   };
 
+  const restoreComposerFocus = () => {
+    // Model menu / search input steals focus; return it after the menu unmounts
+    // and any session metadata re-render from the switch settles.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        triggerFocusInput();
+      });
+    });
+  };
+
   const handleSelectModel = async (model: string) => {
     // 欢迎屏（无会话）：写入全局默认模型，下一个新会话将使用它。
     if (!activeSession) {
       if (switchingModel) return;
       if (model === defaultModel) {
         setModelMenuOpen(false);
+        restoreComposerFocus();
         return;
       }
       setSwitchingModel(model);
@@ -547,6 +559,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       }
       setDefaultModel(model);
       setModelMenuOpen(false);
+      restoreComposerFocus();
       showToast(`默认模型已切换为 ${model}`);
       return;
     }
@@ -561,6 +574,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
     if (model === sessionModel) {
       setModelMenuOpen(false);
+      restoreComposerFocus();
       return;
     }
     const runtimeSessionId = mutationOwner.runtimeSessionId;
@@ -629,6 +643,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
     setModelMenuOpen(false);
+    restoreComposerFocus();
     showToast(`${mutationOwner.displayName} · 已切换为 ${compactModelDisplayName(model)}`);
   };
 
@@ -735,7 +750,15 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
         setWorkDirsOpen(false);
       }
       if (!modelMenuRef.current?.contains(event.target as Node) && !modelPanelRef.current?.contains(event.target as Node)) {
+        const wasModelOpen = modelMenuOpen;
         setModelMenuOpen(false);
+        // Clicking the composer while the model menu is open should land focus in the input.
+        if (wasModelOpen) {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest?.(".kimix-composer-surface, .kimix-composer-surface textarea")) {
+            window.requestAnimationFrame(() => triggerFocusInput());
+          }
+        }
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -748,7 +771,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [usageOpen, workDirsOpen, modelMenuOpen]);
+  }, [usageOpen, workDirsOpen, modelMenuOpen, triggerFocusInput]);
 
   return (
     <div ref={contextBarRef} className="flex w-full items-center justify-between px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, height: 36, lineHeight: "20px" }}>

@@ -3910,6 +3910,17 @@ export function Composer() {
               ? "is-focused"
               : ""
         } ${!canUseComposer ? "opacity-60" : ""}`}
+        onMouseDown={(event) => {
+          if (!canUseComposer) return;
+          const target = event.target as HTMLElement | null;
+          if (!target) return;
+          // Keep native focus for the textarea itself and interactive toolbar controls.
+          if (target.closest("button, a, input, select, [role='menuitem'], [role='menuitemradio'], [contenteditable='true']")) return;
+          if (target.tagName === "TEXTAREA") return;
+          // Clicking card padding / empty chrome should focus the input immediately.
+          event.preventDefault();
+          inputRef.current?.focus();
+        }}
       >
         {isDragging && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-accent-primary bg-accent-primary/5">
