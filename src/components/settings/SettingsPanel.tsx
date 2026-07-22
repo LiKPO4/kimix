@@ -18,7 +18,7 @@ import {
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
-import type { KimiCodeArchivedSessionSummary, KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { KimiCodeArchivedSessionSummary, KimiModelConfigSummary } from "@electron/types/ipc";
 import { usePresence } from "@/hooks/usePresence";
 import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/roomAgentProvisioning";
 import { APP_VERSION } from "@/utils/appVersion";
@@ -98,15 +98,6 @@ type KimiAuthStatus = {
   message: string;
 };
 
-type KimiEnvironmentSummary = {
-  kimiCodeHome: string;
-  proxy: {
-    key: "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY";
-    configured: boolean;
-    value: string;
-  }[];
-};
-
 type KimiConnectionStatus = {
   loading: boolean;
   available: boolean | null;
@@ -121,13 +112,11 @@ const settingsStatusCache: {
   auth: KimiAuthStatus | null;
   modelConfig: KimiModelConfigSummary | null;
   modelConfigMessage: string;
-  kimiEnvironment: KimiEnvironmentSummary | null;
 } = {
   connection: null,
   auth: null,
   modelConfig: null,
   modelConfigMessage: "",
-  kimiEnvironment: null,
 };
 
 function normalizeSettingsSectionOrder(order: unknown[]): SettingsSectionId[] {
@@ -442,8 +431,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
-  const [kimiEnvironment, setKimiEnvironment] = useState<KimiEnvironmentSummary | null>(settingsStatusCache.kimiEnvironment);
-  const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
   const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
@@ -640,12 +627,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const refreshModelConfig = async (options: { showLoading?: boolean } = {}) => {
     const showLoading = options.showLoading ?? !settingsStatusCache.modelConfig;
     if (showLoading) setModelConfigLoading(true);
-    const [res, serverCatalogRes] = await Promise.all([
-      window.api.getKimiModelConfig(),
-      window.api.getKimiCodeServerModelCatalog(),
-    ]);
+    const res = await window.api.getKimiModelConfig();
     setModelConfigLoading(false);
-    setServerModelCatalog(serverCatalogRes.success ? serverCatalogRes.data : null);
     if (res.success) {
       settingsStatusCache.modelConfig = res.data;
       settingsStatusCache.modelConfigMessage = res.data.exists ? "" : "尚未找到 Kimi Code config.toml。";
@@ -671,9 +654,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (res.success) {
         const detail = res.data.output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join("；");
         settingsStatusCache.modelConfigMessage = detail || res.data.message;
-        settingsStatusCache.kimiEnvironment = res.data.environment ?? null;
         setModelConfigMessage(settingsStatusCache.modelConfigMessage);
-        setKimiEnvironment(settingsStatusCache.kimiEnvironment);
         return;
       }
       settingsStatusCache.modelConfigMessage = `配置诊断失败：${res.error}`;
@@ -1935,7 +1916,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">Kimi Code 模型配置</div>
                       <div className="kimix-settings-permission-desc">
-                        {modelConfig?.configPath ?? "正在读取 Kimi Code config.toml"}
+                        管理当前模型、Provider 与连接凭据
                       </div>
                     </div>
                   </div>
@@ -1953,69 +1934,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Provider</div>
                           <div className="kimix-settings-permission-label text-[13px]">
                             {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasEnv || provider.hasOauth).length} 个已配置凭据
-                          </div>
-                        </div>
-                        {serverModelCatalog && (
-                          <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "14px 16px", marginTop: 4 }}>
-                            <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
-                              <div className="min-w-0">
-                                <div className="kimix-settings-permission-label">Server 运行时目录</div>
-                                <div className="kimix-settings-permission-desc">
-                                  {serverModelCatalog.models.length} 个模型 · {serverModelCatalog.providers.length} 个 Provider · 脱敏配置
-                                </div>
-                              </div>
-                              <span className={`rounded-full text-[11.5px] leading-5 ${serverModelCatalog.auth.ready ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ height: 26, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                                {serverModelCatalog.auth.ready ? "认证就绪" : "认证未就绪"}
-                              </span>
-                            </div>
-                            <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
-                              {serverModelCatalog.models.slice(0, 4).map((model) => (
-                                <div key={`${model.provider}:${model.model}`} className="rounded-lg bg-surface-elevated" style={{ padding: "10px 12px" }}>
-                                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                                    <div className="min-w-0">
-                                      <div className="truncate text-[12.5px] font-medium leading-5 text-text-primary">{model.displayName || model.model}</div>
-                                      <div className="truncate text-[11.5px] leading-5 text-text-muted">{model.provider} · Context {model.maxContextSize.toLocaleString()}</div>
-                                    </div>
-                                    <span className="rounded-full bg-[var(--kimix-panel-badge-bg)] text-[10.5px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                                      {[
-                                        model.capabilities.includes("thinking") ? "思考" : null,
-                                        // 0.23.6 起能力名由 select_tools 改为 dynamically_loaded_tools，两种都认。
-                                        model.capabilities.some((capability) => capability === "select_tools" || capability === "dynamically_loaded_tools") ? "按需工具" : null,
-                                      ].filter(Boolean).join(" / ") || "标准"}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
-                              {serverModelCatalog.providers.map((provider) => (
-                                <span key={provider.id} className={`rounded-full text-[11px] leading-5 ${provider.status === "connected" ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
-                                  {provider.id} · {provider.status === "connected" ? "已连接" : provider.status}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {kimiEnvironment && (
-                          <>
-                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Code Home</div>
-                              <div className="kimix-settings-permission-label break-all text-[13px]">{kimiEnvironment.kimiCodeHome}</div>
-                            </div>
-                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>代理变量</div>
-                              <div className="kimix-settings-permission-label break-all text-[13px]">
-                                {kimiEnvironment.proxy.some((item) => item.configured)
-                                  ? kimiEnvironment.proxy.filter((item) => item.configured).map((item) => `${item.key}=${item.value || "已配置"}`).join("；")
-                                  : "未配置，Kimi Code 会直连；localhost MCP 服务始终直连。"}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>微压缩</div>
-                          <div className="kimix-settings-permission-label text-[13px]">
-                            Kimi Code 0.12.0 默认开启，会自动清理较旧的大型工具结果以减少上下文占用。
                           </div>
                         </div>
                         {modelConfigMessage && (
