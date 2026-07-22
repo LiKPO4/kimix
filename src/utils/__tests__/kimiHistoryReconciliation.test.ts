@@ -4,6 +4,7 @@ import * as reportError from "@/utils/reportError";
 import {
   hasEquivalentKimiHistoryTurnBodies,
   mergeMissingLatestCanonicalAssistant,
+  mergeMissingUsageStatusEvents,
   removeIdentityCoveredDuplicateToolCalls,
   shouldReplaceWithCanonicalKimiHistory,
 } from "../kimiHistoryReconciliation";
@@ -665,5 +666,45 @@ describe("shouldReplaceWithCanonicalKimiHistory instrumentation", () => {
     const events = [userMessage, assistant("same body")];
     expect(shouldReplaceWithCanonicalKimiHistory(events, events)).toBe(false);
     expect(logEventSpy).not.toHaveBeenCalled();
+  });
+});
+describe("mergeMissingUsageStatusEvents", () => {
+  const usageStatus = (timestamp: number, tokenCount: number, inputTokenCount: number, id = `st-${timestamp}`): TimelineEvent => ({
+    id,
+    type: "status_update",
+    timestamp,
+    tokenCount,
+    inputTokenCount,
+    message: "模型：kimi-code/kimi-for-coding",
+  });
+
+  it("hydrates missing usage statuses in timestamp order without mutating inputs", () => {
+    const base: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "第一轮" },
+      assistant("回复一", { timestamp: 20 }),
+      usageStatus(25, 54, 22386),
+      { id: "u2", type: "user_message", timestamp: 30, content: "第二轮" },
+      assistant("回复二", { timestamp: 40 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      usageStatus(25, 54, 22386),
+      usageStatus(45, 262, 22472),
+    ];
+    const merged = mergeMissingUsageStatusEvents(base, canonical);
+    expect(merged).toHaveLength(6);
+    // 第一轮直播状态已存在：按身份去重不重复补水合
+    expect(merged.filter((event) => event.type === "status_update")).toHaveLength(2);
+    const second = merged.find((event) => event.type === "status_update" && event.tokenCount === 262);
+    expect(second).toBeDefined();
+    // 时间序插入：落在第二轮用户边界之后
+    expect(merged.indexOf(second!)).toBeGreaterThan(merged.findIndex((event) => event.id === "u2"));
+    expect(base).toHaveLength(5);
+    expect(canonical).toHaveLength(2);
+  });
+
+  it("returns the base events untouched when nothing is missing", () => {
+    const base = [assistant("回复"), usageStatus(25, 54, 22386)];
+    expect(mergeMissingUsageStatusEvents(base, [usageStatus(25, 54, 22386)])).toBe(base);
+    expect(mergeMissingUsageStatusEvents(base, [])).toBe(base);
   });
 });

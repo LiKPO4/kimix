@@ -64,6 +64,7 @@ import {
   hasEquivalentKimiHistoryTurnBodies,
   hasPossiblyLostUserImages,
   mergeMissingLatestCanonicalAssistant,
+  mergeMissingUsageStatusEvents,
   shouldReplaceWithCanonicalKimiHistory,
 } from "@/utils/kimiHistoryReconciliation";
 import { logError } from "@/utils/reportError";
@@ -295,11 +296,13 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
             );
             if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" })) {
               const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(localEvents, reconciliation.events);
-              const patchedEvents = mergeMissingLatestCanonicalAssistant(
+              const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                 localEvents,
                 reconciliation.events,
                 { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" },
-              );
+  ),
+  reconciliation.events,
+);
               const patched = patchedEvents === localEvents
                 ? recoveredDeliveries
                 : updateRoomAgentEvents(recoveredDeliveries, target.roomAgentId, () => patchedEvents);
@@ -524,11 +527,13 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
         const canonicalAdopted = localEvents.length === 0 || shouldUseCanonicalHistory;
         const rejectedPatchedEvents = canonicalAdopted
           ? localEvents
-          : mergeMissingLatestCanonicalAssistant(
+          : mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
             localEvents,
             reconciliation.events,
             { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" },
-          );
+  ),
+  reconciliation.events,
+);
         const hydratedEvents = !canonicalAdopted
           ? (result.runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents, Date.now(), false, true))
           : reconciliation.events;
@@ -2244,11 +2249,13 @@ function App() {
                 const canonicalAdopted = reconciliation.applied && (localAgentEvents.length === 0 || shouldUseCanonicalHistory);
                 const rejectedPatchedEvents = !reconciliation.applied || canonicalAdopted
                   ? localAgentEvents
-                  : mergeMissingLatestCanonicalAssistant(
+                  : mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                     localAgentEvents,
                     reconciliation.events,
                     { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" },
-                  );
+  ),
+  reconciliation.events,
+);
                 const hydratedEvents = !canonicalAdopted
                   ? (runtimeIsActive ? rejectedPatchedEvents : settleInactiveEvents(rejectedPatchedEvents, Date.now(), false, true))
                   : reconciliation.events;
@@ -3322,11 +3329,13 @@ function App() {
                 return item;
               }
               if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason: "running-sample" })) {
-                const patchedEvents = mergeMissingLatestCanonicalAssistant(
+                const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                   localAgentEvents,
                   reconciliation.events,
                   { sessionId: session.id, roomAgentId, reason: "running-sample" },
-                );
+  ),
+  reconciliation.events,
+);
                 if (patchedEvents !== localAgentEvents) {
                   applied = true;
                   return updateRoomAgentEvents(item, roomAgentId, () => patchedEvents);

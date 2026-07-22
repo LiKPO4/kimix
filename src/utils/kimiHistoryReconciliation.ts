@@ -614,3 +614,39 @@ export function shouldReplaceWithCanonicalKimiHistory(
 
   return shouldReplace;
 }
+
+/**
+ * Usage/model footer statuses are additive metadata, not shrinkable content.
+ * When the canonical candidate is rejected to protect richer local history,
+ * hydrate turn-level usage statuses the local timeline never received
+ * (transient live-frame loss) from the wire-backed canonical candidate.
+ * Identity dedup keeps an already-present live status for the same turn.
+ */
+export function mergeMissingUsageStatusEvents(
+  baseEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): TimelineEvent[] {
+  const isUsageStatus = (event: TimelineEvent): event is Extract<TimelineEvent, { type: "status_update" }> => {
+    if (event.type !== "status_update") return false;
+    if (typeof event.tokenCount === "number" && event.tokenCount > 0) return true;
+    if (typeof event.inputTokenCount === "number" && event.inputTokenCount > 0) return true;
+    return typeof event.message === "string" && event.message.startsWith("模型：");
+  };
+  const identityOf = (event: Extract<TimelineEvent, { type: "status_update" }>) => (
+    `${event.message ?? ""}:${event.tokenCount ?? -1}:${event.inputTokenCount ?? -1}`
+  );
+  const candidates = canonicalEvents.filter(isUsageStatus);
+  if (candidates.length === 0) return baseEvents;
+  const known = new Set(baseEvents.filter(isUsageStatus).map(identityOf));
+  const missing = candidates.filter((event) => !known.has(identityOf(event)));
+  if (missing.length === 0) return baseEvents;
+  const merged = [...baseEvents];
+  for (const status of missing) {
+    known.add(identityOf(status));
+    let index = merged.length;
+    while (index > 0 && merged[index - 1].timestamp > status.timestamp) index -= 1;
+    merged.splice(index, 0, status);
+  }
+  return merged;
+}
+
