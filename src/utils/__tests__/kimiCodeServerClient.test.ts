@@ -248,6 +248,50 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
   });
 
+  it("settles a dispatched prompt promptly when the server emits prompt.aborted", async () => {
+    const promptId = "msg_01ABORT";
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toContain("/api/v1/sessions/session-1/prompts");
+      expect(init?.method).toBe("POST");
+      return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = client as unknown as {
+      receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    const dispatched = client.prompt("session-1", "数到 300", {});
+    let settled: string | null = null;
+    void dispatched.then(
+      () => { settled = "resolved"; },
+      (error) => { settled = `rejected:${error instanceof Error ? error.message : String(error)}`; },
+    );
+
+    // 其他 prompt 的 abort 不应结算本次 dispatch
+    internals.receive({
+      type: "prompt.aborted",
+      session_id: "session-1",
+      seq: 20,
+      epoch: "epoch-1",
+      payload: { promptId: "msg_OTHER" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(settled).toBeNull();
+
+    internals.receive({
+      type: "prompt.aborted",
+      session_id: "session-1",
+      seq: 21,
+      epoch: "epoch-1",
+      payload: { promptId },
+    });
+    await vi.waitFor(() => expect(settled).toBe("resolved"));
+    await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
+  });
+
   it("delivers the completed prompt's authoritative assistant before prompt.completed", async () => {
     const promptId = "msg_01PROMPT";
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {

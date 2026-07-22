@@ -976,7 +976,10 @@ export class KimiCodeServerClient {
     for (;;) {
       try {
         await this.waitForSessionEvent(sessionId, (frame) => {
-          if (frame.session_id !== sessionId || frame.type !== "prompt.completed") return false;
+          if (frame.session_id !== sessionId) return false;
+          // 0.29 实测取消终态拼写为 prompt.aborted（载荷同 camelCase promptId）；
+          // 不纳入等待器会让 Esc 后的 dispatch 挂到 180s 空闲恢复。
+          if (frame.type !== "prompt.completed" && frame.type !== "prompt.aborted") return false;
           const payload = frame.payload as { promptId?: unknown; prompt_id?: unknown } | undefined;
           return (payload?.promptId ?? payload?.prompt_id) === result.prompt_id;
         }, 180_000);

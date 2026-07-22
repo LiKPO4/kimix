@@ -141,11 +141,12 @@ Kimix 三条历史链路对已污染会话均不会渲染 goal 续跑 prompt，*
 - **Server 路由**（0.29 真实 Server，长输出 prompt 流中 `:abort`）：20ms 内 `prompts.active` 清空；帧序列 `turn.step.interrupted` → `turn.ended` → `prompt.aborted`；**`turn.step.retrying` 零次**；终态后 5s 观察窗内**零**新 delta/新 turn/新 completed。
 - **SDK 路由**（vendored 0.29 底座 bundle，`session.cancel()`）：`turn.ended` reason = `cancelled`（interrupted 家族，非 failed/retryable）；取消后**零** retry 事件；`turn.ended` 后 3s 尾巴**零**新 delta/新 turn。
 
-### 立项观察项（不属 #1970 回归，修复超出本轮范围）
+### 立项观察项（已在后续单独修复）
 
 - **现象**：`KimiCodeServerClient.prompt()` 的完成等待器只认 `prompt.completed`，不认 0.29 实测的取消终态拼写 `prompt.aborted`。Esc 后该 dispatch promise 要等 180s 空闲超时 → 官方状态查询 → 快照恢复才合成完成帧收场。
 - **影响**：无用户可见阻塞——渲染层 `sendPromise` 为 fire-and-forget（`App.tsx:3123`），`turn.ended` 让 UI 立即结算；仅 host 内部 dispatch promise 的收场被延迟。
-- **建议**：后续把 `prompt.aborted`（及载荷 reason）纳入 `prompt()` 等待器的终态匹配，按中断语义结算（部分正文的快照补齐语义需单独设计验证），不在本轮改动。
+- **修复（本轮）**：`prompt()` 等待器按同一严格 promptId 规则（`promptId ?? prompt_id`）同时匹配 `prompt.completed` 与 `prompt.aborted`，Esc 后 dispatch 立即结算。`prompt.aborted` 载荷形状经官方 schema 确认（camelCase `promptId` + `abortedAt`）。交付屏障（delivery barrier）仍专属 `prompt.completed`——中止轮次保留已流式到达的部分正文，不做快照重放。
+- **验证**：新增单测（异 id 不结算、同 id 立即结算）通过；vitest 全量、typecheck 通过。
 
 ### 探针说明
 
