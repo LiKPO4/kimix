@@ -111,9 +111,24 @@
 - UI 层增删改未在用户真实 `config.toml` 上执行（避免污染真实配置）；写入形状已按 `buildKimixManagedModelBlock`（`electron/main.ts:1240`）逐字段复刻验证，建议用户验收时在设置页顺手增删一个测试 provider 复核。
 - 目录条目 `model` 字段承载别名这一形状与 Kimix 模型菜单对 `/models` 的消费方式一致（外部 provider 走认证 models endpoint 探测，不变量 68），无动作。
 
-## 项 5：goal 泄漏历史兜底确认（待处理）
+## 项 5：goal 泄漏历史兜底确认（已完成——不需要兜底）
 
-计划：核查 #1990 修复前会话混入 transcript 的 continuation prompt 对 canonical 历史映射的影响，给出"需要兜底/不需要"结论。
+### 结论
+
+Kimix 三条历史链路对已污染会话均不会渲染 goal 续跑 prompt，**无需兜底代码**。
+
+### 证据
+
+1. **官方记录形态**（vendored SDK 0.29 源码确认）：续跑 prompt 为 `GOAL_CONTINUATION_PROMPT`（"Continue working toward the active goal. …"），wire 记录为 `context.append_message`、`message.role="user"`、`message.origin={kind:"system_trigger", name:"goal_continuation"}`。
+2. **SDK 兜底路由**：`parseKimiCodeRecord`（`electron/sessionHistory.ts:385`）的 message 分支要求 `message.type` 为字符串；续跑记录的 message 只有 `role/origin/content`，无 `type`，直接跳过——从不进入渲染管线。
+3. **Server 路由（本机 3 个真实污染会话实测）**：这些会话 wire.jsonl 含 `goal_continuation` 记录（CLI goal 模式产生），0.29 快照 100 条消息窗口内**零**续跑文本、零 `goal_continuation` 标记。
+4. **transcript 实测**（`?agent_id=main`，1.3MB）：续跑 turn 仍在，但 origin 已被 #1990 标为 `{kind:"other", payload:{kind:"system_trigger", name:"goal_continuation"}}`，prompt 文本不再出现——修复在读取侧生效，对修复前的老记录同样有效。
+5. **本地缓存残留**：按不变量 19，Server 会话历史加载以官方快照为准，本地镜像不一致时被规范历史替换——即使存在 0.28 时代冻结的污染气泡，下次打开会话即被干净的官方快照替换，无需 bump 缓存版本。
+
+### 边界
+
+- 快照 100 条窗口外的更老污染记录：本身不在渲染窗口内，且 transcript 证据表明读取侧已全量标记。
+- CLI 自渲染（TUI/Web）不在 Kimix 范围。
 
 ## 项 6：中断回归验证（待处理）
 
