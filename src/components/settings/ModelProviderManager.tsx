@@ -587,37 +587,6 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
               </div>
             </label>
 
-            <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
-              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
-                <div className="min-w-0">
-                  <div className="text-[12.5px] font-medium text-text-primary">从 Base URL 探测模型</div>
-                  <div className="kimix-settings-permission-desc">调用 OpenAI-compatible models 接口，返回当前 Key 实际可用的模型</div>
-                </div>
-                <button type="button" onClick={() => void handleDiscoverModels()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:opacity-55">
-                  <RefreshCw size={13} className={busyAction === "discover" ? "kimix-spin" : ""} />
-                  {discoveredModels.length ? "重新探测" : "探测模型"}
-                </button>
-              </div>
-              {discoveredModels.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <select
-                    value={discoveredModels.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""}
-                    onChange={(event) => handleDiscoveredModel(event.target.value)}
-                    className="kimix-settings-input h-9 w-full text-[13px] outline-none"
-                    style={{ paddingLeft: 12, paddingRight: 12 }}
-                  >
-                    <option value="">选择探测到的模型（{discoveredModels.length}）</option>
-                    {discoveredModels.map((model) => (
-                      <option key={model.id} value={model.id}>{model.id}{model.ownedBy ? ` · ${model.ownedBy}` : ""}</option>
-                    ))}
-                  </select>
-                  <div className="truncate text-[11px] leading-5 text-text-muted" style={{ marginTop: 6, paddingLeft: 2, paddingRight: 2 }} title={discoveredEndpoint}>
-                    来源：{discoveredEndpoint}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {isCreatingProvider && (
               <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
@@ -741,45 +710,78 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             )}
 
             {!selectedProviderManaged && (
-              <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)" }}>
-                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
-                  <div>
-                    <div className="text-[12.5px] font-semibold text-text-primary">{selectedModelAlias ? "编辑模型" : "添加模型"}</div>
-                    <div className="kimix-settings-permission-desc">只保存模型自身信息，自动复用 {selectedGroup.provider.name} 的 API</div>
+              <div style={{ marginTop: 14 }}>
+                <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "12px 14px" }}>
+                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] font-medium text-text-primary">从 Base URL 探测模型</div>
+                      <div className="kimix-settings-permission-desc">调用 OpenAI-compatible models 接口，返回当前 Key 实际可用的模型</div>
+                    </div>
+                    <button type="button" onClick={() => void handleDiscoverModels()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover disabled:opacity-55">
+                      <RefreshCw size={13} className={busyAction === "discover" ? "kimix-spin" : ""} />
+                      {discoveredModels.length ? "重新探测" : "探测模型"}
+                    </button>
                   </div>
-                  <KeyRound size={15} className="text-text-muted" />
+                  {discoveredModels.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <select
+                        value={discoveredModels.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""}
+                        onChange={(event) => handleDiscoveredModel(event.target.value)}
+                        className="kimix-settings-input h-9 w-full text-[13px] outline-none"
+                        style={{ paddingLeft: 12, paddingRight: 12 }}
+                      >
+                        <option value="">选择探测到的模型（{discoveredModels.length}）</option>
+                        {discoveredModels.map((model) => (
+                          <option key={model.id} value={model.id}>{model.id}{model.ownedBy ? ` · ${model.ownedBy}` : ""}</option>
+                        ))}
+                      </select>
+                      <div className="truncate text-[11px] leading-5 text-text-muted" style={{ marginTop: 6, paddingLeft: 2, paddingRight: 2 }} title={discoveredEndpoint}>
+                        来源：{discoveredEndpoint}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {catalog.length === 0 ? (
-                  <button type="button" onClick={() => void handleLoadCatalog()} disabled={catalogLoading} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover" style={{ marginTop: 10 }}>
-                    <RefreshCw size={13} className={catalogLoading ? "kimix-spin" : ""} />
-                    从官方目录选择模型
-                  </button>
-                ) : selectedCatalogProvider && (
-                  <select value={selectedCatalogProvider.models.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""} onChange={(event) => handleCatalogModel(event.target.value)} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}>
-                    <option value="">手动填写模型</option>
-                    {selectedCatalogProvider.models.map((model) => <option key={model.id} value={model.id}>{model.name || model.id}</option>)}
-                  </select>
-                )}
-                <div className="kimix-model-provider-form" style={{ marginTop: 12 }}>
-                  <label className="min-w-0">
-                    <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型 ID</span>
-                    <input value={modelDraft.model} onChange={(event) => setModelDraft((current) => ({ ...current, model: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder="例如 gpt-5.1" />
-                  </label>
-                  <label className="min-w-0">
-                    <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
-                    <input value={modelDraft.modelAlias} disabled={Boolean(selectedModelAlias)} onChange={(event) => setModelDraft((current) => ({ ...current, modelAlias: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder={`${selectedGroup.provider.name}/model-id`} />
-                  </label>
-                </div>
-                <div className="kimix-model-editor-footer" style={{ gap: 12, marginTop: 12 }}>
-                  <label className="min-w-0">
-                    <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Context</span>
-                    <input type="number" min={1} max={1048576} value={modelDraft.maxContextSize} onChange={(event) => setModelDraft((current) => ({ ...current, maxContextSize: event.target.value }))} className="kimix-settings-input kimix-number-input h-9 w-full text-center text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} />
-                  </label>
-                  <div className="text-[11.5px] leading-5 text-text-muted">同一供应商可添加任意数量模型；更新 Base URL 或 Key 后会统一生效。</div>
-                  <button type="button" onClick={() => void handleSaveModel()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:opacity-55">
-                    <Check size={13} />
-                    保存模型
-                  </button>
+
+                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)" }}>
+                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
+                    <div>
+                      <div className="text-[12.5px] font-semibold text-text-primary">{selectedModelAlias ? "编辑模型" : "添加模型"}</div>
+                      <div className="kimix-settings-permission-desc">只保存模型自身信息，自动复用 {selectedGroup.provider.name} 的 API</div>
+                    </div>
+                    <KeyRound size={15} className="text-text-muted" />
+                  </div>
+                  {catalog.length === 0 ? (
+                    <button type="button" onClick={() => void handleLoadCatalog()} disabled={catalogLoading} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover" style={{ marginTop: 10 }}>
+                      <RefreshCw size={13} className={catalogLoading ? "kimix-spin" : ""} />
+                      从官方目录选择模型
+                    </button>
+                  ) : selectedCatalogProvider && (
+                    <select value={selectedCatalogProvider.models.some((item) => item.id === modelDraft.model) ? modelDraft.model : ""} onChange={(event) => handleCatalogModel(event.target.value)} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}>
+                      <option value="">手动填写模型</option>
+                      {selectedCatalogProvider.models.map((model) => <option key={model.id} value={model.id}>{model.name || model.id}</option>)}
+                    </select>
+                  )}
+                  <div className="kimix-model-provider-form" style={{ marginTop: 12 }}>
+                    <label className="min-w-0">
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型 ID</span>
+                      <input value={modelDraft.model} onChange={(event) => setModelDraft((current) => ({ ...current, model: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder="例如 gpt-5.1" />
+                    </label>
+                    <label className="min-w-0">
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
+                      <input value={modelDraft.modelAlias} disabled={Boolean(selectedModelAlias)} onChange={(event) => setModelDraft((current) => ({ ...current, modelAlias: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder={`${selectedGroup.provider.name}/model-id`} />
+                    </label>
+                  </div>
+                  <div className="kimix-model-editor-footer" style={{ gap: 12, marginTop: 12 }}>
+                    <label className="min-w-0">
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Context</span>
+                      <input type="number" min={1} max={1048576} value={modelDraft.maxContextSize} onChange={(event) => setModelDraft((current) => ({ ...current, maxContextSize: event.target.value }))} className="kimix-settings-input kimix-number-input h-9 w-full text-center text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} />
+                    </label>
+                    <div className="text-[11.5px] leading-5 text-text-muted">同一供应商可添加任意数量模型；更新 Base URL 或 Key 后会统一生效。</div>
+                    <button type="button" onClick={() => void handleSaveModel()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:opacity-55">
+                      <Check size={13} />
+                      保存模型
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

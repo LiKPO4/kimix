@@ -91,7 +91,13 @@ describe("ModelProviderManager", () => {
 
     const modelEditorTitle = Array.from(container.querySelectorAll("div"))
       .find((element) => element.textContent?.trim() === "添加模型");
+    const discoveryTitle = Array.from(container.querySelectorAll("div"))
+      .find((element) => element.textContent?.trim() === "从 Base URL 探测模型");
     expect(modelEditorTitle?.closest(".kimix-settings-card")).not.toBeNull();
+    expect(discoveryTitle).toBeDefined();
+    expect(discoveryTitle && modelEditorTitle
+      ? Boolean(discoveryTitle.compareDocumentPosition(modelEditorTitle) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : false).toBe(true);
 
     await act(async () => buttonByText(container, "探测模型")?.click());
     const discoveredSelect = Array.from(container.querySelectorAll("select"))
