@@ -1,4 +1,5 @@
 import type { Session, TimelineEvent } from "@/types/ui";
+import { backfillTurnModelsFromUsageStatuses } from "@/utils/kimiHistoryReconciliation";
 import {
   getPrimaryRoomAgent,
   getRoomAgent,
@@ -209,11 +210,12 @@ export function reconcileAgentCanonicalHistory({
   const localEvents = getRoomAgentEvents(session, roomAgentId);
   const scopedCanonical = canonicalEvents.map((event) => scopeEventToRoomAgent(event, roomAgentId));
   const boundCanonical = bindCanonicalHistoryToRoomMessages(session, roomAgentId, scopedCanonical, reason);
-  const events = reason === "running-sample"
+  const reconciledEvents = reason === "running-sample"
     ? reconcileRunningKimiSnapshot(localEvents, boundCanonical.events)
     : reason === "undo"
       ? applyCanonicalUndoHistory(localEvents, boundCanonical.events)
       : preserveLocalUserMediaInCanonicalHistory(localEvents, boundCanonical.events);
+  const events = backfillTurnModelsFromUsageStatuses(reconciledEvents);
 
   let next = updateRoomAgentEvents(session, roomAgentId, () => events);
   if (next.collaboration && boundCanonical.messages) {

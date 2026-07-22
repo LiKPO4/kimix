@@ -7,6 +7,7 @@
 - 修复：Server 快照优先的历史加载合并 wire 镜像的 turn-scoped usage.record → StatusUpdate（时间序插入 + 身份去重），内容仍以快照为权威，页脚从官方 wire 记录水合。
 - 验证：新增合并函数单测 3 项；真实会话 CDP 实测 loadKimiCodeSession 返回 16 事件含 3 条精确用量（54/22386、262/22472、510/25801），位置在各轮 turn.ended 之后；vitest 全绿、typecheck 通过。
 - 跟进（用户复验仍显示"已完成"）：canonical 替换被 no-shrink 门禁拒绝（thinking-history-regression 606>487，门禁尽职）。补第二层——四个对账拒绝分支对保留的本地时间线做增量水合 `mergeMissingUsageStatusEvents`（状态是附加元数据，不受收缩门禁约束，身份去重防直播帧重复）。真实会话 CDP 复验：时间线 12 事件，三轮页脚全部到位（第 1 轮直播状态无重复，第 2/3 轮水合成功）。
+- 跟进（头部/页脚模型不一致）：合成主 Agent 显示名取自会话当前模型（k3），对历史轮误示；按不变量 38 改为——水合/对账时用轮级 usage 状态给无模型 assistant 事件回填真实轮模型，头部在该显示名为模型派生时优先显示轮模型，自定义 Agent 名作为身份保留。真实会话 CDP 实测：3 个 assistant 全部回填 kimi-code/kimi-for-coding，头部渲染与页脚一致。
 
 ## 2026-07-22 验收修复：思考按钮省略、会话树卡片挤压、overrides 伪模型
 

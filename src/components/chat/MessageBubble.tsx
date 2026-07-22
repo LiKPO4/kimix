@@ -14,7 +14,7 @@ import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/util
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
-import { compactModelDisplayName } from "@/utils/modelDisplay";
+import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
@@ -2464,7 +2464,11 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
           <AssistantProcessBlock
             event={processEvent}
             sessionId={sessionId}
-            roomAgentDisplayName={roomAgent?.displayName}
+            roomAgentDisplayName={resolveTurnHeaderModelName({
+              turnModel: processEvent.model,
+              agentDisplayName: roomAgent?.displayName,
+              agentModelAlias: roomAgent?.modelAlias,
+            })}
             tools={leadingTools}
             subagents={leadingSubagents}
             approvals={leadingApprovals}

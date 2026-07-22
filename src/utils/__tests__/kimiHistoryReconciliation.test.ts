@@ -702,9 +702,37 @@ describe("mergeMissingUsageStatusEvents", () => {
     expect(canonical).toHaveLength(2);
   });
 
-  it("returns the base events untouched when nothing is missing", () => {
-    const base = [assistant("回复"), usageStatus(25, 54, 22386)];
+  it("returns the base events untouched when nothing is missing and nothing to stamp", () => {
+    const base = [assistant("回复", { model: "kimi-code/kimi-for-coding" }), usageStatus(25, 54, 22386)];
     expect(mergeMissingUsageStatusEvents(base, [usageStatus(25, 54, 22386)])).toBe(base);
     expect(mergeMissingUsageStatusEvents(base, [])).toBe(base);
+  });
+});
+describe("backfillTurnModelsFromUsageStatuses (via mergeMissingUsageStatusEvents)", () => {
+  const usageStatus = (timestamp: number, tokenCount: number, inputTokenCount: number): TimelineEvent => ({
+    id: `st-${timestamp}`,
+    type: "status_update",
+    timestamp,
+    tokenCount,
+    inputTokenCount,
+    message: "模型：kimi-code/kimi-for-coding",
+  });
+
+  it("stamps the turn model onto model-less assistant events, including turns with an existing live status", () => {
+    const base: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "第一轮" },
+      assistant("回复一", { timestamp: 20 }),
+      usageStatus(25, 54, 22386),
+      { id: "u2", type: "user_message", timestamp: 30, content: "第二轮" },
+      assistant("回复二", { timestamp: 40 }),
+    ];
+    const merged = mergeMissingUsageStatusEvents(base, [usageStatus(45, 262, 22472)]);
+    const assistants = merged.filter((event) => event.type === "assistant_message");
+    expect(assistants.every((event) => event.model === "kimi-code/kimi-for-coding")).toBe(true);
+    const withModel = mergeMissingUsageStatusEvents(
+      [assistant("已有", { model: "deepseek-v4-pro" }), usageStatus(45, 262, 22472)],
+      [],
+    );
+    expect((withModel[0] as { model?: string }).model).toBe("deepseek-v4-pro");
   });
 });

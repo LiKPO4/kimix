@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getLastUsedModelFromEventsAfter, getSessionModelForDisplay, resolveAuthoritativeSessionModel, resolveResumedSessionModel } from "../modelDisplay";
+import { compactModelDisplayName, compactModelText, extractModelFromStatusMessage, getLastUsedModelFromEvents, getLastUsedModelFromEventsAfter, getSessionModelForDisplay, resolveAuthoritativeSessionModel, resolveTurnHeaderModelName, resolveResumedSessionModel } from "../modelDisplay";
 
 describe("modelDisplay", () => {
   it("shows only the segment after the final slash", () => {
@@ -105,5 +105,36 @@ describe("modelDisplay", () => {
       sessionModel: "opencode-go/deepseek-v4-flash",
       modelSwitchedAt: 200,
     })).toBe("opencode-go/deepseek-v4-pro");
+  });
+});
+
+describe("resolveTurnHeaderModelName", () => {
+  it("uses the turn model when the display name is derived from the current model", () => {
+    expect(resolveTurnHeaderModelName({
+      turnModel: "kimi-code/kimi-for-coding",
+      agentDisplayName: "k3",
+      agentModelAlias: "kimi-code/k3",
+    })).toBe("kimi-for-coding");
+  });
+
+  it("keeps a custom agent name as identity instead of replacing it with the model", () => {
+    expect(resolveTurnHeaderModelName({
+      turnModel: "kimi-code/kimi-for-coding",
+      agentDisplayName: "小审",
+      agentModelAlias: "kimi-code/k3",
+    })).toBe("小审");
+  });
+
+  it("falls back to the display name when the turn model is unknown", () => {
+    expect(resolveTurnHeaderModelName({
+      turnModel: undefined,
+      agentDisplayName: "k3",
+      agentModelAlias: "kimi-code/k3",
+    })).toBe("k3");
+    expect(resolveTurnHeaderModelName({ turnModel: null, agentDisplayName: "k3", agentModelAlias: "kimi-code/k3" })).toBe("k3");
+  });
+
+  it("uses the compact turn model when there is no display name at all", () => {
+    expect(resolveTurnHeaderModelName({ turnModel: "kimi-code/k3" })).toBe("k3");
   });
 });

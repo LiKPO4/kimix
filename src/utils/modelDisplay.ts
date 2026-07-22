@@ -68,6 +68,26 @@ export function resolveAuthoritativeSessionModel(input: {
     || null;
 }
 
+/**
+ * Assistant process header name for one turn. Historical turn badges follow the
+ * official turn-scoped model (usage.record.model), never the session's current
+ * model — but a custom agent name is an identity, not a model badge, and stays.
+ */
+export function resolveTurnHeaderModelName(input: {
+  turnModel?: string | null;
+  agentDisplayName?: string | null;
+  agentModelAlias?: string | null;
+}): string | undefined {
+  const displayName = input.agentDisplayName?.trim() || undefined;
+  const turnModel = input.turnModel?.trim() || undefined;
+  if (!turnModel) return displayName;
+  const compactTurn = compactModelDisplayName(turnModel);
+  if (!displayName) return compactTurn;
+  const alias = input.agentModelAlias?.trim() || "";
+  if (alias && compactModelDisplayName(alias) === displayName) return compactTurn;
+  return displayName;
+}
+
 export function getSessionModelForDisplay(input: {
   events: Array<{ type: string; timestamp?: number; message?: string | null; model?: string | null }>;
   sessionModel?: string | null;

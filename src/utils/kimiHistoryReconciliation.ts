@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@/types/ui";
+import { extractModelFromStatusMessage } from "./modelDisplay";
 import { hasMalformedAssistantMarkdown } from "@/utils/eventHelpers";
 import { mergeEvents } from "@/utils/eventMapper";
 import {
@@ -636,10 +637,10 @@ export function mergeMissingUsageStatusEvents(
     `${event.message ?? ""}:${event.tokenCount ?? -1}:${event.inputTokenCount ?? -1}`
   );
   const candidates = canonicalEvents.filter(isUsageStatus);
-  if (candidates.length === 0) return baseEvents;
+  if (candidates.length === 0) return backfillTurnModelsFromUsageStatuses(baseEvents);
   const known = new Set(baseEvents.filter(isUsageStatus).map(identityOf));
   const missing = candidates.filter((event) => !known.has(identityOf(event)));
-  if (missing.length === 0) return baseEvents;
+  if (missing.length === 0) return backfillTurnModelsFromUsageStatuses(baseEvents);
   const merged = [...baseEvents];
   for (const status of missing) {
     known.add(identityOf(status));
@@ -647,6 +648,47 @@ export function mergeMissingUsageStatusEvents(
     while (index > 0 && merged[index - 1].timestamp > status.timestamp) index -= 1;
     merged.splice(index, 0, status);
   }
-  return merged;
+  return backfillTurnModelsFromUsageStatuses(merged);
+}
+
+/**
+ * Stamp each turn's official turn-scoped model (usage.record.model, carried by
+ * usage status messages) onto assistant events that lack one. Historical
+ * headers and footers then agree on the model that actually produced the turn.
+ */
+export function backfillTurnModelsFromUsageStatuses(events: TimelineEvent[]): TimelineEvent[] {
+  type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
+  const result = [...events];
+  let dirty = false;
+  let pendingAssistants: number[] = [];
+  let turnModel: string | null = null;
+  const flushTurn = () => {
+    if (turnModel && pendingAssistants.length > 0) {
+      for (const index of pendingAssistants) {
+        const event = result[index] as AssistantEvent;
+        result[index] = { ...event, model: turnModel };
+        dirty = true;
+      }
+    }
+    pendingAssistants = [];
+    turnModel = null;
+  };
+  for (let index = 0; index < result.length; index += 1) {
+    const event = result[index];
+    if (event.type === "user_message") {
+      flushTurn();
+      continue;
+    }
+    if (event.type === "assistant_message") {
+      if (!(typeof event.model === "string" && event.model.trim())) pendingAssistants.push(index);
+      continue;
+    }
+    if (event.type === "status_update") {
+      const model = extractModelFromStatusMessage(event.message);
+      if (model) turnModel = model;
+    }
+  }
+  flushTurn();
+  return dirty ? result : events;
 }
 
