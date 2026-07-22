@@ -745,7 +745,7 @@ body::before {
   }
 }
 
-@container (max-width: 520px) {
+@container (max-width: 420px) {
   .kimix-composer-toolbar-secondary {
     flex-wrap: wrap;
     justify-content: flex-start;
