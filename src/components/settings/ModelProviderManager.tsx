@@ -741,7 +741,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             )}
 
             {!selectedProviderManaged && (
-              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
+              <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)" }}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div>
                     <div className="text-[12.5px] font-semibold text-text-primary">{selectedModelAlias ? "编辑模型" : "添加模型"}</div>

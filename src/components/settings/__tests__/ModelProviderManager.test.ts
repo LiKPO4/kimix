@@ -85,6 +85,10 @@ describe("ModelProviderManager", () => {
     });
     const { container, root, onConfigChange } = await renderManager(emptyProviderConfig);
 
+    const modelEditorTitle = Array.from(container.querySelectorAll("div"))
+      .find((element) => element.textContent?.trim() === "添加模型");
+    expect(modelEditorTitle?.closest(".kimix-settings-card")).not.toBeNull();
+
     await act(async () => buttonByText(container, "探测模型")?.click());
     const discoveredSelect = Array.from(container.querySelectorAll("select"))
       .find((select) => select.textContent?.includes("model-b"));
