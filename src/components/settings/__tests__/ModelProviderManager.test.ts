@@ -83,7 +83,11 @@ describe("ModelProviderManager", () => {
       configurable: true,
       value: { discoverKimiProviderModels, saveKimiProviderModel, getKimiModelConfig },
     });
-    const { container, root, onConfigChange } = await renderManager(emptyProviderConfig);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onConfigChange = vi.fn();
+    await act(async () => root.render(createElement(StatefulManager, { initialConfig: emptyProviderConfig, onConfigChange })));
 
     const modelEditorTitle = Array.from(container.querySelectorAll("div"))
       .find((element) => element.textContent?.trim() === "添加模型");
@@ -109,6 +113,8 @@ describe("ModelProviderManager", () => {
     });
     expect(getKimiModelConfig).toHaveBeenCalledTimes(1);
     expect(onConfigChange).toHaveBeenCalledWith(discoveredConfig, "已保存 Provider 模型");
+    expect(container.textContent).toContain("1 个模型共享当前供应商连接");
+    expect(container.textContent).toContain("gateway/model-b");
     await act(async () => root.unmount());
   });
 

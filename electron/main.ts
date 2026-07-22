@@ -33,6 +33,7 @@ import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataR
 import { activateWindow } from "./windowActivation";
 import { discoverOpenAiModels } from "./providerModelDiscovery";
 import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
+import { mergeRuntimeAndDiskModelConfig } from "../src/utils/modelConfigSummary";
 import {
   createDeferredOnceTask,
   createDistinctAsyncWriter,
@@ -1359,11 +1360,13 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
 }
 
 async function readKimiModelConfigWithSdk() {
+  const disk = readKimiModelConfig();
   try {
-    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+    const runtime = kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+    return mergeRuntimeAndDiskModelConfig(runtime, disk);
   } catch (error) {
     console.warn("[kimi-code] SDK getConfig failed, falling back to TOML parser:", error);
-    return readKimiModelConfig();
+    return disk;
   }
 }
 
@@ -1428,7 +1431,7 @@ async function saveProviderConfigWithSdk(input: unknown) {
         },
       },
     });
-    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+    return await readKimiModelConfigWithSdk();
   } catch (error) {
     if (error instanceof Error && error.message.includes("managed Provider")) throw error;
     console.warn("[kimi-code] SDK setConfig(provider-only) failed, falling back to TOML writer:", error);
@@ -1472,7 +1475,7 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
     });
     if (config.makeDefault) return await readKimiModelConfigAfterSdkSet(config.modelAlias);
-    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+    return await readKimiModelConfigWithSdk();
   } catch (error) {
     if (error instanceof Error && (error.message.includes("不存在，请先保存") || error.message.includes("managed Provider") || error.message.includes("已由 Provider"))) throw error;
     console.warn("[kimi-code] SDK setConfig(model-only) failed, falling back to TOML writer:", error);
@@ -1564,7 +1567,7 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
     if (config.makeDefault) {
       return await readKimiModelConfigAfterSdkSet(config.modelAlias);
     }
-    return kimiCodeConfigToModelSummary(await kimiCodeHost.getConfig({ reload: true }));
+    return await readKimiModelConfigWithSdk();
   } catch (error) {
     console.warn("[kimi-code] SDK setConfig(provider) failed, falling back to TOML writer:", error);
     return saveOpenAiProviderConfig(input);
