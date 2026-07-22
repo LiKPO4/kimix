@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-20T23:53:00+08:00"
+timestamp: "2026-07-22T12:00:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -49,6 +49,16 @@ flush and before any boundary event merges; snapshot/barrier frames stay on the
 formal path because they may replace body text while the draft only appends.
 When reading assistant content, always treat formal events as authority once
 committed.
+
+The draft identity may legitimately strengthen during one dispatch: the first
+token can be scoped by a renderer-created turn id and a later frame by the
+official turn id. `roomMessageId` remains the immutable dispatch owner. When the
+session, room Agent, and `roomMessageId` match, the store must migrate the
+existing draft to the new key and continue appending; two buffers for the same
+message are forbidden. A batch commit collects drafts in insertion order and
+prepends them once. Repeated `unshift` reverses two identity-era fragments (for
+example `你好` and `霖江路。我会`) and produces a temporarily scrambled body that
+the terminal authoritative frame merely hides later.
 
 ## Memo keys never change semantics for performance
 

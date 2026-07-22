@@ -74,22 +74,34 @@ export function commitActiveTurnDraftsToBatch(
     return true;
   });
 
+  const prependedByBatch = new Map<string, {
+    roomId: string;
+    roomAgentId: string;
+    items: TimelineEvent[];
+  }>();
   for (const key of keys) {
     const parsed = parseActiveTurnDraftKey(key);
     const draft = takeActiveTurnDraft(key);
     if (!parsed || !draft) continue;
     if (!draft.content && !draft.thinking && !(draft.thinkingParts?.length)) continue;
     const batchKey = JSON.stringify([parsed.sessionId, parsed.roomAgentId]);
-    const current = batches.get(batchKey) ?? {
+    const prepended = prependedByBatch.get(batchKey) ?? {
       roomId: parsed.sessionId,
       roomAgentId: parsed.roomAgentId,
       items: [] as TimelineEvent[],
     };
-    current.items.unshift(scopeEventToRoomAgent(
+    prepended.items.push(scopeEventToRoomAgent(
       draftToAssistantEvent(key, draft),
       parsed.roomAgentId,
     ));
-    batches.set(batchKey, current);
+    prependedByBatch.set(batchKey, prepended);
+  }
+
+  for (const [batchKey, prepended] of prependedByBatch) {
+    const current = batches.get(batchKey);
+    batches.set(batchKey, current
+      ? { ...current, items: [...prepended.items, ...current.items] }
+      : prepended);
   }
 }
 

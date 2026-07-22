@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **A stronger live turn identity migrates the same room-message draft**: the local optimistic and later official `agentTurnId` previously created two buffers for one response; repeated batch `unshift` reversed their fragments during streaming, while the terminal full body hid the corruption. Drafts now rekey by immutable `roomMessageId`, and multi-draft commits preserve insertion order. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
 * **Replay-derived file changes stay with their source tool turn**: snapshot replay previously regenerated random IDs for `change_summary` / `diff` and appended them at the timeline tail, so an older file-change card could appear under a newer provider-failed turn. Derived events now use source-stable IDs, inherit turn identity, and upsert beside the source tool; render grouping also repairs already-persisted legacy summaries by timestamped user boundaries. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 * **In-app update package list falls back to electron-builder latest.yml on API rate limits**: GitHub Releases Atom has no enclosure assets, so rate-limited clients previously reported that the update source had no installer list even when the Release page had Setup/exe packages. After API/Atom, Kimix merges `latest.yml` / `latest-mac.yml` / `latest-linux.yml` installer metadata (url, size, sha512) and accepts sha512 verification beside `SHA256SUMS.txt` sha256. See [/project/kimix.md](/project/kimix.md).

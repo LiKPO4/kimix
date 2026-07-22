@@ -1,8 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-22 v2.16.90 流式正文因草稿身份切换而局部倒序
+
+- 真实会话 `session_259f8e2c-6581-49fa-9f08-20a190878d03`：官方 wire 的首段始终是「你好霖江路。我会补上…」，终态正文也正确；Kimix 运行中曾显示「霖江路。我会你好补上…」。
+- 根因：同一 `roomMessageId` 的本地占位 `agentTurnId` 会切换为官方 `agentTurnId`，旧实现留下两个草稿；`commitActiveTurnDraftsToBatch` 对它们逐个 `unshift`，稳定反转到达顺序。终态权威帧 REPLACE 后才恢复正常。
+- 修复：同一 session/Agent/roomMessage 的草稿在 turn identity 切换时迁移到新 key 并继续累积；多个草稿提交时先按创建顺序收集，再一次性前置到边界事件之前。
+- 文件变更裁决：Project06 失败 turn 11 无工具；紧邻的 turn 10 只改 `assets/data/storylets.json`。另两个文件来自 turn 3/6，`v2.16.89` 显示一个文件是正确归属，不是未来丢失。
+- 验收：两条回归测试先稳定复现「后段 + 你好」倒序，再验证身份迁移与批量顺序。
+
 ## 2026-07-22 v2.16.89 失败轮错误继承旧文件变更
 
-- 真实会话 `session_d2092d06-9027-4105-9240-3bc0bc0ca58d`：最新 turn 11 只有 `503 auth_unavailable`，没有工具调用；截图中的三个文件来自 turn 0/3/6。
+- 真实会话 `session_d2092d06-9027-4105-9240-3bc0bc0ca58d`：最新 turn 11 只有 `503 auth_unavailable`，没有工具调用；被错误聚合的三个文件实际来自历史 turn 3/6/10。
 - 根因：快照重放虽给工具结果稳定 ID，但由工具结果派生的 `change_summary` / `diff` 仍使用随机 ID并盲目追加到时间线尾部；失败轮的渲染聚合因此把旧摘要当成当前轮变更。
 - 修复：派生事件使用源工具结果的确定性 ID并继承轮次身份；重放时在源工具旁幂等 upsert；渲染前按用户时间边界修复旧版本已经持久化的迟到摘要，且不改动旧正文。
 - 验收：真实事件链已核对；`eventMapper` 与 `chatRenderItems` 回归测试覆盖重复重放和已污染历史；全量验收见本轮提交。

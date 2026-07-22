@@ -157,7 +157,29 @@ export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
 ): ActiveTurnDraft {
-  const previous = drafts.get(key);
+  let previous = drafts.get(key);
+  let migratedFromKey: string | null = null;
+  if (!previous && event.roomMessageId) {
+    const target = parseActiveTurnDraftKey(key);
+    const compatible = target
+      ? [...drafts.entries()].find(([candidateKey, draft]) => {
+          const candidate = parseActiveTurnDraftKey(candidateKey);
+          return candidate?.sessionId === target.sessionId &&
+            candidate.roomAgentId === target.roomAgentId &&
+            draft.roomMessageId === event.roomMessageId;
+        })
+      : undefined;
+    if (compatible) {
+      const [previousKey, previousDraft] = compatible;
+      previous = previousDraft;
+      drafts.delete(previousKey);
+      pendingNotifyKeys.delete(previousKey);
+      // A local optimistic turn id can be replaced by the official id after
+      // the first token. Move the same room-message draft instead of leaving
+      // two buffers that later commit in a different order.
+      migratedFromKey = previousKey;
+    }
+  }
   const base: AssistantMessage = previous
     ? toAssistantShell(previous, key)
     : {
@@ -211,6 +233,7 @@ export function applyActiveTurnDraftDelta(
     timestamp: previous?.timestamp ?? event.timestamp,
   };
   drafts.set(key, next);
+  if (migratedFromKey) notify(migratedFromKey);
   scheduleNotify(key);
   return next;
 }

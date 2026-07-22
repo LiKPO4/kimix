@@ -56,11 +56,33 @@ describe("activeTurnDraftStore", () => {
     const c = makeActiveTurnDraftKey("s1", "agent-a", "turn-2");
     applyActiveTurnDraftDelta(a, delta("A"));
     applyActiveTurnDraftDelta(b, delta("B"));
-    applyActiveTurnDraftDelta(c, delta("C"));
+    applyActiveTurnDraftDelta(c, delta("C", { roomMessageId: "msg-2" }));
 
     expect(getActiveTurnDraft(a)?.content).toBe("A");
     expect(getActiveTurnDraft(b)?.content).toBe("B");
     expect(getActiveTurnDraft(c)?.content).toBe("C");
+  });
+
+  it("rekeys one room message draft without reversing text when the turn identity changes", () => {
+    const optimisticKey = makeActiveTurnDraftKey("s1", "agent-1", "turn-local");
+    const officialKey = makeActiveTurnDraftKey("s1", "agent-1", "turn-official");
+
+    applyActiveTurnDraftDelta(optimisticKey, delta("你好", {
+      agentTurnId: "turn-local",
+      roomMessageId: "room-message-1",
+    }));
+    applyActiveTurnDraftDelta(officialKey, delta("霖江路。我会补上焦点归还。", {
+      agentTurnId: "turn-official",
+      roomMessageId: "room-message-1",
+    }));
+
+    expect(getActiveTurnDraft(optimisticKey)).toBeNull();
+    expect(getActiveTurnDraft(officialKey)).toMatchObject({
+      content: "你好霖江路。我会补上焦点归还。",
+      agentTurnId: "turn-official",
+      roomMessageId: "room-message-1",
+      revision: 2,
+    });
   });
 
   it("take clears the draft and returns a commit snapshot", () => {

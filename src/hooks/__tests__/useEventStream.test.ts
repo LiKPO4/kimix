@@ -131,4 +131,45 @@ describe("commitActiveTurnDraftsToBatch", () => {
     });
     expect(getActiveTurnDraft(key)).toBeNull();
   });
+
+  it("preserves draft arrival order when more than one identity is committed to one batch", () => {
+    const firstKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-local");
+    const secondKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-official");
+    applyActiveTurnDraftDelta(firstKey, assistant("你好", {
+      agentTurnId: "turn-local",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-local",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    applyActiveTurnDraftDelta(secondKey, assistant("霖江路。我会补上焦点归还。", {
+      agentTurnId: "turn-official",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-official",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    const boundary: TimelineEvent = {
+      id: "tool-boundary",
+      type: "tool_call",
+      timestamp: 3,
+      toolCallId: "call-1",
+      toolName: "Edit",
+      status: "running",
+      arguments: {},
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-official",
+    };
+    const batchKey = JSON.stringify(["session-1", "agent-1"]);
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>([[batchKey, {
+      roomId: "session-1",
+      roomAgentId: "agent-1",
+      items: [boundary],
+    }]]);
+
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+    });
+
+    expect(batches.get(batchKey)?.items.map((event) => (
+      event.type === "assistant_message" ? event.content : event.type
+    ))).toEqual(["你好", "霖江路。我会补上焦点归还。", "tool_call"]);
+  });
 });
