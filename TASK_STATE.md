@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 修复：历史轮页脚模型/用量缺失（wire 镜像水合）
+
+- 现象：session_d1673cd4 末轮只显示"已完成"，无模型/上下文用量。用户疑自定义子代理模型所致。
+- 根因（快照流程取证）：① 官方侧对该会话全部轮次 snapshot/transcript 的 model/usage 均为 null（与自定义子代理无关，wire 证明全部轮次含子代理都是 kimi-for-coding）；② Kimix 页脚来自直播 agent.status.updated（usage.currentTurn）的本地持久化，该轮直播帧当时未到达（瞬态）；③ 现行 0.29 Server 探针证明普通轮/子代理轮均正常下发 usage 帧，非稳定缺陷。
+- 修复：Server 快照优先的历史加载合并 wire 镜像的 turn-scoped usage.record → StatusUpdate（时间序插入 + 身份去重），内容仍以快照为权威，页脚从官方 wire 记录水合。
+- 验证：新增合并函数单测 3 项；真实会话 CDP 实测 loadKimiCodeSession 返回 16 事件含 3 条精确用量（54/22386、262/22472、510/25801），位置在各轮 turn.ended 之后；vitest 全绿、typecheck 通过。
+
 ## 2026-07-22 验收修复：思考按钮省略、会话树卡片挤压、overrides 伪模型
 
 - 思考按钮：`Composer` 思考强度按钮外层由固定 108px 改为 minWidth 108，档位名（如"思考 · 最高"）完整显示不再省略。

@@ -10,7 +10,7 @@ import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
-import { loadSessionHistoryWithFallback } from "./sessionHistoryFallback";
+import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "./sessionHistoryFallback";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
@@ -6527,7 +6527,13 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
         () => kimiCodeHost.loadServerSessionHistory(sessionId),
         () => sessionHistory.getSessionHistory(workDir, sessionId),
       );
-      return { success: true, data: { sessionId, events: history.events, source: history.source } };
+      // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
+      const events = history.source === "server"
+        ? mergeHistoryStatusEventsByTime(history.events, (await sessionHistory.getSessionHistory(workDir, sessionId))
+          .filter((event) => event.type === "StatusUpdate"
+            && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>))))
+        : history.events;
+      return { success: true, data: { sessionId, events, source: history.source } };
     }
     const events = await sessionHistory.getSessionHistory(workDir, sessionId);
     return { success: true, data: { sessionId, events, source: "local" } };
