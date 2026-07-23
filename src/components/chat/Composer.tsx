@@ -4618,11 +4618,11 @@ export function Composer() {
               <ClipboardList size={14} className="shrink-0" />
               <span>Plan</span>
             </button>
-            <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 108 }}>
-              <button
+            <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
+<button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={toggleThinkingMenu}
-                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden border disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: "100%",
                   height: 34,
@@ -4631,11 +4631,7 @@ export function Composer() {
                   lineHeight: "20px",
                   gap: 6,
                   paddingLeft: 12,
-                  paddingRight: 10,
-                  borderColor: activeThinkingEffort !== "off" ? "var(--accent-primary-soft)" : "transparent",
-                  backgroundColor: activeThinkingEffort !== "off" ? "var(--accent-primary-light)" : "transparent",
-                  color: activeThinkingEffort !== "off" ? "var(--accent-primary-dark)" : undefined,
-                  boxShadow: activeThinkingEffort !== "off" ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
+                  paddingRight: 12,
                 }}
                 title={isMutationOwnerRunning
                   ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可调整思考强度`
@@ -4643,8 +4639,8 @@ export function Composer() {
                 aria-haspopup="menu"
                 aria-expanded={showThinkingMenu}
               >
-                <Brain size={14} className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate">思考 · {thinkingEffortLabel(activeThinkingEffort)}</span>
+                <Brain size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                <span className="min-w-0 flex-1 truncate">{thinkingEffortLabel(activeThinkingEffort)}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showThinkingMenu && (
