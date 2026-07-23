@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 交接：验收构建已就绪
+
+- 接手交接摘要（18 提交自 e3b5cde8，HEAD=`74585827`，版本仍为 **v2.16.105** 未 bump）。
+- 本轮动作：`pnpm build` 成功；`scripts/restart-kimix-dev.ps1 --fast` 已拉起 dev；fingerprint 对齐当前 HEAD；Electron 主进程带 `--kimix-runtime-token`，renderer CDP **9222**。
+- 工作区：已提交代码干净；仅存在若干 `.tmp-*` / perf 文档等 untracked，未纳入本轮。
+- 下一步：用户按验收清单截图/实测 → 通过后 bump **v2.16.106** + release notes → 确认后推 tag（不手动 dist）。
+
 ## 2026-07-23 优化：窄宽度输入框底部按钮行布局
 
 - 现象：右侧侧栏展开（composer 内容盒 ~517px）时，输入框下方按钮行变成"左组独占一行 + 右组按钮左聚右留白"，位置奇怪。
