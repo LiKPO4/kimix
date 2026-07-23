@@ -721,7 +721,7 @@ body::before {
   scale: 0.96;
 }
 
-@container (max-width: 760px) {
+@container (max-width: 480px) {
   .kimix-composer-toolbar {
     height: auto !important;
     min-height: 36px;
@@ -753,7 +753,7 @@ body::before {
   }
 }
 
-@container (max-width: 560px) {
+@container (max-width: 760px) {
   .kimix-permission-button-wrap {
     flex: 0 0 auto !important;
     width: auto !important;
