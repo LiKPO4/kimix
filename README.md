@@ -1,6 +1,6 @@
 # Kimix
 
-Kimix 是一个 Codex 风格的 Kimi Code 桌面界面，基于 [Kimi Code CLI](https://github.com/moonshot-ai/kimi-code) 构建。
+Kimix 是一个 Codex 风格的 Kimi Code 桌面界面，基于 [Kimi Code](https://github.com/MoonshotAI/kimi-code) 构建。
 
 ![许可证](https://img.shields.io/badge/license-MIT-blue.svg)
 
