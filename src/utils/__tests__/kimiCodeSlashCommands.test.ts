@@ -31,6 +31,12 @@ describe("listKimiCodeSlashCommands", () => {
       expect(names.has("custom-theme")).toBe(true);
       expect(names.has("import-from-cc-codex")).toBe(true);
       expect(names.has("mcp-config")).toBe(true);
+      expect(names.has("write-goal")).toBe(true);
+      expect(names.has("update-config")).toBe(true);
+      expect(names.has("check-kimi-code-docs")).toBe(true);
+      expect(names.has("sub-skill")).toBe(true);
+      expect(names.has("sub-skill.review")).toBe(true);
+      expect(names.has("sub-skill.consolidate")).toBe(true);
     }
   });
 });

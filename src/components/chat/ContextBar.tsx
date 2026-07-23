@@ -527,6 +527,20 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
   };
 
+  // /model 斜杠命令从 Composer 触发打开模型菜单；无依赖数组以始终读取最新闭包。
+  useEffect(() => {
+    const handleOpenModelMenu = () => {
+      if (!mutationOwner && activeSession) return;
+      setUsageOpen(false);
+      setWorkDirsOpen(false);
+      setModelSearch("");
+      setModelMenuOpen(true);
+      void loadModelCatalog();
+    };
+    window.addEventListener("kimix:open-model-menu", handleOpenModelMenu);
+    return () => window.removeEventListener("kimix:open-model-menu", handleOpenModelMenu);
+  });
+
   const restoreComposerFocus = () => {
     // Model menu / search input steals focus; return it after the menu unmounts
     // and any session metadata re-render from the switch settles.

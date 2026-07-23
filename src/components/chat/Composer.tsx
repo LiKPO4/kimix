@@ -23,7 +23,7 @@ import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimi
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
-import { classifySlashCommand, shouldActivateSkillBeforePrompt } from "@/utils/slashRouting";
+import { classifySlashCommand, shouldActivateSkillBeforePrompt, slashCommandPattern } from "@/utils/slashRouting";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
@@ -32,6 +32,8 @@ import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
+import { APP_VERSION } from "@/utils/appVersion";
+import { sessionToMarkdown } from "@/utils/markdownExport";
 import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel } from "@/utils/thinkingEffort";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
@@ -388,7 +390,6 @@ type CompletionItem = {
   kind: "agent" | "plugin" | "file" | "slash" | "skill" | "plugin-command";
 };
 
-const slashCommandPattern = /^\/([a-zA-Z][\w:-]*)(?:\s+([\s\S]*))?$/;
 function summarizeImportPlan(items: { kind: string; action: string }[]) {
   const active = items.filter((item) => item.action !== "skip");
   const count = (kind: string) => active.filter((item) => item.kind === kind).length;
@@ -522,6 +523,7 @@ export function Composer() {
   const hiddenComposerCards = useAppStore((s) => s.hiddenComposerCards);
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
+  const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
@@ -2563,6 +2565,192 @@ export function Composer() {
       await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。", roomAgentId);
       return true;
     }
+    if (name === "new" || name === "clear") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      if (!currentProject) {
+        await appendStatusMessage("请先选择项目，再创建新会话。", roomAgentId);
+        return true;
+      }
+      const model = await getDefaultKimiModel();
+      const fresh: Session = {
+        id: genId(),
+        engine: "kimi-code" as const,
+        model,
+        permissionMode,
+        planMode: defaultPlanMode,
+        title: "新会话",
+        projectPath: currentProject.path,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        events: [],
+        isLoading: false,
+      };
+      addSession(fresh);
+      setCurrentSession(fresh);
+      await appendStatusMessage("已开启全新会话，官方上下文已丢弃。", roomAgentId);
+      return true;
+    }
+    if (name === "fork") {
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const res = await window.api.forkKimiCodeSession({ sessionId: runtime.runtimeSessionId, title: args || undefined });
+      if (!res.success) {
+        await appendStatusMessage(`派生会话失败：${res.error}`, roomAgentId);
+        return true;
+      }
+      const forked: Session = {
+        id: genId(),
+        engine: "kimi-code" as const,
+        model: null,
+        permissionMode,
+        planMode: defaultPlanMode,
+        title: args || "派生会话",
+        projectPath: res.data.workDir || currentProject?.path || "",
+        officialSessionId: res.data.sessionId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        events: [],
+        isLoading: false,
+      };
+      addSession(forked);
+      setCurrentSession(forked);
+      await appendStatusMessage("已基于当前会话派生新会话，完整历史将在打开时从官方加载。", roomAgentId);
+      return true;
+    }
+    if (name === "title" || name === "rename") {
+      const target = activeSession ?? currentSession;
+      if (!target) {
+        await appendSlashUserMessage(commandNotice, roomAgentId);
+        await appendStatusMessage("当前没有可重命名的会话。", roomAgentId);
+        return true;
+      }
+      if (!args) {
+        await appendSlashUserMessage(commandNotice, roomAgentId);
+        await appendStatusMessage(`当前会话标题：${target.title || "（无标题）"}`, roomAgentId);
+        return true;
+      }
+      const nextTitle = args.slice(0, 200);
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      updateSession(target.id, (session) => ({ ...session, title: nextTitle, updatedAt: Date.now() }));
+      const renamed = useSessionStore.getState().sessions.find((session) => session.id === target.id);
+      if (renamed && useAppStore.getState().currentSession?.id === target.id) setCurrentSession(renamed);
+      const runtimeSessionId = target.runtimeSessionId ?? target.officialSessionId;
+      if (runtimeSessionId) {
+        await window.api.renameKimiCodeSession({ sessionId: runtimeSessionId, title: nextTitle }).catch(() => undefined);
+      }
+      await appendStatusMessage(`会话标题已更新为：${nextTitle}`, roomAgentId);
+      return true;
+    }
+    if (name === "model") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      window.dispatchEvent(new CustomEvent("kimix:open-model-menu"));
+      await appendStatusMessage("已打开模型选择。", roomAgentId);
+      return true;
+    }
+    if (name === "settings" || name === "config") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      await appendStatusMessage("已打开 Kimix 设置。", roomAgentId);
+      return true;
+    }
+    if (name === "provider") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-model-settings")), 80);
+      await appendStatusMessage("已打开设置中的模型与供应商管理。", roomAgentId);
+      return true;
+    }
+    if (name === "mcp") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("mcp");
+      await appendStatusMessage("已打开 MCP 管理面板。", roomAgentId);
+      return true;
+    }
+    if (name === "plugins") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("plugins");
+      await appendStatusMessage("已打开插件管理面板。", roomAgentId);
+      return true;
+    }
+    if (name === "permission") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setShowPermissionMenu(true);
+      await appendStatusMessage("已打开权限模式选择。", roomAgentId);
+      return true;
+    }
+    if (name === "yolo" || name === "yes" || name === "auto") {
+      const targetMode: PermissionMode = name === "auto" ? "auto" : "yolo";
+      const arg = args.toLowerCase();
+      const currentMode = (mutationPermissionMode ?? permissionMode) as PermissionMode;
+      const nextMode: PermissionMode = arg === "on" ? targetMode : arg === "off" ? "manual" : (currentMode === targetMode ? "manual" : targetMode);
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await handleSetPermissionMode(nextMode);
+      return true;
+    }
+    if (name === "tasks" || name === "task") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setLongTaskInspectorOpen(true);
+      await appendStatusMessage("已打开长程任务面板。", roomAgentId);
+      return true;
+    }
+    if (name === "export-md" || name === "export") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const target = activeSession ?? currentSession;
+      if (!target) {
+        await appendStatusMessage("当前没有可导出的会话。", roomAgentId);
+        return true;
+      }
+      const res = await window.api.exportMarkdown({ title: target.title, content: sessionToMarkdown(target) });
+      await appendStatusMessage(res.success ? "已导出 Markdown。" : `导出失败：${res.error}`, roomAgentId);
+      return true;
+    }
+    if (name === "copy") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const target = activeSession ?? currentSession;
+      const lastAssistant = [...(target?.events ?? [])].reverse().find((event) => (
+        event.type === "assistant_message" && event.content.trim()
+      ));
+      if (!lastAssistant || lastAssistant.type !== "assistant_message") {
+        await appendStatusMessage("当前没有可复制的 AI 回复。", roomAgentId);
+        return true;
+      }
+      await navigator.clipboard.writeText(lastAssistant.content);
+      await appendStatusMessage("已复制最后一条 AI 回复。", roomAgentId);
+      return true;
+    }
+    if (name === "help" || name === "h") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await appendStatusMessage([
+        "可用斜杠命令：",
+        "会话：/new /fork /title /compact /undo /export-md /copy /init",
+        "模式：/plan /yolo /auto /permission /model /swarm /goal /btw",
+        "面板：/settings /provider /mcp /plugins /tasks /theme",
+        "信息：/status /usage /help /version /reload",
+        "Skill：/write-goal /update-config /check-kimi-code-docs /sub-skill /custom-theme /import-from-cc-codex /mcp-config /skill:<名称>",
+        "其他：/exit（关闭窗口）；未占用的 /<名称> 会回退匹配 /skill:<名称>。",
+      ].join("\n"), roomAgentId);
+      return true;
+    }
+    if (name === "version") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await appendStatusMessage(`Kimix v${APP_VERSION}`, roomAgentId);
+      return true;
+    }
+    if (name === "exit" || name === "quit" || name === "q") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await window.api.closeWindow();
+      return true;
+    }
+    if (name === "init") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await sendPromptContent(content.trim(), {
+        addUserEvent: false,
+        manualSubmitAutoScroll: false,
+        outboundContent: "分析当前代码库的结构、技术栈、构建与测试命令、目录约定和协作注意事项，在项目根目录生成一份 AGENTS.md；若已存在则在保留既有内容的基础上补充完善。",
+      });
+      return true;
+    }
     if (name === "custom-theme") {
       if (!roomAgentId) await appendSlashUserMessage(commandNotice);
       const sent = await sendPromptContent(content.trim(), {
@@ -3134,6 +3322,21 @@ export function Composer() {
       }
       await handleDirectSlashCommand(trimmed);
       return;
+    }
+    // 官方同款简写回退：未被系统命令占用的 /<name> 回退匹配到 /skill:<name>。
+    // 仅在无图片附件时尝试（Skill 激活不接收图片），未识别时静默按普通消息发送。
+    if (slashRouting === "passthrough" && trimmed.startsWith("/") && imagesToSend.length === 0) {
+      const skillActivated = await applySkillCommand(slashName, slashArgs, {
+        allowMigration: false,
+        reportFailure: false,
+      });
+      if (skillActivated) {
+        setInput("");
+        setImageAttachments([]);
+        inputRef.current?.reset();
+        await appendSlashUserMessage(trimmed, slashRoomAgentId);
+        return;
+      }
     }
     const slashHandled = trimmed.startsWith("/")
       ? await handleSdkSlashCommand(trimmed, slashRoomAgentId)
