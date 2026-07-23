@@ -128,6 +128,28 @@ export function getLatestMetricStatus(events: TimelineEvent[]) {
   return undefined;
 }
 
+
+/** Statuses after the latest user message or compaction end — approximates "current window". */
+export function statusesAfterLatestContextBoundary(
+  events: TimelineEvent[],
+): Extract<TimelineEvent, { type: "status_update" }>[] {
+  let boundaryIndex = -1;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "user_message") {
+      boundaryIndex = index;
+      break;
+    }
+    if (event.type === "compaction" && event.phase === "end") {
+      boundaryIndex = index;
+      break;
+    }
+  }
+  return events
+    .slice(boundaryIndex + 1)
+    .filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
+}
+
 export function getSessionContextUsages(session: Session | undefined): SessionContextUsage[] {
   if (!session) return [];
   const primaryAgentId = getPrimaryRoomAgent(session).id;
@@ -135,13 +157,11 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
     .filter((agent) => !agent.removedAt)
     .map((agent) => {
       const agentEvents = getRoomAgentEvents(session, agent.id);
-      const statusEvents = agentEvents.filter(
-        (event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update",
-      );
-      // Same merge as turn footers: fold usage.record + interim context shells so
-      // the composer ring/popover is not stuck on "等待上下文数据" when only
-      // tokens arrived (usage.record has no contextTokens on 0.29).
-      const merged = mergeMetricStatusUpdates(statusEvents) ?? getLatestMetricStatus(agentEvents);
+      // Prefer metrics after the latest user turn / compaction so a pre-compact
+      // context window does not stick on the composer ring forever.
+      const statusEvents = statusesAfterLatestContextBoundary(agentEvents);
+      const merged = mergeMetricStatusUpdates(statusEvents)
+        ?? getLatestMetricStatus(statusEvents.length > 0 ? statusEvents : agentEvents);
       const contextSize = preferPositiveMetric(merged?.contextSize, merged?.inputTokenCount);
       const hasContext = typeof contextSize === "number" && Number.isFinite(contextSize) && contextSize > 0;
       const reportedLimit = preferPositiveMetric(merged?.contextLimit, undefined);

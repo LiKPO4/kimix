@@ -7753,9 +7753,12 @@ async function handleKimixMediaRequest(request: Request): Promise<Response> {
     if (url.hostname !== "server-file") return new Response("Unknown kimix-media host", { status: 404 });
     const fileId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
     if (!KIMIX_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
-    const filesDir = path.join(os.homedir(), ".kimi-code", "files");
-    const filePath = path.join(filesDir, fileId);
-    if (path.dirname(filePath) !== filesDir || !fs.existsSync(filePath)) return new Response("File not found", { status: 404 });
+    const filesDir = path.resolve(os.homedir(), ".kimi-code", "files");
+    const filePath = path.resolve(filesDir, fileId);
+    // Reject anything that escapes the official files directory (defense in depth on top of fileId regex).
+    if (!filePath.startsWith(filesDir + path.sep) || path.basename(filePath) !== fileId || !fs.existsSync(filePath)) {
+      return new Response("File not found", { status: 404 });
+    }
     if (!kimiCodeServerHost.isReady()) return new Response("Kimi Server 未就绪", { status: 503 });
     const endpoint = kimiCodeServerHost.getStatus().endpoint;
     const range = request.headers.get("range");

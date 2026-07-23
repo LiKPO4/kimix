@@ -7,6 +7,7 @@ import {
   getLatestMeaningfulStatus,
   mergeMetricStatusUpdates,
   preferPositiveMetric,
+  statusesAfterLatestContextBoundary,
   getSessionContextUsages,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
@@ -367,6 +368,24 @@ describe("getSessionContextUsages", () => {
       modelLabel: "kimi-code/k3",
     }));
   });
+
+  it("ignores pre-compaction context when computing the composer ring", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "k3",
+      events: [
+        { id: "old-usage", type: "status_update", timestamp: 1, message: "模型：k3", inputTokenCount: 90_000, tokenCount: 100, contextSize: 90_000, contextLimit: 262_144 },
+        { id: "compact", type: "compaction", timestamp: 2, phase: "end" },
+        { id: "user", type: "user_message", timestamp: 3, content: "继续" },
+        { id: "new-usage", type: "status_update", timestamp: 4, message: "模型：k3", inputTokenCount: 1_200, tokenCount: 40 },
+      ],
+    };
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      hasContext: true,
+      used: 1_200,
+    }));
+  });
+
 });
 
 describe("shouldRecommendNewSession", () => {
@@ -387,5 +406,16 @@ describe("shouldRecommendNewSession", () => {
       { id: "2", type: "user_message", timestamp: 2, content: "b" },
     ]);
     expect(shouldRecommendNewSession(session, true, 2)).toBe(true);
+  });
+});
+
+describe("statusesAfterLatestContextBoundary", () => {
+  it("returns only statuses after the latest user message", () => {
+    const events: TimelineEvent[] = [
+      { id: "s1", type: "status_update", timestamp: 1, inputTokenCount: 10 },
+      { id: "u", type: "user_message", timestamp: 2, content: "hi" },
+      { id: "s2", type: "status_update", timestamp: 3, inputTokenCount: 20 },
+    ];
+    expect(statusesAfterLatestContextBoundary(events).map((e) => e.id)).toEqual(["s2"]);
   });
 });

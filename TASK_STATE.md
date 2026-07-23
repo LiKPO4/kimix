@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 发版：v2.17.0
+
+- 决策：中等版本号跳至 **2.17.0**；Context 近似值、实验 dual-model、强制委派文案、子 Agent 互斥 UI 按用户指示本轮不改。
+- 落地：context 合并仅取最近 user/compaction 边界之后的 status；kimix-media fileId 路径 `resolve` + 目录前缀守卫。
+- 交付：`package.json` 2.17.0；`docs/release-notes/v2.17.0.md`；推 master + tag 由 CI 构建。
+
 ## 2026-07-23 修复：Composer 上下文弹窗「等待上下文数据」
 
 - 现象：页脚已有 Context%，输入区背景信息窗口仍显示「等待上下文数据」。
