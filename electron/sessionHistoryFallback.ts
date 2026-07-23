@@ -1,6 +1,8 @@
 export type SessionHistoryResult = {
   events: Array<{ type: string; payload: unknown; time?: unknown }>;
   source: "server" | "local";
+  /** 官方快照为分页窗口（messages.has_more），只含最近若干条，不是完整历史。 */
+  truncated?: boolean;
 };
 
 export async function loadSessionHistoryWithFallback(
@@ -16,13 +18,16 @@ export async function loadSessionHistoryWithFallback(
         setTimeout(() => reject(new Error("Kimi Server history snapshot timed out")), timeoutMs);
       }),
     ]);
-    if (serverHistory.events.length > 0) return serverHistory;
+    // 0.29 Server 快照只回最近 100 条（has_more）：窗口不能当完整权威历史，
+    // 否则短 canonical 会被 no-shrink 门禁拒绝（丢新轮次）或被接受（丢窗口前老历史）。
+    if (serverHistory.events.length > 0 && !serverHistory.truncated) return serverHistory;
   } catch {
     // Fall through to the SDK/local wire mirror.
   }
 
   const localEvents = await loadLocal();
   if (localEvents.length > 0) return { events: localEvents, source: "local" };
+  // 本地镜像也为空时，截断的 server 窗口仍优于空历史。
   return serverHistory ?? { events: [], source: "local" };
 }
 

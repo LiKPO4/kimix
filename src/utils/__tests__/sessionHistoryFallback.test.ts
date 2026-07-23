@@ -25,6 +25,20 @@ describe("session history fallback", () => {
       1,
     )).resolves.toEqual({ events: [event], source: "local" });
   });
+
+  it("prefers the full local wire mirror when the Server snapshot is a truncated window", async () => {
+    await expect(loadSessionHistoryWithFallback(
+      async () => ({ events: [event], source: "server", truncated: true }),
+      async () => [event, event],
+    )).resolves.toEqual({ events: [event, event], source: "local" });
+  });
+
+  it("keeps the truncated Server window when the local mirror is empty", async () => {
+    await expect(loadSessionHistoryWithFallback(
+      async () => ({ events: [event], source: "server", truncated: true }),
+      async () => [],
+    )).resolves.toEqual({ events: [event], source: "server", truncated: true });
+  });
 });
 
 describe("mergeHistoryStatusEventsByTime", () => {

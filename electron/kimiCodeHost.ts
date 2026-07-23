@@ -2279,7 +2279,7 @@ export function isSdkManagedRuntimeSession(sessionId: string): boolean {
   return sessions.has(sessionId) || sdkPinnedSessionIds.has(sessionId);
 }
 
-export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server" }> {
+export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server"; truncated?: boolean }> {
   // Server 快照只对该 server 进程实际管理的会话有权威。兼容链路（SDK）管理的
   // 会话在 server 侧是休眠空壳：SDK 轮次进行中读它的快照会看到
   // “idle + 空正文 assistant” 的过渡态，触发失败帧合成（模型请求失败误报）。
@@ -2296,6 +2296,8 @@ export async function loadServerSessionHistory(sessionId: string): Promise<{ eve
       time: serverReplayTimestamp(frame),
     })),
     source: "server",
+    // 0.29 快照只回最近 100 条消息（messages.has_more），调用方需改用本地 wire 全量镜像
+    truncated: snapshot.messages?.has_more === true,
   };
 }
 
