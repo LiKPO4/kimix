@@ -368,6 +368,7 @@ export function LongTaskInspectorPanel({
     model: "ok" | "warning" | "error";
     git: "ok" | "warning" | "error";
     session: "ok" | "warning" | "error";
+    server: "ok" | "warning" | "error";
     summary: string;
     details: string[];
   } | null>(null);
@@ -569,14 +570,22 @@ export function LongTaskInspectorPanel({
           `Prompt 诊断：${serverRuntimeRes.data.prompts.activeId ? `active ${serverRuntimeRes.data.prompts.activeStatus ?? "unknown"}` : "无 active"}，队列 ${serverRuntimeRes.data.prompts.queuedCount}`,
         ] : []),
       ];
-      const issueCount = [cliOk, authOk, modelOk, projectPathForKimi ? gitOk : true, liveCurrentSession ? sessionOk : true, serverRuntimeOk].filter((ok) => !ok).length;
+      const failingChecks = ([
+        ["CLI", cliOk],
+        ["登录", authOk],
+        ["模型", modelOk],
+        ["Git", projectPathForKimi ? gitOk : true],
+        ["会话", liveCurrentSession ? sessionOk : true],
+        ["Server", serverRuntimeOk],
+      ] as const).filter(([, ok]) => !ok).map(([name]) => name);
       setKimiHealth({
         cli: cliOk ? "ok" : "error",
         auth: authOk ? "ok" : "warning",
         model: modelOk ? "ok" : "warning",
         git: projectPathForKimi ? (gitOk ? "ok" : "warning") : "warning",
         session: liveCurrentSession ? (sessionOk ? "ok" : "warning") : "warning",
-        summary: issueCount === 0 ? "状态正常" : `${issueCount} 项需关注`,
+        server: serverRuntimeOk ? "ok" : "warning",
+        summary: failingChecks.length === 0 ? "状态正常" : `${failingChecks.length} 项需关注：${failingChecks.join("、")}`,
         details,
       });
     } finally {
@@ -1759,7 +1768,7 @@ export function LongTaskInspectorPanel({
                   )}
                   <div className="min-w-0">
                     <div className="truncate text-[13px] font-medium leading-5 text-text-muted">Kimi Code</div>
-                    <div className="truncate text-[12.5px] leading-5 text-text-muted">{kimiHealth?.summary ?? "正在检测"}</div>
+                    <div className="truncate text-[12.5px] leading-5 text-text-muted" title={kimiHealth?.summary ?? "正在检测"}>{kimiHealth?.summary ?? "正在检测"}</div>
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
@@ -1778,13 +1787,14 @@ export function LongTaskInspectorPanel({
               </div>
               {kimiHealthOpen && (
                 <div style={{ marginTop: 14 }}>
-                  <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
+                  <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
                     {([
                       ["CLI", kimiHealth?.cli],
                       ["登录", kimiHealth?.auth],
                       ["模型", kimiHealth?.model],
                       ["Git", kimiHealth?.git],
                       ["会话", kimiHealth?.session],
+                      ["Server", kimiHealth?.server],
                     ] as const).map(([label, status]) => (
                       <div
                         key={label}
