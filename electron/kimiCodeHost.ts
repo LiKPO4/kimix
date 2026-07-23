@@ -2261,7 +2261,18 @@ export async function listSessions(workDir?: string): Promise<KimiCodeSessionSum
   return sessions.filter((session) => session.archived === true || Boolean(session.lastPrompt?.trim()));
 }
 
+export function isSdkManagedRuntimeSession(sessionId: string): boolean {
+  return sessions.has(sessionId) || sdkPinnedSessionIds.has(sessionId);
+}
+
 export async function loadServerSessionHistory(sessionId: string): Promise<{ events: Array<{ type: string; payload: unknown; time?: unknown }>; source: "server" }> {
+  // Server 快照只对该 server 进程实际管理的会话有权威。兼容链路（SDK）管理的
+  // 会话在 server 侧是休眠空壳：SDK 轮次进行中读它的快照会看到
+  // “idle + 空正文 assistant” 的过渡态，触发失败帧合成（模型请求失败误报）。
+  // 交给调用方 fallback 到本地 wire 镜像。
+  if (isSdkManagedRuntimeSession(sessionId)) {
+    throw new Error(`Session ${sessionId} 当前由兼容链路管理，改用本地 wire 镜像加载历史。`);
+  }
   const snapshot = await getServerClient().getSnapshot(sessionId);
   const frames = snapshotToHistoryFrames(snapshot, sessionId);
   return {
