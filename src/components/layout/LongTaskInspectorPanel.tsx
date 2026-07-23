@@ -51,7 +51,7 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
-import { resolveRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
+import { resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { queueSubagentRouting, recordAppliedSubagentRouting } from "@/utils/subagentRouting";
 
@@ -430,6 +430,7 @@ export function LongTaskInspectorPanel({
   const subagentDisplayedThinking = subagentDesired
     ? subagentDesired.thinkingEffort ?? ""
     : subagentSessionView?.subagentThinkingEffort ?? "";
+  const subagentForceInvokeOn = subagentOwner?.agent.subagentForceInvoke === true;
   const subagentModelOptions = useMemo(
     () => buildSessionModelOptions(subagentModelConfig, subagentServerCatalog),
     [subagentModelConfig, subagentServerCatalog],
@@ -531,6 +532,26 @@ export function LongTaskInspectorPanel({
     } finally {
       setSubagentSaving(false);
     }
+  };
+  const toggleSubagentForceInvoke = () => {
+    const latest = liveCurrentSession
+      ? useSessionStore.getState().sessions.find((session) => session.id === liveCurrentSession.id) ?? liveCurrentSession
+      : null;
+    if (!latest) return;
+    let owner: RoomMutationOwner;
+    try {
+      owner = resolveRoomMutationOwner(latest, latest.collaboration?.defaultRecipientIds, permissionMode);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    const next = !(owner.agent.subagentForceInvoke === true);
+    updateSession(latest.id, (session) => ({
+      ...updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, subagentForceInvoke: next }), permissionMode),
+      updatedAt: Date.now(),
+    }));
+    const updated = useSessionStore.getState().sessions.find((session) => session.id === latest.id);
+    if (updated) setCurrentSession(updated);
   };
   const projectPathForKimi = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const loadKimiHealth = async () => {
@@ -1920,6 +1941,41 @@ export function LongTaskInspectorPanel({
                         {subagentThinkingOptions.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
                       </select>
                     </label>
+                    {subagentOwner && (
+                      <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 12 }}>
+                        <div className="min-w-0">
+                          <div className="text-[13px] leading-5 text-text-muted">强制唤起子代理</div>
+                          <div className="text-[11.5px] leading-4 text-text-faint" style={{ marginTop: 4 }}>
+                            发送时提示主模型把繁琐、高耗 token 的任务委派给子代理
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={subagentForceInvokeOn}
+                          aria-label="强制唤起子代理"
+                          onClick={toggleSubagentForceInvoke}
+                          className="shrink-0 cursor-pointer rounded-full border transition-colors"
+                          style={{
+                            width: 40,
+                            height: 22,
+                            padding: 2,
+                            borderColor: "var(--border-subtle)",
+                            background: subagentForceInvokeOn ? "var(--accent-primary)" : "var(--surface-base)",
+                          }}
+                        >
+                          <span
+                            className="block rounded-full transition-transform"
+                            style={{
+                              width: 16,
+                              height: 16,
+                              background: subagentForceInvokeOn ? "#FFFFFF" : "var(--text-muted)",
+                              transform: subagentForceInvokeOn ? "translateX(18px)" : "translateX(0)",
+                            }}
+                          />
+                        </button>
+                      </div>
+                    )}
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                       <div className={`min-w-0 text-[12px] leading-5 ${subagentCatalogError ? "text-accent-danger" : "text-text-muted"}`}>
                         {subagentCatalogLoading

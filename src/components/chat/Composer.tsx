@@ -58,6 +58,7 @@ import {
 import { persistLocalConversationState } from "@/utils/persistence";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
 import { recordAppliedSubagentRouting } from "@/utils/subagentRouting";
+import { buildForcedSubagentDirective, withForcedSubagentDirective } from "@/utils/forcedSubagentPrompt";
 import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
@@ -656,6 +657,18 @@ export function Composer() {
     ?? thinkingModelConfig?.defaultModel
     ?? null;
   const thinkingModelOption = thinkingModelOptions.find((option) => option.id === mutationModelAlias) ?? null;
+  const forcedSubagentModelAlias = activeMutationOwner?.agent.subagentRoutingDesired?.modelAlias
+    ?? activeMutationOwner?.agent.subagentModelAlias
+    ?? null;
+  const forcedSubagentModelOption = forcedSubagentModelAlias
+    ? thinkingModelOptions.find((option) => option.id === forcedSubagentModelAlias) ?? null
+    : null;
+  const forcedSubagentDirective = activeMutationOwner?.agent.subagentForceInvoke === true
+    ? buildForcedSubagentDirective({
+        modelLabel: forcedSubagentModelOption?.label ?? forcedSubagentModelAlias,
+        maxContextSize: forcedSubagentModelOption?.maxContextSize ?? null,
+      })
+    : null;
   const thinkingEffortOptions = useMemo(
     () => buildThinkingEffortOptions(thinkingModelOption?.supportEfforts),
     [thinkingModelOption?.supportEfforts],
@@ -1300,8 +1313,20 @@ export function Composer() {
             startedAt: Date.now(),
             updatedAt: Date.now(),
           });
+          const targetSubagentModelAlias = agent.subagentRoutingDesired?.modelAlias
+            ?? agent.subagentModelAlias
+            ?? null;
+          const targetSubagentModelOption = targetSubagentModelAlias
+            ? thinkingModelOptions.find((option) => option.id === targetSubagentModelAlias) ?? null
+            : null;
+          const targetForcedSubagentDirective = agent.subagentForceInvoke === true
+            ? buildForcedSubagentDirective({
+                modelLabel: targetSubagentModelOption?.label ?? targetSubagentModelAlias,
+                maxContextSize: targetSubagentModelOption?.maxContextSize ?? null,
+              })
+            : null;
           const outboundPrompt = buildRoomDeliveryPrompt(
-            message.outboundContent ?? message.content,
+            withForcedSubagentDirective(message.outboundContent ?? message.content, targetForcedSubagentDirective),
             delivery.contextShare,
             {
               displayName: agent.displayName,
@@ -1579,7 +1604,10 @@ export function Composer() {
 
     const effectiveEngine = "kimi-code";
     const contentWithAttachments = buildAttachmentPromptContent(content, images);
-    const outboundContent = options?.outboundContent ?? contentWithAttachments;
+    const outboundContent = withForcedSubagentDirective(
+      options?.outboundContent ?? contentWithAttachments,
+      forcedSubagentDirective,
+    );
     const writePrimaryPromptActivity = (
       status: RoomAgentActivity["status"],
       runtimeSessionId = getRuntimeSessionId(targetSession) ?? undefined,

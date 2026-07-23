@@ -208,6 +208,8 @@ export interface RoomAgent {
   subagentThinkingEffort?: string;
   /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
   subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
+  /** 开启后发送时向提示词注入强制委派子代理的指令。 */
+  subagentForceInvoke?: boolean;
   modelSwitchedAt?: number;
   switchedToModel?: string;
   officialGoal?: OfficialGoalState;
@@ -275,6 +277,8 @@ export interface Session {
   subagentThinkingEffort?: string;
   /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
   subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
+  /** 开启后发送时向提示词注入强制委派子代理的指令。 */
+  subagentForceInvoke?: boolean;
   titleLocked?: boolean;
   model?: string | null;
   permissionMode?: PermissionMode;

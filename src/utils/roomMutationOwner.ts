@@ -85,6 +85,7 @@ export function updateRoomMutationOwner(
     subagentModelAlias: next.subagentModelAlias,
     subagentThinkingEffort: next.subagentThinkingEffort,
     subagentRoutingDesired: next.subagentRoutingDesired,
+    subagentForceInvoke: next.subagentForceInvoke,
     model: next.modelAlias,
     permissionMode: next.permissionMode,
     planMode: next.planMode,
