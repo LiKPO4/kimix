@@ -1704,6 +1704,15 @@ export function Composer() {
             if (!thinkingRes.success) {
               throw new Error(`应用思考强度失败：${thinkingRes.error}`);
             }
+            // Re-apply plan mode as well so a resumed session honours the toggle
+            // the user made while the old runtime session was dead.
+            const planModeRes = await window.api.setKimiCodePlanMode({
+              sessionId: resumeRes.data.sessionId,
+              enabled: getPrimaryRoomAgent(targetSession).planMode ?? defaultPlanMode,
+            });
+            if (!planModeRes.success) {
+              throw new Error(`应用 Plan 模式失败：${planModeRes.error}`);
+            }
             updateLinkStatus("消息发送中", "info");
             await applyDesiredSwarmMode(resumeRes.data.sessionId);
             await applyDesiredPrimarySubagentRouting(resumeRes.data.sessionId);
@@ -1966,6 +1975,29 @@ export function Composer() {
           sessionId: resumeRes.data.sessionId,
           model: resumeRes.data.model,
         });
+        // Replay the owner's settings so this path stays consistent with the
+        // main-session resume path above (permission / thinking / plan mode).
+        const ownerPermissionRes = await window.api.setKimiCodePermission({
+          sessionId: resumeRes.data.sessionId,
+          mode: owner.agent.permissionMode ?? useAppStore.getState().permissionMode,
+        });
+        if (!ownerPermissionRes.success) {
+          throw new Error(`应用权限模式失败：${ownerPermissionRes.error}`);
+        }
+        const ownerThinkingRes = await window.api.setKimiCodeThinking({
+          sessionId: resumeRes.data.sessionId,
+          effort: activeThinkingEffort,
+        });
+        if (!ownerThinkingRes.success) {
+          throw new Error(`应用思考强度失败：${ownerThinkingRes.error}`);
+        }
+        const ownerPlanModeRes = await window.api.setKimiCodePlanMode({
+          sessionId: resumeRes.data.sessionId,
+          enabled: owner.agent.planMode ?? defaultPlanMode,
+        });
+        if (!ownerPlanModeRes.success) {
+          throw new Error(`应用 Plan 模式失败：${ownerPlanModeRes.error}`);
+        }
         const updated = useSessionStore.getState().sessions.find((session) => session.id === targetSession.id);
         if (updated && useAppStore.getState().currentSession?.id === targetSession.id) setCurrentSession(updated);
         return {
@@ -3398,6 +3430,13 @@ export function Composer() {
           targetSessionId: targetSession?.id,
           error: res.error,
         });
+        if (isKimiCodeSessionUnavailableError(res.error)) {
+          const modeLabel = PERMISSION_OPTIONS.find((opt) => opt.value === mode)?.label ?? mode;
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `权限已设为${modeLabel}，将在下次发消息时生效`,
+          }));
+          return;
+        }
         if (!targetSession?.collaboration) setPermissionMode(previousMode);
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: `权限切换失败：${res.error}`,
@@ -3614,6 +3653,13 @@ export function Composer() {
     if (activeRuntimeSessionId) {
       const result = await window.api.setKimiCodeThinking({ sessionId: activeRuntimeSessionId, effort });
       if (!result.success) {
+        if (isKimiCodeSessionUnavailableError(result.error)) {
+          const ownerLabel = activeMutationOwner?.displayName;
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `${ownerLabel ? ownerLabel + " · " : ""}思考强度已设为${thinkingEffortLabel(effort)}，将在下次发消息时生效`,
+          }));
+          return;
+        }
         setActiveThinkingEffort(previousEffort);
         setDefaultThinkingEffort(previousEffort);
         window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `思考强度切换失败：${result.error}` }));
@@ -3649,6 +3695,12 @@ export function Composer() {
     }
     const res = await window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: next });
     if (!res.success) {
+      if (isKimiCodeSessionUnavailableError(res.error)) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `${owner.displayName} · ${next ? "Plan 模式已开启，将在下次发消息时生效" : "Plan 模式已关闭，将在下次发消息时生效"}`,
+        }));
+        return;
+      }
       updateSession(activeSession.id, (session) => ({
         ...updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: !next }), permissionMode),
         updatedAt: Date.now(),

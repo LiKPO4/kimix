@@ -20,6 +20,16 @@ describe("Kimi Code session recovery", () => {
     expect(isKimiCodeSessionUnavailableError("network unavailable")).toBe(false);
   });
 
+  it("matches recovery-wrapped unavailable errors produced by runKimiCodeSessionMutationWithRecovery", () => {
+    expect(isKimiCodeSessionUnavailableError("恢复会话失败：Kimi Code session is not active: session-1")).toBe(true);
+    expect(isKimiCodeSessionInactiveError("恢复会话失败：Kimi Code session is not active: session-1")).toBe(true);
+    expect(isKimiCodeSessionUnavailableError("恢复会话失败：Kimi Server session is not active: session-1")).toBe(true);
+    expect(isKimiCodeSessionInactiveError("恢复会话失败：Kimi Server session is not active: session-1")).toBe(true);
+    expect(isKimiCodeSessionUnavailableError("恢复会话失败：session not found")).toBe(true);
+    expect(isKimiCodeSessionMissingError("恢复会话失败：session not found")).toBe(true);
+    expect(isKimiCodeSessionUnavailableError("恢复会话失败：network unavailable")).toBe(false);
+  });
+
   it("removes only persisted startup missing-session errors", () => {
     const events = [
       { id: "stale", type: "error", message: missingMessage },
