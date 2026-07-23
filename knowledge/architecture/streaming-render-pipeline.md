@@ -60,6 +60,31 @@ prepends them once. Repeated `unshift` reverses two identity-era fragments (for
 example `你好` and `霖江路。我会`) and produces a temporarily scrambled body that
 the terminal authoritative frame merely hides later.
 
+Subagent-scoped stream events (`agentId` present and not `main`) never enter the
+draft store at all: `resolveActiveTurnDraftKey` returns `null` for them and they
+flow through the formal batch path into their own subagent card. Because the
+draft key has no subagent dimension, admitting them would splice a subagent's
+delta into the main turn's buffer in arrival order (interleaved, duplicated
+body), and their boundary frames would clear or commit the main draft early.
+
+## Thinking merges are idempotent; canonical replay replaces, never appends
+
+Live `thinking.delta` fragments and snapshot-replayed full `think` parts both
+converge on the same assistant event, so every merge point must be idempotent.
+`mergeAssistantThinkingText` compares whitespace-normalized containment before
+concatenating, and `mergeAssistantThinkingParts` lets a superset part supersede
+*all* fragments it covers while dropping fragments already covered elsewhere;
+the draft fast path and `mergeAssistantProcessEvents` reuse these functions
+instead of blind concatenation. When a canonical snapshot row maps onto an
+already-mounted live row, `kimiCodeSnapshotReplay` replaces the row's
+content/thinking/thinkingParts with the snapshot's clean think/text split
+(keeping live-only fields and never closing a turn early) rather than merging
+on top — the "local text already includes replay text" skip heuristic must not
+fire first, because a fat, duplicated row needs repair, not a skip. History
+reconciliation compares the canonical timeline against a deduplicated local
+timeline so a locally duplicated (and therefore longer) thinking history cannot
+win the regression guard and fossilize duplicates into the persisted state.
+
 ## Memo keys never change semantics for performance
 
 `timelineEventMemoKey` keeps its full-content semantics. Memo cost is reduced by
