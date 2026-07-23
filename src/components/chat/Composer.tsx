@@ -4619,7 +4619,7 @@ export function Composer() {
               <span>Plan</span>
             </button>
             <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
-<button
+              <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={toggleThinkingMenu}
                 className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
