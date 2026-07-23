@@ -1477,39 +1477,6 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
   );
 }
 
-function KimiWebThinkingGroupCard({ blocks, isLive }: { blocks: ThinkingBlock[]; isLive: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="kimix-soft-card overflow-hidden rounded-xl">
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-        style={{ gap: 9, padding: "8px 12px" }}
-      >
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          <Brain size={14} />
-        </span>
-        <span className="flex h-5 min-w-0 flex-1 items-center">
-          <span className="truncate">{isLive ? "思考过程 · 正在生成" : "思考过程"}</span>
-        </span>
-        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
-          <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{isLive ? "正在思考…" : "已完成"}</span>
-          {!isLive && <Check size={14} className="text-accent-success" />}
-        </span>
-        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
-      </button>
-      {expanded && (
-        <div className="border-t border-[var(--kimix-panel-divider)]" style={{ padding: "8px 12px" }}>
-          <KimiWebThinkingBlock blocks={blocks} isLive={isLive} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 const KIMI_WEB_SUBAGENT_DETAIL_LIMIT = 8;
 
 type KimiWebSubagentDetailItem = {
@@ -1861,7 +1828,7 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
 function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: boolean }) {
   switch (group.type) {
     case "thinking":
-      return <KimiWebThinkingGroupCard blocks={group.blocks} isLive={isLive} />;
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":
