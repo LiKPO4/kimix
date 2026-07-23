@@ -296,7 +296,7 @@ async function getDefaultKimiModel() {
 }
 
 const iconButtonClass =
-  "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35";
+  "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-sm-token disabled:cursor-not-allowed disabled:opacity-35";
 
 function roomControlStatusLabel(status: RoomAgentControlTarget["status"]) {
   if (status === "waiting_approval") return "等待审批";
