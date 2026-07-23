@@ -38,8 +38,8 @@ export function buildSessionModelOptions(
       provider,
       providerLabel: providerLabel(provider),
       maxContextSize: model.maxContextSize ?? catalogModel?.maxContextSize ?? null,
-      supportEfforts: catalogModel?.supportEfforts ?? [],
-      defaultEffort: catalogModel?.defaultEffort ?? null,
+      supportEfforts: catalogModel?.supportEfforts?.length ? catalogModel.supportEfforts : (model.supportEfforts ?? []),
+      defaultEffort: catalogModel?.defaultEffort ?? model.defaultEffort ?? null,
     });
   }
   return Array.from(options.values()).sort((a, b) => (

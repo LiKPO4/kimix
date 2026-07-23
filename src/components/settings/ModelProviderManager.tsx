@@ -24,9 +24,11 @@ import {
   groupModelsByProvider,
 } from "@/utils/modelProviderConfig";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 
 const NEW_PROVIDER_ID = "__new_provider__";
 const DEFAULT_CONTEXT_SIZE = 262144;
+const THINKING_EFFORT_CHOICES = ["off", "minimal", "low", "medium", "high", "max"];
 
 type Props = {
   config: KimiModelConfigSummary;
@@ -43,6 +45,8 @@ type ModelDraft = {
   modelAlias: string;
   model: string;
   maxContextSize: string;
+  supportEfforts: string[];
+  defaultEffort: string;
 };
 
 type RemovalTarget =
@@ -54,6 +58,8 @@ function createModelDraft(model?: KimiModelAliasSummary | null): ModelDraft {
     modelAlias: model?.alias ?? "",
     model: model?.model ?? "",
     maxContextSize: String(model?.maxContextSize ?? DEFAULT_CONTEXT_SIZE),
+    supportEfforts: model?.supportEfforts ?? [],
+    defaultEffort: model?.defaultEffort ?? "",
   };
 }
 
@@ -275,6 +281,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
       model: modelId,
       maxContextSize: current.maxContextSize || String(DEFAULT_CONTEXT_SIZE),
+      supportEfforts: current.supportEfforts,
+      defaultEffort: current.defaultEffort,
     }));
   };
 
@@ -301,6 +309,17 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setBusyAction(null);
   };
 
+  const handleToggleEffort = (effort: string) => {
+    setModelDraft((current) => {
+      const next = current.supportEfforts.includes(effort)
+        ? current.supportEfforts.filter((item) => item !== effort)
+        : [...current.supportEfforts, effort];
+      const supportEfforts = THINKING_EFFORT_CHOICES.filter((item) => next.includes(item));
+      const defaultEffort = supportEfforts.includes(current.defaultEffort) ? current.defaultEffort : "";
+      return { ...current, supportEfforts, defaultEffort };
+    });
+  };
+
   const handleSaveModel = async () => {
     const contextSize = readContextSize();
     if (!selectedGroup || selectedProviderManaged) {
@@ -318,6 +337,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       modelAlias: modelDraft.modelAlias.trim(),
       model: modelDraft.model.trim(),
       maxContextSize: contextSize,
+      supportEfforts: modelDraft.supportEfforts,
+      defaultEffort: modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : null,
     });
     if (!res.success) {
       setBusyAction(null);
@@ -735,6 +756,45 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
                       <input value={modelDraft.modelAlias} disabled={Boolean(selectedModelAlias)} onChange={(event) => setModelDraft((current) => ({ ...current, modelAlias: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder={`${selectedGroup.provider.name}/model-id`} />
                     </label>
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>思考档位（可选）</span>
+                    <div className="text-[11.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
+                      声明后输入区可按档位切换；不声明则仅 关闭/开启。档位会原样传给供应商，需与上游实际能力一致。
+                    </div>
+                    <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 8 }}>
+                      {THINKING_EFFORT_CHOICES.map((effort) => {
+                        const selected = modelDraft.supportEfforts.includes(effort);
+                        return (
+                          <button
+                            key={effort}
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() => handleToggleEffort(effort)}
+                            className={`flex items-center justify-center rounded-lg border border-[var(--kimix-panel-border-soft)] text-[12px] leading-none ${selected ? "bg-surface-hover text-accent-primary" : "text-text-muted hover:bg-surface-hover"}`}
+                            style={{ height: 28, paddingLeft: 11, paddingRight: 11 }}
+                          >
+                            {thinkingEffortLabel(effort)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center" style={{ gap: 8, marginTop: 10 }}>
+                      <span className="text-[11.5px] text-text-muted">默认档</span>
+                      <select
+                        value={modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : ""}
+                        disabled={modelDraft.supportEfforts.length === 0}
+                        onChange={(event) => setModelDraft((current) => ({ ...current, defaultEffort: event.target.value }))}
+                        className="kimix-settings-input h-8 text-[12px] outline-none disabled:opacity-55"
+                        style={{ paddingLeft: 10, paddingRight: 10 }}
+                        aria-label="默认思考档位"
+                      >
+                        <option value="">不设置</option>
+                        {modelDraft.supportEfforts.map((effort) => (
+                          <option key={effort} value={effort}>{thinkingEffortLabel(effort)}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className="kimix-model-editor-footer" style={{ gap: 12, marginTop: 12 }}>
                     <label className="min-w-0">

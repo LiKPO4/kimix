@@ -15,9 +15,9 @@ const config: KimiModelConfigSummary = {
     { name: "openai", type: "openai", baseUrl: "https://api.openai.com/v1", hasApiKey: true, hasEnv: false, hasOauth: false },
   ],
   models: [
-    { alias: "kimi-for-coding", provider: "managed:kimi-code", model: "kimi-for-coding", displayName: "Kimi", maxContextSize: 262144, adaptiveThinking: true, isDefault: false },
-    { alias: "openai/gpt-5.1", provider: "openai", model: "gpt-5.1", displayName: "GPT-5.1", maxContextSize: 400000, adaptiveThinking: null, isDefault: true },
-    { alias: "openai/gpt-4.1", provider: "openai", model: "gpt-4.1", displayName: "GPT-4.1", maxContextSize: 1000000, adaptiveThinking: null, isDefault: false },
+    { alias: "kimi-for-coding", provider: "managed:kimi-code", model: "kimi-for-coding", displayName: "Kimi", maxContextSize: 262144, adaptiveThinking: true, supportEfforts: null, defaultEffort: null, isDefault: false },
+    { alias: "openai/gpt-5.1", provider: "openai", model: "gpt-5.1", displayName: "GPT-5.1", maxContextSize: 400000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: true },
+    { alias: "openai/gpt-4.1", provider: "openai", model: "gpt-4.1", displayName: "GPT-4.1", maxContextSize: 1000000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
   ],
 };
 
@@ -36,7 +36,7 @@ describe("model provider config", () => {
   it("keeps orphaned legacy models visible instead of dropping them", () => {
     const groups = groupModelsByProvider({
       ...config,
-      models: [...config.models, { alias: "legacy", provider: null, model: "legacy", displayName: null, maxContextSize: null, adaptiveThinking: null, isDefault: false }],
+      models: [...config.models, { alias: "legacy", provider: null, model: "legacy", displayName: null, maxContextSize: null, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false }],
     });
     const unbound = groups.find((group) => group.provider.name === "__unbound__");
     expect(unbound?.models[0].alias).toBe("legacy");

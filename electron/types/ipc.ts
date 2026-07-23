@@ -391,6 +391,8 @@ export type KimiModelAliasSummary = {
   displayName: string | null;
   maxContextSize: number | null;
   adaptiveThinking: boolean | null;
+  supportEfforts: string[] | null;
+  defaultEffort: string | null;
   isDefault: boolean;
 };
 
@@ -432,6 +434,8 @@ export type SaveKimiProviderModelRequest = {
   model: string;
   maxContextSize?: number;
   makeDefault?: boolean;
+  supportEfforts?: string[];
+  defaultEffort?: string | null;
 };
 
 export type DiscoverKimiProviderModelsRequest = {

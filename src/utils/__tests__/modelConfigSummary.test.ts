@@ -30,6 +30,7 @@ describe("mergeRuntimeAndDiskModelConfig", () => {
         displayName: "opencode-go/mimo-v2.5",
         maxContextSize: 1_000_000,
         adaptiveThinking: null,
+        supportEfforts: null, defaultEffort: null,
         isDefault: true,
       }],
     });
@@ -43,6 +44,7 @@ describe("mergeRuntimeAndDiskModelConfig", () => {
           displayName: "opencode-go/qwen3.7-plus",
           maxContextSize: 1_000_000,
           adaptiveThinking: null,
+          supportEfforts: null, defaultEffort: null,
           isDefault: false,
         },
       ],
@@ -73,6 +75,7 @@ describe("mergeRuntimeAndDiskModelConfig", () => {
         displayName: "Kimi for Coding",
         maxContextSize: 262_144,
         adaptiveThinking: null,
+        supportEfforts: null, defaultEffort: null,
         isDefault: false,
       }],
     });
@@ -96,6 +99,7 @@ describe("mergeRuntimeAndDiskModelConfig", () => {
       displayName: "opencode-go/mimo-v2.5",
       maxContextSize: 1_000_000,
       adaptiveThinking: null,
+      supportEfforts: null, defaultEffort: null,
       isDefault: true,
     };
     const staleDeletedModel = {

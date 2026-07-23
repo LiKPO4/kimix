@@ -1224,6 +1224,26 @@ function readTomlBoolean(sectionText: string, key: string) {
   return match ? match[1].toLowerCase() === "true" : null;
 }
 
+function readTomlStringArray(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*\\[([^\\]]*)\\]\\s*$`, "m"));
+  if (!match) return null;
+  return Array.from(match[1].matchAll(/"((?:\\.|[^"])*)"/g)).map((item) => unescapeTomlString(item[1]));
+}
+
+function removeTomlSectionValue(raw: string, sectionName: string, key: string) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
+  if (matchIndex < 0) return raw;
+  const start = (matches[matchIndex].index ?? 0) + matches[matchIndex][0].length;
+  const end = matches[matchIndex + 1]?.index ?? raw.length;
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const linePattern = new RegExp(`\\n[ \\t]*${escaped}[ \\t]*=[^\\n]*`, "g");
+  const body = raw.slice(start, end);
+  return raw.slice(0, start) + body.replace(linePattern, "") + raw.slice(end);
+}
+
 function setTomlSectionValue(raw: string, sectionName: string, key: string, valueLiteral: string) {
   return setTomlSectionValuePreservingLayout(raw, sectionName, key, valueLiteral);
 }
@@ -1326,6 +1346,11 @@ function readKimiModelConfig() {
     models: modelSections.flatMap((section) => {
       const alias = directModelSectionAlias(section.name);
       if (alias === null) return [];
+      const supportEfforts = readTomlStringArray(section.body, "support_efforts");
+      const rawDefaultEffort = readTomlString(section.body, "default_effort");
+      const defaultEffort = supportEfforts && supportEfforts.length > 0 && rawDefaultEffort && !supportEfforts.includes(rawDefaultEffort)
+        ? null
+        : rawDefaultEffort;
       return {
         alias,
         provider: readTomlString(section.body, "provider"),
@@ -1333,6 +1358,8 @@ function readKimiModelConfig() {
         displayName: readTomlString(section.body, "display_name"),
         maxContextSize: readTomlInteger(section.body, "max_context_size"),
         adaptiveThinking: readTomlBoolean(section.body, "adaptive_thinking"),
+        supportEfforts,
+        defaultEffort,
         isDefault: alias === defaultModel,
       };
     }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN")),
@@ -1351,15 +1378,24 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
     hasOauth: Boolean(provider.oauth),
   })).sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   const defaultModel = config.defaultModel ?? null;
-  const models = Object.entries(config.models ?? {}).map(([alias, model]) => ({
-    alias,
-    provider: model.provider ?? null,
-    model: model.model ?? null,
-    displayName: model.displayName ?? null,
-    maxContextSize: typeof model.maxContextSize === "number" ? model.maxContextSize : null,
-    adaptiveThinking: typeof model.adaptiveThinking === "boolean" ? model.adaptiveThinking : null,
-    isDefault: alias === defaultModel,
-  })).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN"));
+  const models = Object.entries(config.models ?? {}).map(([alias, model]) => {
+    const supportEfforts = model.supportEfforts ?? model.overrides?.supportEfforts ?? null;
+    const rawDefaultEffort = model.defaultEffort ?? model.overrides?.defaultEffort ?? null;
+    const defaultEffort = supportEfforts && supportEfforts.length > 0 && rawDefaultEffort && !supportEfforts.includes(rawDefaultEffort)
+      ? null
+      : rawDefaultEffort;
+    return {
+      alias,
+      provider: model.provider ?? null,
+      model: model.model ?? null,
+      displayName: model.displayName ?? null,
+      maxContextSize: typeof model.maxContextSize === "number" ? model.maxContextSize : null,
+      adaptiveThinking: typeof model.adaptiveThinking === "boolean" ? model.adaptiveThinking : null,
+      supportEfforts,
+      defaultEffort,
+      isDefault: alias === defaultModel,
+    };
+  }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN"));
 
   return {
     configPath,
@@ -1410,6 +1446,8 @@ const SaveProviderModelConfigSchema = z.object({
   model: z.string().trim().min(1).max(160),
   maxContextSize: z.number().int().min(1).max(1048576).optional(),
   makeDefault: z.boolean().optional(),
+  supportEfforts: z.array(z.string().trim().min(1).max(24)).max(8).optional(),
+  defaultEffort: z.string().trim().min(1).max(24).nullish(),
 });
 
 const DiscoverProviderModelsSchema = z.object({
@@ -1463,6 +1501,13 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
   const config = SaveProviderModelConfigSchema.parse(input);
   ensureKimiCodeMigratedConfig();
   const maxContextSize = normalizeOpenAiProviderContextSize(config);
+  const supportEfforts = config.supportEfforts === undefined
+    ? undefined
+    : Array.from(new Set(config.supportEfforts.map((effort) => effort.trim().toLowerCase()).filter((effort) => effort.length > 0)));
+  const requestedDefaultEffort = config.defaultEffort?.trim().toLowerCase() || null;
+  const defaultEffort = supportEfforts && supportEfforts.length > 0 && requestedDefaultEffort && supportEfforts.includes(requestedDefaultEffort)
+    ? requestedDefaultEffort
+    : null;
   try {
     const current = await kimiCodeHost.getConfig({ reload: true });
     const provider = current.providers?.[config.providerName];
@@ -1481,6 +1526,7 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
           maxContextSize,
           displayName: existing?.displayName || config.modelAlias,
           adaptiveThinking: existing?.adaptiveThinking ?? (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined),
+          ...(supportEfforts !== undefined ? { supportEfforts, ...(defaultEffort ? { defaultEffort } : {}) } : {}),
         },
       },
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
@@ -1508,6 +1554,15 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
     next = setTomlSectionValue(next, sectionName, "display_name", `"${escapeTomlString(existing?.displayName || config.modelAlias)}"`);
     if (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek")) {
       next = setTomlSectionValue(next, sectionName, "adaptive_thinking", "false");
+    }
+    if (supportEfforts !== undefined) {
+      const effortsLiteral = `[ ${supportEfforts.map((effort) => `"${escapeTomlString(effort)}"`).join(", ")} ]`;
+      next = setTomlSectionValue(next, sectionName, "support_efforts", effortsLiteral);
+      if (defaultEffort) {
+        next = setTomlSectionValue(next, sectionName, "default_effort", `"${escapeTomlString(defaultEffort)}"`);
+      } else {
+        next = removeTomlSectionValue(next, sectionName, "default_effort");
+      }
     }
     if (config.makeDefault) next = setTopLevelTomlString(next, "default_model", config.modelAlias);
     fs.writeFileSync(configPath, next, "utf-8");

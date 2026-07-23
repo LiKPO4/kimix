@@ -65,6 +65,8 @@ describe("ModelProviderManager", () => {
         maxContextSize: 262144,
         adaptiveThinking: null,
         isDefault: false,
+        supportEfforts: null,
+        defaultEffort: null,
       }],
     };
     const discoverKimiProviderModels = vi.fn().mockResolvedValue({
@@ -117,6 +119,8 @@ describe("ModelProviderManager", () => {
       modelAlias: "gateway/model-b",
       model: "model-b",
       maxContextSize: 262144,
+      supportEfforts: [],
+      defaultEffort: null,
     });
     expect(getKimiModelConfig).toHaveBeenCalledTimes(1);
     expect(onConfigChange).toHaveBeenCalledWith(discoveredConfig, "已保存 Provider 模型");
@@ -180,6 +184,8 @@ describe("ModelProviderManager", () => {
       maxContextSize: 262144,
       adaptiveThinking: null,
       isDefault: true,
+      supportEfforts: null,
+      defaultEffort: null,
     };
     const modelB = { ...modelA, alias: "gateway/model-b", model: "model-b", displayName: "gateway/model-b", isDefault: false };
     const beforeDelete: KimiModelConfigSummary = { ...emptyProviderConfig, defaultModel: modelA.alias, models: [modelA, modelB] };
@@ -223,6 +229,78 @@ describe("ModelProviderManager", () => {
       modelInput.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(modelInput.value).toBe("model-a-next");
+    await act(async () => root.unmount());
+  });
+
+  it("saves declared thinking efforts and default effort for a custom model", async () => {
+    const existingModel = {
+      alias: "gateway/model-a",
+      provider: "gateway",
+      model: "model-a",
+      displayName: "gateway/model-a",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: false,
+      supportEfforts: null,
+      defaultEffort: null,
+    };
+    const initialConfig: KimiModelConfigSummary = { ...emptyProviderConfig, models: [existingModel] };
+    const savedConfig: KimiModelConfigSummary = {
+      ...initialConfig,
+      models: [{ ...existingModel, supportEfforts: ["low", "high"], defaultEffort: "high" }],
+    };
+    const saveKimiProviderModel = vi.fn().mockResolvedValue({
+      success: true,
+      data: { ...savedConfig, message: "已保存 Provider 模型" },
+    });
+    const getKimiModelConfig = vi.fn().mockResolvedValue({ success: true, data: savedConfig });
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { saveKimiProviderModel, getKimiModelConfig },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onConfigChange = vi.fn();
+    await act(async () => root.render(createElement(StatefulManager, { initialConfig, onConfigChange })));
+
+    const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
+      .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
+    expect(card).toBeDefined();
+    const chipByLabel = (label: string) => Array.from(card.querySelectorAll('button[aria-pressed]'))
+      .find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    const defaultSelect = card.querySelector('select[aria-label="默认思考档位"]') as HTMLSelectElement;
+    const setDefaultEffort = async (value: string) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(defaultSelect, value);
+        defaultSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    };
+
+    expect(defaultSelect.disabled).toBe(true);
+    await act(async () => chipByLabel("低").click());
+    await act(async () => chipByLabel("高").click());
+    expect(defaultSelect.disabled).toBe(false);
+    await setDefaultEffort("high");
+    expect(defaultSelect.value).toBe("high");
+
+    // 取消选中当前默认档时，默认档自动清空
+    await act(async () => chipByLabel("高").click());
+    expect(defaultSelect.value).toBe("");
+
+    await act(async () => chipByLabel("高").click());
+    await setDefaultEffort("high");
+    await act(async () => buttonByText(container, "保存模型")?.click());
+
+    expect(saveKimiProviderModel).toHaveBeenCalledWith({
+      providerName: "gateway",
+      modelAlias: "gateway/model-a",
+      model: "model-a",
+      maxContextSize: 262144,
+      supportEfforts: ["low", "high"],
+      defaultEffort: "high",
+    });
+    expect(onConfigChange).toHaveBeenCalledWith(savedConfig, "已保存 Provider 模型");
     await act(async () => root.unmount());
   });
 });
