@@ -687,7 +687,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
             {!selectedProviderManaged && (
               <div style={{ marginTop: 14 }}>
-                <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "12px 14px" }}>
+                <div className="rounded-sm-token border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "12px 14px" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-medium text-text-primary">从 Base URL 探测模型</div>
