@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 修复：Composer 上下文弹窗「等待上下文数据」
+
+- 现象：页脚已有 Context%，输入区背景信息窗口仍显示「等待上下文数据」。
+- 根因：`getSessionContextUsages` 只读最新单条 status 的 `contextSize`，`usage.record` 无 contextTokens 时 hasContext=false。
+- 修复：与页脚一致，对 agent 全部 status 做 `mergeMetricStatusUpdates`，无 context 时用 input 回填 used，并合并 contextLimit。
+- 验证：sessionMetrics 33 项全绿；typecheck 通过；待用户截图弹窗。
+
 ## 2026-07-23 修复：页脚长时间「已完成」且缺 Context
 
 - 现象：含子代理 turn 结束后页脚只显示「已完成」可持续数分钟；恢复后仍缺 Context。

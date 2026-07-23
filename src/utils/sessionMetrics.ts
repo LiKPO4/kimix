@@ -134,10 +134,17 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
   return getRoomAgents(session)
     .filter((agent) => !agent.removedAt)
     .map((agent) => {
-      const latestStatus = getLatestMetricStatus(getRoomAgentEvents(session, agent.id));
-      const contextSize = latestStatus?.contextSize;
+      const agentEvents = getRoomAgentEvents(session, agent.id);
+      const statusEvents = agentEvents.filter(
+        (event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update",
+      );
+      // Same merge as turn footers: fold usage.record + interim context shells so
+      // the composer ring/popover is not stuck on "等待上下文数据" when only
+      // tokens arrived (usage.record has no contextTokens on 0.29).
+      const merged = mergeMetricStatusUpdates(statusEvents) ?? getLatestMetricStatus(agentEvents);
+      const contextSize = preferPositiveMetric(merged?.contextSize, merged?.inputTokenCount);
       const hasContext = typeof contextSize === "number" && Number.isFinite(contextSize) && contextSize > 0;
-      const reportedLimit = latestStatus?.contextLimit;
+      const reportedLimit = preferPositiveMetric(merged?.contextLimit, undefined);
       const limit = typeof reportedLimit === "number" && Number.isFinite(reportedLimit) && reportedLimit > 0
         ? reportedLimit
         : 256000;
@@ -145,10 +152,11 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
         ? Math.max(0, contextSize <= 1 ? contextSize * limit : contextSize)
         : 0;
       const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+      const modelFromStatus = merged?.message?.trim().match(/^模型[：:]\s*(.+)$/)?.[1]?.trim();
       return {
         agentId: agent.id,
         agentName: agent.displayName,
-        modelLabel: agent.modelLabelSnapshot || agent.modelAlias || "模型未知",
+        modelLabel: agent.modelLabelSnapshot || agent.modelAlias || modelFromStatus || session.model || "模型未知",
         isPrimary: agent.id === primaryAgentId,
         hasContext,
         used,

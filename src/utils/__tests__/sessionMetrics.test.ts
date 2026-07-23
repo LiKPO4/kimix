@@ -341,6 +341,32 @@ describe("getSessionContextUsages", () => {
       percent: 0,
     }));
   });
+
+  it("uses turn input tokens as context used when usage.record has no contextTokens", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "kimi-code/k3",
+      events: [
+        { id: "shell", type: "status_update", timestamp: 1, contextSize: 0, contextLimit: 262_144 },
+        {
+          id: "usage",
+          type: "status_update",
+          timestamp: 2,
+          message: "模型：kimi-code/k3",
+          inputTokenCount: 29_451,
+          tokenCount: 822,
+        },
+      ],
+    };
+
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      hasContext: true,
+      used: 29_451,
+      limit: 262_144,
+      percent: expect.closeTo((29_451 / 262_144) * 100, 5),
+      modelLabel: "kimi-code/k3",
+    }));
+  });
 });
 
 describe("shouldRecommendNewSession", () => {
