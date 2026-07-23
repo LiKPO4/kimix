@@ -4581,7 +4581,7 @@ export function Composer() {
 
             <div
               ref={permissionBtnRef}
-              className="relative min-w-0 shrink-0"
+              className="kimix-permission-button-wrap relative min-w-0 shrink-0"
               style={{ flex: "0 0 116px", width: 116 }}
             >
               <button
@@ -4599,7 +4599,7 @@ export function Composer() {
                   const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
                 })()}
-                <span className="min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize, lineHeight: "20px" }}>{permissionLabel}</span>
+                <span className="kimix-permission-button-label min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize, lineHeight: "20px" }}>{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (

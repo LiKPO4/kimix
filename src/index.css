@@ -753,6 +753,17 @@ body::before {
   }
 }
 
+@container (max-width: 560px) {
+  .kimix-permission-button-wrap {
+    flex: 0 0 auto !important;
+    width: auto !important;
+  }
+
+  .kimix-permission-button-label {
+    display: none;
+  }
+}
+
 .kimix-chat-collapse-row {
   min-height: 34px;
   display: flex;
