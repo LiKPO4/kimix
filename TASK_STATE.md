@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 修复：kimi-web 思考组卡样式倒退
+
+- 现象：过程展示选 Kimi Web 时，思考仍显示 Kimix 式「思考过程 / 已完成 ✓」soft-card。
+- 根因：`1ce61d86` 新增 `KimiWebThinkingGroupCard` 并把 thinking 分支从 `KimiWebThinkingBlock` 改为组卡（与工具卡同构），偏离 `d42051cc`/`f9dd5b0a` 官方内联设计。
+- 修复：删除 `KimiWebThinkingGroupCard`，thinking 分支恢复直出 `KimiWebThinkingBlock`；不改数据层合并/回放/直播视口，不改工具/子代理/审批组卡与 Kimix 模式。
+- 验证：diff 与 `1ce61d86` 对称（-34/+1）；typecheck 通过；待用户截图验收。
+
 ## 2026-07-23 交接：验收构建已就绪
 
 - 接手交接摘要（18 提交自 e3b5cde8，HEAD=`74585827`，版本仍为 **v2.16.105** 未 bump）。
