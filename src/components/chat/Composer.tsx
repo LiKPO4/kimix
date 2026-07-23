@@ -4523,11 +4523,11 @@ export function Composer() {
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
-                <ComposerToolbarPopover align="start" width={216} role="menu">
+                <ComposerToolbarPopover align="start" width={200} padding={8} role="menu">
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ gap: 12, minHeight: 40, paddingLeft: 12, paddingRight: 12, paddingTop: 11, paddingBottom: 11, borderRadius: 10 }} className={`flex w-full items-center text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ gap: 10, minHeight: 34, paddingLeft: 10, paddingRight: 10, paddingTop: 6, paddingBottom: 6, borderRadius: 8 }} className={`flex w-full items-center text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
                         {(mutationPermissionMode ?? permissionMode) === opt.value && <Check size={13} className="shrink-0 text-[var(--kimix-panel-text)]" />}
@@ -4644,8 +4644,8 @@ export function Composer() {
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showThinkingMenu && (
-                <ComposerToolbarPopover align="end" width={244} role="menu" aria-label="思考强度">
-                  <div className="flex flex-col" style={{ gap: 8 }}>
+                <ComposerToolbarPopover align="end" width={232} padding={8} role="menu" aria-label="思考强度">
+                  <div className="flex flex-col" style={{ gap: 4 }}>
                     {thinkingMenuLoading && thinkingModelOptions.length === 0 ? (
                       <div className="flex min-h-10 items-center text-[13px] text-[var(--kimix-panel-text-muted)]" style={{ gap: 10, paddingLeft: 12, paddingRight: 12 }}>
                         <Loader2 size={14} className="shrink-0 animate-spin" />
@@ -4664,12 +4664,12 @@ export function Composer() {
                           style={{
                             gridTemplateColumns: "16px minmax(0, 1fr) 16px",
                             gap: 10,
-                            minHeight: 52,
-                            paddingLeft: 12,
-                            paddingRight: 12,
-                            paddingTop: 8,
-                            paddingBottom: 8,
-                            borderRadius: 10,
+                            minHeight: 44,
+                            paddingLeft: 10,
+                            paddingRight: 10,
+                            paddingTop: 6,
+                            paddingBottom: 6,
+                            borderRadius: 8,
                             transitionProperty: "background-color, scale",
                             transitionDuration: "150ms",
                             transitionTimingFunction: "ease-out",

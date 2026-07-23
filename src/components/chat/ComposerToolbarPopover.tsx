@@ -9,6 +9,7 @@ const COMPOSER_TOOLBAR_POPOVER_RADIUS = 16;
 export function ComposerToolbarPopover({
   align,
   width,
+  padding = COMPOSER_TOOLBAR_POPOVER_PADDING,
   children,
   className = "",
   style,
@@ -16,6 +17,7 @@ export function ComposerToolbarPopover({
 }: Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
   align: ComposerToolbarPopoverAlign;
   width: number;
+  padding?: number;
   children: ReactNode;
 }) {
   return (
@@ -34,7 +36,7 @@ export function ComposerToolbarPopover({
         width,
         maxWidth: "calc(100vw - 40px)",
         marginBottom: COMPOSER_TOOLBAR_POPOVER_GAP,
-        padding: COMPOSER_TOOLBAR_POPOVER_PADDING,
+        padding,
         borderRadius: COMPOSER_TOOLBAR_POPOVER_RADIUS,
       }}
     >
