@@ -16,11 +16,21 @@ export const KIMIX_LOCAL_SLASH_COMMANDS = new Set([
   "tasks", "task",
   // 输出与信息
   "export-md", "export",
+  "export-debug-zip",
   "copy",
   "help", "h",
   "version",
   "exit", "quit", "q",
   "init",
+  // 官方 0.29 其余命令（探针确认后的本地映射）
+  "web",
+  "login",
+  "logout",
+  "editor",
+  "experiments", "experimental",
+  "sessions", "resume",
+  "add-dir",
+  "feedback",
 ]);
 
 /** 斜杠命令解析：名称允许字母/数字/下划线/冒号/连字符/点号（子 Skill 点分命令）。 */

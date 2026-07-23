@@ -46,6 +46,15 @@ const COMMON_SLASH_COMMANDS: SlashCommandInfo[] = [
   { name: "version", description: "显示 Kimix 版本号", aliases: [] },
   { name: "exit", description: "关闭 Kimix 窗口", aliases: ["quit", "q"] },
   { name: "init", description: "分析当前代码库并生成 AGENTS.md", aliases: [] },
+  { name: "export-debug-zip", description: "导出当前会话的调试 ZIP（含诊断日志）", aliases: [] },
+  { name: "web", description: "在 Web UI 中打开当前会话", aliases: [] },
+  { name: "login", description: "打开账号登录设置", aliases: [] },
+  { name: "logout", description: "退出当前账号登录", aliases: [] },
+  { name: "editor", description: "官方终端编辑器配置（Kimix 打开设置说明）", aliases: [] },
+  { name: "experiments", description: "打开设置的实验功能区", aliases: ["experimental"] },
+  { name: "sessions", description: "浏览并切换历史会话（打开搜索）", aliases: ["resume"] },
+  { name: "add-dir", description: "添加额外工作目录（list 查看）", aliases: [] },
+  { name: "feedback", description: "打开 Kimix 反馈页面（GitHub Issues）", aliases: [] },
 ];
 
 const SDK_ONLY_SLASH_COMMANDS: SlashCommandInfo[] = [

@@ -524,6 +524,8 @@ export function Composer() {
   const setComposerCardHidden = useAppStore((s) => s.setComposerCardHidden);
   const setPermissionMode = useAppStore((s) => s.setPermissionMode);
   const setLongTaskInspectorOpen = useAppStore((s) => s.setLongTaskInspectorOpen);
+  const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const focusInputTrigger = useAppStore((s) => s.focusInputTrigger);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
@@ -2749,6 +2751,96 @@ export function Composer() {
         manualSubmitAutoScroll: false,
         outboundContent: "分析当前代码库的结构、技术栈、构建与测试命令、目录约定和协作注意事项，在项目根目录生成一份 AGENTS.md；若已存在则在保留既有内容的基础上补充完善。",
       });
+      return true;
+    }
+    if (name === "export-debug-zip") {
+      const runtime = await ensureOfficialRuntimeForSession();
+      if (!runtime) return true;
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const target = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
+      const agents = target?.collaboration
+        ? target.collaboration.agents
+            .filter((agent) => !agent.removedAt)
+            .map((agent) => ({ roomAgentId: agent.id, displayName: agent.displayName, sessionId: agent.runtimeSessionId ?? agent.officialSessionId ?? "" }))
+            .filter((agent) => agent.sessionId)
+        : undefined;
+      const res = await window.api.exportKimiCodeSession({
+        sessionId: runtime.runtimeSessionId,
+        title: target?.title,
+        ...(agents && agents.length > 1 ? { agents } : {}),
+      });
+      await appendStatusMessage(
+        res.success
+          ? (res.data.path ? `已导出调试 ZIP：${res.data.path}` : "已取消导出。")
+          : `导出调试 ZIP 失败：${res.error}`,
+        roomAgentId,
+      );
+      return true;
+    }
+    if (name === "web") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const res = await window.api.openKimiCodeWebServer();
+      await appendStatusMessage(res.success ? "已在 Web UI 中打开当前会话。" : `打开 Web UI 失败：${res.error}`, roomAgentId);
+      return true;
+    }
+    if (name === "login") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings")), 80);
+      await appendStatusMessage("已打开设置的账号登录区。", roomAgentId);
+      return true;
+    }
+    if (name === "logout") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const res = await window.api.logoutKimi();
+      if (res.success) window.dispatchEvent(new CustomEvent("kimix:kimi-auth-changed"));
+      await appendStatusMessage(res.success ? res.data.message : `退出登录失败：${res.error}`, roomAgentId);
+      return true;
+    }
+    if (name === "editor") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      await appendStatusMessage("已打开 Kimix 设置。官方 /editor 用于配置终端 Ctrl-G 外部编辑器；Kimix 为桌面应用，暂无该配置项。", roomAgentId);
+      return true;
+    }
+    if (name === "experiments" || name === "experimental") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      await appendStatusMessage("已打开 Kimix 设置，实验功能开关位于设置页的「实验功能」区。", roomAgentId);
+      return true;
+    }
+    if (name === "sessions" || name === "resume") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setSearchOpen(true);
+      await appendStatusMessage("已打开会话搜索，可浏览并切换历史会话。", roomAgentId);
+      return true;
+    }
+    if (name === "add-dir") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      const arg = args.trim();
+      if (!arg || arg.toLowerCase() === "list") {
+        const dirs = additionalWorkDirs;
+        await appendStatusMessage(
+          dirs.length > 0
+            ? `当前额外工作目录：\n${dirs.map((dir) => `- ${dir}`).join("\n")}\n添加：/add-dir <路径>`
+            : "当前没有额外工作目录。添加：/add-dir <路径>",
+          roomAgentId,
+        );
+        return true;
+      }
+      const normalized = arg.toLowerCase().replace(/\\/g, "/").replace(/\/+$/, "");
+      if (additionalWorkDirs.some((dir) => dir.toLowerCase().replace(/\\/g, "/").replace(/\/+$/, "") === normalized)) {
+        await appendStatusMessage("该目录已在额外工作目录中。", roomAgentId);
+        return true;
+      }
+      setAdditionalWorkDirs([...additionalWorkDirs, arg]);
+      await appendStatusMessage(`已添加额外工作目录：${arg}，随下一条消息生效。`, roomAgentId);
+      return true;
+    }
+    if (name === "feedback") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      await window.api.openExternal("https://github.com/LiKPO4/kimix/issues");
+      await appendStatusMessage("已打开 Kimix 反馈页面（GitHub Issues）。", roomAgentId);
       return true;
     }
     if (name === "custom-theme") {

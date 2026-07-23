@@ -4,7 +4,7 @@ import { classifySlashCommand, shouldActivateSkillBeforePrompt, slashCommandPatt
 describe("classifySlashCommand", () => {
   it("keeps Kimix-only slash commands local", () => {
     expect(classifySlashCommand("theme")).toBe("local");
-    for (const name of ["new", "clear", "fork", "title", "rename", "model", "settings", "config", "provider", "mcp", "plugins", "permission", "yolo", "yes", "auto", "tasks", "task", "export-md", "export", "copy", "help", "h", "version", "exit", "quit", "q", "init"]) {
+    for (const name of ["new", "clear", "fork", "title", "rename", "model", "settings", "config", "provider", "mcp", "plugins", "permission", "yolo", "yes", "auto", "tasks", "task", "export-md", "export", "copy", "help", "h", "version", "exit", "quit", "q", "init", "export-debug-zip", "web", "login", "logout", "editor", "experiments", "experimental", "sessions", "resume", "add-dir", "feedback"]) {
       expect(classifySlashCommand(name)).toBe("local");
     }
   });
