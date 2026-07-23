@@ -1,7 +1,7 @@
 import type { TimelineEvent } from "@/types/ui";
 import { extractModelFromStatusMessage } from "./modelDisplay";
 import { hasMalformedAssistantMarkdown } from "@/utils/eventHelpers";
-import { mergeEvents } from "@/utils/eventMapper";
+import { mergeAssistantThinkingParts, mergeEvents } from "@/utils/eventMapper";
 import {
   hasCanonicalKimiThinkingHistory,
   hasKimiProcessHistoryRegression,
@@ -55,6 +55,68 @@ function thinkingHistorySize(events: TimelineEvent[]): number {
       const text = event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "";
       return sum + text.trim().length;
     }, 0);
+}
+
+/** Collapse an exact whole-text repetition ("XX" from a double-written replay). */
+function collapseRepeatedThinkingText(text: string): string {
+  let current = text;
+  for (;;) {
+    const normalized = current.replace(/\s+/g, " ").trim();
+    if (normalized.length < 2 || normalized.length % 2 !== 0) return current;
+    const half = normalized.length / 2;
+    if (normalized.slice(0, half) !== normalized.slice(half)) return current;
+    current = normalized.slice(0, half);
+  }
+}
+
+/**
+ * Live thinking deltas and snapshot replays can double-write the same thought
+ * into the local timeline (blind fragment concat, replay full text appended
+ * after the live aggregation). Regression gates must compare the local
+ * timeline *after* removing those provable duplicates — otherwise a clean
+ * canonical history looks "thinner" than the inflated local one and the
+ * monotonicity guard rejects it, persisting the duplication forever.
+ * Dedupe is conservative: drop events re-mounted under an identical
+ * (type, id), fold thinkingParts through the idempotent inclusion merge
+ * (covered fragments dropped, supersets kept), and collapse exact whole-text
+ * repetitions. Genuinely distinct content is never touched.
+ */
+function dedupeLocalHistoryForComparison(events: TimelineEvent[]): TimelineEvent[] {
+  const seenEventKeys = new Set<string>();
+  const visit = (list: TimelineEvent[]): TimelineEvent[] => {
+    let changed = false;
+    const result: TimelineEvent[] = [];
+    for (const event of list) {
+      const key = `${event.type} ${event.id}`;
+      if (seenEventKeys.has(key)) {
+        changed = true;
+        continue;
+      }
+      seenEventKeys.add(key);
+      let next = event;
+      if (event.type === "subagent") {
+        const nested = visit(event.events);
+        if (nested !== event.events) next = { ...event, events: nested };
+      }
+      if (next.type === "assistant_message") {
+        if (next.thinkingParts?.length) {
+          const parts = next.thinkingParts.reduce<NonNullable<typeof next.thinkingParts> | undefined>(
+            (acc, part) => mergeAssistantThinkingParts(acc, [part]),
+            undefined,
+          );
+          if (parts && parts.length !== next.thinkingParts.length) next = { ...next, thinkingParts: parts };
+        }
+        if (next.thinking) {
+          const collapsed = collapseRepeatedThinkingText(next.thinking);
+          if (collapsed !== next.thinking) next = { ...next, thinking: collapsed };
+        }
+      }
+      if (next !== event) changed = true;
+      result.push(next);
+    }
+    return changed ? result : list;
+  };
+  return visit(events);
 }
 
 function displayableUserImageCount(events: TimelineEvent[]): number {
@@ -510,6 +572,10 @@ export function shouldReplaceWithCanonicalKimiHistory(
   if (canonicalEvents.length === 0) return false;
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
   const cachedAssistantSize = assistantBodySize(cachedEvents);
+  // Regression gates below compare against the local timeline stripped of
+  // provable double-write duplicates, so an inflated local history cannot
+  // veto a clean canonical one.
+  const comparisonCached = dedupeLocalHistoryForComparison(cachedEvents);
 
   if (hasStableSnapshotMessageBodyExpansion(cachedEvents, canonicalEvents)) {
     logEvent("kimiHistoryReconciliation.accepted", {
@@ -552,11 +618,11 @@ export function shouldReplaceWithCanonicalKimiHistory(
   // omitting tool-call lifecycle frames. Never let such a partial snapshot
   // destructively replace a richer live/local process timeline.
   const repairsDuplicateToolHistory = hasRepairableDuplicateKimiToolHistory(cachedEvents, canonicalEvents);
-  if (hasKimiProcessHistoryRegression(cachedEvents, canonicalEvents) && !repairsDuplicateToolHistory) {
+  if (hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents) && !repairsDuplicateToolHistory) {
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,
       reason: "process-history-regression",
-      localProcessEvents: kimiHistoryProcessEventCount(cachedEvents),
+      localProcessEvents: kimiHistoryProcessEventCount(comparisonCached),
       canonicalProcessEvents: kimiHistoryProcessEventCount(canonicalEvents),
     });
     return false;
@@ -565,7 +631,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
   const canonicalAssistantBody = assistantBodyText(canonicalEvents);
   const cachedAssistantBody = assistantBodyText(cachedEvents);
   const canonicalThinkingSize = thinkingHistorySize(canonicalEvents);
-  const cachedThinkingSize = thinkingHistorySize(cachedEvents);
+  const cachedThinkingSize = thinkingHistorySize(comparisonCached);
   const canonicalImageCount = displayableUserImageCount(canonicalEvents);
   const cachedImageCount = displayableUserImageCount(cachedEvents);
 

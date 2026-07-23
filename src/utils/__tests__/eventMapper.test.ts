@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory, deduplicateTimelineEvents } from "../eventMapper";
+import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory, deduplicateTimelineEvents, mergeAssistantThinkingText, mergeAssistantThinkingParts } from "../eventMapper";
 import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
@@ -2514,5 +2514,163 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     const once = deduplicateTimelineEvents(events);
     expect(once).toHaveLength(3);
     expect(deduplicateTimelineEvents(once)).toHaveLength(3);
+  });
+});
+
+describe("mergeAssistantThinkingText", () => {
+  it("returns the fuller text when one side already contains the other", () => {
+    expect(mergeAssistantThinkingText("思考全文", "思考")).toBe("思考全文");
+    expect(mergeAssistantThinkingText("思考", "思考全文")).toBe("思考全文");
+    expect(mergeAssistantThinkingText("思考全文", "思考全文")).toBe("思考全文");
+  });
+
+  it("does not duplicate near-identical text that only differs in whitespace", () => {
+    const live = "第一步：读文件\n\n第二步：改代码";
+    const replay = "第一步：读文件\n第二步：改代码";
+    // Raw includes checks fail on both sides; normalized comparison must win.
+    expect(mergeAssistantThinkingText(live, replay)).toBe(live);
+    expect(mergeAssistantThinkingText(replay, live)).toBe(replay);
+  });
+
+  it("does not duplicate when a whitespace-drifted replay extends the live text", () => {
+    const live = "分析需求\n\n动手实现";
+    const replay = "分析需求\n动手实现\n\n补充测试";
+    expect(mergeAssistantThinkingText(live, replay)).toBe(replay);
+  });
+
+  it("still concatenates genuinely different thoughts", () => {
+    expect(mergeAssistantThinkingText("思考A", "思考B")).toBe("思考A思考B");
+  });
+
+  it("ignores empty incoming text", () => {
+    expect(mergeAssistantThinkingText("已有", "")).toBe("已有");
+    expect(mergeAssistantThinkingText("已有", "   ")).toBe("已有");
+    expect(mergeAssistantThinkingText(undefined, "新增")).toBe("新增");
+  });
+});
+
+describe("mergeAssistantThinkingParts", () => {
+  const part = (id: string, text: string, timestamp = 1) => ({ id, timestamp, text });
+
+  it("a full replay removes every fragment it covers instead of only the first", () => {
+    const fragments = [part("f1", "片段一"), part("f2", "片段二"), part("f3", "片段三")];
+    const merged = mergeAssistantThinkingParts(fragments, [part("full", "片段一片段二片段三")]);
+    expect(merged).toHaveLength(1);
+    expect(merged?.[0].text).toBe("片段一片段二片段三");
+  });
+
+  it("merging full replay plus its own fragments ends up equal to the full replay", () => {
+    const full = "第一步：读文件\n\n第二步：改代码";
+    const fragments = [part("f1", "第一步：读文件"), part("f2", "第二步：改代码")];
+    // Fragments first, then the whitespace-drifted full replay.
+    const afterReplay = mergeAssistantThinkingParts(fragments, [part("full", "第一步：读文件\n第二步：改代码")]);
+    expect(afterReplay).toHaveLength(1);
+    expect(afterReplay?.[0].text).toBe("第一步：读文件\n第二步：改代码");
+    // Late duplicate fragments must not reappear.
+    const afterLateFragments = mergeAssistantThinkingParts(afterReplay, fragments);
+    expect(afterLateFragments).toHaveLength(1);
+    // Re-merging the same replay is idempotent.
+    const again = mergeAssistantThinkingParts(afterReplay, [part("full-2", full)]);
+    expect(again).toHaveLength(1);
+  });
+
+  it("skips fragments already covered by an existing part even with whitespace drift", () => {
+    const existing = [part("full", "第一步：读文件\n\n第二步")];
+    const merged = mergeAssistantThinkingParts(existing, [part("f1", "第一步：读文件 第二步")]);
+    expect(merged).toHaveLength(1);
+    expect(merged?.[0].text).toBe("第一步：读文件\n\n第二步");
+  });
+
+  it("out-of-order fragments followed by a full replay do not interleave", () => {
+    // Fragments arrive out of order.
+    const shuffled = [part("f2", "第二段"), part("f1", "第一段")];
+    const withReplay = mergeAssistantThinkingParts(shuffled, [part("full", "第一段第二段")]);
+    expect(withReplay).toHaveLength(1);
+    expect(withReplay?.[0].text).toBe("第一段第二段");
+  });
+
+  it("keeps uncovered distinct parts and preserves their order", () => {
+    const existing = [part("a", "思考A"), part("b", "思考B")];
+    const merged = mergeAssistantThinkingParts(existing, [part("c", "思考C")]);
+    expect(merged?.map((item) => item.text)).toEqual(["思考A", "思考B", "思考C"]);
+  });
+
+  it("still upgrades a same-id part in place when the text grew", () => {
+    const existing = [part("t1", "流式片段", 1), part("t2", "另一段", 2)];
+    const merged = mergeAssistantThinkingParts(existing, [part("t1", "流式片段变长了", 3)]);
+    expect(merged).toHaveLength(2);
+    expect(merged?.[0]).toMatchObject({ id: "t1", text: "流式片段变长了" });
+    expect(merged?.[1]).toMatchObject({ id: "t2", text: "另一段" });
+  });
+
+  it("keeps the existing version when a same-id part did not grow", () => {
+    const existing = [part("t1", "完整文本")];
+    const merged = mergeAssistantThinkingParts(existing, [part("t1", "完整")]);
+    expect(merged?.[0].text).toBe("完整文本");
+  });
+});
+
+describe("mergeEvents assistant thinking dedup", () => {
+  it("does not double thinking when a snapshot replay overlaps live deltas", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "a-open",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "",
+        thinking: "第一步：读文件\n\n第二步：改代码",
+        isThinking: true,
+        isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+    const replay: TimelineEvent = {
+      id: "a-replay",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "",
+      thinking: "第一步：读文件\n第二步：改代码",
+      isThinking: true,
+      isComplete: false,
+      agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, replay);
+    const assistant = result.find((event) => event.type === "assistant_message");
+    const thinking = assistant && assistant.type === "assistant_message" ? assistant.thinking ?? "" : "";
+    expect(thinking.match(/第一步：读文件/g)).toHaveLength(1);
+    expect(thinking.match(/第二步：改代码/g)).toHaveLength(1);
+  });
+
+  it("does not double thinkingParts when live fragments meet a full replay", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "a-open",
+        type: "assistant_message",
+        timestamp: 2,
+        content: "",
+        thinkingParts: [
+          { id: "f1", timestamp: 2, text: "片段一" },
+          { id: "f2", timestamp: 2, text: "片段二" },
+        ],
+        isThinking: true,
+        isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+    const replay: TimelineEvent = {
+      id: "a-replay",
+      type: "assistant_message",
+      timestamp: 3,
+      content: "",
+      thinkingParts: [{ id: "full", timestamp: 3, text: "片段一片段二" }],
+      isThinking: true,
+      isComplete: false,
+      agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, replay);
+    const assistant = result.find((event) => event.type === "assistant_message");
+    const parts = assistant && assistant.type === "assistant_message" ? assistant.thinkingParts ?? [] : [];
+    expect(parts).toHaveLength(1);
+    expect(parts[0].text).toBe("片段一片段二");
   });
 });

@@ -25,6 +25,7 @@ import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { hasMetricStatus, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
+import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
@@ -733,8 +734,16 @@ export function buildRenderItems(
       id: first.agentTurnId || first.roomMessageId ? `assistant:${first.agentTurnId ?? first.roomMessageId}` : first.id,
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
-      thinking: visible.map((event) => event.thinking ?? "").filter((thinking) => thinking.trim()).join(""),
-      thinkingParts: visible.flatMap((event) => event.thinkingParts ?? []),
+      // Reuse the idempotent merges so a full thinking replay overlapping live
+      // fragments across split assistant events is deduplicated, not doubled.
+      thinking: visible.reduce<string | undefined>(
+        (merged, event) => mergeAssistantThinkingText(merged, event.thinking),
+        undefined,
+      ),
+      thinkingParts: visible.reduce<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>(
+        (merged, event) => mergeAssistantThinkingParts(merged, event.thinkingParts),
+        undefined,
+      ),
       isThinking: visible.some((event) => event.isThinking && !event.isComplete),
       isComplete: visible.every((event) => event.isComplete),
       durationMs: reliableAssistantDurationMs(last.durationMs),

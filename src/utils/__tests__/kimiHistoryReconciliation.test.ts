@@ -98,6 +98,82 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
+  it("does not reject a clean canonical history when local thinking is fatter only from duplicated fragments", () => {
+    const logSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    // Live fragment + full replay blind-concatenated: the raw local thinking
+    // is larger than the canonical one, but every fragment is covered by the
+    // full part, so the deduped comparison must not veto the canonical history.
+    const cached: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("短回答", {
+        id: "local-answer",
+        thinkingParts: [
+          { id: "tp-1", timestamp: 1, text: "第一步：读取配置。" },
+          { id: "tp-2", timestamp: 2, text: "第一步：读取配置。第二步：汇总。" },
+        ],
+      }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "official-user", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("长得多的正式回答内容，覆盖本地短回答。", {
+        id: "official-answer",
+        thinking: "第一步：读取配置。第二步：汇总。",
+        snapshotMessageId: "msg-a",
+        snapshotMessageIdStable: true,
+      }),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical)).toBe(true);
+    expect(logSpy).not.toHaveBeenCalledWith(
+      "kimiHistoryReconciliation.rejected",
+      expect.objectContaining({ reason: "thinking-history-regression" }),
+    );
+  });
+
+  it("does not reject for process regression when local process rows are re-mounted duplicates with identical ids", () => {
+    const logSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const cached: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("短", { id: "local-answer" }),
+      subagentWithContent("子代理输出"),
+      // Same deterministic replay id mounted twice by the double-write bug.
+      subagentWithContent("子代理输出"),
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "official-user", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("更长的正式回答内容，明显超过本地回答。", { id: "official-answer" }),
+      subagentWithContent("子代理输出"),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical)).toBe(true);
+    expect(logSpy).not.toHaveBeenCalledWith(
+      "kimiHistoryReconciliation.rejected",
+      expect.objectContaining({ reason: "process-history-regression" }),
+    );
+  });
+
+  it("still rejects when the local thinking is genuinely richer than the canonical one", () => {
+    const cached: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("回答", {
+        id: "local-answer",
+        thinkingParts: [
+          { id: "tp-1", timestamp: 1, text: "第一步：读取配置。" },
+          { id: "tp-2", timestamp: 2, text: "第二步：独立的额外推理。" },
+        ],
+      }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "official-user", type: "user_message", timestamp: 100, content: "问题" },
+      assistant("回答", {
+        id: "official-answer",
+        thinking: "第一步：读取配置。",
+      }),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical)).toBe(false);
+  });
+
   it("does not replace when canonical has less assistant body text", () => {
     const local = [userMessage, assistant("local has more content here")];
     const canonical = [userMessage, assistant("short")];

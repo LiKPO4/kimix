@@ -51,12 +51,30 @@ function batchHasBoundaryEvent(items: TimelineEvent[]): boolean {
   return items.some((event) => !isDeferrableStreamEvent(event));
 }
 
+/**
+ * Events carrying a subagent scope (`agentId` other than the main agent) must
+ * never enter the active-turn draft store. The draft key is
+ * (sessionId, roomAgentId, agentTurnId) with no subagent dimension, and room
+ * sessions stamp every delta with the main turn's agentTurnId — so subagent
+ * deltas would be appended into the MAIN turn's draft, leaking subagent text
+ * into the visible main content in arrival order and resurrecting the draft
+ * after the main turn closed (duplicate `active-draft:` event ids). These
+ * events stay on the formal batch path, where mergeEvents attaches them to
+ * their own subagent card via attachScopedEventToSubagent.
+ */
+export function hasSubagentEventScope(event: TimelineEvent): boolean {
+  if (!("agentId" in event)) return false;
+  const agentId = event.agentId;
+  return typeof agentId === "string" && agentId.length > 0 && agentId !== "main";
+}
+
 function resolveActiveTurnDraftKey(
   sessionId: string,
   roomAgentId: string,
   event: TimelineEvent,
 ): string | null {
   if (event.type !== "assistant_message" || !event.agentTurnId) return null;
+  if (hasSubagentEventScope(event)) return null;
   return makeActiveTurnDraftKey(sessionId, roomAgentId, event.agentTurnId);
 }
 
@@ -201,10 +219,13 @@ export function useEventStream() {
       return;
     }
 
-    if (isActiveTurnDraftEnabled()) {
+    if (isActiveTurnDraftEnabled() && !hasSubagentEventScope(scoped)) {
       // Authoritative full-body frames (barrier / stable snapshot / complete with
       // content) own the final text. Drop the draft instead of committing it so
       // mergeEvents does not append draft + full body (duplicate greeting).
+      // Subagent-scoped frames never touch the MAIN turn's draft: they must not
+      // clear it (their authoritative body belongs to the subagent card) nor
+      // force an early commit of it.
       if (draftKey && isAuthoritativeAssistantBodyEvent(scoped)) {
         clearActiveTurnDraft(draftKey);
       } else {

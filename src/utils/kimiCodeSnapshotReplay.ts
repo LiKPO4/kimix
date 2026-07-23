@@ -58,6 +58,127 @@ function assistantContainsSnapshotText(event: AssistantEvent, text: string): boo
   return content.includes(text);
 }
 
+function normalizeReplayText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function countTextOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let index = haystack.indexOf(needle);
+  while (index !== -1) {
+    count += 1;
+    index = haystack.indexOf(needle, index + needle.length);
+  }
+  return count;
+}
+
+/**
+ * The official snapshot is the single source of truth for a turn's think/text
+ * split. Pick the canonical text whenever the local text is a cumulative
+ * prefix of it, a duplicated replay of it, or the same text padded with
+ * replayed fragments. Only a local row that is strictly ahead of the sample
+ * (one embedded canonical copy plus genuinely new text) keeps its local text;
+ * unrelated disjoint texts are left untouched so an unrelated same-turn step
+ * is never overwritten.
+ */
+function resolveCanonicalReplayText(localText: string, canonicalText: string): string {
+  const canonical = normalizeReplayText(canonicalText);
+  if (!canonical) return localText;
+  const local = normalizeReplayText(localText);
+  if (!local) return canonicalText;
+  if (canonical === local || canonical.startsWith(local)) return canonicalText;
+  const copies = countTextOccurrences(local, canonical);
+  if (copies >= 2) return canonicalText;
+  if (copies === 1) {
+    const start = local.indexOf(canonical);
+    const before = local.slice(0, start).trim();
+    const after = local.slice(start + canonical.length).trim();
+    if ((before && canonical.includes(before)) || (after && canonical.includes(after))) {
+      return canonicalText;
+    }
+  }
+  return localText;
+}
+
+/**
+ * Live deltas and snapshot replays otherwise double-write into the same
+ * mounted row: mergeEvents appends the replayed full thinking/body onto the
+ * live aggregation and the duplication persists. When a canonical snapshot
+ * assistant maps onto a mounted live row (same stable identity, or the open
+ * assistant of the same user turn), replace the body fields with the
+ * snapshot's separated think/text while keeping live-only state (row
+ * identity, timestamps, activity flags). Returns null when no mounted row
+ * matches or no field needs repair, so the caller keeps its usual merge.
+ */
+function replaceMountedLiveAssistantWithCanonical(
+  events: readonly TimelineEvent[],
+  canonical: AssistantEvent,
+): TimelineEvent[] | null {
+  const canonicalThinkingText = canonical.thinking?.trim()
+    ? canonical.thinking
+    : (canonical.thinkingParts ?? []).map((part) => part.text).join("");
+  if (!canonical.content.trim() && !canonicalThinkingText.trim()) return null;
+
+  const canonicalSnapshotId = canonical.snapshotMessageIdStable === true
+    ? snapshotMessageIdFromEvent(canonical)
+    : undefined;
+  let targetIndex = -1;
+  if (canonicalSnapshotId) {
+    targetIndex = events.findLastIndex((event) => (
+      event.type === "assistant_message" &&
+      event.snapshotMessageIdStable === true &&
+      snapshotMessageIdFromEvent(event) === canonicalSnapshotId
+    ));
+  }
+  if (targetIndex === -1) {
+    targetIndex = events.findLastIndex((event) => (
+      event.type === "assistant_message" &&
+      !event.isComplete &&
+      event.snapshotMessageIdStable !== true &&
+      sharesUserTurn(events, event.timestamp, canonical.timestamp)
+    ));
+  }
+  if (targetIndex === -1) return null;
+  const target = events[targetIndex];
+  if (target.type !== "assistant_message") return null;
+
+  const targetThinkingText = target.thinking?.trim()
+    ? target.thinking
+    : (target.thinkingParts ?? []).map((part) => part.text).join("");
+  const content = resolveCanonicalReplayText(target.content, canonical.content);
+  const thinking = resolveCanonicalReplayText(targetThinkingText, canonicalThinkingText);
+  const thinkingParts = canonical.thinkingParts?.some((part) => part.text.trim())
+    ? canonical.thinkingParts
+    : thinking !== targetThinkingText
+      // The replay carried thinking as plain text; drop the stale live
+      // fragments so the duplicated parts cannot survive beside the clean text.
+      ? undefined
+      : target.thinkingParts;
+  if (
+    content === target.content &&
+    thinking === targetThinkingText &&
+    thinkingParts === target.thinkingParts
+  ) {
+    return null;
+  }
+  const remainsComplete = target.isComplete || canonical.isComplete;
+  const replaced: AssistantEvent = {
+    ...target,
+    content,
+    thinking: thinking === targetThinkingText ? target.thinking : (thinking.trim() ? thinking : undefined),
+    thinkingParts,
+    model: canonical.model ?? target.model,
+    agentRole: canonical.agentRole ?? target.agentRole,
+    completionBarrierReplay: canonical.completionBarrierReplay ?? target.completionBarrierReplay,
+    isThinking: remainsComplete ? false : (target.isThinking || Boolean(thinking.trim())),
+    isComplete: remainsComplete,
+  };
+  const result = [...events];
+  result[targetIndex] = replaced;
+  return result;
+}
+
 function hasPendingLocalPromptPlaceholder(events: readonly TimelineEvent[]): boolean {
   const assistantIndex = events.findLastIndex((event) => event.type === "assistant_message" && !event.isComplete);
   if (assistantIndex === -1) return false;
@@ -323,6 +444,18 @@ export function reconcileRunningKimiSnapshot(
     // independent history entries instead.
     if (!alreadyMounted && lastLocalUserTs !== undefined && event.type === "assistant_message" && event.timestamp < lastLocalUserTs) {
       return [...events, event];
+    }
+    // Current-turn canonical assistants replace the mounted live row's
+    // think/text (snapshot is the single source of truth) instead of letting
+    // mergeEvents append the replayed full body onto the live aggregation,
+    // which double-wrote thinking and persisted the duplication. This runs
+    // even when alreadyMounted is true: the containment heuristics above also
+    // match a fat double-written row (the duplicated local text still contains
+    // the canonical text), and such rows need repair, not a skip. The helper
+    // returns null when nothing needs repair, so clean rows keep the skip.
+    if (event.type === "assistant_message") {
+      const replaced = replaceMountedLiveAssistantWithCanonical(events, event);
+      if (replaced) return replaced;
     }
     return alreadyMounted ? events : mergeEvents(events, event);
   }, [...localEvents]);

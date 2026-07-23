@@ -186,45 +186,88 @@ function appendAssistantContent(existingContent: string, incomingContent: string
 
 type AssistantThinkingPart = NonNullable<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>[number];
 
+/** Collapse whitespace so live deltas and snapshot replays compare equal despite formatting drift. */
+function normalizeThinkingWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 /** Merge thinking text without losing earlier steps or duplicating stream prefixes. */
-function mergeAssistantThinkingText(existing?: string, incoming?: string): string | undefined {
+export function mergeAssistantThinkingText(existing?: string, incoming?: string): string | undefined {
   const left = existing ?? "";
   const right = incoming ?? "";
   if (!right.trim()) return existing;
   if (!left.trim()) return incoming;
   if (right === left || right.includes(left)) return right;
   if (left.includes(right)) return left;
+  // Live-accumulated text and full snapshot replays of the same thought often
+  // differ only in whitespace (newlines/indentation), which defeats the raw
+  // includes checks above and duplicates the whole passage as left + right.
+  // Compare whitespace-normalized forms before falling back to concatenation.
+  const normalizedLeft = normalizeThinkingWhitespace(left);
+  const normalizedRight = normalizeThinkingWhitespace(right);
+  if (normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight)) return left;
+  if (normalizedRight.includes(normalizedLeft)) return right;
   return left + right;
 }
 
 /** Append thinking parts across multi-step barrier frames; upgrade supersets in place. */
-function mergeAssistantThinkingParts(
+export function mergeAssistantThinkingParts(
   existing: AssistantThinkingPart[] | undefined,
   incoming: AssistantThinkingPart[] | undefined,
 ): AssistantThinkingPart[] | undefined {
   if (!incoming?.length) return existing;
   if (!existing?.length) return incoming;
-  const result = [...existing];
+  let result = [...existing];
   for (const part of incoming) {
-    const text = part.text.trim();
-    if (!text) continue;
-    const matchIndex = result.findIndex((item) => (
-      item.id === part.id ||
-      item.text === part.text ||
-      item.text.includes(part.text) ||
-      part.text.includes(item.text)
-    ));
-    if (matchIndex === -1) {
-      result.push(part);
+    const partText = normalizeThinkingWhitespace(part.text);
+    if (!partText) continue;
+
+    // Same id means a streaming update of the same thought: replace in place
+    // only when the incoming text grew, otherwise keep the existing version.
+    const sameIdIndex = result.findIndex((item) => item.id === part.id);
+    if (sameIdIndex !== -1) {
+      const current = result[sameIdIndex];
+      if (part.text.length > current.text.length) {
+        result[sameIdIndex] = {
+          ...current,
+          ...part,
+          text: part.text,
+        };
+      }
       continue;
     }
-    if (part.text.length > result[matchIndex].text.length) {
-      result[matchIndex] = {
-        ...result[matchIndex],
+
+    // A fragment already covered by an existing part contributes nothing.
+    const alreadyCovered = result.some((item) => {
+      const itemText = normalizeThinkingWhitespace(item.text);
+      return itemText.length >= partText.length && itemText.includes(partText);
+    });
+    if (alreadyCovered) continue;
+
+    // A full replay supersedes every earlier fragment it covers (normalized
+    // whitespace comparison): drop them all and insert at the first covered
+    // position so ordering stays stable.
+    let insertIndex = -1;
+    const coveredIndexes = new Set<number>();
+    result.forEach((item, index) => {
+      const itemText = normalizeThinkingWhitespace(item.text);
+      if (itemText && partText.length > itemText.length && partText.includes(itemText)) {
+        coveredIndexes.add(index);
+        if (insertIndex === -1) insertIndex = index;
+      }
+    });
+    if (coveredIndexes.size > 0) {
+      const firstCovered = result[insertIndex];
+      result = result.filter((_, index) => !coveredIndexes.has(index));
+      result.splice(insertIndex, 0, {
+        ...firstCovered,
         ...part,
         text: part.text,
-      };
+      });
+      continue;
     }
+
+    result.push(part);
   }
   return result;
 }

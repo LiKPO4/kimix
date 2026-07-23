@@ -136,6 +136,27 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(key)?.thinkingParts?.map((part) => part.text)).toEqual(["第一段", "第二段"]);
   });
 
+  it("does not duplicate thinking parts when a cumulative frame supersedes its fragments", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p1", timestamp: 1, text: "第一步：读取配置。" }] }));
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p2", timestamp: 2, text: "第二步：汇总结果。" }] }));
+    // Full replay of the same thought: supersedes both fragments in place.
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p3", timestamp: 3, text: "第一步：读取配置。第二步：汇总结果。" }] }));
+    // A late fragment already covered by the full frame is skipped.
+    applyActiveTurnDraftDelta(key, delta("", { thinkingParts: [{ id: "p4", timestamp: 4, text: "第一步：读取配置。" }] }));
+    expect(getActiveTurnDraft(key)?.thinkingParts?.map((part) => part.text))
+      .toEqual(["第一步：读取配置。第二步：汇总结果。"]);
+  });
+
+  it("does not duplicate thinking text when a cumulative replay follows fragments", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "先读配置。" }));
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "先读配置。\n再汇总。" }));
+    // Same thought replayed with whitespace drift only.
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "先读配置。 再汇总。" }));
+    expect(getActiveTurnDraft(key)?.thinking).toBe("先读配置。\n再汇总。");
+  });
+
   it("pickDraftText prefers the longer snapshot", () => {
     expect(pickDraftText("hello world", "hello")).toBe("hello world");
     expect(pickDraftText("hi", "hello")).toBe("hello");

@@ -1,12 +1,22 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import type { TimelineEvent } from "@/types/ui";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
+import type { Session, TimelineEvent } from "@/types/ui";
+import { useSessionStore } from "@/stores/sessionStore";
 import {
   applyActiveTurnDraftDelta,
   getActiveTurnDraft,
+  listActiveTurnDraftKeys,
   makeActiveTurnDraftKey,
   resetActiveTurnDraftStoreForTests,
 } from "@/utils/activeTurnDraftStore";
-import { coalesceStreamEventBatch, commitActiveTurnDraftsToBatch, isDeferrableStreamEvent } from "../useEventStream";
+import {
+  coalesceStreamEventBatch,
+  commitActiveTurnDraftsToBatch,
+  hasSubagentEventScope,
+  isDeferrableStreamEvent,
+  useEventStream,
+} from "../useEventStream";
 
 function assistant(content: string, patch: Partial<Extract<TimelineEvent, { type: "assistant_message" }>> = {}): TimelineEvent {
   return {
@@ -171,5 +181,133 @@ describe("commitActiveTurnDraftsToBatch", () => {
     expect(batches.get(batchKey)?.items.map((event) => (
       event.type === "assistant_message" ? event.content : event.type
     ))).toEqual(["你好", "霖江路。我会补上焦点归还。", "tool_call"]);
+  });
+});
+
+function renderHook<T>(callback: () => T) {
+  const result = { current: null as unknown as T };
+  function Wrapper() {
+    result.current = callback();
+    return null;
+  }
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  act(() => {
+    root.render(React.createElement(Wrapper));
+  });
+  return {
+    result,
+    unmount() {
+      act(() => {
+        root.unmount();
+      });
+    },
+  };
+}
+
+function subagentCard(agentId: string): TimelineEvent {
+  return {
+    id: `card-${agentId}`,
+    type: "subagent",
+    timestamp: 1,
+    agentId,
+    agentName: "explore",
+    status: "running",
+    events: [],
+  };
+}
+
+function seedSession(events: TimelineEvent[]): Session {
+  return {
+    id: "session-1",
+    engine: "kimi-code",
+    title: "Swarm",
+    projectPath: "D:/WORKS/test",
+    createdAt: 1,
+    updatedAt: 1,
+    events,
+    isLoading: false,
+  } as Session;
+}
+
+describe("hasSubagentEventScope", () => {
+  it("detects subagent-scoped events and exempts the main agent", () => {
+    expect(hasSubagentEventScope(assistant("x", { agentId: "sub-1" }))).toBe(true);
+    expect(hasSubagentEventScope(assistant("x", { agentId: "main" }))).toBe(false);
+    expect(hasSubagentEventScope(assistant("x"))).toBe(false);
+    expect(hasSubagentEventScope({ id: "s", type: "status_update", timestamp: 1, message: "m" })).toBe(false);
+  });
+});
+
+describe("enqueueStreamEvent subagent scope attribution", () => {
+  beforeEach(() => {
+    resetActiveTurnDraftStoreForTests();
+    useSessionStore.setState({ sessions: [seedSession([subagentCard("sub-1")])] });
+  });
+
+  afterEach(() => {
+    resetActiveTurnDraftStoreForTests();
+    useSessionStore.setState({ sessions: [] });
+  });
+
+  it("keeps subagent deltas out of the main turn draft (same agentTurnId key collision)", () => {
+    const { result, unmount } = renderHook(() => useEventStream());
+    const mainKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("你好", { id: "main-delta-1" }));
+    });
+    expect(getActiveTurnDraft(mainKey)?.content).toBe("你好");
+
+    // Subagent delta inheriting the MAIN turn identity (App.tsx stamps the room
+    // activity's activeTurnId onto every live delta). Pre-fix this appended the
+    // subagent text into the main draft in arrival order.
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("子代理输出", {
+        id: "sub-delta-1",
+        agentId: "sub-1",
+      }));
+    });
+
+    expect(getActiveTurnDraft(mainKey)?.content).toBe("你好");
+    expect(listActiveTurnDraftKeys()).toEqual([mainKey]);
+
+    act(() => {
+      result.current.flushStreamEvents();
+    });
+    const session = useSessionStore.getState().sessions[0];
+    const card = session.events.find((event) => event.type === "subagent") as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(card.events.some((event) => event.type === "assistant_message" && event.content.includes("子代理输出"))).toBe(true);
+    const mainAssistant = session.events.find((event) => event.type === "assistant_message") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    expect(mainAssistant?.content ?? "").not.toContain("子代理输出");
+    unmount();
+  });
+
+  it("does not clear the main turn draft on a subagent authoritative frame", () => {
+    const { result, unmount } = renderHook(() => useEventStream());
+
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("你好", { id: "main-delta-1" }));
+    });
+    // Subagent completes with a full body while the main turn is still streaming.
+    // Pre-fix this was treated as authoritative for the SHARED draft key and
+    // cleared the main turn's buffered text, permanently dropping "你好".
+    // (A complete frame flushes immediately, which legitimately COMMITS the main
+    // draft into the timeline — the regression is the draft being CLEARED.)
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("子代理最终答复", {
+        id: "sub-final-1",
+        agentId: "sub-1",
+        isComplete: true,
+      }));
+    });
+
+    const session = useSessionStore.getState().sessions[0];
+    const mainAssistant = session.events.find((event) => event.type === "assistant_message") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
+    expect(mainAssistant?.content).toContain("你好");
+    expect(mainAssistant?.content).not.toContain("子代理最终答复");
+    const card = session.events.find((event) => event.type === "subagent") as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(card.events.some((event) => event.type === "assistant_message" && event.content.includes("子代理最终答复"))).toBe(true);
+    unmount();
   });
 });

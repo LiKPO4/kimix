@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { TimelineEvent } from "@/types/ui";
-import { mergeEvents } from "@/utils/eventMapper";
+import { mergeAssistantThinkingParts, mergeAssistantThinkingText, mergeEvents } from "@/utils/eventMapper";
 import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 
@@ -147,12 +147,6 @@ export function appendStreamingText(existing: string, incoming: string): string 
   return existing + incoming;
 }
 
-function appendStreamingThinking(existing: string | undefined, incoming: string | undefined): string | undefined {
-  if (!incoming) return existing;
-  if (!existing) return incoming;
-  return appendStreamingText(existing, incoming);
-}
-
 export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
@@ -203,15 +197,16 @@ export function applyActiveTurnDraftDelta(
   // Deltas routed here are live text/thinking fragments (snapshot and barrier
   // frames stay on the formal path upstream). Prefer O(fragment) accumulation
   // with overlap-safe merge; snapshot-bearing events fall back to mergeEvents.
+  // Thinking reuses the idempotent eventMapper merge: a full cumulative frame
+  // must supersede the fragments it covers instead of being blind-appended
+  // ([...base, ...incoming] double-wrote every replayed thought).
   const isAppendOnlyDelta = !event.snapshotMessageId && !event.snapshotMessageIdStable;
   const merged = isAppendOnlyDelta
     ? [{
         ...base,
         content: appendStreamingText(base.content, event.content ?? ""),
-        thinking: appendStreamingThinking(base.thinking, event.thinking),
-        thinkingParts: event.thinkingParts
-          ? [...(base.thinkingParts ?? []), ...event.thinkingParts]
-          : base.thinkingParts,
+        thinking: mergeAssistantThinkingText(base.thinking, event.thinking),
+        thinkingParts: mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
         model: event.model ?? base.model,
         agentRole: event.agentRole ?? base.agentRole,
       }]

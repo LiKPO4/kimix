@@ -507,6 +507,93 @@ describe("reconcileRunningKimiSnapshot chronological order", () => {
   });
 });
 
+describe("reconcileRunningKimiSnapshot replay replacement", () => {
+  it("replaces double-written live thinking/content with the canonical think/text split", () => {
+    // The live row aggregated fragments AND a full replay: thinking doubled.
+    // The snapshot is the single source of truth, so the mounted row must end
+    // up with exactly one copy while keeping its live identity and open state.
+    const live: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 200,
+      content: "正文。",
+      thinking: "先读配置。再汇总。先读配置。再汇总。",
+      thinkingParts: [
+        { id: "tp-1", timestamp: 200, text: "先读配置。" },
+        { id: "tp-2", timestamp: 201, text: "先读配置。再汇总。" },
+      ],
+      isThinking: true,
+      isComplete: false,
+      agentTurnId: "turn-1",
+      roomMessageId: "msg-live",
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:user-1:user:0", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "snapshot:msg-a:assistant:0",
+      type: "assistant_message",
+      timestamp: 300,
+      content: "正文。",
+      thinking: "先读配置。再汇总。",
+      isThinking: false,
+      isComplete: true,
+    }];
+
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const assistants = result.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({
+      id: "assistant-live",
+      content: "正文。",
+      thinking: "先读配置。再汇总。",
+      // 完成态只能由真实 turn 结束授予，快照替换不得提前关闭。
+      isComplete: false,
+      agentTurnId: "turn-1",
+      roomMessageId: "msg-live",
+    });
+    // Stale duplicated live fragments are dropped with the clean text.
+    expect((assistants[0] as Extract<TimelineEvent, { type: "assistant_message" }>).thinkingParts).toBeUndefined();
+  });
+
+  it("keeps live text that is strictly ahead of the running sample", () => {
+    const live: TimelineEvent[] = [{
+      id: "user-1", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 200,
+      content: "正文。继续输出中",
+      thinking: "先读配置。再汇总。",
+      isThinking: true,
+      isComplete: false,
+    }];
+    const snapshot: TimelineEvent[] = [{
+      id: "snapshot:user-1:user:0", type: "user_message", timestamp: 100, content: "继续",
+    }, {
+      id: "snapshot:msg-a:assistant:0",
+      type: "assistant_message",
+      timestamp: 300,
+      content: "正文。",
+      thinking: "先读配置。再汇总。",
+      isThinking: false,
+      isComplete: true,
+    }];
+
+    const result = reconcileRunningKimiSnapshot(live, snapshot);
+    const assistants = result.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({
+      id: "assistant-live",
+      content: "正文。继续输出中",
+      thinking: "先读配置。再汇总。",
+      isComplete: false,
+    });
+  });
+});
+
+
 describe("reconcileRunningKimiSnapshot missing user boundary", () => {
   it("does not downgrade a canonical completed Assistant into an orphan placeholder", () => {
     const local: TimelineEvent[] = [{
