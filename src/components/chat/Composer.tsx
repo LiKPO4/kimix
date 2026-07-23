@@ -57,7 +57,7 @@ import {
 } from "@/utils/roomAgentRecovery";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
-import { recordAppliedSubagentRouting } from "@/utils/subagentRouting";
+import { recordAppliedSubagentRouting, resolveSubagentRoutingToApply } from "@/utils/subagentRouting";
 import { buildForcedSubagentDirective, withForcedSubagentDirective } from "@/utils/forcedSubagentPrompt";
 import {
   bindProvisionedRoomAgent,
@@ -1227,12 +1227,12 @@ export function Composer() {
   ) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     const agent = latest ? getRoomAgent(latest, roomAgentId, permissionMode) : null;
-    const desired = agent?.subagentRoutingDesired;
-    if (!latest || !agent || !desired) return;
+    const routing = agent ? resolveSubagentRoutingToApply(agent) : null;
+    if (!latest || !agent || !routing) return;
     const response = await window.api.setKimiCodeSubagentRouting({
       sessionId: runtimeSessionId,
-      modelAlias: desired.modelAlias ?? undefined,
-      thinkingEffort: desired.thinkingEffort ?? undefined,
+      modelAlias: routing.modelAlias ?? undefined,
+      thinkingEffort: routing.thinkingEffort ?? undefined,
     });
     if (!response.success) throw new Error(`应用子 Agent 配置失败：${response.error}`);
     const timestamp = Date.now();

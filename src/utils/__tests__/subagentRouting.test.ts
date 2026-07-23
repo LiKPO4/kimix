@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "@/types/ui";
 import { createCollaborationStateFromSession, getPrimaryRoomAgent, getRoomAgent } from "../collaborationRooms";
-import { queueSubagentRouting, recordAppliedSubagentRouting } from "../subagentRouting";
+import { queueSubagentRouting, recordAppliedSubagentRouting, resolveSubagentRoutingToApply } from "../subagentRouting";
 
 function session(): Session {
   return {
@@ -69,5 +69,39 @@ describe("subagentRouting", () => {
       thinkingEffort: null,
     });
     expect(getPrimaryRoomAgent(queued).subagentRoutingDesired).toBeUndefined();
+  });
+
+  describe("resolveSubagentRoutingToApply", () => {
+    it("prefers the queued desired routing over stored values", () => {
+      expect(resolveSubagentRoutingToApply({
+        subagentModelAlias: "stored-model",
+        subagentThinkingEffort: "stored-effort",
+        subagentRoutingDesired: { modelAlias: "desired-model", thinkingEffort: "high" },
+      })).toEqual({ modelAlias: "desired-model", thinkingEffort: "high" });
+    });
+
+    it("returns the double-null clear override when desired is double null", () => {
+      expect(resolveSubagentRoutingToApply({
+        subagentModelAlias: "stored-model",
+        subagentThinkingEffort: "stored-effort",
+        subagentRoutingDesired: { modelAlias: null, thinkingEffort: null },
+      })).toEqual({ modelAlias: null, thinkingEffort: null });
+    });
+
+    it("falls back to a stored-only model override", () => {
+      expect(resolveSubagentRoutingToApply({
+        subagentModelAlias: "stored-model",
+      })).toEqual({ modelAlias: "stored-model", thinkingEffort: null });
+    });
+
+    it("falls back to a stored-only thinking effort override", () => {
+      expect(resolveSubagentRoutingToApply({
+        subagentThinkingEffort: "low",
+      })).toEqual({ modelAlias: null, thinkingEffort: "low" });
+    });
+
+    it("returns null when nothing is configured", () => {
+      expect(resolveSubagentRoutingToApply({})).toBeNull();
+    });
   });
 });

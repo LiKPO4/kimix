@@ -1,10 +1,23 @@
-import type { PermissionMode, Session } from "@/types/ui";
+import type { PermissionMode, RoomAgent, Session } from "@/types/ui";
 import { updateRoomMutationOwner } from "@/utils/roomMutationOwner";
 
 export type SubagentRoutingSelection = {
   modelAlias: string | null;
   thinkingEffort: string | null;
 };
+
+export function resolveSubagentRoutingToApply(
+  agent: Pick<RoomAgent, "subagentRoutingDesired" | "subagentModelAlias" | "subagentThinkingEffort">,
+): SubagentRoutingSelection | null {
+  if (agent.subagentRoutingDesired) return agent.subagentRoutingDesired;
+  if (agent.subagentModelAlias || agent.subagentThinkingEffort) {
+    return {
+      modelAlias: agent.subagentModelAlias ?? null,
+      thinkingEffort: agent.subagentThinkingEffort ?? null,
+    };
+  }
+  return null;
+}
 
 export function queueSubagentRouting(
   session: Session,
