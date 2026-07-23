@@ -50,6 +50,22 @@ export function markModelAsNonVision(model: string | null | undefined): void {
   }
 }
 
+const nonVideoModels = new Set<string>();
+
+export function markModelAsNonVideo(model: string | null | undefined): void {
+  if (model) {
+    nonVideoModels.add(model);
+    interceptorLog("info", "marked model as non-video", model);
+  }
+}
+
+// 不接受图片的模型必然也不接受视频；其余模型先按支持视频处理，被拒后按会话标记降级。
+export function modelSupportsVideos(model: string | null | undefined): boolean {
+  if (!model) return true;
+  if (!modelSupportsImages(model)) return false;
+  return !nonVideoModels.has(model);
+}
+
 function isKnownNonVisionModelName(model: string): boolean {
   const normalized = normalizeModelName(model);
   return normalized.includes("deepseek");

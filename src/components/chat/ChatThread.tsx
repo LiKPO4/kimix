@@ -667,8 +667,10 @@ function mergeChangeSummaryEvents(events: Extract<TimelineEvent, { type: "change
 
 function restoreLateHistoricalChangePlacement(events: TimelineEvent[]): TimelineEvent[] {
   let repaired: TimelineEvent[] | null = null;
+  const movedSiblingIds = new Set<string>();
   for (let sourceIndex = 0; sourceIndex < events.length; sourceIndex += 1) {
     const event = events[sourceIndex];
+    if (movedSiblingIds.has(event.id)) continue;
     const target: TimelineEvent[] = repaired ?? events.slice(0, sourceIndex);
     if (event.type !== "change_summary") {
       if (repaired) repaired.push(event);
@@ -681,7 +683,25 @@ function restoreLateHistoricalChangePlacement(events: TimelineEvent[]): Timeline
       if (repaired) repaired.push(event);
       continue;
     }
-    target.splice(laterUserIndex, 0, event);
+    // The diff/todo derived from the same tool result is persisted right after
+    // the summary; move it along so the restored turn keeps its structured diff
+    // preview and the later turn does not render a stray standalone change card.
+    const siblingDiffIds = new Set(
+      event.files.map((file) => file.diffEventId).filter((id): id is string => Boolean(id)),
+    );
+    const siblingPaths = new Set(event.files.map((file) => normalizeFilePath(file.path)));
+    const siblings: TimelineEvent[] = [];
+    for (let siblingIndex = sourceIndex + 1; siblingIndex < events.length; siblingIndex += 1) {
+      const sibling = events[siblingIndex];
+      if (movedSiblingIds.has(sibling.id) || sibling.timestamp !== event.timestamp) break;
+      const isSameSourceDiff = sibling.type === "diff" && (
+        siblingDiffIds.has(sibling.id) || siblingPaths.has(normalizeFilePath(sibling.filePath))
+      );
+      if (!isSameSourceDiff && sibling.type !== "todo") break;
+      siblings.push(sibling);
+      movedSiblingIds.add(sibling.id);
+    }
+    target.splice(laterUserIndex, 0, event, ...siblings);
     repaired = target;
   }
   return repaired ?? events;

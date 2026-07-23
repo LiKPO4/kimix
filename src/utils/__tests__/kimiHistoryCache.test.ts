@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 14 for historical tool replay ownership migration", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(15);
+  it("uses cache version 16 for the usage-status hydration migration", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(16);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {

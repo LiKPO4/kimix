@@ -18,8 +18,10 @@ import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, stripHtmlForError } from "./kimiUsage";
 import {
   installNonVisionFetchInterceptor,
+  markModelAsNonVideo,
   markModelAsNonVision,
   modelSupportsImages,
+  modelSupportsVideos,
 } from "./nonVisionFetchInterceptor";
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
@@ -1257,6 +1259,31 @@ function resolveExistingManagedApiKey(raw: string, providerName: string) {
   return envBody ? readTomlString(envBody, "OPENAI_API_KEY") : null;
 }
 
+function sameUrlOrigin(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false;
+  try {
+    // 只比较 origin（协议+host+端口），已保存 base_url 可能带路径。
+    return new URL(left).origin === new URL(right).origin;
+  } catch {
+    return false;
+  }
+}
+
+// 仅当请求 baseUrl 与已保存 base_url 同源时才复用落盘 API Key，
+// 防止 renderer 传入任意 baseUrl 把保存的 Key 以 Bearer 外发到第三方 origin。
+async function resolveSavedProviderApiKeyForBaseUrl(raw: string, providerName: string, requestedBaseUrl: string) {
+  const body = readTomlSectionBody(raw, `providers.${toTomlTableKey(providerName)}`);
+  if (body && sameUrlOrigin(readTomlString(body, "base_url"), requestedBaseUrl)) {
+    const savedKey = resolveExistingManagedApiKey(raw, providerName);
+    if (savedKey) return savedKey;
+  }
+  const savedProvider = (await kimiCodeHost.getConfig({ reload: true }).catch(() => null))?.providers?.[providerName];
+  if (savedProvider && sameUrlOrigin(savedProvider.baseUrl, requestedBaseUrl)) {
+    return savedProvider.apiKey?.trim() || savedProvider.env?.OPENAI_API_KEY?.trim() || null;
+  }
+  return null;
+}
+
 function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
   const maxContextSize = normalizeOpenAiProviderContextSize(config);
   const disableAdaptiveThinking = `${config.providerName} ${config.baseUrl} ${config.model}`.toLowerCase().includes("deepseek");
@@ -1531,6 +1558,12 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
       },
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),
     });
+    // SDK 的 deepMerge 跳过 undefined、patch schema 拒绝 null，无法经 setConfig 删除已落盘的
+    // default_effort（...existing 会把旧值原样带回）；用户选「不设置」时直接改文件清除，
+    // 与下方 TOML fallback 的 removeTomlSectionValue 语义对齐。
+    if (supportEfforts !== undefined && !defaultEffort) {
+      clearPersistedDefaultEffort(config.modelAlias);
+    }
     if (config.makeDefault) return await readKimiModelConfigAfterSdkSet(config.modelAlias);
     return await readKimiModelConfigWithSdk();
   } catch (error) {
@@ -1568,6 +1601,16 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
     fs.writeFileSync(configPath, next, "utf-8");
     return readKimiModelConfig();
   }
+}
+
+function clearPersistedDefaultEffort(modelAlias: string) {
+  const configPath = getKimiPaths().config;
+  if (!fs.existsSync(configPath)) return;
+  const raw = fs.readFileSync(configPath, "utf-8");
+  const next = removeTomlSectionValue(raw, `models.${toTomlTableKey(modelAlias)}`, "default_effort");
+  if (next === raw) return;
+  backupFileIfExists(configPath);
+  fs.writeFileSync(configPath, next, "utf-8");
 }
 
 function saveOpenAiProviderConfig(input: unknown) {
@@ -1793,11 +1836,7 @@ async function testOpenAiProviderConfig(input: unknown) {
   const config = TestOpenAiProviderConfigSchema.parse(input);
   const configPath = getKimiPaths().config;
   const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
-  let apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(current, config.providerName);
-  if (!apiKey) {
-    const savedProvider = (await kimiCodeHost.getConfig({ reload: true }).catch(() => null))?.providers?.[config.providerName];
-    apiKey = savedProvider?.apiKey?.trim() || savedProvider?.env?.OPENAI_API_KEY?.trim() || null;
-  }
+  const apiKey = config.apiKey?.trim() || await resolveSavedProviderApiKeyForBaseUrl(current, config.providerName, config.baseUrl);
   if (!apiKey) throw new Error("API Key 为空，无法测试 Provider。");
   const kimiPath = await requireKimiExecutable();
   // 把测试会话隔离到临时 KIMI_CODE_HOME，避免污染用户真实会话历史和当前项目侧栏。
@@ -1847,11 +1886,7 @@ async function discoverProviderModels(input: unknown) {
   const config = DiscoverProviderModelsSchema.parse(input);
   const configPath = getKimiPaths().config;
   const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
-  let apiKey = config.apiKey?.trim() || resolveExistingManagedApiKey(current, config.providerName);
-  if (!apiKey) {
-    const savedProvider = (await kimiCodeHost.getConfig({ reload: true }).catch(() => null))?.providers?.[config.providerName];
-    apiKey = savedProvider?.apiKey?.trim() || savedProvider?.env?.OPENAI_API_KEY?.trim() || null;
-  }
+  const apiKey = config.apiKey?.trim() || await resolveSavedProviderApiKeyForBaseUrl(current, config.providerName, config.baseUrl);
   if (!apiKey) throw new Error("API Key 为空，无法探测模型列表。");
   return discoverOpenAiModels({ baseUrl: config.baseUrl, apiKey });
 }
@@ -5776,24 +5811,45 @@ function isImageUnsupportedError(error: unknown): boolean {
   return /unknown variant [`'"]image_url[`'"]|expected [`'"]text[`'"]|image_url.*not supported|does not support images/i.test(text);
 }
 
+// 视频对等链路：只匹配明确指向 video_url 的报错，避免把图片能力误标；
+// 泛化的 expected `text` 仍走 isImageUnsupportedError，此时重试会把视频一并剥离，不再是注定失败的发送。
+function isVideoUnsupportedError(error: unknown): boolean {
+  const text = typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
+  return /unknown variant [`'"]video_url[`'"]|video_url.*not supported|does not support videos?/i.test(text);
+}
+
 installNonVisionFetchInterceptor();
 
 function adaptPromptForModel(
   content: string,
   images: { name: string; dataUrl: string }[],
+  videos: { name: string; dataUrl?: string; fileId?: string }[],
   model: string | undefined,
 ) {
-  if (images.length === 0 || modelSupportsImages(model)) {
-    return { content, images };
+  let nextContent = content;
+  let nextImages = images;
+  let nextVideos = videos;
+  if (nextImages.length > 0 && !modelSupportsImages(model)) {
+    const imageLines = nextImages.map((image, index) => `${index + 1}. [图片: ${image.name}]`);
+    nextContent = [
+      nextContent.trim(),
+      "图片：",
+      ...imageLines,
+      "",
+    ].filter(Boolean).join("\n");
+    nextImages = [];
   }
-  const imageLines = images.map((image, index) => `${index + 1}. [图片: ${image.name}]`);
-  const nextContent = [
-    content.trim(),
-    "图片：",
-    ...imageLines,
-    "",
-  ].filter(Boolean).join("\n");
-  return { content: nextContent, images: [] };
+  if (nextVideos.length > 0 && !modelSupportsVideos(model)) {
+    const videoLines = nextVideos.map((video, index) => `${index + 1}. [视频: ${video.name}]`);
+    nextContent = [
+      nextContent.trim(),
+      "视频：",
+      ...videoLines,
+      "",
+    ].filter(Boolean).join("\n");
+    nextVideos = [];
+  }
+  return { content: nextContent, images: nextImages, videos: nextVideos };
 }
 
 function parseKimiCodeImages(value: unknown) {
@@ -5927,21 +5983,31 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
     if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
-    const trySend = async (promptContent: string, promptImages: { name: string; dataUrl: string }[]) => {
-      const input = toKimiCodePromptInput(promptContent, promptImages, videos);
+    const trySend = async (
+      promptContent: string,
+      promptImages: { name: string; dataUrl: string }[],
+      promptVideos: { name: string; dataUrl?: string; fileId?: string }[],
+    ) => {
+      const input = toKimiCodePromptInput(promptContent, promptImages, promptVideos);
       const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
       const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
       return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);
     };
-    const adapted = adaptPromptForModel(content, images, model);
+    const adapted = adaptPromptForModel(content, images, videos, model);
     try {
-      const data = await trySend(adapted.content, adapted.images);
+      const data = await trySend(adapted.content, adapted.images, adapted.videos);
       return { success: true, data };
     } catch (err) {
+      if (adapted.videos.length > 0 && isVideoUnsupportedError(err)) {
+        markModelAsNonVideo(model);
+        const fallback = adaptPromptForModel(content, images, videos, model);
+        const data = await trySend(fallback.content, fallback.images, fallback.videos);
+        return { success: true, data };
+      }
       if (isImageUnsupportedError(err)) {
         markModelAsNonVision(model);
-        const fallback = adaptPromptForModel(content, images, model);
-        const data = await trySend(fallback.content, fallback.images);
+        const fallback = adaptPromptForModel(content, images, videos, model);
+        const data = await trySend(fallback.content, fallback.images, fallback.videos);
         return { success: true, data };
       }
       throw err;
@@ -5996,15 +6062,21 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     const videos = parseKimiCodeVideos(req.videos);
     if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const steerModel = kimiCodeHost.getSessionModel(sessionId);
-    const steerAdapted = adaptPromptForModel(content, images, steerModel);
+    const steerAdapted = adaptPromptForModel(content, images, videos, steerModel);
     try {
-      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, videos));
+      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, steerAdapted.videos));
       return { success: true, data: undefined };
     } catch (err) {
+      if (steerAdapted.videos.length > 0 && isVideoUnsupportedError(err)) {
+        markModelAsNonVideo(steerModel);
+        const fallback = adaptPromptForModel(content, images, videos, steerModel);
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos));
+        return { success: true, data: undefined };
+      }
       if (isImageUnsupportedError(err)) {
         markModelAsNonVision(steerModel);
-        const fallback = adaptPromptForModel(content, images, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, videos));
+        const fallback = adaptPromptForModel(content, images, videos, steerModel);
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos));
         return { success: true, data: undefined };
       }
       throw err;
@@ -6583,11 +6655,18 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
         () => sessionHistory.getSessionHistory(workDir, sessionId),
       );
       // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
-      const events = history.source === "server"
-        ? mergeHistoryStatusEventsByTime(history.events, (await sessionHistory.getSessionHistory(workDir, sessionId))
-          .filter((event) => event.type === "StatusUpdate"
-            && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>))))
-        : history.events;
+      let events = history.events;
+      if (history.source === "server") {
+        try {
+          const statusEvents = (await sessionHistory.getSessionHistory(workDir, sessionId))
+            .filter((event) => event.type === "StatusUpdate"
+              && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>)));
+          events = mergeHistoryStatusEventsByTime(history.events, statusEvents);
+        } catch (hydrationError) {
+          // wire 镜像在 existsSync 与流读取之间可能被删/独占，水合失败不应拖垮完好的 server 快照
+          console.warn("[kimi-code] loadSession wire hydration failed, falling back to unmerged server events:", hydrationError);
+        }
+      }
       return { success: true, data: { sessionId, events, source: history.source } };
     }
     const events = await sessionHistory.getSessionHistory(workDir, sessionId);

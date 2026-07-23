@@ -2,6 +2,7 @@ import type { TimelineEvent, TodoItem, UserMessageImage } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
+import { stripForcedSubagentDirective } from "./forcedSubagentPrompt";
 import { logEvent } from "@/utils/reportError";
 import { preferPositiveMetric } from "@/utils/sessionMetrics";
 import { normalizePathForComparison } from "./pathCase";
@@ -745,9 +746,9 @@ function appendAroundTrailingSteer(existing: TimelineEvent[], additions: Timelin
   return [...existing, ...additions];
 }
 
-function createTodoEvent(items: TodoItem[], timestamp: number): TimelineEvent | null {
+function createTodoEvent(items: TodoItem[], timestamp: number, sourceId: string): TimelineEvent | null {
   return {
-    id: generateId(),
+    id: derivedEventId(sourceId, "todo"),
     type: "todo",
     timestamp,
     items,
@@ -933,6 +934,10 @@ export function stripLegacyKimixClarificationWrapper(content: string): string {
 function stripKimixClarificationInstruction(content: string): string {
   const withoutRoomContext = stripRoomContextFromPrompt(content);
   if (withoutRoomContext !== content) return stripKimixClarificationInstruction(withoutRoomContext);
+  // 强制委派指令只注入 wire 内容，不属于用户可见原文；与其他 Kimix 包装一样剥离，
+  // 否则历史回放的气泡、本地媒体匹配和房间消息绑定都会因文本不一致而失效。
+  const withoutForcedDirective = stripForcedSubagentDirective(content);
+  if (withoutForcedDirective !== content) return stripKimixClarificationInstruction(withoutForcedDirective);
   if (content.startsWith("【Kimix Hooks 上下文】")) {
     const markerIndex = content.indexOf(HOOK_CONTEXT_MARKER);
     if (markerIndex === -1) return "";
@@ -1164,6 +1169,23 @@ function shouldPreserveLocalUserImages(
   incoming: Extract<TimelineEvent, { type: "user_message" }>,
 ) {
   return hasDisplayableImages(local.images) && !hasDisplayableImages(incoming.images);
+}
+
+/**
+ * 本地回显与 canonical 回放的媒体引用形式不同（本地 dataUrl vs canonical fileId/url），
+ * 签名必然不等；按「媒体数量 + kind + 位置」兜底视为同一条消息。仅在本地媒体可展示时
+ * 才允许用该兜底保住本地回显，否则放行 canonical，避免把播放不了的本地气泡留在时间线上。
+ */
+function hasSameUserMediaShape(
+  local: Extract<TimelineEvent, { type: "user_message" }>,
+  incoming: Extract<TimelineEvent, { type: "user_message" }>,
+): boolean {
+  const localImages = local.images ?? [];
+  const incomingImages = incoming.images ?? [];
+  if (localImages.length === 0 || localImages.length !== incomingImages.length) return false;
+  return hasDisplayableImages(local.images) && localImages.every((image, index) => (
+    (image.kind ?? "image") === (incomingImages[index].kind ?? "image")
+  ));
 }
 
 function readTimestampCandidate(value: unknown): number | null {
@@ -1707,6 +1729,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
             if (getUserImageSignature(lastUser) === getUserImageSignature(incoming)) {
               return existing;
             }
+            // 纯媒体消息（如纯视频）：canonical 回放带 fileId/url 可展示，本地回显带
+            // dataUrl，签名必然不等；按媒体形状兜底，避免同一条消息重复出泡。
+            if (hasSameUserMediaShape(lastUser, incoming)) {
+              return existing;
+            }
           }
         }
       }
@@ -1727,6 +1754,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
 
   const withScopedSubagentEvent = attachScopedEventToSubagent(existing, incoming);
   if (withScopedSubagentEvent) return withScopedSubagentEvent;
+
+  // 带非 main agentId 的事件只属于对应子代理卡片；无卡可挂（卡片尚未到达或已丢失）
+  // 时丢弃，绝不落入下方无 scope 的通用合并，把子代理内容拼进主 turn。
+  if (incoming.type !== "subagent" && scopedAgentId(incoming)) {
+    logEvent("eventMapper.scopedEventWithoutSubagentCard", {
+      agentId: scopedAgentId(incoming),
+      eventType: incoming.type,
+      eventId: incoming.id,
+    });
+    return existing;
+  }
 
   // Merge streaming assistant messages
   if (incoming.type === "assistant_message") {
@@ -2055,9 +2093,14 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const callIndex = result.findLastIndex(
       (e) => e.type === "tool_call" && e.toolCallId === incoming.toolCallId
     );
+    // 派生事件（diff/change_summary/todo）的来源键必须稳定：live 帧的 incoming.id
+    // 每帧都是 generateId()，快照/缓存回放又是另一套 id，只有 toolCallId 在两种
+    // 来源间一致，upsert 才能靠 sameDerivedToolEvent 的 id 判等滤掉旧派生事件。
+    // toolCallId 缺失时退回 incoming.id，保持原有的时间戳+签名兜底。
+    const derivedSourceId = incoming.toolCallId || incoming.id;
     const diffEvent = incoming.display?.diff
       ? {
-          id: derivedEventId(incoming.id, "diff"),
+          id: derivedEventId(derivedSourceId, "diff"),
           type: "diff" as const,
           timestamp: incoming.timestamp,
           filePath: incoming.display.diff.path,
@@ -2069,8 +2112,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           dispatchAttemptId: incoming.dispatchAttemptId,
         }
       : null;
-    const changeEvent = diffEvent ? createChangeSummaryFromDiff(diffEvent, incoming.id) : null;
-    const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp) : null;
+    const changeEvent = diffEvent ? createChangeSummaryFromDiff(diffEvent, derivedSourceId) : null;
+    const todoEvent = incoming.display?.todo ? createTodoEvent(incoming.display.todo, incoming.timestamp, derivedSourceId) : null;
     const displayEvents = [...(changeEvent ? [changeEvent] : []), ...(diffEvent ? [diffEvent] : []), ...(todoEvent ? [todoEvent] : [])];
     if (callIndex !== -1) {
       const call = result[callIndex] as Extract<TimelineEvent, { type: "tool_call" }>;
@@ -2092,7 +2135,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         durationMs: isRecoveryInterruption ? undefined : Math.max(0, incoming.timestamp - call.timestamp),
       };
       const fallbackChangeEvent = displayEvents.length === 0
-        ? createChangeSummaryFromToolCall(call, incoming.timestamp, incoming.id)
+        ? createChangeSummaryFromToolCall(call, incoming.timestamp, derivedSourceId)
         : null;
       const merged = upsertDerivedToolEvents(result, incoming.toolCallId, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
       const updatedCallIndex = merged.findIndex((event) => event.type === "tool_call" && event.toolCallId === incoming.toolCallId);

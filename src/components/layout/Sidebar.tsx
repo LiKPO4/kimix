@@ -13,7 +13,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { compareSessionsByRecentConversation, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
-import { mergeMissingLatestCanonicalAssistant, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
+import { backfillTurnModelsFromUsageStatuses, mergeMissingLatestCanonicalAssistant, mergeMissingUsageStatusEvents, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { reportError } from "@/utils/reportError";
@@ -720,11 +720,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         { sessionId: session.id, reason: "sidebar-select" },
       );
       const hydratedEvents = canonicalAdopted
-        ? events
-        : mergeMissingLatestCanonicalAssistant(
-          current.events,
+        ? backfillTurnModelsFromUsageStatuses(events)
+        : mergeMissingUsageStatusEvents(
+          mergeMissingLatestCanonicalAssistant(
+            current.events,
+            events,
+            { sessionId: session.id, reason: "sidebar-select" },
+          ),
           events,
-          { sessionId: session.id, reason: "sidebar-select" },
         );
       return {
         ...hydrateSessionModel(

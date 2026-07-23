@@ -303,4 +303,54 @@ describe("ModelProviderManager", () => {
     expect(onConfigChange).toHaveBeenCalledWith(savedConfig, "已保存 Provider 模型");
     await act(async () => root.unmount());
   });
+
+  it("re-enables the panel when model discovery rejects at the IPC level", async () => {
+    const discoverKimiProviderModels = vi.fn().mockRejectedValue(new Error("ipc broken"));
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { discoverKimiProviderModels },
+    });
+    const { container, root } = await renderManager(emptyProviderConfig);
+
+    const discoverButton = buttonByText(container, "探测模型") as HTMLButtonElement;
+    expect(discoverButton.disabled).toBe(false);
+    await act(async () => discoverButton.click());
+
+    expect(discoverKimiProviderModels).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("模型探测失败：ipc broken");
+    expect((buttonByText(container, "探测模型") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => root.unmount());
+  });
+
+  it("closes the removal dialog and re-enables actions when removal rejects at the IPC level", async () => {
+    const modelA = {
+      alias: "gateway/model-a",
+      provider: "gateway",
+      model: "model-a",
+      displayName: "gateway/model-a",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+      supportEfforts: null,
+      defaultEffort: null,
+    };
+    const modelB = { ...modelA, alias: "gateway/model-b", model: "model-b", displayName: "gateway/model-b", isDefault: false };
+    const beforeDelete: KimiModelConfigSummary = { ...emptyProviderConfig, defaultModel: modelA.alias, models: [modelA, modelB] };
+    const removeKimiModelConfig = vi.fn().mockRejectedValue(new Error("ipc broken"));
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { removeKimiModelConfig },
+    });
+    const { container, root } = await renderManager(beforeDelete);
+
+    const removeButton = container.querySelector('button[aria-label="删除 gateway/model-b"]') as HTMLButtonElement;
+    await act(async () => removeButton.click());
+    await act(async () => buttonByText(document.body, "确认删除")?.click());
+
+    expect(removeKimiModelConfig).toHaveBeenCalledWith({ modelAlias: "gateway/model-b" });
+    expect(container.textContent).toContain("删除失败：ipc broken");
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    expect((container.querySelector('button[aria-label="删除 gateway/model-b"]') as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => root.unmount());
+  });
 });

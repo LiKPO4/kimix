@@ -423,6 +423,137 @@ describe("buildRenderItems usage footer", () => {
     expect(failedAssistant.changeSummary).toBeUndefined();
   });
 
+  it("moves the sibling diff of a late historical change summary back to its source turn", () => {
+    const items = buildRenderItems([{
+      id: "user-old-change",
+      type: "user_message",
+      timestamp: 1,
+      content: "修改文件",
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "assistant-old-change",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "修改完成",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "user-new-turn",
+      type: "user_message",
+      timestamp: 10,
+      content: "继续检查",
+      agentTurnId: "turn-new-turn",
+    }, {
+      id: "assistant-new-turn",
+      type: "assistant_message",
+      timestamp: 12,
+      content: "第二轮回复",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-new-turn",
+    }, {
+      // Misplaced persistence: the summary and its sibling diff/todo belong to
+      // the first turn but landed after the second user boundary.
+      id: "result-1:change-summary",
+      type: "change_summary",
+      timestamp: 3,
+      files: [{ path: "src/a.ts", additions: 1, deletions: 1, diffEventId: "result-1:diff" }],
+      additions: 1,
+      deletions: 1,
+    }, {
+      id: "result-1:diff",
+      type: "diff",
+      timestamp: 3,
+      filePath: "src/a.ts",
+      oldText: "before",
+      newText: "after",
+    }, {
+      id: "result-1:todo",
+      type: "todo",
+      timestamp: 3,
+      items: [{ id: "todo-1", content: "跟进修改", status: "pending" }],
+    }], "kimi-code");
+
+    const oldAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "修改完成"
+    ));
+    const newAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "第二轮回复"
+    ));
+    expect(oldAssistant?.type).toBe("event");
+    expect(newAssistant?.type).toBe("event");
+    if (oldAssistant?.type !== "event" || newAssistant?.type !== "event") return;
+    expect(oldAssistant.changeSummary?.files.map((file) => file.path)).toEqual(["src/a.ts"]);
+    expect(newAssistant.changeSummary).toBeUndefined();
+    // The sibling diff must not stay behind as a standalone card of the newer turn.
+    expect(items.some((item) => item.type === "change_group")).toBe(false);
+  });
+
+  it("matches the sibling diff by timestamp and path when the summary lacks a diffEventId", () => {
+    const items = buildRenderItems([{
+      id: "user-old-change",
+      type: "user_message",
+      timestamp: 1,
+      content: "修改文件",
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "assistant-old-change",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "修改完成",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-old-change",
+    }, {
+      id: "user-new-turn",
+      type: "user_message",
+      timestamp: 10,
+      content: "继续检查",
+      agentTurnId: "turn-new-turn",
+    }, {
+      id: "assistant-new-turn",
+      type: "assistant_message",
+      timestamp: 12,
+      content: "第二轮回复",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "turn-new-turn",
+    }, {
+      id: "legacy-summary",
+      type: "change_summary",
+      timestamp: 3,
+      files: [{ path: "src/a.ts", additions: 5, deletions: 2 }],
+      additions: 5,
+      deletions: 2,
+    }, {
+      id: "legacy-diff",
+      type: "diff",
+      timestamp: 3,
+      filePath: "src/a.ts",
+      oldText: "before",
+      newText: "after",
+    }, {
+      // A genuinely newer diff must stay as a standalone card of the second turn.
+      id: "other-turn-diff",
+      type: "diff",
+      timestamp: 11,
+      filePath: "src/b.ts",
+      oldText: "x",
+      newText: "y",
+    }], "kimi-code");
+
+    const oldAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "修改完成"
+    ));
+    expect(oldAssistant?.type).toBe("event");
+    if (oldAssistant?.type !== "event") return;
+    expect(oldAssistant.changeSummary?.files.map((file) => file.path)).toEqual(["src/a.ts"]);
+    const changeGroupIds = items.filter((item) => item.type === "change_group")
+      .map((item) => (item.type === "change_group" ? item.id : ""));
+    expect(changeGroupIds).toEqual(["diff-group-other-turn-diff"]);
+  });
+
   it("keeps the Assistant header during the primary room send-to-first-model-event gap", () => {
     const primaryAgentId = "room-agent:primary";
     const items = buildRenderItems([{

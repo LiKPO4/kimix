@@ -4,7 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
-import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { KimiCodeServerModelCatalog, KimiCodeSubagentRoutingResponse, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -1229,12 +1229,35 @@ export function Composer() {
     const agent = latest ? getRoomAgent(latest, roomAgentId, permissionMode) : null;
     const routing = agent ? resolveSubagentRoutingToApply(agent) : null;
     if (!latest || !agent || !routing) return;
-    const response = await window.api.setKimiCodeSubagentRouting({
-      sessionId: runtimeSessionId,
-      modelAlias: routing.modelAlias ?? undefined,
-      thinkingEffort: routing.thinkingEffort ?? undefined,
-    });
-    if (!response.success) throw new Error(`应用子 Agent 配置失败：${response.error}`);
+    let response: KimiCodeSubagentRoutingResponse;
+    try {
+      response = await window.api.setKimiCodeSubagentRouting({
+        sessionId: runtimeSessionId,
+        modelAlias: routing.modelAlias ?? undefined,
+        thinkingEffort: routing.thinkingEffort ?? undefined,
+      });
+    } catch (error) {
+      response = { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    if (!response.success) {
+      // Subagent routing is an enhancement, not a send prerequisite. A failed
+      // replay (e.g. the server defers the config while a turn is running) must
+      // not block or fail the prompt; the desired routing stays recorded and is
+      // retried on the next send.
+      console.warn(`[Composer] 应用子 Agent 配置失败（不影响发送）：${response.error}`);
+      window.api.writeDiag?.({
+        message: "[Composer] subagentRouting",
+        data: {
+          stage: "replay:skipped",
+          at: Date.now(),
+          uiSessionId,
+          roomAgentId,
+          runtimeSessionId,
+          error: response.error,
+        },
+      }).catch(logError("writeDiag"));
+      return;
+    }
     const timestamp = Date.now();
     updateSession(uiSessionId, (session) => ({
       ...recordAppliedSubagentRouting(session, roomAgentId, response.data, permissionMode),
@@ -3459,6 +3482,18 @@ export function Composer() {
           error: res.error,
         });
         if (isKimiCodeSessionUnavailableError(res.error)) {
+          // Keep the mode locally so the next send actually uses it: the resume
+          // replay reads the per-agent mode (room path) or the global mode (main
+          // path). Mirrors the thinking/plan branches, which keep their local
+          // writes on this same session-unavailable path.
+          if (targetSession && ownerId) {
+            updateSession(targetSession.id, (session) => ({
+              ...updateRoomMutationOwner(session, ownerId, (agent) => ({ ...agent, permissionMode: mode }), previousMode),
+              updatedAt: Date.now(),
+            }));
+            syncCurrentSessionFromStore(targetSession.id);
+          }
+          if (!targetSession?.collaboration) setPermissionMode(mode);
           const modeLabel = PERMISSION_OPTIONS.find((opt) => opt.value === mode)?.label ?? mode;
           window.dispatchEvent(new CustomEvent("kimix:toast", {
             detail: `权限已设为${modeLabel}，将在下次发消息时生效`,

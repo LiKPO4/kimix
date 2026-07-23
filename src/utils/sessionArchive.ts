@@ -292,6 +292,7 @@ export function detachRoomAgentAsSession(
     subagentModelAlias: agent.subagentModelAlias,
     subagentThinkingEffort: agent.subagentThinkingEffort,
     subagentRoutingDesired: agent.subagentRoutingDesired,
+    subagentForceInvoke: agent.subagentForceInvoke,
     model: agent.modelAlias,
     modelSwitchedAt: agent.modelSwitchedAt,
     switchedToModel: agent.switchedToModel,

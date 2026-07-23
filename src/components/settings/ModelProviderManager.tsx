@@ -222,14 +222,19 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleLoadCatalog = async () => {
     setCatalogLoading(true);
     setMessage("正在载入官方 Provider 目录...");
-    const res = await window.api.listKimiProviderCatalog();
-    setCatalogLoading(false);
-    if (!res.success) {
-      setMessage(`目录载入失败：${res.error}`);
-      return;
+    try {
+      const res = await window.api.listKimiProviderCatalog();
+      if (!res.success) {
+        setMessage(`目录载入失败：${res.error}`);
+        return;
+      }
+      setCatalog(res.data.providers);
+      setMessage(`已载入 ${res.data.providers.length} 个 OpenAI-compatible Provider。`);
+    } catch (error) {
+      setMessage(`目录载入失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setCatalogLoading(false);
     }
-    setCatalog(res.data.providers);
-    setMessage(`已载入 ${res.data.providers.length} 个 OpenAI-compatible Provider。`);
   };
 
   const handleCatalogProvider = (providerId: string) => {
@@ -257,21 +262,28 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }
     setBusyAction("discover");
     setMessage("正在从 Base URL 探测可用模型...");
-    const res = await window.api.discoverKimiProviderModels({
-      providerName: providerDraft.providerName.trim(),
-      baseUrl: providerDraft.baseUrl.trim(),
-      apiKey: providerDraft.apiKey.trim() || undefined,
-    });
-    setBusyAction(null);
-    if (!res.success) {
+    try {
+      const res = await window.api.discoverKimiProviderModels({
+        providerName: providerDraft.providerName.trim(),
+        baseUrl: providerDraft.baseUrl.trim(),
+        apiKey: providerDraft.apiKey.trim() || undefined,
+      });
+      if (!res.success) {
+        setDiscoveredModels([]);
+        setDiscoveredEndpoint("");
+        setMessage(`模型探测失败：${res.error}`);
+        return;
+      }
+      setDiscoveredModels(res.data.models);
+      setDiscoveredEndpoint(res.data.endpoint);
+      setMessage(`已从接口发现 ${res.data.models.length} 个模型，请直接选择。`);
+    } catch (error) {
       setDiscoveredModels([]);
       setDiscoveredEndpoint("");
-      setMessage(`模型探测失败：${res.error}`);
-      return;
+      setMessage(`模型探测失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
     }
-    setDiscoveredModels(res.data.models);
-    setDiscoveredEndpoint(res.data.endpoint);
-    setMessage(`已从接口发现 ${res.data.models.length} 个模型，请直接选择。`);
   };
 
   const handleDiscoveredModel = (modelId: string) => {
@@ -293,20 +305,24 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }
     setBusyAction("provider");
     setMessage("正在保存供应商连接配置...");
-    const res = await window.api.saveKimiProvider({
-      providerName: providerDraft.providerName.trim(),
-      baseUrl: providerDraft.baseUrl.trim(),
-      apiKey: providerDraft.apiKey.trim() || undefined,
-    });
-    if (!res.success) {
+    try {
+      const res = await window.api.saveKimiProvider({
+        providerName: providerDraft.providerName.trim(),
+        baseUrl: providerDraft.baseUrl.trim(),
+        apiKey: providerDraft.apiKey.trim() || undefined,
+      });
+      if (!res.success) {
+        setMessage(`保存失败：${res.error}`);
+        return;
+      }
+      const providerName = providerDraft.providerName.trim();
+      setSelectedProviderName(providerName);
+      await applyConfigResult(res.data, "已保存 Provider 连接配置");
+    } catch (error) {
+      setMessage(`保存失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
       setBusyAction(null);
-      setMessage(`保存失败：${res.error}`);
-      return;
     }
-    const providerName = providerDraft.providerName.trim();
-    setSelectedProviderName(providerName);
-    await applyConfigResult(res.data, "已保存 Provider 连接配置");
-    setBusyAction(null);
   };
 
   const handleToggleEffort = (effort: string) => {
@@ -332,22 +348,26 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }
     setBusyAction("model");
     setMessage("正在保存模型...");
-    const res = await window.api.saveKimiProviderModel({
-      providerName: selectedGroup.provider.name,
-      modelAlias: modelDraft.modelAlias.trim(),
-      model: modelDraft.model.trim(),
-      maxContextSize: contextSize,
-      supportEfforts: modelDraft.supportEfforts,
-      defaultEffort: modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : null,
-    });
-    if (!res.success) {
+    try {
+      const res = await window.api.saveKimiProviderModel({
+        providerName: selectedGroup.provider.name,
+        modelAlias: modelDraft.modelAlias.trim(),
+        model: modelDraft.model.trim(),
+        maxContextSize: contextSize,
+        supportEfforts: modelDraft.supportEfforts,
+        defaultEffort: modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : null,
+      });
+      if (!res.success) {
+        setMessage(`模型保存失败：${res.error}`);
+        return;
+      }
+      setSelectedModelAlias(modelDraft.modelAlias.trim());
+      await applyConfigResult(res.data, "已保存 Provider 模型");
+    } catch (error) {
+      setMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
       setBusyAction(null);
-      setMessage(`模型保存失败：${res.error}`);
-      return;
     }
-    setSelectedModelAlias(modelDraft.modelAlias.trim());
-    await applyConfigResult(res.data, "已保存 Provider 模型");
-    setBusyAction(null);
   };
 
   const handleTestProvider = async () => {
@@ -361,41 +381,56 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }
     setBusyAction("test");
     setMessage("正在用当前模型测试连接...");
-    const res = await window.api.testKimiOpenAiProvider({
-      providerName: providerDraft.providerName.trim(),
-      baseUrl: providerDraft.baseUrl.trim(),
-      apiKey: providerDraft.apiKey.trim() || undefined,
-      modelAlias,
-      model,
-      maxContextSize: contextSize,
-    });
-    setBusyAction(null);
-    setMessage(res.success ? `测试通过：${res.data.output || res.data.message}` : `测试失败：${res.error}`);
+    try {
+      const res = await window.api.testKimiOpenAiProvider({
+        providerName: providerDraft.providerName.trim(),
+        baseUrl: providerDraft.baseUrl.trim(),
+        apiKey: providerDraft.apiKey.trim() || undefined,
+        modelAlias,
+        model,
+        maxContextSize: contextSize,
+      });
+      setMessage(res.success ? `测试通过：${res.data.output || res.data.message}` : `测试失败：${res.error}`);
+    } catch (error) {
+      setMessage(`测试失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const handleSetDefault = async (modelAlias: string) => {
     setBusyAction("default");
-    const res = await window.api.setKimiDefaultModel({ modelAlias });
-    setBusyAction(null);
-    if (!res.success) {
-      setMessage(`切换失败：${res.error}`);
-      return;
+    try {
+      const res = await window.api.setKimiDefaultModel({ modelAlias });
+      if (!res.success) {
+        setMessage(`切换失败：${res.error}`);
+        return;
+      }
+      await applyConfigResult(res.data, "已切换使用模型");
+    } catch (error) {
+      setMessage(`切换失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
     }
-    await applyConfigResult(res.data, "已切换使用模型");
   };
 
   const handleToggleThinking = async (model: KimiModelAliasSummary) => {
     setBusyAction("thinking");
-    const res = await window.api.setKimiModelAdaptiveThinking({
-      modelAlias: model.alias,
-      adaptiveThinking: !Boolean(model.adaptiveThinking),
-    });
-    setBusyAction(null);
-    if (!res.success) {
-      setMessage(`更新思考设置失败：${res.error}`);
-      return;
+    try {
+      const res = await window.api.setKimiModelAdaptiveThinking({
+        modelAlias: model.alias,
+        adaptiveThinking: !Boolean(model.adaptiveThinking),
+      });
+      if (!res.success) {
+        setMessage(`更新思考设置失败：${res.error}`);
+        return;
+      }
+      await applyConfigResult(res.data, "已更新自适应思考");
+    } catch (error) {
+      setMessage(`更新思考设置失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
     }
-    await applyConfigResult(res.data, "已更新自适应思考");
   };
 
   const handleRemoveModel = (model: KimiModelAliasSummary) => {
@@ -412,31 +447,41 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     if (!target) return;
     if (target.type === "model") {
       setBusyAction("remove-model");
-      const res = await window.api.removeKimiModelConfig({ modelAlias: target.model.alias });
-      if (!res.success) {
-        setBusyAction(null);
+      try {
+        const res = await window.api.removeKimiModelConfig({ modelAlias: target.model.alias });
+        if (!res.success) {
+          setRemovalTarget(null);
+          setMessage(`删除失败：${res.error}`);
+          return;
+        }
         setRemovalTarget(null);
-        setMessage(`删除失败：${res.error}`);
-        return;
+        setSelectedModelAlias("");
+        await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
+      } catch (error) {
+        setRemovalTarget(null);
+        setMessage(`删除失败：${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setBusyAction(null);
       }
-      setRemovalTarget(null);
-      setSelectedModelAlias("");
-      await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
-      setBusyAction(null);
       return;
     }
     setBusyAction("remove-provider");
-    const res = await window.api.removeKimiProviderConfig({ providerName: target.providerName });
-    if (!res.success) {
-      setBusyAction(null);
+    try {
+      const res = await window.api.removeKimiProviderConfig({ providerName: target.providerName });
+      if (!res.success) {
+        setRemovalTarget(null);
+        setMessage(`删除供应商失败：${res.error}`);
+        return;
+      }
       setRemovalTarget(null);
-      setMessage(`删除供应商失败：${res.error}`);
-      return;
+      setSelectedProviderName(chooseInitialModelProvider(res.data));
+      await applyConfigResult(res.data, "已删除 Provider 及其模型");
+    } catch (error) {
+      setRemovalTarget(null);
+      setMessage(`删除供应商失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
     }
-    setRemovalTarget(null);
-    setSelectedProviderName(chooseInitialModelProvider(res.data));
-    await applyConfigResult(res.data, "已删除 Provider 及其模型");
-    setBusyAction(null);
   };
 
   const handleSelectModel = (model: KimiModelAliasSummary) => {

@@ -93,6 +93,12 @@ export function buildUnifiedDiff(oldText = "", newText = ""): DiffLine[] {
   return diff;
 }
 
+// Beyond this many lines in the changed region, the Myers search below costs
+// O(distance^2): a Write/big-Edit rewriting thousands of lines with few shared
+// lines blocked the UI for seconds. Larger regions are reported as a wholesale
+// replacement (linear) instead of exact statistics.
+const MAX_EXACT_DIFF_REGION_LINES = 4000;
+
 export function countUnifiedDiffChanges(oldText = "", newText = "") {
   const toLines = (value: string) => {
     if (!value) return [];
@@ -107,10 +113,30 @@ export function countUnifiedDiffChanges(oldText = "", newText = "") {
   if (oldCount === 0) return { additions: newCount, deletions: 0 };
   if (newCount === 0) return { additions: 0, deletions: oldCount };
 
+  // Strip the common prefix/suffix: exact for the shared runs, and shrinks the
+  // region the quadratic search below has to inspect.
+  let prefix = 0;
+  const maxShared = Math.min(oldCount, newCount);
+  while (prefix < maxShared && oldLines[prefix] === newLines[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < maxShared - prefix && oldLines[oldCount - 1 - suffix] === newLines[newCount - 1 - suffix]) {
+    suffix += 1;
+  }
+
+  const oldMiddle = oldLines.slice(prefix, oldCount - suffix);
+  const newMiddle = newLines.slice(prefix, newCount - suffix);
+  const oldMiddleCount = oldMiddle.length;
+  const newMiddleCount = newMiddle.length;
+  if (oldMiddleCount === 0) return { additions: newMiddleCount, deletions: 0 };
+  if (newMiddleCount === 0) return { additions: 0, deletions: oldMiddleCount };
+  if (oldMiddleCount + newMiddleCount > MAX_EXACT_DIFF_REGION_LINES) {
+    return { additions: newMiddleCount, deletions: oldMiddleCount };
+  }
+
   // Myers shortest-edit-path: exact line statistics without the O(n*m)
   // matrix used by the small visual diff renderer.
   const furthest = new Map<number, number>([[1, 0]]);
-  const maxDistance = oldCount + newCount;
+  const maxDistance = oldMiddleCount + newMiddleCount;
   for (let distance = 0; distance <= maxDistance; distance += 1) {
     for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
       const down = diagonal === -distance
@@ -119,13 +145,13 @@ export function countUnifiedDiffChanges(oldText = "", newText = "") {
         ? furthest.get(diagonal + 1) ?? 0
         : (furthest.get(diagonal - 1) ?? 0) + 1;
       let newIndex = oldIndex - diagonal;
-      while (oldIndex < oldCount && newIndex < newCount && oldLines[oldIndex] === newLines[newIndex]) {
+      while (oldIndex < oldMiddleCount && newIndex < newMiddleCount && oldMiddle[oldIndex] === newMiddle[newIndex]) {
         oldIndex += 1;
         newIndex += 1;
       }
       furthest.set(diagonal, oldIndex);
-      if (oldIndex >= oldCount && newIndex >= newCount) {
-        const delta = newCount - oldCount;
+      if (oldIndex >= oldMiddleCount && newIndex >= newMiddleCount) {
+        const delta = newMiddleCount - oldMiddleCount;
         return {
           additions: (distance + delta) / 2,
           deletions: (distance - delta) / 2,
@@ -133,7 +159,7 @@ export function countUnifiedDiffChanges(oldText = "", newText = "") {
       }
     }
   }
-  return { additions: newCount, deletions: oldCount };
+  return { additions: newMiddleCount, deletions: oldMiddleCount };
 }
 
 export function collectSessionDiffs(events: TimelineEvent[]): SessionDiffEntry[] {

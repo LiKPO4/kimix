@@ -50,6 +50,38 @@ describe("countUnifiedDiffChanges", () => {
   it("does not count unchanged context around a replacement", () => {
     expect(countUnifiedDiffChanges("a\nbefore\nc", "a\nafter\nc")).toEqual({ additions: 1, deletions: 1 });
   });
+
+  it("keeps exact statistics for a small edit inside a large file", () => {
+    const oldLines = Array.from({ length: 5000 }, (_, index) => `line-${index}`);
+    const newLines = [...oldLines];
+    newLines[2500] = "changed";
+    expect(countUnifiedDiffChanges(oldLines.join("\n"), newLines.join("\n"))).toEqual({ additions: 1, deletions: 1 });
+  });
+
+  it("falls back to linear region counts for a wholesale large rewrite", () => {
+    const oldText = Array.from({ length: 6000 }, (_, index) => `old-${index}`).join("\n");
+    const newText = Array.from({ length: 6000 }, (_, index) => `new-${index}`).join("\n");
+    const startedAt = performance.now();
+    const stats = countUnifiedDiffChanges(oldText, newText);
+    const elapsedMs = performance.now() - startedAt;
+    // No shared lines: the linear fallback is still exact here, and must not
+    // pay the O(distance^2) Myers cost (~2.4s measured for 6000 replaced lines).
+    expect(stats).toEqual({ additions: 6000, deletions: 6000 });
+    expect(elapsedMs).toBeLessThan(1000);
+  });
+
+  it("reports an oversized partially-shared region as a wholesale replacement", () => {
+    const oldMiddle = Array.from({ length: 2100 }, (_, index) => `o-${index}`);
+    const newMiddle = Array.from({ length: 2150 }, (_, index) => `n-${index}`);
+    // Shared lines deep inside the region cannot be trimmed from either edge.
+    oldMiddle.splice(1000, 75, ...Array.from({ length: 75 }, (_, index) => `shared-${index}`));
+    newMiddle.splice(1200, 75, ...Array.from({ length: 75 }, (_, index) => `shared-${index}`));
+    const oldText = ["head", ...oldMiddle, "tail"].join("\n");
+    const newText = ["head", ...newMiddle, "tail"].join("\n");
+    // 2100 + 2150 exceeds the exact-search budget, so the whole region counts
+    // as replaced (exact Myers would credit the 75 shared lines instead).
+    expect(countUnifiedDiffChanges(oldText, newText)).toEqual({ additions: 2150, deletions: 2100 });
+  });
 });
 
 describe("collectSessionDiffs", () => {

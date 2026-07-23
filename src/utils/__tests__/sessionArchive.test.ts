@@ -249,6 +249,33 @@ describe("official-first session archive", () => {
     expect(resolveRoomRuntimeOwner([result.room, result.detached], "official-secondary")?.roomId).toBe(result.detached.id);
   });
 
+  it("移出 Agent 时把子代理配置（含强制唤起开关）镜像到独立会话", () => {
+    const source = room();
+    const secondary = source.collaboration!.agents[1];
+    const configured: Session = {
+      ...source,
+      collaboration: {
+        ...source.collaboration!,
+        agents: source.collaboration!.agents.map((agent) => agent.id === secondary.id ? {
+          ...agent,
+          subagentModelAlias: "openai/gpt-5-mini",
+          subagentThinkingEffort: "high",
+          subagentRoutingDesired: { modelAlias: null, thinkingEffort: "low" },
+          subagentForceInvoke: true,
+        } : agent),
+      },
+    };
+
+    const result = detachRoomAgentAsSession(configured, secondary.id, new Set([source.id]), 300);
+
+    expect(result.detached).toMatchObject({
+      subagentModelAlias: "openai/gpt-5-mini",
+      subagentThinkingEffort: "high",
+      subagentRoutingDesired: { modelAlias: null, thinkingEffort: "low" },
+      subagentForceInvoke: true,
+    });
+  });
+
   it("房间存在运行、排队或等待交互的 Agent 时阻止成员和归档身份变更", () => {
     const source = room();
     const secondary = source.collaboration!.agents[1];

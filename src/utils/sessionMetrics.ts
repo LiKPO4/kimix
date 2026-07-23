@@ -132,7 +132,7 @@ export function getLatestMetricStatus(events: TimelineEvent[]) {
 /** Statuses after the latest user message or compaction end — approximates "current window". */
 export function statusesAfterLatestContextBoundary(
   events: TimelineEvent[],
-): Extract<TimelineEvent, { type: "status_update" }>[] {
+): { statuses: Extract<TimelineEvent, { type: "status_update" }>[]; foundBoundary: boolean } {
   let boundaryIndex = -1;
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
@@ -145,9 +145,12 @@ export function statusesAfterLatestContextBoundary(
       break;
     }
   }
-  return events
-    .slice(boundaryIndex + 1)
-    .filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
+  return {
+    statuses: events
+      .slice(boundaryIndex + 1)
+      .filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update"),
+    foundBoundary: boundaryIndex >= 0,
+  };
 }
 
 export function getSessionContextUsages(session: Session | undefined): SessionContextUsage[] {
@@ -159,9 +162,11 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
       const agentEvents = getRoomAgentEvents(session, agent.id);
       // Prefer metrics after the latest user turn / compaction so a pre-compact
       // context window does not stick on the composer ring forever.
-      const statusEvents = statusesAfterLatestContextBoundary(agentEvents);
+      const { statuses: statusEvents, foundBoundary } = statusesAfterLatestContextBoundary(agentEvents);
+      // A boundary with no statuses after it yet (post-compaction / new-turn gap)
+      // means the old window is gone — never fall back to pre-boundary metrics.
       const merged = mergeMetricStatusUpdates(statusEvents)
-        ?? getLatestMetricStatus(statusEvents.length > 0 ? statusEvents : agentEvents);
+        ?? getLatestMetricStatus(statusEvents.length > 0 || foundBoundary ? statusEvents : agentEvents);
       const contextSize = preferPositiveMetric(merged?.contextSize, merged?.inputTokenCount);
       const hasContext = typeof contextSize === "number" && Number.isFinite(contextSize) && contextSize > 0;
       const reportedLimit = preferPositiveMetric(merged?.contextLimit, undefined);

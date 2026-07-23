@@ -386,6 +386,22 @@ describe("getSessionContextUsages", () => {
     }));
   });
 
+  it("does not resurrect the pre-compaction window during the post-compaction gap", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "k3",
+      events: [
+        { id: "old-usage", type: "status_update", timestamp: 1, message: "模型：k3", inputTokenCount: 90_000, tokenCount: 100, contextSize: 90_000, contextLimit: 262_144 },
+        { id: "compact", type: "compaction", timestamp: 2, phase: "end" },
+      ],
+    };
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      hasContext: false,
+      used: 0,
+      percent: 0,
+    }));
+  });
+
 });
 
 describe("shouldRecommendNewSession", () => {
@@ -416,6 +432,17 @@ describe("statusesAfterLatestContextBoundary", () => {
       { id: "u", type: "user_message", timestamp: 2, content: "hi" },
       { id: "s2", type: "status_update", timestamp: 3, inputTokenCount: 20 },
     ];
-    expect(statusesAfterLatestContextBoundary(events).map((e) => e.id)).toEqual(["s2"]);
+    const result = statusesAfterLatestContextBoundary(events);
+    expect(result.statuses.map((e) => e.id)).toEqual(["s2"]);
+    expect(result.foundBoundary).toBe(true);
+  });
+
+  it("reports no boundary when there is no user message or compaction end", () => {
+    const events: TimelineEvent[] = [
+      { id: "s1", type: "status_update", timestamp: 1, inputTokenCount: 10 },
+    ];
+    const result = statusesAfterLatestContextBoundary(events);
+    expect(result.statuses.map((e) => e.id)).toEqual(["s1"]);
+    expect(result.foundBoundary).toBe(false);
   });
 });

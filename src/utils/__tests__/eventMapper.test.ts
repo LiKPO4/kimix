@@ -3,6 +3,7 @@ import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaIn
 import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
+import { buildForcedSubagentDirective, withForcedSubagentDirective } from "../forcedSubagentPrompt";
 
 describe("mapStreamEvent", () => {
   it("returns null for non-object input", () => {
@@ -55,6 +56,52 @@ describe("mapStreamEvent", () => {
       agentTurnId: "turn:review",
       dispatchAttemptId: "attempt:review",
     });
+  });
+
+  it("strips the forced subagent directive from user input", () => {
+    const directive = buildForcedSubagentDirective({ modelLabel: "Kimi K2", maxContextSize: 262144 });
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: { user_input: withForcedSubagentDirective("请检查最新改动", directive) },
+    });
+    expect(event).toMatchObject({ type: "user_message", content: "请检查最新改动" });
+  });
+
+  it("strips the forced subagent directive nested inside room context", () => {
+    const directive = buildForcedSubagentDirective({});
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: buildRoomDeliveryPrompt(
+          withForcedSubagentDirective("请检查最新改动", directive),
+          undefined,
+          { displayName: "Reviewer", mentionName: "reviewer" },
+          {
+            roomMessageId: "message:review",
+            agentTurnId: "turn:review",
+            dispatchAttemptId: "attempt:review",
+          },
+        ),
+      },
+    });
+    expect(event).toMatchObject({
+      type: "user_message",
+      content: "请检查最新改动",
+      roomMessageId: "message:review",
+      agentTurnId: "turn:review",
+      dispatchAttemptId: "attempt:review",
+    });
+  });
+
+  it("strips the forced subagent directive left behind a hooks context wrapper", () => {
+    const directive = buildForcedSubagentDirective({});
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: `【Kimix Hooks 上下文】\n规则\n\n【用户当前消息】\n${withForcedSubagentDirective("真实用户消息", directive)}`,
+      },
+    });
+    expect(event).toMatchObject({ type: "user_message", content: "真实用户消息" });
   });
 
   it("restores server base64 image parts from TurnBegin history", () => {
@@ -427,6 +474,52 @@ describe("mergeEvents", () => {
     const user = result[0] as Extract<TimelineEvent, { type: "user_message" }>;
     expect(result).toHaveLength(1);
     expect(user.images?.[0].dataUrl).toBe("data:image/png;base64,local");
+  });
+
+  it("keeps the local echo when a pure video message replays with only a file id", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "user_message",
+        timestamp: 1,
+        content: "",
+        images: [{ kind: "video", name: "录制.mp4", dataUrl: "data:video/mp4;base64,local" }],
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "user_message",
+      timestamp: 2,
+      content: "",
+      images: [{ kind: "video", name: "视频 1", fileId: "file-video-1", mediaType: "video/mp4" }],
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    const user = result[0] as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(user.images?.[0].dataUrl).toBe("data:video/mp4;base64,local");
+  });
+
+  it("still appends a pure media echo whose media shape differs from the local message", () => {
+    const existing: TimelineEvent[] = [
+      {
+        id: "1",
+        type: "user_message",
+        timestamp: 1,
+        content: "",
+        images: [{ kind: "video", name: "录制.mp4", dataUrl: "data:video/mp4;base64,local" }],
+      },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "user_message",
+      timestamp: 2,
+      content: "",
+      images: [
+        { kind: "video", name: "视频 1", fileId: "file-video-1", mediaType: "video/mp4" },
+        { kind: "video", name: "视频 2", fileId: "file-video-2", mediaType: "video/mp4" },
+      ],
+    };
+    expect(mergeEvents(existing, incoming)).toHaveLength(2);
   });
 
   it("deduplicates delayed room user echoes by stable delivery identity", () => {
@@ -1500,6 +1593,58 @@ describe("mergeEvents", () => {
     });
   });
 
+  it("dedups derived change events across live and replayed tool results with drifted timestamps", () => {
+    const existing: TimelineEvent[] = [
+      { id: "call-1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "Edit", status: "running", arguments: {} },
+    ];
+    const liveResult: TimelineEvent = {
+      id: "live-random-1",
+      type: "tool_result",
+      timestamp: 100,
+      toolCallId: "tc-1",
+      toolName: "Edit",
+      result: "ok",
+      display: { diff: { path: "src/app.ts", oldText: "before", newText: "after\nmore" } },
+    };
+    // 同一次工具结果的快照回放：incoming.id 与 timestamp 都与 live 帧不同。
+    const replayedResult: TimelineEvent = {
+      ...liveResult,
+      id: "snapshot:msg-1:tool:tc-1:0",
+      timestamp: 105,
+    };
+
+    const once = mergeEvents(existing, liveResult);
+    const twice = mergeEvents(once, replayedResult);
+    const changes = twice.filter((event) => event.type === "change_summary");
+    const diffs = twice.filter((event) => event.type === "diff");
+    expect(changes).toHaveLength(1);
+    expect(diffs).toHaveLength(1);
+    const change = changes[0] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.additions).toBe(2);
+    expect(change.files[0].diffEventId).toBe(diffs[0].id);
+  });
+
+  it("keeps identical edits from different tool calls as separate change summaries", () => {
+    const existing: TimelineEvent[] = [
+      { id: "call-1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "Edit", status: "running", arguments: {} },
+      { id: "call-2", type: "tool_call", timestamp: 2, toolCallId: "tc-2", toolName: "Edit", status: "running", arguments: {} },
+    ];
+    const makeResult = (id: string, toolCallId: string, timestamp: number): TimelineEvent => ({
+      id,
+      type: "tool_result",
+      timestamp,
+      toolCallId,
+      toolName: "Edit",
+      result: "ok",
+      display: { diff: { path: "src/app.ts", oldText: "before", newText: "after" } },
+    });
+
+    const once = mergeEvents(existing, makeResult("r-1", "tc-1", 3));
+    const twice = mergeEvents(once, makeResult("r-2", "tc-2", 4));
+    expect(twice.filter((event) => event.type === "change_summary")).toHaveLength(2);
+    expect(twice.filter((event) => event.type === "diff")).toHaveLength(2);
+  });
+
   it("keeps an orphaned historical diff before a later user boundary", () => {
     const existing: TimelineEvent[] = [
       { id: "user-old", type: "user_message", timestamp: 1, content: "修改文件" },
@@ -1585,6 +1730,63 @@ describe("mergeEvents", () => {
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(1);
     expect((result[0] as Extract<TimelineEvent, { type: "status_update" }>).tokenCount).toBe(20);
+  });
+
+  it("drops a subagent-scoped assistant event when no matching card exists", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "主 turn 正文", isThinking: false, isComplete: false },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "assistant_message",
+      timestamp: 2,
+      agentId: "sub-1",
+      content: "子代理文本",
+      isThinking: false,
+      isComplete: false,
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("主 turn 正文");
+  });
+
+  it("still attaches a subagent-scoped event when its card exists", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "主 turn 正文", isThinking: false, isComplete: false },
+      { id: "2", type: "subagent", timestamp: 2, agentId: "sub-1", agentName: "explore", status: "running", events: [] },
+    ];
+    const incoming: TimelineEvent = {
+      id: "3",
+      type: "assistant_message",
+      timestamp: 3,
+      agentId: "sub-1",
+      content: "子代理文本",
+      isThinking: false,
+      isComplete: false,
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    const card = result[1] as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(card.events.some((event) => event.type === "assistant_message" && event.content === "子代理文本")).toBe(true);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("主 turn 正文");
+  });
+
+  it("keeps merging assistant events scoped to the main agent", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "assistant_message", timestamp: 1, content: "主", isThinking: false, isComplete: false },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "assistant_message",
+      timestamp: 2,
+      agentId: "main",
+      content: " turn",
+      isThinking: false,
+      isComplete: false,
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect((result[0] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("主 turn");
   });
 
   it("merges subagent events by agentName", () => {

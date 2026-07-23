@@ -1011,10 +1011,12 @@ export async function loadServerFile(fileId: string): Promise<{ fileId: string; 
   };
 }
 
-async function materializeVideoFileReferences(input: string | KimiCodePromptPart[]): Promise<string | KimiCodePromptPart[]> {
-  if (typeof input === "string" || !input.some((part) => part.type === "video_url" && part.videoUrl.fileId)) return input;
+export async function materializeVideoFileReferences(input: string | KimiCodePromptPart[]): Promise<string | KimiCodePromptPart[]> {
+  if (typeof input === "string" || !input.some((part) => part.type === "video_url" && part.videoUrl.fileId && !part.videoUrl.url?.startsWith("data:"))) return input;
   return Promise.all(input.map(async (part): Promise<KimiCodePromptPart> => {
-    if (part.type !== "video_url" || !part.videoUrl.fileId) return part;
+    // Retried/steered history can carry both fileId and a local data: URL; the
+    // data: URL is already sendable, so skip the redundant server download.
+    if (part.type !== "video_url" || !part.videoUrl.fileId || part.videoUrl.url?.startsWith("data:")) return part;
     const file = await loadServerFile(part.videoUrl.fileId);
     return { type: "video_url", videoUrl: { url: file.dataUrl, id: part.videoUrl.id } };
   }));
@@ -1227,7 +1229,19 @@ export async function setSubagentRouting(
   }
 
   const status = await applySubagentRoutingAtomic(managed.session, routing);
-  sdkPinnedSessionIds.add(sessionId);
+  if (hasExplicitSubagentRouting(routing) || status.swarmMode === true) {
+    // Explicit subagent overrides and active Swarm mode both require the legacy SDK route.
+    sdkPinnedSessionIds.add(sessionId);
+  } else {
+    // Override cleared back to "follow the main agent": unpin so the session can
+    // rejoin the official Server route (Markdown custom agents only work there).
+    // promoteSdkSessionToServer skips sessions mid-turn; the pin stays off either
+    // way, so the migration then lands on the next idle turn or after a restart.
+    sdkPinnedSessionIds.delete(sessionId);
+    if (!await promoteSdkSessionToServer(sessionId)) {
+      console.warn(`[KimiCodeServerHost] subagent override cleared; session ${sessionId} rejoins the Server route on the next idle turn.`);
+    }
+  }
   return normalizeSdkSessionStatus(status, managed.status);
 }
 
