@@ -605,24 +605,27 @@ describe("reconcileOfficialSessionCatalog", () => {
   });
 
   it("归档后的旧活跃目录快照不会把 Skill 会话重新复活", () => {
+    // 归档是近刚发生的（分钟级）：官方归档状态在目录中的滞后不会超过这个窗口，
+    // 旧活跃快照不得复活它（24h 误归档自愈规则不适用）。
+    const archivedAt = Date.now() - 60_000;
     const archived = localSession({
       id: "skill-leaf",
       officialSessionId: "skill-leaf",
       runtimeSessionId: "skill-leaf",
       skillForkParentSessionId: "session-parent",
-      archivedAt: 300,
-      updatedAt: 300,
+      archivedAt,
+      updatedAt: archivedAt,
     });
     const result = reconcileOfficialSessionCatalog([archived], [{
       id: "skill-leaf",
       workDir: "D:\\work\\demo",
-      updatedAt: 200,
+      updatedAt: archivedAt - 100,
       title: "/skill:game-development",
       source: "server",
       metadata: { source: "kimix-fork", forkedFrom: "session-parent" },
     }], "D:\\work\\demo", { source: "server" });
 
-    expect(result[0].archivedAt).toBe(300);
+    expect(result[0].archivedAt).toBe(archivedAt);
   });
 
   it("忽略其他项目的目录项", () => {
@@ -704,6 +707,54 @@ describe("reconcileOfficialSessionCatalog", () => {
     }], "D:\\work\\demo", { source: "sdk" });
 
     expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
+  it("Server 明确返回已归档时归档带正文的本地镜像", () => {
+    const local = localSession({
+      id: "official-archived",
+      officialSessionId: "official-archived",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "正文" }],
+    });
+    const result = reconcileOfficialSessionCatalog([local], [{
+      id: "official-archived",
+      workDir: "D:\\work\\demo",
+      updatedAt: 200,
+      archived: true,
+      source: "server",
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeTypeOf("number");
+  });
+
+  it("Server 目录缺席但带正文的本地镜像不再被归档", () => {
+    const local = localSession({
+      id: "official-gone",
+      officialSessionId: "official-gone",
+      events: [{ id: "user-1", type: "user_message", timestamp: 10, content: "正文" }],
+    });
+    const result = reconcileOfficialSessionCatalog([local], [], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeUndefined();
+  });
+
+  it("本地归档超过 24h 而官方仍在活动目录的镜像自动恢复", () => {
+    const archivedAt = Date.now() - 25 * 60 * 60 * 1000;
+    const local = localSession({
+      id: "official-1",
+      officialSessionId: "official-1",
+      archivedAt,
+      updatedAt: archivedAt,
+    });
+    const result = reconcileOfficialSessionCatalog([local], [{
+      id: "official-1",
+      workDir: "D:\\work\\demo",
+      updatedAt: archivedAt - 1000,
+      brief: "官方仍活跃",
+      source: "server",
+    }], "D:\\work\\demo", { source: "server" });
+
+    expect(result[0].archivedAt).toBeUndefined();
+    expect(result[0].title).toBe("官方仍活跃");
   });
 
   it("不为只存在于官方归档目录的会话创建新镜像", () => {

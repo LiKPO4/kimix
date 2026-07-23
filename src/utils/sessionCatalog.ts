@@ -5,6 +5,11 @@ import { parseOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
 import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
+/**
+ * 误归档自愈宽限：官方归档状态在目录中的滞后最多分钟级，
+ * 本地归档超过 24h 而官方仍在活动目录可见，必为历史误归档。
+ */
+const MISARCHIVE_RESTORE_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export interface OfficialSessionCatalogItem {
   id: string;
@@ -317,7 +322,11 @@ export function reconcileOfficialSessionCatalog(
       const existing = next[archivedMirrorIndex];
       // The active catalog can lag behind a successful archive mutation. Only a
       // catalog row updated after the local archive is evidence of a real restore.
-      if ((official.updatedAt || 0) <= (existing.archivedAt ?? 0)) continue;
+      // 例外：本地归档已超过 24h 而官方仍在活动目录可见——官方归档滞后不可能超过
+      // 分钟级，必为历史误归档（sweep 曾仅凭目录缺席归档有内容会话），自动恢复。
+      const restoredAfterArchive = (official.updatedAt || 0) > (existing.archivedAt ?? 0);
+      const misArchivedEvidence = Date.now() - (existing.archivedAt ?? 0) > MISARCHIVE_RESTORE_GRACE_MS;
+      if (!restoredAfterArchive && !misArchivedEvidence) continue;
       const updatedAt = Math.max(existing.updatedAt, official.updatedAt || 0);
       const officialSessionId = official.id;
       const runtimeSessionId = lineageIds.size > 1 ? official.id : existing.runtimeSessionId;
@@ -448,7 +457,9 @@ export function reconcileOfficialSessionCatalog(
       // Kimi Code 0.24+（agent-core-v2）的 exclude_empty 会把刚创建的空会话立即滤出官方目录；
       // “不在列表里”不等于“已被官方移除”，创建宽限期内只凭显式归档证据处理。
       if (!explicitlyArchived && Date.now() - session.createdAt < EMPTY_SESSION_CREATION_GRACE_MS) return;
-      if (!serverAuthoritative && !referencesVisibleSession && !explicitlyArchived && !supersededByTransparentFork && !isAbandonedEmptyMirror(session, projectPath)) return;
+      // 目录缺席不等于官方移除（exclude_empty、注册表不全、快照分页都会让目录不完整），
+      // 所有路由统一只凭显式证据归档：可见重复镜像 / 官方明确归档 / 透明 fork 取代 / 本地空镜像。
+      if (!referencesVisibleSession && !explicitlyArchived && !supersededByTransparentFork && !isAbandonedEmptyMirror(session, projectPath)) return;
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
       changed = true;

@@ -2265,11 +2265,20 @@ async function findExistingRoomSession(
 export async function listSessions(workDir?: string): Promise<KimiCodeSessionSummary[]> {
   if (shouldRouteNewSessionToServer()) {
     const normalizedWorkDir = workDir ? normalizePathForComparison(path.resolve(workDir)) : undefined;
-    return (await getServerClient().listSessions())
-      .filter((session) => !normalizedWorkDir || (
-        typeof session.metadata?.cwd === "string" && normalizePathForComparison(path.resolve(session.metadata.cwd)) === normalizedWorkDir
-      ))
-      .map(serverSessionSummary);
+    const matchesWorkDir = (session: ServerSession) => !normalizedWorkDir || (
+      typeof session.metadata?.cwd === "string" && normalizePathForComparison(path.resolve(session.metadata.cwd)) === normalizedWorkDir
+    );
+    // 活动目录（exclude_empty）+ 归档目录合并：reconcile 需要 archived:true 行作为
+    // 「官方明确归档」的显式证据，否则只能靠目录缺席猜测，误归档有内容的会话。
+    const [active, archived] = await Promise.all([
+      getServerClient().listSessions(),
+      getServerClient().listArchivedSessions().catch(() => [] as ServerSession[]),
+    ]);
+    const merged = new Map<string, ServerSession>();
+    for (const session of [...archived, ...active]) {
+      if (matchesWorkDir(session)) merged.set(session.id, session);
+    }
+    return [...merged.values()].map(serverSessionSummary);
   }
   const sessions = await listSdkSessionSummaries(workDir, { includeBrief: true });
   return sessions.filter((session) => session.archived === true || Boolean(session.lastPrompt?.trim()));
