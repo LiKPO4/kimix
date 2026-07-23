@@ -211,7 +211,7 @@
 ### 正确流程
 
 1. 确保版本号三处同步：`package.json` + `Sidebar.tsx` + `SettingsPanel.tsx`
-2. 新增或更新对应版本的 Release notes：`docs/release-notes/vX.Y.Z.md`，并确认标题和内容不是旧版本复制残留
+2. 新增或更新对应版本的 Release notes：`docs/release-notes/vX.Y.Z.md`，并确认标题和内容不是旧版本复制残留。Release notes **面向最终用户**：只写用户可感知的变动、影响与已知边界；变动范围从上一个**实际发布**的版本算起（撤版版本并入下一版说明）；不写「验证」「建议重点复验」等开发者视角小节
 3. 提交并推送代码到 `master`
 4. 推送标签：`git tag vX.Y.Z && git push origin vX.Y.Z`
 5. GitHub Actions 会自动构建 Windows/Mac/Linux，并优先用 `docs/release-notes/vX.Y.Z.md` 发布到 Release

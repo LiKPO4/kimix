@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-07-14T23:30:00+08:00"
+timestamp: "2026-07-23T19:05:00+08:00"
 ---
 
 # Release Process
@@ -14,7 +14,7 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
 # Preconditions
 
 1. Synchronize the application version in `package.json`, `src/components/layout/Sidebar.tsx`, and `src/components/settings/SettingsPanel.tsx` when a product release is being prepared.
-2. Add `docs/release-notes/vX.Y.Z.md` with content specific to that version.
+2. Add `docs/release-notes/vX.Y.Z.md` with content specific to that version, written for end users: user-visible changes and known limitations only, scoped from the last actually published release (a withdrawn version folds into the next one). Omit developer-facing sections such as verification evidence and suggested retest steps.
 3. Run `pnpm typecheck`, tests, production build, `pnpm knowledge:validate`, and `git diff --check`.
 4. Commit and push the reviewed code to `master`.
 
