@@ -2148,14 +2148,17 @@ function AssistantMessageFooter({
 
 export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean): string {
   if (isActiveAssistant) return "消息处理中";
-  if (event.roomAgentId) {
-    if (!event.isComplete) return "消息处理中";
-    const model = compactModelDisplayName(event.model);
-    return model ? `模型：${model}` : "已完成";
-  }
+  if (!event.isComplete) return "消息处理中";
+  // Prefer model for both room and single-Agent sessions so usage-late turns
+  // never sit on bare "已完成" when the assistant already knows its model.
+  const model = compactModelDisplayName(event.model);
+  if (model) return `模型：${model}`;
+  // Room Agents historically omit duration (often unreliable across multi-Agent
+  // clocks); keep the compact completed label when model is also missing.
+  if (event.roomAgentId) return "已完成";
   const duration = reliableAssistantDurationMs(event.durationMs);
   if (duration !== undefined) return `已完成 · 用时 ${formatAssistantTurnDuration(duration)}`;
-  return event.isComplete ? "已完成" : "消息处理中";
+  return "已完成";
 }
 
 type AssistantProcessBlockProps = {

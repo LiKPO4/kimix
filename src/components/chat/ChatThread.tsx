@@ -729,6 +729,12 @@ export function buildRenderItems(
     if (visible.length === 0) return undefined;
     const first = visible[0];
     const last = visible[visible.length - 1];
+    const model = [...visible].reverse().find((event) => event.model?.trim())?.model
+      ?? first.model
+      ?? last.model;
+    const durationMs = [...visible]
+      .map((event) => reliableAssistantDurationMs(event.durationMs))
+      .find((value) => value !== undefined);
     return {
       ...first,
       id: first.agentTurnId || first.roomMessageId ? `assistant:${first.agentTurnId ?? first.roomMessageId}` : first.id,
@@ -744,9 +750,10 @@ export function buildRenderItems(
         (merged, event) => mergeAssistantThinkingParts(merged, event.thinkingParts),
         undefined,
       ),
+      model,
       isThinking: visible.some((event) => event.isThinking && !event.isComplete),
       isComplete: visible.every((event) => event.isComplete),
-      durationMs: reliableAssistantDurationMs(last.durationMs),
+      durationMs,
     } satisfies Extract<TimelineEvent, { type: "assistant_message" }>;
   };
 
@@ -851,12 +858,37 @@ export function buildRenderItems(
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = mergeMetricStatusUpdates(settledStatusEvents);
     const interruptedStatus = settledStatusEvents.findLast(isInterruptedStatusEvent);
+    // Prefer real turn usage. If usage.record is late, still surface a model-only
+    // footer from the assistant (or a model message status) so the bubble never
+    // sits on bare "已完成" for minutes.
+    const modelOnlyFallbackStatus = (() => {
+      if (finalUsageStatus) return undefined;
+      const modelFromStatus = settledStatusEvents
+        .map((status) => status.message?.trim())
+        .find((message) => message?.startsWith("模型："));
+      const modelFromAssistant = renderAssistantEvent?.model?.trim()
+        ? `模型：${renderAssistantEvent.model.trim()}`
+        : undefined;
+      const message = modelFromStatus || modelFromAssistant;
+      if (!message || !renderAssistantEvent) return undefined;
+      return {
+        id: `footer-model:${renderAssistantEvent.id}`,
+        type: "status_update" as const,
+        timestamp: renderAssistantEvent.timestamp,
+        message,
+        roomAgentId: renderAssistantEvent.roomAgentId,
+        roomMessageId: renderAssistantEvent.roomMessageId,
+        agentTurnId: renderAssistantEvent.agentTurnId,
+      };
+    })();
     const trailingStatusEvents = turnSettled
       ? interruptedStatus
         ? [interruptedStatus, ...(finalUsageStatus && finalUsageStatus !== interruptedStatus ? [finalUsageStatus] : [])]
         : (finalUsageStatus
             ? [finalUsageStatus]
-            : settledStatusEvents.filter((status) => !hasMetricStatus(status)).slice(-1))
+            : (modelOnlyFallbackStatus
+                ? [modelOnlyFallbackStatus]
+                : settledStatusEvents.filter((status) => !hasMetricStatus(status)).slice(-1)))
       : [];
     const activeStatusEvent = turnSettled
       ? undefined

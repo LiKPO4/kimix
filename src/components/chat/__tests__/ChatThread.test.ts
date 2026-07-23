@@ -227,4 +227,30 @@ describe("buildRenderItems turn metrics", () => {
       contextLimit: 500_000,
     });
   });
+
+  it("surfaces model-only footer before usage.record arrives for room agents", () => {
+    const items = buildRenderItems([{
+      id: "user",
+      type: "user_message",
+      timestamp: 1,
+      content: "explore",
+      roomAgentId: "room-1",
+      agentTurnId: "turn-1",
+    }, {
+      id: "assistant-1",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "done",
+      isThinking: false,
+      isComplete: true,
+      model: "kimi-code/k3",
+      roomAgentId: "room-1",
+      agentTurnId: "turn-1",
+    }], "kimi-code");
+    const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const trailing = assistantItem?.type === "event" ? assistantItem.trailingStatuses : undefined;
+    expect(trailing?.[0]).toMatchObject({
+      message: "模型：kimi-code/k3",
+    });
+  });
 });

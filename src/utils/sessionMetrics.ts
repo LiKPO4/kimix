@@ -65,6 +65,18 @@ export function hasMetricStatus(event: Extract<TimelineEvent, { type: "status_up
     event.contextLimit !== undefined;
 }
 
+/** Prefer a positive finite metric over undefined/0 shells from interim status frames. */
+export function preferPositiveMetric(
+  incoming: number | undefined,
+  previous: number | undefined,
+): number | undefined {
+  if (typeof incoming === "number" && Number.isFinite(incoming) && incoming > 0) return incoming;
+  if (typeof previous === "number" && Number.isFinite(previous) && previous > 0) return previous;
+  if (typeof incoming === "number" && Number.isFinite(incoming)) return incoming;
+  if (typeof previous === "number" && Number.isFinite(previous)) return previous;
+  return undefined;
+}
+
 export function mergeMetricStatusUpdates(
   statuses: Extract<TimelineEvent, { type: "status_update" }>[],
 ) {
@@ -74,20 +86,30 @@ export function mergeMetricStatusUpdates(
     Boolean(status.message?.trim().startsWith("模型："))
   ));
   if (!hasTurnUsage) return undefined;
-  return statuses.filter(hasMetricStatus).reduce<Extract<TimelineEvent, { type: "status_update" }> | undefined>(
-    (merged, incoming) => merged
+  const merged = statuses.filter(hasMetricStatus).reduce<Extract<TimelineEvent, { type: "status_update" }> | undefined>(
+    (acc, incoming) => acc
       ? {
-          ...merged,
+          ...acc,
           ...incoming,
-          message: incoming.message ?? merged.message,
-          inputTokenCount: incoming.inputTokenCount ?? merged.inputTokenCount,
-          tokenCount: incoming.tokenCount ?? merged.tokenCount,
-          contextSize: incoming.contextSize ?? merged.contextSize,
-          contextLimit: incoming.contextLimit ?? merged.contextLimit,
+          message: incoming.message?.trim() ? incoming.message : acc.message,
+          inputTokenCount: preferPositiveMetric(incoming.inputTokenCount, acc.inputTokenCount),
+          tokenCount: preferPositiveMetric(incoming.tokenCount, acc.tokenCount),
+          // Interim agent.status frames often carry contextSize:0 + a limit only;
+          // a later usage.record must not permanently zero out a real context.
+          contextSize: preferPositiveMetric(incoming.contextSize, acc.contextSize),
+          contextLimit: preferPositiveMetric(incoming.contextLimit, acc.contextLimit),
         }
       : incoming,
     undefined,
   );
+  if (!merged) return undefined;
+  // usage.record has tokens but no contextTokens. When the turn only ever saw
+  // contextLimit shells (size 0), fall back to input tokens as "used" so the
+  // footer can still show Context: used/limit.
+  const contextSize = preferPositiveMetric(merged.contextSize, merged.inputTokenCount);
+  return contextSize === merged.contextSize
+    ? merged
+    : { ...merged, contextSize };
 }
 
 export function getLatestMeaningfulStatus(events: TimelineEvent[]) {

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-23 修复：页脚长时间「已完成」且缺 Context
+
+- 现象：含子代理 turn 结束后页脚只显示「已完成」可持续数分钟；恢复后仍缺 Context。
+- 根因：① `usage.record` 晚于 settle，期间 merge 只见 contextSize=0 壳且不认 turn usage → trailing 空；② merge assistant 从 first 取 model， intermediate 无 model 时 fallback 纯「已完成」；③ `mergeMetricStatusUpdates` 用 `??` 让 0 盖掉有效 context，且 usage.record 本身无 contextTokens。
+- 修复：`preferPositiveMetric` 合并用量/上下文；usage 无 context 时用 input 作 used；merge assistant 保留任一可见 model；settle 无 usage 时合成 model-only trailing；fallback 优先模型。
+- 验证：sessionMetrics/ChatThread/chatRenderItems 定向 89 项全绿；typecheck 通过；待用户截图。
+
 ## 2026-07-23 修复：kimi-web 思考组卡样式倒退
 
 - 现象：过程展示选 Kimi Web 时，思考仍显示 Kimix 式「思考过程 / 已完成 ✓」soft-card。

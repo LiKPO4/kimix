@@ -3,6 +3,7 @@ import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, is
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 import { logEvent } from "@/utils/reportError";
+import { preferPositiveMetric } from "@/utils/sessionMetrics";
 import { normalizePathForComparison } from "./pathCase";
 import { countUnifiedDiffChanges } from "./diff";
 
@@ -2139,11 +2140,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const merged: typeof last = {
         ...last,
         ...incoming,
-        message: incoming.message ?? last.message,
-        tokenCount: incoming.tokenCount ?? last.tokenCount,
-        inputTokenCount: incoming.inputTokenCount ?? last.inputTokenCount,
-        contextSize: incoming.contextSize ?? last.contextSize,
-        contextLimit: incoming.contextLimit ?? last.contextLimit,
+        message: incoming.message?.trim() ? incoming.message : last.message,
+        tokenCount: preferPositiveMetric(incoming.tokenCount, last.tokenCount),
+        inputTokenCount: preferPositiveMetric(incoming.inputTokenCount, last.inputTokenCount),
+        contextSize: preferPositiveMetric(incoming.contextSize, last.contextSize),
+        contextLimit: preferPositiveMetric(incoming.contextLimit, last.contextLimit),
       };
       return [...existing.slice(0, -1), merged];
     }

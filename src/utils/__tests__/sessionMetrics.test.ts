@@ -6,6 +6,7 @@ import {
   getLatestMetricStatus,
   getLatestMeaningfulStatus,
   mergeMetricStatusUpdates,
+  preferPositiveMetric,
   getSessionContextUsages,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
@@ -153,6 +154,58 @@ describe("mergeMetricStatusUpdates", () => {
       contextSize: 101_116,
       contextLimit: 500_000,
     }])).toBeUndefined();
+  });
+
+  it("keeps a positive context when a later shell reports contextSize 0", () => {
+    const merged = mergeMetricStatusUpdates([{
+      id: "live",
+      type: "status_update",
+      timestamp: 1,
+      contextSize: 48_000,
+      contextLimit: 262_144,
+    }, {
+      id: "usage",
+      type: "status_update",
+      timestamp: 2,
+      message: "模型：k3",
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+      contextSize: 0,
+      contextLimit: 262_144,
+    }]);
+    expect(merged).toMatchObject({
+      message: "模型：k3",
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+      contextSize: 48_000,
+      contextLimit: 262_144,
+    });
+  });
+
+  it("falls back contextSize to input tokens when only usage.record arrived", () => {
+    const merged = mergeMetricStatusUpdates([{
+      id: "usage",
+      type: "status_update",
+      timestamp: 2,
+      message: "模型：k3",
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+    }]);
+    expect(merged).toMatchObject({
+      message: "模型：k3",
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+      contextSize: 29_451,
+    });
+  });
+});
+
+describe("preferPositiveMetric", () => {
+  it("prefers a later positive value over a previous zero", () => {
+    expect(preferPositiveMetric(120, 0)).toBe(120);
+  });
+  it("keeps a previous positive when incoming is zero", () => {
+    expect(preferPositiveMetric(0, 120)).toBe(120);
   });
 });
 
