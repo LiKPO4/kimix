@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-24T10:30:00+08:00"
+timestamp: "2026-07-24T22:50:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -14,6 +14,28 @@ writes, cheap active-block rendering, and viewport work that yields to user
 scrolling. The full plan and acceptance criteria live in
 `docs/plan-streaming-scroll-performance.md`; this entry records the durable
 invariants the code now depends on.
+
+## Turn blocks preserve official step order
+
+A kimi-code turn is rendered from an ordered `TurnBlock[]` built by walking the
+turn's event array once (`src/utils/turnBlocks.ts`). Each block is one of
+thinking / text / tool / subagent / approval, and adjacent same-kind blocks may
+merge, but **timestamp sorting is forbidden**: official wire data stamps a
+think part and its following tool call with the same millisecond, so any
+timestamp-based reordering (or tool-timestamp cutting of thinking phases)
+scrambles the sequence into multiple split tool groups and mis-ordered Swarm
+cards. Continuous tool blocks still aggregate into one "N 个工具调用" card;
+a thinking/text/subagent boundary starts a new run — the same rule as official
+kimi-web `assistantRenderBlocks`.
+
+Agent/Task/AgentSwarm tool calls are absorbed into the matching subagent card
+via `parentToolCallId` at the tool-call position (official treats the Agent
+tool itself as the task card). Unmatched Agent calls fall back to plain tool
+blocks. Subagent-internal assistant content is **never** promoted into the
+main timeline body: `createSubagentOnlyAssistantEvent` is gone, and a tool- or
+subagent-only turn renders an empty-content process container with the ordered
+blocks. History cache mapping version 17 forces re-hydration of sessions that
+previously fossilized that synthetic body.
 
 ## Storage event identity is stable; projection must preserve it
 

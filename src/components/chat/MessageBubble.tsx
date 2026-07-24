@@ -17,6 +17,7 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { turnBlocksEqual, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -69,6 +70,7 @@ interface MessageBubbleProps {
   hideProcessSummary?: boolean;
   expandProcessByDefault?: boolean;
   eagerMarkdown?: boolean;
+  turnBlocks?: TurnBlock[];
   onDeleteUserMessage?: (eventId: string) => void;
 }
 
@@ -238,6 +240,7 @@ function messageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubblePr
     eventArrayMemoEqual(prev.leadingHooks, next.leadingHooks) &&
     eventArrayMemoEqual(prev.leadingApprovals, next.leadingApprovals) &&
     eventArrayMemoEqual(prev.attachedSteers, next.attachedSteers) &&
+    turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
       prev.activeStatus === next.activeStatus ||
       (!prev.activeStatus && !next.activeStatus) ||
@@ -1860,7 +1863,103 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserv
   );
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean }) {
+type TurnBlockGroup =
+  | { type: "thinking"; key: string; blocks: ThinkingBlock[] }
+  | { type: "text"; key: string; content: string }
+  | { type: "tool"; key: string; tools: ToolEvent[] }
+  | { type: "subagent"; key: string; subagents: SubagentEvent[] }
+  | { type: "approval"; key: string; approvals: ApprovalEvent[] };
+
+/**
+ * Group only adjacent same-kind blocks, mirroring the official kimi-web
+ * assistantRenderBlocks rule: a tool run aggregates into one "N 个工具调用"
+ * card only while uninterrupted; a thinking/text/subagent boundary starts a
+ * new run. Order comes from the event array, never from timestamps.
+ */
+function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
+  const groups: TurnBlockGroup[] = [];
+  for (const block of blocks) {
+    const last = groups.at(-1);
+    if (block.kind === "thinking") {
+      if (last?.type === "thinking") last.blocks.push(...block.blocks);
+      else groups.push({ type: "thinking", key: block.key, blocks: [...block.blocks] });
+    } else if (block.kind === "text") {
+      groups.push({ type: "text", key: block.key, content: block.content });
+    } else if (block.kind === "tool") {
+      if (last?.type === "tool") last.tools.push(block.tool);
+      else groups.push({ type: "tool", key: block.key, tools: [block.tool] });
+    } else if (block.kind === "subagent") {
+      if (last?.type === "subagent") last.subagents.push(block.subagent);
+      else groups.push({ type: "subagent", key: block.key, subagents: [block.subagent] });
+    } else if (block.kind === "approval") {
+      if (last?.type === "approval") last.approvals.push(block.approval);
+      else groups.push({ type: "approval", key: block.key, approvals: [block.approval] });
+    }
+  }
+  return groups;
+}
+
+/**
+ * Official-style interleaved turn timeline (kimi-web mode, expanded): thinking
+ * teasers, aggregated tool-run cards, subagent task cards, approvals and text
+ * markdown render exactly where they happened in the turn.
+ */
+function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false, isComplete }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean; isComplete: boolean }) {
+  const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
+  return (
+    <div className="flex min-w-0 flex-col" style={{ gap: 10 }}>
+      {groups.map((group, index) => {
+        if (group.type === "text") {
+          const isLastGroup = index === groups.length - 1;
+          const streaming = isActiveAssistant && isLastGroup;
+          return (
+            <div
+              key={group.key}
+              className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]"
+              style={{ paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}
+            >
+              <MarkdownRenderer
+                content={group.content}
+                streaming={streaming}
+                normalizeAssistantProgress
+                deferOffscreen={!streaming && isComplete && group.content.length > 1200}
+              />
+            </div>
+          );
+        }
+        return (
+          <TurnBlocksProcessGroup
+            key={group.key}
+            group={group}
+            isLive={shouldUseLiveThinkingViewport({
+              groupIndex: index,
+              groupCount: groups.length,
+              isThinkingGroup: group.type === "thinking",
+              isActiveAssistant,
+              hasFinalContent,
+              preserveDuringFinalTransition,
+            })}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGroup, { type: "text" }>; isLive: boolean }) {
+  switch (group.type) {
+    case "thinking":
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
+    case "tool":
+      return <KimiWebToolGroupCard tools={group.tools} />;
+    case "subagent":
+      return <KimiWebSubagentGroupCard subagents={group.subagents} />;
+    case "approval":
+      return <KimiWebApprovalGroupCard approvals={group.approvals} />;
+  }
+}
+
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
@@ -1887,26 +1986,67 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     viewportTop: number;
     anchor: "summary" | "content";
   } | null>(null);
-  const thinkingBlocks = useMemo(() => buildThinkingBlocks({
+  // When ordered turn blocks are available (kimi-code engine), process items
+  // follow the event array order — the official wire gives a think part and its
+  // following tool call the same millisecond, so timestamp sorting scrambles
+  // the sequence and tool-timestamp cutting splits tool runs apart. The legacy
+  // timestamp path stays only for bubbles without block data (prompt engine).
+  const blockThinking = useMemo(() => {
+    if (!turnBlocks) return undefined;
+    return turnBlocks.flatMap((block) => block.kind === "thinking" ? block.blocks : []);
+  }, [turnBlocks]);
+  const thinkingBlocks = useMemo(() => blockThinking ?? buildThinkingBlocks({
     ...event,
     boundaryTimestamps: tools.map((tool) => tool.timestamp),
-  }), [event.thinking, event.thinkingParts, event.timestamp, tools]);
-  const items: ProcessItem[] = useMemo(() => [
-    ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
-    ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
-    ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
-    ...approvals.map((approval): ProcessItem => ({ type: "approval", approval })),
-  ].sort((a, b) => (
-    processItemTimestamp(a) - processItemTimestamp(b) || processItemPriority(a) - processItemPriority(b)
-  )), [thinkingBlocks, tools, subagents, approvals]);
+  }), [blockThinking, event.thinking, event.thinkingParts, event.timestamp, tools]);
+  const items: ProcessItem[] = useMemo(() => {
+    if (turnBlocks) {
+      const ordered: ProcessItem[] = [];
+      for (const block of turnBlocks) {
+        if (block.kind === "thinking") {
+          for (const thinkingBlock of block.blocks) ordered.push({ type: "thinking", block: thinkingBlock });
+        } else if (block.kind === "tool") {
+          ordered.push({ type: "tool", tool: block.tool });
+        } else if (block.kind === "subagent") {
+          ordered.push({ type: "subagent", subagent: block.subagent });
+        } else if (block.kind === "approval") {
+          ordered.push({ type: "approval", approval: block.approval });
+        }
+      }
+      return ordered;
+    }
+    return [
+      ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
+      ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
+      ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
+      ...approvals.map((approval): ProcessItem => ({ type: "approval", approval })),
+    ].sort((a, b) => (
+      processItemTimestamp(a) - processItemTimestamp(b) || processItemPriority(a) - processItemPriority(b)
+    ));
+  }, [turnBlocks, thinkingBlocks, tools, subagents, approvals]);
+  const blockCounts = useMemo(() => {
+    if (!turnBlocks) return undefined;
+    let toolCount = 0;
+    let subagentCount = 0;
+    let approvalCount = 0;
+    for (const block of turnBlocks) {
+      if (block.kind === "tool") toolCount += 1;
+      else if (block.kind === "subagent") subagentCount += 1;
+      else if (block.kind === "approval") approvalCount += 1;
+    }
+    return { toolCount, subagentCount, approvalCount };
+  }, [turnBlocks]);
+  const summaryToolCount = blockCounts?.toolCount ?? tools.length;
+  const summarySubagentCount = blockCounts?.subagentCount ?? subagents.length;
+  const summaryApprovalCount = blockCounts?.approvalCount ?? approvals.length;
   const hasDetails = items.length > 0;
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = useMemo(() => joinSummaryParts([
     thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段${detailUnit}` : "",
-    tools.length > 0 ? `${tools.length} 条命令` : "",
-    subagents.length > 0 ? `${subagents.length} 个子代理` : "",
-    approvals.length > 0 ? `${approvals.length} 个工具请求` : "",
-  ]), [approvals.length, detailUnit, subagents.length, thinkingBlocks.length, tools.length]);
+    summaryToolCount > 0 ? `${summaryToolCount} 条命令` : "",
+    summarySubagentCount > 0 ? `${summarySubagentCount} 个子代理` : "",
+    summaryApprovalCount > 0 ? `${summaryApprovalCount} 个工具请求` : "",
+  ]), [summaryApprovalCount, detailUnit, summarySubagentCount, thinkingBlocks.length, summaryToolCount]);
   const isFinalContentTransition = shouldCollapseKimiWebProcessOnFinalContent({
     previousHasFinalContent: previousHasFinalContentRef.current,
     hasFinalContent,
@@ -1990,6 +2130,13 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     return () => window.cancelAnimationFrame(frame);
   }, [expanded]);
 
+  // The bubble coordinates body rendering with the expanded state: in kimi-web
+  // block mode the expanded detail already contains the text segments inline,
+  // so the bottom body must not duplicate them.
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
+
   const summaryContent = (
     <>
       {hasDetails ? (expanded ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />) : <span className="w-[15px]" />}
@@ -2024,12 +2171,22 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
       {expanded && hasDetails && (
         <div ref={processDetailRef} className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
           {isKimiWeb ? (
+            turnBlocks ? (
+              <TurnBlocksTimeline
+                blocks={turnBlocks}
+                isActiveAssistant={isActiveAssistant}
+                hasFinalContent={hasFinalContent}
+                preserveDuringFinalTransition={isFinalContentTransition}
+                isComplete={event.isComplete}
+              />
+            ) : (
             <KimiWebProcessList
               items={items}
               isActiveAssistant={isActiveAssistant}
               hasFinalContent={hasFinalContent}
               preserveDuringFinalTransition={isFinalContentTransition}
             />
+            )
           ) : <ProcessDetailList items={items} />}
           {!isKimiWeb && (
             <button
@@ -2176,6 +2333,8 @@ type AssistantProcessBlockProps = {
   collapseWhileRunning: boolean;
   turnStartedAt?: number;
   activeStatusMessage?: string;
+  turnBlocks?: TurnBlock[];
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: AssistantProcessBlockProps) {
@@ -2189,6 +2348,8 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.collapseWhileRunning === next.collapseWhileRunning &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
+    prev.onExpandedChange === next.onExpandedChange &&
+    turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
       prev.event === next.event ||
       (
@@ -2223,6 +2384,8 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   collapseWhileRunning,
   turnStartedAt,
   activeStatusMessage,
+  turnBlocks,
+  onExpandedChange,
 }: AssistantProcessBlockProps) {
   const hasActualThinking = Boolean(
     event.thinking?.trim() ||
@@ -2261,6 +2424,8 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       hasFinalContent={hasFinalContent}
       collapseWhileRunning={collapseWhileRunning}
       label={processLabel}
+      turnBlocks={turnBlocks}
+      onExpandedChange={onExpandedChange}
     />
   );
 }, assistantProcessBlockEqual);
@@ -2278,10 +2443,13 @@ type AssistantBodyBlockProps = {
   trailingStatuses: Extract<TimelineEvent, { type: "status_update" }>[];
   hookBadgeEvents: Extract<TimelineEvent, { type: "hook" }>[];
   footerFallbackLabel: string;
+  /** Full turn text for clipboard; defaults to content when omitted. */
+  copyContent?: string;
 };
 
 function assistantBodyBlockEqual(prev: AssistantBodyBlockProps, next: AssistantBodyBlockProps) {
   return prev.content === next.content &&
+    prev.copyContent === next.copyContent &&
     prev.thinking === next.thinking &&
     prev.thinkingParts === next.thinkingParts &&
     prev.timestamp === next.timestamp &&
@@ -2312,27 +2480,31 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
   trailingStatuses,
   hookBadgeEvents,
   footerFallbackLabel,
+  copyContent,
 }: AssistantBodyBlockProps) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
-  const hasContent = content.trim().length > 0;
+  const clipboardContent = (copyContent ?? content).trim().length > 0 ? (copyContent ?? content) : content;
+  const hasVisibleContent = content.trim().length > 0;
+  const hasCopyableContent = clipboardContent.trim().length > 0;
   const changedFilesSignature = changedFiles.join("\u001f");
   const mdArtifacts = useMemo(() => {
     if (!isComplete) return [];
+    const source = hasVisibleContent ? content : clipboardContent;
     const changedSet = new Set(changedFiles.map((filePath) => normalizePathForComparison(filePath)));
     return Array.from(new Set(
-      content.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
+      source.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
     )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
-  }, [changedFilesSignature, content, isComplete]);
+  }, [changedFilesSignature, clipboardContent, content, hasVisibleContent, isComplete]);
   const fullCopyText = useMemo(
-    () => buildAssistantFullCopyText({ content, thinking, thinkingParts, timestamp } as AssistantEvent),
-    [content, thinking, thinkingParts, timestamp],
+    () => buildAssistantFullCopyText({ content: clipboardContent, thinking, thinkingParts, timestamp } as AssistantEvent),
+    [clipboardContent, thinking, thinkingParts, timestamp],
   );
-  const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || isComplete || isActiveAssistant;
+  const shouldShowBodyFooter = hasVisibleContent || hasCopyableContent || changeSummary || trailingStatuses.length > 0 || isComplete || isActiveAssistant;
   if (!shouldShowBodyFooter) return null;
   return (
     <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
-      {hasContent && (
+      {hasVisibleContent && (
         <>
           <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
             <MarkdownRenderer
@@ -2355,20 +2527,21 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
       <AssistantMessageFooter
         statuses={trailingStatuses}
         fallbackLabel={footerFallbackLabel}
-        onCopy={() => void trigger(content)}
-        onCopyAll={() => void triggerAll(fullCopyText || content)}
+        onCopy={() => void trigger(clipboardContent)}
+        onCopyAll={() => void triggerAll(fullCopyText || clipboardContent)}
         copied={copied}
         copiedAll={copiedAll}
         hookBadgeEvents={hookBadgeEvents}
-        showActions={hasContent}
+        showActions={hasCopyableContent}
       />
     </div>
   );
 }, assistantBodyBlockEqual);
 
-function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean }) {
+function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false, turnBlocks }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean; turnBlocks?: TurnBlock[] }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
+  const [processExpanded, setProcessExpanded] = useState(false);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
@@ -2425,6 +2598,17 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   const hasContent = displayContent.trim().length > 0;
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
+  // When the process detail is expanded under kimi-web + ordered turn blocks,
+  // text segments already render inline in TurnBlocksTimeline — suppress the
+  // bottom body Markdown to avoid duplicating every "你好霖江路" segment.
+  // Footer (copy / usage / change summary) still renders underneath.
+  const bodyContentSuppressed = Boolean(
+    turnBlocks &&
+    processDisplayMode === "kimi-web" &&
+    !hideProcessSummary &&
+    processExpanded &&
+    hasContent
+  );
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
   const footerFallbackLabel = isInterrupted
     ? "输出打断"
@@ -2483,6 +2667,8 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             collapseWhileRunning={collapseProcessWhileRunning}
             turnStartedAt={turnStartedAt}
             activeStatusMessage={activeStatus?.message}
+            turnBlocks={turnBlocks}
+            onExpandedChange={setProcessExpanded}
           />
         )}
 
@@ -2494,7 +2680,11 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
 
         {shouldShowBodyFooter && (
           <AssistantBodyBlock
-            content={displayContent}
+            // Render body Markdown only when the interleaved timeline is not
+            // already painting the same text segments (expanded kimi-web
+            // turnBlocks). Copy/export always receives the full displayContent
+            // via the props below so the clipboard never goes empty.
+            content={bodyContentSuppressed ? "" : displayContent}
             thinking={displayThinking || undefined}
             thinkingParts={displayThinkingParts}
             timestamp={event.timestamp}
@@ -2506,6 +2696,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             trailingStatuses={trailingStatuses}
             hookBadgeEvents={hookBadgeEvents}
             footerFallbackLabel={footerFallbackLabel}
+            copyContent={displayContent}
           />
         )}
       </div>
@@ -2513,12 +2704,12 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, eagerMarkdown, onDeleteUserMessage }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, eagerMarkdown, turnBlocks, onDeleteUserMessage }: MessageBubbleProps) {
   if (event.type === "user_message") {
     return <UserMessageBubble event={event} onDelete={onDeleteUserMessage} />;
   }
   if (event.type === "steer_message") {
     return <SteerMessageBubble event={event} />;
   }
-  return <AssistantMessageBubble event={event} sessionId={sessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} />;
+  return <AssistantMessageBubble event={event} sessionId={sessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} turnBlocks={turnBlocks} />;
 }, messageBubblePropsEqual);

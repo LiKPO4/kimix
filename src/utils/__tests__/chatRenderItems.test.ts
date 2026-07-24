@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems, filterStatusUpdates } from "@/components/chat/ChatThread";
 import { assistantFooterFallbackLabel, timelineEventMemoKey } from "@/components/chat/MessageBubble";
-import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "../chatRenderItems";
+import { createToolOnlyAssistantEvent } from "../chatRenderItems";
 import type { RoomAgentActivity, TimelineEvent, ToolCallEvent } from "@/types/ui";
 
 function activeRoomTurn(
@@ -60,9 +60,9 @@ describe("createToolOnlyAssistantEvent", () => {
   });
 });
 
-describe("createSubagentOnlyAssistantEvent", () => {
-  it("keeps the assistant header active while any subagent is active", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
+describe("createToolOnlyAssistantEvent with subagents", () => {
+  it("keeps the process container active while any subagent is active", () => {
+    const event = createToolOnlyAssistantEvent([], false, [
       {
         id: "agent-1",
         type: "subagent",
@@ -71,149 +71,29 @@ describe("createSubagentOnlyAssistantEvent", () => {
         status: "running",
         events: [],
       },
-      {
-        id: "agent-2",
-        type: "subagent",
-        timestamp: 4,
-        agentName: "worker",
-        status: "completed",
-        events: [],
-      },
-    ];
-
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.type).toBe("assistant_message");
-    expect(event.id).toBe("assistant-subagents-agent-1:agent-2");
+    ]);
     expect(event.content).toBe("");
     expect(event.isComplete).toBe(false);
   });
 
-  it("creates a completed assistant header when all subagents are settled", () => {
-    const event = createSubagentOnlyAssistantEvent([
+  it("never fabricates body content from subagent events", () => {
+    const event = createToolOnlyAssistantEvent([], false, [
       {
         id: "agent-1",
         type: "subagent",
-        timestamp: 5,
-        agentName: "worker",
+        timestamp: 1,
+        agentId: "a1",
+        agentName: "coder",
         status: "completed",
-        events: [],
+        events: [
+          { id: "a1", type: "assistant_message", timestamp: 2, content: "子代理内部正文", isThinking: false, isComplete: true },
+        ],
       },
     ]);
-
+    expect(event.content).toBe("");
+    expect(event.thinking).toBeUndefined();
     expect(event.isComplete).toBe(true);
   });
-
-  it("surfaces assistant content from subagent events when the main timeline has none", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "agent-1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [
-          { id: "a1", type: "assistant_message", timestamp: 2, content: "剩余小债务", isThinking: false, isComplete: true },
-        ],
-      },
-    ];
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.content).toBe("剩余小债务");
-    expect(event.isComplete).toBe(true);
-  });
-
-  it("joins content from multiple subagent assistant messages", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [
-          { id: "a1", type: "assistant_message", timestamp: 2, content: "第一部分", isThinking: false, isComplete: true },
-          { id: "a2", type: "assistant_message", timestamp: 3, content: "第二部分", isThinking: false, isComplete: true },
-        ],
-      },
-    ];
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.content).toBe("第一部分\n\n第二部分");
-  });
-
-  it("collects thinking from subagent events", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [
-          { id: "a1", type: "assistant_message", timestamp: 2, content: "", thinking: "思考内容", isThinking: false, isComplete: true },
-        ],
-      },
-    ];
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.thinking).toBe("思考内容");
-  });
-
-  it("collects content from nested subagent events", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [
-          {
-            id: "s2",
-            type: "subagent",
-            timestamp: 2,
-            agentId: "a2",
-            agentName: "reviewer",
-            status: "completed",
-            events: [
-              { id: "a2", type: "assistant_message", timestamp: 3, content: "嵌套子代理正文", isThinking: false, isComplete: true },
-            ],
-          },
-        ],
-      },
-    ];
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.content).toBe("嵌套子代理正文");
-  });
-
-  it("collects thinking from thinkingParts when thinking field is empty", () => {
-    const subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [
-      {
-        id: "s1",
-        type: "subagent",
-        timestamp: 1,
-        agentId: "a1",
-        agentName: "coder",
-        status: "completed",
-        events: [
-          {
-            id: "a1",
-            type: "assistant_message",
-            timestamp: 2,
-            content: "",
-            thinking: "",
-            thinkingParts: [{ id: "tp1", timestamp: 2, text: "分段思考", signature: "sig1" }],
-            isThinking: false,
-            isComplete: true,
-          },
-        ],
-      },
-    ];
-    const event = createSubagentOnlyAssistantEvent(subagents);
-    expect(event.thinking).toBe("分段思考");
-  });
-
 });
 
 describe("buildRenderItems compaction placement", () => {

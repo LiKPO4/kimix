@@ -21,7 +21,8 @@ import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { createSubagentOnlyAssistantEvent, createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
+import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
+import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { reliableAssistantDurationMs } from "@/utils/duration";
 import { hasMetricStatus, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
@@ -552,7 +553,7 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning, turnBlocks }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean; turnBlocks?: TurnBlock[] }) {
   switch (event.type) {
     case "user_message":
       return (
@@ -564,7 +565,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
     case "steer_message":
       return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
-      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} turnBlocks={turnBlocks} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -730,13 +731,21 @@ export function buildRenderItems(
   const items: RenderItem[] = [];
   const usedCompletedTurnCacheKeys = new Set<string>();
 
-  const pushStandaloneTools = (tools: ToolCallEvent[], turnStartedAt?: number, isTurnActive = false) => {
-    if (tools.length === 0) return;
+  const pushStandaloneTools = (
+    tools: ToolCallEvent[],
+    turnStartedAt?: number,
+    isTurnActive = false,
+    subagents: Extract<TimelineEvent, { type: "subagent" }>[] = [],
+    turnBlocks?: TurnBlock[],
+  ) => {
+    if (tools.length === 0 && subagents.length === 0) return;
     if (sessionEngine === "kimi-code") {
-      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools, isTurnActive), turnStartedAt, isAssistantActive: isTurnActive, leadingTools: tools, trailingStatuses: [] });
+      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools, isTurnActive, subagents), turnStartedAt, isAssistantActive: isTurnActive, leadingTools: tools, leadingSubagents: subagents, trailingStatuses: [], turnBlocks });
       return;
     }
-    items.push({ type: "tool_group", id: tools[0].id, tools });
+    if (tools.length > 0) {
+      items.push({ type: "tool_group", id: tools[0].id, tools });
+    }
   };
 
   const mergeAssistantProcessEvents = (assistantEvents: Extract<TimelineEvent, { type: "assistant_message" }>[]) => {
@@ -803,6 +812,9 @@ export function buildRenderItems(
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
     const hooks = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "hook" }> => event.type === "hook");
+    // Official-ordered render blocks for this turn: thinking / text / tool /
+    // subagent / approval appear exactly where they sit in the event array.
+    const turnBlocks = buildTurnBlocks(turnEvents);
     // Resolved (approved/rejected) approvals fold into the assistant process
     // summary; only pending ones stay as standalone interactive cards. If there
     // is no assistant message to fold into, keep them standalone as a fallback.
@@ -949,6 +961,7 @@ export function buildRenderItems(
         changedFiles: Array.from(changedFiles),
         changeSummary: mergedChangeSummary ?? undefined,
         trailingStatuses: trailingStatusEvents,
+        turnBlocks,
       });
       assistantAttached = true;
       toolsAttached = true;
@@ -986,6 +999,7 @@ export function buildRenderItems(
         changedFiles: Array.from(changedFiles),
         changeSummary: mergedChangeSummary ?? undefined,
         trailingStatuses: [],
+        turnBlocks,
       });
       assistantAttached = true;
       toolsAttached = true;
@@ -1023,6 +1037,7 @@ export function buildRenderItems(
           changeSummary: assistantAttached ? undefined : mergedChangeSummary ?? undefined,
           trailingStatuses: assistantAttached ? [] : trailingStatusEvents,
           hideProcessSummary: assistantAttached && (hasContent || !hasOwnProcessDetails),
+          turnBlocks,
         });
         assistantAttached = true;
         toolsAttached = true;
@@ -1031,8 +1046,8 @@ export function buildRenderItems(
       }
       if (event.type === "user_message" || event.type === "todo") continue;
       if (!toolsAttached) {
-        if (tools.length > 0) {
-          pushStandaloneTools(tools, turnStartedAt, !turnSettled);
+        if (tools.length > 0 || subagents.length > 0) {
+          pushStandaloneTools(tools, turnStartedAt, !turnSettled, subagents, turnBlocks);
           toolsAttached = true;
         }
       }
@@ -1064,7 +1079,10 @@ export function buildRenderItems(
       items.push({ type: "event", event });
     }
 
-    if (!toolsAttached) pushStandaloneTools(tools, turnStartedAt, !turnSettled);
+    if (!toolsAttached) {
+      pushStandaloneTools(tools, turnStartedAt, !turnSettled, subagents, turnBlocks);
+      toolsAttached = true;
+    }
     pushStandaloneSteers();
     if (mergedChangeSummary && !changeSummaryAttached) {
       items.push({ type: "event", event: mergedChangeSummary });
@@ -1086,18 +1104,12 @@ export function buildRenderItems(
         .filter(shouldRenderStandaloneStatusUpdate)
         .forEach((event) => items.push({ type: "event", event }));
     }
-    if (!assistantAttached && subagents.length > 0) {
-      items.push({
-        type: "event",
-        event: createSubagentOnlyAssistantEvent(subagents),
-        turnStartedAt,
-        isAssistantActive: !turnSettled,
-        leadingSubagents: subagents,
-        trailingStatuses: [],
-      });
-      assistantAttached = true;
-    }
-    // Subagent progress belongs to the message stream so it stays aligned with the turn timeline.
+    // Subagent progress belongs to the message stream so it stays aligned with
+    // the turn timeline. Subagent-internal output is never promoted into the
+    // main timeline body (official keeps agentId-scoped frames out of the main
+    // transcript); turns without their own assistant text render their ordered
+    // turn blocks (tool groups / subagent task cards) through the container
+    // bubble pushed by pushStandaloneTools above.
   };
 
   let turnBody: TimelineEvent[] = [];
@@ -1781,7 +1793,7 @@ export const ChatThread = memo(function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId ?? undefined} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} />
+                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} turnBlocks={item.turnBlocks} />
               }
             </div>
           ))}
