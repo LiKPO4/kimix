@@ -105,9 +105,9 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
 }
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
-  { value: "manual", label: "手动审批", desc: "高风险操作会先问你", tooltip: "手动审批：高风险工具调用会暂停确认。" },
-  { value: "auto", label: "自动权限", desc: "全自动，不再向你提问", tooltip: "自动权限：完全自主推进，不会再向你提问或等待确认。" },
-  { value: "yolo", label: "完全访问", desc: "自动批工具，仍可能提问", tooltip: "完全访问：自动批准工具操作，但 Agent 仍可能向你提问。" },
+  { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
+  { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。" },
+  { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
 ];
 
 const permissionMenuIcons = {
@@ -4290,9 +4290,9 @@ export function Composer() {
   };
 
   const permissionLabel = {
-    manual: "手动审批",
-    auto: "自动权限",
-    yolo: "完全访问",
+    manual: "逐条确认",
+    auto: "完全自主",
+    yolo: "自动通过",
   }[mutationPermissionMode ?? permissionMode];
   const permissionLabelFontSize = permissionLabel.length > 5 ? 11 : permissionLabel.length > 4 ? 12 : 13;
 

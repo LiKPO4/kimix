@@ -1101,9 +1101,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
-    { value: "manual", label: "手动审批", desc: "高风险操作会先问你", icon: Shield, tooltip: "手动审批：高风险工具调用会暂停确认。" },
-    { value: "auto", label: "自动权限", desc: "全自动，不再向你提问", icon: Zap, tooltip: "自动权限：完全自主推进，不会再向你提问或等待确认。" },
-    { value: "yolo", label: "完全访问", desc: "自动批工具，仍可能提问", icon: GitBranch, tooltip: "完全访问：自动批准工具操作，但 Agent 仍可能向你提问。谨慎使用。" },
+    { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", icon: Shield, tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
+    { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", icon: GitBranch, tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。谨慎使用。" },
+    { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
   ];
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
     { value: "never", label: "永不弹出", desc: "不显示系统通知，也不显示任务栏红点" },
