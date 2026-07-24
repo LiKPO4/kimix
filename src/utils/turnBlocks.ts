@@ -50,6 +50,12 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
   const absorbedSubagentIds = new Set<string>();
 
   const blocks: TurnBlock[] = [];
+  // A content-less assistant_message (e.g. Server route step.end / turn.ended)
+  // marks a step boundary. The next text-bearing assistant_message must start a
+  // new text block instead of appending to the previous one, so intermediate
+  // body text stays separated from the final answer and renders inside the
+  // process timeline rather than the bottom body.
+  let textBoundaryPending = false;
   for (const event of turnEvents) {
     if (event.type === "assistant_message") {
       const thinkingBlocks = buildThinkingBlocks({
@@ -64,19 +70,26 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
         } else {
           blocks.push({ kind: "thinking", key: `thinking:${event.id}`, blocks: thinkingBlocks });
         }
+        textBoundaryPending = false;
       }
       const content = event.content.trim();
       if (content) {
         const tail = blocks.at(-1);
-        if (tail?.kind === "text") {
+        if (tail?.kind === "text" && !textBoundaryPending) {
           tail.events.push(event);
           tail.content = `${tail.content}\n\n${content}`;
         } else {
           blocks.push({ kind: "text", key: `text:${event.id}`, events: [event], content });
         }
+        textBoundaryPending = false;
+      } else {
+        // A content-less assistant step boundary: the next text-bearing event
+        // must NOT merge into the previous text block.
+        textBoundaryPending = true;
       }
       continue;
     }
+    textBoundaryPending = false;
     if (event.type === "tool_call") {
       const spawned = event.toolCallId ? subagentsByParentCall.get(event.toolCallId) : undefined;
       if (spawned && spawned.length > 0) {

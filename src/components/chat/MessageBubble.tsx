@@ -1186,21 +1186,6 @@ const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-const KIMI_WEB_THINKING_TEASER_MAX_CHARS = 220;
-
-/**
- * Extract the trailing sentence for a thinking teaser. Official kimi-web keeps
- * the last sentence (delimited by 。！？?!) so the folded summary ends with a
- * concise takeaway instead of a random middle paragraph.
- */
-function extractLastSentence(text: string): string {
-  const normalized = text.replace(/\n/g, " ").trim();
-  const matches = normalized.match(/[^。！？?!]+[。！？?!]?/g);
-  if (!matches) return normalized;
-  const sentences = matches.map((s) => s.trim()).filter((s) => s.length > 0);
-  return sentences.at(-1) ?? normalized;
-}
-
 function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const paragraphs = useMemo(() =>
@@ -1210,15 +1195,10 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
       .filter((p) => p.length > 0),
     [block.text]
   );
-  // Official kimi-web ThinkingBlock.vue keeps a concise trailing summary:
-  // take the last sentence, cap it, and let the user expand for the full text.
-  const isFoldable = paragraphs.length > 1 || block.text.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS;
-  const teaser = useMemo(() => {
-    const lastSentence = extractLastSentence(block.text);
-    return lastSentence.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS
-      ? `${lastSentence.slice(0, KIMI_WEB_THINKING_TEASER_MAX_CHARS)}…`
-      : lastSentence;
-  }, [block.text]);
+  // Official kimi-web ThinkingBlock.vue: fold only when there is more than one
+  // paragraph, and show the LAST paragraph (untruncated) as the teaser.
+  const isFoldable = paragraphs.length > 1;
+  const teaser = paragraphs.at(-1) ?? block.text;
   if (isLive) {
     return (
       <div
@@ -1263,7 +1243,9 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
 /**
  * Intermediate body text that appears inside the expanded process timeline.
  * It is NOT the final answer, so it uses the same secondary style as thinking
- * summaries and can be folded to its last sentence.
+ * summaries and follows the same fold-to-last-paragraph rule as official
+ * kimi-web ThinkingBlock.vue. No side indent: it shares the process timeline
+ * column with thinking teasers and tool cards.
  */
 function KimiWebIntermediateTextBlock({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -1274,15 +1256,10 @@ function KimiWebIntermediateTextBlock({ content }: { content: string }) {
       .filter((p) => p.length > 0),
     [content]
   );
-  const isFoldable = paragraphs.length > 1 || content.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS;
-  const teaser = useMemo(() => {
-    const lastSentence = extractLastSentence(content);
-    return lastSentence.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS
-      ? `${lastSentence.slice(0, KIMI_WEB_THINKING_TEASER_MAX_CHARS)}…`
-      : lastSentence;
-  }, [content]);
+  const isFoldable = paragraphs.length > 1;
+  const teaser = paragraphs.at(-1) ?? content;
   return (
-    <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
+    <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
       {isFoldable ? (
         <button
           type="button"

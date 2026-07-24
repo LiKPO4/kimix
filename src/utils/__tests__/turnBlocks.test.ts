@@ -180,6 +180,36 @@ describe("buildTurnBlocks", () => {
     expect(joined).not.toContain("子代理2内部结论");
     expect(joined).not.toContain("内部思考");
   });
+
+  it("does not merge text blocks across a content-less step boundary", () => {
+    // Server route emits a content-less assistant_message (step.end /
+    // turn.ended) between two text-bearing steps. That boundary must split
+    // them into independent text blocks so the final answer stays separated
+    // from intermediate body text.
+    const events: TimelineEvent[] = [
+      assistant("a-step1", "中途正文：先分析一下问题。"),
+      assistant("a-step1-end", "", undefined, nextTimestamp()),
+      assistant("a-step2", "最终答案：问题已解决。"),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    expect(textBlocks.length).toBe(2);
+    expect(textBlocks[0].content).toBe("中途正文：先分析一下问题。");
+    expect(textBlocks[1].content).toBe("最终答案：问题已解决。");
+  });
+
+  it("still merges adjacent text deltas inside one step", () => {
+    // Streaming deltas within the same step (no content-less boundary between
+    // them) must keep merging into one text block.
+    const events: TimelineEvent[] = [
+      assistant("a-delta1", "第一段。"),
+      assistant("a-delta2", "第二段。"),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    expect(textBlocks.length).toBe(1);
+    expect(textBlocks[0].content).toBe("第一段。\n\n第二段。");
+  });
 });
 
 describe("buildRenderItems with official-order turn", () => {
