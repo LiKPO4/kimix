@@ -342,8 +342,12 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       setMessage("请先选择一个第三方 Provider。");
       return;
     }
-    if (!modelDraft.modelAlias.trim() || !modelDraft.model.trim() || contextSize === null) {
-      setMessage("请填写有效的模型别名、模型 ID 和 Context。");
+    const trimmedModel = modelDraft.model.trim();
+    const trimmedAlias = modelDraft.modelAlias.trim();
+    const effectiveAlias = trimmedAlias || trimmedModel;
+
+    if (!trimmedModel || contextSize === null) {
+      setMessage("请填写有效的模型 ID 和 Context。");
       return;
     }
     setBusyAction("model");
@@ -351,8 +355,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     try {
       const res = await window.api.saveKimiProviderModel({
         providerName: selectedGroup.provider.name,
-        modelAlias: modelDraft.modelAlias.trim(),
-        model: modelDraft.model.trim(),
+        modelAlias: effectiveAlias,
+        model: trimmedModel,
         maxContextSize: contextSize,
         supportEfforts: modelDraft.supportEfforts,
         defaultEffort: modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : null,
@@ -361,7 +365,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         setMessage(`模型保存失败：${res.error}`);
         return;
       }
-      setSelectedModelAlias(modelDraft.modelAlias.trim());
+      setSelectedModelAlias(effectiveAlias);
       await applyConfigResult(res.data, "已保存 Provider 模型");
     } catch (error) {
       setMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
@@ -798,8 +802,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       <input value={modelDraft.model} onChange={(event) => setModelDraft((current) => ({ ...current, model: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder="例如 gpt-5.1" />
                     </label>
                     <label className="min-w-0">
-                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名</span>
-                      <input value={modelDraft.modelAlias} disabled={Boolean(selectedModelAlias)} onChange={(event) => setModelDraft((current) => ({ ...current, modelAlias: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder={`${selectedGroup.provider.name}/model-id`} />
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名（可选）</span>
+                      <input value={modelDraft.modelAlias} disabled={Boolean(selectedModelAlias)} onChange={(event) => setModelDraft((current) => ({ ...current, modelAlias: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder={modelDraft.model.trim() ? `不填则自动为 ${modelDraft.model.trim()}` : `${selectedGroup.provider.name}/model-id`} />
                     </label>
                   </div>
                   <div style={{ marginTop: 14 }}>

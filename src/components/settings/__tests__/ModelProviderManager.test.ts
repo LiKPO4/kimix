@@ -354,4 +354,33 @@ describe("ModelProviderManager", () => {
     expect((container.querySelector('button[aria-label="删除 gateway/model-b"]') as HTMLButtonElement).disabled).toBe(false);
     await act(async () => root.unmount());
   });
+
+  it("automatically uses model ID as modelAlias when modelAlias is omitted", async () => {
+    const saveKimiProviderModel = vi.fn().mockResolvedValue({
+      success: true,
+      data: { ...emptyProviderConfig, message: "已保存 Provider 模型" },
+    });
+    const getKimiModelConfig = vi.fn().mockResolvedValue({ success: true, data: emptyProviderConfig });
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { saveKimiProviderModel, getKimiModelConfig },
+    });
+    const { container, root } = await renderManager(emptyProviderConfig);
+
+    const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "my-custom-model");
+      modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find((btn) => btn.textContent?.includes("保存模型"));
+    await act(async () => saveButton?.click());
+
+    expect(saveKimiProviderModel).toHaveBeenCalledWith(expect.objectContaining({
+      providerName: "gateway",
+      model: "my-custom-model",
+      modelAlias: "my-custom-model",
+    }));
+    await act(async () => root.unmount());
+  });
 });
