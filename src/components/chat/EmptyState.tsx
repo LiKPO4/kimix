@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bug, GitBranch, ListChecks, Sparkles } from "lucide-react";
+import { Bug, GitBranch, ListChecks, RotateCcw, Sparkles } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Session, TimelineEvent } from "@/types/ui";
@@ -53,7 +53,7 @@ function loadProjectSuggestions(projectPath: string): string[] {
 
 function saveProjectSuggestions(projectPath: string, items: string[]) {
   try {
-    localStorage.setItem(storageKey(projectPath), JSON.stringify(items.slice(0, 4)));
+    localStorage.setItem(storageKey(projectPath), JSON.stringify(items.slice(0, 5)));
   } catch {
     // localStorage can fail in restricted environments; suggestions still work with defaults.
   }
@@ -102,9 +102,9 @@ export function EmptyState() {
       "分析项目结构，找出 3 个最该优先处理的问题",
     ].filter(Boolean);
 
-    const unique = Array.from(new Set(dynamic)).slice(0, 4);
+    const unique = Array.from(new Set(dynamic)).slice(0, 5);
     return unique.map((text) => ({
-      icon: text.startsWith("继续：") ? ListChecks : (SUGGESTION_ICONS[text] ?? Sparkles),
+      icon: text.startsWith("继续：") ? RotateCcw : (SUGGESTION_ICONS[text] ?? Sparkles),
       text,
     }));
   }, [project, savedSuggestions, sessions]);
