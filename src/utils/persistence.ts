@@ -379,13 +379,35 @@ async function stripImagesFromPending(pending: PendingMessage[], into: StoredIma
   );
 }
 
-function collectImageRefs(value: unknown, refs: Set<string>): void {
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectImageRefs(item, refs));
-  } else if (value && typeof value === "object") {
-    const record = value as { imageRef?: unknown };
-    if (typeof record.imageRef === "string") refs.add(record.imageRef);
-    Object.values(value as Record<string, unknown>).forEach((item) => collectImageRefs(item, refs));
+function collectImageRefsFromSessions(sessions: unknown[], refs: Set<string>): void {
+  for (const item of sessions) {
+    if (!item || typeof item !== "object") continue;
+    const session = item as { events?: TimelineEvent[]; collaboration?: { messages?: { images?: { imageRef?: string }[] }[] } };
+    for (const event of session.events ?? []) {
+      if (event.type === "user_message" || event.type === "steer_message") {
+        for (const img of (event as Extract<TimelineEvent, { type: "user_message" }>).images ?? []) {
+          const ref = (img as { imageRef?: string }).imageRef;
+          if (ref) refs.add(ref);
+        }
+      }
+    }
+    if (session.collaboration?.messages) {
+      for (const msg of session.collaboration.messages) {
+        for (const img of msg.images ?? []) {
+          if (img?.imageRef) refs.add(img.imageRef);
+        }
+      }
+    }
+  }
+}
+
+function collectImageRefsFromPending(pending: unknown[], refs: Set<string>): void {
+  for (const item of pending) {
+    if (!item || typeof item !== "object") continue;
+    const msg = item as { images?: { imageRef?: string }[] };
+    for (const img of msg.images ?? []) {
+      if (img?.imageRef) refs.add(img.imageRef);
+    }
   }
 }
 
@@ -486,8 +508,8 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
     ], images));
 
     const referencedRefs = new Set<string>();
-    collectImageRefs(strippedSessions, referencedRefs);
-    collectImageRefs(strippedPending, referencedRefs);
+    collectImageRefsFromSessions(strippedSessions, referencedRefs);
+    collectImageRefsFromPending(strippedPending, referencedRefs);
 
     const allIds = await getAllImageIds();
     const toDelete = allIds.filter((id) => !referencedRefs.has(id));
@@ -605,7 +627,7 @@ export async function loadLocalSessions(): Promise<Session[]> {
   const raw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
   if (!raw || !Array.isArray(raw)) return [];
   const refs = new Set<string>();
-  raw.forEach((session) => collectImageRefs(session, refs));
+  collectImageRefsFromSessions(raw, refs);
   const dataUrlById = await loadImages(Array.from(refs));
   // Replay duplication repair: histories written before the snapshot user
   // dedup guards may contain repeated user messages; clean once on load.
@@ -626,7 +648,7 @@ export async function loadLocalPendingMessages(): Promise<PendingMessage[]> {
   const raw = await getStateItem<unknown[]>(LOCAL_PENDING_KEY);
   if (!raw || !Array.isArray(raw)) return [];
   const refs = new Set<string>();
-  raw.forEach((item) => collectImageRefs(item, refs));
+  collectImageRefsFromPending(raw, refs);
   const dataUrlById = await loadImages(Array.from(refs));
   return hydratePending(raw, dataUrlById);
 }
