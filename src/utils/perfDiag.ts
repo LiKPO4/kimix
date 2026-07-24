@@ -47,6 +47,26 @@ export function timeSync<T>(label: string, fn: () => T): T {
   }
 }
 
+/**
+ * Measure an asynchronous hot-path section, await included — work hidden in
+ * promise continuations (e.g. JSON.stringify inside an IndexedDB commit) is
+ * invisible to timeSync but attributed here. Accumulates into the same
+ * bucket table as timeSync under the same diag flag.
+ */
+export async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  if (!isPerfDiagEnabled()) return fn();
+  const start = performance.now();
+  try {
+    return await fn();
+  } finally {
+    const elapsed = performance.now() - start;
+    const bucket = timings[label] ?? (timings[label] = { count: 0, totalMs: 0, maxMs: 0 });
+    bucket.count += 1;
+    bucket.totalMs += elapsed;
+    bucket.maxMs = Math.max(bucket.maxMs, elapsed);
+  }
+}
+
 export function noteProfilerCommit(label: string, actualDuration: number) {
   if (!isPerfDiagEnabled()) return;
   const bucket = timings[label] ?? (timings[label] = { count: 0, totalMs: 0, maxMs: 0 });

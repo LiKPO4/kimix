@@ -15,7 +15,7 @@ import {
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
-import { timeSync } from "./perfDiag";
+import { timeAsync, timeSync } from "./perfDiag";
 import { stripLegacyKimixClarificationWrapper } from "./eventMapper";
 import {
   commitState,
@@ -35,6 +35,9 @@ export const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 const STREAMING_PERSIST_DEBOUNCE_MS = 5000;
 const STREAMING_MAX_PERSIST_WAIT_MS = 60_000;
 const IDLE_MAX_PERSIST_WAIT_MS = 5000;
+const STARTUP_PERSIST_DEBOUNCE_MS = 10_000;
+const STARTUP_MAX_PERSIST_WAIT_MS = 30_000;
+const STARTUP_WINDOW_MS = 30_000;
 
 /**
  * Persist cadence for the debounced session-state writer. Each persist walks
@@ -45,13 +48,31 @@ const IDLE_MAX_PERSIST_WAIT_MS = 5000;
  * streaming ends, on archive/delete, on visibility loss, and on unload.
  * Server-backed sessions re-import from canonical history after a crash, so
  * the wider window is safe.
+ *
+ * The startup window (first 30s of renderer lifetime) gets the same trade:
+ * the history-repair loop and catalog sync each produce real setState changes
+ * that would otherwise schedule near-immediate full persists (measured: two
+ * 70MB persists ≈ 3.3s of long tasks during startup), so the idle cadence
+ * stretches to a 10s debounce with a 30s ceiling to coalesce the storm into
+ * at most 1-2 writes. The explicit flush paths (archive/delete, streaming
+ * end, visibility loss, beforeunload) never go through this function and are
+ * unaffected; repairs are idempotent and re-run on the next launch, so the
+ * wider durability window is safe. `startupWindowActive` is injectable for
+ * tests; when omitted it is probed from performance.now().
  */
 export function resolvePersistDelayMs(options: {
   streaming: boolean;
   elapsedSincePersistMs: number;
+  startupWindowActive?: boolean;
 }): number {
-  const debounce = options.streaming ? STREAMING_PERSIST_DEBOUNCE_MS : LOCAL_PERSIST_DEBOUNCE_MS;
-  const maxWait = options.streaming ? STREAMING_MAX_PERSIST_WAIT_MS : IDLE_MAX_PERSIST_WAIT_MS;
+  const startupWindowActive = options.startupWindowActive
+    ?? (typeof performance !== "undefined" && performance.now() < STARTUP_WINDOW_MS);
+  const debounce = options.streaming
+    ? STREAMING_PERSIST_DEBOUNCE_MS
+    : startupWindowActive ? STARTUP_PERSIST_DEBOUNCE_MS : LOCAL_PERSIST_DEBOUNCE_MS;
+  const maxWait = options.streaming
+    ? STREAMING_MAX_PERSIST_WAIT_MS
+    : startupWindowActive ? STARTUP_MAX_PERSIST_WAIT_MS : IDLE_MAX_PERSIST_WAIT_MS;
   return Math.max(0, Math.min(debounce, maxWait - options.elapsedSincePersistMs));
 }
 
@@ -509,17 +530,26 @@ export function markConversationStatePersisted(sessions?: Session[], pendingMess
 
 async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   isPersisting = true;
+  const runStart = performance.now();
+  let stripMs = 0;
+  let commitMs = 0;
   try {
     const images: StoredImage[] = [];
+    const stripStart = performance.now();
     const [strippedSessions, strippedPending] = await Promise.all([
       timeSync("persist.stripSessions", () => stripImagesFromSessions(snapshot.sessions, images)),
       stripImagesFromPending(snapshot.pendingMessages, images),
     ]);
+    stripMs = performance.now() - stripStart;
 
-    await timeSync("persist.commitState", () => commitState([
+    // commitState hides the full JSON.stringify inside its async section, so
+    // timeSync under-reports it; timeAsync attributes the whole await.
+    const commitStart = performance.now();
+    await timeAsync("persist.commitState", () => commitState([
       { key: LOCAL_SESSIONS_KEY, value: strippedSessions },
       { key: LOCAL_PENDING_KEY, value: strippedPending },
     ], images));
+    commitMs = performance.now() - commitStart;
 
     const referencedRefs = new Set<string>();
     collectImageRefsFromSessions(strippedSessions, referencedRefs);
@@ -530,6 +560,20 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
     if (toDelete.length > 0) {
       await deleteImages(toDelete);
     }
+
+    // One low-frequency attribution entry per actual disk write (the
+    // reference-guard skip path never reaches here), so startup long tasks
+    // can be charged to the persist that caused them.
+    void window.api?.writeDiag?.({
+      message: "persist.run",
+      data: {
+        sessionCount: snapshot.sessions.length,
+        totalEvents: snapshot.sessions.reduce((sum, session) => sum + session.events.length, 0),
+        stripMs: Math.round(stripMs),
+        commitMs: Math.round(commitMs),
+        totalMs: Math.round(performance.now() - runStart),
+      },
+    })?.catch?.(() => {});
 
     if (persistQueue) {
       const next = persistQueue;
