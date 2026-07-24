@@ -42,6 +42,15 @@ function previewText(value: string, limit = TEXT_PREVIEW_LIMIT) {
   return `${head}\n...（已省略 ${value.length - head.length} 字，避免过程卡片卡顿）`;
 }
 
+function unEscapeJsonStringLiterals(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "")
+    .replace(/\\t/g, "  ")
+    .replace(/\\"/g, '"');
+}
+
 function compactValue(value: unknown, key = "", depth = 0): unknown {
   if (typeof value === "string") {
     const shouldSummarize = LARGE_TEXT_KEYS.has(key) || value.length > TEXT_PREVIEW_LIMIT;
@@ -71,22 +80,22 @@ function compactValue(value: unknown, key = "", depth = 0): unknown {
 
 function stringifyCompact(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string") return previewText(value, DETAIL_LIMIT);
+  if (typeof value === "string") return unEscapeJsonStringLiterals(previewText(value, DETAIL_LIMIT));
   try {
-    const text = JSON.stringify(compactValue(value), null, 2);
+    const text = unEscapeJsonStringLiterals(JSON.stringify(compactValue(value), null, 2));
     return text.length > DETAIL_LIMIT ? `${text.slice(0, DETAIL_LIMIT).trimEnd()}\n...（已省略 ${text.length - DETAIL_LIMIT} 字）` : text;
   } catch {
-    return String(value);
+    return unEscapeJsonStringLiterals(String(value));
   }
 }
 
 function stringifyFull(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return unEscapeJsonStringLiterals(value);
   try {
-    return JSON.stringify(value, null, 2);
+    return unEscapeJsonStringLiterals(JSON.stringify(value, null, 2));
   } catch {
-    return String(value);
+    return unEscapeJsonStringLiterals(String(value));
   }
 }
 

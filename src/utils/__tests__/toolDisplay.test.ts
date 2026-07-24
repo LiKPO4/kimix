@@ -49,4 +49,24 @@ describe("toolDisplay", () => {
     expect(toolArgumentPreview(event)).toBe("plans/next.md");
     expect(formatToolArgumentsForDisplay(event)).not.toContain('"}{"path"');
   });
+
+  it("unescapes escaped newlines and quotes in stringified arguments for proper rich text line breaks", () => {
+    const event: Extract<TimelineEvent, { type: "tool_call" }> = {
+      id: "tool-2",
+      type: "tool_call",
+      timestamp: 1,
+      toolCallId: "call-2",
+      toolName: "AgentSwarm",
+      status: "running",
+      arguments: {
+        description: "排查安卓三问题",
+        prompt_template: "文本 425 字 / 5 行\n你在调查 Windows 剪贴板工具 ClipStash\n\n要求：只读调查",
+      },
+    };
+
+    const formatted = formatToolArgumentsForDisplay(event);
+    expect(formatted).not.toContain("\\n");
+    expect(formatted).toContain("文本 425 字 / 5 行\n你在调查");
+    expect(formatted).toContain("\n\n要求：只读调查");
+  });
 });
