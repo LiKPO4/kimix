@@ -13,6 +13,17 @@
 - 已排除：bootstrap IPC 不含全量 sessions；`deduplicateTimelineEvents` 是 O(n) 非 O(n²)；bbc8d1a image refs 修复完整；v2.16.86 settle 轮询修复无回退。
 - 下一步：用户拍板修复顺序（建议先修 1+2 持久化锤）；或用诊断版实测 `window.KIMIX_PERF()` 验证各根因占比。
 
+## 2026-07-25 修复：启动持久化锤（根因 1+2 落地）
+
+- 方案：`persistLocalConversationState` 引用守卫——store 的 sessions/pendingMessages 数组引用与「上次成功落盘或 hydration 登记」相同则跳过 prepare+strip+stringify，返回 `{success:true}`。
+- 三条不变量（reviewer 独立审查产出）：登记只旧不新（入口捕获快照源引用，禁止 await 后 getState 现值）；hydration 必须先 `markConversationStatePersisted(restoredSessions, 当前pending引用)` 再 setState（订阅同步触发）；跳过必须返回 success（persist 是房间投递/Composer 的 pre-dispatch barrier，失败会回滚）。
+- 落地：persistence.ts 守卫 + 登记 API；App.tsx hydration 两处先登记后 setState（pending 引用必须同时登记，否则 0→N flush 不命中——P0-b 二轮修正）；删除 repairKimiCodeHistoryBodies 4 处绕过防抖的显式落盘（订阅防抖兜底）；其余 9 处直接调用不动（无变化时守卫自动 no-op）。
+- 附带收益：守卫跳过消除「hydration flush 把空 pending 覆盖盘上未发送草稿」的既有读写竞态。
+- 提交：`5bfbe35`（守卫+登记+删 4 处+测试）、`d0605bf`（P0-b pending 引用+hydration 时序测试）。
+- 验证：typecheck；persistence/useStatePersistence 定向 20+19；全量 1127 通过；build 通过。区分：守卫逻辑已验证；启动卡顿实测改善幅度未验证，待用户重启实测（可用 `window.KIMIX_PERF()` 对比）。
+- 知识库：streaming-render-pipeline 补 startup persistence guard 段 + log。
+- 下一步：用户重启实测启动卡顿；剩余根因（loadSession 4s race、eagerMarkdown×settle 窗口、Sidebar O(n²)、4.25MB 单 bundle）按实测占比逐个推进。
+
 ## 2026-07-23 发版：v2.17.0
 
 - 决策：中等版本号跳至 **2.17.0**；Context 近似值、实验 dual-model、强制委派文案、子 Agent 互斥 UI 按用户指示本轮不改。
