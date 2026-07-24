@@ -566,4 +566,38 @@ describe("persistLocalConversationState reference guard", () => {
     entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
     expect(entries.find((entry) => entry.key === "kimix_sessions")?.value).toEqual([]);
   });
+
+  it("skips the startup hydration flush when the pre-load pending reference is marked too", async () => {
+    const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
+    // Mirror the App.tsx hydration order: mark the restored sessions together
+    // with the store's current (still pre-load) pendingMessages reference,
+    // then apply the 0→N sessions setState that triggers the immediate flush.
+    const sessions = [{ ...guardSession }];
+    markConversationStatePersisted(sessions, useSessionStore.getState().pendingMessages);
+    useSessionStore.setState({ sessions });
+
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).not.toHaveBeenCalled();
+
+    // The pending load completes afterwards: mark the loaded array, setState,
+    // and the debounced persist is skipped as well.
+    const loadedPending: PendingMessage[] = [{
+      id: "pending-1",
+      sessionId: guardSession.id,
+      content: "未发送草稿",
+      createdAt: 100,
+    }];
+    markConversationStatePersisted(undefined, loadedPending);
+    useSessionStore.setState({ pendingMessages: loadedPending });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).not.toHaveBeenCalled();
+
+    // Any real change (new sessions reference) still persists normally.
+    useSessionStore.setState({ sessions: [{ ...guardSession, title: "真实变更" }] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+    const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    expect(stored.title).toBe("真实变更");
+  });
 });

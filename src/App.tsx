@@ -2409,11 +2409,15 @@ function App() {
               isLoading: session.id === restoringActiveSessionId,
             });
           });
-          // Register the restored arrays as already durable before setState:
-          // the 0→N subscription treats this as archive/deletion and flushes
-          // immediately, and the guard lets that flush skip the redundant
-          // full stringify of data we just read from disk.
-          markConversationStatePersisted(restoredSessions);
+          // Register the restored sessions together with the store's current
+          // (still pre-load) pendingMessages reference as already durable
+          // before setState: the 0→N subscription treats this as
+          // archive/deletion and flushes immediately, and the guard lets that
+          // flush skip the redundant full stringify of data we just read from
+          // disk. Skipping also avoids writing the empty pre-load pending
+          // array over unsent drafts still sitting on disk (the pending load
+          // below re-reads LOCAL_PENDING_KEY untouched).
+          markConversationStatePersisted(restoredSessions, useSessionStore.getState().pendingMessages);
           useSessionStore.setState({ sessions: restoredSessions });
           restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
           void repairKimiCodeHistoryBodies(restoredSessions);
