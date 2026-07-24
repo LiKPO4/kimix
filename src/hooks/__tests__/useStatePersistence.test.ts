@@ -2,12 +2,22 @@
 
 import { StrictMode, act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
 import { LOCAL_ACTIVE_CONTEXT_KEY } from "@/utils/persistence";
 import { useStatePersistence } from "../useStatePersistence";
+
+const persistConversationMock = vi.fn().mockResolvedValue({ success: true });
+
+vi.mock("@/utils/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/persistence")>();
+  return {
+    ...actual,
+    persistLocalConversationState: () => persistConversationMock(),
+  };
+});
 
 function PersistenceProbe({ activeContextReady = true }: { activeContextReady?: boolean }) {
   useStatePersistence(activeContextReady);
@@ -38,6 +48,7 @@ describe("useStatePersistence", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    persistConversationMock.mockClear();
     useAppStore.setState({ currentProject: null, currentSession: null, runningSessionId: null });
     useSessionStore.setState({ sessions: [], recentProjects: [], pendingMessages: [] });
     container = document.createElement("div");
@@ -109,5 +120,19 @@ describe("useStatePersistence", () => {
     // Allow the async flush promise to settle without crashing.
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
     expect(root).toBeTruthy();
+  });
+
+  it("flushes immediately on archive or deletion without waiting for the debounce", () => {
+    root = createRoot(container);
+    act(() => root?.render(createElement(PersistenceProbe)));
+
+    act(() => useSessionStore.setState({ sessions: [session] }));
+    expect(persistConversationMock).toHaveBeenCalledTimes(1);
+
+    act(() => useSessionStore.setState({ sessions: [{ ...session, archivedAt: 123456 }] }));
+    expect(persistConversationMock).toHaveBeenCalledTimes(2);
+
+    act(() => useSessionStore.setState({ sessions: [] }));
+    expect(persistConversationMock).toHaveBeenCalledTimes(3);
   });
 });

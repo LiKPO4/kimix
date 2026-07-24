@@ -52,6 +52,7 @@ import {
   resetStaleSessionRecommendationEvents,
   loadLocalSessions,
   loadLocalPendingMessages,
+  markConversationStatePersisted,
 } from "@/utils/persistence";
 import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -332,7 +333,6 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
         if (latest && useAppStore.getState().currentSession?.id === session.id) {
           useAppStore.setState({ currentSession: latest });
         }
-        void persistLocalConversationState();
         break;
       }
       if (recoveryAccepted && session.collaboration) {
@@ -345,7 +345,6 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               : item;
           }),
         }));
-        void persistLocalConversationState();
       }
       if (historyReachable && !recoveryAccepted && session.collaboration) {
         useSessionStore.setState((state) => ({
@@ -359,7 +358,6 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               : item
           )),
         }));
-        void persistLocalConversationState();
       }
       if (!historyReachable && session.collaboration) {
         useSessionStore.setState((state) => ({
@@ -373,7 +371,6 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               : item
           )),
         }));
-        void persistLocalConversationState();
       }
     }
   }
@@ -2412,6 +2409,11 @@ function App() {
               isLoading: session.id === restoringActiveSessionId,
             });
           });
+          // Register the restored arrays as already durable before setState:
+          // the 0→N subscription treats this as archive/deletion and flushes
+          // immediately, and the guard lets that flush skip the redundant
+          // full stringify of data we just read from disk.
+          markConversationStatePersisted(restoredSessions);
           useSessionStore.setState({ sessions: restoredSessions });
           restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
           void repairKimiCodeHistoryBodies(restoredSessions);
@@ -2424,6 +2426,7 @@ function App() {
 
       try {
         const pendingMessages = await loadLocalPendingMessages();
+        markConversationStatePersisted(undefined, pendingMessages);
         useSessionStore.setState({ pendingMessages });
       } catch {
         // ignore

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { PendingMessage } from "@/stores/sessionStore";
 import type { Project, RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession, roomAgentActivityKey } from "@/utils/collaborationRooms";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
@@ -485,5 +486,84 @@ describe("persistLocalConversationState", () => {
     const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Array<Record<string, unknown>>)[0];
     expect(stored.collaboration).toEqual(futureRaw);
     expect(stored.unsupportedCollaboration).toBeUndefined();
+  });
+});
+
+describe("persistLocalConversationState reference guard", () => {
+  // Use a dedicated session id so the module-level remembered-collaboration
+  // map populated by earlier tests never rewrites these arrays mid-test.
+  const guardSession: Session = { ...session, id: "ref-guard-session" };
+
+  beforeEach(() => {
+    localStorage.clear();
+    useAppStore.setState({ currentProject: null, currentSession: null, runningSessionId: null, roomAgentActivities: {} });
+    useSessionStore.setState({ sessions: [], recentProjects: [], pendingMessages: [] });
+    commitStateMock.mockReset();
+    getAllImageIdsMock.mockReset().mockResolvedValue([]);
+    deleteImagesMock.mockReset().mockResolvedValue(undefined);
+    getStateItemMock.mockReset().mockResolvedValue(null);
+    loadImagesMock.mockReset().mockResolvedValue(new Map());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("skips the write when the marked references are still current", async () => {
+    const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
+    const sessions = [{ ...guardSession }];
+    const pendingMessages: PendingMessage[] = [];
+    useSessionStore.setState({ sessions, pendingMessages });
+    markConversationStatePersisted(sessions, pendingMessages);
+
+    const result = await persistLocalConversationState();
+    expect(result.success).toBe(true);
+    expect(commitStateMock).not.toHaveBeenCalled();
+  });
+
+  it("skips an unchanged persist after a successful save", async () => {
+    const { persistLocalConversationState } = await import("@/utils/persistence");
+    useSessionStore.setState({ sessions: [{ ...guardSession }], pendingMessages: [] });
+
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists normally once the store references change", async () => {
+    const { persistLocalConversationState } = await import("@/utils/persistence");
+    useSessionStore.setState({ sessions: [{ ...guardSession }], pendingMessages: [] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+
+    useSessionStore.setState({ sessions: [{ ...guardSession, title: "更新后的标题" }] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(2);
+    const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    expect(stored.title).toBe("更新后的标题");
+  });
+
+  it("still persists archive and deletion changes after a successful save", async () => {
+    const { persistLocalConversationState } = await import("@/utils/persistence");
+    useSessionStore.setState({ sessions: [{ ...guardSession }], pendingMessages: [] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+
+    const archived: Session = { ...guardSession, archivedAt: 123456 };
+    useSessionStore.setState({ sessions: [archived] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(2);
+    let entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    expect((entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0].archivedAt).toBe(123456);
+
+    useSessionStore.setState({ sessions: [] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(3);
+    entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    expect(entries.find((entry) => entry.key === "kimix_sessions")?.value).toEqual([]);
   });
 });

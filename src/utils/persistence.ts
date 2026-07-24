@@ -493,6 +493,20 @@ let persistQueue: PersistSnapshot | null = null;
 let isPersisting = false;
 let activePersistPromise: Promise<PersistResult> | null = null;
 
+// Reference guard against redundant persists. Hydration registers the arrays
+// it is about to setState, and every successful write re-registers the
+// references it captured, so a persist triggered by state that is already
+// durable (e.g. the subscription flush right after startup hydration
+// re-applies the sessions it just read from disk) can return before the
+// expensive prepare + strip + stringify walk over the whole sessions value.
+let lastPersistedSessionsRef: Session[] | null = null;
+let lastPersistedPendingRef: PendingMessage[] | null = null;
+
+export function markConversationStatePersisted(sessions?: Session[], pendingMessages?: PendingMessage[]): void {
+  if (sessions !== undefined) lastPersistedSessionsRef = sessions;
+  if (pendingMessages !== undefined) lastPersistedPendingRef = pendingMessages;
+}
+
 async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   isPersisting = true;
   try {
@@ -546,6 +560,14 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
       ? guardedSessions.find((session) => session.id === currentSessionId)
       : undefined;
     if (restoredCurrent) useAppStore.setState({ currentSession: restoredCurrent });
+  }
+  // Skip the expensive persist when the store still holds the exact references
+  // that are already durable (registered by hydration or by the last
+  // successful write). Runs after the collaboration-restore correction above
+  // so that repair side effect is never skipped.
+  const current = useSessionStore.getState();
+  if (lastPersistedSessionsRef === current.sessions && lastPersistedPendingRef === current.pendingMessages) {
+    return { success: true };
   }
   const activeStatuses = new Set(["creating", "queued", "sending", "accepted", "running", "waiting_approval", "waiting_question"]);
   const prepareEvents = (session: Session, roomAgentId: string | null, events: TimelineEvent[]) => {
@@ -617,7 +639,15 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
   const promise = runPersist(snapshot);
   activePersistPromise = promise;
   try {
-    return await promise;
+    const result = await promise;
+    if (result.success) {
+      // Register the entry-captured references rather than the derived
+      // snapshot: if the store moved on while the write was in flight the
+      // references differ and the next call persists normally.
+      lastPersistedSessionsRef = state.sessions;
+      lastPersistedPendingRef = state.pendingMessages;
+    }
+    return result;
   } finally {
     if (activePersistPromise === promise) activePersistPromise = null;
   }
