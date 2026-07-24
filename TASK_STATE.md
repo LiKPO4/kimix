@@ -24,6 +24,15 @@
 - 知识库：streaming-render-pipeline 补 startup persistence guard 段 + log。
 - 下一步：用户重启实测启动卡顿；剩余根因（loadSession 4s race、eagerMarkdown×settle 窗口、Sidebar O(n²)、4.25MB 单 bundle）按实测占比逐个推进。
 
+## 2026-07-25 修复：带图发消息「模型请求失败：/api/v1/files: HTTP 500」
+
+- 现象：Server 路由发带两张截图的消息，整轮失败（截图显示 1 秒内报错 + 已完成）。
+- 取证：错误格式锁定 `kimiCodeServerClient.request`（uploadFile POST）；wire.jsonl 无 prompt 帧（上传阶段即失败，prompt 未发出）；Server 0.29.1（PID 22904）16:32 起持续健康，本地同形态复现（FormData、1x1~20MB、并发两张、token 一致）全部 200——官方 Server 瞬态 500，Kimix 无法根治；`~/.kimi-code/files/index.json` 自 7-11 未更新（0.29.x 不再维护索引，新旧 id 格式不同）。
+- 根因定性：Kimix 健壮性缺陷——upload 失败无任何回退，prompt 也不 fallback SDK 完成本轮（kimiCodeHost.ts:1110-1121 只给下轮换 SDK session）。
+- 修复（`7ab9d3b`）：toServerPromptContent upload 抛错时图片回退 base64 内嵌（与 1fb6311 前官方发图路径同形态），视频不回退，13M base64 文本上限（超限时抛原始错误），console.warn 留痕。
+- 验证：typecheck；定向 49/49；全量 1135 通过；build 通过。真实 500 瞬态无法本地复现，回退路径由单测覆盖。
+- 知识库：runtime-routing 不变量 25 更新 + log。
+
 ## 2026-07-25 修复：启动 persist 风暴压平（用户实测「前 15s 仍 2-3 次卡顿」）
 
 - 取证（diag.log 17:32:19-29Z 启动窗口）：longTasks 12 次共 3350ms、maxMs 851ms；persist.stripSessions 2 次共 392ms（修复前 5-7 次/10s，守卫生效）；timeSync 可见仅 ~400ms，其余 ~2950ms 在盲区——commitState 的 70MB stringify 在 Promise 异步段，timeSync 只计同步段显示 0ms。同窗口 2 条 kimiHistoryReconciliation.rejected 佐证修复循环在跑，2 次真实状态变化各触发一次全量 persist。
