@@ -8,6 +8,7 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
 import { useProjectedTimeline } from "@/hooks/useProjectedTimeline";
 import { noteProfilerCommit, noteRenderTurnBodyRun, timeSync } from "@/utils/perfDiag";
+import { noteStartupRenderCycle, measureSync as measureStartupSync } from "@/utils/startupProfiler";
 import { useChatViewport } from "@/hooks/useChatViewport";
 import { EmptyState } from "./EmptyState";
 import { ChatNavigationRail } from "./ChatNavigationRail";
@@ -1360,15 +1361,18 @@ export const ChatThread = memo(function ChatThread() {
   )));
   const hasPendingMessage = Boolean(session && pendingMessages.some((msg) => msg.sessionId === session.id));
   const renderItems = useMemo(
-    () => timeSync("buildRenderItems", () => buildRenderItems(
-      visibleEvents,
-      session?.engine,
-      splitEvents.attachedByUserId,
-      hasActiveTurn,
-      sessionRoomAgentActivities,
-      completedTurnRenderCacheRef.current,
-      primaryRoomAgentId,
-    )),
+    () => {
+      noteStartupRenderCycle();
+      return measureStartupSync("buildRenderItems", () => timeSync("buildRenderItems", () => buildRenderItems(
+        visibleEvents,
+        session?.engine,
+        splitEvents.attachedByUserId,
+        hasActiveTurn,
+        sessionRoomAgentActivities,
+        completedTurnRenderCacheRef.current,
+        primaryRoomAgentId,
+      )));
+    },
     [visibleEvents, session?.engine, splitEvents.attachedByUserId, hasActiveTurn, sessionRoomAgentActivities, primaryRoomAgentId]
   );
   const surfacedSubagentContentKeysRef = useRef(new Set<string>());

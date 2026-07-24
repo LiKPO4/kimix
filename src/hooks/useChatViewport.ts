@@ -7,6 +7,7 @@ import {
 } from "react";
 import { logError } from "@/utils/reportError";
 import { noteScrollTopWrite } from "@/utils/perfDiag";
+import { noteStartupLayoutEffect, noteStartupScrollTopWrite } from "@/utils/startupProfiler";
 import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import {
   distanceFromBottom,
@@ -593,6 +594,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       setDetachedTailCompensation(plan.tailCompensation, plan.minimumScrollHeight);
       const compensatedScrollHeight = node.scrollHeight;
       ignoreScrollUntilRef.current = Date.now() + 240;
+      noteStartupScrollTopWrite();
       node.scrollTop = plan.targetScrollTop;
       clearResizeAnchor();
       cancelPendingAnchorCapture();
@@ -647,6 +649,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [sessionId, settleUserSubmittedMessageAtBottom]);
 
   useLayoutEffect(() => {
+    noteStartupLayoutEffect();
     const node = scrollRef.current;
     const snapshot = contentResizeSnapshotRef.current;
     if (
@@ -659,6 +662,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       node.scrollHeight < snapshot.scrollHeight
     ) {
       ignoreScrollUntilRef.current = Date.now() + 120;
+      noteStartupScrollTopWrite();
       node.scrollTop = scrollTopPreservingBottomDistance({
         previousScrollHeight: snapshot.scrollHeight,
         previousScrollTop: snapshot.scrollTop,
@@ -680,6 +684,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [contentVersion, sessionId, autoFollowRef, userScrollRef, ignoreScrollUntilRef]);
 
   useLayoutEffect(() => {
+    noteStartupLayoutEffect();
     setPrimedSessionId(null);
     cancelSessionAutoBottom();
     autoFollowRef.current = true;
@@ -704,6 +709,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       const node = scrollRef.current;
       if (node) {
+        noteStartupScrollTopWrite();
         node.scrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
       }
       settleSessionAtBottom();
@@ -740,12 +746,14 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   ]);
 
   useLayoutEffect(() => {
+    noteStartupLayoutEffect();
     if (primedSessionId) {
       settleSessionAtBottom();
     }
   }, [primedSessionId, settleSessionAtBottom]);
 
   useLayoutEffect(() => {
+    noteStartupLayoutEffect();
     const node = scrollRef.current;
     if (!node || !sessionId) return;
     const anchor = pendingTailExpandScrollAnchorRef.current;
@@ -768,6 +776,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
   }, [expandedInitialTailSessionId, sessionId, scrollToBottom, autoFollowRef, userScrollRef, pendingTailExpandScrollAnchorRef, updateShowScrollToBottom, scrollRef]);
 
   useLayoutEffect(() => {
+    noteStartupLayoutEffect();
     const anchor = pendingOlderItemsScrollAnchorRef.current;
     const node = scrollRef.current;
     if (!anchor || !node || olderItemsPage === 0) return;

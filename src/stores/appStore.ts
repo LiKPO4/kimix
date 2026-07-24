@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { noteStartupStateSet } from "@/utils/startupProfiler";
 import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
@@ -135,7 +136,13 @@ export interface AppStore extends AppState {
   setSearchOpen: (open: boolean) => void;
 }
 
-export const useAppStore = create<AppStore>((set) => ({
+export const useAppStore = create<AppStore>((rawSet) => {
+  // Count every store update during the startup profiling window.
+  const set: typeof rawSet = (partial, replace) => {
+    noteStartupStateSet();
+    return rawSet(partial as never, replace as never);
+  };
+  return {
   currentProject: null,
   currentSession: null,
   permissionMode: "manual",
@@ -281,4 +288,5 @@ export const useAppStore = create<AppStore>((set) => ({
       themePalette: state.themePalette === kimiThemePaletteId(normalizedId) ? DEFAULT_THEME_PALETTE_ID : state.themePalette,
     };
   }),
-}));
+  };
+});

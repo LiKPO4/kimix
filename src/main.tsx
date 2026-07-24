@@ -76,6 +76,7 @@ import "./index.css";
 import { applyCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { ensureLongTaskObserver, getPerfDiagSnapshot, resetPerfDiagCounters } from "@/utils/perfDiag";
 import { isPerfDiagEnabled } from "@/utils/perfFlags";
+import { installStartupLongTaskObserver, getStartupProfile } from "@/utils/startupProfiler";
 
 const BROWSER_PREVIEW_SETTINGS_KEY = "kimix_browser_preview_settings";
 
@@ -710,19 +711,26 @@ applyCachedThemeSnapshot();
 reportStartup("after theme snapshot");
 installBrowserPreviewApi();
 reportStartup("after browser preview api");
+installStartupLongTaskObserver();
 ensureLongTaskObserver();
+
 (window as unknown as { KIMIX_PERF: () => unknown }).KIMIX_PERF = () => {
-  const snapshot = getPerfDiagSnapshot();
-  console.group("🚀 Kimix 启动与渲染性能诊断报告 (Perf Diag)");
-  console.log("主线程长任务 (LongTasks >50ms):", snapshot.longTasks);
-  console.log("滚动位置强制重写次数 (scrollTopWrites):", snapshot.scrollTopWrites);
-  console.log("Hot-Path 耗时分布 (Timings):", snapshot.timings);
-  console.log("TurnBody 渲染次数与缓存命中:", {
-    runs: snapshot.renderTurnBodyRuns,
-    cacheHits: snapshot.renderTurnBodyCacheHits,
-  });
+  const perfSnapshot = getPerfDiagSnapshot();
+  const startupProfile = getStartupProfile();
+  console.group("🚀 Kimix 性能诊断报告");
+  console.log("⏱ 启动至今 (ms):", startupProfile.elapsedSinceStartMs);
+  console.log("🔴 主线程长任务 (LongTasks >50ms):", startupProfile.longTasks);
+  console.log("🔄 React 渲染周期:", startupProfile.renderCycles);
+  console.log("📐 LayoutEffect 触发次数:", startupProfile.layoutEffectCycles);
+  console.log("📝 Store setState 调用:", startupProfile.stateSetCalls);
+  console.log("📜 scrollTop 强制写入:", startupProfile.scrollTopWriteCount);
+  console.log("📊 启动阶段耗时:", startupProfile.phases);
+  console.log("--- PerfDiag (需 localStorage 开启) ---");
+  console.log("scrollTopWrites:", perfSnapshot.scrollTopWrites);
+  console.log("timings:", perfSnapshot.timings);
+  console.log("turnBodyRuns:", perfSnapshot.renderTurnBodyRuns, "cacheHits:", perfSnapshot.renderTurnBodyCacheHits);
   console.groupEnd();
-  return snapshot;
+  return { startup: startupProfile, perfDiag: perfSnapshot };
 };
 
 createRoot(rootEl).render(

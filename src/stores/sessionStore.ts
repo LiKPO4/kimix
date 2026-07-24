@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { noteStartupStateSet } from "@/utils/startupProfiler";
 import type { Session, TimelineEvent, Project, UserMessageImage } from "@/types/ui";
 
 export interface PendingMessage {
@@ -43,7 +44,13 @@ function createPendingMessage(sessionId: string, content: string, images: UserMe
   };
 }
 
-export const useSessionStore = create<SessionStore>((set) => ({
+export const useSessionStore = create<SessionStore>((rawSet) => {
+  // Count every store update during the startup profiling window.
+  const set: typeof rawSet = (partial, replace) => {
+    noteStartupStateSet();
+    return rawSet(partial as never, replace as never);
+  };
+  return {
   sessions: [],
   recentProjects: [],
   pendingMessages: [],
@@ -149,4 +156,5 @@ export const useSessionStore = create<SessionStore>((set) => ({
     });
     return result;
   },
-}));
+  };
+});
