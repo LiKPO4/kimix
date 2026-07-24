@@ -24,6 +24,13 @@
 - 知识库：streaming-render-pipeline 补 startup persistence guard 段 + log。
 - 下一步：用户重启实测启动卡顿；剩余根因（loadSession 4s race、eagerMarkdown×settle 窗口、Sidebar O(n²)、4.25MB 单 bundle）按实测占比逐个推进。
 
+## 2026-07-25 修复：启动 persist 风暴压平（用户实测「前 15s 仍 2-3 次卡顿」）
+
+- 取证（diag.log 17:32:19-29Z 启动窗口）：longTasks 12 次共 3350ms、maxMs 851ms；persist.stripSessions 2 次共 392ms（修复前 5-7 次/10s，守卫生效）；timeSync 可见仅 ~400ms，其余 ~2950ms 在盲区——commitState 的 70MB stringify 在 Promise 异步段，timeSync 只计同步段显示 0ms。同窗口 2 条 kimiHistoryReconciliation.rejected 佐证修复循环在跑，2 次真实状态变化各触发一次全量 persist。
+- 修复（`d6e0cb4`）：① resolvePersistDelayMs 加启动档——启动 30s 内非 streaming 按 10s debounce/30s maxWait（streaming 5s/60s、archive-delete/流式结束/切后台/beforeunload 显式 flush 均不变），窗口内 2-3 次全量 persist 合并为最多 1-2 次；② perfDiag 新增 timeAsync，commitState 改用它消除 stringify 计时盲区；③ runPersist 写 `persist.run` 归因日志（sessionCount/totalEvents/stripMs/commitMs/totalMs），下次取证直接可见每次落盘成本。
+- 验证：typecheck；定向 26/26；全量 1132 通过；build 通过。实测改善待用户重启确认（diag.log 看 persist.run 条数与 longTasks 对比）。
+- 知识库：streaming-render-pipeline 持久化段补启动档。
+
 ## 2026-07-23 发版：v2.17.0
 
 - 决策：中等版本号跳至 **2.17.0**；Context 近似值、实验 dual-model、强制委派文案、子 Agent 互斥 UI 按用户指示本轮不改。
