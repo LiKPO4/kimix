@@ -1220,13 +1220,24 @@ function readSecondaryModelFromToml(raw: string): { model: string | null; defaul
 function removeTomlSection(raw: string, sectionName: string) {
   const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
   const matches = Array.from(raw.matchAll(sectionPattern));
-  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
-  if (matchIndex < 0) return raw;
-  const start = matches[matchIndex].index ?? 0;
-  const end = matches[matchIndex + 1]?.index ?? raw.length;
-  const before = raw.slice(0, start).trimEnd();
-  const after = raw.slice(end).trimStart();
-  return `${before}${before && after ? "\n\n" : ""}${after}`;
+  // Remove ALL matching sections, not just the first, so duplicate writes do
+  // not accumulate.
+  const targetIndexes: number[] = [];
+  matches.forEach((match, index) => {
+    if (match[1].trim() === sectionName) targetIndexes.push(index);
+  });
+  if (targetIndexes.length === 0) return raw;
+  let result = raw;
+  // Process from last to first so indexes stay valid.
+  for (let i = targetIndexes.length - 1; i >= 0; i--) {
+    const matchIndex = targetIndexes[i];
+    const start = matches[matchIndex].index ?? 0;
+    const end = matches[matchIndex + 1]?.index ?? result.length;
+    const before = result.slice(0, start).trimEnd();
+    const after = result.slice(end).trimStart();
+    result = `${before}${before && after ? "\n\n" : ""}${after}`;
+  }
+  return result;
 }
 
 function readTomlBoolean(sectionText: string, key: string) {
@@ -1636,20 +1647,20 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
   const model = config.model || null;
   const defaultEffort = config.defaultEffort || null;
   backupFileIfExists(configPath);
-  let next = raw;
-  if (model) {
-    next = setTomlSectionValue(next, "secondary_model", "model", `"${escapeTomlString(model)}"`);
-  } else {
-    next = removeTomlSectionValue(next, "secondary_model", "model");
-  }
-  if (defaultEffort) {
-    next = setTomlSectionValue(next, "secondary_model", "default_effort", `"${escapeTomlString(defaultEffort)}"`);
-  } else {
-    next = removeTomlSectionValue(next, "secondary_model", "default_effort");
-  }
-  // Remove the entire [secondary_model] section if both keys are gone.
-  if (!model && !defaultEffort) {
-    next = removeTomlSection(next, "secondary_model");
+  // Remove ALL existing [secondary_model] sections first (prior writes may have
+  // left duplicates with non-standard formatting that the TOML editor cannot
+  // match), then write a single clean section if needed.
+  let next = removeTomlSection(raw, "secondary_model");
+  // Also strip any malformed inline-section remnants like `[secondary_model]key = ...`
+  next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
+  next = next.replace(/\n{3,}/g, "\n\n");
+  if (model || defaultEffort) {
+    const newline = next.includes("\r\n") ? "\r\n" : "\n";
+    const lines: string[] = [`[secondary_model]`];
+    if (model) lines.push(`model = "${escapeTomlString(model)}"`);
+    if (defaultEffort) lines.push(`default_effort = "${escapeTomlString(defaultEffort)}"`);
+    const base = next.trimEnd();
+    next = `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
   }
   fs.writeFileSync(configPath, next, "utf-8");
   await reloadIdleKimiCodeSessionsAfterConfigChange();
