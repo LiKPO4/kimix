@@ -861,11 +861,13 @@ export function buildRenderItems(
     // session. Stale incomplete flags from the previous turn must not consume
     // the next turn's session-level runtime state.
     const isSupersededPrimaryTurn = isPrimaryRoomAgentTurn && hasLaterUserBoundary && !activeRoomAgentTurn;
-    const turnSettled = isSupersededPrimaryTurn || (
+    const hasPendingToolOrSubagent = tools.some((event) => event.status === "running") ||
+      subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended");
+    const isSessionLevelTurnStopped = !isSessionRunning && !activeRoomAgentTurn && !hasPendingToolOrSubagent;
+    const turnSettled = isSupersededPrimaryTurn || isSessionLevelTurnStopped || (
       !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&
-      !tools.some((event) => event.status === "running") &&
-      !subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended")
+      !hasPendingToolOrSubagent
     );
     const projectedFailureAssistant: Extract<TimelineEvent, { type: "assistant_message" }> | undefined = !mergedAssistantEvent && turnSettled && turnUserEvent && errorEvents.length > 0
       ? {
