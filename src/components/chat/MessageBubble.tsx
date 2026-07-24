@@ -1186,6 +1186,21 @@ const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
+const KIMI_WEB_THINKING_TEASER_MAX_CHARS = 220;
+
+/**
+ * Extract the trailing sentence for a thinking teaser. Official kimi-web keeps
+ * the last sentence (delimited by 。！？?!) so the folded summary ends with a
+ * concise takeaway instead of a random middle paragraph.
+ */
+function extractLastSentence(text: string): string {
+  const normalized = text.replace(/\n/g, " ").trim();
+  const matches = normalized.match(/[^。！？?!]+[。！？?!]?/g);
+  if (!matches) return normalized;
+  const sentences = matches.map((s) => s.trim()).filter((s) => s.length > 0);
+  return sentences.at(-1) ?? normalized;
+}
+
 function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const paragraphs = useMemo(() =>
@@ -1195,11 +1210,15 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
       .filter((p) => p.length > 0),
     [block.text]
   );
-  // Match the official kimi-web ThinkingBlock.vue behavior:
-  // single-paragraph thinking is shown straight; multi-paragraph thinking
-  // is folded to its last paragraph and expands inline on click.
-  const isFoldable = paragraphs.length > 1;
-  const teaser = paragraphs.at(-1) ?? block.text;
+  // Official kimi-web ThinkingBlock.vue keeps a concise trailing summary:
+  // take the last sentence, cap it, and let the user expand for the full text.
+  const isFoldable = paragraphs.length > 1 || block.text.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS;
+  const teaser = useMemo(() => {
+    const lastSentence = extractLastSentence(block.text);
+    return lastSentence.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS
+      ? `${lastSentence.slice(0, KIMI_WEB_THINKING_TEASER_MAX_CHARS)}…`
+      : lastSentence;
+  }, [block.text]);
   if (isLive) {
     return (
       <div
@@ -1235,6 +1254,58 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
           style={{ whiteSpace: "pre-wrap" }}
         >
           {block.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Intermediate body text that appears inside the expanded process timeline.
+ * It is NOT the final answer, so it uses the same secondary style as thinking
+ * summaries and can be folded to its last sentence.
+ */
+function KimiWebIntermediateTextBlock({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const paragraphs = useMemo(() =>
+    content
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0),
+    [content]
+  );
+  const isFoldable = paragraphs.length > 1 || content.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS;
+  const teaser = useMemo(() => {
+    const lastSentence = extractLastSentence(content);
+    return lastSentence.length > KIMI_WEB_THINKING_TEASER_MAX_CHARS
+      ? `${lastSentence.slice(0, KIMI_WEB_THINKING_TEASER_MAX_CHARS)}…`
+      : lastSentence;
+  }, [content]);
+  return (
+    <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
+      {isFoldable ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
+          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+        >
+          {teaser}
+        </button>
+      ) : (
+        <div
+          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+        >
+          {content}
+        </div>
+      )}
+      {expanded && isFoldable && (
+        <div
+          className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
+          style={{ whiteSpace: "pre-wrap" }}
+        >
+          {content}
         </div>
       )}
     </div>
@@ -1901,31 +1972,28 @@ function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
 
 /**
  * Official-style interleaved turn timeline (kimi-web mode, expanded): thinking
- * teasers, aggregated tool-run cards, subagent task cards, approvals and text
- * markdown render exactly where they happened in the turn.
+ * teasers, aggregated tool-run cards, subagent task cards, approvals and
+ * intermediate body text render exactly where they happened in the turn.
+ *
+ * The final text block is intentionally skipped here: it is rendered as the
+ * bottom body Markdown so the answer stays in the answer area and is not
+ * duplicated in the process detail.
  */
-function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false, isComplete }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean; isComplete: boolean }) {
+function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
+  const lastTextGroupIndex = useMemo(() => {
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i].type === "text") return i;
+    }
+    return -1;
+  }, [groups]);
   return (
     <div className="flex min-w-0 flex-col" style={{ gap: 10 }}>
       {groups.map((group, index) => {
         if (group.type === "text") {
-          const isLastGroup = index === groups.length - 1;
-          const streaming = isActiveAssistant && isLastGroup;
-          return (
-            <div
-              key={group.key}
-              className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]"
-              style={{ paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}
-            >
-              <MarkdownRenderer
-                content={group.content}
-                streaming={streaming}
-                normalizeAssistantProgress
-                deferOffscreen={!streaming && isComplete && group.content.length > 1200}
-              />
-            </div>
-          );
+          // Skip the final answer segment; it is rendered as the bottom body.
+          if (index === lastTextGroupIndex) return null;
+          return <KimiWebIntermediateTextBlock key={group.key} content={group.content} />;
         }
         return (
           <TurnBlocksProcessGroup
@@ -2177,7 +2245,6 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
                 isActiveAssistant={isActiveAssistant}
                 hasFinalContent={hasFinalContent}
                 preserveDuringFinalTransition={isFinalContentTransition}
-                isComplete={event.isComplete}
               />
             ) : (
             <KimiWebProcessList
@@ -2541,7 +2608,9 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
 function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false, turnBlocks }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean; turnBlocks?: TurnBlock[] }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
-  const [processExpanded, setProcessExpanded] = useState(false);
+  // processExpanded is tracked only so the process summary can notify the
+  // bubble of expand/collapse transitions; the body no longer depends on it.
+  const [, setProcessExpanded] = useState(false);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
@@ -2596,19 +2665,17 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     };
   }, [event, displayThinking, displayThinkingParts]);
   const hasContent = displayContent.trim().length > 0;
+  // In kimi-web block mode the bottom body should show only the final text
+  // segment (the answer). Earlier intermediate text segments live inside the
+  // expanded process timeline. When blocks are unavailable, fall back to the
+  // full merged content as before.
+  const finalTextBlockContent = useMemo(() => {
+    if (!turnBlocks) return displayContent;
+    const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    return textBlocks.at(-1)?.content ?? displayContent;
+  }, [turnBlocks, displayContent]);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
-  // When the process detail is expanded under kimi-web + ordered turn blocks,
-  // text segments already render inline in TurnBlocksTimeline — suppress the
-  // bottom body Markdown to avoid duplicating every "你好霖江路" segment.
-  // Footer (copy / usage / change summary) still renders underneath.
-  const bodyContentSuppressed = Boolean(
-    turnBlocks &&
-    processDisplayMode === "kimi-web" &&
-    !hideProcessSummary &&
-    processExpanded &&
-    hasContent
-  );
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
   const footerFallbackLabel = isInterrupted
     ? "输出打断"
@@ -2680,11 +2747,10 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
 
         {shouldShowBodyFooter && (
           <AssistantBodyBlock
-            // Render body Markdown only when the interleaved timeline is not
-            // already painting the same text segments (expanded kimi-web
-            // turnBlocks). Copy/export always receives the full displayContent
-            // via the props below so the clipboard never goes empty.
-            content={bodyContentSuppressed ? "" : displayContent}
+            // The bottom body is the final answer segment only. Copy/export
+            // still receives the full displayContent so the clipboard keeps
+            // everything including intermediate text segments.
+            content={finalTextBlockContent}
             thinking={displayThinking || undefined}
             thinkingParts={displayThinkingParts}
             timestamp={event.timestamp}
