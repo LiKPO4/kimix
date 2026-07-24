@@ -9,11 +9,18 @@ import { displayProjectName } from "@/utils/projectDisplay";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
 const FALLBACK_SUGGESTIONS = [
-  { icon: Sparkles, text: "分析项目结构，找出 3 个最该优先处理的问题" },
+  { icon: Sparkles, text: "快速全面了解一下当前的项目" },
   { icon: ListChecks, text: "读取最近会话和 Git 改动，整理待办与下一步" },
   { icon: GitBranch, text: "检查未提交改动风险，给出代码审查意见" },
-  { icon: Bug, text: "定位最影响使用的问题，给出复现步骤" },
+  { icon: Bug, text: "分析项目结构，找出 3 个最该优先处理的问题" },
 ];
+
+const SUGGESTION_ICONS: Record<string, typeof Sparkles> = {
+  "快速全面了解一下当前的项目": Sparkles,
+  "读取最近会话和 Git 改动，整理待办与下一步": ListChecks,
+  "检查未提交改动风险，给出代码审查意见": GitBranch,
+  "分析项目结构，找出 3 个最该优先处理的问题": Bug,
+};
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -89,14 +96,17 @@ export function EmptyState() {
     const dynamic = [
       ...savedSuggestions,
       lastUserMessage?.type === "user_message" ? `继续：${lastUserMessage.content.slice(0, 28)}` : "",
+      "快速全面了解一下当前的项目",
       "读取最近会话和 Git 改动，整理待办与下一步",
       "检查未提交改动风险，给出代码审查意见",
       "分析项目结构，找出 3 个最该优先处理的问题",
     ].filter(Boolean);
 
     const unique = Array.from(new Set(dynamic)).slice(0, 4);
-    const icons = [ListChecks, GitBranch, Bug, Sparkles];
-    return unique.map((text, index) => ({ icon: icons[index] ?? Sparkles, text }));
+    return unique.map((text) => ({
+      icon: text.startsWith("继续：") ? ListChecks : (SUGGESTION_ICONS[text] ?? Sparkles),
+      text,
+    }));
   }, [project, savedSuggestions, sessions]);
 
   const ensureSession = async (): Promise<Session | null> => {
