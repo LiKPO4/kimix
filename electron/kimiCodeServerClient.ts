@@ -290,6 +290,7 @@ export type ServerFrame = {
   seq?: number;
   epoch?: string;
   volatile?: boolean;
+  offset?: number;
   session_id?: string;
   payload?: unknown;
 };
@@ -495,7 +496,13 @@ export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> 
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>
     : {};
-  return { type: frame.type, ...payload, seq: frame.seq, kimixTerminalScope: "prompt" };
+  return {
+    type: frame.type,
+    ...payload,
+    seq: frame.seq,
+    ...(typeof frame.offset === "number" ? { offset: frame.offset } : {}),
+    kimixTerminalScope: "prompt",
+  };
 }
 
 export function recoveredPromptCompletedFrame(

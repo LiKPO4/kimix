@@ -17,6 +17,9 @@ export type ActiveTurnDraft = {
   model?: string;
   agentRole?: AssistantMessage["agentRole"];
   timestamp: number;
+  /** 0.29 Server volatile delta 的流锚点（内容/思考各自的累计长度），null 表示未锚定。 */
+  streamContentAnchor?: number | null;
+  streamThinkAnchor?: number | null;
 };
 
 type DraftListener = () => void;
@@ -147,6 +150,82 @@ export function appendStreamingText(existing: string, incoming: string): string 
   return existing + incoming;
 }
 
+type StreamAnchor = number | null;
+
+/**
+ * 0.29 Server 的 volatile delta 携带累计 offset（协议：offset < 本地长度=重复，
+ * 跳过；offset > 本地长度=中间缺帧）。对齐官方 web 的 turnLen 锚定模型：
+ * offset===0 视为流（重）起点——重试/重连后旧流作废，以新流替换；
+ * offset===锚点 顺序追加；offset<锚点 跳过重复尾部；
+ * offset>锚点 说明缺帧，本地长度不再可信，回退模糊合并并放弃本轮锚定。
+ */
+function anchorStreamText(
+  acc: string,
+  delta: string,
+  offset: number,
+  anchor: StreamAnchor,
+  legacyAppend: (left: string, right: string) => string,
+): { text: string; anchor: StreamAnchor } {
+  if (offset === 0) return { text: delta, anchor: delta.length };
+  if (anchor === null) return { text: legacyAppend(acc, delta), anchor: null };
+  if (offset === anchor) return { text: acc + delta, anchor: anchor + delta.length };
+  if (offset < anchor) return { text: acc, anchor };
+  return { text: legacyAppend(acc, delta), anchor: null };
+}
+
+function applyStreamOffsetDelta(
+  base: AssistantMessage,
+  event: AssistantMessage,
+  anchors: { content: StreamAnchor; think: StreamAnchor },
+): { event: AssistantMessage; contentAnchor: StreamAnchor; thinkAnchor: StreamAnchor } {
+  const offset = event.streamOffset as number;
+  if (event.thinking && !event.content) {
+    const merged = anchorStreamText(
+      base.thinking ?? "",
+      event.thinking,
+      offset,
+      anchors.think,
+      (left, right) => mergeAssistantThinkingText(left, right) ?? "",
+    );
+    const anchored = merged.anchor !== null;
+    const basePart = base.thinkingParts?.[0];
+    const deltaPart = event.thinkingParts?.[0];
+    return {
+      event: {
+        ...base,
+        thinking: merged.text || undefined,
+        thinkingParts: merged.text
+          ? anchored
+            ? [{
+                id: basePart?.id ?? deltaPart?.id ?? event.id,
+                timestamp: basePart?.timestamp ?? event.timestamp,
+                text: merged.text,
+                signature: deltaPart?.signature ?? basePart?.signature,
+              }]
+            : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts)
+          : base.thinkingParts,
+        model: event.model ?? base.model,
+        agentRole: event.agentRole ?? base.agentRole,
+      },
+      contentAnchor: anchors.content,
+      thinkAnchor: merged.anchor,
+    };
+  }
+  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, appendStreamingText);
+  return {
+    event: {
+      ...base,
+      content: merged.text,
+      thinking: merged.anchor !== null ? base.thinking : mergeAssistantThinkingText(base.thinking, event.thinking),
+      thinkingParts: merged.anchor !== null ? base.thinkingParts : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
+      model: event.model ?? base.model,
+      agentRole: event.agentRole ?? base.agentRole,
+    },
+    contentAnchor: merged.anchor,
+    thinkAnchor: anchors.think,
+  };
+}
+
 export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
@@ -197,23 +276,32 @@ export function applyActiveTurnDraftDelta(
   // Deltas routed here are live text/thinking fragments (snapshot and barrier
   // frames stay on the formal path upstream). Prefer O(fragment) accumulation
   // with overlap-safe merge; snapshot-bearing events fall back to mergeEvents.
-  // Thinking reuses the idempotent eventMapper merge: a full cumulative frame
-  // must supersede the fragments it covers instead of being blind-appended
-  // ([...base, ...incoming] double-wrote every replayed thought).
+  // 0.29 Server volatile delta 带累计 offset 时按官方 turnLen 模型锚定装配，
+  // 否则沿用原有顺序拼接与幂等合并（快照回放替换、思考超集取代）。
   const isAppendOnlyDelta = !event.snapshotMessageId && !event.snapshotMessageIdStable;
-  const merged = isAppendOnlyDelta
-    ? [{
-        ...base,
-        content: appendStreamingText(base.content, event.content ?? ""),
-        thinking: mergeAssistantThinkingText(base.thinking, event.thinking),
-        thinkingParts: mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
-        model: event.model ?? base.model,
-        agentRole: event.agentRole ?? base.agentRole,
-      }]
-    : mergeEvents([base], {
-        ...event,
-        isComplete: false,
-      });
+  let contentAnchor: StreamAnchor = previous?.streamContentAnchor ?? null;
+  let thinkAnchor: StreamAnchor = previous?.streamThinkAnchor ?? null;
+  let merged: TimelineEvent[];
+  if (isAppendOnlyDelta && typeof event.streamOffset === "number") {
+    const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor });
+    merged = [applied.event];
+    contentAnchor = applied.contentAnchor;
+    thinkAnchor = applied.thinkAnchor;
+  } else {
+    merged = isAppendOnlyDelta
+      ? [{
+          ...base,
+          content: appendStreamingText(base.content, event.content ?? ""),
+          thinking: mergeAssistantThinkingText(base.thinking, event.thinking),
+          thinkingParts: mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
+          model: event.model ?? base.model,
+          agentRole: event.agentRole ?? base.agentRole,
+        }]
+      : mergeEvents([base], {
+          ...event,
+          isComplete: false,
+        });
+  }
   const nextEvent = merged.find((item): item is AssistantMessage => item.type === "assistant_message") ?? base;
   const next: ActiveTurnDraft = {
     content: nextEvent.content,
@@ -226,6 +314,8 @@ export function applyActiveTurnDraftDelta(
     model: event.model ?? previous?.model,
     agentRole: event.agentRole ?? previous?.agentRole,
     timestamp: previous?.timestamp ?? event.timestamp,
+    streamContentAnchor: contentAnchor,
+    streamThinkAnchor: thinkAnchor,
   };
   drafts.set(key, next);
   if (migratedFromKey) notify(migratedFromKey);

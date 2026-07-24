@@ -10,6 +10,8 @@ okf_version: "0.1"
 
 * [Collaboration Room Routing](architecture/collaboration-room-routing.md) - How multi-Agent rooms isolate official sessions while projecting routing, queues, visible-body sharing, and recovery into one conversation.
 * [Runtime Routing](architecture/runtime-routing.md) - How Kimix routes sessions between the official Server and vendored SDK fallback.
+* [Streaming Render Pipeline](architecture/streaming-render-pipeline.md) - How streaming output stays cheap and correct through identity-preserving projection, offset-anchored draft assembly, and scroll-yield viewport gates.
+* [Chat Viewport State](architecture/chat-viewport-state.md) - How completed turns, tail following, explicit navigation, and detached viewport anchoring keep one state owner.
 
 # Operations
 

@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-22T12:00:00+08:00"
+timestamp: "2026-07-24T10:30:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -84,6 +84,28 @@ fire first, because a fat, duplicated row needs repair, not a skip. History
 reconciliation compares the canonical timeline against a deduplicated local
 timeline so a locally duplicated (and therefore longer) thinking history cannot
 win the regression guard and fossilize duplicates into the persisted state.
+
+## Offset-anchored volatile deltas take precedence over order-based merging
+
+Kimi Code 0.29 Server tags volatile `assistant.delta` / `thinking.delta` WS
+frames with a cumulative character `offset` within the in-flight turn's
+accumulated stream (per-stream: text and thinking lengths are tracked
+separately). The official web client assembles strictly by this anchor —
+`offset === 0` restarts the stream (retry/reconnect discards the old one),
+`offset === local length` appends, `offset < local length` skips a duplicated
+tail, and `offset > local length` means frames were missed and triggers a
+re-snapshot. Kimix's draft store implements the same model
+(`streamContentAnchor` / `streamThinkAnchor` per draft key, with the offset
+threaded `ServerFrame → flattenServerEvent → mapKimiCodeEvent →
+AssistantMessageEvent.streamOffset`), except that a gap falls back to the
+legacy fuzzy merge for that delta instead of re-snapshotting, keeping content
+while dropping the anchor for the rest of the turn. Order-based concatenation
+plus containment checks must never be applied to offset-bearing frames: fuzzy
+containment drops genuine fragments and produces scrambled, duplicated
+thinking (observed live as paragraphs repeated with words spliced across
+sentences). Anchored thinking collapses to a single growing part per draft,
+mirroring the official one-block-per-turn presentation. SDK-route deltas carry
+no offset and keep the legacy path.
 
 ## Memo keys never change semantics for performance
 

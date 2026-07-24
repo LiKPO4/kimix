@@ -423,6 +423,8 @@ export interface AssistantMessageEvent {
   snapshotMessageIdStable?: boolean;
   /** Authoritative prompt-completion replay; replaces partial live dimensions in the same turn. */
   completionBarrierReplay?: boolean;
+  /** Cumulative stream offset of a volatile delta within its in-flight turn (0.29 Server). */
+  streamOffset?: number;
   agentId?: string;
   agentRole?: "executor" | "reviewer";
   content: string;

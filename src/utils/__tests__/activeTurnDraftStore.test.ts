@@ -180,6 +180,45 @@ describe("activeTurnDraftStore", () => {
     expect(content).toContain("## 本轮目标");
   });
 
+  it("assembles thinking by stream offset and skips duplicated tails", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "项目根目录是", streamOffset: 0 }));
+    applyActiveTurnDraftDelta(key, delta("", { thinking: " D:/WORKS，", streamOffset: 6 }));
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "看起来是一个工具。", streamOffset: 16 }));
+    // 重复/回放尾部（offset 小于已累积长度）必须跳过
+    applyActiveTurnDraftDelta(key, delta("", { thinking: " D:/WORKS，", streamOffset: 6 }));
+    const draft = getActiveTurnDraft(key);
+    expect(draft?.thinking).toBe("项目根目录是 D:/WORKS，看起来是一个工具。");
+    expect(draft?.thinkingParts).toHaveLength(1);
+    expect(draft?.thinkingParts?.[0]?.text).toBe("项目根目录是 D:/WORKS，看起来是一个工具。");
+  });
+
+  it("replaces live thinking when the stream restarts at offset 0", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "旧的思考流", streamOffset: 0 }));
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "继续", streamOffset: 5 }));
+    // 服务端重试/重连后流从 0 重启：旧流作废，以新流为准
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "新的思考流", streamOffset: 0 }));
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "继续", streamOffset: 5 }));
+    expect(getActiveTurnDraft(key)?.thinking).toBe("新的思考流继续");
+  });
+
+  it("falls back to fuzzy merge on offset gaps without losing content", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "第一段", streamOffset: 0 }));
+    // offset 跳跃（缺帧）：回退模糊合并且本轮不再锚定
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "第三段", streamOffset: 99 }));
+    expect(getActiveTurnDraft(key)?.thinking).toBe("第一段第三段");
+  });
+
+  it("anchors assistant content deltas by stream offset", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("你好", { streamOffset: 0 }));
+    applyActiveTurnDraftDelta(key, delta("霖江路", { streamOffset: 2 }));
+    applyActiveTurnDraftDelta(key, delta("江路", { streamOffset: 3 }));
+    expect(getActiveTurnDraft(key)?.content).toBe("你好霖江路");
+  });
+
   it("marks complete/barrier bodies as authoritative", () => {
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { isComplete: true }))).toBe(true);
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { completionBarrierReplay: true }))).toBe(true);
