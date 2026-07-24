@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-07-24 启动后卡顿根因收敛（四路分析 + 诊断接线）
+
+- 现场：上个 agent 发现 perfDiag 埋点因 `isPerfDiagEnabled()` 默认 false（perfFlags.ts:31）全短路，已建 `startupProfiler.ts`（启动 30s 无条件采集）但未接线完。本轮补齐 `noteStartupScrollTopWrite`（useChatViewport 3 处写入点）、`noteStartupLayoutEffect`（5 个 useLayoutEffect）、`noteStartupStateSet`（两个 zustand store set 包装），修正 KIMIX_PERF 注释。typecheck + 定向 19 测试 + build 通过，提交 `2592af5`。
+- 四路只读分析（滚动管线 / React 渲染 / 持久化加载 / 主进程启动序列）收敛根因排序：
+  1. **启动即全量回写 70MB**：`useStatePersistence.ts:70-72` hydration 0→N setState 命中 length 变化 → `archiveOrDeletionChanged=true` → 立即 flush → stringify 70MB + IDB 克隆 140MB（1-3s 主线程）。数据刚从磁盘读出未变，纯浪费。
+  2. **每启动 12 会话全量修复循环**：`App.tsx:217-229` 候选条件 OR 链几乎恒真（cacheVersion 无筛选作用）；每会话 IPC 全量历史 + `mapHistoryEvents` O(n²)（eventMapper.ts:2280 逐事件过 mergeEvents 含全扫+全拷贝）+ setState 风暴；且 `App.tsx:335/348/362/376` 直接 `void persistLocalConversationState()` 绕过防抖，级联多次 70MB 锤。
+  3. **loadSession 4s server race**：`electron/main.ts:6691-6696` server 未就绪时确定性空等最多 4s，本地 wire 镜像本可立即回答；修复循环每会话也撞此 race。
+  4. **eagerMarkdown × settle 3.5s 窗口耦合**：`useChatViewport.ts:790-792` settle 窗口内禁用 deferOffscreen → 启动同步全量 markdown 渲染（tail ≤28 项），布局不稳延长 settle，每次校正 2 条无条件 writeDiag IPC（useAutoFollow.ts:106/134）。
+  5. **Sidebar `dedupeSidebarSessions` O(n²)**（Sidebar.tsx:521-536），启动期 5+ 次 sessions 数组换引用反复触发；v2.16.87 只修了 isInternalPromptText 没修它。
+  6. **4.25MB 单 renderer bundle 无分包**，parse/eval 300-800ms 阻塞首 paint。
+- 已排除：bootstrap IPC 不含全量 sessions；`deduplicateTimelineEvents` 是 O(n) 非 O(n²)；bbc8d1a image refs 修复完整；v2.16.86 settle 轮询修复无回退。
+- 下一步：用户拍板修复顺序（建议先修 1+2 持久化锤）；或用诊断版实测 `window.KIMIX_PERF()` 验证各根因占比。
+
 ## 2026-07-23 发版：v2.17.0
 
 - 决策：中等版本号跳至 **2.17.0**；Context 近似值、实验 dual-model、强制委派文案、子 Agent 互斥 UI 按用户指示本轮不改。
