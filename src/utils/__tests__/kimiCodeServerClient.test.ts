@@ -79,6 +79,39 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(upload).toHaveBeenCalledWith({ name: "shot.png", mediaType: "image/png", data: "AA==" });
   });
 
+  it("falls back to inline base64 when the image upload fails", async () => {
+    const failure = new Error("/api/v1/files: HTTP 500");
+    const upload = vi.fn(async () => { throw failure; });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(toServerPromptContent([
+      { type: "image_url", imageUrl: { url: "data:image/png;base64,iVBORw0KGgo=", id: "shot.png" } },
+    ], upload)).resolves.toEqual([
+      { type: "image", source: { kind: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+    ]);
+    expect(warn).toHaveBeenCalledWith("[KimiCodeServerClient] 图片上传失败，回退 base64 内嵌:", failure);
+    warn.mockRestore();
+  });
+
+  it("does not fall back when a video upload fails", async () => {
+    const failure = new Error("/api/v1/files: HTTP 500");
+    const upload = vi.fn(async () => { throw failure; });
+    await expect(toServerPromptContent([
+      { type: "video_url", videoUrl: { url: "data:video/mp4;base64,AA==", id: "clip.mp4" } },
+    ], upload)).rejects.toBe(failure);
+  });
+
+  it("does not fall back for oversize images when the upload fails", async () => {
+    const failure = new Error("/api/v1/files: HTTP 500");
+    const upload = vi.fn(async () => { throw failure; });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const bigData = "A".repeat(13_000_001);
+    await expect(toServerPromptContent([
+      { type: "image_url", imageUrl: { url: `data:image/png;base64,${bigData}`, id: "big.png" } },
+    ], upload)).rejects.toBe(failure);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("maps inline, uploaded, and restored videos to the official video content shape", async () => {
     await expect(toServerPromptContent([
       { type: "video_url", videoUrl: { url: "data:video/mp4;base64,AA==", id: "clip.mp4" } },

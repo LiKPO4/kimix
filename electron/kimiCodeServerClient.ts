@@ -424,6 +424,10 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
   }));
 }
 
+// base64 内嵌回退的上限：13M base64 文本 ≈ 10MB 二进制。超过则不回退，
+// 避免更大 body 撞上 Server 另一个限制，保留原始 upload 错误信息。
+const MAX_BASE64_FALLBACK_DATA_LENGTH = 13_000_000;
+
 export async function toServerPromptContent(
   input: string | Array<{
     type: string;
@@ -446,14 +450,25 @@ export async function toServerPromptContent(
     if (dataUrl) {
       const mediaType = isVideo ? dataUrl[1] : sniffImageMediaType(dataUrl[2]) ?? dataUrl[1];
       if (upload) {
-        const file = await upload({
-          name: media?.id?.trim() || (isVideo ? "video" : "image"),
-          mediaType,
-          data: dataUrl[2],
-        });
-        return isVideo
-          ? { type: "video", source: { kind: "file", file_id: file.id } }
-          : { type: "image", source: { kind: "file", file_id: file.id } };
+        try {
+          const file = await upload({
+            name: media?.id?.trim() || (isVideo ? "video" : "image"),
+            mediaType,
+            data: dataUrl[2],
+          });
+          return isVideo
+            ? { type: "video", source: { kind: "file", file_id: file.id } }
+            : { type: "image", source: { kind: "file", file_id: file.id } };
+        } catch (err) {
+          // 视频不回退：单视频上限 50MiB，base64 内嵌不现实，直接抛原始错误。
+          if (isVideo) throw err;
+          // 超限图片也不回退（见常量注释），抛原始 upload 错误。
+          if (dataUrl[2].length > MAX_BASE64_FALLBACK_DATA_LENGTH) throw err;
+          // 官方 Server /api/v1/files 存在瞬态 500；图片回退 base64 内嵌
+          // （与无 upload 参数的既有路径同形态，协议合法）。
+          console.warn("[KimiCodeServerClient] 图片上传失败，回退 base64 内嵌:", err);
+          return { type: "image", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } };
+        }
       }
       return isVideo
         ? { type: "video", source: { kind: "base64", media_type: mediaType, data: dataUrl[2] } }
