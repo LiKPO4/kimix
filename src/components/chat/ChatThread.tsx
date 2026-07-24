@@ -882,8 +882,11 @@ export function buildRenderItems(
           agentTurnId,
         }
       : undefined;
-    const derivedDurationMs = (turnStartedAt && mergedAssistantEvent && mergedAssistantEvent.timestamp > turnStartedAt)
-      ? reliableAssistantDurationBetween(turnStartedAt, mergedAssistantEvent.timestamp)
+    const turnEndedAt = turnEvents.reduce((max, event) => (
+      event.type !== "user_message" ? Math.max(max, event.timestamp) : max
+    ), 0);
+    const derivedDurationMs = (turnStartedAt && turnEndedAt > turnStartedAt)
+      ? reliableAssistantDurationBetween(turnStartedAt, turnEndedAt)
       : undefined;
     const baseAssistant = mergedAssistantEvent
       ? (mergedAssistantEvent.durationMs === undefined && derivedDurationMs !== undefined)
