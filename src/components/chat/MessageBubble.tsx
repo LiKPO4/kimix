@@ -10,14 +10,14 @@ import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
-import { formatAssistantTurnDuration, reliableAssistantDurationMs } from "@/utils/duration";
+import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { turnBlocksEqual, type TurnBlock } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -1049,7 +1049,13 @@ function AssistantProcessLabel({
 }) {
   const isActivelyThinking = Boolean(isActiveAssistant && event.isThinking);
   const elapsed = useElapsed(elapsedStartAt ?? event.timestamp, isActiveAssistant);
-  const completedDuration = reliableAssistantDurationMs(event.durationMs);
+  const eventDuration = reliableAssistantDurationMs(event.durationMs);
+  const fullTurnDuration = (elapsedStartAt && event.timestamp > elapsedStartAt)
+    ? reliableAssistantDurationBetween(elapsedStartAt, event.timestamp)
+    : undefined;
+  const completedDuration = (fullTurnDuration !== undefined && eventDuration !== undefined)
+    ? Math.max(fullTurnDuration, eventDuration)
+    : (fullTurnDuration ?? eventDuration);
   const hasVisibleOutput = Boolean(
     event.content.trim() ||
     event.thinking?.trim() ||
@@ -2031,23 +2037,30 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     viewportTop: number;
     anchor: "summary" | "content";
   } | null>(null);
-  // When ordered turn blocks are available (kimi-code engine), process items
-  // follow the event array order — the official wire gives a think part and its
-  // following tool call the same millisecond, so timestamp sorting scrambles
-  // the sequence and tool-timestamp cutting splits tool runs apart. The legacy
-  // timestamp path stays only for bubbles without block data (prompt engine).
+  const effectiveTurnBlocks = useMemo(() => {
+    if (turnBlocks && turnBlocks.length > 0) return turnBlocks;
+    const syntheticEvents: TimelineEvent[] = [
+      event,
+      ...tools,
+      ...subagents,
+      ...approvals,
+    ];
+    const built = buildTurnBlocks(syntheticEvents);
+    return built.length > 0 ? built : undefined;
+  }, [turnBlocks, event, tools, subagents, approvals]);
+
   const blockThinking = useMemo(() => {
-    if (!turnBlocks) return undefined;
-    return turnBlocks.flatMap((block) => block.kind === "thinking" ? block.blocks : []);
-  }, [turnBlocks]);
+    if (!effectiveTurnBlocks) return undefined;
+    return effectiveTurnBlocks.flatMap((block: TurnBlock) => block.kind === "thinking" ? block.blocks : []);
+  }, [effectiveTurnBlocks]);
   const thinkingBlocks = useMemo(() => blockThinking ?? buildThinkingBlocks({
     ...event,
     boundaryTimestamps: tools.map((tool) => tool.timestamp),
   }), [blockThinking, event.thinking, event.thinkingParts, event.timestamp, tools]);
   const items: ProcessItem[] = useMemo(() => {
-    if (turnBlocks) {
+    if (effectiveTurnBlocks) {
       const ordered: ProcessItem[] = [];
-      for (const block of turnBlocks) {
+      for (const block of effectiveTurnBlocks) {
         if (block.kind === "thinking") {
           for (const thinkingBlock of block.blocks) ordered.push({ type: "thinking", block: thinkingBlock });
         } else if (block.kind === "tool") {
@@ -2061,20 +2074,20 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
       return ordered;
     }
     return [
-      ...thinkingBlocks.map((block): ProcessItem => ({ type: "thinking", block })),
+      ...thinkingBlocks.map((block: ThinkingBlock): ProcessItem => ({ type: "thinking", block })),
       ...tools.map((tool): ProcessItem => ({ type: "tool", tool })),
       ...subagents.map((subagent): ProcessItem => ({ type: "subagent", subagent })),
       ...approvals.map((approval): ProcessItem => ({ type: "approval", approval })),
     ].sort((a, b) => (
       processItemTimestamp(a) - processItemTimestamp(b) || processItemPriority(a) - processItemPriority(b)
     ));
-  }, [turnBlocks, thinkingBlocks, tools, subagents, approvals]);
+  }, [effectiveTurnBlocks, thinkingBlocks, tools, subagents, approvals]);
   const blockCounts = useMemo(() => {
-    if (!turnBlocks) return undefined;
+    if (!effectiveTurnBlocks) return undefined;
     let toolCount = 0;
     let subagentCount = 0;
     let approvalCount = 0;
-    for (const block of turnBlocks) {
+    for (const block of effectiveTurnBlocks) {
       if (block.kind === "tool") toolCount += 1;
       else if (block.kind === "subagent") subagentCount += 1;
       else if (block.kind === "approval") approvalCount += 1;
@@ -2216,9 +2229,9 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
       {expanded && hasDetails && (
         <div ref={processDetailRef} className="flex flex-col" style={{ gap: 10, paddingTop: isKimiWeb ? 8 : 12, paddingBottom: isKimiWeb ? 12 : 0 }}>
           {isKimiWeb ? (
-            turnBlocks ? (
+            effectiveTurnBlocks ? (
               <TurnBlocksTimeline
-                blocks={turnBlocks}
+                blocks={effectiveTurnBlocks}
                 isActiveAssistant={isActiveAssistant}
                 hasFinalContent={hasFinalContent}
                 preserveDuringFinalTransition={isFinalContentTransition}
