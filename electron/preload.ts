@@ -32,6 +32,7 @@ import type {
   KimiLoginResponse,
   KimiLogoutResponse,
   SaveKimiModelConfigResponse,
+  SaveKimiSecondaryModelRequest,
   SetKimiDefaultModelRequest,
   SetKimiModelAdaptiveThinkingRequest,
   RemoveKimiModelConfigRequest,
@@ -176,9 +177,7 @@ import type {
   KimiCodeSetPermissionRequest,
   KimiCodeSetPlanModeRequest,
   KimiCodeSetModelRequest,
-  KimiCodeSetSubagentRoutingRequest,
   KimiCodeSetThinkingRequest,
-  KimiCodeSubagentRoutingResponse,
   KimiCodeStatusPayload,
   KimiCodeStatusResponse,
   KimiCodeUsageResponse,
@@ -306,6 +305,8 @@ const api = {
     ipcRenderer.invoke("kimi:doctorConfig"),
   testKimiOpenAiProvider: (req: KimiOpenAiProviderConfigRequest): Promise<TestKimiModelConfigResponse> =>
     ipcRenderer.invoke("kimi:testOpenAiProvider", req),
+  saveKimiSecondaryModel: (req: SaveKimiSecondaryModelRequest): Promise<SaveKimiModelConfigResponse> =>
+    ipcRenderer.invoke("kimi:saveSecondaryModel", req),
   loginKimi: (): Promise<KimiLoginResponse> =>
     ipcRenderer.invoke("kimi:login"),
   logoutKimi: (): Promise<KimiLogoutResponse> =>
@@ -404,8 +405,6 @@ const api = {
     ipcRenderer.invoke("kimi-code:setModel", req),
   setKimiCodeThinking: (req: KimiCodeSetThinkingRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setThinking", req),
-  setKimiCodeSubagentRouting: (req: KimiCodeSetSubagentRoutingRequest): Promise<KimiCodeSubagentRoutingResponse> =>
-    ipcRenderer.invoke("kimi-code:setSubagentRouting", req),
   setKimiCodePermission: (req: KimiCodeSetPermissionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:setPermission", req),
   compactKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>

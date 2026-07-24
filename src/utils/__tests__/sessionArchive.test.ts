@@ -258,10 +258,7 @@ describe("official-first session archive", () => {
         ...source.collaboration!,
         agents: source.collaboration!.agents.map((agent) => agent.id === secondary.id ? {
           ...agent,
-          subagentModelAlias: "openai/gpt-5-mini",
-          subagentThinkingEffort: "high",
-          subagentRoutingDesired: { modelAlias: null, thinkingEffort: "low" },
-          subagentForceInvoke: true,
+          modelAlias: "openai/gpt-5-mini",
         } : agent),
       },
     };
@@ -269,10 +266,7 @@ describe("official-first session archive", () => {
     const result = detachRoomAgentAsSession(configured, secondary.id, new Set([source.id]), 300);
 
     expect(result.detached).toMatchObject({
-      subagentModelAlias: "openai/gpt-5-mini",
-      subagentThinkingEffort: "high",
-      subagentRoutingDesired: { modelAlias: null, thinkingEffort: "low" },
-      subagentForceInvoke: true,
+      model: "openai/gpt-5-mini",
     });
   });
 

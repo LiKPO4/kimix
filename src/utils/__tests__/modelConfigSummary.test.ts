@@ -16,6 +16,7 @@ function summary(overrides: Partial<KimiModelConfigSummary> = {}): KimiModelConf
       hasOauth: false,
     }],
     models: [],
+    secondaryModel: null,
     ...overrides,
   };
 }

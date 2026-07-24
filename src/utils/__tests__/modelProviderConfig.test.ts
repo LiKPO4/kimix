@@ -19,6 +19,7 @@ const config: KimiModelConfigSummary = {
     { alias: "openai/gpt-5.1", provider: "openai", model: "gpt-5.1", displayName: "GPT-5.1", maxContextSize: 400000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: true },
     { alias: "openai/gpt-4.1", provider: "openai", model: "gpt-4.1", displayName: "GPT-4.1", maxContextSize: 1000000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
   ],
+  secondaryModel: null,
 };
 
 describe("model provider config", () => {

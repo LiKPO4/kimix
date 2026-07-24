@@ -12,6 +12,7 @@ describe("session model catalog", () => {
         { alias: "opencode/minimax-m3", provider: "opencode", model: "minimax-m3", displayName: null, maxContextSize: 1_000_000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
         { alias: "kimi-code/kimi-for-coding", provider: "managed:kimi-code", model: "kimi-for-coding", displayName: "K2.7 Code", maxContextSize: 262_144, adaptiveThinking: true, supportEfforts: null, defaultEffort: null, isDefault: true },
       ],
+      secondaryModel: null,
     }, null);
 
     expect(options.map((option) => option.id)).toContain("opencode/minimax-m3");
@@ -29,6 +30,7 @@ describe("session model catalog", () => {
       models: [
         { alias: "deepseek/v4", provider: "deepseek", model: "v4", displayName: "deepseek/DeepSeek V4", maxContextSize: null, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
       ],
+      secondaryModel: null,
     }, {
       auth: { ready: true, providerCount: 1, defaultModel: null, managedProvider: null },
       config: {},
@@ -67,6 +69,7 @@ describe("session model catalog", () => {
           defaultEffort: "medium",
         },
       ],
+      secondaryModel: null,
     }, {
       auth: { ready: true, providerCount: 1, defaultModel: null, managedProvider: null },
       config: {},
@@ -101,6 +104,7 @@ describe("session model catalog", () => {
           defaultEffort: "medium",
         },
       ],
+      secondaryModel: null,
     }, {
       auth: { ready: true, providerCount: 1, defaultModel: null, managedProvider: null },
       config: {},

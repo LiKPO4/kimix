@@ -4,7 +4,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
-import type { KimiCodeServerModelCatalog, KimiCodeSubagentRoutingResponse, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
 import { TodoPanel, getVisibleTodos } from "./TodoPanel";
@@ -59,8 +59,6 @@ import {
 } from "@/utils/roomAgentRecovery";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
-import { recordAppliedSubagentRouting, resolveSubagentRoutingToApply } from "@/utils/subagentRouting";
-import { buildForcedSubagentDirective, withForcedSubagentDirective } from "@/utils/forcedSubagentPrompt";
 import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
@@ -661,18 +659,6 @@ export function Composer() {
     ?? thinkingModelConfig?.defaultModel
     ?? null;
   const thinkingModelOption = thinkingModelOptions.find((option) => option.id === mutationModelAlias) ?? null;
-  const forcedSubagentModelAlias = activeMutationOwner?.agent.subagentRoutingDesired?.modelAlias
-    ?? activeMutationOwner?.agent.subagentModelAlias
-    ?? null;
-  const forcedSubagentModelOption = forcedSubagentModelAlias
-    ? thinkingModelOptions.find((option) => option.id === forcedSubagentModelAlias) ?? null
-    : null;
-  const forcedSubagentDirective = activeMutationOwner?.agent.subagentForceInvoke === true
-    ? buildForcedSubagentDirective({
-        modelLabel: forcedSubagentModelOption?.label ?? forcedSubagentModelAlias,
-        maxContextSize: forcedSubagentModelOption?.maxContextSize ?? null,
-      })
-    : null;
   const thinkingEffortOptions = useMemo(
     () => buildThinkingEffortOptions(thinkingModelOption?.supportEfforts),
     [thinkingModelOption?.supportEfforts],
@@ -1224,52 +1210,6 @@ export function Composer() {
     }));
   };
 
-  const applyDesiredSubagentRouting = async (
-    uiSessionId: string,
-    roomAgentId: string,
-    runtimeSessionId: string,
-  ) => {
-    const latest = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    const agent = latest ? getRoomAgent(latest, roomAgentId, permissionMode) : null;
-    const routing = agent ? resolveSubagentRoutingToApply(agent) : null;
-    if (!latest || !agent || !routing) return;
-    let response: KimiCodeSubagentRoutingResponse;
-    try {
-      response = await window.api.setKimiCodeSubagentRouting({
-        sessionId: runtimeSessionId,
-        modelAlias: routing.modelAlias ?? undefined,
-        thinkingEffort: routing.thinkingEffort ?? undefined,
-      });
-    } catch (error) {
-      response = { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-    if (!response.success) {
-      // Subagent routing is an enhancement, not a send prerequisite. A failed
-      // replay (e.g. the server defers the config while a turn is running) must
-      // not block or fail the prompt; the desired routing stays recorded and is
-      // retried on the next send.
-      console.warn(`[Composer] 应用子 Agent 配置失败（不影响发送）：${response.error}`);
-      window.api.writeDiag?.({
-        message: "[Composer] subagentRouting",
-        data: {
-          stage: "replay:skipped",
-          at: Date.now(),
-          uiSessionId,
-          roomAgentId,
-          runtimeSessionId,
-          error: response.error,
-        },
-      }).catch(logError("writeDiag"));
-      return;
-    }
-    const timestamp = Date.now();
-    updateSession(uiSessionId, (session) => ({
-      ...recordAppliedSubagentRouting(session, roomAgentId, response.data, permissionMode),
-      updatedAt: timestamp,
-    }));
-    syncCurrentSessionFromStore(uiSessionId);
-  };
-
   const resumeRoomAgentForPrompt = async (roomId: string, roomAgentId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
     if (!latest) throw new Error("房间会话不存在");
@@ -1289,7 +1229,6 @@ export function Composer() {
       sessionId: resumed.data.sessionId,
       model: resumed.data.model,
     });
-    await applyDesiredSubagentRouting(roomId, roomAgentId, resumed.data.sessionId);
     syncCurrentSessionFromStore(roomId);
     const persisted = await persistLocalConversationState();
     if (!persisted.success) throw new Error(`保存 Agent runtime 绑定失败：${persisted.error}`);
@@ -1329,7 +1268,6 @@ export function Composer() {
               return { success: false as const, certainty: "not-sent" as const, error: error instanceof Error ? error.message : String(error) };
             }
           }
-          await applyDesiredSubagentRouting(roomId, roomAgentId, runtimeSessionId);
           setRoomAgentActivity({
             roomId,
             roomAgentId,
@@ -1340,20 +1278,8 @@ export function Composer() {
             startedAt: Date.now(),
             updatedAt: Date.now(),
           });
-          const targetSubagentModelAlias = agent.subagentRoutingDesired?.modelAlias
-            ?? agent.subagentModelAlias
-            ?? null;
-          const targetSubagentModelOption = targetSubagentModelAlias
-            ? thinkingModelOptions.find((option) => option.id === targetSubagentModelAlias) ?? null
-            : null;
-          const targetForcedSubagentDirective = agent.subagentForceInvoke === true
-            ? buildForcedSubagentDirective({
-                modelLabel: targetSubagentModelOption?.label ?? targetSubagentModelAlias,
-                maxContextSize: targetSubagentModelOption?.maxContextSize ?? null,
-              })
-            : null;
           const outboundPrompt = buildRoomDeliveryPrompt(
-            withForcedSubagentDirective(message.outboundContent ?? message.content, targetForcedSubagentDirective),
+            message.outboundContent ?? message.content,
             delivery.contextShare,
             {
               displayName: agent.displayName,
@@ -1631,10 +1557,7 @@ export function Composer() {
 
     const effectiveEngine = "kimi-code";
     const contentWithAttachments = buildAttachmentPromptContent(content, images);
-    const outboundContent = withForcedSubagentDirective(
-      options?.outboundContent ?? contentWithAttachments,
-      forcedSubagentDirective,
-    );
+    const outboundContent = options?.outboundContent ?? contentWithAttachments;
     const writePrimaryPromptActivity = (
       status: RoomAgentActivity["status"],
       runtimeSessionId = getRuntimeSessionId(targetSession) ?? undefined,
@@ -1695,10 +1618,6 @@ export function Composer() {
             swarmModeDesired: undefined,
             swarmModeLockedAt: desired ? session.swarmModeLockedAt ?? timestamp : session.swarmModeLockedAt,
           }));
-          targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
-        };
-        const applyDesiredPrimarySubagentRouting = async (runtimeSessionId: string) => {
-          await applyDesiredSubagentRouting(targetSession.id, primaryAgentId, runtimeSessionId);
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
         const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
@@ -1770,7 +1689,6 @@ export function Composer() {
             }
             updateLinkStatus("消息发送中", "info");
             await applyDesiredSwarmMode(resumeRes.data.sessionId);
-            await applyDesiredPrimarySubagentRouting(resumeRes.data.sessionId);
             return resumeRes.data.sessionId;
           }
           updateLinkStatus("消息发送中", "info");
@@ -1807,7 +1725,6 @@ export function Composer() {
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
         await applyDesiredSwarmMode(createRes.data.sessionId);
-        await applyDesiredPrimarySubagentRouting(createRes.data.sessionId);
         return createRes.data.sessionId;
       };
 
@@ -2150,7 +2067,6 @@ export function Composer() {
       response.data.sessionId,
       agent.modelAlias,
     ));
-    await applyDesiredSubagentRouting(roomId, roomAgentId, response.data.sessionId);
     syncCurrentSessionFromStore(roomId);
     setRoomAgentActivity({
       roomId,

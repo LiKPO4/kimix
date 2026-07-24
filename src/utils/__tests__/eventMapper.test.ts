@@ -3,7 +3,6 @@ import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaIn
 import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
-import { buildForcedSubagentDirective, withForcedSubagentDirective } from "../forcedSubagentPrompt";
 
 describe("mapStreamEvent", () => {
   it("returns null for non-object input", () => {
@@ -56,52 +55,6 @@ describe("mapStreamEvent", () => {
       agentTurnId: "turn:review",
       dispatchAttemptId: "attempt:review",
     });
-  });
-
-  it("strips the forced subagent directive from user input", () => {
-    const directive = buildForcedSubagentDirective({ modelLabel: "Kimi K2", maxContextSize: 262144 });
-    const event = mapStreamEvent({
-      type: "TurnBegin",
-      payload: { user_input: withForcedSubagentDirective("请检查最新改动", directive) },
-    });
-    expect(event).toMatchObject({ type: "user_message", content: "请检查最新改动" });
-  });
-
-  it("strips the forced subagent directive nested inside room context", () => {
-    const directive = buildForcedSubagentDirective({});
-    const event = mapStreamEvent({
-      type: "TurnBegin",
-      payload: {
-        user_input: buildRoomDeliveryPrompt(
-          withForcedSubagentDirective("请检查最新改动", directive),
-          undefined,
-          { displayName: "Reviewer", mentionName: "reviewer" },
-          {
-            roomMessageId: "message:review",
-            agentTurnId: "turn:review",
-            dispatchAttemptId: "attempt:review",
-          },
-        ),
-      },
-    });
-    expect(event).toMatchObject({
-      type: "user_message",
-      content: "请检查最新改动",
-      roomMessageId: "message:review",
-      agentTurnId: "turn:review",
-      dispatchAttemptId: "attempt:review",
-    });
-  });
-
-  it("strips the forced subagent directive left behind a hooks context wrapper", () => {
-    const directive = buildForcedSubagentDirective({});
-    const event = mapStreamEvent({
-      type: "TurnBegin",
-      payload: {
-        user_input: `【Kimix Hooks 上下文】\n规则\n\n【用户当前消息】\n${withForcedSubagentDirective("真实用户消息", directive)}`,
-      },
-    });
-    expect(event).toMatchObject({ type: "user_message", content: "真实用户消息" });
   });
 
   it("restores server base64 image parts from TurnBegin history", () => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Bot,
   Check,
   ChevronRight,
   Eye,
@@ -144,10 +145,12 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [discoveredModels, setDiscoveredModels] = useState<DiscoveredKimiProviderModel[]>([]);
   const [discoveredEndpoint, setDiscoveredEndpoint] = useState("");
-  const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
+  const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | "secondary-model" | null>(null);
   const [message, setMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
+  const [secondaryModelDraft, setSecondaryModelDraft] = useState("");
+  const [secondaryEffortDraft, setSecondaryEffortDraft] = useState("");
 
   const selectedGroup = groups.find((group) => group.provider.name === selectedProviderName) ?? null;
   const isCreatingProvider = selectedProviderName === NEW_PROVIDER_ID || !selectedGroup;
@@ -198,6 +201,47 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       : `${savedMessage}；即时刷新失败：${refreshed.error}`;
     setMessage(nextMessage);
     window.dispatchEvent(new CustomEvent("kimix:kimi-model-config-changed"));
+  };
+
+  const secondaryModelOptions = useMemo(() => {
+    return config.models.map((model) => ({
+      alias: model.alias,
+      label: model.displayName || model.alias,
+      supportEfforts: model.supportEfforts ?? [],
+    }));
+  }, [config.models]);
+
+  const secondarySelectedModel = useMemo(
+    () => secondaryModelOptions.find((option) => option.alias === secondaryModelDraft) ?? null,
+    [secondaryModelOptions, secondaryModelDraft],
+  );
+
+  const secondaryEffortOptions = useMemo(() => {
+    if (!secondarySelectedModel?.supportEfforts?.length) return THINKING_EFFORT_CHOICES;
+    return secondarySelectedModel.supportEfforts;
+  }, [secondarySelectedModel]);
+
+  useEffect(() => {
+    setSecondaryModelDraft(config.secondaryModel?.model ?? "");
+    setSecondaryEffortDraft(config.secondaryModel?.defaultEffort ?? "");
+  }, [config.secondaryModel?.model, config.secondaryModel?.defaultEffort]);
+
+  const handleSaveSecondaryModel = async () => {
+    setBusyAction("secondary-model");
+    try {
+      const model = secondaryModelDraft.trim() || undefined;
+      const defaultEffort = secondaryEffortDraft.trim() || undefined;
+      const res = await window.api.saveKimiSecondaryModel({ model, defaultEffort });
+      if (res.success) {
+        await applyConfigResult(res.data, model ? "已设置子代理默认模型" : "已清除子代理默认模型");
+      } else {
+        setMessage(res.error);
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const handleSelectProvider = (providerName: string) => {
@@ -857,6 +901,60 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             )}
           </div>
         )}
+      </section>
+      <section className="kimix-settings-card" style={{ marginTop: 14 }}>
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <Bot size={16} className="shrink-0 text-text-muted" />
+          <span className="text-[15px] font-medium leading-none text-text-primary">子代理默认模型</span>
+        </div>
+        <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 8 }}>
+          全局配置。设置后，新生成的子代理默认使用此模型而非主 Agent 模型；agent 文件可单独指定 model_preference 覆盖。
+        </div>
+        <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
+          <label className="min-w-0">
+            <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型</span>
+            <select
+              value={secondaryModelDraft}
+              onChange={(event) => setSecondaryModelDraft(event.target.value)}
+              className="kimix-settings-input h-9 w-full text-[13px] outline-none"
+              style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }}
+              aria-label="子代理默认模型"
+            >
+              <option value="">跟随主 Agent（不配置）</option>
+              {secondaryModelOptions.map((option) => (
+                <option key={option.alias} value={option.alias}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-end" style={{ gap: 12 }}>
+            <label className="min-w-0 flex-1">
+              <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>默认思考强度</span>
+              <select
+                value={secondaryEffortDraft}
+                onChange={(event) => setSecondaryEffortDraft(event.target.value)}
+                disabled={!secondaryModelDraft}
+                className="kimix-settings-input h-9 w-full text-[13px] outline-none disabled:opacity-55"
+                style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }}
+                aria-label="子代理默认思考强度"
+              >
+                <option value="">不设置</option>
+                {secondaryEffortOptions.map((effort) => (
+                  <option key={effort} value={effort}>{thinkingEffortLabel(effort)}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleSaveSecondaryModel()}
+              disabled={busyAction !== null}
+              className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:opacity-55 shrink-0"
+              style={{ height: 36 }}
+            >
+              <Check size={13} />
+              保存
+            </button>
+          </div>
+        </div>
       </section>
       {removalTarget && (
         <RemovalConfirmDialog

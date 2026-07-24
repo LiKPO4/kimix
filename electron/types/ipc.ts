@@ -396,12 +396,18 @@ export type KimiModelAliasSummary = {
   isDefault: boolean;
 };
 
+export type KimiSecondaryModelSummary = {
+  model: string | null;
+  defaultEffort: string | null;
+} | null;
+
 export type KimiModelConfigSummary = {
   configPath: string;
   exists: boolean;
   defaultModel: string | null;
   providers: KimiModelProviderSummary[];
   models: KimiModelAliasSummary[];
+  secondaryModel: KimiSecondaryModelSummary;
 };
 
 export type GetKimiModelConfigResponse = {
@@ -501,6 +507,11 @@ export type SaveKimiModelConfigResponse = {
 } | {
   success: false;
   error: string;
+};
+
+export type SaveKimiSecondaryModelRequest = {
+  model?: string;
+  defaultEffort?: string;
 };
 
 export type TestKimiModelConfigResponse = {
@@ -1596,8 +1607,6 @@ export type KimiCodeSessionStatus = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   swarmMode?: boolean;
-  subagentModel?: string;
-  subagentThinkingEffort?: string;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -1941,12 +1950,6 @@ export type KimiCodeSetThinkingRequest = {
   effort: string;
 };
 
-export type KimiCodeSetSubagentRoutingRequest = {
-  sessionId: string;
-  modelAlias?: string;
-  thinkingEffort?: string;
-};
-
 export type KimiCodeSetPermissionRequest = {
   sessionId: string;
   mode: KimiCodePermissionMode;
@@ -2117,14 +2120,6 @@ export type KimiCodeVoidResponse = {
 };
 
 export type KimiCodeStatusResponse = {
-  success: true;
-  data: KimiCodeSessionStatus;
-} | {
-  success: false;
-  error: string;
-};
-
-export type KimiCodeSubagentRoutingResponse = {
   success: true;
   data: KimiCodeSessionStatus;
 } | {

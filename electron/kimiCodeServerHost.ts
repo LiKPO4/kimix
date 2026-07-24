@@ -425,7 +425,14 @@ export class KimiCodeServerHost {
         // 0.28+: official foreground server entry is `kimi web --no-open`.
         this.child = spawn(executable, buildManagedKimiServerArgs(port), {
           cwd: os.homedir(),
-          env: { ...this.env, KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1" },
+          env: {
+            ...this.env,
+            KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1",
+            // Enable the official 0.29.1 secondary-model feature (PR #2064) so
+            // subagents can use a separately configured [secondary_model] in
+            // config.toml instead of inheriting the caller's model.
+            KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL: this.env.KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL || "1",
+          },
           windowsHide: true,
           shell: false,
           stdio: ["ignore", "pipe", "pipe"],

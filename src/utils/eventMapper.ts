@@ -2,7 +2,6 @@ import type { TimelineEvent, TodoItem, UserMessageImage } from "@/types/ui";
 import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiAgentEnvelope, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
-import { stripForcedSubagentDirective } from "./forcedSubagentPrompt";
 import { logEvent } from "@/utils/reportError";
 import { preferPositiveMetric } from "@/utils/sessionMetrics";
 import { normalizePathForComparison } from "./pathCase";
@@ -934,10 +933,6 @@ export function stripLegacyKimixClarificationWrapper(content: string): string {
 function stripKimixClarificationInstruction(content: string): string {
   const withoutRoomContext = stripRoomContextFromPrompt(content);
   if (withoutRoomContext !== content) return stripKimixClarificationInstruction(withoutRoomContext);
-  // 强制委派指令只注入 wire 内容，不属于用户可见原文；与其他 Kimix 包装一样剥离，
-  // 否则历史回放的气泡、本地媒体匹配和房间消息绑定都会因文本不一致而失效。
-  const withoutForcedDirective = stripForcedSubagentDirective(content);
-  if (withoutForcedDirective !== content) return stripKimixClarificationInstruction(withoutForcedDirective);
   if (content.startsWith("【Kimix Hooks 上下文】")) {
     const markerIndex = content.indexOf(HOOK_CONTEXT_MARKER);
     if (markerIndex === -1) return "";

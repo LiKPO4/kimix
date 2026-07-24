@@ -202,14 +202,6 @@ export interface RoomAgent {
   swarmModeLockedAt?: number;
   swarmMode?: boolean;
   swarmModeDesired?: boolean;
-  /** 新子 Agent 的默认模型；空值表示跟随当前主 Agent。 */
-  subagentModelAlias?: string;
-  /** 新子 Agent 的默认思考强度；空值表示跟随当前主 Agent。 */
-  subagentThinkingEffort?: string;
-  /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
-  subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
-  /** 开启后发送时向提示词注入强制委派子代理的指令。 */
-  subagentForceInvoke?: boolean;
   modelSwitchedAt?: number;
   switchedToModel?: string;
   officialGoal?: OfficialGoalState;
@@ -271,14 +263,6 @@ export interface Session {
   swarmMode?: boolean;
   /** 运行中切换 Swarm 时记录的下一轮目标状态；应用成功后清除。 */
   swarmModeDesired?: boolean;
-  /** 新子 Agent 的默认模型；空值表示跟随当前主 Agent。 */
-  subagentModelAlias?: string;
-  /** 新子 Agent 的默认思考强度；空值表示跟随当前主 Agent。 */
-  subagentThinkingEffort?: string;
-  /** 当前轮结束或 runtime 建立后要应用的子 Agent 配置。null 表示清除覆盖。 */
-  subagentRoutingDesired?: { modelAlias: string | null; thinkingEffort: string | null };
-  /** 开启后发送时向提示词注入强制委派子代理的指令。 */
-  subagentForceInvoke?: boolean;
   titleLocked?: boolean;
   model?: string | null;
   permissionMode?: PermissionMode;

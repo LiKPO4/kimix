@@ -1208,6 +1208,15 @@ function readTomlSectionBody(raw: string, sectionName: string) {
   return raw.slice((match.index ?? 0) + match[0].length, matches[matchIndex + 1]?.index ?? raw.length);
 }
 
+function readSecondaryModelFromToml(raw: string): { model: string | null; defaultEffort: string | null } | null {
+  const body = readTomlSectionBody(raw, "secondary_model");
+  if (!body) return null;
+  const model = readTomlString(body, "model");
+  const defaultEffort = readTomlString(body, "default_effort");
+  if (!model && !defaultEffort) return null;
+  return { model: model ?? null, defaultEffort: defaultEffort ?? null };
+}
+
 function removeTomlSection(raw: string, sectionName: string) {
   const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
   const matches = Array.from(raw.matchAll(sectionPattern));
@@ -1318,6 +1327,7 @@ function readKimiModelConfig() {
       defaultModel: null,
       providers: [],
       models: [],
+      secondaryModel: null,
     };
   }
 
@@ -1390,6 +1400,7 @@ function readKimiModelConfig() {
         isDefault: alias === defaultModel,
       };
     }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN")),
+    secondaryModel: readSecondaryModelFromToml(raw),
   };
 }
 
@@ -1430,6 +1441,7 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
     defaultModel,
     providers,
     models,
+    secondaryModel: null,
   };
 }
 
@@ -1611,6 +1623,38 @@ function clearPersistedDefaultEffort(modelAlias: string) {
   if (next === raw) return;
   backupFileIfExists(configPath);
   fs.writeFileSync(configPath, next, "utf-8");
+}
+
+async function saveKimiSecondaryModelConfig(input: unknown) {
+  const config = z.object({
+    model: z.string().trim().optional(),
+    defaultEffort: z.string().trim().optional(),
+  }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  const model = config.model || null;
+  const defaultEffort = config.defaultEffort || null;
+  backupFileIfExists(configPath);
+  let next = raw;
+  if (model) {
+    next = setTomlSectionValue(next, "secondary_model", "model", `"${escapeTomlString(model)}"`);
+  } else {
+    next = removeTomlSectionValue(next, "secondary_model", "model");
+  }
+  if (defaultEffort) {
+    next = setTomlSectionValue(next, "secondary_model", "default_effort", `"${escapeTomlString(defaultEffort)}"`);
+  } else {
+    next = removeTomlSectionValue(next, "secondary_model", "default_effort");
+  }
+  // Remove the entire [secondary_model] section if both keys are gone.
+  if (!model && !defaultEffort) {
+    next = removeTomlSection(next, "secondary_model");
+  }
+  fs.writeFileSync(configPath, next, "utf-8");
+  await reloadIdleKimiCodeSessionsAfterConfigChange();
+  const summary = await readKimiModelConfigWithSdk();
+  return { ...summary, message: model ? "已设置子代理默认模型" : "已清除子代理默认模型" };
 }
 
 function saveOpenAiProviderConfig(input: unknown) {
@@ -5628,6 +5672,14 @@ ipcMain.handle("kimi:testOpenAiProvider", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi:saveSecondaryModel", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await saveKimiSecondaryModelConfig(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:login", async () => {
   try {
     const kimiPath = await requireKimiExecutable();
@@ -6157,24 +6209,6 @@ ipcMain.handle("kimi-code:loadFile", async (_, request: unknown) => {
     const fileId = typeof req.fileId === "string" ? req.fileId.trim() : "";
     if (!fileId) return { success: false, error: "Missing fileId" };
     return { success: true, data: await kimiCodeHost.loadServerFile(fileId) };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("kimi-code:setSubagentRouting", async (_, request: unknown) => {
-  try {
-    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
-    const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
-    const modelAlias = typeof req.modelAlias === "string" && req.modelAlias.trim()
-      ? req.modelAlias.trim()
-      : undefined;
-    const thinkingEffort = typeof req.thinkingEffort === "string" && req.thinkingEffort.trim()
-      ? req.thinkingEffort.trim()
-      : undefined;
-    if (!sessionId) return { success: false, error: "Missing sessionId" };
-    const data = await kimiCodeHost.setSubagentRouting(sessionId, { modelAlias, thinkingEffort });
-    return { success: true, data };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

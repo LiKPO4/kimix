@@ -58,5 +58,6 @@ export function mergeRuntimeAndDiskModelConfig(
     models: [...models.values()]
       .map((model) => ({ ...model, isDefault: model.alias === defaultModel }))
       .sort((left, right) => Number(right.isDefault) - Number(left.isDefault) || left.alias.localeCompare(right.alias, "zh-CN")),
+    secondaryModel: disk.secondaryModel ?? runtime.secondaryModel ?? null,
   };
 }

@@ -19,6 +19,7 @@ const emptyProviderConfig: KimiModelConfigSummary = {
     hasOauth: false,
   }],
   models: [],
+  secondaryModel: null,
 };
 
 afterEach(() => {
