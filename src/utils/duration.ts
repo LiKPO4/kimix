@@ -1,5 +1,5 @@
 const MAX_ASSISTANT_TURN_DURATION_MS = 12 * 60 * 60 * 1000;
-const MIN_ASSISTANT_TURN_DURATION_MS = 2 * 1000;
+const MIN_ASSISTANT_TURN_DURATION_MS = 100;
 
 export function reliableAssistantDurationMs(durationMs: unknown): number | undefined {
   if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) return undefined;

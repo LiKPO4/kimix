@@ -23,7 +23,7 @@ import { SessionRecommendationCard } from "./SessionRecommendationCard";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
-import { reliableAssistantDurationMs } from "@/utils/duration";
+import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { hasMetricStatus, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
@@ -882,12 +882,20 @@ export function buildRenderItems(
           agentTurnId,
         }
       : undefined;
-    const renderAssistantEvent = mergedAssistantEvent
-      ? turnSettled && !mergedAssistantEvent.isComplete
-        ? { ...mergedAssistantEvent, isThinking: false, isComplete: true }
-        : !turnSettled && mergedAssistantEvent.isComplete
-          ? { ...mergedAssistantEvent, isComplete: false }
-          : mergedAssistantEvent
+    const derivedDurationMs = (turnStartedAt && mergedAssistantEvent && mergedAssistantEvent.timestamp > turnStartedAt)
+      ? reliableAssistantDurationBetween(turnStartedAt, mergedAssistantEvent.timestamp)
+      : undefined;
+    const baseAssistant = mergedAssistantEvent
+      ? (mergedAssistantEvent.durationMs === undefined && derivedDurationMs !== undefined)
+        ? { ...mergedAssistantEvent, durationMs: derivedDurationMs }
+        : mergedAssistantEvent
+      : undefined;
+    const renderAssistantEvent = baseAssistant
+      ? turnSettled && !baseAssistant.isComplete
+        ? { ...baseAssistant, isThinking: false, isComplete: true }
+        : !turnSettled && baseAssistant.isComplete
+          ? { ...baseAssistant, isComplete: false }
+          : baseAssistant
       : projectedFailureAssistant;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
     const finalUsageStatus = mergeMetricStatusUpdates(settledStatusEvents);
