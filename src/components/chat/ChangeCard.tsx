@@ -361,7 +361,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
       if (!response.success) throw new Error(response.error);
       const preview = response.data;
       if (preview.source === "unavailable" || !preview.patch) {
-        setPreviewErrors((state) => ({ ...state, [key]: "未找到可确认属于本轮的差异，未使用其他轮次或当前文件内容代替。" }));
+        setPreviewErrors((state) => ({ ...state, [key]: "未找到可确认属于本轮的差异。" }));
         return;
       }
       const previewSource: "commit" | "workspace" = preview.source;
