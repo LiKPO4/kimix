@@ -518,6 +518,35 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await client.close();
   });
 
+  it("passes through a subagent prompt.completed without running the completion barrier", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0, data: { has_more: false, items: [] } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const observed: Array<{ type: string; payload?: unknown }> = [];
+    client.onFrame((current) => observed.push(current));
+    const internals = client as unknown as {
+      receive: (current: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+
+    // 0.29 实测：Swarm 子代理的 prompt.completed 携带子代理自己的 agentId，
+    // 不得触发主会话的消息回放/权威快照替换屏障。
+    internals.receive({
+      type: "prompt.completed",
+      session_id: "session-1",
+      seq: 20,
+      epoch: "epoch-1",
+      payload: { promptId: "msg-subagent-prompt", agentId: "agent-0", reason: "completed" },
+    });
+
+    await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(observed.some((current) => current.type === "kimix.server.snapshot")).toBe(false);
+    await client.close();
+  });
+
   it("recovers a stable failure assistant before delivering a failed prompt completion", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       expect(url).toBe("http://127.0.0.1:58627/api/v1/sessions/session-1/snapshot");

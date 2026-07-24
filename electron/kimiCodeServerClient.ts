@@ -1247,8 +1247,14 @@ export class KimiCodeServerClient {
       typeof frame.session_id === "string" &&
       payload.recovered_from_snapshot !== true
     ) {
-      this.queuePromptCompletion(frame);
-      return;
+      // 0.29 实测：Swarm/Agent 子代理的 prompt.completed 携带子代理自己的 agentId。
+      // 完成屏障（消息回放/权威快照替换）只为主 Agent 的 prompt.completed 运行；
+      // 子代理完成帧直接透传，避免主轮中途被快照替换截断正文。
+      const agentId = typeof payload.agentId === "string" && payload.agentId ? payload.agentId : "main";
+      if (agentId === "main") {
+        this.queuePromptCompletion(frame);
+        return;
+      }
     }
     this.deliver(frame);
   }

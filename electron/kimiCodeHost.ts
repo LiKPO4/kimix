@@ -2772,11 +2772,17 @@ function handleServerFrame(frame: ServerFrame) {
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event, "prompt");
   if (frame.type === "prompt.completed") {
-    const currentStatus = serverSessions.get(sessionId)?.status;
-    if (currentStatus !== "interrupted" && currentStatus !== "error") setStatus(sessionId, "completed");
-    void refreshServerSessionStatus(sessionId, true).catch((error) => {
-      console.warn(`[KimiCodeServerHost] refresh completed status failed for ${sessionId}:`, error);
-    });
+    // 0.29 实测：Swarm/Agent 子代理的 prompt.completed 携带子代理自己的 agentId。
+    // 只有主 Agent 的 prompt.completed 才代表本会话轮次完成；子代理的完成帧
+    // 不得把仍在运行的主轮置为 completed（否则底部误显示「已完成」并抖动）。
+    const completedAgentId = typeof payload.agentId === "string" && payload.agentId ? payload.agentId : "main";
+    if (completedAgentId === "main") {
+      const currentStatus = serverSessions.get(sessionId)?.status;
+      if (currentStatus !== "interrupted" && currentStatus !== "error") setStatus(sessionId, "completed");
+      void refreshServerSessionStatus(sessionId, true).catch((error) => {
+        console.warn(`[KimiCodeServerHost] refresh completed status failed for ${sessionId}:`, error);
+      });
+    }
   }
 }
 
