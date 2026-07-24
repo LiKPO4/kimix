@@ -1960,6 +1960,25 @@ describe("mapHistoryEvents", () => {
     expect(result).toMatchObject([{ type: "status_update", message: "已调用 Skill：game-development" }]);
   });
 
+  it("collapses background-task notification envelopes into status summaries instead of user bubbles", () => {
+    const result = mapHistoryEvents([{
+      type: "TurnBegin",
+      payload: {
+        user_input: [{
+          type: "text",
+          text: '<notification id="task:bash-h:completed" category="task" type="task.completed" source_kind="background_task" source_id="bash-h">\nTitle: Background process completed\nSeverity: info\n全量 flutter test completed.\n<output-file path="C:/x.log" bytes="1">x</output-file>\n</notification>',
+        }],
+      },
+    }]);
+
+    expect(result).toMatchObject([{
+      type: "status_update",
+      message: "后台任务已完成：全量 flutter test",
+      source: "runtime",
+      tone: "success",
+    }]);
+  });
+
   it("maps an array of raw events", () => {
     const raw = [
       { type: "TurnBegin", payload: { user_input: "Hi" } },

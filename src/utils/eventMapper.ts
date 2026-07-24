@@ -1,5 +1,5 @@
 import type { TimelineEvent, TodoItem, UserMessageImage } from "@/types/ui";
-import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiSkillActivation } from "./eventHelpers";
+import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiAgentEnvelope, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 import { stripForcedSubagentDirective } from "./forcedSubagentPrompt";
@@ -1330,6 +1330,17 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     case "TurnBegin": {
       const userMessage = extractUserMessage(payload.user_input);
       if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
+      const envelope = parseKimiAgentEnvelope(userMessage.content);
+      if (envelope) {
+        return {
+          id: generateId(),
+          type: "status_update",
+          timestamp: eventTimestamp,
+          message: envelope.summary,
+          source: "runtime",
+          tone: envelope.tone,
+        };
+      }
       const skillActivation = parseKimiSkillActivation(userMessage.content);
       if (skillActivation?.trigger === "model-tool") {
         return {

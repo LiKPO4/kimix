@@ -19,6 +19,40 @@ export function parseKimiSkillActivation(content: string): { name: string; args:
   };
 }
 
+export interface AgentEnvelopeSummary {
+  kind: "notification" | "cron-fire";
+  tone: "info" | "success" | "warning";
+  summary: string;
+}
+
+/**
+ * 官方运行时会话历史中的代理循环信封（后台任务完成/丢失通知、定时任务触发）
+ * 以 role=user 持久化。它们不是用户输入，渲染时必须折叠为状态摘要，
+ * 否则原始 XML 信封会出现在用户气泡里。
+ */
+export function parseKimiAgentEnvelope(content: string): AgentEnvelopeSummary | null {
+  const trimmed = content.trim();
+  const notification = trimmed.match(/^<notification\b([^>]*)>([\s\S]*?)<\/notification>\s*$/i);
+  if (notification) {
+    const type = notification[1].match(/\btype="([^"]*)"/i)?.[1] ?? "";
+    const text = notification[2].replace(/<output-file\b[\s\S]*?(<\/output-file>|$)/gi, "").trim();
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const title = lines.find((line) => /^Title:/i.test(line))?.replace(/^Title:\s*/i, "") ?? "";
+    const description = lines.filter((line) => !/^(Title|Severity):/i.test(line)).join(" ").trim();
+    const target = description.replace(/\s+(completed|lost|failed|stopped)\.?$/i, "").trim() || description || title;
+    if (type === "task.completed") return { kind: "notification", tone: "success", summary: `后台任务已完成：${target}` };
+    if (type === "task.lost") return { kind: "notification", tone: "warning", summary: `后台任务已丢失：${target}` };
+    return { kind: "notification", tone: "info", summary: `后台任务通知：${target}` };
+  }
+  const cronFire = trimmed.match(/^<cron-fire\b([^>]*)>([\s\S]*?)<\/cron-fire>\s*$/i);
+  if (cronFire) {
+    const prompt = cronFire[2].match(/<prompt>([\s\S]*?)<\/prompt>/i)?.[1].trim() ?? "";
+    const firstLine = prompt.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0] ?? "";
+    return { kind: "cron-fire", tone: "info", summary: `定时任务触发：${firstLine.slice(0, 80)}` };
+  }
+  return null;
+}
+
 const BUILTIN_SKILL_COMMAND_NAMES = new Set(["custom-theme", "import-from-cc-codex", "mcp-config"]);
 
 export function formatKimiSkillActivationCommand(name: string, args = "") {
@@ -59,6 +93,17 @@ export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[
   return events.flatMap<TimelineEvent>((event) => {
     if (event.type === "error" && isLegacyKimiWorkDirError(event.message)) return [];
     if (event.type !== "user_message") return [event];
+    const envelope = parseKimiAgentEnvelope(event.content);
+    if (envelope) {
+      return [{
+        id: event.id,
+        type: "status_update" as const,
+        timestamp: event.timestamp,
+        message: envelope.summary,
+        source: "runtime" as const,
+        tone: envelope.tone,
+      }];
+    }
     const activation = parseKimiSkillActivation(event.content);
     if (!activation) return [event];
     if (activation.trigger === "model-tool") {

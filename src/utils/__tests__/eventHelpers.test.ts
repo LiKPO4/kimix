@@ -268,6 +268,65 @@ describe("sanitizePersistedEvents", () => {
     }]);
   });
 
+  it("collapses background-task notification envelopes into status summaries", () => {
+    const events: TimelineEvent[] = [{
+      id: "notif-1",
+      type: "user_message",
+      timestamp: 3,
+      content: '<notification id="task:bash-hbcvffrs:completed" category="task" type="task.completed" source_kind="background_task" source_id="bash-hbcvffrs">\nTitle: Background process completed\nSeverity: info\n全量 flutter test（十方杀机包） completed.\n<output-file path="C:/Users/x/output.log" bytes="533">\nRead the output file to retrieve the result\n</output-file>\n</notification>',
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([{
+      type: "status_update",
+      message: "后台任务已完成：全量 flutter test（十方杀机包）",
+      tone: "success",
+    }]);
+  });
+
+  it("collapses lost-task notification envelopes with warning tone", () => {
+    const events: TimelineEvent[] = [{
+      id: "notif-2",
+      type: "user_message",
+      timestamp: 4,
+      content: '<notification id="task:bash-v:lost" category="task" type="task.lost" source_kind="background_task" source_id="bash-v">\nTitle: Background process lost\nSeverity: warning\n发布 1.4.482：构建 APK 并上传 8084 lost.\n</notification>',
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([{
+      type: "status_update",
+      message: "后台任务已丢失：发布 1.4.482：构建 APK 并上传 8084",
+      tone: "warning",
+    }]);
+  });
+
+  it("collapses cron-fire envelopes into status summaries", () => {
+    const events: TimelineEvent[] = [{
+      id: "cron-1",
+      type: "user_message",
+      timestamp: 5,
+      content: '<cron-fire jobId="j1" cron="*/5 * * * *" recurring="true" coalescedCount="1" stale="false">\n<prompt>\n检查构建状态并汇报\n</prompt>\n</cron-fire>',
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([{
+      type: "status_update",
+      message: "定时任务触发：检查构建状态并汇报",
+      tone: "info",
+    }]);
+  });
+
+  it("keeps ordinary user messages untouched by envelope sanitizing", () => {
+    const events: TimelineEvent[] = [{
+      id: "user-1",
+      type: "user_message",
+      timestamp: 6,
+      content: "帮我看下 <notification> 这个标签怎么用",
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([{
+      type: "user_message",
+      content: "帮我看下 <notification> 这个标签怎么用",
+    }]);
+  });
+
   it("sanitizes cached official Skill activation titles", () => {
     expect(sanitizeKimiSkillActivationTitle('User activated the skill "find-skills".'))
       .toBe("使用 find-skills");
