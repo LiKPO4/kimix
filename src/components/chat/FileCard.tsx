@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect } from "react";
-import { ChevronDown, FileText, ExternalLink, FolderOpen, Copy, Check } from "lucide-react";
+import { ChevronDown, FileText, ExternalLink, Code, FolderOpen, Copy, Check } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 
@@ -30,16 +30,26 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  const fullPath = project?.path ? `${project.path}/${path.replace(/^[\\/]/, "")}` : path;
+
   const handleOpenDefault = async () => {
     setIsOpen(false);
     if (!project || !path) return;
     await window.api.openFile({ projectPath: project.path, filePath: path });
   };
 
+  const handleOpenInEditor = async () => {
+    setIsOpen(false);
+    if (!path) return;
+    const res = await window.api.openProjectEditor({ path: fullPath, editor: "vscode" });
+    if (res && !res.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `在编辑器打开失败：${res.error}` }));
+    }
+  };
+
   const handleRevealInFolder = async () => {
     setIsOpen(false);
     if (!path) return;
-    const fullPath = project?.path ? `${project.path}/${path.replace(/^[\\/]/, "")}` : path;
     const res = await window.api.revealPath({ path: fullPath });
     if (res && !res.success) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `在管理器定位失败：${res.error}` }));
@@ -49,7 +59,6 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
   const handleCopyFullPath = async () => {
     setIsOpen(false);
     if (!path) return;
-    const fullPath = project?.path ? `${project.path}/${path.replace(/^[\\/]/, "")}` : path;
     await navigator.clipboard.writeText(fullPath);
     setCopied("full");
     setTimeout(() => setCopied(null), 2000);
@@ -66,7 +75,12 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
   };
 
   return (
-    <div className="relative w-full rounded-[14px] border border-border-subtle bg-surface-elevated" style={{ padding: "18px 22px" }}>
+    <div
+      className={`relative w-full rounded-[14px] border border-border-subtle bg-surface-elevated transition-all ${
+        isOpen ? "z-[60]" : "z-10"
+      }`}
+      style={{ padding: "18px 22px" }}
+    >
       <div className="flex items-center" style={{ gap: 16 }}>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-surface-hover text-text-muted">
           <FileText size={22} />
@@ -82,7 +96,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               type="button"
               onClick={handleOpenDefault}
               disabled={!project || !path}
-              className="flex h-9 items-center text-[13.5px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45 rounded-l-xl transition-colors"
+              className="flex h-9 items-center text-[13.5px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45 rounded-l-xl transition-colors whitespace-nowrap"
               style={{ paddingLeft: 14, paddingRight: 8 }}
             >
               打开
@@ -100,45 +114,54 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
 
           {isOpen && (
             <div
-              className="absolute right-0 top-full z-30 min-w-[178px] rounded-xl border border-border-subtle bg-surface-elevated shadow-elevated-token animate-in fade-in zoom-in-95 duration-100"
-              style={{ marginTop: 6, padding: 6 }}
+              className="absolute right-0 top-full z-[100] min-w-[210px] whitespace-nowrap rounded-xl border border-border bg-surface-elevated shadow-elevated-token animate-in fade-in zoom-in-95 duration-100"
+              style={{ marginTop: 8, padding: "8px 6px" }}
             >
               <button
                 type="button"
                 onClick={handleOpenDefault}
-                className="flex w-full items-center rounded-lg text-left text-[13px] text-text-primary hover:bg-surface-hover transition-colors"
-                style={{ height: 34, gap: 10, paddingLeft: 12, paddingRight: 12 }}
+                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
-                <ExternalLink size={14} className="shrink-0 text-text-muted" />
-                <span>系统程序打开</span>
+                <ExternalLink size={15} className="shrink-0 text-text-muted" />
+                <span className="whitespace-nowrap">系统默认程序打开</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenInEditor}
+                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
+              >
+                <Code size={15} className="shrink-0 text-text-muted" />
+                <span className="whitespace-nowrap">在编辑器中打开 (VS Code)</span>
               </button>
               <button
                 type="button"
                 onClick={handleRevealInFolder}
-                className="flex w-full items-center rounded-lg text-left text-[13px] text-text-primary hover:bg-surface-hover transition-colors"
-                style={{ height: 34, gap: 10, paddingLeft: 12, paddingRight: 12 }}
+                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
-                <FolderOpen size={14} className="shrink-0 text-text-muted" />
-                <span>在文件管理器中定位</span>
+                <FolderOpen size={15} className="shrink-0 text-text-muted" />
+                <span className="whitespace-nowrap">在文件管理器中定位</span>
               </button>
-              <div className="my-1 border-t border-border-subtle" />
+              <div className="my-1.5 border-t border-border-subtle" />
               <button
                 type="button"
                 onClick={handleCopyFullPath}
-                className="flex w-full items-center rounded-lg text-left text-[13px] text-text-primary hover:bg-surface-hover transition-colors"
-                style={{ height: 34, gap: 10, paddingLeft: 12, paddingRight: 12 }}
+                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
-                {copied === "full" ? <Check size={14} className="shrink-0 text-accent-primary" /> : <Copy size={14} className="shrink-0 text-text-muted" />}
-                <span>{copied === "full" ? "已复制完整路径" : "复制完整路径"}</span>
+                {copied === "full" ? <Check size={15} className="shrink-0 text-accent-primary" /> : <Copy size={15} className="shrink-0 text-text-muted" />}
+                <span className="whitespace-nowrap">{copied === "full" ? "已复制完整路径" : "复制完整路径"}</span>
               </button>
               <button
                 type="button"
                 onClick={handleCopyRelativePath}
-                className="flex w-full items-center rounded-lg text-left text-[13px] text-text-primary hover:bg-surface-hover transition-colors"
-                style={{ height: 34, gap: 10, paddingLeft: 12, paddingRight: 12 }}
+                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
-                {copied === "relative" ? <Check size={14} className="shrink-0 text-accent-primary" /> : <Copy size={14} className="shrink-0 text-text-muted" />}
-                <span>{copied === "relative" ? "已复制相对路径" : "复制相对路径"}</span>
+                {copied === "relative" ? <Check size={15} className="shrink-0 text-accent-primary" /> : <Copy size={15} className="shrink-0 text-text-muted" />}
+                <span className="whitespace-nowrap">{copied === "relative" ? "已复制相对路径" : "复制相对路径"}</span>
               </button>
             </div>
           )}
