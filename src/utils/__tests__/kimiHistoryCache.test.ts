@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 17 for the turn-block order / no-subagent-surface migration", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(17);
+  it("uses cache version 18 to force re-hydration of pre-offset-anchored thinking", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(18);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {
