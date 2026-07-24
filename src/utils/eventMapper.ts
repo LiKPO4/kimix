@@ -182,6 +182,8 @@ function normalizeApprovalDisplay(display: Record<string, unknown>): Extract<Tim
 function appendAssistantContent(existingContent: string, incomingContent: string): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
+  if (incomingContent === existingContent || incomingContent.includes(existingContent)) return incomingContent;
+  if (existingContent.includes(incomingContent)) return existingContent;
   return existingContent + incomingContent;
 }
 
@@ -1777,13 +1779,24 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const stableSnapshotId = incoming.snapshotMessageIdStable === true
       ? incoming.snapshotMessageId
       : undefined;
-    const stableAssistantIndex = stableSnapshotId
+    const stableAssistantIndexBySnapshot = stableSnapshotId
       ? existing.findLastIndex((event) => (
         event.type === "assistant_message" &&
         event.snapshotMessageIdStable === true &&
         event.snapshotMessageId === stableSnapshotId
       ))
       : -1;
+    const sameTurnAssistantIndex = (incoming.agentTurnId || incoming.roomMessageId)
+      ? existing.findLastIndex((event) => (
+        event.type === "assistant_message" &&
+        !event.isComplete &&
+        ((incoming.agentTurnId && event.agentTurnId === incoming.agentTurnId) ||
+         (incoming.roomMessageId && event.roomMessageId === incoming.roomMessageId))
+      ))
+      : -1;
+    const stableAssistantIndex = stableAssistantIndexBySnapshot !== -1
+      ? stableAssistantIndexBySnapshot
+      : sameTurnAssistantIndex;
     const latestUserTimestamp = existing.reduce<number | undefined>((latest, event) => (
       event.type === "user_message" && (latest === undefined || event.timestamp > latest)
         ? event.timestamp
