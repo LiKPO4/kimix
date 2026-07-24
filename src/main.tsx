@@ -710,7 +710,21 @@ applyCachedThemeSnapshot();
 reportStartup("after theme snapshot");
 installBrowserPreviewApi();
 reportStartup("after browser preview api");
-reportStartup("before React render");
+ensureLongTaskObserver();
+(window as unknown as { KIMIX_PERF: () => unknown }).KIMIX_PERF = () => {
+  const snapshot = getPerfDiagSnapshot();
+  console.group("🚀 Kimix 启动与渲染性能诊断报告 (Perf Diag)");
+  console.log("主线程长任务 (LongTasks >50ms):", snapshot.longTasks);
+  console.log("滚动位置强制重写次数 (scrollTopWrites):", snapshot.scrollTopWrites);
+  console.log("Hot-Path 耗时分布 (Timings):", snapshot.timings);
+  console.log("TurnBody 渲染次数与缓存命中:", {
+    runs: snapshot.renderTurnBodyRuns,
+    cacheHits: snapshot.renderTurnBodyCacheHits,
+  });
+  console.groupEnd();
+  return snapshot;
+};
+
 createRoot(rootEl).render(
   <StrictMode>
     <App />
