@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 补充：被拒 canonical 仍恢复压缩用量（v2.20.18）
+
+- v2.20.17 已保留 session usage，但该问题会话长期因本地正文更丰富而拒绝整份 canonical history；已有的 additive usage 合并按原始时间戳把 usage 插回 `complete` 之前，仍会被上下文边界排除。
+- 修复：缺失的 `usageScope:"session"` 在 additive 合并时固定插到对应成功 compaction end 之后；普通 turn usage 仍保持时间序。这样无需再次压缩，重启当前问题会话也能从 wire 恢复最近一次约 25,079 token 的窗口数据。版本升至 v2.20.18。
+
 ## 2026-07-26 修复：压缩完成重复提示且小窗无用量（v2.20.17）
 
 - 用户 v2.20.16 实测：压缩终态已能出现，但同一次 `/compact` 显示两条“上下文压缩完成”；背景信息窗口仍显示“等待上下文数据”。

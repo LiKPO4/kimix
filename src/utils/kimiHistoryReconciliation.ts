@@ -788,6 +788,18 @@ export function mergeMissingUsageStatusEvents(
   const merged = [...baseEvents];
   for (const status of missing) {
     known.add(identityOf(status));
+    if (status.usageScope === "session") {
+      const compactionEndIndex = merged.findLastIndex((event) => (
+        event.type === "compaction" &&
+        event.phase === "end" &&
+        event.outcome !== "cancelled" &&
+        event.timestamp >= status.timestamp
+      ));
+      if (compactionEndIndex >= 0) {
+        merged.splice(compactionEndIndex + 1, 0, status);
+        continue;
+      }
+    }
     let index = merged.length;
     while (index > 0 && merged[index - 1].timestamp > status.timestamp) index -= 1;
     merged.splice(index, 0, status);

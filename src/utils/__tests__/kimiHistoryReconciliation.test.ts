@@ -879,6 +879,25 @@ describe("mergeMissingUsageStatusEvents", () => {
     expect(mergeMissingUsageStatusEvents(base, [usageStatus(25, 54, 22386)])).toBe(base);
     expect(mergeMissingUsageStatusEvents(base, [])).toBe(base);
   });
+
+  it("places session usage after its compaction boundary when canonical replacement is rejected", () => {
+    const base: TimelineEvent[] = [
+      { id: "begin", type: "compaction", timestamp: 100, phase: "begin" },
+      { id: "end", type: "compaction", timestamp: 200, phase: "end", outcome: "completed" },
+    ];
+    const sessionUsage: Extract<TimelineEvent, { type: "status_update" }> = {
+      id: "st-190",
+      type: "status_update",
+      timestamp: 190,
+      tokenCount: 1_294,
+      inputTokenCount: 25_079,
+      message: "模型：kimi-code/kimi-for-coding",
+      usageScope: "session",
+    };
+
+    const merged = mergeMissingUsageStatusEvents(base, [sessionUsage]);
+    expect(merged.map((event) => event.id)).toEqual(["begin", "end", "st-190"]);
+  });
 });
 describe("backfillTurnModelsFromUsageStatuses (via mergeMissingUsageStatusEvents)", () => {
   const usageStatus = (timestamp: number, tokenCount: number, inputTokenCount: number): TimelineEvent => ({
