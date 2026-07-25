@@ -560,6 +560,7 @@ export interface StatusUpdateEvent {
   inputTokenCount?: number;
   contextSize?: number;
   contextLimit?: number;
+  usageScope?: "turn" | "session";
   planMode?: boolean;
   swarmMode?: boolean;
   message?: string;

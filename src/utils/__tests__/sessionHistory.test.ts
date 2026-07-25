@@ -31,6 +31,31 @@ describe("Kimi Code wire history", () => {
     ]);
   });
 
+  it("keeps post-compaction session usage after the completion boundary", () => {
+    const records = [
+      { type: "full_compaction.begin", source: "manual", time: 100 },
+      {
+        type: "usage.record",
+        model: "kimi-code/k3",
+        usageScope: "session",
+        usage: { inputOther: 5_879, inputCacheRead: 19_200, inputCacheCreation: 0, output: 1_294 },
+        time: 190,
+      },
+      { type: "full_compaction.complete", time: 200 },
+    ].map(parseKimiCodeRecord).filter((event) => event !== null);
+
+    const timeline = mapHistoryEvents(records);
+    expect(timeline).toHaveLength(3);
+    expect(timeline[0]).toMatchObject({ type: "compaction", phase: "begin" });
+    expect(timeline[1]).toMatchObject({ type: "compaction", phase: "end", outcome: "completed" });
+    expect(timeline[2]).toMatchObject({
+      type: "status_update",
+      usageScope: "session",
+      inputTokenCount: 25_079,
+      tokenCount: 1_294,
+    });
+  });
+
   it("preserves timestamps from wrapped wire messages", () => {
     expect(parseKimiCodeRecord({
       time: "2026-07-01T20:03:27+08:00",

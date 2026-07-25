@@ -10,7 +10,7 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
-import { findOfficialCompactionTerminal, type OfficialCompactionTerminal } from "./compactionWire";
+import { findOfficialCompactionResult, type OfficialCompactionResult } from "./compactionWire";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -1482,12 +1482,13 @@ export async function compactSession(sessionId: string, instruction?: string): P
   if (serverManaged) {
     const startedAt = Date.now();
     await getServerClient().compactSession(sessionId, instruction);
-    const terminal = await waitForOfficialCompactionTerminal(sessionId, serverManaged.workDir, startedAt);
-    eventSink?.({ sessionId, event: terminal });
+    const result = await waitForOfficialCompactionResult(sessionId, serverManaged.workDir, startedAt);
+    eventSink?.({ sessionId, event: result.terminal });
+    if (result.usage) eventSink?.({ sessionId, event: result.usage });
     await refreshServerSessionStatus(sessionId, true).catch((error) => {
       console.warn(`[KimiCodeServerHost] refresh after compaction failed for ${sessionId}:`, error);
     });
-    if (terminal.type === "full_compaction.cancel") {
+    if (result.terminal.type === "full_compaction.cancel") {
       throw new Error("Server 取消了本次上下文压缩。");
     }
     return;
@@ -3206,19 +3207,19 @@ async function readWireTail(wireFile: string): Promise<string> {
   }
 }
 
-async function waitForOfficialCompactionTerminal(
+async function waitForOfficialCompactionResult(
   sessionId: string,
   workDir: string,
   startedAt: number,
-): Promise<OfficialCompactionTerminal> {
+): Promise<OfficialCompactionResult> {
   const deadline = Date.now() + COMPACTION_WIRE_CONFIRM_TIMEOUT_MS;
   let wireFile = await getSessionWireFile(sessionId, workDir);
   while (Date.now() <= deadline) {
     if (!wireFile) wireFile = await getSessionWireFile(sessionId, workDir);
     if (wireFile) {
       const content = await readWireTail(wireFile).catch(() => "");
-      const terminal = findOfficialCompactionTerminal(content, startedAt);
-      if (terminal) return terminal;
+      const result = findOfficialCompactionResult(content, startedAt);
+      if (result) return result;
     }
     await delay(COMPACTION_WIRE_CONFIRM_INTERVAL_MS);
   }

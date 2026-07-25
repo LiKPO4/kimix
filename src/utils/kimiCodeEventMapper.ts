@@ -631,6 +631,7 @@ export function mapKimiCodeEvent(
         timestamp,
         tokenCount: usageOutput(usage),
         inputTokenCount: usageInput(usage),
+        usageScope: event.usageScope === "turn" || event.usageScope === "session" ? event.usageScope : undefined,
         message: isString(event.model) ? `模型：${event.model}` : undefined,
       };
     }

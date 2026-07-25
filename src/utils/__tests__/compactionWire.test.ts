@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findOfficialCompactionTerminal } from "../../../electron/compactionWire";
+import { findOfficialCompactionResult } from "../../../electron/compactionWire";
 
 describe("official compaction wire terminal", () => {
   it("finds the newest completion after the current request", () => {
@@ -9,9 +9,11 @@ describe("official compaction wire terminal", () => {
       JSON.stringify({ type: "full_compaction.complete", time: 300 }),
     ].join("\n");
 
-    expect(findOfficialCompactionTerminal(content, 200)).toEqual({
-      type: "full_compaction.complete",
-      time: 300,
+    expect(findOfficialCompactionResult(content, 200)).toEqual({
+      terminal: {
+        type: "full_compaction.complete",
+        time: 300,
+      },
     });
   });
 
@@ -22,11 +24,33 @@ describe("official compaction wire terminal", () => {
       JSON.stringify({ type: "full_compaction.cancel", time: 400, reason: "aborted" }),
     ].join("\n");
 
-    expect(findOfficialCompactionTerminal(content, 350)).toEqual({
-      type: "full_compaction.cancel",
-      time: 400,
-      reason: "aborted",
+    expect(findOfficialCompactionResult(content, 350)).toEqual({
+      terminal: {
+        type: "full_compaction.cancel",
+        time: 400,
+        reason: "aborted",
+      },
     });
-    expect(findOfficialCompactionTerminal(content, 500)).toBeNull();
+    expect(findOfficialCompactionResult(content, 500)).toBeNull();
+  });
+
+  it("returns the session usage written immediately before completion", () => {
+    const usage = {
+      type: "usage.record",
+      model: "kimi-code/k3",
+      usageScope: "session",
+      usage: { inputOther: 5_879, inputCacheRead: 19_200, output: 1_294 },
+      time: 290,
+    };
+    const content = [
+      JSON.stringify({ type: "full_compaction.begin", time: 200 }),
+      JSON.stringify(usage),
+      JSON.stringify({ type: "full_compaction.complete", time: 300 }),
+    ].join("\n");
+
+    expect(findOfficialCompactionResult(content, 200)).toEqual({
+      terminal: { type: "full_compaction.complete", time: 300 },
+      usage,
+    });
   });
 });

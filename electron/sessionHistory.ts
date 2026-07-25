@@ -411,9 +411,9 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
     };
   }
 
-  // A turn-scoped usage record is the authoritative model actually used for
-  // that response. Config updates only describe selection changes.
-  if (record.type === "usage.record" && record.usageScope === "turn") {
+  // Turn-scoped usage identifies the response model. Session-scoped usage is
+  // emitted by full compaction and is the authoritative post-compaction window.
+  if (record.type === "usage.record" && (record.usageScope === "turn" || record.usageScope === "session")) {
     const usage = record.usage && typeof record.usage === "object"
       ? record.usage as Record<string, unknown>
       : {};
@@ -427,6 +427,7 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
           output: usage.output,
         },
         model: record.model,
+        usage_scope: record.usageScope,
       },
       time: record.time,
     };

@@ -2955,7 +2955,7 @@ export function Composer() {
       await appendSlashUserMessage(commandNotice, runtime.roomAgentId);
       await appendStatusMessage("上下文压缩请求已提交，正在处理。", runtime.roomAgentId);
       const res = await window.api.compactKimiCodeSession({ sessionId: runtime.runtimeSessionId, instruction: args || undefined });
-      await appendStatusMessage(res.success ? "上下文压缩完成。" : `压缩失败：${res.error}`, runtime.roomAgentId);
+      if (!res.success) await appendStatusMessage(`压缩失败：${res.error}`, runtime.roomAgentId);
       return true;
     }
     if (name === "plan") {

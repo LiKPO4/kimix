@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-26T07:38:00+08:00"
+timestamp: "2026-07-26T07:48:00+08:00"
 ---
 
 # Runtime Routing
@@ -131,6 +131,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 87. Live-turn forensics for residual symptoms (partial body + fake "输出完成", long blank then burst, heavy-task stall vs official web) are recorded under a single `[live]` channel in `diag.log` (project root + userData): `display` (UI settled vs active), `stream` (body/think/tool/terminal samples), `silence` (engine running + no stream), `settle` (poll terminal settle with turn summary). Full per-frame `[wsframe]` remains opt-in via `KIMIX_FRAME_DIAG=1`; dev defaults enable the lighter live path (`KIMIX_LIVE_DIAG` unset and unpackaged).
 88. Official Server compaction uses `full_compaction.begin`, `full_compaction.complete`, and `full_compaction.cancel`, while older SDK/history sources may use `compaction.started`, `compaction.completed`, and `compaction.cancelled`. Both families must map into the same timeline lifecycle in live streaming and wire-history recovery; cancellation must remain distinct from completion. The `:compact` POST is a long-running control path and must not inherit the ordinary 5-second control timeout. Request acknowledgement is not the terminal result: UI entry points show the request/processing state, while the official lifecycle event supplies the durable completed/cancelled feedback.
 89. Kimi Server 0.29 writes `full_compaction.begin/complete/cancel` to the session's main `wire.jsonl` but does not deliver those records through the subscribed WebSocket or current snapshot replay. A direct `:compact` adapter must therefore treat the HTTP response as acknowledgement, poll only the target wire tail for a terminal whose timestamp is at or after the request, emit that terminal through the ordinary event sink, and refresh Server status so the post-compaction context meter does not remain at “等待上下文数据”. Historical loading still parses the same wire records normally.
+90. A successful full compaction writes a session-scoped `usage.record` immediately before `full_compaction.complete`; Server status may still omit `context_tokens` afterward. That `usageScope:"session"` record is the authoritative post-compaction context measurement. The direct bridge emits the terminal first and then the captured usage so current-window metrics see it after the compaction boundary; history parsing retains the same record, and compaction-completion placement likewise moves the terminal before that usage. UI commands must not synthesize a second success status when the durable terminal notice already owns completion feedback.
 
 # Main Components
 

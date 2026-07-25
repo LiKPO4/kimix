@@ -1628,6 +1628,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         inputTokenCount,
         contextSize,
         contextLimit: contextSize !== undefined ? 256000 : undefined,
+        usageScope: payload.usage_scope === "turn" || payload.usage_scope === "session" ? payload.usage_scope : undefined,
         planMode: typeof payload.plan_mode === "boolean" ? payload.plan_mode : undefined,
         message: isString(payload.model)
           ? `模型：${payload.model}`

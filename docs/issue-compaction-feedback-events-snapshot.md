@@ -63,3 +63,16 @@ renderItems                                   -> 无 compaction 项
 也不回放这类生命周期记录。因此 mapper 兼容只能解决历史读取，不能单独解决实时终态。
 v2.20.16 在 `:compact` 适配层等待目标 wire 的新终态，再通过现有 event sink 主动投递并刷新
 Server 状态/上下文用量。
+
+## v2.20.16 实测补充
+
+终态反馈已经出现，但完成提示重复，且小窗仍等待上下文数据。wire 表明真正的压缩后用量并不来自
+Server status，而是紧邻终态之前的 session-scoped usage：
+
+```json
+{"type":"usage.record","model":"kimi-code/k3","usage":{"inputOther":5879,"output":1294,"inputCacheRead":19200,"inputCacheCreation":0},"usageScope":"session","time":1785022852799}
+{"type":"full_compaction.complete","time":1785022852803}
+```
+
+这对应 25,079 个输入 token。v2.20.17 保留并投递该记录；完成提示只由官方终态生成，不再由
+Composer 追加第二条。
