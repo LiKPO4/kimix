@@ -10,6 +10,7 @@ import {
   makeActiveTurnDraftKey,
   resetActiveTurnDraftStoreForTests,
 } from "@/utils/activeTurnDraftStore";
+import { deduplicateTimelineEvents } from "@/utils/eventMapper";
 import {
   coalesceStreamEventBatch,
   commitActiveTurnDraftsToBatch,
@@ -199,6 +200,33 @@ describe("commitActiveTurnDraftsToBatch", () => {
     expect(batches.get(batchKey)?.items.map((event) => (
       event.type === "assistant_message" ? event.content : event.type
     ))).toEqual(["你好", "霖江路。我会补上焦点归还。", "tool_call"]);
+  });
+
+  it("gives repeated materializations of one turn unique persisted ids", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const materialize = (content: string, timestamp: number) => {
+      applyActiveTurnDraftDelta(key, assistant(content, {
+        timestamp,
+        agentTurnId: "turn-1",
+        roomAgentId: "agent-1",
+      }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+      const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>();
+      commitActiveTurnDraftsToBatch(batches, {
+        sessionId: "session-1",
+        roomAgentId: "agent-1",
+        agentTurnId: "turn-1",
+      });
+      return batches.get(JSON.stringify(["session-1", "agent-1"]))!.items[0];
+    };
+
+    const interim = materialize("阶段性汇报", 1);
+    const final = materialize("完整最终正文", 2);
+    const hydrated = deduplicateTimelineEvents([interim, final]);
+
+    expect(interim.id).not.toBe(final.id);
+    expect(hydrated.map((event) => (
+      event.type === "assistant_message" ? event.content : event.type
+    ))).toEqual(["阶段性汇报", "完整最终正文"]);
   });
 });
 

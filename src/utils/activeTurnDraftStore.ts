@@ -7,6 +7,8 @@ import { isUserScrollActive } from "@/utils/userScrollActivity";
 type AssistantMessage = Extract<TimelineEvent, { type: "assistant_message" }>;
 
 export type ActiveTurnDraft = {
+  /** Distinguishes each persisted segment when one Agent turn crosses formal boundaries. */
+  materializationId: string;
   content: string;
   thinking?: string;
   thinkingParts?: AssistantMessage["thinkingParts"];
@@ -33,6 +35,12 @@ type StreamAnchors = { content: StreamAnchor; think: StreamAnchor };
 const streamAnchors = new Map<string, StreamAnchors>();
 const listeners = new Map<string, Set<DraftListener>>();
 const globalListeners = new Set<DraftListener>();
+
+function createMaterializationId(): string {
+  return typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
 function notify(key: string) {
   const keyed = listeners.get(key);
@@ -122,7 +130,7 @@ export function subscribeAllActiveTurnDrafts(listener: DraftListener): () => voi
 function toAssistantShell(draft: ActiveTurnDraft, key: string): AssistantMessage {
   const parsed = parseActiveTurnDraftKey(key);
   return {
-    id: `active-draft:${key}`,
+    id: `active-draft:${key}:${draft.materializationId}`,
     type: "assistant_message",
     timestamp: draft.timestamp,
     content: draft.content,
@@ -319,6 +327,7 @@ export function applyActiveTurnDraftDelta(
   }
   const nextEvent = merged.find((item): item is AssistantMessage => item.type === "assistant_message") ?? base;
   const next: ActiveTurnDraft = {
+    materializationId: previous?.materializationId ?? createMaterializationId(),
     content: nextEvent.content,
     thinking: nextEvent.thinking,
     thinkingParts: nextEvent.thinkingParts,
