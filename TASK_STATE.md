@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 模型 Context Window 表更新至最新两代
+
+- 用户要求：74f9acc 补充的模型落后，点名补 kimi k3/k2.7-code、glm 5.2/5.1。
+- 查证（四路并行官方来源，2026-07-25）：k3=1M（官方仅 "1M-token"，按 kimi 二进制行文取 1,048,576，精确值待 07-27 技术报告）；k2.7-code/k2.5/k2.6/k2-thinking/k2-0905=262,144；k2 初版=131,072；glm-5.2=1,000,000、glm-5.1/5/4.6=200,000；gpt-5.6/5.5=1,050,000、gpt-5/5.3-codex=400,000、gpt-4.1=1,047,576（官方奇特精确值）；claude fable-5/sonnet-5/opus-4-8/4-7/4-6/sonnet-4-6=1M（GA 默认）、haiku-4-5=200k；gemini-3 全系=1,048,576（3.x pro 也是 1M，不再 2M）；qwen3.7/3.6-plus/3.6-flash=1M、qwen3.6-max/qwen3-max=256k；grok-4.5=500k（比上代小的陷阱）、grok-4.3/4.20=1M。
+- 落地（`6f548b2`）：modelContextInference.ts 家族规则按新版在前顺序更新 + 顶部来源注释；测试 +6 it 块。
+- 验证：typecheck；定向 17/17；全量 1153 通过；build 通过。
+- 知识库：无需更新（数据表维护，非架构/流程知识）。
+- 跟进：07-27 k3 技术报告发布后核对精确 context 值。
+
 ## 2026-07-24 启动后卡顿根因收敛（四路分析 + 诊断接线）
 
 - 现场：上个 agent 发现 perfDiag 埋点因 `isPerfDiagEnabled()` 默认 false（perfFlags.ts:31）全短路，已建 `startupProfiler.ts`（启动 30s 无条件采集）但未接线完。本轮补齐 `noteStartupScrollTopWrite`（useChatViewport 3 处写入点）、`noteStartupLayoutEffect`（5 个 useLayoutEffect）、`noteStartupStateSet`（两个 zustand store set 包装），修正 KIMIX_PERF 注释。typecheck + 定向 19 测试 + build 通过，提交 `2592af5`。
