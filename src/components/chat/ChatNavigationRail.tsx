@@ -270,28 +270,6 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
           </button>
         );
       })}
-      {(() => {
-        const activeIndex = markers.findIndex((m) => m.active);
-        if (activeIndex === -1) return null;
-        const activeMarker = markers[activeIndex];
-        return (
-          <div
-            className="kimix-chat-navigation-active-indicator pointer-events-none absolute"
-            style={{
-              top: activeIndex * markerGap,
-              height: markerGap,
-              right: 0,
-              width: 40,
-            }}
-          >
-            <span
-              className="kimix-chat-navigation-active-thumb absolute"
-              style={{ top: "50%", right: 8 }}
-              data-kind={activeMarker?.kind}
-            />
-          </div>
-        );
-      })()}
       {preview && previewItem && (
         <ChatNavigationPreview
           item={previewItem}
