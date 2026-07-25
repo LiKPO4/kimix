@@ -289,10 +289,19 @@ describe("computeFinalTextBlockContent", () => {
     expect(computeFinalTextBlockContent(blocks, "draft", false)).toBe("");
   });
 
-  it("returns empty string for multiple text blocks with trailing tools", () => {
-    // Multiple text blocks + trailing tools → intermediate segments, suppress.
-    const blocks: TurnBlock[] = [textBlock("第一段中间分析"), textBlock("第二段中间分析"), toolBlock(), toolBlock()];
-    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("");
+  it("returns last text block for complete multi-segment turns even with trailing tools", () => {
+    // Complete multi-step turns often have late tools after the final answer
+    // (or snapshot recovery re-appends tools). Hiding the body made restart
+    // show "输出完成" with no body while local content and official web still
+    // had the answer.
+    const finalAnswer = "需要你知晓/决策的 3 个点\n\n1. 燃血…";
+    const blocks: TurnBlock[] = [
+      textBlock("发现两个要点，继续确认…", "text-mid"),
+      toolBlock("tool-mid"),
+      textBlock(finalAnswer, "text-final"),
+      toolBlock("tool-late"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe(finalAnswer);
   });
 
   it("returns last text block content when no trailing process blocks", () => {

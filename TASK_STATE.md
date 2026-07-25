@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：完成轮重启后正文被 turnBlocks 规则藏空（v2.20.11）
+
+- 用户 v2.20.10 重启后：头「输出完成 5分19秒」+ 用量 footer，正文空白；官方 web 同轮全文仍在；用户称结束当时曾见正文。
+- 日志：startup reconcile `assistant-body-regression` 拒绝更短 canonical（local 21227 > canonical 20240）；display `event-…-1159` `textChars:1438` `isComplete:true` `active:false`——**数据在本地，非丢库**。
+- 根因：`computeFinalTextBlockContent` 在 complete + 多段 text + 末段后仍有 tool 时 return ""（旧注释当「中间段」）。多步轮/快照补 tool 后常见此结构 → 正文区空、过程折叠，看起来像「没正文」。
+- 修复：complete 时始终取最后一段 text 为最终正文；streaming 仍 return ""。回归测试改写。
+- 待用户实测：重启后该 review 轮正文重新出现（最后答案段）；运行中仍不闪中间段。
+
 ## 2026-07-25 修复：prompt.completed 过早 completed（伪正文+卡住，v2.20.10）
 
 - 用户 v2.20.9 截图：头「输出完成 5分19秒」+ 伪正文「发现两个要点…」+ 过程折叠 + 底「已连接」；实际卡住。
