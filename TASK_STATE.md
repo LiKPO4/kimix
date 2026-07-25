@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：prompt 前 WS 订阅保障（review 3279387 后修正）
+
+- 背景：3279387 为修「发消息一直没有首字」在 prompt() 开头加 `this.subscribed.add(sessionId)`。用户要求 review。
+- review 结论：方向对（首字丢失 = Server 端 WS 订阅缺失，delta 只推订阅者）但实现不充分——裸 add 只改本地 Set，Server 端订阅仅经两条路建立：connect() 握手 client_hello 的 subscriptions（:1240，仅新连接瞬间）与 subscribe() 的 sendControl("subscribe")（:970）。WS 已连接而会话未订阅（正是 bug 场景）时 add 不发任何控制帧，首波 delta 照丢；且污染 recoverSnapshot 的 subscribed.has() 判定。
+- 修正（`a73ed3c`）：prompt() 未订阅会话改走真 subscribe()（add+ensureConnected+sendControl），失败 console.warn 降级（HTTP prompt 与快照兜底不阻断）；steer() 不动（运行中必已订阅）。测试：fake WS 断言 subscribe 控制帧先于 prompts HTTP、订阅失败仍发送、已订阅不重复。
+- 验证：typecheck；定向 52/52；全量 1157 通过；build 通过。待用户实测发消息首字。
+- 知识库：runtime-routing 新增不变量 83（WS 订阅是线路状态非本地 Set）+ log。
+
 ## 2026-07-25 修复：启动恢复会话不置底（92ec0ad 误改回退）
 
 - 现象：启动自动恢复上次项目会话后不停在底部（实测停在 distance≈433px），用户自改一轮（92ec0ad）无效。
