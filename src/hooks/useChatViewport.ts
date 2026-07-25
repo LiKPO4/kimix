@@ -783,7 +783,11 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       return;
     }
     if (autoFollowRef.current && !userScrollRef.current && viewportReady) {
-      settleSessionAtBottom();
+      // 直接贴底兜底：settleSessionAtBottom 在会话打开 settle 窗口过期或连续
+      // 稳定提前退出后调用是空操作，而启动恢复的对账/子代理内容浮现发生在那之后，
+      // 会导致 scrollHeight 增长后无人贴底。applyScrollToBottom 自带贴底短路与
+      // 同帧 rAF 合并，跟随态下幂等。
+      scrollToBottom("auto");
     }
   }, [expandedInitialTailSessionId, sessionId, viewportReady, contentVersion, settleSessionAtBottom, scrollToBottom, autoFollowRef, userScrollRef, pendingTailExpandScrollAnchorRef, updateShowScrollToBottom, scrollRef]);
 

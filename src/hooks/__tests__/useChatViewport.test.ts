@@ -332,6 +332,56 @@ describe("useChatViewport", () => {
     });
   });
 
+  it("pins to the bottom when content grows after the session settle window expired", () => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "Date",
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+      ],
+    });
+    const { viewport, scroll, rerender } = renderTest({
+      sessionId: "session-1",
+      contentVersion: "v1",
+      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
+    });
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, writable: true, value: 1000 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+
+    // The open-session settle loop pins to the bottom, then exits early after
+    // consecutive stable polls (which also closes the settle window).
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(scroll.scrollTop).toBe(800);
+    expect(viewport().getScrollDiagSnapshot()).toMatchObject({
+      autoFollow: true,
+      userScroll: false,
+    });
+
+    // Long after the settle window expired, restored-session content
+    // (history reconciliation / sub-agent reveals) grows the scroll height.
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    Object.defineProperty(scroll, "scrollHeight", { configurable: true, writable: true, value: 1400 });
+    rerender({ contentVersion: "v2" });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    // The follow branch must write the bottom directly; calling the expired
+    // settleSessionAtBottom here is a no-op that leaves scrollTop stale.
+    expect(scroll.scrollTop).toBe(1200);
+  });
+
   it("preserves a pending focus request while switching to its target session", async () => {
     const onHighlight = vi.fn();
     const { rerender } = renderTest({
