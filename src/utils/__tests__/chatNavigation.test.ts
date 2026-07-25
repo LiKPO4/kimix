@@ -102,9 +102,9 @@ describe("chat navigation", () => {
     expect(CHAT_NAVIGATION_PREVIEW_SWITCH_DELAY_MS).toBe(16);
   });
 
-  it("uses the viewport center for the active marker and click alignment", () => {
+  it("uses top reading line for active marker tracking", () => {
     expect(chatNavigationReadingLine(0)).toBe(0);
-    expect(chatNavigationReadingLine(600)).toBe(300);
+    expect(chatNavigationReadingLine(600)).toBe(120);
   });
 
   it("pins the first and last marker at the physical scroll edges", () => {

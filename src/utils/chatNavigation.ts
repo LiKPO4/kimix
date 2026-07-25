@@ -14,6 +14,7 @@ export interface ChatNavigationItem {
 
 export interface ChatNavigationGeometry {
   key: string;
+  top?: number;
   bottom: number;
 }
 
@@ -32,7 +33,7 @@ export const CHAT_NAVIGATION_PREVIEW_INITIAL_DELAY_MS = 110;
 export const CHAT_NAVIGATION_PREVIEW_SWITCH_DELAY_MS = 16;
 
 export function chatNavigationReadingLine(clientHeight: number) {
-  return Math.max(0, clientHeight / 2);
+  return Math.min(160, Math.max(0, clientHeight * 0.2));
 }
 
 export function chatNavigationPreviewOpenDelay(hasVisiblePreview: boolean) {

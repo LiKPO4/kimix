@@ -87,6 +87,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
       const rect = node.getBoundingClientRect();
       return [{
         key: item.key,
+        top: rect.top - scrollTop,
         bottom: rect.bottom - scrollTop,
       }];
     });
