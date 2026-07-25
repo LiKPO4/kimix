@@ -1804,7 +1804,7 @@ export function LongTaskInspectorPanel({
                 {subagentExternalServer && (
                   <div
                     className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[12.5px] leading-5 text-accent-warning"
-                    style={{ padding: "12px 14px" }}
+                    style={{ padding: "12px 14px", overflowWrap: "anywhere" }}
                   >
                     当前连接的是外部 Server（未确认开启 secondary_model 实验特性），子代理模型配置可能不生效。请重启 Kimix 切换为托管 Server，或手动以 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1 重启 Server。
                   </div>
