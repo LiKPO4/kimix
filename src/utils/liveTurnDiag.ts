@@ -195,7 +195,8 @@ export function noteLiveDisplayMode(input: {
     to: input.mode,
     sid: input.sessionId?.slice(-8),
     key: input.key.slice(-24),
-    bodyLen: input.bodyLen ?? 0,
+    // 字段名避免 *body*：writeDiag 默认 redact 会吞掉 bodyLen
+    contentChars: input.bodyLen ?? 0,
     isComplete: Boolean(input.isComplete),
     durationMs: input.durationMs ?? undefined,
     wallElapsedMs: input.wallElapsedMs,
@@ -237,13 +238,13 @@ export function noteLiveStreamFrame(input: {
     kind,
     rawType: input.rawType,
     mappedType: input.mappedType,
-    bodyLen: input.bodyLen ?? 0,
+    contentChars: input.bodyLen ?? 0,
     isComplete: Boolean(input.isComplete),
     isThinking: Boolean(input.isThinking),
     volatile: input.volatile,
     offset: input.offset,
     counts: {
-      body: counts.body,
+      bodyDelta: counts.body,
       think: counts.think,
       tool: counts.tool,
       terminal: counts.terminal,
@@ -251,7 +252,7 @@ export function noteLiveStreamFrame(input: {
       other: counts.other,
     },
     sinceFirstMs: now - counts.firstAt,
-    bodyAgeMs: counts.lastBodyAt ? now - counts.lastBodyAt : null,
+    sinceBodyMs: counts.lastBodyAt ? now - counts.lastBodyAt : null,
   });
 }
 
@@ -273,20 +274,33 @@ export function noteLiveSilence(input: {
   if (now - last < every) return;
   lastSilenceLogAtBySid.set(sid, now);
   const counts = streamCountsBySid.get(sid);
+  const turn = input.turn
+    ? {
+        openAssistants: input.turn.openAssistants,
+        completeAssistants: input.turn.completeAssistants,
+        contentChars: input.turn.latestBodyLen,
+        latestIsComplete: input.turn.latestIsComplete,
+        latestDurationMs: input.turn.latestDurationMs,
+        latestTimestamp: input.turn.latestTimestamp,
+        toolRunning: input.turn.toolRunning,
+        toolDone: input.turn.toolDone,
+        hasThinking: input.turn.hasThinking,
+      }
+    : undefined;
   writeLive("[live] silence", {
     sid: sid.slice(-8),
     engine: input.engineStatus,
     streamAgeMs: input.streamAgeMs,
     running: input.runningSessionId ? input.runningSessionId.slice(-8) : null,
-    turn: input.turn,
+    turn,
     streamCounts: counts
       ? {
-          body: counts.body,
+          bodyDelta: counts.body,
           think: counts.think,
           tool: counts.tool,
           terminal: counts.terminal,
           status: counts.status,
-          bodyAgeMs: counts.lastBodyAt ? now - counts.lastBodyAt : null,
+          sinceBodyMs: counts.lastBodyAt ? now - counts.lastBodyAt : null,
         }
       : null,
   });
@@ -304,6 +318,19 @@ export function noteLiveSettle(input: {
   activityStatus?: string | null;
   wallSinceStartMs?: number;
 }) {
+  const turn = input.turn
+    ? {
+        openAssistants: input.turn.openAssistants,
+        completeAssistants: input.turn.completeAssistants,
+        contentChars: input.turn.latestBodyLen,
+        latestIsComplete: input.turn.latestIsComplete,
+        latestDurationMs: input.turn.latestDurationMs,
+        latestTimestamp: input.turn.latestTimestamp,
+        toolRunning: input.turn.toolRunning,
+        toolDone: input.turn.toolDone,
+        hasThinking: input.turn.hasThinking,
+      }
+    : undefined;
   writeLive("[live] settle", {
     room: input.roomId.slice(-8),
     sid: input.runtimeSessionId.slice(-8),
@@ -311,7 +338,7 @@ export function noteLiveSettle(input: {
     terminalStatus: input.terminalStatus,
     terminalPolls: input.terminalPolls,
     turnReceivedBody: input.turnReceivedBody,
-    turn: input.turn,
+    turn,
     running: input.runningSessionId ? input.runningSessionId.slice(-8) : null,
     activity: input.activityStatus ?? null,
     wallSinceStartMs: input.wallSinceStartMs,
