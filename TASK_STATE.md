@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 诊断：启动卡顿复发根因收敛（persist 风暴 × 永败 reconcile）
+
+- 现象：启动卡顿复发且更严重。KIMIX_PERF：启动 30s 窗口 21 个长任务共 26065ms、maxMs 1894，呈 ~1.7s 周期性（2.7s 持续到 27s+）；React 渲染仅 7 次、setState 仅 29 次。
+- 石锤（diag.log 04:46-04:48 启动段）：① `persist.run {sessionCount:365,totalEvents:39560,stripMs:6764,commitMs:3931,totalMs:13887}`，启动窗口每秒级连续全量落盘（04:46:55/56/57 三连 + 04:47:57 + 04:48:47/49）；② 同一 Swarm 房间会话 session_a4d8499f 每秒 ~15 次 `kimiHistoryReconciliation.rejected {reason:"process-history-regression",localProcessEvents:119,canonicalProcessEvents:19→64}`。
+- 根因三层：L1 直接成本——persist 对 365 会话/39560 事件全量 strip（extractImages 图片提取 + 遍历拷贝）+ stringify + IDB 克隆，单次 1.4-13.9s，规模只涨不跌（persistence.ts:351 stripImagesFromSessions、:548 commitState）。L2 触发放大——Swarm 房间本地 119 过程事件 vs canonical snapshot 19-64（缺工具帧），process-history-regression 保护逻辑（kimiHistoryReconciliation.ts:621，行为正确）永远拒绝；而修复候选条件 roomAgentNeedsKimiCodeHistoryRepair 的 OR 链恒真（App.tsx:218-229），repair 循环（:254 slice 0,12）/startup recovery（:502）每次启动+恢复无限重试，无熔断无记忆，每次 setState 换 sessions 引用。L3 防线失效——引用守卫只拦"引用相同"（persistence.ts:523-529）；启动档防抖只走订阅 debounce；archiveOrDeletionChanged 立即 flush（useStatePersistence.ts:73-84）等路径绕过；叠加后每秒级全量落盘。
+- 复发原因：上轮 5bfbe35/d0605bf/d6e0cb4 只减落盘次数，未治单次成本；数据规模增长（70MB→39560 事件/13.9s）+ Swarm 房间永败目标是上轮没有的新放大器。
+- 已排除：MessageBubble:574（撤回手动路径）、Composer:3056（发消息路径）非风暴源；无 sendSync；buildRenderItems 实测 max 0.7ms 非瓶颈；scrollTopWrites≈0。
+- 遗留取证缺口：rejected 日志调用方 reason 被 "process-history-regression" 覆盖（kimiHistoryReconciliation.ts:622-627），无法区分 repair/startup/running-sample 调用源，修复时一并补。
+- 修复选项（待用户拍板）：A. reconcile 熔断/记忆（rejected 指纹持久化，canonical 未变不重试；repair 对永败目标登记不再每启动重试）；B. persist 触发收口（启动窗口内 archiveOrDeletionChanged 立即 flush 改合并；setState map 全原引用时复用旧数组）；C. persist 成本治本（按会话分键增量持久化或 strip/stringify 迁 Worker）；D. 日志补调用方 reason。建议 A+B 先行，C 立项。
+
 ## 2026-07-25 修复：自定义模型子代理未生效（外部 Server 缺实验 flag）
 
 - 现象：配置子代理用 deepseek（[secondary_model] deepseek/deepseek-v4-flash），跑任务后 deepseek 无账单，实际仍用 kimi 额度。
