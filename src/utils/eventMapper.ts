@@ -1803,45 +1803,61 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         : latest
     ), undefined);
 
-    if (stableAssistantIndex !== -1) {
-      const target = existing[stableAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
-      const isIdentityTerminal = incoming.isComplete && !incoming.content && !incoming.thinking;
-      if (isIdentityTerminal) {
-        if (target.isComplete) return existing;
-        const result = [...existing];
-        result[stableAssistantIndex] = {
-          ...target,
-          isThinking: false,
-          isComplete: true,
-          durationMs: completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs),
-        };
-        return result;
-      }
-      const remainsComplete = target.isComplete || incoming.isComplete;
-      // Barrier may rewrite final body text, but thinking must accumulate across
-      // multi-part / multi-step frames. Replacing thinkingParts with the latest
-      // frame alone drops earlier tool-step thoughts (only the last "N 个工具调用"
-      // row remains visible).
-      const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
-      const result = [...existing];
-      result[stableAssistantIndex] = {
-        ...target,
-        completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
-        agentRole: incoming.agentRole ?? target.agentRole,
-        model: incoming.model ?? target.model,
-        content: replaceCanonicalBody
-          ? incoming.content
-          : appendAssistantContent(target.content, incoming.content),
-        thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
-        thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
-        isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
-        isComplete: remainsComplete,
-        durationMs: incoming.isComplete && !target.isComplete
-          ? completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs)
-          : reliableAssistantDurationMs(target.durationMs),
-      };
-      return result;
-    }
+	    if (stableAssistantIndex !== -1) {
+	      const target = existing[stableAssistantIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+	      const isIdentityTerminal = incoming.isComplete && !incoming.content && !incoming.thinking;
+	      if (isIdentityTerminal) {
+	        if (target.isComplete) return existing;
+	        const result = [...existing];
+	        result[stableAssistantIndex] = {
+	          ...target,
+	          isThinking: false,
+	          isComplete: true,
+	          durationMs: completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs),
+	        };
+	        return result;
+	      }
+
+	      // Break segment: if tool/subagent/approval events exist between the
+	      // target assistant and the end of the array, this incoming frame belongs
+	      // to a new text segment (post-tools). Append as a new assistant event
+	      // instead of merging into the pre-tools target. This ensures mapHistoryEvents
+	      // and live streaming produce multi-text-block turns that turnBlocks can
+	      // correctly render (final answer segment after tools, not a single merged
+	      // block before all tools).
+	      const hasToolBoundary = existing.slice(stableAssistantIndex + 1).some(
+	        (e) => e.type === "tool_call" || e.type === "subagent" || e.type === "approval_request"
+	      );
+	      if (hasToolBoundary) {
+	        // Fall through to append path (lines 1846+) — the incoming frame becomes
+	        // a new entry in the timeline, preserving the tool break order.
+	      } else {
+	        const remainsComplete = target.isComplete || incoming.isComplete;
+	        // Barrier may rewrite final body text, but thinking must accumulate across
+	        // multi-part / multi-step frames. Replacing thinkingParts with the latest
+	        // frame alone drops earlier tool-step thoughts (only the last "N 个工具调用"
+	        // row remains visible).
+	        const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
+	        const result = [...existing];
+	        result[stableAssistantIndex] = {
+	          ...target,
+	          completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
+	          agentRole: incoming.agentRole ?? target.agentRole,
+	          model: incoming.model ?? target.model,
+	          content: replaceCanonicalBody
+	            ? incoming.content
+	            : appendAssistantContent(target.content, incoming.content),
+	          thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
+	          thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
+	          isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
+	          isComplete: remainsComplete,
+	          durationMs: incoming.isComplete && !target.isComplete
+	            ? completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs)
+	            : reliableAssistantDurationMs(target.durationMs),
+	        };
+	        return result;
+	      }
+	    }
 
     if (stableSnapshotId && incoming.completionBarrierReplay) {
       // Bind the live placeholder to the first official barrier message only.
@@ -1967,6 +1983,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const eventsAfterOpenAssistant = existing.slice(lastIndex + 1);
       const hasQuestionBoundary = eventsAfterOpenAssistant.some((event) => event.type === "question_request");
       if (hasQuestionBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
+        return [...existing, incoming];
+      }
+      const hasToolBoundary = eventsAfterOpenAssistant.some(
+        (e) => e.type === "tool_call" || e.type === "subagent" || e.type === "approval_request"
+      );
+      if (hasToolBoundary && (incoming.content.trim() || incoming.thinking?.trim())) {
         return [...existing, incoming];
       }
       const hasConfirmedSteerBoundary = eventsAfterOpenAssistant.some((event) => (

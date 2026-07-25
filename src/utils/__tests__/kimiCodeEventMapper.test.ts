@@ -532,15 +532,20 @@ describe("reduceKimiCodeEvents", () => {
       },
     ], testOptions());
 
-    expect(events).toHaveLength(2);
-    const assistant = events[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    // With break-segment, the post-tool text becomes a separate assistant
+    // event (3 events: thinking+empty, tool, final text).
+    expect(events).toHaveLength(3);
+    const firstAssistant = events[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
     const tool = events[1] as Extract<TimelineEvent, { type: "tool_call" }>;
-    expect(assistant.type).toBe("assistant_message");
-    expect(assistant.thinking).toBe("先检查一下");
-    expect(assistant.content).toBe("最终正文");
-    expect(assistant.isComplete).toBe(true);
+    const finalAssistant = events[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(firstAssistant.type).toBe("assistant_message");
+    expect(firstAssistant.thinking).toBe("先检查一下");
+    expect(firstAssistant.content).toBe("");
+    expect(firstAssistant.isComplete).toBe(true);
     expect(tool.type).toBe("tool_call");
     expect(tool.status).toBe("success");
+    expect(finalAssistant.content).toBe("最终正文");
+    expect(finalAssistant.isComplete).toBe(true);
   });
 
   it("places assistant chunks after official turn.steer confirmation", () => {

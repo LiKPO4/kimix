@@ -138,10 +138,12 @@ describe("Kimi Code wire history", () => {
     ]);
 
     const timeline = mapHistoryEvents(history);
-    expect(timeline).toHaveLength(3);
+    // With break-segment, the second thinking after tool-1 becomes a separate
+    // assistant event (4 events: a1, tool-1, a2, tool-2).
+    expect(timeline).toHaveLength(4);
     expect(timeline[0]).toMatchObject({
       type: "assistant_message",
-      thinking: "Read around line 4380-4420 for event panel.Events are displayed directly with title/body.",
+      thinking: "Read around line 4380-4420 for event panel.",
     });
     expect(timeline[1]).toMatchObject({
       type: "tool_call",
@@ -152,21 +154,34 @@ describe("Kimi Code wire history", () => {
       result: "4380: event panel",
     });
     expect(timeline[2]).toMatchObject({
+      type: "assistant_message",
+      thinking: "Events are displayed directly with title/body.",
+    });
+    expect(timeline[3]).toMatchObject({
       type: "tool_call",
       toolCallId: "tool-2",
       status: "success",
       result: "id,title,body,choices",
     });
 
-    const assistant = timeline[0];
-    if (assistant.type !== "assistant_message") throw new Error("Expected assistant history event");
-    const tools = timeline.filter((event) => event.type === "tool_call");
-    const blocks = buildThinkingBlocks({
-      ...assistant,
-      boundaryTimestamps: tools.map((tool) => tool.timestamp),
+    const firstAssistant = timeline[0];
+    const secondAssistant = timeline[2];
+    if (firstAssistant.type !== "assistant_message" || secondAssistant.type !== "assistant_message") throw new Error("Expected assistant history event");
+    // First assistant's thinking blocks end at tool-1's timestamp.
+    let blocks = buildThinkingBlocks({
+      ...firstAssistant,
+      boundaryTimestamps: [timeline[1].timestamp],
     });
     expect(blocks.map((block) => block.summary)).toEqual([
       "Read around line 4380-4420 for event panel.",
+    ]);
+
+    // Second assistant's thinking blocks end at tool-2's timestamp.
+    blocks = buildThinkingBlocks({
+      ...secondAssistant,
+      boundaryTimestamps: [timeline[3].timestamp],
+    });
+    expect(blocks.map((block) => block.summary)).toEqual([
       "Events are displayed directly with title/body.",
     ]);
   });

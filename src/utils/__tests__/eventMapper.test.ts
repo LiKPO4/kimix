@@ -546,9 +546,13 @@ describe("mergeEvents", () => {
       isThinking: false,
       isComplete: false,
     };
+    // With break-segment, the post-tool text becomes a new assistant event.
     const result = mergeEvents(existing, incoming);
-    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
-    expect(assistant.content).toBe("先读取关键文件确认当前代码状态。现在开始并行修复批次1的安全类P0问题。");
+    expect(result).toHaveLength(4);
+    const preTool = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(preTool.content).toBe("先读取关键文件确认当前代码状态。");
+    const postTool = result[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(postTool.content).toBe("现在开始并行修复批次1的安全类P0问题。");
   });
 
   it("does not split an unfinished bold label across a tool boundary", () => {
@@ -566,9 +570,13 @@ describe("mergeEvents", () => {
       isComplete: false,
     };
 
+    // With break-segment, the post-tool text is a new assistant event.
     const result = mergeEvents(existing, incoming);
-    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
-    expect(assistant.content).toBe("- **Achiever**：图鉴\n- **Explorer**：骰子组合、法宝协同");
+    expect(result).toHaveLength(4);
+    const preTool = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(preTool.content).toBe("- **Achiever**：图鉴\n- **");
+    const postTool = result[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(postTool.content).toBe("Explorer**：骰子组合、法宝协同");
   });
 
   it("does not split list text or words at arbitrary process boundaries", () => {
@@ -577,15 +585,22 @@ describe("mergeEvents", () => {
       { id: "2", type: "subagent", timestamp: 2, agentId: "agent-1", agentName: "reviewer", status: "completed", events: [] },
     ];
     const choice: TimelineEvent = { id: "3", type: "assistant_message", timestamp: 3, content: " choice。\n5. **奖励多样性**：增加构筑资源。\n\n# 二、2D 游戏分析（game", isThinking: false, isComplete: false };
+    // subagent is a process boundary → break segment: text2 appended as new event.
     const afterChoice = mergeEvents(existing, choice);
+    expect(afterChoice).toHaveLength(3);
     const boundary: TimelineEvent = { id: "4", type: "tool_call", timestamp: 4, toolCallId: "tc-2", toolName: "Read", status: "success", arguments: {} };
     const afterBoundary = mergeEvents(afterChoice, boundary);
     const suffix: TimelineEvent = { id: "5", type: "assistant_message", timestamp: 5, content: "-development/2d-games）", isThinking: false, isComplete: false };
+    // tool is also a process boundary → text3 also appended as new event.
     const result = mergeEvents(afterBoundary, suffix);
-    const assistant = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
-
-    expect(assistant.content).toContain("informed choice。\n5. **奖励多样性**");
-    expect(assistant.content).toContain("# 二、2D 游戏分析（game-development/2d-games）");
+    expect(result).toHaveLength(5);
+    const preToolText = result[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(preToolText.content).toBe("4. **负面骰子标签化**：让玩家有 informed");
+    const postSubagentText = result[2] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(postSubagentText.content).toContain("choice。\n5. **奖励多样性**：增加构筑资源。");
+    expect(postSubagentText.content).toContain("# 二、2D 游戏分析（game");
+    const postToolText = result[4] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(postToolText.content).toBe("-development/2d-games）");
   });
 
   it("keeps inline code path fragments together across tool boundaries", () => {
@@ -602,7 +617,9 @@ describe("mergeEvents", () => {
       isThinking: false,
       isComplete: false,
     };
+    // With break-segment, post-tool text becomes a new assistant event.
     const firstResult = mergeEvents(existing, firstIncoming);
+    expect(firstResult).toHaveLength(4);
     const secondIncoming: TimelineEvent = {
       id: "5",
       type: "assistant_message",
@@ -611,9 +628,11 @@ describe("mergeEvents", () => {
       isThinking: false,
       isComplete: false,
     };
+    // Second incoming merges into the post-tool event (no tool between them).
     const secondResult = mergeEvents(firstResult, secondIncoming);
-    const assistant = secondResult[0] as Extract<TimelineEvent, { type: "assistant_message" }>;
-    expect(assistant.content).toBe("- `lib/features/run/presentation/run_page.dart`：新增按钮。");
+    expect(secondResult).toHaveLength(4);
+    const mergedPostTool = secondResult[3] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(mergedPostTool.content).toBe("/features/run/presentation/run_page.dart`：新增按钮。");
   });
 
   it("completes assistant message on TurnEnd", () => {
@@ -1884,6 +1903,104 @@ describe("mergeEvents", () => {
     const result = mergeEvents(existing, incoming);
     expect(result[result.length - 1].type).toBe("change_summary");
     expect(result[result.length - 2].type).toBe("status_update");
+  });
+
+  it("break-segment: text1 → tool → text2 produces two assistant messages (text2 after tool)", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message" as const, timestamp: 1, content: "hi", agentTurnId: "turn-1" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "第一段分析", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+      { id: "t1", type: "tool_call" as const, timestamp: 3, toolCallId: "call-1", toolName: "Read", status: "success" as const, arguments: {} },
+    ];
+    const text2: TimelineEvent = {
+      id: "a2", type: "assistant_message" as const, timestamp: 4, content: "第二段最终答案", isThinking: false, isComplete: false, agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, text2);
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    // First assistant (pre-tool) has only the first segment's content.
+    expect(assistants[0]).toMatchObject({ content: "第一段分析", isComplete: false });
+    // Second assistant (post-tool) has the new content.
+    expect(assistants[1]).toMatchObject({ content: "第二段最终答案", isComplete: false });
+    // Order: text1 before tool, text2 after tool.
+    expect(result.indexOf(assistants[0])).toBeLessThan(result.indexOf(assistants[1]));
+    expect(result.indexOf(assistants[1])).toBeGreaterThan(result.indexOf(existing[2])); // after tool
+  });
+
+  it("break-segment: text1 → text2 (no tool) still merges into one", () => {
+    const existing: TimelineEvent[] = [
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "第一段", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+    ];
+    const text2: TimelineEvent = {
+      id: "a2", type: "assistant_message" as const, timestamp: 3, content: "第一段第二段", isThinking: false, isComplete: false, agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, text2);
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ content: "第一段第二段" });
+  });
+
+  it("break-segment: text1 → tool → text2 → turn.ended marks text2 complete", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message" as const, timestamp: 1, content: "hi", agentTurnId: "turn-1" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "分析", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+      { id: "t1", type: "tool_call" as const, timestamp: 3, toolCallId: "call-1", toolName: "Read", status: "success" as const, arguments: {} },
+    ];
+    // text2 is appended as new assistant after tool.
+    const afterText2 = mergeEvents(existing, {
+      id: "a2", type: "assistant_message" as const, timestamp: 4, content: "答案", isThinking: false, isComplete: false, agentTurnId: "turn-1",
+    });
+    // turn.ended: identity terminal marks the last open assistant complete.
+    const result = mergeEvents(afterText2, {
+      id: "end-turn", type: "assistant_message" as const, timestamp: 5, content: "", isThinking: false, isComplete: true, agentTurnId: "turn-1",
+    });
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    expect(assistants[0]).toMatchObject({ content: "分析", isComplete: false });
+    expect(assistants[1]).toMatchObject({ content: "答案", isComplete: true });
+  });
+
+  it("break-segment: thinking delta followed by tool also breaks", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message" as const, timestamp: 1, content: "hi", agentTurnId: "turn-1" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "分析", thinking: "思考1", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+      { id: "t1", type: "tool_call" as const, timestamp: 3, toolCallId: "call-1", toolName: "Read", status: "success" as const, arguments: {} },
+    ];
+    // thinking delta with text after tool → break
+    const result = mergeEvents(existing, {
+      id: "a2", type: "assistant_message" as const, timestamp: 4, content: "新分析", thinking: "新思考", isThinking: false, isComplete: false, agentTurnId: "turn-1",
+    });
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    expect(assistants[0]).toMatchObject({ content: "分析", thinking: "思考1" });
+    expect(assistants[1]).toMatchObject({ content: "新分析", thinking: "新思考" });
+  });
+
+  it("break-segment: completionBarrierReplay still replaces target content", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message" as const, timestamp: 1, content: "hi", agentTurnId: "turn-1" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "旧内容", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+    ];
+    // Barrier replay reuses same turn id → merges, no break.
+    const result = mergeEvents(existing, {
+      id: "a-barrier", type: "assistant_message" as const, timestamp: 3, content: "替换内容",
+      isThinking: false, isComplete: true, agentTurnId: "turn-1", completionBarrierReplay: true,
+    });
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ content: "替换内容", isComplete: true });
+  });
+
+  it("break-segment: different roomAgentId does not merge", () => {
+    const existing: TimelineEvent[] = [
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "A发言", isThinking: false, isComplete: false, roomAgentId: "agent-1", agentTurnId: "turn-1" },
+      { id: "t1", type: "tool_call" as const, timestamp: 3, toolCallId: "call-1", toolName: "Read", status: "success" as const, arguments: {} },
+    ];
+    // Different roomAgentId → no sameTurn match → appended regardless.
+    const result = mergeEvents(existing, {
+      id: "a2", type: "assistant_message" as const, timestamp: 4, content: "B发言", isThinking: false, isComplete: false, roomAgentId: "agent-2", agentTurnId: "turn-1",
+    });
+    const assistants = result.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
   });
 });
 
