@@ -19,6 +19,16 @@
 - 误判纠正（曾报"断段副作用"）：IDB 里 87 条空完成帧曾被认为是断段引入的非幂等累积。逐行复核 mergeEvents 全部路径（:1809 标记完成、:1874/:1897 stable id return existing、:1936-1976 后备路径 return base 不含 incoming、:1968 TurnEnd 主动删除空白未完成 assistant）——**所有路径均不 append 空帧**。87 条实为 canonical 官方历史的合法 step 边界标记，随断段版 reconcile 进入本地，渲染层过滤、体积可忽略、无幂等问题。`398e1b4` 补 3 项防回归测试（全完成空帧不新增/正常标记完成/幂等）。
 - 验证：typecheck ✓；全量 128 文件 1195 测试 ✓；build ✓。
 
+## 2026-07-25 修复：乱序 delta 拼接错乱（grok 正文"你好"移位）
+
+- 现象（用户新会话实测 grok-4.5）：①"你好霖江路"被拼成"霖江路\n\n最近几你好轮改动"（"你好"被移到句中）；②一轮显示"用 swarm 并行读几处关键文件，读完汇总给你"后"输出完成"，汇总正文未显示。
+- 取证（CDP 查 store）：两轮最终正文完整正确（1687 字符/996 字符汇总全文均在）——用户看到的是**流式中间态**，非数据丢失。
+- 根因①（拼接错乱）：appendAssistantContent（eventMapper.ts:187）只做 existing+incoming 简单拼接，完全不看 streamOffset；grok-4.5（第三方 provider）delta 乱序到达（offset 2"霖江路"先于 offset 0"你好"）→ 按到达顺序拼错。既有问题，与断段无关；权威快照帧最终纠正 store。
+- 根因②（没说完就结束）：轮次完成显示时正文还是流式预告段，权威全量汇总在完成后到达替换（时序窗口），store 最终正确。
+- 修复（`69b2581`+`ea755ff`）：新建 mergeAssistantContentWithOffset——两端均有 streamOffset 时按区间排序拼接（完全在前 prepend/完全在后 append/重叠取先到者+不重叠后缀）；无 offset 回退 mergeAssistantContentPrefixSafe（startsWith 语义，与原 mergeLiveBody 一致，避免 includes 把中部子串误判为全量覆盖丢字）。stableAssistantIndex 与后备 lastIndex 两处合并路径替换，合并后事件 streamOffset 取最小值。审查打回两处已修：19 行 Tab 缩进（ea755ff 修回，agent 第二次引入同类污染已要求自查工具链）+ mergeLiveBody→includes 未披露语义变化（改 startsWith 保守语义）。
+- 测试：乱序真实案例（"霖江路"→"最近几"→"你好"→"你好霖江路最近几"）、顺序、重叠去重、无 offset 回退、includes 替换、startsWith 中部子串安全。
+- 验证：typecheck ✓；全量 128 文件 1201 测试 ✓；build ✓。待用户实测：grok 新消息拼接顺序正确；旧轮次回看确认时序窗口自愈。
+
 ## 2026-07-25 诊断：启动卡顿复发根因收敛（persist 风暴 × 永败 reconcile）
 
 - 现象：启动卡顿复发且更严重。KIMIX_PERF：启动 30s 窗口 21 个长任务共 26065ms、maxMs 1894，呈 ~1.7s 周期性（2.7s 持续到 27s+）；React 渲染仅 7 次、setState 仅 29 次。
