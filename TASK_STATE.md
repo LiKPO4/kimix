@@ -9,6 +9,14 @@
 - 测试：真实场景 fixture（user → barrier(f_000010, +40s) 绑定 → unseen stable(f_000008, +30s) 插入 → 断言预告在汇总前）。
 - 验证：typecheck ✓；全量 128 文件 1202 测试 ✓；build ✓；ignore-all-space diff 确认缩进纯格式。待用户实测：该轮显示完整汇总（预告段在过程详情）。
 
+## 2026-07-25 修复：重排不生效——hydration changed 检测 length 比较丢弃修复（v2.20.2）
+
+- 现象：c2261d2（存量重排）+ v2.20.1 后用户实测显示依旧——"改了多轮都没变"。
+- 根因：persistence.ts 两处 hydration 接入处 `changed = events.length !== session.events.length || ...`——`repairStableAssistantOrder` 位置槽交换**不改变数组 length**，dedupe 无重复也不变 length → changed=false → 返回未重排的原始 session，重排结果被整个丢弃。接入 bug（c2261d2 审查时我和执行 agent 均未发现：重排"length 不变"特性与 length 检测冲突）。
+- 修复（`95fd25f`）：两处 changed 检测从 length 比较改为**引用比较**（`events !== session.events` / `agentEvents[agentId] !== list`）——dedupe（eventMapper.ts:2451）与 repairStableAssistantOrder 幂等均返回原引用，幂等时引用全同返回原 session（identity 缓存友好），重排产生新数组时 changed=true 生效。补关键回归测试（错乱但 length 不变的持久化会话 → loadLocalSessions → 顺序修复断言）。bump 2.20.2。
+- 验证：typecheck ✓；全量 1207 测试 ✓（persistence 定向 17/17 含新测试）；build ✓（index-DoyQhs7W.js）；Tab 0。待用户实测：重启后该轮显示完整汇总，版本号 v2.20.2。
+- 教训沉淀：hydration/缓存层的"是否变化"检测必须与数据变换的特性对齐——位置交换/内容编辑类变换（length 不变）一律用引用比较，length 比较只适用于增删类变换。
+
 ## 2026-07-25 诊断：历史轮次正文"消失"（kimi-web 块模式误判单块合并正文为中间过程）
 
 - 现象（用户截图+官方 web 对照）：所有历史轮次只剩消息头+工具组+变更卡，assistant 正文全部不见；最后一轮只显示正文尾部两句（"简洁汇报。生效后..."）；与官方 kimi web 同轮对照，正文完整但 Kimix 未显示。
