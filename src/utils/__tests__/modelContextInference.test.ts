@@ -23,11 +23,25 @@ describe("inferModelContextSize (grounded in official provider docs for latest &
     expect(inferModelContextSize("gemini-2.0-flash-exp")).toBe(1_048_576);
   });
 
+  it("infers official context size for Google Gemini 3.x models (1M incl. Pro)", () => {
+    expect(inferModelContextSize("gemini-3.6-flash")).toBe(1_048_576);
+    expect(inferModelContextSize("gemini-3.1-pro-preview")).toBe(1_048_576);
+  });
+
   it("infers official context size for Anthropic Claude models (200,000)", () => {
     expect(inferModelContextSize("claude-3-7-sonnet")).toBe(200_000);
     expect(inferModelContextSize("claude-3-5-sonnet-20241022")).toBe(200_000);
     expect(inferModelContextSize("claude-3-5-haiku")).toBe(200_000);
     expect(inferModelContextSize("claude-3-haiku")).toBe(200_000);
+  });
+
+  it("infers official context size for Anthropic Claude latest two generations (1M GA default)", () => {
+    expect(inferModelContextSize("claude-fable-5")).toBe(1_000_000);
+    expect(inferModelContextSize("claude-sonnet-5")).toBe(1_000_000);
+    expect(inferModelContextSize("claude-opus-4-8")).toBe(1_000_000);
+    expect(inferModelContextSize("claude-opus-4-7")).toBe(1_000_000);
+    expect(inferModelContextSize("claude-opus-4-6")).toBe(1_000_000);
+    expect(inferModelContextSize("claude-haiku-4-5")).toBe(200_000);
   });
 
   it("infers official context size for DeepSeek models (1M V4 / 128k V3 & R1)", () => {
@@ -47,9 +61,23 @@ describe("inferModelContextSize (grounded in official provider docs for latest &
     expect(inferModelContextSize("gpt-3.5-turbo")).toBe(16_385);
   });
 
+  it("infers official context size for OpenAI GPT-5.6 / 5.5 / 5 and GPT-4.1", () => {
+    expect(inferModelContextSize("gpt-5.6-sol")).toBe(1_050_000);
+    expect(inferModelContextSize("gpt-5.5")).toBe(1_050_000);
+    expect(inferModelContextSize("gpt-5")).toBe(400_000);
+    expect(inferModelContextSize("gpt-5.3-codex")).toBe(400_000);
+    expect(inferModelContextSize("gpt-4.1")).toBe(1_047_576);
+  });
+
   it("infers official context size for xAI Grok models (1M Grok 3 / 128k Grok 2)", () => {
     expect(inferModelContextSize("grok-3")).toBe(1_000_000);
     expect(inferModelContextSize("grok-2-1212")).toBe(131_072);
+  });
+
+  it("infers official context size for xAI Grok latest two generations (4.5 = 500k / 4.3 & 4.20 = 1M)", () => {
+    expect(inferModelContextSize("grok-4.5")).toBe(500_000);
+    expect(inferModelContextSize("grok-4.3")).toBe(1_000_000);
+    expect(inferModelContextSize("grok-4.20")).toBe(1_000_000);
   });
 
   it("infers official context size for Qwen and Llama models", () => {
@@ -61,12 +89,39 @@ describe("inferModelContextSize (grounded in official provider docs for latest &
     expect(inferModelContextSize("llama-3-70b")).toBe(8_192);
   });
 
+  it("infers official context size for Qwen latest two generations (3.7 = 1M / 3.6-Max & 3-Max = 256k)", () => {
+    expect(inferModelContextSize("qwen3.7-max")).toBe(1_000_000);
+    expect(inferModelContextSize("qwen3.6-plus")).toBe(1_000_000);
+    expect(inferModelContextSize("qwen3.6-flash")).toBe(1_000_000);
+    expect(inferModelContextSize("qwen3.6-max-preview")).toBe(256_000);
+    expect(inferModelContextSize("qwen3-max")).toBe(256_000);
+  });
+
   it("infers official context size for Baidu ERNIE, Cohere, MiniMax, and Yi", () => {
     expect(inferModelContextSize("ernie-4.0-turbo-128k")).toBe(128_000);
     expect(inferModelContextSize("ernie-4.0-pro")).toBe(8_192);
     expect(inferModelContextSize("command-r-plus")).toBe(128_000);
     expect(inferModelContextSize("minimax-abab6.5")).toBe(245_760);
     expect(inferModelContextSize("yi-lightning")).toBe(128_000);
+  });
+
+  it("infers official context size for Zhipu GLM latest two generations (5.2 = 1M / 5.1 & 5 & 4.6 = 200k)", () => {
+    expect(inferModelContextSize("glm-5.2")).toBe(1_000_000);
+    expect(inferModelContextSize("glm-5.1")).toBe(200_000);
+    expect(inferModelContextSize("glm-5")).toBe(200_000);
+    expect(inferModelContextSize("glm-4.6")).toBe(200_000);
+    expect(inferModelContextSize("glm-4-long")).toBe(1_000_000);
+    expect(inferModelContextSize("glm-4.5")).toBe(128_000);
+  });
+
+  it("infers official context size for Moonshot Kimi latest two generations (K3 = 1M / K2.7-Code = 256k)", () => {
+    expect(inferModelContextSize("kimi-k3")).toBe(1_048_576);
+    expect(inferModelContextSize("kimi-k2.7-code")).toBe(262_144);
+    expect(inferModelContextSize("kimi-k2.7-code-highspeed")).toBe(262_144);
+    expect(inferModelContextSize("kimi-k2.5")).toBe(262_144);
+    expect(inferModelContextSize("kimi-k2-thinking")).toBe(262_144);
+    expect(inferModelContextSize("kimi-k2-instruct-0905")).toBe(262_144);
+    expect(inferModelContextSize("kimi-k2-instruct")).toBe(131_072);
   });
 
   it("falls back to 128,000 for unknown model IDs without API context length", () => {
