@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：同轮事件顺序错乱——汇总排在预告前致正文"缺失"
+
+- 现象（用户重启后仍缺失）："用 swarm 模式随便读点东西"轮只显示 33 字符预告（"读完汇总给你"），996 字符完整汇总不见。
+- 实锤（CDP 查 IDB）：该轮两条 assistant——996 汇总（sid=f_000010, stable, barrier, ts=user+40ms）排在 user 后第 2 位；33 预告（sid=f_000008, ts=user+30s）排在 subagent×4 之后。官方 sid 序列预告(8)在前、汇总(10)在后，数组顺序相反 → turnBlocks 按数组顺序取最后 text 块（预告）为"最终答案"，汇总被折叠进过程详情。
+- 根因：eventMapper.ts completionBarrierReplay 绑定分支（:1846-1872）`{...target, content: incoming.content}` 保留本地 placeholder 的早期 timestamp（=user 发送时刻），官方后续消息（预告）按官方 ts 插入落在汇总之后。
+- 修复（`f510c91`+`df05e32`）：① barrier 绑定 timestamp 改 `incoming.timestamp ?? target.timestamp`（官方权威时间优先）；② 附带发现——绑定未设 isComplete 致被绑事件保持未完成、sameTurnAssistantIndex 会错误合并后续不同 sid 事件，改 `isComplete: incoming.isComplete || target.isComplete`；③ df05e32 修回 17 行 Tab 缩进（执行 agent 第三次同类污染，我已直接修并在此记录：后续派单提示词必须硬性要求"提交前 grep Tab 验证为 0"）。
+- 测试：真实场景 fixture（user → barrier(f_000010, +40s) 绑定 → unseen stable(f_000008, +30s) 插入 → 断言预告在汇总前）。
+- 验证：typecheck ✓；全量 128 文件 1202 测试 ✓；build ✓；ignore-all-space diff 确认缩进纯格式。待用户实测：该轮显示完整汇总（预告段在过程详情）。
+
 ## 2026-07-25 诊断：历史轮次正文"消失"（kimi-web 块模式误判单块合并正文为中间过程）
 
 - 现象（用户截图+官方 web 对照）：所有历史轮次只剩消息头+工具组+变更卡，assistant 正文全部不见；最后一轮只显示正文尾部两句（"简洁汇报。生效后..."）；与官方 kimi web 同轮对照，正文完整但 Kimix 未显示。
