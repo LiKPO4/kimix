@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：启动恢复会话不置底（92ec0ad 误改回退）
+
+- 现象：启动自动恢复上次项目会话后不停在底部（实测停在 distance≈433px），用户自改一轮（92ec0ad）无效。
+- 取证（diag.log 02:38 启动段）：primed 完成（32.1）但 scrollTopWrites 全 0、`[useAutoFollow] scrollToBottom` 零记录——启动后从未发生自动贴底写入；handleScroll 证 userScroll 只能来自真实交互（排除程序化误判）。
+- 根因：92ec0ad 把 useChatViewport.ts:785 跟随分支从 `scrollToBottom("auto")` 改成 `settleSessionAtBottom()`——settle 在「连续 3 次稳定提前退出」（v2.16.86 引入）或 3.5s 窗口过期后调用直接 return（useAutoFollow.ts:171 remaining<=0）。启动恢复的对账换入/子代理内容浮现/markdown 升级都发生在 settle 死后（实测 scrollHeight 涨 ~433px），无人贴底。
+- 修复（`e4055b5`）：该分支恢复 `scrollToBottom("auto")`，保留 92ec0ad 正确的 contentVersion 依赖与 viewportReady 条件；回归测试「settle 窗口过期后内容增长仍贴底」双向验证（buggy 版复现失败、修复后通过）。
+- 验证：typecheck；定向 17/17；全量 1154 通过；build 通过。待用户重启实测置底。
+- 知识库：chat-viewport-state 增「死 settle 循环不贴底，contentVersion 兜底必须直接写」不变量 + log。
+
 ## 2026-07-25 模型 Context Window 表更新至最新两代
 
 - 用户要求：74f9acc 补充的模型落后，点名补 kimi k3/k2.7-code、glm 5.2/5.1。

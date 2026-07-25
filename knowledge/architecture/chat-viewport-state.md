@@ -4,7 +4,7 @@ title: Chat Viewport State
 description: How chat rendering assigns turn activity and gives one owner control of tail-follow and detached viewport anchoring.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, viewport, scrolling, content-version]
-timestamp: "2026-07-19T11:32:00+08:00"
+timestamp: "2026-07-25T11:10:00+08:00"
 ---
 
 # Chat Viewport State
@@ -63,6 +63,15 @@ the DOM safety boundary. Hidden history is mounted only by an explicit history d
 or navigation request, with a rendered-message anchor protecting that explicit
 expansion. User input must never both move the viewport and change its history
 window in the same transaction.
+
+The session-open settle loop is a bounded window, not a permanent follower. It
+ends early after three consecutive stable at-bottom polls, and once it ends
+`settleSessionAtBottom()` is a no-op (`remaining <= 0`). Content that grows
+after the loop dies — startup history reconciliation, surfaced subagent
+content, the settled-markdown upgrade — must be pinned by the
+`contentVersion`-driven fallback calling `scrollToBottom("auto")` directly;
+routing that fallback through `settleSessionAtBottom()` regresses launch
+restore to a stranded mid-scroll position (92ec0ad incident).
 
 Rail/search navigation uses an immediate scroll transaction. A smooth animation
 would expose multiple intermediate `scrollTop` values while streaming commits
