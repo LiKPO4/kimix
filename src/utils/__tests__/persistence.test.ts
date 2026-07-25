@@ -674,6 +674,28 @@ describe("persistLocalConversationState reference guard", () => {
     expect(stored.title).toBe("真实变更");
   });
 
+  it("repairs stable assistant order on hydration even when event count is unchanged", async () => {
+    // Regression: the hydration `changed` check used to compare lengths, but
+    // repairStableAssistantOrder swaps events in place (same length), so the
+    // repair was silently dropped. Now reference-compared.
+    const { loadLocalSessions } = await import("@/utils/persistence");
+    const user = { id: "u-1", type: "user_message" as const, timestamp: 1000, content: "问", images: [] };
+    const preview = { id: "a-8", type: "assistant_message" as const, timestamp: 1010, content: "预告", isComplete: true, snapshotMessageId: "snap_000008", snapshotMessageIdStable: true };
+    const summary = { id: "a-10", type: "assistant_message" as const, timestamp: 1020, content: "汇总", isComplete: true, snapshotMessageId: "snap_000010", snapshotMessageIdStable: true };
+    // Persisted in the broken order: summary (seq 10) before preview (seq 8),
+    // same length after repair — the old length check would have discarded it.
+    const disordered = { ...guardSession, id: "order-session", events: [user, summary, preview] as Session["events"] };
+    getStateItemMock.mockImplementation((key: string) => {
+      if (key === "kimix_local_sessions_index") return Promise.resolve(null);
+      if (key === "kimix_sessions") return Promise.resolve([disordered]);
+      return Promise.resolve(null);
+    });
+
+    const loaded = await loadLocalSessions();
+    const bodies = loaded[0].events.map((e) => (e.type === "assistant_message" || e.type === "user_message" ? e.content : e.type));
+    expect(bodies).toEqual(["问", "预告", "汇总"]);
+  });
+
   it("does not delete images referenced by unchanged sessions (P1-c GC regression)", async () => {
     const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
 

@@ -889,12 +889,15 @@ export async function loadLocalSessions(): Promise<Session[]> {
     const sessions = hydrateSessions(rawSessions, dataUrlById).map((session) => {
       const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
       if (!session.collaboration) {
-        return events.length === session.events.length ? session : { ...session, events };
+        // Reference comparison, not length: repairStableAssistantOrder swaps
+        // event objects in place (same length), so a length check would drop
+        // the repair. Idempotent helpers return the original array reference.
+        return events === session.events ? session : { ...session, events };
       }
       const agentEntries = Object.entries(session.collaboration.agentEvents);
       const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
-      const changed = events.length !== session.events.length ||
-        agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
+      const changed = events !== session.events ||
+        agentEntries.some(([agentId, list]) => agentEvents[agentId] !== list);
       return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
     });
     // Establish the session reference cache so the first persist skips all sessions.
@@ -923,12 +926,12 @@ export async function loadLocalSessions(): Promise<Session[]> {
   const sessions = hydrateSessions(raw, dataUrlById).map((session) => {
     const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
     if (!session.collaboration) {
-      return events.length === session.events.length ? session : { ...session, events };
+      return events === session.events ? session : { ...session, events };
     }
     const agentEntries = Object.entries(session.collaboration.agentEvents);
     const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
-    const changed = events.length !== session.events.length ||
-      agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
+    const changed = events !== session.events ||
+      agentEntries.some(([agentId, list]) => agentEvents[agentId] !== list);
     return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
   });
   // Establish cache from old format too.
