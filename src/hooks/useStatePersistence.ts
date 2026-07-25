@@ -61,6 +61,10 @@ export function useStatePersistence(activeContextReady = true) {
 
     const unsubscribeSessionPersistence = useSessionStore.subscribe((state, prev) => {
       if (state.sessions === prev.sessions && state.pendingMessages === prev.pendingMessages) return;
+      // Shallow comparison: new array from map() with identical elements is not a real change.
+      if (state.pendingMessages === prev.pendingMessages &&
+          state.sessions.length === prev.sessions.length &&
+          state.sessions.every((s, i) => s === prev.sessions[i])) return;
       const visibleSessions = state.sessions.filter((session) => !isHiddenInternalSession(session));
       if (visibleSessions.length !== state.sessions.length) {
         useSessionStore.setState({ sessions: visibleSessions });
@@ -80,7 +84,14 @@ export function useStatePersistence(activeContextReady = true) {
             forgetArchivedSessionTombstone(session);
           }
         }
-        void flushLocalConversationState();
+        // Startup window: merge into debounced persist instead of forcing flush
+        // (tombstone localStorage writes above are already done immediately).
+        const startupWindowActive = typeof performance !== "undefined" && performance.now() < 30_000;
+        if (startupWindowActive) {
+          scheduleLocalConversationPersist();
+        } else {
+          void flushLocalConversationState();
+        }
         return;
       }
       scheduleLocalConversationPersist();
