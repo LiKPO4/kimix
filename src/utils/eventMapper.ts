@@ -179,19 +179,30 @@ function normalizeApprovalDisplay(display: Record<string, unknown>): Extract<Tim
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
-function appendAssistantContent(existingContent: string, incomingContent: string): string {
+/**
+ * Prefix-safe content merge for the streaming delta path (replaces the now
+ * removed mergeLiveBody). Uses startsWith rather than includes so that an
+ * incoming fragment that merely contains the existing text in its middle
+ * (e.g. existing="世界", incoming="你好世界") does NOT trigger a silent
+ * replacement—it concatenates instead. This matches the conservative
+ * semantics of the original streaming merge while still catching true
+ * cumulative deltas where incoming starts with existing.
+ */
+function mergeAssistantContentPrefixSafe(existingContent: string, incomingContent: string): string {
   if (!incomingContent) return existingContent;
   if (!existingContent) return incomingContent;
-  if (incomingContent === existingContent || incomingContent.includes(existingContent)) return incomingContent;
-  if (existingContent.includes(incomingContent)) return existingContent;
+  if (incomingContent === existingContent) return existingContent;
+  if (incomingContent.startsWith(existingContent)) return incomingContent;
+  if (existingContent.startsWith(incomingContent)) return existingContent;
   return existingContent + incomingContent;
 }
 
 /**
  * Merge assistant content with streamOffset awareness. When both fragments
  * carry a streamOffset, reorder content by offset order and deduplicate
- * overlapping regions. Falls back to appendAssistantContent when offsets
- * are unavailable.
+ * overlapping regions. Falls back to prefix-safe merge (startsWith, not
+ * includes) when offsets are unavailable — matches the original mergeLiveBody
+ * semantics so middle-of-string matches never cause silent replacement.
  *
  * The returned string is the correctly ordered, deduplicated content.
  */
@@ -202,9 +213,9 @@ export function mergeAssistantContentWithOffset(
   const { content: existingContent, streamOffset: existingOffset } = target;
   const { content: incomingContent, streamOffset: incomingOffset } = incoming;
 
-  // Either lacks offset → use existing simple merge.
+  // Either lacks offset → use prefix-safe merge.
   if (existingOffset === undefined || incomingOffset === undefined) {
-    return appendAssistantContent(existingContent, incomingContent);
+    return mergeAssistantContentPrefixSafe(existingContent, incomingContent);
   }
 
   const existingEnd = existingOffset + existingContent.length;
@@ -215,9 +226,9 @@ export function mergeAssistantContentWithOffset(
     return incomingContent + existingContent;
   }
 
-  // Incoming entirely after existing → append with dedup.
+  // Incoming entirely after existing → append with prefix-safe dedup.
   if (incomingOffset >= existingEnd) {
-    return appendAssistantContent(existingContent, incomingContent);
+    return mergeAssistantContentPrefixSafe(existingContent, incomingContent);
   }
 
   // Content overlaps: sort by offset and merge.
@@ -2064,25 +2075,25 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         }
         return appendAfterConfirmedSteer(existing, [incoming]);
       }
-	      // Complete / barrier frames with body text are authoritative: REPLACE.
-	      // Live frames use offset-aware merge (mergeAssistantContentWithOffset).
-	      const replaceOpenBody = Boolean(
-	        incoming.content.trim() &&
-	        (incoming.isComplete || incoming.completionBarrierReplay)
-	      );
-	      const updated: typeof last = {
-	        ...last,
-	        snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
-	        snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
-	        completionBarrierReplay: incoming.completionBarrierReplay ?? last.completionBarrierReplay,
-	        agentRole: incoming.agentRole ?? last.agentRole,
-	        model: incoming.model ?? last.model,
-	        streamOffset: last.streamOffset !== undefined || incoming.streamOffset !== undefined
-	          ? Math.min(last.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
-	          : undefined,
-	        content: replaceOpenBody
-	          ? incoming.content
-	          : mergeAssistantContentWithOffset(last, incoming),
+        // Complete / barrier frames with body text are authoritative: REPLACE.
+        // Live frames use offset-aware merge (mergeAssistantContentWithOffset).
+        const replaceOpenBody = Boolean(
+          incoming.content.trim() &&
+          (incoming.isComplete || incoming.completionBarrierReplay)
+        );
+        const updated: typeof last = {
+          ...last,
+          snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
+          snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
+          completionBarrierReplay: incoming.completionBarrierReplay ?? last.completionBarrierReplay,
+          agentRole: incoming.agentRole ?? last.agentRole,
+          model: incoming.model ?? last.model,
+          streamOffset: last.streamOffset !== undefined || incoming.streamOffset !== undefined
+            ? Math.min(last.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
+            : undefined,
+          content: replaceOpenBody
+            ? incoming.content
+            : mergeAssistantContentWithOffset(last, incoming),
         thinking: mergeAssistantThinkingText(last.thinking, incoming.thinking),
         thinkingParts: mergeAssistantThinkingParts(last.thinkingParts, incoming.thinkingParts),
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),

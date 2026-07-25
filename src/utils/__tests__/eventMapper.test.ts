@@ -2086,7 +2086,7 @@ describe("mergeAssistantContentWithOffset", () => {
     expect(result).toBe("ABC");
   });
 
-  it("falls back to appendAssistantContent when offsets are undefined", () => {
+  it("falls back to prefix-safe merge when offsets are undefined", () => {
     const result = mergeAssistantContentWithOffset(
       { content: "你好", streamOffset: undefined },
       { content: "霖江路", streamOffset: undefined },
@@ -2100,13 +2100,24 @@ describe("mergeAssistantContentWithOffset", () => {
     expect(mixed).toBe("你好霖江路");
   });
 
-  it("complete replacement (includes relationship) still works", () => {
-    // incoming completely contains existing → replace.
+  it("startsWith replacement works: incoming extends existing text", () => {
+    // incoming starts with existing → cumulative delta path → replace.
     const result = mergeAssistantContentWithOffset(
       { content: "你好霖江路", streamOffset: 0 },
       { content: "你好霖江路最近几", streamOffset: 0 },
     );
     expect(result).toBe("你好霖江路最近几");
+  });
+
+  it("startsWith safety: middle-of-string match does not replace", () => {
+    // existing="世界", incoming="你好世界" → incoming does NOT start with
+    // existing → concatenate, not replace. This is the P2 semantic change
+    // from includes (appendAssistantContent) to startsWith (mergeLiveBody).
+    const result = mergeAssistantContentWithOffset(
+      { content: "世界", streamOffset: undefined },
+      { content: "你好世界", streamOffset: undefined },
+    );
+    expect(result).toBe("世界你好世界");
   });
 });
 
