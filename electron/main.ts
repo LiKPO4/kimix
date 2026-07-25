@@ -7672,6 +7672,14 @@ function enqueueDiagLine(line: string) {
   return queued;
 }
 
+// 帧级诊断（排查 WS 推送问题用）：默认关闭，仅 KIMIX_FRAME_DIAG=1 时开启，
+// 把主进程 WS 帧流写入 diag.log。本次"正文 delta 缺帧"即靠它定位。
+if (process.env.KIMIX_FRAME_DIAG === "1") {
+  kimiCodeHost.setFrameDiagLogger((line) => {
+    void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
+  });
+}
+
 ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
   const req = request && typeof request === "object" ? (request as { message?: string; data?: unknown }) : {};
   const msg = typeof req.message === "string" ? req.message : typeof request === "string" ? request : "";

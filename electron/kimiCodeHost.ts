@@ -2726,8 +2726,24 @@ function getServerClient() {
   return serverClient;
 }
 
+// 临时帧级诊断（定位"实时 delta 缺帧"）：记录每个进入主进程的 WS 帧，
+// 包括会被 sessionId 校验丢弃的帧。由 main.ts 通过 setFrameDiagLogger 注入。
+let frameDiagLogger: ((line: string) => void) | null = null;
+export function setFrameDiagLogger(logger: ((line: string) => void) | null) {
+  frameDiagLogger = logger;
+}
+
 function handleServerFrame(frame: ServerFrame) {
   const sessionId = frame.session_id;
+  if (frameDiagLogger) {
+    try {
+      const known = sessionId ? serverSessions.has(sessionId) : false;
+      const payload = frame.payload && typeof frame.payload === "object" ? frame.payload as Record<string, unknown> : {};
+      const partType = typeof payload.part === "object" && payload.part !== null ? (payload.part as { type?: unknown }).type : undefined;
+      const summary = partType ?? (typeof payload.type === "string" ? payload.type : "") ?? "";
+      frameDiagLogger(`[wsframe] ${frame.type} sid=${sessionId ? sessionId.slice(-8) : "-"} known=${known} seq=${frame.seq ?? "-"} part=${summary}`);
+    } catch { /* diag must never break frame handling */ }
+  }
   if (!sessionId || !serverSessions.has(sessionId)) return;
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>

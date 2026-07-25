@@ -1,6 +1,17 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+
+// 官方 kimi-web 形态的 client_id（`web_` 前缀），用于解锁 Server 的 volatile
+// assistant.delta（正文实时帧）推送。优先复用官方设备 id，缺失时随机生成。
+function kimixWsClientId(): string {
+  try {
+    const deviceId = fs.readFileSync(path.join(os.homedir(), ".kimi", "device_id"), "utf-8").trim();
+    if (deviceId) return `web_${deviceId}`;
+  } catch { /* fall through */ }
+  return `web_${randomUUID()}`;
+}
 
 export type ServerPromptPart =
   | { type: "text"; text: string }
@@ -1227,8 +1238,12 @@ export class KimiCodeServerClient {
     // Kimi Code 0.24+（agent-core-v2）的 WS upgrade 只认 Authorization 头或
     // `kimi-code.bearer.<token>` 子协议，不再读取 ?token= 查询参数；保留查询参数以兼容 0.23 及更早的 v1 网关。
     const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
+    // 官方 kimi-web 以 `client_id=web_*` 连接并获得 volatile assistant.delta（正文
+    // 实时帧）推送；Kimix 仅有 bearer 时 Server 不发该 volatile 正文帧（正文只能等
+    // 完成屏障回放补全）。追加官方形态的 client_id 以解锁正文实时推送。
+    const clientIdQuery = `${tokenQuery ? "&" : "?"}client_id=${encodeURIComponent(kimixWsClientId())}`;
     const protocols = token ? [`kimi-code.bearer.${token}`] : undefined;
-    const socket = new WebSocket(`${this.endpoint.replace(/^http/, "ws")}/api/v1/ws${tokenQuery}`, protocols);
+    const socket = new WebSocket(`${this.endpoint.replace(/^http/, "ws")}/api/v1/ws${tokenQuery}${clientIdQuery}`, protocols);
     this.socket = socket;
     socket.addEventListener("message", (event) => {
       try {

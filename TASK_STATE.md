@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 根治：正文只在完成时回放、运行中无流式——WS 缺 client_id 致 volatile delta 不推（v2.20.6）
+
+- 现象：多轮迭代后用户仍报"正文只发一条就输出完成"；重启后完整。运行中思考实时可见、正文不实时。
+- 帧级取证（主进程 WS 诊断，KIMIX_FRAME_DIAG）：① 运行期间 WS 零 `assistant.delta`，仅 thinking.delta(durable, seq 递增)/tool.call.delta/tool.result 等实时帧；② 正文全在 `prompt.completed` 时刻整批回放到达；③ 回放后 store 与显示均完整（用户确认）。
+- 根因（对照官方开源仓库实锤）：官方 kimi-web 正文实时推送用 `assistant.delta`（volatile text-delta，seq=durable watermark 不推进），且以 `?client_id=web_<uuid>` 连接 WS；Server 只对带 `client_id=web_` 的连接推 volatile 正文帧。**Kimix 的 WS 连接只有 bearer token、无 client_id** → Server 只发基础帧（thinking.delta），正文 volatile delta 不发 → 正文只能等完成屏障回放补全。排除项：cursor 机制（官方 trackCursor 与 Kimix deliver 逻辑相同）、client_id 值门控（官方 client_id 亦为随机 uuid，实按 `web_` 前缀形态识别）。
+- 修复：kimiCodeServerClient.connect 的 WS URL 追加 `client_id=web_<device_id>`（kimixWsClientId，复用 ~/.kimi/device_id，缺失回退 randomUUID）——仅加客户端标识，不动 bearer 鉴权。帧诊断改 KIMIX_FRAME_DIAG=1 才开（默认关，防刷屏）。
+- 验证（用户实测复现）：帧流出现 26 个实时 `assistant.delta`（5 秒内 ~300ms/个陆续到达，非回放）+ 渲染正文实时流式显示完整。typecheck ✓；全量 1214 测试 ✓；build ✓。
+- 知识库：runtime-routing 增不变量（WS client_id 必须带 `web_` 前缀形态才能解锁 Server volatile assistant.delta 推送）。
+
 ## 2026-07-25 修复：Kimi Web 未勾选「运行中折叠」时过程仍被自动折叠（v2.20.5）
 
 - 现象：用户 Kimi Web 模式 + 关闭「运行中折叠过程详情」（未勾选），运行中「k3 · 正在输出」仍折叠——期望「未勾选时 agent 反应期间思考/命令流全程实时展开，除非手动折叠」。
