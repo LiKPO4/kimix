@@ -8,6 +8,7 @@ import {
   persistLocalConversationState,
   rememberArchivedSessionTombstone,
   resolvePersistDelayMs,
+  STARTUP_WINDOW_MS,
 } from "@/utils/persistence";
 
 export function useStatePersistence(activeContextReady = true) {
@@ -86,7 +87,7 @@ export function useStatePersistence(activeContextReady = true) {
         }
         // Startup window: merge into debounced persist instead of forcing flush
         // (tombstone localStorage writes above are already done immediately).
-        const startupWindowActive = typeof performance !== "undefined" && performance.now() < 30_000;
+        const startupWindowActive = typeof performance !== "undefined" && performance.now() < STARTUP_WINDOW_MS;
         if (startupWindowActive) {
           scheduleLocalConversationPersist();
         } else {

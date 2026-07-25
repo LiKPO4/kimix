@@ -572,7 +572,7 @@ export function mergeMissingLatestCanonicalAssistant(
 export function shouldReplaceWithCanonicalKimiHistory(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
-  context?: { sessionId?: string; roomAgentId?: string; reason?: string },
+  context?: { sessionId?: string; roomAgentId?: string; reason?: string; rawCanonicalEvents?: TimelineEvent[] },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
@@ -637,7 +637,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
   const repairsDuplicateToolHistory = hasRepairableDuplicateKimiToolHistory(cachedEvents, canonicalEvents);
   if (hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents) && !repairsDuplicateToolHistory) {
     if (context?.sessionId && context?.roomAgentId) {
-      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, canonicalEvents);
+      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,
@@ -677,7 +677,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
         : null;
   if (regression) {
     if (context?.sessionId && context?.roomAgentId) {
-      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, canonicalEvents);
+      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,

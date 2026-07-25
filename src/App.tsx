@@ -262,6 +262,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
     for (const target of getKimiHistoryTargets(session)) {
       let historyReachable = false;
       let recoveryAccepted = false;
+      let circuitSkipped = false;
       for (const sessionId of target.sessionIds) {
         const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
         if (!loaded?.success) continue;
@@ -276,6 +277,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
         const preSession = preState.sessions.find((s) => s.id === session.id);
         const preLocalEvents = preSession ? getRoomAgentEvents(preSession, target.roomAgentId) : [];
         if (isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
+          circuitSkipped = true;
           continue;
         }
         let applied = false;
@@ -304,7 +306,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               Date.now(),
               new Set([target.roomAgentId]),
             );
-            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" })) {
+            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair", rawCanonicalEvents: canonicalEvents })) {
               const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(localEvents, reconciliation.events);
               const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                 localEvents,
@@ -355,7 +357,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           }),
         }));
       }
-      if (historyReachable && !recoveryAccepted && session.collaboration) {
+      if (historyReachable && !recoveryAccepted && !circuitSkipped && session.collaboration) {
         useSessionStore.setState((state) => ({
           sessions: state.sessions.map((item) => (
             item.id === session.id
@@ -533,7 +535,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
         )) {
           deliveryEvidence.set(attemptId, evidence);
         }
-        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" });
+        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery", rawCanonicalEvents: result.canonicalEvents });
         const canonicalAdopted = localEvents.length === 0 || shouldUseCanonicalHistory;
         const rejectedPatchedEvents = canonicalAdopted
           ? localEvents
@@ -2259,7 +2261,7 @@ function App() {
                   reason: "startup",
                 });
                 const shouldUseCanonicalHistory = reconciliation.applied &&
-                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" });
+                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup", rawCanonicalEvents: canonicalEvents });
                 const canonicalAdopted = reconciliation.applied && (localAgentEvents.length === 0 || shouldUseCanonicalHistory);
                 const rejectedPatchedEvents = !reconciliation.applied || canonicalAdopted
                   ? localAgentEvents
@@ -3356,7 +3358,7 @@ function App() {
               if (!reconciliation.applied) {
                 return item;
               }
-              if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason: "running-sample" })) {
+              if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason: "running-sample", rawCanonicalEvents: canonicalSnapshotEvents })) {
                 const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                   localAgentEvents,
                   reconciliation.events,

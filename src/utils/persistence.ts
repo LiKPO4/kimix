@@ -33,6 +33,7 @@ export const LOCAL_ACTIVE_CONTEXT_KEY = "kimix_active_context";
 export const LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY = "kimix_archived_session_tombstones";
 export const LOCAL_SESSIONS_INDEX_KEY = "kimix_local_sessions_index";
 export const LOCAL_SESSION_PREFIX = "kimix_local_session_";
+export const STARTUP_WINDOW_MS = 30_000;
 export const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 
 const STREAMING_PERSIST_DEBOUNCE_MS = 5000;
@@ -40,7 +41,6 @@ const STREAMING_MAX_PERSIST_WAIT_MS = 60_000;
 const IDLE_MAX_PERSIST_WAIT_MS = 5000;
 const STARTUP_PERSIST_DEBOUNCE_MS = 10_000;
 const STARTUP_MAX_PERSIST_WAIT_MS = 30_000;
-const STARTUP_WINDOW_MS = 30_000;
 
 /**
  * Persist cadence for the debounced session-state writer. Each persist walks
@@ -528,7 +528,15 @@ let lastPersistedSessionsRef: Session[] | null = null;
 let lastPersistedPendingRef: PendingMessage[] | null = null;
 
 export function markConversationStatePersisted(sessions?: Session[], pendingMessages?: PendingMessage[]): void {
-  if (sessions !== undefined) lastPersistedSessionsRef = sessions;
+  if (sessions !== undefined) {
+    lastPersistedSessionsRef = sessions;
+    // Populate per-session reference cache so the first real change after
+    // hydration skips unchanged sessions (App.tsx hydration creates new
+    // array objects; the cache uses individual store element references).
+    for (const session of sessions) {
+      hydratedSessionRefs.set(session.id, session);
+    }
+  }
   if (pendingMessages !== undefined) lastPersistedPendingRef = pendingMessages;
 }
 
@@ -561,6 +569,13 @@ function sessionKey(id: string): string {
 // runPersist compares current session references against this cache to skip
 // unchanged sessions. Module-level to survive across persist calls.
 let hydratedSessionRefs = new Map<string, Session>();
+
+// Per-session image refs cache: avoids re-traversing unchanged sessions for GC.
+// Updated when a session is stripped (changed), reused for unchanged sessions.
+let sessionImageRefs = new Map<string, Set<string>>();
+
+// Migration flag: only check for old single-key format on the first persist.
+let oldKeyMigrationDone = false;
 
 async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   isPersisting = true;
@@ -638,35 +653,41 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
       await removeStateItem(sessionKey(id));
     }
 
-    // Migrate away from old single-key format after the first successful
-    // per-session write completes.
-    try {
-      const oldRaw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
-      if (oldRaw !== null) {
-        await removeStateItem(LOCAL_SESSIONS_KEY);
+    // Migrate away from old single-key format: only check on the first
+    // persist after load. Once deleted or confirmed absent, skip forever.
+    if (!oldKeyMigrationDone) {
+      try {
+        const oldRaw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
+        if (oldRaw !== null) {
+          await removeStateItem(LOCAL_SESSIONS_KEY);
+        }
+        oldKeyMigrationDone = true;
+      } catch {
+        // Best-effort migration cleanup; retry on next persist.
       }
-    } catch {
-      // Best-effort migration cleanup.
     }
 
-    // GC images: collect refs only from written sessions + pending.
+    // GC images: collect refs from written sessions (using cache for unchanged).
     const referencedRefs = new Set<string>();
     for (const session of snapshot.sessions) {
-      if (!changedIds.has(session.id) && !deletedIds.includes(session.id)) continue;
-      // Collect image refs from the stripped (persisted) version.
-      const stripped = entries.find((e) => e.key === sessionKey(session.id));
-      if (stripped) {
-        collectImageRefsFromSessions([stripped.value], referencedRefs);
+      if (changedIds.has(session.id)) {
+        // Changed session: collect refs from the stripped value just written.
+        const stripped = entries.find((e) => e.key === sessionKey(session.id));
+        if (stripped) {
+          const sessionRefs = new Set<string>();
+          collectImageRefsFromSessions([stripped.value], sessionRefs);
+          sessionImageRefs.set(session.id, sessionRefs);
+          for (const ref of sessionRefs) referencedRefs.add(ref);
+        }
+      } else if (!deletedIds.includes(session.id)) {
+        // Unchanged session: reuse cached refs.
+        const cachedRefs = sessionImageRefs.get(session.id);
+        if (cachedRefs) {
+          for (const ref of cachedRefs) referencedRefs.add(ref);
+        }
       }
     }
-    // For unchanged sessions, collect refs from cache (their images didn't change).
-    for (const [id, cached] of hydratedSessionRefs) {
-      if (changedIds.has(id) || deletedIds.includes(id)) continue;
-      // Build a minimal representation for ref collection.
-      const cachedRefs = new Set<string>();
-      collectImageRefsFromSessions([cached], cachedRefs);
-      for (const ref of cachedRefs) referencedRefs.add(ref);
-    }
+    // Collect refs from pending.
     collectImageRefsFromPending(strippedPending, referencedRefs);
 
     const allIds = await getAllImageIds();
@@ -685,6 +706,7 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
     }
     for (const id of deletedIds) {
       hydratedSessionRefs.delete(id);
+      sessionImageRefs.delete(id);
     }
 
     // One low-frequency attribution entry per actual disk write (the

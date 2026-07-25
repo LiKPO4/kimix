@@ -126,19 +126,20 @@ describe("useStatePersistence", () => {
     // Ensure we are outside the startup window so archive/deletion triggers
     // an immediate flush instead of merging into the debounced persist.
     const nowStub = vi.spyOn(performance, "now").mockReturnValue(60_000);
+    try {
+      root = createRoot(container);
+      act(() => root?.render(createElement(PersistenceProbe)));
 
-    root = createRoot(container);
-    act(() => root?.render(createElement(PersistenceProbe)));
+      act(() => useSessionStore.setState({ sessions: [session] }));
+      expect(persistConversationMock).toHaveBeenCalledTimes(1);
 
-    act(() => useSessionStore.setState({ sessions: [session] }));
-    expect(persistConversationMock).toHaveBeenCalledTimes(1);
+      act(() => useSessionStore.setState({ sessions: [{ ...session, archivedAt: 123456 }] }));
+      expect(persistConversationMock).toHaveBeenCalledTimes(2);
 
-    act(() => useSessionStore.setState({ sessions: [{ ...session, archivedAt: 123456 }] }));
-    expect(persistConversationMock).toHaveBeenCalledTimes(2);
-
-    act(() => useSessionStore.setState({ sessions: [] }));
-    expect(persistConversationMock).toHaveBeenCalledTimes(3);
-
-    nowStub.mockRestore();
+      act(() => useSessionStore.setState({ sessions: [] }));
+      expect(persistConversationMock).toHaveBeenCalledTimes(3);
+    } finally {
+      nowStub.mockRestore();
+    }
   });
 });

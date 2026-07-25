@@ -26,6 +26,10 @@ type CircuitEntry = {
 
 type CircuitData = Record<string, CircuitEntry>;
 
+/**
+ * Inline duplicate of kimiHistoryReconciliation.flattenTimelineEvents to avoid
+ * a circular import (kimiHistoryReconciliation already imports from here).
+ */
 function flattenTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
   const result: TimelineEvent[] = [];
   for (const event of events) {

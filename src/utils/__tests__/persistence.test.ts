@@ -646,4 +646,31 @@ describe("persistLocalConversationState reference guard", () => {
     const stored = sessionEntryById(entries, guardSession.id) as Session;
     expect(stored.title).toBe("真实变更");
   });
+
+  it("marks hydrated sessions in per-session cache so the first real change skips unchanged sessions", async () => {
+    // Simulate App.tsx hydration flow: loadLocalSessions produces session
+    // references; App.tsx maps them through visibility filtering (new array,
+    // same elements), then calls markConversationStatePersisted with the
+    // final store references before setState.
+    const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
+    const loaded = { ...guardSession };
+    const restoredSessions = [loaded]; // App.tsx visibleSessions.map(...)
+    markConversationStatePersisted(restoredSessions, useSessionStore.getState().pendingMessages);
+    useSessionStore.setState({ sessions: restoredSessions });
+
+    // First persist should skip: all store references match the cache.
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).not.toHaveBeenCalled();
+
+    // A real change (new title) still persists normally and writes only the
+    // changed session, not the full array.
+    useSessionStore.setState({ sessions: [{ ...loaded, title: "真实变更" }] });
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+    const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
+    const sessionKeys = entries.filter((e) => e.key.startsWith("kimix_local_session_"));
+    expect(sessionKeys).toHaveLength(1);
+    const stored = sessionEntryById(entries, loaded.id) as Session;
+    expect(stored.title).toBe("真实变更");
+  });
 });
