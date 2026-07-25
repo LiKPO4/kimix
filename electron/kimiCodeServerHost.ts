@@ -38,6 +38,12 @@ export type KimiCodeServerHostStatus = {
   managed: boolean;
   capabilities?: KimiCodeServerCapabilities;
   error?: string;
+  /**
+   * 仅在 attach 外部 Server（managed=false）且用户 config.toml 配了 [secondary_model]
+   * 时设置：外部进程未注入 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1，官方 0.29.1 的
+   * secondary_model 实验特性可能未开启，子代理模型配置可能不生效。managed 时不设置。
+   */
+  secondaryModelExternalServer?: { model: string };
 };
 
 type ServerEnvelope<T> = { code: number; msg?: string; data: T };
@@ -79,6 +85,30 @@ function contractIsUsable(capabilities: KimiCodeServerCapabilities) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 解析 config.toml 文本中的 [secondary_model] 段；段存在且 model 非空时返回模型名。
+ * 与 electron/main.ts 的 readSecondaryModelFromToml 保持同一轻量正则解析风格，
+ * 避免为本场景引入完整 TOML 解析依赖。
+ */
+export function detectSecondaryModelInConfigToml(raw: string): { model: string } | undefined {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const index = matches.findIndex((match) => match[1].trim() === "secondary_model");
+  if (index < 0) return undefined;
+  const body = raw.slice((matches[index].index ?? 0) + matches[index][0].length, matches[index + 1]?.index ?? raw.length);
+  const model = body.match(/^\s*model\s*=\s*"((?:\\.|[^"])*)"\s*$/m)?.[1]?.trim();
+  return model ? { model } : undefined;
+}
+
+/** attach 外部 Server 时读取用户 config.toml，判断子代理模型配置是否存在。 */
+function readSecondaryModelExternalServerHint(): { model: string } | undefined {
+  try {
+    return detectSecondaryModelInConfigToml(fs.readFileSync(path.join(os.homedir(), ".kimi-code", "config.toml"), "utf-8"));
+  } catch {
+    return undefined;
+  }
 }
 
 // Kimi Code 0.24+（agent-core-v2）对全部 /api/* 与 /openapi.json、/asyncapi.json 强制
@@ -328,6 +358,8 @@ export class KimiCodeServerHost {
       ...this.status,
       state: nextState,
       error: undefined,
+      // 重连回托管进程时清除外部 Server 提示；仍为外部 attach 时保留。
+      ...(this.child ? { secondaryModelExternalServer: undefined } : {}),
     };
   }
 
@@ -340,6 +372,7 @@ export class KimiCodeServerHost {
       routing: "sdk",
       managed: false,
       error: errorMessage(error),
+      secondaryModelExternalServer: undefined,
     };
   }
 
@@ -360,7 +393,13 @@ export class KimiCodeServerHost {
 
     try {
       const capabilities = await this.probe(this.status.endpoint);
-      this.status = { ...this.status, state: "attached", managed: false, capabilities };
+      this.status = {
+        ...this.status,
+        state: "attached",
+        managed: false,
+        capabilities,
+        secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
+      };
       return this.getStatus();
     } catch {
       // Preferred endpoint empty; discover registry instances or spawn below.
@@ -380,6 +419,7 @@ export class KimiCodeServerHost {
           endpoint,
           capabilities,
           error: undefined,
+          secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
         };
         return this.getStatus();
       } catch {
@@ -413,6 +453,7 @@ export class KimiCodeServerHost {
           endpoint,
           capabilities,
           error: undefined,
+          secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
         };
         return this.getStatus();
       } catch {
@@ -458,6 +499,8 @@ export class KimiCodeServerHost {
           endpoint,
           capabilities,
           error: undefined,
+          // 托管 spawn 已注入 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1，无需提示。
+          secondaryModelExternalServer: undefined,
         };
         return this.getStatus();
       } catch (error) {
@@ -476,6 +519,7 @@ export class KimiCodeServerHost {
         ...spawnErrors.slice(-4),
         this.stderr.trim(),
       ].filter(Boolean).join("\n").slice(0, 4_000),
+      secondaryModelExternalServer: undefined,
     };
     return this.getStatus();
   }
@@ -488,6 +532,7 @@ export class KimiCodeServerHost {
       routing: "sdk",
       managed: false,
       error: errorMessage(error),
+      secondaryModelExternalServer: undefined,
     };
   }
 
@@ -508,7 +553,12 @@ export class KimiCodeServerHost {
       await this.waitUntilStopped();
     }
     this.child = null;
-    this.status = { ...this.status, state: this.status.enabled ? "stopped" : "disabled", managed: false };
+    this.status = {
+      ...this.status,
+      state: this.status.enabled ? "stopped" : "disabled",
+      managed: false,
+      secondaryModelExternalServer: undefined,
+    };
   }
 
   private async probe(endpoint = this.status.endpoint): Promise<KimiCodeServerCapabilities> {

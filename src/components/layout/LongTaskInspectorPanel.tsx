@@ -387,6 +387,7 @@ export function LongTaskInspectorPanel({
   const [subagentModelDraft, setSubagentModelDraft] = useState("");
   const [subagentThinkingDraft, setSubagentThinkingDraft] = useState("");
   const [subagentSaving, setSubagentSaving] = useState(false);
+  const [subagentExternalServer, setSubagentExternalServer] = useState<{ model: string } | null>(null);
   const [gitFiles, setGitFiles] = useState<GitStatusFile[]>([]);
   const [gitTotalFileCount, setGitTotalFileCount] = useState(0);
   const [gitFilesTruncated, setGitFilesTruncated] = useState(false);
@@ -1086,6 +1087,10 @@ export function LongTaskInspectorPanel({
         }
         const catalog = await window.api.getKimiCodeServerModelCatalog().catch(() => null);
         if (!cancelled) setSubagentServerCatalog(catalog?.success ? catalog.data : null);
+        const diagnostics = await window.api.getKimiCodeConfigDiagnostics().catch(() => null);
+        if (!cancelled) {
+          setSubagentExternalServer(diagnostics?.success ? diagnostics.data.secondaryModelExternalServer ?? null : null);
+        }
       } catch (error) {
         if (!cancelled) setSubagentCatalogError(error instanceof Error ? error.message : String(error));
       } finally {
@@ -1796,6 +1801,14 @@ export function LongTaskInspectorPanel({
                 {rightCardDragHandle("subagent", "子 Agent")}
               </div>
               <div className="flex flex-col" style={{ gap: 14, marginTop: 14 }}>
+                {subagentExternalServer && (
+                  <div
+                    className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[12.5px] leading-5 text-accent-warning"
+                    style={{ padding: "12px 14px" }}
+                  >
+                    当前连接的是外部 Server（未确认开启 secondary_model 实验特性），子代理模型配置可能不生效。请重启 Kimix 切换为托管 Server，或手动以 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1 重启 Server。
+                  </div>
+                )}
                 <label className="block">
                   <span className="block text-[12px] leading-5 text-text-muted" style={{ marginBottom: 8 }}>新子 Agent 模型</span>
                   <select

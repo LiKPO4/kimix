@@ -6372,7 +6372,14 @@ ipcMain.handle("kimi-code:getUsage", async (_, request: unknown) => {
 
 ipcMain.handle("kimi-code:getConfigDiagnostics", async () => {
   try {
-    return { success: true, data: await kimiCodeHost.getConfigDiagnostics() };
+    const diagnostics = await kimiCodeHost.getConfigDiagnostics();
+    // 聚合 server host 的只读状态：attach 外部 Server 且配置了 [secondary_model] 时
+    // 透传给 renderer，用于「子代理模型配置可能不生效」的警告提示。
+    const secondaryModelExternalServer = kimiCodeServerHost.getStatus().secondaryModelExternalServer;
+    return {
+      success: true,
+      data: secondaryModelExternalServer ? { ...diagnostics, secondaryModelExternalServer } : diagnostics,
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

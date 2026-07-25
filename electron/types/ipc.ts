@@ -1786,6 +1786,8 @@ export type KimiCodeSkillSummary = {
 
 export type KimiCodeConfigDiagnostics = {
   warnings?: string[];
+  /** attach 外部 Server（非托管）且配置了 [secondary_model] 时由主进程聚合，用于子代理模型配置可能不生效的提示。 */
+  secondaryModelExternalServer?: { model: string };
 };
 
 export type KimiCodeSessionSummary = {

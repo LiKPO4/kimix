@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildManagedKimiServerArgs,
+  detectSecondaryModelInConfigToml,
   inspectKimiCodeServerContract,
   isKimiCodeServerExperimentEnabled,
   KimiCodeServerHost,
@@ -162,6 +163,52 @@ describe("kimiCodeServerHost", () => {
       managed: false,
       error: "Kimi Server 进程已退出：1",
     });
+  });
+
+  it("detects a configured [secondary_model] section for the external-server hint", () => {
+    // 有段且 model 非空：返回模型名，用于外部 Server 警告。
+    expect(detectSecondaryModelInConfigToml([
+      'default_model = "kimi-for-coding"',
+      "",
+      "[secondary_model]",
+      'model = "deepseek/deepseek-v4-flash"',
+      'default_effort = "low"',
+      "",
+      "[models.kimi]",
+      'model = "kimi-for-coding"',
+    ].join("\n"))).toEqual({ model: "deepseek/deepseek-v4-flash" });
+  });
+
+  it("returns undefined when the config has no [secondary_model] section", () => {
+    expect(detectSecondaryModelInConfigToml('default_model = "kimi-for-coding"\n')).toBeUndefined();
+    expect(detectSecondaryModelInConfigToml("")).toBeUndefined();
+  });
+
+  it("returns undefined when [secondary_model] has an empty or missing model", () => {
+    // model 为空串：视为未配置，不提示。
+    expect(detectSecondaryModelInConfigToml('[secondary_model]\nmodel = ""\n')).toBeUndefined();
+    // 只有 default_effort 没有 model：不提示。
+    expect(detectSecondaryModelInConfigToml('[secondary_model]\ndefault_effort = "low"\n')).toBeUndefined();
+    // 下一段的 model 不应被误读进 secondary_model 段。
+    expect(detectSecondaryModelInConfigToml('[secondary_model]\n\n[models.kimi]\nmodel = "kimi-for-coding"\n')).toBeUndefined();
+  });
+
+  it("clears the external-server secondary model hint when leaving the attached state", () => {
+    const host = new KimiCodeServerHost({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" });
+    const internals = host as unknown as {
+      status: ReturnType<KimiCodeServerHost["getStatus"]>;
+    };
+    internals.status = {
+      enabled: true,
+      state: "attached",
+      endpoint: "http://127.0.0.1:58627",
+      routing: "server",
+      managed: false,
+      secondaryModelExternalServer: { model: "deepseek/deepseek-v4-flash" },
+    };
+
+    host.markFallback(new Error("fetch failed"));
+    expect(host.getStatus().secondaryModelExternalServer).toBeUndefined();
   });
 
   it("recognizes missing session errors without treating them as server runtime failures", () => {
