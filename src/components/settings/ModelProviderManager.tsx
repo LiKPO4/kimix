@@ -23,6 +23,7 @@ import {
   defaultModelAliasForProvider,
   groupModelsByProvider,
 } from "@/utils/modelProviderConfig";
+import { inferModelContextSize } from "@/utils/modelContextInference";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 
@@ -252,7 +253,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const readContextSize = () => {
     const value = Number(modelDraft.maxContextSize.trim());
-    return Number.isInteger(value) && value >= 1 && value <= 1048576 ? value : null;
+    return Number.isInteger(value) && value >= 1 && value <= 10_000_000 ? value : null;
   };
 
   const handleDiscoverModels = async () => {
@@ -276,7 +277,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       }
       setDiscoveredModels(res.data.models);
       setDiscoveredEndpoint(res.data.endpoint);
-      setMessage(`已从接口发现 ${res.data.models.length} 个模型，请直接选择。`);
+      setMessage(`已从接口发现 ${res.data.models.length} 个模型，选择后将自动解析填入 Context 上下文大小。`);
     } catch (error) {
       setDiscoveredModels([]);
       setDiscoveredEndpoint("");
@@ -288,11 +289,13 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const handleDiscoveredModel = (modelId: string) => {
     if (!modelId) return;
+    const item = discoveredModels.find((m) => m.id === modelId);
+    const inferredContext = inferModelContextSize(modelId, item?.contextLength);
     setSelectedModelAlias("");
     setModelDraft((current) => ({
       modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
       model: modelId,
-      maxContextSize: current.maxContextSize || String(DEFAULT_CONTEXT_SIZE),
+      maxContextSize: item?.contextLength ? String(item.contextLength) : (current.maxContextSize.trim() || String(inferredContext)),
       supportEfforts: current.supportEfforts,
       defaultEffort: current.defaultEffort,
     }));
@@ -799,7 +802,25 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                   <div className="kimix-model-provider-form" style={{ marginTop: 12 }}>
                     <label className="min-w-0">
                       <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型 ID</span>
-                      <input value={modelDraft.model} onChange={(event) => setModelDraft((current) => ({ ...current, model: event.target.value }))} className="kimix-settings-input h-9 w-full text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} placeholder="例如 gpt-5.1" />
+                      <input
+                        value={modelDraft.model}
+                        onChange={(event) => {
+                          const val = event.target.value;
+                          setModelDraft((current) => {
+                            const shouldAutoFillContext = !current.maxContextSize.trim();
+                            const item = discoveredModels.find((m) => m.id === val.trim());
+                            const inferredContext = shouldAutoFillContext ? inferModelContextSize(val.trim(), item?.contextLength) : null;
+                            return {
+                              ...current,
+                              model: val,
+                              maxContextSize: inferredContext ? String(inferredContext) : current.maxContextSize,
+                            };
+                          });
+                        }}
+                        className="kimix-settings-input h-9 w-full text-[13px] outline-none"
+                        style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }}
+                        placeholder="例如 gpt-5.1"
+                      />
                     </label>
                     <label className="min-w-0">
                       <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>模型别名（可选）</span>

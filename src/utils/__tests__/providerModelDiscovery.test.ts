@@ -34,6 +34,20 @@ describe("provider model discovery", () => {
     ]);
   });
 
+  it("extracts context length from model list entries when present", () => {
+    expect(parseOpenAiModelList({
+      data: [
+        { id: "openrouter/model", context_length: 200000 },
+        { id: "oneapi/model", context_window: 128000 },
+        { id: "ollama/model", details: { context_length: 32768 } },
+      ],
+    })).toEqual([
+      { id: "ollama/model", ownedBy: null, contextLength: 32768 },
+      { id: "oneapi/model", ownedBy: null, contextLength: 128000 },
+      { id: "openrouter/model", ownedBy: null, contextLength: 200000 },
+    ]);
+  });
+
   it("uses Bearer authentication and falls back to /v1/models only after the direct path fails", async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "not found" } }), {

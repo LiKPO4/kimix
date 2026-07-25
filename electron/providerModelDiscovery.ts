@@ -4,6 +4,7 @@ const MODEL_DISCOVERY_TIMEOUT_MS = 12_000;
 export type DiscoveredOpenAiModel = {
   id: string;
   ownedBy: string | null;
+  contextLength?: number | null;
 };
 
 export type OpenAiModelDiscoveryResult = {
@@ -64,7 +65,22 @@ export function parseOpenAiModelList(payload: unknown) {
     const ownedBy = entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).owned_by === "string"
       ? String((entry as Record<string, unknown>).owned_by).trim() || null
       : null;
-    byId.set(id, { id, ownedBy });
+
+    let contextLength: number | null = null;
+    if (entry && typeof entry === "object") {
+      const rec = entry as Record<string, unknown>;
+      const rawCtx = rec.context_length ?? rec.context_window ?? rec.max_context_length ?? rec.max_tokens ?? rec.input_token_limit ?? (rec.details && typeof rec.details === "object" ? (rec.details as Record<string, unknown>).context_length : undefined);
+      const num = typeof rawCtx === "number" ? rawCtx : typeof rawCtx === "string" ? Number(rawCtx) : NaN;
+      if (Number.isFinite(num) && num > 0 && num <= 10_000_000) {
+        contextLength = Math.round(num);
+      }
+    }
+
+    const modelItem: DiscoveredOpenAiModel = { id, ownedBy };
+    if (contextLength !== null) {
+      modelItem.contextLength = contextLength;
+    }
+    byId.set(id, modelItem);
     if (byId.size >= 1_000) break;
   }
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id, "en"));

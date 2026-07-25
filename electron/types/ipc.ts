@@ -453,6 +453,7 @@ export type DiscoverKimiProviderModelsRequest = {
 export type DiscoveredKimiProviderModel = {
   id: string;
   ownedBy: string | null;
+  contextLength?: number | null;
 };
 
 export type DiscoverKimiProviderModelsResponse = {
