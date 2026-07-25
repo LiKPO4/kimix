@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Target, Loader2, Film, Images } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -4226,15 +4226,6 @@ export function Composer() {
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
   const todoHidden = hiddenCards.includes("todo");
   const pendingHidden = hiddenCards.includes("pending");
-  const goalHidden = hiddenCards.includes("goal");
-  const currentGoal = mutationSessionView?.officialGoal?.goal ?? null;
-  const goalStatus = currentGoal?.status ?? "";
-  const showGoalModeCard = Boolean(currentGoal && !goalHidden && !["complete", "cancelled", "canceled"].includes(goalStatus));
-  const goalToneClass = goalStatus === "blocked"
-    ? "text-accent-danger"
-    : goalStatus === "paused"
-      ? "text-accent-warning"
-      : "text-accent-primary";
   const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
   const visibleRoomControlTargets = roomControlRequest?.action === "stop" ? roomStopTargets : roomSteerTargets;
   const roomControlTitle = roomControlRequest?.action === "stop" ? "选择要停止的 Agent" : "选择要引导的 Agent";
@@ -4390,44 +4381,7 @@ export function Composer() {
         </div>
       )}
 
-      {showGoalModeCard && currentGoal && (
-        <div
-          className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
-          style={{ marginBottom: 8 }}
-        >
-          <div
-            className="grid min-h-10 items-center text-[14px] text-[var(--kimix-panel-text-secondary)]"
-            style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10, paddingLeft: 20, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
-          >
-            <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary-light ${goalToneClass}`}>
-                {goalStatus === "active" ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />}
-              </span>
-              <span className={`shrink-0 text-[13px] font-medium leading-5 ${goalToneClass}`}>
-                Goal {goalStatusLabel(goalStatus)}
-              </span>
-              <span className="min-w-0 truncate leading-5 text-[var(--kimix-panel-text)]">
-                {currentGoal.objective}
-              </span>
-            </div>
-            <span
-              className="shrink-0 rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]"
-              style={{ minHeight: 24, minWidth: 42, paddingLeft: 9, paddingRight: 9, textAlign: "center" }}
-            >
-              {currentGoal.turnsUsed ?? 0} 轮
-            </span>
-            <button
-              type="button"
-              onClick={() => hideComposerCard("goal", "官方 Goal")}
-              className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-              title="收起到侧栏"
-              aria-label="收起官方 Goal 状态"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {themeImportPreview && (
         <div

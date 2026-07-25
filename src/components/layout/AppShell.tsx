@@ -16,7 +16,6 @@ import {
   ExternalLink,
   FileText,
   MessageSquarePlus,
-  Target,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -42,7 +41,7 @@ import { LongTaskInspectorPanel, type BtwPanelState, type HiddenComposerCardEntr
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { claimRuntimeSessionOwnership, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
-import { isTerminalGoalStatus, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
+import { reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { logError } from "@/utils/reportError";
 import {
@@ -78,13 +77,7 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   return isSamePath(a, b);
 }
 
-function goalStatusLabel(status: string) {
-  if (status === "active") return "进行中";
-  if (status === "paused") return "已暂停";
-  if (status === "blocked") return "受阻";
-  if (status === "complete") return "已完成";
-  return status;
-}
+
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -1066,10 +1059,6 @@ export function AppShell() {
     ? { ...btwTransientState, rounds: mutationSessionView.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
-  const rawCurrentGoal = mutationSessionView?.officialGoal?.goal ?? null;
-  const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
-  const currentGoalStatus = currentGoal?.status ?? "";
-  const hasVisibleGoalModeCard = Boolean(currentGoal && !["complete", "cancelled", "canceled"].includes(currentGoalStatus));
   const hiddenComposerCardEntries = [
     hiddenComposerCardList.includes("todo") && latestTodos.length > 0
       ? {
@@ -1085,14 +1074,6 @@ export function AppShell() {
           title: "排队消息",
           desc: `${pendingMessages.length} 条消息正在排队`,
           icon: MessageSquarePlus,
-        }
-      : null,
-    hiddenComposerCardList.includes("goal") && hasVisibleGoalModeCard
-      ? {
-          key: "goal" as const,
-          title: "官方 Goal",
-          desc: `${currentGoalStatus ? goalStatusLabel(currentGoalStatus) : "进行中"} · ${currentGoal?.objective ?? ""}`,
-          icon: Target,
         }
       : null,
   ].filter((item) => item !== null) as HiddenComposerCardEntry[];

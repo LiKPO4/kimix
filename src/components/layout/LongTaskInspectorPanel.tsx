@@ -29,7 +29,6 @@ import {
   Send,
   ShieldAlert,
   Square,
-  Target,
   Terminal,
   Trash2,
   LogIn,
@@ -46,7 +45,6 @@ import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { formatReleaseDate } from "@/utils/format";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
-import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
@@ -307,7 +305,6 @@ export function LongTaskInspectorPanel({
   btwState,
   btwDisabled,
   defaultPlanMode,
-  officialGoal,
   sessionAgentLabel,
   gitDetailsOpenSignal,
   gitGraphOpenSignal,
@@ -329,11 +326,6 @@ export function LongTaskInspectorPanel({
   onSetBtwInput,
   onAskBtw,
   onClearBtw,
-  onRefreshOfficialGoal,
-  onCreateOfficialGoal,
-  onPauseOfficialGoal,
-  onResumeOfficialGoal,
-  onCancelOfficialGoal,
   showToast,
   copyToClipboard,
 }: LongTaskInspectorPanelProps) {
@@ -349,8 +341,6 @@ export function LongTaskInspectorPanel({
   const updateSession = useSessionStore((state) => state.updateSession);
   const addSession = useSessionStore((state) => state.addSession);
   const [collapsedBtwRoundIds, setCollapsedBtwRoundIds] = useState<Set<string>>(() => new Set());
-  const [goalDraft, setGoalDraft] = useState("");
-  const [goalBusy, setGoalBusy] = useState<"refresh" | "create" | "replace" | "pause" | "resume" | "cancel" | null>(null);
   const [serverChildren, setServerChildren] = useState<KimiCodeSessionSummary[]>([]);
   const [serverTreeAvailable, setServerTreeAvailable] = useState(false);
   const [serverTreeLoading, setServerTreeLoading] = useState(false);
@@ -953,26 +943,7 @@ export function LongTaskInspectorPanel({
     if (btwDisabled || btwState.loading || !btwState.input.trim()) return;
     void onAskBtw();
   };
-  const rawCurrentGoal = officialGoal?.goal ?? null;
-  const currentGoal = rawCurrentGoal && !isTerminalGoalStatus(rawCurrentGoal.status) ? rawCurrentGoal : null;
-  const goalStatusLabel = currentGoal?.status === "active"
-    ? "进行中"
-    : currentGoal?.status === "paused"
-      ? "已暂停"
-      : currentGoal?.status === "blocked"
-        ? "受阻"
-        : currentGoal?.status === "complete"
-          ? "已完成"
-          : currentGoal?.status ?? "未启动";
-  const runGoalAction = async (busy: typeof goalBusy, action: () => Promise<void>) => {
-    if (goalBusy) return;
-    setGoalBusy(busy);
-    try {
-      await action();
-    } finally {
-      setGoalBusy(null);
-    }
-  };
+
   const officialRuntimeSessionId = liveCurrentSession?.engine === "kimi-code"
     ? liveCurrentSession.runtimeSessionId ?? liveCurrentSession.officialSessionId ?? null
     : null;
@@ -1964,111 +1935,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("goal", 4, { padding: "16px 16px 18px" })}>
-              <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
-                  <Target size={15} className="shrink-0 text-accent-primary" />
-                  <div className="text-[13px] font-medium leading-5 text-text-muted">官方 Goal</div>
-                  {sessionAgentLabel && <div className="min-w-0 truncate text-[12px] leading-5 text-text-faint">· {sessionAgentLabel}</div>}
-                </div>
-                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={!liveCurrentSession || Boolean(goalBusy)}
-                    onClick={() => void runGoalAction("refresh", onRefreshOfficialGoal)}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    <RefreshCw size={13} className={goalBusy === "refresh" ? "animate-spin" : ""} />
-                    刷新
-                  </button>
-                  {rightCardDragHandle("goal", "官方 Goal")}
-                </div>
-              </div>
-              <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
-                <div
-                  className={`rounded-lg border ${currentGoal ? "border-accent-primary-soft bg-accent-primary-light/40" : "border-border-subtle bg-surface-base"} text-[13px] leading-5`}
-                  style={{ padding: "12px 12px" }}
-                >
-                  <div className="flex items-center justify-between" style={{ gap: 10 }}>
-                    <span className="font-medium text-accent-primary">{goalStatusLabel}</span>
-                    {currentGoal && (
-                      <span className="shrink-0 rounded-lg bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
-                        {currentGoal.turnsUsed ?? 0} 轮
-                      </span>
-                    )}
-                  </div>
-                  <div className="whitespace-pre-wrap break-words text-text-secondary" style={{ marginTop: 8 }}>
-                    {currentGoal?.objective ?? "用 /goal 或下方输入框启动一个官方 Goal。"}
-                  </div>
-                  {currentGoal?.terminalReason && (
-                    <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 8 }}>
-                      {currentGoal.terminalReason}
-                    </div>
-                  )}
-                  {officialGoal?.error && (
-                    <div className="text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 8 }}>
-                      {officialGoal.error}
-                    </div>
-                  )}
-                </div>
-                <textarea
-                  value={goalDraft}
-                  onChange={(event) => setGoalDraft(event.target.value)}
-                  placeholder="输入一个可验证的目标"
-                  className="min-h-[70px] w-full resize-none rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent-primary"
-                  style={{ padding: "12px 12px" }}
-                />
-                <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                  <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
-                    {currentGoal?.status === "active" ? (
-                      <button
-                        type="button"
-                        disabled={Boolean(goalBusy)}
-                        onClick={() => void runGoalAction("pause", onPauseOfficialGoal)}
-                        className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-hover"
-                      >
-                        <Pause size={13} />
-                        暂停
-                      </button>
-                    ) : currentGoal ? (
-                      <button
-                        type="button"
-                        disabled={Boolean(goalBusy)}
-                        onClick={() => void runGoalAction("resume", onResumeOfficialGoal)}
-                        className="kimix-icon-text-button is-compact shrink-0 text-accent-primary hover:bg-accent-primary-light"
-                      >
-                        <Play size={13} />
-                        继续
-                      </button>
-                    ) : null}
-                    {currentGoal && (
-                      <button
-                        type="button"
-                        disabled={Boolean(goalBusy)}
-                        onClick={() => void runGoalAction("cancel", onCancelOfficialGoal)}
-                        className="kimix-icon-text-button is-compact shrink-0 text-accent-danger hover:bg-accent-danger-light"
-                      >
-                        <Trash2 size={13} />
-                        取消
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={Boolean(goalBusy) || !goalDraft.trim()}
-                    onClick={() => void runGoalAction(currentGoal ? "replace" : "create", async () => {
-                      await onCreateOfficialGoal(goalDraft.trim(), Boolean(currentGoal));
-                      setGoalDraft("");
-                    })}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    <Target size={13} />
-                    {currentGoal ? "替换" : "启动"}
-                  </button>
-                </div>
-              </div>
-            </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("btw", 5, { padding: "16px 16px 18px" })}>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("btw", 4, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <MessageCircleQuestion size={15} className="shrink-0 text-accent-primary" />

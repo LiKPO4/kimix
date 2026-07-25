@@ -6,7 +6,7 @@ import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
-const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "goal", "btw", "plan", "serverTree", "session", "diffs"];
+const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
 
@@ -60,7 +60,7 @@ function readRightSidebarCardOrder(): RightSidebarCardId[] {
     const parsed = JSON.parse(localStorage.getItem(RIGHT_SIDEBAR_CARD_ORDER_KEY) ?? "[]");
     if (!Array.isArray(parsed)) return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
     const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
-    const filtered = parsed.filter((item): item is RightSidebarCardId => known.has(item));
+    const filtered = parsed.filter((item): item is RightSidebarCardId => known.has(item) && item !== ("goal" as unknown));
     if (!filtered.includes("longTaskStatus")) {
       return placeNewSubagentCard([
         "longTaskStatus",
