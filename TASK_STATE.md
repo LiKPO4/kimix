@@ -20,7 +20,10 @@
 - 验证：typecheck × 4 轮均通过；kimiHistoryReconciliation 45/45 + persistence 14/14 + useStatePersistence 5/5 = 64 定向全绿。
 - 审查修复（两轮打回，`6c11254`/`2b95953`）：① P0 缓存引用错位——loadLocalSessions 用内部引用填缓存，App.tsx hydration 两次 map 换引用，首次真实 persist 退化全量；修为 markConversationStatePersisted 逐项登记。② P1-a 熔断命中后仍写误导性 error issue；修为 circuitSkipped 守卫。③ P1-b 熔断指纹登记用 reconciled canonical、检查用 raw canonical，含用户媒体时熔断静默失效；修为 context.rawCanonicalEvents 同源。④ P1-c→新 P0 GC 误删：sessionImageRefs 只为变化会话建立，未变化会话 refs 缺失将被 deleteImages 批量误删历史图片；修为预填充+惰性回退，补非空 getAllImageIds 回归测试（mock 恒 [] 的测试结构抓不到此类 bug）。⑤ P1-d 迁移检查改模块级 flag。知识库新增 Invariant D（GC ref availability）。
 - 最终验证（独立复验）：typecheck ✓；全量 128 文件 1179 测试 ✓；build ✓（新 hash）；knowledge:validate ✓。
-- 待用户重启实测：`KIMIX_PERF` 启动 30s 长任务总时长 <1500ms；persist.run ≤2 次且单次 <500ms（changedSessions 应远小于 totalSessions）；同指纹 rejected 日志每目标 ≤1 次；另请抽查历史会话图片是否正常显示（GC 回归防线）。
+- 用户实测 v2.20.0 仍卡（06:15 启动段取证）：persist 增量确认根治（commitMs 103-129ms、changedSessions 2-3/365），但暴露两个运行时缺陷（此前被 persist 风暴掩盖）：① 熔断失效——repair patch 路径每次追加 Date.now() usage status 事件，指纹 localLastTs 每 ~70ms 变，同 canonical 被 reconcile 23 次（callerReason:"repair"，canonical 统计量 119vs64 恒定）；② rejected 日志经 ...context 携带完整 rawCanonicalEvents 事件数组，84KB/条×25=2.1MB 序列化+IPC+写盘（06:15:30 窗口 6 长任务 10519ms、timings 空白的真凶）；首次 persist stripMs 墙钟 38s 系主线程被挤占的受害者。
+- 三轮修复（`bb94d61`）：① 指纹去掉 lastTs，仅留 assistantBodySize+processEventCount（PROCESS_EVENT_TYPES={tool_call,subagent,approval_request,question_request,hook}，usage status 不影响，patch 免疫）；② logCtx 剔除 rawCanonicalEvents（7 处统一）；③ repair 限流同 target ≤3 次/轮（circuitSkipped 联动抑制 error issue）。
+- 三轮复验：typecheck ✓；全量 1180 ✓；build ✓（index-BIR0lN-9.js）。
+- 待用户二次实测：KIMIX_PERF 启动 30s 长任务总时长 <1500ms；persist.run ≤2 次且 <500ms；同 target rejected ≤3 次/启动；rejected 日志行 <1KB；diag.log 启动段无 MB 级增长；抽查历史图片显示正常。
 
 ## 2026-07-25 修复：自定义模型子代理未生效（外部 Server 缺实验 flag）
 
