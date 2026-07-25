@@ -14,7 +14,7 @@ import {
   scopeEventToRoomAgent,
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
-import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
+import { sanitizePersistedEvents, settleInactiveEvents, repairStableAssistantOrder } from "./eventHelpers";
 import { timeAsync } from "./perfDiag";
 import { stripLegacyKimixClarificationWrapper } from "./eventMapper";
 import {
@@ -887,12 +887,12 @@ export async function loadLocalSessions(): Promise<Session[]> {
     collectImageRefsFromSessions(rawSessions, refs);
     const dataUrlById = await loadImages(Array.from(refs));
     const sessions = hydrateSessions(rawSessions, dataUrlById).map((session) => {
-      const events = deduplicateTimelineEvents(session.events);
+      const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
       if (!session.collaboration) {
         return events.length === session.events.length ? session : { ...session, events };
       }
       const agentEntries = Object.entries(session.collaboration.agentEvents);
-      const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, deduplicateTimelineEvents(list)]));
+      const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
       const changed = events.length !== session.events.length ||
         agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
       return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
@@ -921,12 +921,12 @@ export async function loadLocalSessions(): Promise<Session[]> {
   // Replay duplication repair: histories written before the snapshot user
   // dedup guards may contain repeated user messages; clean once on load.
   const sessions = hydrateSessions(raw, dataUrlById).map((session) => {
-    const events = deduplicateTimelineEvents(session.events);
+    const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
     if (!session.collaboration) {
       return events.length === session.events.length ? session : { ...session, events };
     }
     const agentEntries = Object.entries(session.collaboration.agentEvents);
-    const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, deduplicateTimelineEvents(list)]));
+    const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
     const changed = events.length !== session.events.length ||
       agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
     return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;

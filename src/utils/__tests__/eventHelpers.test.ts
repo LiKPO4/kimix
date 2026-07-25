@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -474,5 +474,63 @@ describe("hasMalformedAssistantMarkdown", () => {
       ];
       expect(hasTurnReceivedBody(events)).toBe(false);
     });
+  });
+});
+
+describe("repairStableAssistantOrder", () => {
+  function assistant(content: string, sid: string, overrides: Partial<TimelineEvent> = {}): TimelineEvent {
+    return { id: `a-${content.slice(0, 6)}`, type: "assistant_message" as const, timestamp: 1,
+      content, isThinking: false, isComplete: true, snapshotMessageId: sid, snapshotMessageIdStable: true,
+      ...overrides } as TimelineEvent;
+  }
+
+  it("reorders out-of-sequence stable events within a turn", () => {
+    // Real scenario: summary(sid=f_000010, ts=user+40ms) before preview(sid=f_000008, ts=user+30s).
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message" as const, timestamp: 100, content: "hi" },
+      assistant("完整汇总996字符", "87f_000010"),
+      { id: "tool-1", type: "tool_call" as const, timestamp: 200, toolCallId: "c1", toolName: "Read", status: "success" as const, arguments: {} },
+      assistant("33字符预告", "87f_000008"),
+    ];
+    const result = repairStableAssistantOrder(events);
+    const texts = result.filter((e) => e.type === "assistant_message").map((e) => e.content);
+    expect(texts).toEqual(["33字符预告", "完整汇总996字符"]);
+  });
+
+  it("idempotent: correctly ordered events are unchanged", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message" as const, timestamp: 100, content: "hi" },
+      assistant("预告33字符", "87f_000008"),
+      assistant("完整汇总996字符", "87f_000010"),
+    ];
+    const result = repairStableAssistantOrder(events);
+    const texts = result.filter((e) => e.type === "assistant_message").map((e) => e.content);
+    expect(texts).toEqual(["预告33字符", "完整汇总996字符"]);
+    expect(result).toBe(events); // same reference when no change
+  });
+
+  it("ignores events without stable sid or numeric tail", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message" as const, timestamp: 100, content: "hi" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 200, content: "无sid", isThinking: false, isComplete: true },
+      { id: "a2", type: "assistant_message" as const, timestamp: 300, content: "stable无数字", isThinking: false, isComplete: true,
+        snapshotMessageIdStable: true, snapshotMessageId: "no_number_suffix" },
+    ];
+    const result = repairStableAssistantOrder(events);
+    expect(result).toBe(events);
+  });
+
+  it("handles multiple turns with different prefixes", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message" as const, timestamp: 100, content: "第一轮" },
+      assistant("第一轮汇总", "step1_000010"),
+      assistant("第一轮预告", "step1_000008"),
+      { id: "user-2", type: "user_message" as const, timestamp: 500, content: "第二轮" },
+      assistant("第二轮总结", "step2_000020"),
+      assistant("第二轮预览", "step2_000015"),
+    ];
+    const result = repairStableAssistantOrder(events);
+    const texts = result.filter((e) => e.type === "assistant_message").map((e) => e.content);
+    expect(texts).toEqual(["第一轮预告", "第一轮汇总", "第二轮预览", "第二轮总结"]);
   });
 });

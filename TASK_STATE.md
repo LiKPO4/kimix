@@ -6080,3 +6080,11 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - `src/utils/__tests__/kimiHistoryCache.test.ts`
 ## 下一步
 - 完整验证后启动 v2.14.121，重新打开目标会话；缓存版本 3 应使用官方 wire 中保留换行的 thinking 替换本地粘连版本。
+
+## 2026-07-25 存量事件顺序错乱修复（hydration 重排 + v2.20.1）
+
+- 根因：barrier 绑定保留 placeholder 早期 timestamp（f510c91 修复未来，本任务修复存量）
+- 修法：新建 repairStableAssistantOrder（eventHelpers.ts），按 sid 尾部数字号排序
+- 接入：loadLocalSessions 两处 hydration 路径（per-session + old-key）
+- 测试 4 项：真实错乱修复、幂等、无 sid 不动、多轮不同 prefix
+- 版本：2.20.1；release notes v2.20.1.md

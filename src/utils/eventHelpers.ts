@@ -458,3 +458,95 @@ export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
   };
   return [...events.slice(0, beginIndex + 1), endEvent, ...events.slice(beginIndex + 1)];
 }
+
+/**
+ * Extract a numeric sequence number from a snapshotMessageId that ends with
+ * `_<digits>`. Returns undefined when no tail digit is present.
+ */
+function snapshotSeq(snapshotMessageId?: string): number | undefined {
+  if (!snapshotMessageId) return undefined;
+  const match = /_(\d+)$/.exec(snapshotMessageId);
+  return match ? Number(match[1]) : undefined;
+}
+
+/**
+ * Repair in-place event ordering broken by the barrier-binding timestamp bug
+ * (f510c91 fix for future; this repairs already-persisted data on load).
+ *
+ * Within each user-message-delimited turn segment, collect all assistant
+ * events that carry a stable snapshotMessageId with a numeric tail sequence
+ * number (e.g. `87f_000008` → seq 8). If any two within the same segment
+ * have the same prefix and are out of order relative to their sequence
+ * numbers, reorder them in-place (content slots are swapped so the event
+ * objects retain their original array positions, only the stable content
+ * moves to the correct sequence slot). Idempotent: correctly ordered
+ * segments are untouched.
+ *
+ * Does NOT handle collaboration agentEvents — that must be done by the
+ * caller if needed.
+ */
+export function repairStableAssistantOrder(events: TimelineEvent[]): TimelineEvent[] {
+  // Find turn boundaries: user_message / steer_message.
+  const turnBreaks: number[] = [];
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].type === "user_message" || events[i].type === "steer_message") {
+      turnBreaks.push(i);
+    }
+  }
+  turnBreaks.push(events.length); // sentinel
+
+  let result = events;
+  let startIdx = 0;
+  for (const endIdx of turnBreaks) {
+    if (endIdx - startIdx < 2) { startIdx = endIdx; continue; }
+
+    // Collect stable assistant positions and their seq numbers in this segment.
+    const slots: Array<{ index: number; seq: number; prefix: string }> = [];
+    for (let i = startIdx; i < endIdx; i++) {
+      const event = result[i];
+      if (event.type !== "assistant_message") continue;
+      if (!event.snapshotMessageIdStable && !event.snapshotMessageId) continue;
+      const seq = snapshotSeq(event.snapshotMessageId);
+      if (seq === undefined) continue;
+      // Extract prefix (everything before the final _<digits>).
+      const lastUnderscore = event.snapshotMessageId!.lastIndexOf("_");
+      const prefix = lastUnderscore > 0 ? event.snapshotMessageId!.slice(0, lastUnderscore) : "";
+      slots.push({ index: i, seq, prefix });
+    }
+
+    if (slots.length < 2) { startIdx = endIdx; continue; }
+
+    // Group by prefix — only events with the same prefix are from the same sequence.
+    const byPrefix = new Map<string, typeof slots>();
+    for (const slot of slots) {
+      const group = byPrefix.get(slot.prefix) ?? [];
+      group.push(slot);
+      byPrefix.set(slot.prefix, group);
+    }
+
+    for (const [, group] of byPrefix) {
+      if (group.length < 2) continue;
+
+      // Check if already sorted.
+      let sorted = true;
+      for (let i = 1; i < group.length; i++) {
+        if (group[i].seq < group[i - 1].seq) { sorted = false; break; }
+      }
+      if (sorted) continue;
+
+      // Reorder: keep positions, swap event objects into correct seq order.
+      // lowest seq → earliest position, highest seq → latest position.
+      if (result === events) result = [...events];
+      const originalOrder = [...group]; // sorted by position (ascending index)
+      const sortedBySeq = [...group].sort((a, b) => a.seq - b.seq);
+      const eventsToAssign = sortedBySeq.map((slot) => result[slot.index]);
+      for (let i = 0; i < originalOrder.length; i++) {
+        result[originalOrder[i].index] = eventsToAssign[i];
+      }
+    }
+
+    startIdx = endIdx;
+  }
+
+  return result;
+}
