@@ -18,7 +18,9 @@
 - Phase C（4384265）：增量持久化。分键存储 `kimix_local_sessions_index` + `kimix_local_session_<id>`；runPersist 按引用缓存判断变化会话，仅 strip+写变化/新增/删除；loadLocalSessions 读 index 分批并行加载（20/批）；旧单键 `kimix_sessions` 自动迁移。persist.run 日志补 changedSessions/totalSessions。
 - Phase 4：package.json 2.19.5→2.20.0；streaming-render-pipeline.md 持久化段更新并新增不变量 A/B/C；knowledge/log.md 记录；docs/release-notes/v2.20.0.md。
 - 验证：typecheck × 4 轮均通过；kimiHistoryReconciliation 45/45 + persistence 14/14 + useStatePersistence 5/5 = 64 定向全绿。
-- 待用户重启实测：`KIMIX_PERF` 启动 30s 长任务总时长 <1500ms；persist.run ≤2 次且单次 <500ms；同指纹 rejected 日志每目标 ≤1 次。
+- 审查修复（两轮打回，`6c11254`/`2b95953`）：① P0 缓存引用错位——loadLocalSessions 用内部引用填缓存，App.tsx hydration 两次 map 换引用，首次真实 persist 退化全量；修为 markConversationStatePersisted 逐项登记。② P1-a 熔断命中后仍写误导性 error issue；修为 circuitSkipped 守卫。③ P1-b 熔断指纹登记用 reconciled canonical、检查用 raw canonical，含用户媒体时熔断静默失效；修为 context.rawCanonicalEvents 同源。④ P1-c→新 P0 GC 误删：sessionImageRefs 只为变化会话建立，未变化会话 refs 缺失将被 deleteImages 批量误删历史图片；修为预填充+惰性回退，补非空 getAllImageIds 回归测试（mock 恒 [] 的测试结构抓不到此类 bug）。⑤ P1-d 迁移检查改模块级 flag。知识库新增 Invariant D（GC ref availability）。
+- 最终验证（独立复验）：typecheck ✓；全量 128 文件 1179 测试 ✓；build ✓（新 hash）；knowledge:validate ✓。
+- 待用户重启实测：`KIMIX_PERF` 启动 30s 长任务总时长 <1500ms；persist.run ≤2 次且单次 <500ms（changedSessions 应远小于 totalSessions）；同指纹 rejected 日志每目标 ≤1 次；另请抽查历史会话图片是否正常显示（GC 回归防线）。
 
 ## 2026-07-25 修复：自定义模型子代理未生效（外部 Server 缺实验 flag）
 
