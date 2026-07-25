@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：中间 complete 步正文闪现再收进过程（v2.20.9）
+
+- 用户实测 v2.20.8：整轮更正常；唯一残留——中间汇报句（「代码部分已全部完成，正在跑最终验收」）先出现在正文位，续跑后又缩回折叠过程。
+- 日志：`thinking→settled_complete`（prompt.completed）→约 10s 后 `settled_complete→running`（同一 key）；`computeFinalTextBlockContent` 在 isComplete 时展示正文，再变 incomplete 时 return ""。
+- 根因：非房间路径 `isRuntimeAwaitingTurnOutput` 用 `!hasCompletedAssistantOutput` 门闩——中间步已 complete 时误判 turnSettled，ChatThread 投影 isComplete=true 再因会话仍 running 重开。房间路径本就不看该门闩。
+- 修复：非房间与房间统一——latest + session running 即 awaiting；显示层 `event.isComplete && !isActiveAssistant` 才算最终正文。回归测试 body-flash guard。
+- 待用户实测：多步工具轮中间汇报不再进正文位闪现；整轮结束后最终答案仍正常显示。
+
 ## 2026-07-25 一口 live 诊断 + 官方 client_id 对齐（v2.20.8）
 
 - 目标：用同一条 `diag.log` 录全症状 7/11/12/13，并对照官方 kimi-web 补复刻缺口，而不是再盲改显示层。

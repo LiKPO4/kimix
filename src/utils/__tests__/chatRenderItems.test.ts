@@ -136,13 +136,27 @@ describe("buildRenderItems usage footer", () => {
     id: "usage-2", type: "status_update", timestamp: 4, inputTokenCount: 120, tokenCount: 30,
   }];
 
-  it("does not reopen a completed Assistant while the next runtime turn is starting", () => {
-    const assistant = buildRenderItems(events, "kimi-code", undefined, true)
-      .find((item) => item.type === "event" && item.event.type === "assistant_message");
-    expect(assistant?.type).toBe("event");
-    if (assistant?.type !== "event") return;
-    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
-    expect(assistant.event.type === "assistant_message" && assistant.event.isComplete).toBe(true);
+  it("does not reopen a completed Assistant once the next user boundary is present", () => {
+    // Send path writes the next user_message before flipping isSessionRunning, so
+    // the previous turn is superseded by hasLaterUserBoundary and keeps its footer.
+    // (A bare isSessionRunning=true without the next user would incorrectly reopen
+    // the latest complete step; that race is closed by send-path ordering, same as
+    // the room path — not by treating mid-turn complete steps as turnSettled.)
+    const nextUser: TimelineEvent = {
+      id: "user-next",
+      type: "user_message",
+      timestamp: 5,
+      content: "继续检查",
+    };
+    const items = buildRenderItems([...events, nextUser], "kimi-code", undefined, true);
+    const previous = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.id === "assistant"
+    ));
+    expect(previous?.type).toBe("event");
+    if (previous?.type !== "event") return;
+    expect(previous.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
+    expect(previous.event.type === "assistant_message" && previous.event.isComplete).toBe(true);
+    expect(previous.isAssistantActive).toBe(false);
   });
 
   it("derives the active Assistant header when the latest user turn has lost its placeholder", () => {
@@ -708,6 +722,33 @@ describe("buildRenderItems usage footer", () => {
     const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
     expect(assistant?.type).toBe("event");
     if (assistant?.type !== "event" || assistant.event.type !== "assistant_message") return;
+    expect(assistant.event.isComplete).toBe(false);
+  });
+
+  it("does not settle a mid-turn complete assistant while the session is still running (body-flash guard)", () => {
+    // agent-core-v2 may mark a content-bearing step isComplete mid-turn. If we
+    // treat that as turnSettled, the body flashes in the answer slot then folds
+    // when the next tool/think phase reopens the turn.
+    const items = buildRenderItems([{
+      id: "user-mid",
+      type: "user_message",
+      timestamp: 1,
+      content: "上一轮内容做完了吗",
+    }, {
+      id: "assistant-mid-step",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "你好霖江路。汇报一下：上一轮的设计实现代码部分已全部完成，正在跑最终验收。",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 136_054,
+    }], "kimi-code", undefined, true);
+    const assistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.id === "assistant-mid-step"
+    ));
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event" || assistant.event.type !== "assistant_message") return;
+    expect(assistant.isAssistantActive).toBe(true);
     expect(assistant.event.isComplete).toBe(false);
   });
 

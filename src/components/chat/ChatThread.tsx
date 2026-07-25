@@ -831,30 +831,24 @@ export function buildRenderItems(
     const activeRoomAgentTurn = roomAgentId
       ? roomAgentActivities?.find((activity) => roomAgentActivityMatchesTurn(activity, turnIdentity, isLatestTurn))
       : undefined;
-    const hasCompletedAssistantOutput = assistantEvents.some((event) => event.isComplete && Boolean(
-      event.content.trim() ||
-      event.thinking?.trim() ||
-      event.thinkingParts?.some((part) => part.text.trim())
-    ));
     // A session-level running flag can switch before the optimistic user event
-    // reaches this timeline. Do not reopen the previous completed response
-    // during that gap; runtime state may keep only an output-less/tool-only
-    // latest turn active until its first authoritative event arrives.
+    // reaches this timeline. Previous turns are protected by isLatestTurn /
+    // hasLaterUserBoundary (superseded), not by treating intermediate complete
+    // steps as "turn settled".
     const isPrimaryRoomAgentTurn = !roomAgentId || roomAgentId === primaryRoomAgentId;
     // agent-core-v2 commits content-bearing, isComplete:true assistant steps
     // mid-turn (step.end finishReason=end_turn) while the turn keeps running.
-    // For a room turn, the send path always writes the user_message before it
-    // flips the session-running flag, so the latest running turn is
-    // unambiguously the one the runtime is still working on. The completed
-    // output of an intermediate step must not settle it — otherwise the process
-    // header shows "输出完成" (or loses its header entirely) while the footer
-    // still says "运行中". The terminal-status handler clears the running flag
-    // and marks the activity terminal in the same tick, so the turn settles at
-    // the true end. Only the legacy non-room path keeps the completed-output
-    // gate, which guards the pre-user-event gap it was written for.
+    // The send path writes the user_message before flipping the session-running
+    // flag, so the latest running turn is the one the runtime is still working
+    // on — room and non-room alike. An intermediate complete step must NOT
+    // settle the turn: otherwise computeFinalTextBlockContent shows that step
+    // as the final body, then the next tool/think phase forces isComplete back
+    // to false and the body folds into the process card (user-visible flash).
+    // Terminal status clears the running flag in the same tick as true end.
+    // (Legacy non-room used `!hasCompletedAssistantOutput` as a gap guard; that
+    // gate is what produced the body flash on multi-step turns.)
     const isRuntimeAwaitingTurnOutput = Boolean(
-      isPrimaryRoomAgentTurn && isLatestTurn && isSessionRunning &&
-      (Boolean(roomAgentId) || !hasCompletedAssistantOutput)
+      isPrimaryRoomAgentTurn && isLatestTurn && isSessionRunning
     );
     const isTurnActive = Boolean(activeRoomAgentTurn || isRuntimeAwaitingTurnOutput);
     const foldApprovals = Boolean(mergedAssistantEvent || isTurnActive) && resolvedApprovals.length > 0;

@@ -2698,9 +2698,15 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   // segment (the answer). Earlier intermediate text segments live inside the
   // expanded process timeline. When blocks are unavailable, fall back to the
   // full merged content as before.
+  // 运行中即使 event.isComplete（v2 中间 step 提交）也不把段当最终正文，
+  // 避免「正文区闪一下再被收进过程」；真正展示最终正文需完成且非 active。
   const finalTextBlockContent = useMemo(() => {
-    return computeFinalTextBlockContent(turnBlocks, displayContent, event.isComplete);
-  }, [turnBlocks, displayContent, event.isComplete]);
+    return computeFinalTextBlockContent(
+      turnBlocks,
+      displayContent,
+      event.isComplete && !isActiveAssistant,
+    );
+  }, [turnBlocks, displayContent, event.isComplete, isActiveAssistant]);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
