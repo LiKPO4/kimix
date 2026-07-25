@@ -2002,6 +2002,48 @@ describe("mergeEvents", () => {
     const assistants = result.filter((e) => e.type === "assistant_message");
     expect(assistants).toHaveLength(2);
   });
+
+  it("empty identity terminal after all assistants complete does not append noise event", () => {
+    // text → tool → text → turn.ended: after break-segment the second text is
+    // a new assistant. turn.ended marks it complete but leaves no incomplete
+    // target for a second turn.ended → must not append.
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message" as const, timestamp: 1, content: "hi" },
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "分析", isThinking: false, isComplete: true, agentTurnId: "turn-1" },
+      { id: "t1", type: "tool_call" as const, timestamp: 3, toolCallId: "call-1", toolName: "Read", status: "success" as const, arguments: {} },
+      { id: "a2", type: "assistant_message" as const, timestamp: 4, content: "答案", isThinking: false, isComplete: true, agentTurnId: "turn-1" },
+    ];
+    const turnEnded: TimelineEvent = {
+      id: "end", type: "assistant_message" as const, timestamp: 5, content: "", isThinking: false, isComplete: true,
+    };
+    const result = mergeEvents(existing, turnEnded);
+    expect(result).toHaveLength(existing.length);
+    expect(result.every((e) => e.type !== "assistant_message" || e.isComplete)).toBe(true);
+  });
+
+  it("normal step.end with uncompleted target still marks it complete", () => {
+    const existing: TimelineEvent[] = [
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "正在思考", isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+    ];
+    const stepEnd: TimelineEvent = {
+      id: "end", type: "assistant_message" as const, timestamp: 3, content: "", isThinking: false, isComplete: true, agentTurnId: "turn-1",
+    };
+    const result = mergeEvents(existing, stepEnd);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ content: "正在思考", isComplete: true });
+  });
+
+  it("identity terminal is idempotent: two merges same as one", () => {
+    const base: TimelineEvent[] = [
+      { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "正文", isThinking: false, isComplete: true },
+    ];
+    const emptyFrame: TimelineEvent = {
+      id: "empty", type: "assistant_message" as const, timestamp: 3, content: "", isThinking: false, isComplete: true,
+    };
+    const once = mergeEvents(base, emptyFrame);
+    const twice = mergeEvents(once, emptyFrame);
+    expect(twice).toEqual(once);
+  });
 });
 
 describe("mapHistoryEvents", () => {
