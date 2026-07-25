@@ -1646,22 +1646,10 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
   const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
   const model = config.model || null;
   const defaultEffort = config.defaultEffort || null;
+  // 写前校验：模型声明了非空 support_efforts 而请求档位不在其中时，这里先抛错，
+  // backup 与写盘都不会执行，config.toml 保持原样（官方运行时会静默丢弃非法档位）。
+  const next = kimiCodeHost.applySecondaryModelConfigToml(raw, model, defaultEffort);
   backupFileIfExists(configPath);
-  // Remove ALL existing [secondary_model] sections first (prior writes may have
-  // left duplicates with non-standard formatting that the TOML editor cannot
-  // match), then write a single clean section if needed.
-  let next = removeTomlSection(raw, "secondary_model");
-  // Also strip any malformed inline-section remnants like `[secondary_model]key = ...`
-  next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
-  next = next.replace(/\n{3,}/g, "\n\n");
-  if (model || defaultEffort) {
-    const newline = next.includes("\r\n") ? "\r\n" : "\n";
-    const lines: string[] = [`[secondary_model]`];
-    if (model) lines.push(`model = "${escapeTomlString(model)}"`);
-    if (defaultEffort) lines.push(`default_effort = "${escapeTomlString(defaultEffort)}"`);
-    const base = next.trimEnd();
-    next = `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
-  }
   fs.writeFileSync(configPath, next, "utf-8");
   await reloadIdleKimiCodeSessionsAfterConfigChange();
   const summary = await readKimiModelConfigWithSdk();

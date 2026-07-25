@@ -431,6 +431,96 @@ export type KimiCodeModelAlias = {
 
 export type KimiCodeConfigPatch = Partial<KimiCodeConfig>;
 
+// ===== config.toml [secondary_model] 写前校验与重写（纯函数，main.ts 与单测共用）=====
+// main.ts 模块级副作用较多、无法被 vitest 直接导入，secondary_model 段的校验与
+// 重写逻辑抽到这里保持可测；以下 TOML 工具与 main.ts 内私有实现逐行保持一致。
+
+function unescapeTomlString(value: string) {
+  return value.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
+function escapeTomlString(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function toTomlTableKey(name: string) {
+  return /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapeTomlString(name)}"`;
+}
+
+function readTomlSectionBody(raw: string, sectionName: string) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
+  if (matchIndex < 0) return null;
+  const match = matches[matchIndex];
+  return raw.slice((match.index ?? 0) + match[0].length, matches[matchIndex + 1]?.index ?? raw.length);
+}
+
+function readTomlStringArray(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*\\[([^\\]]*)\\]\\s*$`, "m"));
+  if (!match) return null;
+  return Array.from(match[1].matchAll(/"((?:\\.|[^"])*)"/g)).map((item) => unescapeTomlString(item[1]));
+}
+
+function removeTomlSection(raw: string, sectionName: string) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  // Remove ALL matching sections, not just the first, so duplicate writes do
+  // not accumulate.
+  const targetIndexes: number[] = [];
+  matches.forEach((match, index) => {
+    if (match[1].trim() === sectionName) targetIndexes.push(index);
+  });
+  if (targetIndexes.length === 0) return raw;
+  let result = raw;
+  // Process from last to first so indexes stay valid.
+  for (let i = targetIndexes.length - 1; i >= 0; i--) {
+    const matchIndex = targetIndexes[i];
+    const start = matches[matchIndex].index ?? 0;
+    const end = matches[matchIndex + 1]?.index ?? result.length;
+    const before = result.slice(0, start).trimEnd();
+    const after = result.slice(end).trimStart();
+    result = `${before}${before && after ? "\n\n" : ""}${after}`;
+  }
+  return result;
+}
+
+// 写前校验：模型在 config.toml 的 models."<alias>" 段声明了非空 support_efforts，
+// 且请求档位不在其中时抛出中文错误（官方运行时会静默丢弃非法档位，这里提前拒绝）；
+// 模型无 support_efforts 声明、或未同时提供 model 与 defaultEffort 时跳过校验。
+export function assertSecondaryModelEffortDeclared(rawConfigToml: string, modelAlias: string | null, defaultEffort: string | null) {
+  if (!modelAlias || !defaultEffort) return;
+  const body = readTomlSectionBody(rawConfigToml, `models.${toTomlTableKey(modelAlias)}`);
+  if (!body) return;
+  const supportEfforts = readTomlStringArray(body, "support_efforts");
+  if (!supportEfforts || supportEfforts.length === 0) return;
+  if (!supportEfforts.includes(defaultEffort)) {
+    throw new Error(`模型 ${modelAlias} 未声明思考档位 "${defaultEffort}"（可用：${supportEfforts.join("、")}）`);
+  }
+}
+
+// 校验 + 重写 config.toml 文本并返回新内容；校验失败抛错时调用方不得写盘。
+export function applySecondaryModelConfigToml(raw: string, model: string | null, defaultEffort: string | null) {
+  assertSecondaryModelEffortDeclared(raw, model, defaultEffort);
+  // Remove ALL existing [secondary_model] sections first (prior writes may have
+  // left duplicates with non-standard formatting that the TOML editor cannot
+  // match), then write a single clean section if needed.
+  let next = removeTomlSection(raw, "secondary_model");
+  // Also strip any malformed inline-section remnants like `[secondary_model]key = ...`
+  next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
+  next = next.replace(/\n{3,}/g, "\n\n");
+  if (model || defaultEffort) {
+    const newline = next.includes("\r\n") ? "\r\n" : "\n";
+    const lines: string[] = [`[secondary_model]`];
+    if (model) lines.push(`model = "${escapeTomlString(model)}"`);
+    if (defaultEffort) lines.push(`default_effort = "${escapeTomlString(defaultEffort)}"`);
+    const base = next.trimEnd();
+    next = `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
+  }
+  return next;
+}
+
 export type KimiCodeCatalogModel = {
   id: string;
   name?: string;
