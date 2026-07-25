@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：自定义模型子代理未生效（外部 Server 缺实验 flag）
+
+- 现象：配置子代理用 deepseek（[secondary_model] deepseek/deepseek-v4-flash），跑任务后 deepseek 无账单，实际仍用 kimi 额度。
+- 取证链：① config.toml [secondary_model] 配置正确；② 子代理 wire `modelAlias: kimi-code/k3`（caller inheritance 石锤）；③ server 日志 `experimental flags enabled flags=[]`（flag 未开石锤）；④ 当前 server 父进程是 powershell 非 electron（kimiCodeServerHost spawn 用 shell:false，证明该 server 是手动启动的 `kimi web`），没有 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1；⑤ 附带发现 default_effort="max" 不在模型声明 ["low","medium","high"]（官方会静默丢弃）。
+- 根因：0.29.1 secondary_model 是实验特性，flag 跟随 Server 进程而非配置文件；手动启动的 server 无 flag → [secondary_model] 被静默忽略。
+- 修复：`3ccbb0b` attach 外部 server 时检测 config 的 [secondary_model] 并经 diagnostics 透传，子 Agent 卡显示「外部 Server 可能不生效」警告；`9188f19` 保存 secondary_model 写前校验 default_effort 合法性（拒绝未声明档位）。另直接修正用户 config 的 max→high（备份 .kimix-backup-effort-fix）。
+- 验证：typecheck；定向 4/4 + 22/22；全量 1165/1161 两轮通过；build 通过。警告条视觉待用户截图验收（AGENTS.md 规则）。
+- 用户操作：重启 Kimix（切换为托管 server 带 flag）或手动 `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1 kimi web --no-open` 后，子代理即走 deepseek。
+- 知识库：runtime-routing 不变量 71 扩展（flag 随进程不随配置）+ log。
+
 ## 2026-07-25 修复：prompt 前 WS 订阅保障（review 3279387 后修正）
 
 - 背景：3279387 为修「发消息一直没有首字」在 prompt() 开头加 `this.subscribed.add(sessionId)`。用户要求 review。
