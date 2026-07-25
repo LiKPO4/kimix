@@ -287,6 +287,16 @@ describe("mapStreamEvent", () => {
     expect((endWithSummary as Extract<TimelineEvent, { type: "compaction" }>).summary).toBe("保留用户目标和已完成文件列表。");
   });
 
+  it("maps official full_compaction wire events", () => {
+    const begin = mapStreamEvent({ type: "full_compaction.begin", source: "manual", time: 100 });
+    const end = mapStreamEvent({ type: "full_compaction.complete", time: 200 });
+    const cancelled = mapStreamEvent({ type: "full_compaction.cancel", time: 300 });
+
+    expect(begin).toMatchObject({ type: "compaction", phase: "begin", timestamp: 100 });
+    expect(end).toMatchObject({ type: "compaction", phase: "end", outcome: "completed", timestamp: 200 });
+    expect(cancelled).toMatchObject({ type: "compaction", phase: "end", outcome: "cancelled", timestamp: 300 });
+  });
+
   it("strips Kimix clarification instructions from user input", () => {
     for (const header of ["【Kimix 需求澄清工具：自动判断】", "【Kimix 需求澄清：自动判断】"]) {
       const event = mapStreamEvent({

@@ -448,6 +448,9 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
     record.type === "compaction.started" ||
     record.type === "compaction.completed" ||
     record.type === "compaction.cancelled" ||
+    record.type === "full_compaction.begin" ||
+    record.type === "full_compaction.complete" ||
+    record.type === "full_compaction.cancel" ||
     record.type === "warning" ||
     record.type === "error"
   )) {

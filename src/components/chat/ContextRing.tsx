@@ -65,7 +65,8 @@ const COMPACTION_STALE_MS = 5 * 60 * 1000;
 
 export function ContextRing() {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [compactStatus, setCompactStatus] = useState<"idle" | "pending" | "sent" | "failed">("idle");
+  const [compactStatus, setCompactStatus] = useState<"idle" | "pending" | "requested" | "success" | "failed">("idle");
+  const [compactError, setCompactError] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const compactStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -98,7 +99,7 @@ export function ContextRing() {
   const percent = primaryContextUsage?.percent ?? 0;
   const recommendation = getSessionRecommendationMetrics(session, sessionRecommendationTurnLimit);
   const isCurrentSessionRunning = isSessionRuntimeRunning(currentSession, runningSessionId);
-  const compactRequestPending = compactStatus === "pending";
+  const compactRequestPending = compactStatus === "pending" || compactStatus === "requested";
   const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting && !compactRequestPending);
   const compactingDots = useAnimatedDots(isCompacting || compactRequestPending);
 
@@ -118,19 +119,48 @@ export function ContextRing() {
     if (!runtimeSessionId) return;
     try {
       if (compactStatusTimerRef.current) clearTimeout(compactStatusTimerRef.current);
+      setCompactError("");
       setCompactStatus("pending");
       const res = await window.api.compactKimiCodeSession({
         sessionId: runtimeSessionId,
       });
       if (!res.success) throw new Error(res.error);
-      setCompactStatus("sent");
-      compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 2200);
+      setCompactStatus("requested");
     } catch (err) {
       console.error("Compact failed:", err);
+      setCompactError(err instanceof Error ? err.message : String(err));
       setCompactStatus("failed");
-      compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 3200);
+      compactStatusTimerRef.current = setTimeout(() => {
+        setCompactStatus("idle");
+        setCompactError("");
+      }, 8000);
     }
   };
+
+  const latestCompactionEvent = useMemo(
+    () => session?.events.findLast((event) => event.type === "compaction"),
+    [session?.events],
+  );
+  const handledCompactionEventIdRef = useRef<string | null>(latestCompactionEvent?.id ?? null);
+
+  useEffect(() => {
+    if (!latestCompactionEvent || handledCompactionEventIdRef.current === latestCompactionEvent.id) return;
+    handledCompactionEventIdRef.current = latestCompactionEvent.id;
+    if (latestCompactionEvent.phase !== "end") return;
+    if (compactStatusTimerRef.current) clearTimeout(compactStatusTimerRef.current);
+    if (latestCompactionEvent.outcome === "cancelled") {
+      setCompactError("Server 取消了本次上下文压缩。");
+      setCompactStatus("failed");
+      compactStatusTimerRef.current = setTimeout(() => {
+        setCompactStatus("idle");
+        setCompactError("");
+      }, 8000);
+      return;
+    }
+    setCompactError("");
+    setCompactStatus("success");
+    compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 3200);
+  }, [latestCompactionEvent]);
 
   useEffect(() => {
     return () => {
@@ -174,7 +204,7 @@ export function ContextRing() {
               className="shrink-0 rounded-md text-[13px] transition-colors disabled:cursor-not-allowed"
               style={{
                 padding: "2px 8px",
-                color: isCompacting || compactRequestPending ? "var(--accent-warning)" : compactStatus === "failed" ? "var(--accent-danger)" : canCompact || compactStatus === "sent" ? "var(--accent-primary)" : "var(--text-muted)",
+                color: isCompacting || compactRequestPending ? "var(--accent-warning)" : compactStatus === "failed" ? "var(--accent-danger)" : canCompact || compactStatus === "success" ? "var(--accent-primary)" : "var(--text-muted)",
               }}
             >
               {isCompacting || compactRequestPending ? (
@@ -182,9 +212,22 @@ export function ContextRing() {
                   压缩中
                   <span className="inline-block w-[1.5em] text-left">{compactingDots}</span>
                 </>
-              ) : compactStatus === "sent" ? "已请求" : compactStatus === "failed" ? "压缩失败" : "压缩"}
+              ) : compactStatus === "success" ? "压缩完成" : compactStatus === "failed" ? "压缩失败" : "压缩"}
             </button>
           </div>
+          {compactStatus === "failed" && compactError && (
+            <div
+              className="text-[12px]"
+              style={{
+                color: "var(--accent-danger)",
+                marginTop: 12,
+                lineHeight: 1.5,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {compactError}
+            </div>
+          )}
           <div
             style={{
               display: "flex",

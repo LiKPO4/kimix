@@ -195,7 +195,13 @@ function eventNavigationContent(item: Extract<RenderItem, { type: "event" }>) {
     case "compaction":
       return {
         title: "上下文压缩",
-        preview: compactChatNavigationText(event.summary || (event.phase === "begin" ? "正在压缩上下文…" : "上下文压缩完成")),
+        preview: compactChatNavigationText(event.summary || (
+          event.phase === "begin"
+            ? "正在压缩上下文…"
+            : event.outcome === "cancelled"
+              ? "上下文压缩已取消"
+              : "上下文压缩完成"
+        )),
         fileLabels: [],
       };
     case "error":

@@ -228,6 +228,17 @@ describe("mapKimiCodeEvent", () => {
     expect(compaction?.type).toBe("compaction");
     expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).phase).toBe("end");
     expect((compaction as Extract<TimelineEvent, { type: "compaction" }>).summary).toBe("压缩后保留当前任务清单。");
+    expect(mapKimiCodeEvent({ type: "full_compaction.begin", time: 100 }, options)).toMatchObject({
+      type: "compaction",
+      phase: "begin",
+      timestamp: 100,
+    });
+    expect(mapKimiCodeEvent({ type: "full_compaction.complete", time: 200 }, options)).toMatchObject({
+      type: "compaction",
+      phase: "end",
+      outcome: "completed",
+      timestamp: 200,
+    });
     expect(error?.type).toBe("error");
     expect((error as Extract<TimelineEvent, { type: "error" }>).source).toBe("sdk");
   });

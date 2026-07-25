@@ -635,6 +635,7 @@ export interface CompactionEvent {
   type: "compaction";
   timestamp: number;
   phase: "begin" | "end";
+  outcome?: "completed" | "cancelled";
   summary?: string;
 }
 

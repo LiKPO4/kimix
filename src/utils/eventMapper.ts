@@ -1371,6 +1371,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
 
     case "compaction.started":
+    case "full_compaction.begin":
       return {
         id: generateId(),
         type: "compaction",
@@ -1379,12 +1380,24 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
 
     case "compaction.completed":
-    case "compaction.cancelled":
+    case "full_compaction.complete":
       return {
         id: generateId(),
         type: "compaction",
         timestamp: eventTimestamp,
         phase: "end",
+        outcome: "completed",
+        summary: extractCompactionSummary(payload, source),
+      };
+
+    case "compaction.cancelled":
+    case "full_compaction.cancel":
+      return {
+        id: generateId(),
+        type: "compaction",
+        timestamp: eventTimestamp,
+        phase: "end",
+        outcome: "cancelled",
         summary: extractCompactionSummary(payload, source),
       };
 

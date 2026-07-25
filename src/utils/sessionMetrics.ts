@@ -140,7 +140,7 @@ export function statusesAfterLatestContextBoundary(
       boundaryIndex = index;
       break;
     }
-    if (event.type === "compaction" && event.phase === "end") {
+    if (event.type === "compaction" && event.phase === "end" && event.outcome !== "cancelled") {
       boundaryIndex = index;
       break;
     }

@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-25T23:30:00+08:00"
+timestamp: "2026-07-26T07:18:00+08:00"
 ---
 
 # Runtime Routing
@@ -129,6 +129,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 85. The Server WS push can silently stall on a single connection while HTTP stays healthy. Observed on a long run (0.29.1): the server kept producing output in its wire log (`llm.request`/`content.part`/`tool.call` at 14:05) and HTTP `getStatus` kept returning `running`, yet the WS connection delivered ZERO frames for 13+ minutes — no `close` event, no delta, not even ping — while an official kimi-web client on another connection received them normally. Because the socket never fires `close`, a naive client waits forever and the turn appears stuck "正在思考" (0/9) while the official client advances (3/9). The Client must run a watchdog: track `lastMessageAt` in `receive()` and, when the socket is OPEN with active subscriptions but silent for >90 s (`WS_SILENCE_LIMIT_MS`), force `close()` + reconnect (client_hello + `recoverSnapshot`), which resyncs the turn to the server's latest state. 90 s covers normal llm-thinking `thinking.delta` cadence; a false positive costs only one harmless reconnect + snapshot.
 86. Official kimi-web uses **one** stable `web_*` client id for both the WS URL query (`buildWsUrl` → `?client_id=`) and `client_hello.payload.client_id` (DaemonEventSocket). Kimix must not put `web_*` only on the URL while hello still sends `kimix-<pid>-<ts>` — that is an incomplete protocol clone and can diverge from the server's web-client recognition path. Keep a process-cached `kimixWsClientId()` shared by connect URL and hello.
 87. Live-turn forensics for residual symptoms (partial body + fake "输出完成", long blank then burst, heavy-task stall vs official web) are recorded under a single `[live]` channel in `diag.log` (project root + userData): `display` (UI settled vs active), `stream` (body/think/tool/terminal samples), `silence` (engine running + no stream), `settle` (poll terminal settle with turn summary). Full per-frame `[wsframe]` remains opt-in via `KIMIX_FRAME_DIAG=1`; dev defaults enable the lighter live path (`KIMIX_LIVE_DIAG` unset and unpackaged).
+88. Official Server compaction uses `full_compaction.begin`, `full_compaction.complete`, and `full_compaction.cancel`, while older SDK/history sources may use `compaction.started`, `compaction.completed`, and `compaction.cancelled`. Both families must map into the same timeline lifecycle in live streaming and wire-history recovery; cancellation must remain distinct from completion. The `:compact` POST is a long-running control path and must not inherit the ordinary 5-second control timeout. Request acknowledgement is not the terminal result: UI entry points show the request/processing state, while the official lifecycle event supplies the durable completed/cancelled feedback.
 
 # Main Components
 

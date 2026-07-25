@@ -399,7 +399,10 @@ function CompactionLabel({
   const isStale = event.phase === "begin" && !isSessionRunning && elapsed >= COMPACTION_STALE_MS;
   const dots = useAnimatedDots(event.phase === "begin" && !isStale);
   if (isStale) return <>上下文压缩可能已卡住，可重新尝试</>;
-  if (event.phase === "end") return <>{event.summary ? "上下文压缩完成，已生成摘要" : "上下文压缩完成"}</>;
+  if (event.phase === "end") {
+    if (event.outcome === "cancelled") return <>上下文压缩已取消</>;
+    return <>{event.summary ? "上下文压缩完成，已生成摘要" : "上下文压缩完成"}</>;
+  }
   if (isLongRunning) {
     return (
       <>

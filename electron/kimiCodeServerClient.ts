@@ -1117,6 +1117,7 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:compact`, {
       method: "POST",
       body: JSON.stringify(instruction ? { instruction } : {}),
+      timeoutMs: PROMPT_TIMEOUT_MS,
     });
   }
 

@@ -402,6 +402,21 @@ describe("getSessionContextUsages", () => {
     }));
   });
 
+  it("keeps the existing context window when compaction is cancelled", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "k3",
+      events: [
+        { id: "old-usage", type: "status_update", timestamp: 1, message: "模型：k3", inputTokenCount: 90_000, tokenCount: 100, contextSize: 90_000, contextLimit: 262_144 },
+        { id: "compact", type: "compaction", timestamp: 2, phase: "end", outcome: "cancelled" },
+      ],
+    };
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      hasContext: true,
+      used: 90_000,
+    }));
+  });
+
 });
 
 describe("shouldRecommendNewSession", () => {

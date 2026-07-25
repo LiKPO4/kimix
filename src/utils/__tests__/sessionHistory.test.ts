@@ -7,6 +7,30 @@ import { mapHistoryEvents } from "../eventMapper";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
 describe("Kimi Code wire history", () => {
+  it("preserves official full compaction lifecycle records", () => {
+    expect([
+      parseKimiCodeRecord({ type: "full_compaction.begin", source: "manual", instruction: "保留待办", time: 100 }),
+      parseKimiCodeRecord({ type: "full_compaction.complete", time: 200 }),
+      parseKimiCodeRecord({ type: "full_compaction.cancel", time: 300 }),
+    ]).toEqual([
+      {
+        type: "full_compaction.begin",
+        payload: { type: "full_compaction.begin", source: "manual", instruction: "保留待办", time: 100 },
+        time: 100,
+      },
+      {
+        type: "full_compaction.complete",
+        payload: { type: "full_compaction.complete", time: 200 },
+        time: 200,
+      },
+      {
+        type: "full_compaction.cancel",
+        payload: { type: "full_compaction.cancel", time: 300 },
+        time: 300,
+      },
+    ]);
+  });
+
   it("preserves timestamps from wrapped wire messages", () => {
     expect(parseKimiCodeRecord({
       time: "2026-07-01T20:03:27+08:00",

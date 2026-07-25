@@ -684,6 +684,7 @@ export function mapKimiCodeEvent(
       return mapSubagentEvent(event, "error", options);
 
     case "compaction.started":
+    case "full_compaction.begin":
       return {
         id: getId(options),
         type: "compaction",
@@ -692,12 +693,24 @@ export function mapKimiCodeEvent(
       };
 
     case "compaction.completed":
-    case "compaction.cancelled":
+    case "full_compaction.complete":
       return {
         id: getId(options),
         type: "compaction",
         timestamp,
         phase: "end",
+        outcome: "completed",
+        summary: extractCompactionSummary(event),
+      };
+
+    case "compaction.cancelled":
+    case "full_compaction.cancel":
+      return {
+        id: getId(options),
+        type: "compaction",
+        timestamp,
+        phase: "end",
+        outcome: "cancelled",
         summary: extractCompactionSummary(event),
       };
 
