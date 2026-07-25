@@ -125,7 +125,6 @@ describe("useStatePersistence", () => {
   it("flushes immediately on archive or deletion without waiting for the debounce", () => {
     // Ensure we are outside the startup window so archive/deletion triggers
     // an immediate flush instead of merging into the debounced persist.
-    const origNow = performance.now.bind(performance);
     const nowStub = vi.spyOn(performance, "now").mockReturnValue(60_000);
 
     root = createRoot(container);
