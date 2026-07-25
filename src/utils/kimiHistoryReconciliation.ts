@@ -575,6 +575,10 @@ export function shouldReplaceWithCanonicalKimiHistory(
   context?: { sessionId?: string; roomAgentId?: string; reason?: string; rawCanonicalEvents?: TimelineEvent[] },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
+  // Log-safe context: strip rawCanonicalEvents (a full event array) to avoid
+  // serializing MB-scale arrays into every rejected/accepted diagnostic entry.
+  const logCtx: Record<string, unknown> = context ? { ...context } : {};
+  delete logCtx.rawCanonicalEvents;
   const canonicalAssistantSize = assistantBodySize(canonicalEvents);
   const cachedAssistantSize = assistantBodySize(cachedEvents);
   // Regression gates below compare against the local timeline stripped of
@@ -587,7 +591,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       clearReconciliationCircuit(context.sessionId, context.roomAgentId);
     }
     logEvent("kimiHistoryReconciliation.accepted", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       reason: "stable-snapshot-message-body-expansion",
       localSize: cachedAssistantSize,
@@ -605,7 +609,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       clearReconciliationCircuit(context.sessionId, context.roomAgentId);
     }
     logEvent("kimiHistoryReconciliation.accepted", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       reason: "stable-snapshot-turn-ownership-mismatch",
       localSize: cachedAssistantSize,
@@ -622,7 +626,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       clearReconciliationCircuit(context.sessionId, context.roomAgentId);
     }
     logEvent("kimiHistoryReconciliation.accepted", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       reason: "cross-turn-canonical-reply-composition",
       localSize: cachedAssistantSize,
@@ -640,7 +644,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }
     logEvent("kimiHistoryReconciliation.rejected", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       reason: "process-history-regression",
       localProcessEvents: kimiHistoryProcessEventCount(comparisonCached),
@@ -680,7 +684,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }
     logEvent("kimiHistoryReconciliation.rejected", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       ...regression,
     });
@@ -701,7 +705,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       clearReconciliationCircuit(context.sessionId, context.roomAgentId);
     }
     logEvent("kimiHistoryReconciliation.accepted", {
-      ...context,
+      ...logCtx,
       callerReason: context?.reason,
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,

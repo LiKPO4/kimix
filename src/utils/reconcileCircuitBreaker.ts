@@ -49,9 +49,13 @@ function assistantBodySize(events: TimelineEvent[]): number {
 
 /**
  * Derive a lightweight change-detection fingerprint from local and canonical
- * event arrays. Uses content statistics plus the identity of the very last
- * event, so any substantive change (new turn, more process frames, different
- * assistant text) flips the fingerprint.
+ * event arrays. Uses content statistics (assistant body size + process event
+ * count) which are invariant under patch operations like
+ * mergeMissingUsageStatusEvents (which appends status events but does not
+ * change body size or process count). Explicitly avoids last-event timestamps:
+ * the repair loop's rejected path appends usage status events with
+ * Date.now() timestamps, which would make the fingerprint change every
+ * ~70ms and defeat the circuit breaker.
  */
 function computeFingerprint(
   localEvents: TimelineEvent[],
@@ -59,15 +63,11 @@ function computeFingerprint(
 ): string {
   const localBodySize = assistantBodySize(localEvents);
   const localProcessCount = kimiHistoryProcessEventCount(localEvents);
-  const localLast = localEvents[localEvents.length - 1];
-  const localLastTs = localLast ? localLast.timestamp : 0;
 
   const canonicalBodySize = assistantBodySize(canonicalEvents);
   const canonicalProcessCount = kimiHistoryProcessEventCount(canonicalEvents);
-  const canonicalLast = canonicalEvents[canonicalEvents.length - 1];
-  const canonicalLastTs = canonicalLast ? canonicalLast.timestamp : 0;
 
-  return `l=${localBodySize},${localProcessCount},${localLastTs}|c=${canonicalBodySize},${canonicalProcessCount},${canonicalLastTs}`;
+  return `l=${localBodySize},${localProcessCount}|c=${canonicalBodySize},${canonicalProcessCount}`;
 }
 
 function loadCircuit(): CircuitData {

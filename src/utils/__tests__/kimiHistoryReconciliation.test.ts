@@ -811,4 +811,24 @@ describe("backfillTurnModelsFromUsageStatuses (via mergeMissingUsageStatusEvents
     );
     expect((withModel[0] as { model?: string }).model).toBe("deepseek-v4-pro");
   });
+
+  it("does not include rawCanonicalEvents in log output (prevents MB-scale diag.log bloat)", () => {
+    const logEventSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const canonical = [userMessage, assistant("much longer canonical body")];
+    const rawCanonical = [userMessage, assistant("much longer canonical body")];
+    const local = [userMessage, assistant("short")];
+    const context = {
+      sessionId: "s-1",
+      roomAgentId: "agent-a",
+      reason: "repair",
+      rawCanonicalEvents: rawCanonical,
+    };
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical, context)).toBe(true);
+    expect(logEventSpy).toHaveBeenCalledTimes(1);
+    const logArg = logEventSpy.mock.calls[0][1] as Record<string, unknown>;
+    expect(logArg).not.toHaveProperty("rawCanonicalEvents");
+    // Context fields other than rawCanonicalEvents must still be present.
+    expect(logArg.sessionId).toBe("s-1");
+    expect(logArg.roomAgentId).toBe("agent-a");
+  });
 });

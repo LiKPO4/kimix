@@ -263,6 +263,10 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
       let historyReachable = false;
       let recoveryAccepted = false;
       let circuitSkipped = false;
+      // Repair rate limit: at most 3 reconcile attempts per (session, roomAgentId)
+      // per repairKimiCodeHistoryBodies invocation. After the limit, the target
+      // is skipped until the next startup/canonical change.
+      const repairAttempts = new Map<string, number>();
       for (const sessionId of target.sessionIds) {
         const loaded = await window.api.loadKimiCodeSession({ workDir: session.projectPath, sessionId }).catch(() => null);
         if (!loaded?.success) continue;
@@ -277,6 +281,14 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
         const preSession = preState.sessions.find((s) => s.id === session.id);
         const preLocalEvents = preSession ? getRoomAgentEvents(preSession, target.roomAgentId) : [];
         if (isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
+          circuitSkipped = true;
+          continue;
+        }
+        // Repair rate limit: max 3 reconcile attempts per (session, agent) per run.
+        const rateKey = `${session.id}:${target.roomAgentId}`;
+        const attempts = (repairAttempts.get(rateKey) ?? 0) + 1;
+        repairAttempts.set(rateKey, attempts);
+        if (attempts > 3) {
           circuitSkipped = true;
           continue;
         }

@@ -82,14 +82,17 @@ describe("isCanonicalReconciliationCircuitOpen", () => {
     expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonicalNew)).toBe(false);
   });
 
-  it("considers latest event id as part of the fingerprint", () => {
+  it("does not consider last-event timestamp (patch paths append status events, must not defeat breaker)", () => {
     const local = [user("hello"), assistant("world")];
     const canonical = [user("hello"), assistant("earth")];
     markReconciliationRejected("sess-1", "agent-a", local, canonical);
-    // Same content but different event ids
-    const localSame = [user("hello"), assistant("world")];
-    const canonicalSameContent = [user("hello"), assistant("earth")];
-    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", localSame, canonicalSameContent)).toBe(true);
+    // Same content but different event IDs and timestamps: still matches.
+    const localDiffTs = [{ ...user("hello"), timestamp: 999 }, { ...assistant("world"), timestamp: 999 }];
+    const canonicalSameText = [user("hello"), assistant("earth")];
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", localDiffTs, canonicalSameText)).toBe(true);
+    // But different body size does change the fingerprint.
+    const localDiffBody = [user("hello"), assistant("world with extra text")];
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", localDiffBody, canonicalSameText)).toBe(false);
   });
 });
 
@@ -166,11 +169,16 @@ describe("rawCanonicalEvents alignment", () => {
     // With rawCanonicalEvents: circuit should be open when checking with raw canonical
     expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, rawCanonical)).toBe(true);
 
-    // Without rawCanonicalEvents (simulating old behavior): the check with raw canonical
-    // should NOT match because the registered fingerprint used reconciledEvents.
-    // To verify, manually register with reconciledEvents (as the old code would).
+    // Without rawCanonicalEvents (simulating old behavior): registration uses
+    // reconciledEvents. Since the current fingerprint (bodySize+processCount)
+    // is the same for raw and reconciled when no user media is present, the
+    // circuit still opens for the same raw canonical data. But it DOES NOT
+    // open when the canonical data changes (fingerprint differs).
     resetAllReconciliationCircuits();
     markReconciliationRejected("sess-raw", "agent-a", localEvents, reconciledEvents);
-    expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, rawCanonical)).toBe(false);
+    expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, rawCanonical)).toBe(true);
+    // Different canonical body → fingerprint changes → circuit closed.
+    const differentCanonical = [user("hello"), assistant("different body text here")];
+    expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, differentCanonical)).toBe(false);
   });
 });
