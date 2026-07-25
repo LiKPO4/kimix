@@ -11,6 +11,10 @@ import {
   kimiHistoryProcessEventCount,
 } from "@/utils/kimiHistoryCache";
 import { logEvent } from "@/utils/reportError";
+import {
+  clearReconciliationCircuit,
+  markReconciliationRejected,
+} from "@/utils/reconcileCircuitBreaker";
 
 /**
  * Flatten a timeline so that events nested inside subagent.events are also
@@ -549,6 +553,7 @@ export function mergeMissingLatestCanonicalAssistant(
   if (patched === localEvents) return localEvents;
   logEvent("kimiHistoryReconciliation.latestFailedTurnPatched", {
     ...context,
+    callerReason: context?.reason,
     snapshotMessageId: canonicalAssistant.snapshotMessageId,
   });
   return patched;
@@ -578,8 +583,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
   const comparisonCached = dedupeLocalHistoryForComparison(cachedEvents);
 
   if (hasStableSnapshotMessageBodyExpansion(cachedEvents, canonicalEvents)) {
+    if (context?.sessionId && context?.roomAgentId) {
+      clearReconciliationCircuit(context.sessionId, context.roomAgentId);
+    }
     logEvent("kimiHistoryReconciliation.accepted", {
       ...context,
+      callerReason: context?.reason,
       reason: "stable-snapshot-message-body-expansion",
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
@@ -592,8 +601,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
   // one identity-backed case the canonical snapshot may shrink the body and
   // process projection to repair an already persisted cross-turn merge.
   if (hasStableSnapshotTurnOwnershipMismatch(cachedEvents, canonicalEvents)) {
+    if (context?.sessionId && context?.roomAgentId) {
+      clearReconciliationCircuit(context.sessionId, context.roomAgentId);
+    }
     logEvent("kimiHistoryReconciliation.accepted", {
       ...context,
+      callerReason: context?.reason,
       reason: "stable-snapshot-turn-ownership-mismatch",
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
@@ -605,8 +618,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
     canonicalAssistantSize < cachedAssistantSize &&
     hasCrossTurnCanonicalReplyComposition(cachedEvents, canonicalEvents)
   ) {
+    if (context?.sessionId && context?.roomAgentId) {
+      clearReconciliationCircuit(context.sessionId, context.roomAgentId);
+    }
     logEvent("kimiHistoryReconciliation.accepted", {
       ...context,
+      callerReason: context?.reason,
       reason: "cross-turn-canonical-reply-composition",
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
@@ -619,8 +636,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
   // destructively replace a richer live/local process timeline.
   const repairsDuplicateToolHistory = hasRepairableDuplicateKimiToolHistory(cachedEvents, canonicalEvents);
   if (hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents) && !repairsDuplicateToolHistory) {
+    if (context?.sessionId && context?.roomAgentId) {
+      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, canonicalEvents);
+    }
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,
+      callerReason: context?.reason,
       reason: "process-history-regression",
       localProcessEvents: kimiHistoryProcessEventCount(comparisonCached),
       canonicalProcessEvents: kimiHistoryProcessEventCount(canonicalEvents),
@@ -655,8 +676,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
           }
         : null;
   if (regression) {
+    if (context?.sessionId && context?.roomAgentId) {
+      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, canonicalEvents);
+    }
     logEvent("kimiHistoryReconciliation.rejected", {
       ...context,
+      callerReason: context?.reason,
       ...regression,
     });
     return false;
@@ -672,8 +697,12 @@ export function shouldReplaceWithCanonicalKimiHistory(
     hasCanonicalKimiThinkingHistory(cachedEvents, canonicalEvents);
 
   if (shouldReplace) {
+    if (context?.sessionId && context?.roomAgentId) {
+      clearReconciliationCircuit(context.sessionId, context.roomAgentId);
+    }
     logEvent("kimiHistoryReconciliation.accepted", {
       ...context,
+      callerReason: context?.reason,
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
     });

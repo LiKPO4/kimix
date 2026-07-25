@@ -68,6 +68,7 @@ import {
   mergeMissingUsageStatusEvents,
   shouldReplaceWithCanonicalKimiHistory,
 } from "@/utils/kimiHistoryReconciliation";
+import { isCanonicalReconciliationCircuitOpen } from "@/utils/reconcileCircuitBreaker";
 import { logError } from "@/utils/reportError";
 import { timeSync } from "@/utils/perfDiag";
 import {
@@ -269,6 +270,14 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
           loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
             ? loaded.data.events
             : [];
+        // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
+        const canonicalEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
+        const preState = useSessionStore.getState();
+        const preSession = preState.sessions.find((s) => s.id === session.id);
+        const preLocalEvents = preSession ? getRoomAgentEvents(preSession, target.roomAgentId) : [];
+        if (isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
+          continue;
+        }
         let applied = false;
         useSessionStore.setState((state) => ({
           sessions: state.sessions.map((item) => {
@@ -278,7 +287,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[]) {
               session: item,
               roomAgentId: target.roomAgentId,
               expectedRuntimeSessionId: sessionId,
-              canonicalEvents: settleInactiveEvents(mapHistoryEvents(eventsSource)),
+              canonicalEvents,
               reason: "repair",
             });
             if (!reconciliation.applied) {
@@ -499,6 +508,10 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           continue;
         }
         const localEvents = getRoomAgentEvents(next, result.target.roomAgentId);
+        // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
+        if (isCanonicalReconciliationCircuitOpen(session.id, result.target.roomAgentId, localEvents, result.canonicalEvents)) {
+          continue;
+        }
         const reconciliation = reconcileAgentCanonicalHistory({
           session: next,
           roomAgentId: result.target.roomAgentId,
@@ -2234,6 +2247,10 @@ function App() {
                 const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;
                 const ownerAgentId = roomRuntimeOwner?.roomAgentId ?? getPrimaryRoomAgent(latestOwner).id;
                 const localAgentEvents = getRoomAgentEvents(latestOwner, ownerAgentId);
+                // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
+                if (isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, canonicalEvents)) {
+                  return;
+                }
                 const reconciliation = reconcileAgentCanonicalHistory({
                   session: latestOwner,
                   roomAgentId: ownerAgentId,
@@ -3325,6 +3342,10 @@ function App() {
             let applied = false;
             updateSession(session.id, (item) => {
               const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
+              // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
+              if (isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
+                return item;
+              }
               const reconciliation = timeSync("runningSample.reconcile", () => reconcileAgentCanonicalHistory({
                 session: item,
                 roomAgentId,
