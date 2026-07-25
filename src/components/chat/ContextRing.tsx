@@ -125,7 +125,8 @@ export function ContextRing() {
         sessionId: runtimeSessionId,
       });
       if (!res.success) throw new Error(res.error);
-      setCompactStatus("requested");
+      setCompactStatus("success");
+      compactStatusTimerRef.current = setTimeout(() => setCompactStatus("idle"), 3200);
     } catch (err) {
       console.error("Compact failed:", err);
       setCompactError(err instanceof Error ? err.message : String(err));

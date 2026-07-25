@@ -49,3 +49,17 @@ renderItems                                   -> 无 compaction 项
 - 压缩请求使用 120 秒长任务超时。
 - 背景信息窗口区分“压缩处理中”“压缩完成”和“压缩失败”，并保留 8 秒的具体失败原因。
 - `/compact` 收到接口确认后追加“上下文压缩请求已提交。”；真正完成或取消由官方终态事件反馈。
+
+## v2.20.15 实测补充
+
+第二次手动压缩的 wire：
+
+```json
+{"type":"full_compaction.begin","source":"manual","time":1785022120736}
+{"type":"full_compaction.complete","time":1785022157362}
+```
+
+本次约 36.6 秒完成，但同一时间的主进程 WS 诊断中没有任何 `full_compaction` 帧，Snapshot
+也不回放这类生命周期记录。因此 mapper 兼容只能解决历史读取，不能单独解决实时终态。
+v2.20.16 在 `:compact` 适配层等待目标 wire 的新终态，再通过现有 event sink 主动投递并刷新
+Server 状态/上下文用量。

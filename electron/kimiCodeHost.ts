@@ -10,6 +10,7 @@ import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
+import { findOfficialCompactionTerminal, type OfficialCompactionTerminal } from "./compactionWire";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -733,6 +734,9 @@ const statusSequencer = new KimiCodeStatusSequencer((sessionId, status) => setSt
 
 const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
+const COMPACTION_WIRE_CONFIRM_TIMEOUT_MS = 10 * 60 * 1000;
+const COMPACTION_WIRE_CONFIRM_INTERVAL_MS = 250;
+const COMPACTION_WIRE_TAIL_BYTES = 256 * 1024;
 const SERVER_RELOAD_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂不支持直接重载配置；如需刷新 Skill、Plugin 或配置，请新建或 fork 会话。";
 const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用兼容会话或等待官方 Server 支持。";
 const sdkPinnedSessionIds = new Set<string>();
@@ -1474,8 +1478,18 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
 }
 
 export async function compactSession(sessionId: string, instruction?: string): Promise<void> {
-  if (serverSessions.has(sessionId)) {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    const startedAt = Date.now();
     await getServerClient().compactSession(sessionId, instruction);
+    const terminal = await waitForOfficialCompactionTerminal(sessionId, serverManaged.workDir, startedAt);
+    eventSink?.({ sessionId, event: terminal });
+    await refreshServerSessionStatus(sessionId, true).catch((error) => {
+      console.warn(`[KimiCodeServerHost] refresh after compaction failed for ${sessionId}:`, error);
+    });
+    if (terminal.type === "full_compaction.cancel") {
+      throw new Error("Server 取消了本次上下文压缩。");
+    }
     return;
   }
   const managed = getManagedSession(sessionId);
@@ -3176,6 +3190,39 @@ async function getSessionWireFile(sessionId: string, workDir: string): Promise<s
     if (sessionDir) return path.join(sessionDir, "agents", "main", "wire.jsonl");
   }
   return null;
+}
+
+async function readWireTail(wireFile: string): Promise<string> {
+  const handle = await fs.promises.open(wireFile, "r");
+  try {
+    const stat = await handle.stat();
+    const length = Math.min(stat.size, COMPACTION_WIRE_TAIL_BYTES);
+    if (length <= 0) return "";
+    const buffer = Buffer.alloc(length);
+    await handle.read(buffer, 0, length, stat.size - length);
+    return buffer.toString("utf-8");
+  } finally {
+    await handle.close();
+  }
+}
+
+async function waitForOfficialCompactionTerminal(
+  sessionId: string,
+  workDir: string,
+  startedAt: number,
+): Promise<OfficialCompactionTerminal> {
+  const deadline = Date.now() + COMPACTION_WIRE_CONFIRM_TIMEOUT_MS;
+  let wireFile = await getSessionWireFile(sessionId, workDir);
+  while (Date.now() <= deadline) {
+    if (!wireFile) wireFile = await getSessionWireFile(sessionId, workDir);
+    if (wireFile) {
+      const content = await readWireTail(wireFile).catch(() => "");
+      const terminal = findOfficialCompactionTerminal(content, startedAt);
+      if (terminal) return terminal;
+    }
+    await delay(COMPACTION_WIRE_CONFIRM_INTERVAL_MS);
+  }
+  throw new Error("等待 Server 返回上下文压缩结果超时。");
 }
 
 async function findSteerRecordInWire(
