@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { inferModelContextSize } from "../modelContextInference";
 
-describe("inferModelContextSize", () => {
+describe("inferModelContextSize (grounded in official provider docs)", () => {
   it("uses explicit API context length when provided and valid", () => {
     expect(inferModelContextSize("custom-model", 200_000)).toBe(200_000);
     expect(inferModelContextSize("some-model", 32_768)).toBe(32_768);
@@ -16,28 +16,38 @@ describe("inferModelContextSize", () => {
     expect(inferModelContextSize("model-200k")).toBe(200_000);
   });
 
-  it("infers context size for Gemini models", () => {
-    expect(inferModelContextSize("gemini-1.5-pro")).toBe(1_048_576);
+  it("infers official context size for Gemini models (2M Pro / 1M Flash)", () => {
+    expect(inferModelContextSize("gemini-1.5-pro")).toBe(2_097_152);
+    expect(inferModelContextSize("gemini-2.0-pro-exp")).toBe(2_097_152);
+    expect(inferModelContextSize("gemini-1.5-flash")).toBe(1_048_576);
     expect(inferModelContextSize("gemini-2.0-flash-exp")).toBe(1_048_576);
   });
 
-  it("infers context size for Claude models", () => {
+  it("infers official context size for Claude models (200,000)", () => {
     expect(inferModelContextSize("claude-3-5-sonnet-20241022")).toBe(200_000);
     expect(inferModelContextSize("claude-3-7-sonnet")).toBe(200_000);
+    expect(inferModelContextSize("claude-3-haiku")).toBe(200_000);
   });
 
-  it("infers context size for DeepSeek and Qwen models", () => {
+  it("infers official context size for DeepSeek models (1M V4 / 128k V3 & R1)", () => {
+    expect(inferModelContextSize("deepseek-v4-flash")).toBe(1_000_000);
     expect(inferModelContextSize("deepseek-chat")).toBe(128_000);
     expect(inferModelContextSize("deepseek-v3")).toBe(128_000);
     expect(inferModelContextSize("deepseek-r1")).toBe(128_000);
-    expect(inferModelContextSize("qwen-2.5-coder-7b-instruct")).toBe(128_000);
   });
 
-  it("infers context size for OpenAI GPT and O-series models", () => {
+  it("infers official context size for OpenAI GPT and O-series models", () => {
     expect(inferModelContextSize("gpt-4o")).toBe(128_000);
-    expect(inferModelContextSize("o1-mini")).toBe(128_000);
-    expect(inferModelContextSize("o3-mini")).toBe(128_000);
+    expect(inferModelContextSize("o1-mini")).toBe(200_000);
+    expect(inferModelContextSize("o3-mini")).toBe(200_000);
     expect(inferModelContextSize("gpt-3.5-turbo")).toBe(16_385);
+  });
+
+  it("infers official context size for Qwen and Llama models", () => {
+    expect(inferModelContextSize("qwen-2.5-72b-instruct")).toBe(131_072);
+    expect(inferModelContextSize("qwen-long")).toBe(10_000_000);
+    expect(inferModelContextSize("llama-3.1-405b")).toBe(131_072);
+    expect(inferModelContextSize("llama-3-70b")).toBe(8_192);
   });
 
   it("falls back to 128,000 for unknown model IDs without API context length", () => {
