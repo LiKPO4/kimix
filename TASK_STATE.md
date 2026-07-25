@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 根治：WS 假死致轮次卡"正在思考"（Server 在跑但 WS 停推，v2.20.7）
+
+- 现象：重任务（TodoList 9 项）卡"正在思考 9分28秒"+0/9 十几分钟，官方 web 同任务已 3/9 推进。
+- 帧级取证（KIMIX_FRAME_DIAG 默认开，七维探针：wsframe/wsc/wssnap/wsbarrier/poll/running-sample/settle）：① `[poll]` engineStatus 持续 running（无 idle → settle 未触发，排除轮询误判）；② running-sample 触发但 reconcile rejected（保护拦住，排除快照替换误判）；③ **13:48:31 后 WS 13+ 分钟零帧**（无 close/无 delta/无 ping），但 `[poll]` HTTP 轮询持续 running；④ wire.jsonl 显示 Server 端 14:05 仍持续产出（llm.request/content.part/tool.call）。
+- 根因：**Server 端 WS 推送对 Kimix 该连接假死**（Server 在跑、HTTP 正常、官方 web 另一连接正常收到，唯独 Kimix 这条 WS 连接 13+ 分钟零帧）；socket 不发 close，客户端检测不到，卡"正在思考"。属 Server 端推送连接级停滞；Kimix 侧缺陷是无假死检测。
+- 修复（v2.20.7）：kimiCodeServerClient 加 WS watchdog——receive() 记 lastMessageAt，每 10s 检查，socket OPEN + 有活跃订阅 + 静默 >90s（WS_SILENCE_LIMIT_MS）则主动 close + scheduleReconnect（client_hello + recoverSnapshot 补全到 Server 最新）。90s 覆盖 llm 长考 thinking.delta 正常节奏，误判代价仅一次重连+快照（无害）。
+- 验证：typecheck ✓；build ✓；重启后启动恢复把卡住的会话从 0/9 补到 5/9 且任务继续推进（14 个文件变更）。帧诊断改回默认关（KIMIX_FRAME_DIAG=1 才开）；渲染层 settle/running-sample 低频诊断保留。
+- 知识库：runtime-routing 增不变量 85（WS 假死检测）+ log。
+- 待用户实测：重任务长考不再卡"正在思考"；watchdog 真死时自动重连补全。
+
 ## 2026-07-25 根治：正文只在完成时回放、运行中无流式——WS 缺 client_id 致 volatile delta 不推（v2.20.6）
 
 - 现象：多轮迭代后用户仍报"正文只发一条就输出完成"；重启后完整。运行中思考实时可见、正文不实时。

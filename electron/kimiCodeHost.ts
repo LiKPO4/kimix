@@ -2740,8 +2740,10 @@ function handleServerFrame(frame: ServerFrame) {
       const known = sessionId ? serverSessions.has(sessionId) : false;
       const payload = frame.payload && typeof frame.payload === "object" ? frame.payload as Record<string, unknown> : {};
       const partType = typeof payload.part === "object" && payload.part !== null ? (payload.part as { type?: unknown }).type : undefined;
-      const summary = partType ?? (typeof payload.type === "string" ? payload.type : "") ?? "";
-      frameDiagLogger(`[wsframe] ${frame.type} sid=${sessionId ? sessionId.slice(-8) : "-"} known=${known} seq=${frame.seq ?? "-"} part=${summary}`);
+      const reason = typeof payload.reason === "string" ? payload.reason : "";
+      const agentId = typeof payload.agentId === "string" ? payload.agentId : "";
+      const summary = [partType ?? "", reason, agentId].filter(Boolean).join("/");
+      frameDiagLogger(`[wsframe] ${frame.type} sid=${sessionId ? sessionId.slice(-8) : "-"} known=${known} seq=${frame.seq ?? "-"} vol=${frame.volatile === true ? 1 : 0} ${summary}`);
     } catch { /* diag must never break frame handling */ }
   }
   if (!sessionId || !serverSessions.has(sessionId)) return;

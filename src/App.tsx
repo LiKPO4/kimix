@@ -3347,6 +3347,16 @@ function App() {
             now - lastHistoryRefreshAt >= 30_000
           ) {
             runtimeHistoryRefreshAtRef.current.set(runtimeSessionId, now);
+            void window.api?.writeDiag?.({
+              message: "[running-sample] trigger",
+              data: {
+                sessionId: session.id.slice(-8),
+                runtimeSessionId: runtimeSessionId.slice(-8),
+                engineStatus: response.data.engineStatus,
+                streamAgeMs: now - lastStreamEventAt,
+                histAgeMs: now - lastHistoryRefreshAt,
+              },
+            });
             const loaded = await timeSync("runningSample.loadHistory", () => window.api.loadKimiCodeSession({
               workDir: session.projectPath,
               sessionId: runtimeSessionId,
@@ -3427,6 +3437,18 @@ function App() {
         ) return;
         flushStreamEvents();
         const settledAt = Date.now();
+        void window.api?.writeDiag?.({
+          message: "[settle] terminal",
+          data: {
+            sessionId: session.id.slice(-8),
+            runtimeSessionId: runtimeSessionId.slice(-8),
+            terminalStatus,
+            terminalPolls,
+            turnReceivedBody,
+            agentEventCount: guardAgentEvents.length,
+            settledAt,
+          },
+        });
         updateSession(session.id, (item) => settleTerminalRoomAgent(item, {
           roomAgentId,
           roomMessageId: active?.roomMessageId ?? persistedTarget?.roomMessageId,

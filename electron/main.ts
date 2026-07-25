@@ -10,6 +10,7 @@ import AdmZip from "adm-zip";
 import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
+import { setServerClientDiag } from "./kimiCodeServerClient";
 import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "./sessionHistoryFallback";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
@@ -6341,7 +6342,12 @@ ipcMain.handle("kimi-code:getStatus", async (_, request: unknown) => {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
-    return { success: true, data: await kimiCodeHost.getStatus(sessionId) };
+    const data = await kimiCodeHost.getStatus(sessionId);
+    if (process.env.KIMIX_FRAME_DIAG === "1") {
+      const d = data as { engineStatus?: string; model?: string } | undefined;
+      void enqueueDiagLine(`[${new Date().toISOString()}] [poll] sid=${sessionId.slice(-8)} engine=${d?.engineStatus ?? "?"} model=${d?.model ?? "?"}`);
+    }
+    return { success: true, data };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -7672,10 +7678,13 @@ function enqueueDiagLine(line: string) {
   return queued;
 }
 
-// 帧级诊断（排查 WS 推送问题用）：默认关闭，仅 KIMIX_FRAME_DIAG=1 时开启，
-// 把主进程 WS 帧流写入 diag.log。本次"正文 delta 缺帧"即靠它定位。
+// 帧级诊断（排查 WS/状态机问题用）：默认关闭，仅 KIMIX_FRAME_DIAG=1 时开启。
+// 本次"正文 delta 缺帧 / WS 假死"均靠它定位。
 if (process.env.KIMIX_FRAME_DIAG === "1") {
   kimiCodeHost.setFrameDiagLogger((line) => {
+    void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
+  });
+  setServerClientDiag((line) => {
     void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
   });
 }

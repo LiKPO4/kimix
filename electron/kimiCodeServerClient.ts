@@ -3,6 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
+// 帧级诊断（KIMIX_FRAME_DIAG=1 开启）：定位"多 step 轮次完成状态机误判"。
+let serverClientDiag: ((line: string) => void) | null = null;
+export function setServerClientDiag(logger: ((line: string) => void) | null) {
+  serverClientDiag = logger;
+}
+function sdiag(line: string) {
+  try { serverClientDiag?.(line); } catch { /* diag must never break client logic */ }
+}
+
 // 官方 kimi-web 形态的 client_id（`web_` 前缀），用于解锁 Server 的 volatile
 // assistant.delta（正文实时帧）推送。优先复用官方设备 id，缺失时随机生成。
 function kimixWsClientId(): string {
@@ -341,6 +350,10 @@ export type ServerSnapshot = {
 const CONTROL_TIMEOUT_MS = 5_000;
 const PROMPT_TIMEOUT_MS = 120_000;
 const UPLOAD_TIMEOUT_MS = 300_000;
+// WS 假死检测：连接 OPEN 但超过该时长无任何帧（含 thinking/durable 帧）则判定推送停滞并重连。
+// 90s 覆盖 llm 长考期间 thinking.delta 的正常推送间隔；误判代价仅为一次重连+快照补全（无害）。
+const WS_SILENCE_LIMIT_MS = 90_000;
+const WS_WATCHDOG_INTERVAL_MS = 10_000;
 
 class ServerSessionIdleTimeoutError extends Error {
   constructor(readonly idleTimeoutMs: number) {
@@ -725,6 +738,27 @@ export class KimiCodeServerClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private runtimeFailureNotified = false;
+  // WS 假死检测：连接未断但持续无帧时（Server 端推送停滞）自动重连补全。
+  private lastMessageAt = 0;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+
+  private armWsWatchdog() {
+    if (this.watchdogTimer) return;
+    this.watchdogTimer = setInterval(() => {
+      if (this.closing || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+      if (this.subscribed.size === 0) return;
+      const silenceMs = Date.now() - this.lastMessageAt;
+      if (silenceMs < WS_SILENCE_LIMIT_MS) return;
+      sdiag(`[wsc] watchdog 假死判定 silence=${Math.round(silenceMs / 1000)}s subs=${this.subscribed.size} → 主动重连`);
+      this.socket.close();
+      this.handleSocketClose(this.socket);
+    }, WS_WATCHDOG_INTERVAL_MS);
+  }
+
+  private disarmWsWatchdog() {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
+  }
 
   constructor(readonly endpoint: string, private readonly options: ServerClientOptions = {}) {}
 
@@ -1192,6 +1226,7 @@ export class KimiCodeServerClient {
 
   async close() {
     this.closing = true;
+    this.disarmWsWatchdog();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.socket?.close();
@@ -1264,7 +1299,10 @@ export class KimiCodeServerClient {
       cursors: this.cursorPayload(this.subscribed),
     });
     if (ack.code !== 0) throw new Error(`Kimi Server handshake 失败：${ack.msg ?? ack.code}`);
+    sdiag(`[wsc] connect ok subs=${this.subscribed.size} ack=${ack.code} reconnecting=${reconnecting}`);
     this.reconnectAttempt = 0;
+    this.lastMessageAt = Date.now();
+    this.armWsWatchdog();
     await this.handleAckResync(ack);
     this.runtimeFailureNotified = false;
     if (reconnecting) {
@@ -1280,6 +1318,7 @@ export class KimiCodeServerClient {
   }
 
   private receive(frame: ServerFrame) {
+    this.lastMessageAt = Date.now();
     const payload = isRecord(frame.payload) ? frame.payload : {};
     if (
       frame.type === "prompt.completed" &&
@@ -1323,6 +1362,7 @@ export class KimiCodeServerClient {
       ? String(payload.promptId ?? payload.prompt_id)
       : "";
     const completionReason = typeof payload.reason === "string" ? payload.reason.toLowerCase() : "";
+    sdiag(`[wsbarrier] prompt.completed ${sessionId?.slice(-8)} promptId=${promptId || "?"} reason=${completionReason || "?"}`);
     // Failed prompts have no displayable Assistant body by definition. Do not
     // run the success-only message barrier, but also do not assume transient
     // error frames reached the renderer, nor that recoverSnapshot will
@@ -1509,6 +1549,7 @@ export class KimiCodeServerClient {
     if (socket !== this.socket) return;
     this.socket = null;
     this.connected = null;
+    sdiag(`[wsc] close subscribed=${this.subscribed.size} closing=${this.closing} attempt=${this.reconnectAttempt}`);
     if (this.closing || this.subscribed.size === 0) return;
     // 首次重连立即通知前端，不等 3 次失败后再报
     if (this.reconnectAttempt === 0) {
@@ -1521,6 +1562,7 @@ export class KimiCodeServerClient {
     if (this.reconnectTimer || this.closing) return;
     const delay = Math.min(250 * (2 ** this.reconnectAttempt), 5_000);
     this.reconnectAttempt += 1;
+    sdiag(`[wsc] reconnect attempt=${this.reconnectAttempt} delay=${delay}`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       void this.ensureConnected().catch((error) => {
@@ -1561,10 +1603,12 @@ export class KimiCodeServerClient {
     const inFlight = this.recoveringSnapshots.get(sessionId);
     if (inFlight) return inFlight;
     const recovery = (async () => {
+      sdiag(`[wssnap] start ${sessionId.slice(-8)}`);
       const snapshot = await this.request<ServerSnapshot>(
         `/api/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       );
       this.cursors.set(sessionId, { seq: snapshot.as_of_seq, epoch: snapshot.epoch });
+      sdiag(`[wssnap] done ${sessionId.slice(-8)} as_of_seq=${snapshot.as_of_seq} epoch=${snapshot.epoch} msgs=${snapshot.messages?.items?.length ?? "?"} inFlight=${snapshot.in_flight_turn ? 1 : 0}`);
       const frame: ServerFrame = {
         type: "kimix.server.snapshot",
         session_id: sessionId,
@@ -1578,6 +1622,7 @@ export class KimiCodeServerClient {
         session_ids: [sessionId],
         cursors: this.cursorPayload([sessionId]),
       });
+      sdiag(`[wssnap] resub ${sessionId.slice(-8)} ack=${ack.code}`);
       if (ack.code !== 0) throw new Error(`Kimi Server snapshot 重订阅失败：${ack.msg ?? ack.code}`);
     })();
     this.recoveringSnapshots.set(sessionId, recovery);
