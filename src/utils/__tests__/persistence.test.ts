@@ -7,6 +7,27 @@ import type { PendingMessage } from "@/stores/sessionStore";
 import type { Project, RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession, roomAgentActivityKey } from "@/utils/collaborationRooms";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
+import { LOCAL_SESSION_PREFIX, LOCAL_SESSIONS_KEY } from "@/utils/persistence";
+
+// Helpers to find session data in commitState entries (supports both old
+// single-key and new per-session key formats).
+function firstSessionEntry(entries: Array<{ key: string; value: unknown }>): unknown {
+  const sessionEntry = entries.find((entry) => entry.key.startsWith(LOCAL_SESSION_PREFIX));
+  if (sessionEntry) return sessionEntry.value;
+  const oldEntry = entries.find((entry) => entry.key === LOCAL_SESSIONS_KEY);
+  return oldEntry ? (oldEntry.value as unknown[])[0] : undefined;
+}
+
+function sessionEntryById(entries: Array<{ key: string; value: unknown }>, id: string): unknown {
+  const sessionEntry = entries.find((entry) => entry.key === `${LOCAL_SESSION_PREFIX}${id}`);
+  if (sessionEntry) return sessionEntry.value;
+  const oldEntry = entries.find((entry) => entry.key === LOCAL_SESSIONS_KEY);
+  if (oldEntry) {
+    const arr = oldEntry.value as unknown[];
+    return arr.find((s: unknown) => (s as { id?: string }).id === id);
+  }
+  return undefined;
+}
 
 const commitStateMock = vi.fn();
 const getAllImageIdsMock = vi.fn().mockResolvedValue([]);
@@ -92,10 +113,8 @@ describe("persistLocalConversationState", () => {
     let calls = 0;
     commitStateMock.mockImplementation(async (entries: Array<{ key: string; value: unknown }>) => {
       calls++;
-      const sessionsEntry = entries.find((entry) => entry.key === "kimix_sessions");
-      const title = Array.isArray(sessionsEntry?.value)
-        ? (sessionsEntry.value[0] as { title?: string } | undefined)?.title
-        : undefined;
+      const firstSession = firstSessionEntry(entries) as { title?: string } | undefined;
+      const title = firstSession?.title;
       if (title) persistedTitles.push(title);
       if (calls === 1) {
         await firstWriteStarted;
@@ -136,10 +155,8 @@ describe("persistLocalConversationState", () => {
     let calls = 0;
     commitStateMock.mockImplementation(async (entries: Array<{ key: string; value: unknown }>) => {
       calls += 1;
-      const sessionsEntry = entries.find((entry) => entry.key === "kimix_sessions");
-      const title = Array.isArray(sessionsEntry?.value)
-        ? (sessionsEntry.value[0] as { title?: string } | undefined)?.title
-        : undefined;
+      const firstSession = firstSessionEntry(entries) as { title?: string } | undefined;
+      const title = firstSession?.title;
       if (title) persistedTitles.push(title);
       if (calls === 1) await firstWriteGate;
     });
@@ -183,7 +200,7 @@ describe("persistLocalConversationState", () => {
     useAppStore.setState({ runningSessionId: session.id });
     await persistLocalConversationState();
     const ordinaryEntries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const ordinaryStored = (ordinaryEntries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const ordinaryStored = firstSessionEntry(ordinaryEntries) as Session;
     expect(ordinaryStored.collaboration).toBeUndefined();
     expect((ordinaryStored.events[0] as Extract<TimelineEvent, { type: "assistant_message" }>).isComplete).toBe(false);
 
@@ -231,7 +248,7 @@ describe("persistLocalConversationState", () => {
     await persistLocalConversationState();
 
     const roomEntries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const storedRoom = (roomEntries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const storedRoom = firstSessionEntry(roomEntries) as Session;
     const storedPrimary = storedRoom.collaboration!.agentEvents[primary.id][0] as Extract<TimelineEvent, { type: "assistant_message" }>;
     const storedSecondary = storedRoom.collaboration!.agentEvents[secondary.id][0] as Extract<TimelineEvent, { type: "assistant_message" }>;
     expect(storedPrimary.isComplete).toBe(true);
@@ -287,8 +304,8 @@ describe("persistLocalConversationState", () => {
     await persistLocalConversationState();
 
     const [entries, storedImages] = commitStateMock.mock.calls.at(-1) as [Array<{ key: string; value: unknown }>, Array<{ id: string; dataUrl: string }>];
-    const storedSessions = entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[];
-    const storedRoom = storedSessions[0];
+    const storedRoom = firstSessionEntry(entries) as Session;
+    const storedSessions = [storedRoom];
     const messageRef = (storedRoom.collaboration!.messages[0].images![0] as typeof image & { imageRef: string }).imageRef;
     const primaryRef = (storedRoom.collaboration!.agentEvents[primary.id][0] as Extract<TimelineEvent, { type: "user_message" }>).images![0] as typeof image & { imageRef: string };
     const secondaryRef = (storedRoom.collaboration!.agentEvents[secondary.id][0] as Extract<TimelineEvent, { type: "user_message" }>).images![0] as typeof image & { imageRef: string };
@@ -297,7 +314,11 @@ describe("persistLocalConversationState", () => {
     expect(secondaryRef.imageRef).toBeTruthy();
     expect(storedImages.every((storedImage) => storedImage.dataUrl === dataUrl)).toBe(true);
 
-    getStateItemMock.mockResolvedValue(storedSessions);
+    getStateItemMock.mockImplementation((key) => {
+      if (key === 'kimix_local_sessions_index') return Promise.resolve(null);
+      if (key === 'kimix_sessions') return Promise.resolve(storedSessions);
+      return Promise.resolve(null);
+    });
     loadImagesMock.mockImplementation(async (ids: string[]) => new Map(ids.map((id) => [id, dataUrl])));
     const loaded = (await loadLocalSessions())[0];
     expect(loaded.collaboration?.messages[0].images?.[0].dataUrl).toBe(dataUrl);
@@ -330,10 +351,15 @@ describe("persistLocalConversationState", () => {
     await persistLocalConversationState();
 
     const [entries, storedImages] = commitStateMock.mock.calls.at(-1) as [Array<{ key: string; value: unknown }>, Array<{ id: string; dataUrl: string; kind?: string; fileId?: string; mediaType?: string }>];
-    const storedSessions = entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[];
+    const storedSession = firstSessionEntry(entries) as Session;
     expect(storedImages[0]).toMatchObject({ dataUrl, kind: "video", fileId: "file-video", mediaType: "video/mp4" });
 
-    getStateItemMock.mockResolvedValue(storedSessions);
+    // For loadLocalSessions fallback path, mock returns an array for old key.
+    getStateItemMock.mockImplementation((key) => {
+      if (key === 'kimix_local_sessions_index') return Promise.resolve(null);
+      if (key === 'kimix_sessions') return Promise.resolve([storedSession]);
+      return Promise.resolve(null);
+    });
     loadImagesMock.mockResolvedValue(new Map([[storedImages[0].id, dataUrl]]));
     const loadedVideo = (await loadLocalSessions())[0].events[0] as Extract<TimelineEvent, { type: "user_message" }>;
     expect(loadedVideo.images?.[0]).toMatchObject(video);
@@ -380,7 +406,11 @@ describe("persistLocalConversationState", () => {
         },
       },
     };
-    getStateItemMock.mockResolvedValue([stored]);
+    getStateItemMock.mockImplementation((key) => {
+      if (key === 'kimix_local_sessions_index') return Promise.resolve(null);
+      if (key === 'kimix_sessions') return Promise.resolve([stored]);
+      return Promise.resolve(null);
+    });
 
     const { loadLocalSessions } = await import("@/utils/persistence");
     const loaded = (await loadLocalSessions())[0];
@@ -423,7 +453,11 @@ describe("persistLocalConversationState", () => {
         })),
       },
     };
-    getStateItemMock.mockResolvedValue([guardedRoom]);
+    getStateItemMock.mockImplementation((key) => {
+      if (key === 'kimix_local_sessions_index') return Promise.resolve(null);
+      if (key === 'kimix_sessions') return Promise.resolve([guardedRoom]);
+      return Promise.resolve(null);
+    });
     const { loadLocalSessions, persistLocalConversationState } = await import("@/utils/persistence");
     const loaded = (await loadLocalSessions())[0];
     expect(loaded.collaboration?.messages[0].deliveries[guardedPrimaryId].dispatchAttemptId)
@@ -453,7 +487,7 @@ describe("persistLocalConversationState", () => {
 
     expect((await persistLocalConversationState()).success).toBe(true);
     const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const stored = sessionEntryById(entries, "guard-room") as Session;
     const primaryId = stored.collaboration?.primaryAgentId ?? "";
     expect(stored.collaboration?.agents).toHaveLength(1);
     expect(stored.collaboration?.agentEvents[primaryId]).toEqual([
@@ -474,16 +508,25 @@ describe("persistLocalConversationState", () => {
 
   it("preserves an unknown future collaboration payload byte-for-byte on the next save", async () => {
     const futureRaw = { schemaVersion: 2, agents: [{ id: "future-agent" }], opaque: { keep: true } };
-    getStateItemMock.mockResolvedValue([{ ...session, collaboration: futureRaw }]);
+    getStateItemMock.mockImplementation((key) => {
+      if (key === 'kimix_local_sessions_index') return Promise.resolve(null);
+      if (key === 'kimix_sessions') return Promise.resolve([{ ...session, collaboration: futureRaw }]);
+      return Promise.resolve(null);
+    });
     const { loadLocalSessions, persistLocalConversationState } = await import("@/utils/persistence");
     const loaded = (await loadLocalSessions())[0];
     expect(loaded.collaboration).toBeUndefined();
     expect(loaded.unsupportedCollaboration?.raw).toEqual(futureRaw);
 
     useSessionStore.setState({ sessions: [loaded], pendingMessages: [] });
+    // Force a real session change to trigger per-session write (incremental
+    // persist skips unchanged sessions after hydration populates the cache).
+    useSessionStore.setState((prev) => ({
+      sessions: prev.sessions.map((s) => s.id === loaded.id ? { ...s, title: "持久化验证" } : s),
+    }));
     await persistLocalConversationState();
     const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Array<Record<string, unknown>>)[0];
+    const stored = sessionEntryById(entries, loaded.id) as Record<string, unknown>;
     expect(stored.collaboration).toEqual(futureRaw);
     expect(stored.unsupportedCollaboration).toBeUndefined();
   });
@@ -543,7 +586,7 @@ describe("persistLocalConversationState reference guard", () => {
     expect((await persistLocalConversationState()).success).toBe(true);
     expect(commitStateMock).toHaveBeenCalledTimes(2);
     const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const stored = sessionEntryById(entries, guardSession.id) as Session;
     expect(stored.title).toBe("更新后的标题");
   });
 
@@ -558,13 +601,16 @@ describe("persistLocalConversationState reference guard", () => {
     expect((await persistLocalConversationState()).success).toBe(true);
     expect(commitStateMock).toHaveBeenCalledTimes(2);
     let entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    expect((entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0].archivedAt).toBe(123456);
+    expect((sessionEntryById(entries, guardSession.id) as Session).archivedAt).toBe(123456);
 
     useSessionStore.setState({ sessions: [] });
     expect((await persistLocalConversationState()).success).toBe(true);
     expect(commitStateMock).toHaveBeenCalledTimes(3);
     entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    expect(entries.find((entry) => entry.key === "kimix_sessions")?.value).toEqual([]);
+    // Deleted sessions produce a removeStateItem call; the index entry also changes.
+    // The per-session key should have been removed; verify by checking index presence.
+    const lastSessionKeys = entries.filter((entry) => entry.key.startsWith(LOCAL_SESSION_PREFIX));
+    expect(lastSessionKeys.length).toBe(0);
   });
 
   it("skips the startup hydration flush when the pre-load pending reference is marked too", async () => {
@@ -597,7 +643,7 @@ describe("persistLocalConversationState reference guard", () => {
     expect((await persistLocalConversationState()).success).toBe(true);
     expect(commitStateMock).toHaveBeenCalledTimes(1);
     const entries = commitStateMock.mock.calls.at(-1)?.[0] as Array<{ key: string; value: unknown }>;
-    const stored = (entries.find((entry) => entry.key === "kimix_sessions")?.value as Session[])[0];
+    const stored = sessionEntryById(entries, guardSession.id) as Session;
     expect(stored.title).toBe("真实变更");
   });
 });

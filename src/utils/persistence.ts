@@ -15,7 +15,7 @@ import {
   synchronizeCollaborationPrimaryMirror,
 } from "@/utils/collaborationRooms";
 import { sanitizePersistedEvents, settleInactiveEvents } from "./eventHelpers";
-import { timeAsync, timeSync } from "./perfDiag";
+import { timeAsync } from "./perfDiag";
 import { stripLegacyKimixClarificationWrapper } from "./eventMapper";
 import {
   commitState,
@@ -23,6 +23,7 @@ import {
   getAllImageIds,
   getStateItem,
   loadImages,
+  removeStateItem,
   type StoredImage,
 } from "./stateStorage";
 
@@ -30,6 +31,8 @@ export const LOCAL_SESSIONS_KEY = "kimix_sessions";
 export const LOCAL_PENDING_KEY = "kimix_pending";
 export const LOCAL_ACTIVE_CONTEXT_KEY = "kimix_active_context";
 export const LOCAL_ARCHIVED_SESSION_TOMBSTONES_KEY = "kimix_archived_session_tombstones";
+export const LOCAL_SESSIONS_INDEX_KEY = "kimix_local_sessions_index";
+export const LOCAL_SESSION_PREFIX = "kimix_local_session_";
 export const LOCAL_PERSIST_DEBOUNCE_MS = 900;
 
 const STREAMING_PERSIST_DEBOUNCE_MS = 5000;
@@ -507,6 +510,7 @@ function hydratePending(raw: unknown[], dataUrlById: Map<string, string>): Pendi
 
 type PersistSnapshot = {
   sessions: Session[];
+  originalSessions: Session[];
   pendingMessages: PendingMessage[];
 };
 
@@ -528,6 +532,36 @@ export function markConversationStatePersisted(sessions?: Session[], pendingMess
   if (pendingMessages !== undefined) lastPersistedPendingRef = pendingMessages;
 }
 
+type SessionIndexEntry = {
+  id: string;
+  updatedAt: number;
+  archivedAt?: number;
+  projectPath: string;
+};
+
+type SessionIndex = {
+  version: 2;
+  entries: SessionIndexEntry[];
+};
+
+function sessionIndexEntry(session: Session): SessionIndexEntry {
+  return {
+    id: session.id,
+    updatedAt: session.updatedAt,
+    archivedAt: session.archivedAt,
+    projectPath: session.projectPath ?? "",
+  };
+}
+
+function sessionKey(id: string): string {
+  return `${LOCAL_SESSION_PREFIX}${id}`;
+}
+
+// Per-session reference cache established on hydration and updated on persist.
+// runPersist compares current session references against this cache to skip
+// unchanged sessions. Module-level to survive across persist calls.
+let hydratedSessionRefs = new Map<string, Session>();
+
 async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   isPersisting = true;
   const runStart = performance.now();
@@ -536,23 +570,103 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
   try {
     const images: StoredImage[] = [];
     const stripStart = performance.now();
-    const [strippedSessions, strippedPending] = await Promise.all([
-      timeSync("persist.stripSessions", () => stripImagesFromSessions(snapshot.sessions, images)),
+
+    // Determine which sessions changed by comparing original refs against cache.
+    const changedIds = new Set<string>();
+    const currentIds = new Set<string>();
+    const indexEntries: SessionIndexEntry[] = [];
+    let indexChanged = false;
+
+    for (let i = 0; i < snapshot.sessions.length; i++) {
+      const prepared = snapshot.sessions[i];
+      const original = snapshot.originalSessions[i];
+      const id = prepared.id;
+      currentIds.add(id);
+
+      const cached = hydratedSessionRefs.get(id);
+      if (cached === original) {
+        // Unchanged: keep cache, use prepared metadata for index entry.
+        indexEntries.push(sessionIndexEntry(prepared));
+      } else {
+        // Changed or new session.
+        changedIds.add(id);
+        indexEntries.push(sessionIndexEntry(prepared));
+      }
+    }
+
+    // Detect deleted sessions (in cache but not in current state).
+    const deletedIds: string[] = [];
+    for (const [id] of hydratedSessionRefs) {
+      if (!currentIds.has(id)) {
+        deletedIds.push(id);
+        changedIds.add(id);
+      }
+    }
+
+    // Rebuild index if any session was added, removed, or updated.
+    if (changedIds.size > 0) indexChanged = true;
+
+    // Strip and write only changed sessions (plus pending).
+    const entries: Array<{ key: string; value: unknown }> = [];
+    for (const session of snapshot.sessions) {
+      if (!changedIds.has(session.id)) continue;
+      const strippedSessions = await stripImagesFromSessions([session], images);
+      entries.push({ key: sessionKey(session.id), value: strippedSessions[0] });
+    }
+
+    // Write pending (always, single key).
+    const [strippedPending] = await Promise.all([
       stripImagesFromPending(snapshot.pendingMessages, images),
     ]);
+    entries.push({ key: LOCAL_PENDING_KEY, value: strippedPending });
+
+    // Write index if changed.
+    if (indexChanged) {
+      const indexData: SessionIndex = { version: 2, entries: indexEntries };
+      entries.push({ key: LOCAL_SESSIONS_INDEX_KEY, value: indexData });
+    }
+
     stripMs = performance.now() - stripStart;
 
-    // commitState hides the full JSON.stringify inside its async section, so
-    // timeSync under-reports it; timeAsync attributes the whole await.
+    // commitState batch writes all entries + images.
     const commitStart = performance.now();
-    await timeAsync("persist.commitState", () => commitState([
-      { key: LOCAL_SESSIONS_KEY, value: strippedSessions },
-      { key: LOCAL_PENDING_KEY, value: strippedPending },
-    ], images));
+    await timeAsync("persist.commitState", () => commitState(entries, images));
     commitMs = performance.now() - commitStart;
 
+    // Delete stale session keys for removed sessions.
+    for (const id of deletedIds) {
+      await removeStateItem(sessionKey(id));
+    }
+
+    // Migrate away from old single-key format after the first successful
+    // per-session write completes.
+    try {
+      const oldRaw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
+      if (oldRaw !== null) {
+        await removeStateItem(LOCAL_SESSIONS_KEY);
+      }
+    } catch {
+      // Best-effort migration cleanup.
+    }
+
+    // GC images: collect refs only from written sessions + pending.
     const referencedRefs = new Set<string>();
-    collectImageRefsFromSessions(strippedSessions, referencedRefs);
+    for (const session of snapshot.sessions) {
+      if (!changedIds.has(session.id) && !deletedIds.includes(session.id)) continue;
+      // Collect image refs from the stripped (persisted) version.
+      const stripped = entries.find((e) => e.key === sessionKey(session.id));
+      if (stripped) {
+        collectImageRefsFromSessions([stripped.value], referencedRefs);
+      }
+    }
+    // For unchanged sessions, collect refs from cache (their images didn't change).
+    for (const [id, cached] of hydratedSessionRefs) {
+      if (changedIds.has(id) || deletedIds.includes(id)) continue;
+      // Build a minimal representation for ref collection.
+      const cachedRefs = new Set<string>();
+      collectImageRefsFromSessions([cached], cachedRefs);
+      for (const ref of cachedRefs) referencedRefs.add(ref);
+    }
     collectImageRefsFromPending(strippedPending, referencedRefs);
 
     const allIds = await getAllImageIds();
@@ -561,13 +675,29 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
       await deleteImages(toDelete);
     }
 
+    // Update the session reference cache for all current sessions.
+    for (let i = 0; i < snapshot.originalSessions.length; i++) {
+      const original = snapshot.originalSessions[i];
+      const prepared = snapshot.sessions[i];
+      if (deletedIds.includes(prepared.id)) continue;
+      // Cache the original store reference (used for change detection).
+      hydratedSessionRefs.set(prepared.id, original);
+    }
+    for (const id of deletedIds) {
+      hydratedSessionRefs.delete(id);
+    }
+
     // One low-frequency attribution entry per actual disk write (the
     // reference-guard skip path never reaches here), so startup long tasks
     // can be charged to the persist that caused them.
+    const totalSessions = snapshot.sessions.length;
+    const changedSessions = changedIds.size;
     void window.api?.writeDiag?.({
       message: "persist.run",
       data: {
-        sessionCount: snapshot.sessions.length,
+        sessionCount: totalSessions,
+        changedSessions,
+        totalSessions,
         totalEvents: snapshot.sessions.reduce((sum, session) => sum + session.events.length, 0),
         stripMs: Math.round(stripMs),
         commitMs: Math.round(commitMs),
@@ -664,6 +794,7 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
 
   const snapshot: PersistSnapshot = {
     sessions: preparedSessions,
+    originalSessions: state.sessions,
     pendingMessages: state.pendingMessages,
   };
 
@@ -698,6 +829,45 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
 }
 
 export async function loadLocalSessions(): Promise<Session[]> {
+  // Try new per-session format first.
+  const indexData = await getStateItem<SessionIndex>(LOCAL_SESSIONS_INDEX_KEY);
+  if (indexData?.version === 2 && Array.isArray(indexData.entries) && indexData.entries.length > 0) {
+    const ids = indexData.entries.map((e) => e.id);
+    // Batch parallel loads (20 per batch).
+    const BATCH_SIZE = 20;
+    const rawSessions: unknown[] = [];
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((id) => getStateItem<unknown>(sessionKey(id)))
+      );
+      for (const result of results) {
+        if (result !== null) rawSessions.push(result);
+      }
+    }
+    if (rawSessions.length === 0) return [];
+    const refs = new Set<string>();
+    collectImageRefsFromSessions(rawSessions, refs);
+    const dataUrlById = await loadImages(Array.from(refs));
+    const sessions = hydrateSessions(rawSessions, dataUrlById).map((session) => {
+      const events = deduplicateTimelineEvents(session.events);
+      if (!session.collaboration) {
+        return events.length === session.events.length ? session : { ...session, events };
+      }
+      const agentEntries = Object.entries(session.collaboration.agentEvents);
+      const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, deduplicateTimelineEvents(list)]));
+      const changed = events.length !== session.events.length ||
+        agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
+      return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
+    });
+    // Establish the session reference cache so the first persist skips all sessions.
+    for (const session of sessions) {
+      hydratedSessionRefs.set(session.id, session);
+    }
+    return sessions;
+  }
+
+  // Fall back to old single-key format.
   const raw = await getStateItem<unknown[]>(LOCAL_SESSIONS_KEY);
   if (!raw || !Array.isArray(raw)) return [];
   const refs = new Set<string>();
@@ -705,7 +875,7 @@ export async function loadLocalSessions(): Promise<Session[]> {
   const dataUrlById = await loadImages(Array.from(refs));
   // Replay duplication repair: histories written before the snapshot user
   // dedup guards may contain repeated user messages; clean once on load.
-  return hydrateSessions(raw, dataUrlById).map((session) => {
+  const sessions = hydrateSessions(raw, dataUrlById).map((session) => {
     const events = deduplicateTimelineEvents(session.events);
     if (!session.collaboration) {
       return events.length === session.events.length ? session : { ...session, events };
@@ -716,6 +886,11 @@ export async function loadLocalSessions(): Promise<Session[]> {
       agentEntries.some(([agentId, list]) => agentEvents[agentId].length !== list.length);
     return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
   });
+  // Establish cache from old format too.
+  for (const session of sessions) {
+    hydratedSessionRefs.set(session.id, session);
+  }
+  return sessions;
 }
 
 export async function loadLocalPendingMessages(): Promise<PendingMessage[]> {
