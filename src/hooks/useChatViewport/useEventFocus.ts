@@ -17,7 +17,7 @@ export type UseEventFocusResult = {
   resetForNewSession: (nextSessionId?: string) => void;
 };
 
-export type TimelineFocusAlignment = "center" | "start-center";
+export type TimelineFocusAlignment = "center" | "start-center" | "start";
 
 const MAX_FOCUS_RECURSIVE_ATTEMPTS = 10;
 const MAX_FOCUS_DURATION_MS = 2_000;
@@ -148,7 +148,12 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     const didSelectText = selectTextInNode(target, searchText);
     if (!didSelectText) {
       const scrollNode = scrollRef.current;
-      if (alignment === "start-center" && scrollNode) {
+      if (alignment === "start" && scrollNode) {
+        const scrollRect = scrollNode.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - 16;
+        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+      } else if (alignment === "start-center" && scrollNode) {
         const scrollRect = scrollNode.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - scrollNode.clientHeight / 2;

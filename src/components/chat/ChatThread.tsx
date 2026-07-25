@@ -1822,10 +1822,10 @@ export const ChatThread = memo(function ChatThread() {
             items={visibleRenderItems}
             scrollRef={viewport.scrollRef}
             contentRef={viewport.streamContentRef}
-            onNavigate={(eventId, kind) => viewport.focusTimelineEvent(
+            onNavigate={(eventId) => viewport.focusTimelineEvent(
               eventId,
               undefined,
-              kind === "user" ? "center" : "start-center",
+              "start",
             )}
           />
         </div>
