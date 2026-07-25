@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { PendingMessage } from "@/stores/sessionStore";
-import type { Project, RoomAgent, Session, TimelineEvent } from "@/types/ui";
+import type { Project, RoomAgent, Session, TimelineEvent, UserMessageImage } from "@/types/ui";
 import { createCollaborationStateFromSession, roomAgentActivityKey } from "@/utils/collaborationRooms";
 import { projectCollaborationTimeline } from "@/utils/collaborationTimeline";
 import { LOCAL_SESSION_PREFIX, LOCAL_SESSIONS_KEY } from "@/utils/persistence";
@@ -672,5 +672,50 @@ describe("persistLocalConversationState reference guard", () => {
     expect(sessionKeys).toHaveLength(1);
     const stored = sessionEntryById(entries, loaded.id) as Session;
     expect(stored.title).toBe("真实变更");
+  });
+
+  it("does not delete images referenced by unchanged sessions (P1-c GC regression)", async () => {
+    const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
+
+    // Session A: unchanged, has an image with imageRef.
+    const imageRef = "img-in-use";
+    const sessionA: Session = {
+      ...guardSession, id: "session-a",
+      events: [{
+        id: "user-a", type: "user_message" as const, timestamp: 1, content: "A",
+        images: [{ name: "a.png", kind: "image" as const, imageRef }] as unknown as UserMessageImage[],
+      }],
+    };
+    // Session B: will change, has no image.
+    const sessionB: Session = { ...guardSession, id: "session-b", events: [] };
+
+    // Simulate hydration: mark with final store references.
+    markConversationStatePersisted([sessionA, sessionB], []);
+    useSessionStore.setState({ sessions: [sessionA, sessionB] });
+
+    // Mock IDB to report the in-use image id.
+    getAllImageIdsMock.mockResolvedValue([imageRef]);
+    deleteImagesMock.mockReset();
+
+    // Change sessionB only (new title → new store reference). SessionA unchanged.
+    useSessionStore.setState((prev) => ({
+      sessions: prev.sessions.map((s) => s.id === "session-b" ? { ...s, title: "B 更新" } : s),
+    }));
+
+    expect((await persistLocalConversationState()).success).toBe(true);
+
+    // The unchanged session A's image ref must still be in referencedRefs,
+    // so deleteImages should NOT receive "img-in-use".
+    const deleteArgs = deleteImagesMock.mock.calls.flatMap((call) => call[0] as string[]);
+    expect(deleteArgs).not.toContain(imageRef);
+
+    // Second persist: sessionA still unchanged, verify cache persists.
+    deleteImagesMock.mockReset();
+    useSessionStore.setState((prev) => ({
+      sessions: prev.sessions.map((s) => s.id === "session-b" ? { ...s, title: "B 再更新" } : s),
+    }));
+    expect((await persistLocalConversationState()).success).toBe(true);
+    const deleteArgs2 = deleteImagesMock.mock.calls.flatMap((call) => call[0] as string[]);
+    expect(deleteArgs2).not.toContain(imageRef);
   });
 });

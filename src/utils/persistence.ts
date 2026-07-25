@@ -535,6 +535,13 @@ export function markConversationStatePersisted(sessions?: Session[], pendingMess
     // array objects; the cache uses individual store element references).
     for (const session of sessions) {
       hydratedSessionRefs.set(session.id, session);
+      // Pre-populate image refs cache if not already set (prevents GC from
+      // deleting images referenced by unchanged sessions on the first persist).
+      if (!sessionImageRefs.has(session.id)) {
+        const refsSet = new Set<string>();
+        collectImageRefsFromSessions([session], refsSet);
+        sessionImageRefs.set(session.id, refsSet);
+      }
     }
   }
   if (pendingMessages !== undefined) lastPersistedPendingRef = pendingMessages;
@@ -680,8 +687,16 @@ async function runPersist(snapshot: PersistSnapshot): Promise<PersistResult> {
           for (const ref of sessionRefs) referencedRefs.add(ref);
         }
       } else if (!deletedIds.includes(session.id)) {
-        // Unchanged session: reuse cached refs.
-        const cachedRefs = sessionImageRefs.get(session.id);
+        // Unchanged session: reuse cached refs, or lazy-populate from store.
+        let cachedRefs = sessionImageRefs.get(session.id);
+        if (!cachedRefs) {
+          const storeSession = hydratedSessionRefs.get(session.id);
+          if (storeSession) {
+            cachedRefs = new Set<string>();
+            collectImageRefsFromSessions([storeSession], cachedRefs);
+            sessionImageRefs.set(session.id, cachedRefs);
+          }
+        }
         if (cachedRefs) {
           for (const ref of cachedRefs) referencedRefs.add(ref);
         }
@@ -883,8 +898,16 @@ export async function loadLocalSessions(): Promise<Session[]> {
       return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
     });
     // Establish the session reference cache so the first persist skips all sessions.
-    for (const session of sessions) {
+    // Also pre-populate image refs cache to avoid first-time lazy traversal on GC.
+    for (let i = 0; i < sessions.length; i++) {
+      const session = sessions[i];
       hydratedSessionRefs.set(session.id, session);
+      const rawEntry = rawSessions[i];
+      if (rawEntry) {
+        const refsSet = new Set<string>();
+        collectImageRefsFromSessions([rawEntry], refsSet);
+        sessionImageRefs.set(session.id, refsSet);
+      }
     }
     return sessions;
   }
@@ -909,8 +932,15 @@ export async function loadLocalSessions(): Promise<Session[]> {
     return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
   });
   // Establish cache from old format too.
-  for (const session of sessions) {
+  for (let i = 0; i < sessions.length; i++) {
+    const session = sessions[i];
     hydratedSessionRefs.set(session.id, session);
+    const rawEntry = Array.isArray(raw) ? raw[i] : undefined;
+    if (rawEntry) {
+      const refsSet = new Set<string>();
+      collectImageRefsFromSessions([rawEntry], refsSet);
+      sessionImageRefs.set(session.id, refsSet);
+    }
   }
   return sessions;
 }

@@ -135,3 +135,42 @@ describe("resetAllReconciliationCircuits", () => {
     expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonical)).toBe(false);
   });
 });
+
+describe("rawCanonicalEvents alignment", () => {
+  it("hits the circuit when rawCanonicalEvents aligns check with register (P1-b regression)", async () => {
+    // Simulate the scenario where reconcileAgentCanonicalHistory transforms raw
+    // canonical (e.g. backfillTurnModelsFromUsageStatuses adds a trailing status
+    // event), producing reconciledEvents with different statistics than raw.
+    // Without rawCanonicalEvents, the circuit breaker would register the
+    // reconciled fingerprint, and the check (using raw canonical) would never match.
+    const localEvents = [user("hello"), toolCall(), assistant("world")];
+    const rawCanonical = [user("hello"), assistant("world")]; // 2 events
+    const reconciledEvents: TimelineEvent[] = [
+      user("hello"),
+      assistant("world"),
+      // Simulate backfillTurnModelsFromUsageStatuses adding a trailing status
+      { id: "status-1", type: "status_update", timestamp: 300, message: "模型：kimi-code/k3" },
+    ];
+
+    // shouldReplaceWithCanonicalKimiHistory rejects (process-history-regression)
+    // and registers the circuit breaker.
+    const { shouldReplaceWithCanonicalKimiHistory } = await import("@/utils/kimiHistoryReconciliation");
+    const result = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciledEvents, {
+      sessionId: "sess-raw",
+      roomAgentId: "agent-a",
+      reason: "repair",
+      rawCanonicalEvents: rawCanonical,
+    });
+    expect(result).toBe(false);
+
+    // With rawCanonicalEvents: circuit should be open when checking with raw canonical
+    expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, rawCanonical)).toBe(true);
+
+    // Without rawCanonicalEvents (simulating old behavior): the check with raw canonical
+    // should NOT match because the registered fingerprint used reconciledEvents.
+    // To verify, manually register with reconciledEvents (as the old code would).
+    resetAllReconciliationCircuits();
+    markReconciliationRejected("sess-raw", "agent-a", localEvents, reconciledEvents);
+    expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, rawCanonical)).toBe(false);
+  });
+});
