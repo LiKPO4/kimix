@@ -187,6 +187,59 @@ function appendAssistantContent(existingContent: string, incomingContent: string
   return existingContent + incomingContent;
 }
 
+/**
+ * Merge assistant content with streamOffset awareness. When both fragments
+ * carry a streamOffset, reorder content by offset order and deduplicate
+ * overlapping regions. Falls back to appendAssistantContent when offsets
+ * are unavailable.
+ *
+ * The returned string is the correctly ordered, deduplicated content.
+ */
+export function mergeAssistantContentWithOffset(
+  target: { content: string; streamOffset?: number },
+  incoming: { content: string; streamOffset?: number },
+): string {
+  const { content: existingContent, streamOffset: existingOffset } = target;
+  const { content: incomingContent, streamOffset: incomingOffset } = incoming;
+
+  // Either lacks offset → use existing simple merge.
+  if (existingOffset === undefined || incomingOffset === undefined) {
+    return appendAssistantContent(existingContent, incomingContent);
+  }
+
+  const existingEnd = existingOffset + existingContent.length;
+  const incomingEnd = incomingOffset + incomingContent.length;
+
+  // Incoming entirely before existing → prepend.
+  if (incomingEnd <= existingOffset) {
+    return incomingContent + existingContent;
+  }
+
+  // Incoming entirely after existing → append with dedup.
+  if (incomingOffset >= existingEnd) {
+    return appendAssistantContent(existingContent, incomingContent);
+  }
+
+  // Content overlaps: sort by offset and merge.
+  const fragments = [
+    { start: existingOffset, content: existingContent },
+    { start: incomingOffset, content: incomingContent },
+  ].sort((a, b) => a.start - b.start);
+
+  const [first, second] = fragments;
+  const firstEnd = first.start + first.content.length;
+
+  // No actual overlap after sorting (gap between them).
+  if (second.start >= firstEnd) {
+    return first.content + second.content;
+  }
+
+  // Overlapping: take first's content, append second's non-overlapping suffix.
+  const overlapChars = firstEnd - second.start;
+  const secondSuffix = second.content.slice(overlapChars);
+  return first.content + secondSuffix;
+}
+
 type AssistantThinkingPart = NonNullable<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>[number];
 
 /** Collapse whitespace so live deltas and snapshot replays compare equal despite formatting drift. */
@@ -1837,16 +1890,19 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           // multi-part / multi-step frames. Replacing thinkingParts with the latest
           // frame alone drops earlier tool-step thoughts (only the last "N 个工具调用"
           // row remains visible).
-          const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
-          const result = [...existing];
-          result[stableAssistantIndex] = {
-            ...target,
-            completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
-            agentRole: incoming.agentRole ?? target.agentRole,
-            model: incoming.model ?? target.model,
-            content: replaceCanonicalBody
-              ? incoming.content
-              : appendAssistantContent(target.content, incoming.content),
+        const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
+        const result = [...existing];
+        result[stableAssistantIndex] = {
+          ...target,
+          completionBarrierReplay: incoming.completionBarrierReplay ?? target.completionBarrierReplay,
+          agentRole: incoming.agentRole ?? target.agentRole,
+          model: incoming.model ?? target.model,
+          streamOffset: target.streamOffset !== undefined || incoming.streamOffset !== undefined
+            ? Math.min(target.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
+            : undefined,
+          content: replaceCanonicalBody
+            ? incoming.content
+            : mergeAssistantContentWithOffset(target, incoming),
             thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
             thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
             isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
@@ -2008,31 +2064,25 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         }
         return appendAfterConfirmedSteer(existing, [incoming]);
       }
-      // Complete / barrier frames with body text are authoritative: REPLACE.
-      // Live frames use prefix-safe merge so cumulative content.part does not
-      // double the greeting, while pure token deltas still concatenate.
-      const replaceOpenBody = Boolean(
-        incoming.content.trim() &&
-        (incoming.isComplete || incoming.completionBarrierReplay)
-      );
-      const mergeLiveBody = (existingContent: string, incomingContent: string) => {
-        if (!incomingContent) return existingContent;
-        if (!existingContent) return incomingContent;
-        if (incomingContent === existingContent) return existingContent;
-        if (incomingContent.startsWith(existingContent)) return incomingContent;
-        if (existingContent.startsWith(incomingContent)) return existingContent;
-        return existingContent + incomingContent;
-      };
-      const updated: typeof last = {
-        ...last,
-        snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
-        snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
-        completionBarrierReplay: incoming.completionBarrierReplay ?? last.completionBarrierReplay,
-        agentRole: incoming.agentRole ?? last.agentRole,
-        model: incoming.model ?? last.model,
-        content: replaceOpenBody
-          ? incoming.content
-          : mergeLiveBody(last.content, incoming.content),
+	      // Complete / barrier frames with body text are authoritative: REPLACE.
+	      // Live frames use offset-aware merge (mergeAssistantContentWithOffset).
+	      const replaceOpenBody = Boolean(
+	        incoming.content.trim() &&
+	        (incoming.isComplete || incoming.completionBarrierReplay)
+	      );
+	      const updated: typeof last = {
+	        ...last,
+	        snapshotMessageId: last.snapshotMessageId ?? incoming.snapshotMessageId,
+	        snapshotMessageIdStable: last.snapshotMessageIdStable ?? incoming.snapshotMessageIdStable,
+	        completionBarrierReplay: incoming.completionBarrierReplay ?? last.completionBarrierReplay,
+	        agentRole: incoming.agentRole ?? last.agentRole,
+	        model: incoming.model ?? last.model,
+	        streamOffset: last.streamOffset !== undefined || incoming.streamOffset !== undefined
+	          ? Math.min(last.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
+	          : undefined,
+	        content: replaceOpenBody
+	          ? incoming.content
+	          : mergeAssistantContentWithOffset(last, incoming),
         thinking: mergeAssistantThinkingText(last.thinking, incoming.thinking),
         thinkingParts: mergeAssistantThinkingParts(last.thinkingParts, incoming.thinkingParts),
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),

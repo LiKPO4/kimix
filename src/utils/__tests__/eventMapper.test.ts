@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory, deduplicateTimelineEvents, mergeAssistantThinkingText, mergeAssistantThinkingParts } from "../eventMapper";
+import { mapStreamEvent, mergeEvents, mapHistoryEvents, preserveLocalUserMediaInCanonicalHistory, deduplicateTimelineEvents, mergeAssistantThinkingText, mergeAssistantThinkingParts, mergeAssistantContentWithOffset } from "../eventMapper";
 import * as reportError from "@/utils/reportError";
 import type { TimelineEvent } from "@/types/ui";
 import { buildRoomDeliveryPrompt } from "../roomContextBridge";
@@ -2043,6 +2043,70 @@ describe("mergeEvents", () => {
     const once = mergeEvents(base, emptyFrame);
     const twice = mergeEvents(once, emptyFrame);
     expect(twice).toEqual(once);
+  });
+});
+
+describe("mergeAssistantContentWithOffset", () => {
+  it("orders out-of-order deltas by streamOffset", () => {
+    // arrival: "霖江路"(offset 2) → "最近几"(offset 6) → "你好"(offset 0)
+    // expected: "你好霖江路最近几"
+    // First delta merge would be handled by mergeEvents append,
+    // so we test the pure function with accumulated state.
+    const step1 = mergeAssistantContentWithOffset(
+      { content: "", streamOffset: undefined },
+      { content: "霖江路", streamOffset: 2 },
+    );
+    expect(step1).toBe("霖江路");
+    const step2 = mergeAssistantContentWithOffset(
+      { content: "霖江路", streamOffset: 2 },
+      { content: "最近几", streamOffset: 6 },
+    );
+    expect(step2).toBe("霖江路最近几");
+    const step3 = mergeAssistantContentWithOffset(
+      { content: "霖江路最近几", streamOffset: 2 },
+      { content: "你好", streamOffset: 0 },
+    );
+    expect(step3).toBe("你好霖江路最近几");
+  });
+
+  it("sequential deltas produce same result as appendAssistantContent", () => {
+    const result = mergeAssistantContentWithOffset(
+      { content: "你好", streamOffset: 0 },
+      { content: "霖江路", streamOffset: 2 },
+    );
+    expect(result).toBe("你好霖江路");
+  });
+
+  it("overlapping deltas deduplicate overlapping region", () => {
+    // "AB" at offset 0, "BC" at offset 1 → "ABC"
+    const result = mergeAssistantContentWithOffset(
+      { content: "AB", streamOffset: 0 },
+      { content: "BC", streamOffset: 1 },
+    );
+    expect(result).toBe("ABC");
+  });
+
+  it("falls back to appendAssistantContent when offsets are undefined", () => {
+    const result = mergeAssistantContentWithOffset(
+      { content: "你好", streamOffset: undefined },
+      { content: "霖江路", streamOffset: undefined },
+    );
+    expect(result).toBe("你好霖江路");
+    // Also test with mixed: one has offset, other doesn't.
+    const mixed = mergeAssistantContentWithOffset(
+      { content: "你好", streamOffset: 0 },
+      { content: "霖江路", streamOffset: undefined },
+    );
+    expect(mixed).toBe("你好霖江路");
+  });
+
+  it("complete replacement (includes relationship) still works", () => {
+    // incoming completely contains existing → replace.
+    const result = mergeAssistantContentWithOffset(
+      { content: "你好霖江路", streamOffset: 0 },
+      { content: "你好霖江路最近几", streamOffset: 0 },
+    );
+    expect(result).toBe("你好霖江路最近几");
   });
 });
 
