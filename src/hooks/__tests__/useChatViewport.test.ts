@@ -287,7 +287,7 @@ describe("useChatViewport", () => {
       viewport().focusTimelineEvent("b", undefined, "start-center");
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 380, behavior: "auto" });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 380, behavior: "smooth" });
   });
 
   it("invalidates the old viewport anchor before navigation so streaming cannot pull it back", () => {

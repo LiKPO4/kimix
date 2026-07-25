@@ -636,11 +636,30 @@ body::before {
   box-shadow: 0 0 0 2px var(--accent-primary-soft);
 }
 
-.kimix-chat-navigation-hit[data-active="true"] .kimix-chat-navigation-mark,
-.kimix-chat-navigation-hit[data-active="true"]:hover .kimix-chat-navigation-mark,
-.kimix-chat-navigation-hit[data-active="true"]:focus-visible .kimix-chat-navigation-mark {
+.kimix-chat-navigation-hit[data-active="true"] .kimix-chat-navigation-mark {
+  opacity: 0;
+}
+
+.kimix-chat-navigation-active-indicator {
+  transition: top 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: top;
+}
+
+.kimix-chat-navigation-active-thumb {
+  display: block;
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--text-primary);
   opacity: 1;
+  transform: translateY(-50%);
+  transform-origin: right center;
   box-shadow: 0 0 0 2px var(--accent-primary-light);
+  transition: opacity 160ms cubic-bezier(0.2, 0, 0, 1), background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.kimix-chat-navigation-active-thumb[data-kind="user"] {
+  background: var(--accent-primary);
 }
 
 .kimix-chat-navigation-preview {

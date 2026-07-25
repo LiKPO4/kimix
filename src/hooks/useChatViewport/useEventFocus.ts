@@ -152,14 +152,14 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
         const scrollRect = scrollNode.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - 16;
-        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
       } else if (alignment === "start-center" && scrollNode) {
         const scrollRect = scrollNode.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const targetTop = scrollNode.scrollTop + targetRect.top - scrollRect.top - scrollNode.clientHeight / 2;
-        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+        scrollNode.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
       } else {
-        target.scrollIntoView({ behavior: "auto", block: "center" });
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
     if (highlightClearTimerRef.current !== null) {
