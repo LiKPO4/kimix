@@ -25,6 +25,12 @@ export type ActiveTurnDraft = {
 type DraftListener = () => void;
 
 const drafts = new Map<string, ActiveTurnDraft>();
+type StreamAnchors = { content: StreamAnchor; think: StreamAnchor };
+// Server offsets are cumulative for the whole Agent turn, while `drafts`
+// contains only the currently visible segment and is committed at tool/status
+// boundaries. Keep the protocol cursor independent from that transient draft
+// so replayed tails after a boundary are still recognized as duplicates.
+const streamAnchors = new Map<string, StreamAnchors>();
 const listeners = new Map<string, Set<DraftListener>>();
 const globalListeners = new Set<DraftListener>();
 
@@ -157,20 +163,24 @@ type StreamAnchor = number | null;
  * 跳过；offset > 本地长度=中间缺帧）。对齐官方 web 的 turnLen 锚定模型：
  * offset===0 视为流（重）起点——重试/重连后旧流作废，以新流替换；
  * offset===锚点 顺序追加；offset<锚点 跳过重复尾部；
- * offset>锚点 说明缺帧，本地长度不再可信，回退模糊合并并放弃本轮锚定。
+ * offset>锚点 说明缺帧；残片不能安全拼接，等待权威快照/offset 0 自愈。
+ * 无锚点且本地段为空时允许从非零 offset 接续：权威快照可能已经承载前文。
  */
 function anchorStreamText(
   acc: string,
   delta: string,
   offset: number,
   anchor: StreamAnchor,
-  legacyAppend: (left: string, right: string) => string,
 ): { text: string; anchor: StreamAnchor } {
   if (offset === 0) return { text: delta, anchor: delta.length };
-  if (anchor === null) return { text: legacyAppend(acc, delta), anchor: null };
+  if (anchor === null) {
+    return acc
+      ? { text: acc, anchor: null }
+      : { text: delta, anchor: offset + delta.length };
+  }
   if (offset === anchor) return { text: acc + delta, anchor: anchor + delta.length };
   if (offset < anchor) return { text: acc, anchor };
-  return { text: legacyAppend(acc, delta), anchor: null };
+  return { text: acc, anchor };
 }
 
 function applyStreamOffsetDelta(
@@ -185,7 +195,6 @@ function applyStreamOffsetDelta(
       event.thinking,
       offset,
       anchors.think,
-      (left, right) => mergeAssistantThinkingText(left, right) ?? "",
     );
     const anchored = merged.anchor !== null;
     const basePart = base.thinkingParts?.[0];
@@ -211,7 +220,7 @@ function applyStreamOffsetDelta(
       thinkAnchor: merged.anchor,
     };
   }
-  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, appendStreamingText);
+  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content);
   return {
     event: {
       ...base,
@@ -246,6 +255,11 @@ export function applyActiveTurnDraftDelta(
       const [previousKey, previousDraft] = compatible;
       previous = previousDraft;
       drafts.delete(previousKey);
+      const previousAnchors = streamAnchors.get(previousKey);
+      if (previousAnchors) {
+        streamAnchors.delete(previousKey);
+        streamAnchors.set(key, previousAnchors);
+      }
       pendingNotifyKeys.delete(previousKey);
       // A local optimistic turn id can be replaced by the official id after
       // the first token. Move the same room-message draft instead of leaving
@@ -279,8 +293,9 @@ export function applyActiveTurnDraftDelta(
   // 0.29 Server volatile delta 带累计 offset 时按官方 turnLen 模型锚定装配，
   // 否则沿用原有顺序拼接与幂等合并（快照回放替换、思考超集取代）。
   const isAppendOnlyDelta = !event.snapshotMessageId && !event.snapshotMessageIdStable;
-  let contentAnchor: StreamAnchor = previous?.streamContentAnchor ?? null;
-  let thinkAnchor: StreamAnchor = previous?.streamThinkAnchor ?? null;
+  const persistedAnchors = streamAnchors.get(key);
+  let contentAnchor: StreamAnchor = persistedAnchors?.content ?? previous?.streamContentAnchor ?? null;
+  let thinkAnchor: StreamAnchor = persistedAnchors?.think ?? previous?.streamThinkAnchor ?? null;
   let merged: TimelineEvent[];
   if (isAppendOnlyDelta && typeof event.streamOffset === "number") {
     const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor });
@@ -318,6 +333,7 @@ export function applyActiveTurnDraftDelta(
     streamThinkAnchor: thinkAnchor,
   };
   drafts.set(key, next);
+  streamAnchors.set(key, { content: contentAnchor, think: thinkAnchor });
   if (migratedFromKey) notify(migratedFromKey);
   scheduleNotify(key);
   return next;
@@ -331,11 +347,17 @@ export function takeActiveTurnDraft(key: string): ActiveTurnDraft | null {
   pendingNotifyKeys.delete(key);
   flushPendingNotifications();
   drafts.delete(key);
+  // Do not clear streamAnchors: `take` commits only the current visual segment.
+  // The Server offset remains turn-global across later tool/model steps.
   notify(key);
   return draft;
 }
 
 export function clearActiveTurnDraft(key: string): void {
+  // An authoritative snapshot/body becomes the new formal baseline. Its
+  // per-message body cannot reconstruct the Server's whole-turn offset, so let
+  // the next live frame seed a fresh cursor (including a non-zero resume).
+  streamAnchors.delete(key);
   if (!drafts.has(key)) return;
   pendingNotifyKeys.delete(key);
   flushPendingNotifications();
@@ -352,6 +374,9 @@ export function clearActiveTurnDraftsForSession(sessionId: string): void {
     drafts.delete(key);
     changed = true;
     notify(key);
+  }
+  for (const key of [...streamAnchors.keys()]) {
+    if (key.startsWith(prefix)) streamAnchors.delete(key);
   }
   if (changed) {
     for (const listener of globalListeners) listener();
@@ -409,6 +434,7 @@ export function useActiveTurnDraft(key: string | null): ActiveTurnDraft | null {
 /** test helper */
 export function resetActiveTurnDraftStoreForTests(): void {
   drafts.clear();
+  streamAnchors.clear();
   listeners.clear();
   globalListeners.clear();
   pendingNotifyKeys.clear();

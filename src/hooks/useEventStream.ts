@@ -27,6 +27,21 @@ import { isUserScrollActive } from "@/utils/userScrollActivity";
 
 const STREAM_EVENT_FLUSH_MS = 80;
 const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
+const TOOL_ONLY_STREAM_EVENT_FLUSH_MS = 500;
+
+export function getStreamEventFlushDelay(items: TimelineEvent[], scrolling: boolean): number {
+  if (scrolling) return STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING;
+  // Raw tool arguments are not conversational text. On long tool calls they
+  // can otherwise force an O(history) projection several times per second and
+  // starve the actual assistant stream. Completion/boundary frames still flush
+  // synchronously before this delay is consulted.
+  const onlyBackgroundProgress = items.length > 0 && items.every((event) => (
+    event.type === "status_update" ||
+    (event.type === "subagent" && event.status === "running") ||
+    (event.type === "tool_call" && event.status === "running")
+  ));
+  return onlyBackgroundProgress ? TOOL_ONLY_STREAM_EVENT_FLUSH_MS : STREAM_EVENT_FLUSH_MS;
+}
 
 export function isDeferrableStreamEvent(event: TimelineEvent): boolean {
   if (event.type === "assistant_message" && !event.isComplete) return true;
@@ -253,9 +268,10 @@ export function useEventStream() {
     }
 
     if (!streamFlushTimerRef.current) {
-      const delay = isScrollYieldEnabled() && isUserScrollActive()
-        ? STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING
-        : STREAM_EVENT_FLUSH_MS;
+      const delay = getStreamEventFlushDelay(
+        current.items,
+        isScrollYieldEnabled() && isUserScrollActive(),
+      );
       streamFlushTimerRef.current = setTimeout(flushStreamEvents, delay);
     }
   }, [flushStreamEvents]);

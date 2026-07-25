@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-25T01:40:00+08:00"
+timestamp: "2026-07-26T06:29:49+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -110,24 +110,32 @@ win the regression guard and fossilize duplicates into the persisted state.
 ## Offset-anchored volatile deltas take precedence over order-based merging
 
 Kimi Code 0.29 Server tags volatile `assistant.delta` / `thinking.delta` WS
-frames with a cumulative character `offset` within the in-flight turn's
-accumulated stream (per-stream: text and thinking lengths are tracked
-separately). The official web client assembles strictly by this anchor —
-`offset === 0` restarts the stream (retry/reconnect discards the old one),
+frames with a cumulative character `offset` across the **whole Agent turn**;
+text and thinking lengths are tracked separately, and neither cursor resets at
+a `turn.step` or tool boundary. The official web client assembles strictly by
+this anchor — `offset === 0` restarts the stream after a missed turn boundary,
 `offset === local length` appends, `offset < local length` skips a duplicated
-tail, and `offset > local length` means frames were missed and triggers a
-re-snapshot. Kimix's draft store implements the same model
-(`streamContentAnchor` / `streamThinkAnchor` per draft key, with the offset
-threaded `ServerFrame → flattenServerEvent → mapKimiCodeEvent →
-AssistantMessageEvent.streamOffset`), except that a gap falls back to the
-legacy fuzzy merge for that delta instead of re-snapshotting, keeping content
-while dropping the anchor for the rest of the turn. Order-based concatenation
-plus containment checks must never be applied to offset-bearing frames: fuzzy
-containment drops genuine fragments and produces scrambled, duplicated
-thinking (observed live as paragraphs repeated with words spliced across
-sentences). Anchored thinking collapses to a single growing part per draft,
-mirroring the official one-block-per-turn presentation. SDK-route deltas carry
-no offset and keep the legacy path.
+tail, and `offset > local length` means frames were missed and requires an
+authoritative snapshot.
+
+Kimix therefore keeps protocol cursors in `activeTurnDraftStore` independently
+from the transient visible draft. `commitActiveTurnDraftsToBatch` may delete a
+draft at every formal/tool boundary, but it must retain the whole-turn content
+and thinking cursors; otherwise a reconnect replay tail seeds the next visual
+segment and creates sentences with old prefixes spliced into new text. An
+authoritative body/snapshot clears the cursor because its per-message text
+cannot reconstruct the whole-turn length; the next live frame may seed a fresh
+cursor from a non-zero offset, with the snapshot already carrying the prefix.
+An offset gap against a known cursor is never fuzzy-appended: showing a shorter
+authoritative/live prefix is preferable to persisting invented prose.
+
+The offset is threaded `ServerFrame → flattenServerEvent →
+mapKimiCodeEvent → AssistantMessageEvent.streamOffset`. Order-based
+concatenation plus containment checks must never be applied to offset-bearing
+frames: fuzzy containment drops genuine fragments and produces scrambled,
+duplicated thinking. Anchored thinking collapses to a single growing part per
+draft, mirroring the official one-block-per-turn presentation. SDK-route
+deltas carry no offset and keep the legacy path.
 
 ## Memo keys never change semantics for performance
 
@@ -168,8 +176,9 @@ New invariants:
 - **Invariant D (GC ref availability)**: every session skipped by incremental persist must still contribute its image refs to garbage collection — either from `sessionImageRefs` (pre-populated at load/registration and refreshed whenever that session is stripped) or via the lazy fallback that collects once from the cached store session. A cache that is only populated for *changed* sessions makes unchanged sessions' refs vanish from `referencedRefs`, and the GC deletes their in-use images (caught in review, v2.20.0: the first real persist after hydration would have bulk-deleted history images). Any GC test that mocks `getAllImageIds` to `[]` structurally cannot catch this — at least one test must report an in-use image id and assert it is never passed to `deleteImages`.
 - **Invariant E (tool boundary breaks assistant segments)**: `mergeEvents` must never merge an incoming assistant text/thinking frame into an earlier unfinished assistant when a `tool_call`/`subagent`/`approval_request` event already sits between them (v2.20.0, `hasToolBoundary` in both the `stableAssistantIndex` and fallback merge paths). The old `sameTurnAssistantIndex` behavior absorbed a whole turn's text into one pre-tools message, which collapsed every completed turn to a single text block before its tools — and `computeFinalTextBlockContent` then misclassified that sole block as "intermediate process" (trailing tools ⇒ bottom body `""`), making all historical turn bodies vanish into the collapsed process summary. Empty identity-terminal frames (`isComplete`, no content/thinking) are exempt and still complete the latest unfinished assistant; barrier replays and stable snapshot ids keep their own paths. As a display-layer backstop for already-merged legacy histories, a complete turn with exactly one text block and trailing process blocks shows that block in full.
 - **Invariant F (stream-offset-ordered body merge)**: when both assistant frames carry `streamOffset`, content must merge by offset interval order — prepend when the incoming fragment ends before the target starts, append after, and on overlap keep the earlier fragment plus the later fragment's non-overlapping suffix (`mergeAssistantContentWithOffset`, v2.20.0). Plain concatenation corrupts text whenever a provider emits out-of-order deltas (observed with grok-4.5: offset 2 arrived before offset 0, rendering "霖江路…你好" until the authoritative snapshot frame rewrote the body). When either side lacks an offset, fall back to **prefix-safe** merge (`startsWith`, never `includes`) — a fragment that merely contains the existing text mid-string must not be treated as an authoritative superset, because `includes` silently drops the prefix context while `startsWith` at worst concatenates once and self-heals on the next frame.
+- **Invariant G (turn-global stream cursor)**: Server `assistant.delta` / `thinking.delta` offsets survive visual draft commits and tool/model step boundaries. `takeActiveTurnDraft` removes only the visible segment; its per-turn cursor remains until an authoritative body resets the baseline or the session is cleared. A lower offset is replay and must be skipped. A higher offset against a known cursor is a gap and must not be fuzzy-appended. After an authoritative snapshot clears the cursor, an empty draft may seed from the next non-zero offset because the snapshot owns the omitted prefix.
 
-Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on a production reproduction: 395 flushes/10s at 14ms each (streaming tool-call arguments were misclassified as immediate boundaries — `tool_call` with `status === "running"` must batch like other informational events), and the remaining main-thread saturation was browser text layout, not JS (Profiler callbacks are no-ops in production React, so commit time must be inferred, not measured that way). Two invariants follow: live thinking renders only the tail (`capLiveThinkingRenderText`, 2000 chars — the viewport is 144px), and draft notifications cap at 10 fps (`STREAMING_NOTIFY_MS = 100`, 250 ms while scrolling) because every notification re-shapes the growing text.
+Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on production reproductions: an earlier immediate-boundary bug caused 395 flushes/10s at 14ms each; a later 5,500-event long turn still spent 6–7s of every 10s rebuilding render items while running tool arguments flushed 38–42 times. Running tool/status/subagent-only batches therefore use a 500ms cadence, while Assistant text keeps the 80ms cadence and true boundaries remain synchronous. Live thinking renders only the tail (`capLiveThinkingRenderText`, 2000 chars — the viewport is 144px), and draft notifications cap at 10 fps (`STREAMING_NOTIFY_MS = 100`, 250 ms while scrolling) because every notification re-shapes the growing text.
 
 ## Streaming markdown is plain until settled
 

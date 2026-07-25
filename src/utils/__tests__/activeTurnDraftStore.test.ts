@@ -203,12 +203,19 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(key)?.thinking).toBe("新的思考流继续");
   });
 
-  it("falls back to fuzzy merge on offset gaps without losing content", () => {
+  it("does not splice an unreadable fragment into the draft when an offset gap is detected", () => {
     const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
     applyActiveTurnDraftDelta(key, delta("", { thinking: "第一段", streamOffset: 0 }));
-    // offset 跳跃（缺帧）：回退模糊合并且本轮不再锚定
+    // offset 跳跃代表中间帧已丢失；等待快照，不能把第三段硬接到第一段。
     applyActiveTurnDraftDelta(key, delta("", { thinking: "第三段", streamOffset: 99 }));
-    expect(getActiveTurnDraft(key)?.thinking).toBe("第一段第三段");
+    expect(getActiveTurnDraft(key)?.thinking).toBe("第一段");
+  });
+
+  it("can resume from a non-zero offset after an authoritative snapshot supplied the prefix", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("快照后的续写", { streamOffset: 40 }));
+    applyActiveTurnDraftDelta(key, delta("。", { streamOffset: 46 }));
+    expect(getActiveTurnDraft(key)?.content).toBe("快照后的续写。");
   });
 
   it("anchors assistant content deltas by stream offset", () => {
@@ -217,6 +224,19 @@ describe("activeTurnDraftStore", () => {
     applyActiveTurnDraftDelta(key, delta("霖江路", { streamOffset: 2 }));
     applyActiveTurnDraftDelta(key, delta("江路", { streamOffset: 3 }));
     expect(getActiveTurnDraft(key)?.content).toBe("你好霖江路");
+  });
+
+  it("keeps the turn-global offset cursor after a tool boundary commits the visual draft", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("先读 DamageService。", { streamOffset: 0 }));
+    const first = takeActiveTurnDraft(key);
+    expect(first?.content).toBe("先读 DamageService。");
+
+    // Reconnect/tool-boundary replay of an old tail must not seed the new
+    // segment. The next legitimate delta continues from the whole-turn offset.
+    applyActiveTurnDraftDelta(key, delta("DamageService。", { streamOffset: 2 }));
+    applyActiveTurnDraftDelta(key, delta("再看调用方。", { streamOffset: "先读 DamageService。".length }));
+    expect(getActiveTurnDraft(key)?.content).toBe("再看调用方。");
   });
 
   it("marks complete/barrier bodies as authoritative", () => {

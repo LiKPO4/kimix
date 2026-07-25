@@ -13,6 +13,7 @@ import {
 import {
   coalesceStreamEventBatch,
   commitActiveTurnDraftsToBatch,
+  getStreamEventFlushDelay,
   hasSubagentEventScope,
   isDeferrableStreamEvent,
   useEventStream,
@@ -47,6 +48,23 @@ describe("isDeferrableStreamEvent", () => {
     expect(isDeferrableStreamEvent({ ...base, type: "tool_call", toolCallId: "t", toolName: "Bash", status: "completed", arguments: {} })).toBe(false);
     expect(isDeferrableStreamEvent({ ...base, type: "approval_request", requestId: "r", toolName: "Bash", description: "d", details: "x", riskLevel: "low", status: "pending" })).toBe(false);
     expect(isDeferrableStreamEvent({ ...base, type: "error", message: "x" })).toBe(false);
+  });
+});
+
+describe("getStreamEventFlushDelay", () => {
+  it("slows pure tool progress without delaying assistant text or boundaries", () => {
+    const base = { id: "e1", timestamp: 1 };
+    const runningTool: TimelineEvent = {
+      ...base,
+      type: "tool_call",
+      toolCallId: "t",
+      toolName: "Read",
+      status: "running",
+      arguments: {},
+    };
+    expect(getStreamEventFlushDelay([runningTool], false)).toBe(500);
+    expect(getStreamEventFlushDelay([assistant("正文")], false)).toBe(80);
+    expect(getStreamEventFlushDelay([runningTool], true)).toBe(250);
   });
 });
 
