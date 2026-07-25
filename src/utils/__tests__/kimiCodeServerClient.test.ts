@@ -294,8 +294,11 @@ describe("KimiCodeServerClient protocol adapters", () => {
 
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     const internals = client as unknown as {
+      subscribed: Set<string>;
       receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
     };
+    // 本用例只验证 abort 结算；预标记订阅，prompt 不再尝试建立真实 WS 订阅。
+    internals.subscribed.add("session-1");
     const dispatched = client.prompt("session-1", "数到 300", {});
     let settled: string | null = null;
     void dispatched.then(
@@ -323,6 +326,139 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
     await vi.waitFor(() => expect(settled).toBe("resolved"));
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
+  });
+
+  it("establishes a real websocket subscription before prompting an unsubscribed session", async () => {
+    const promptId = "msg_01SUBSCRIBE";
+    const order: string[] = [];
+    const sentFrames: Array<{ type: string; id: string; payload: unknown }> = [];
+    class FakeWebSocket {
+      static OPEN = 1;
+      readyState = 0;
+      private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+
+      constructor(readonly url: string) {
+        queueMicrotask(() => {
+          this.readyState = 1;
+          this.emit("open");
+          this.emit("message", { data: JSON.stringify({ type: "server_hello" }) });
+        });
+      }
+
+      addEventListener(type: string, listener: (...args: unknown[]) => void) {
+        const list = this.listeners.get(type) ?? [];
+        list.push(listener);
+        this.listeners.set(type, list);
+      }
+
+      send(raw: string) {
+        const frame = JSON.parse(raw) as { type: string; id: string; payload: unknown };
+        sentFrames.push(frame);
+        order.push(`ws:${frame.type}`);
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({ type: "ack", id: frame.id, code: 0 }),
+        }));
+      }
+
+      close() {
+        this.readyState = 3;
+      }
+
+      emit(type: string, ...args: unknown[]) {
+        for (const listener of this.listeners.get(type) ?? []) listener(...args);
+      }
+    }
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      expect(url).toContain("/api/v1/sessions/session-1/prompts");
+      order.push("http:prompts");
+      return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = client as unknown as {
+      receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    const dispatched = client.prompt("session-1", "数到 300", {});
+    internals.receive({
+      type: "prompt.aborted",
+      session_id: "session-1",
+      seq: 30,
+      epoch: "epoch-1",
+      payload: { promptId },
+    });
+    await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
+
+    const subscribeFrame = sentFrames.find((frame) => frame.type === "subscribe");
+    expect(subscribeFrame?.payload).toMatchObject({ session_ids: ["session-1"] });
+    expect(order.indexOf("ws:subscribe")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("ws:subscribe")).toBeLessThan(order.indexOf("http:prompts"));
+    await client.close();
+  });
+
+  it("still sends the prompt when the pre-prompt subscription fails", async () => {
+    const promptId = "msg_01SUBFAIL";
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toContain("/api/v1/sessions/session-1/prompts");
+      return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = client as unknown as {
+      receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    const failure = new Error("Kimi Server WebSocket 连接失败");
+    const subscribe = vi.spyOn(client, "subscribe").mockRejectedValue(failure);
+
+    const dispatched = client.prompt("session-1", "数到 300", {});
+    internals.receive({
+      type: "prompt.aborted",
+      session_id: "session-1",
+      seq: 31,
+      epoch: "epoch-1",
+      payload: { promptId },
+    });
+    await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
+    expect(subscribe).toHaveBeenCalledWith("session-1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith("[KimiCodeServerClient] prompt 前建立会话订阅失败，继续发送（首波增量可经快照兜底）:", failure);
+    warn.mockRestore();
+  });
+
+  it("does not resubscribe an already-subscribed session before prompting", async () => {
+    const promptId = "msg_01SUBBED";
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      expect(url).toContain("/api/v1/sessions/session-1/prompts");
+      return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = client as unknown as {
+      subscribed: Set<string>;
+      receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
+    };
+    internals.subscribed.add("session-1");
+    const subscribe = vi.spyOn(client, "subscribe");
+    const dispatched = client.prompt("session-1", "数到 300", {});
+    internals.receive({
+      type: "prompt.aborted",
+      session_id: "session-1",
+      seq: 32,
+      epoch: "epoch-1",
+      payload: { promptId },
+    });
+    await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
+    expect(subscribe).not.toHaveBeenCalled();
   });
 
   it("delivers the completed prompt's authoritative assistant before prompt.completed", async () => {

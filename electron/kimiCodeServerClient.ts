@@ -983,7 +983,15 @@ export class KimiCodeServerClient {
   }
 
   async prompt(sessionId: string, input: unknown, controls: Record<string, unknown>) {
-    this.subscribed.add(sessionId);
+    // 裸 add 只改本地 Set，Server 端订阅只经 client_hello 握手或 subscribe 控制帧建立；
+    // WS 已连而会话未订阅时不发控制帧，首波流式增量照丢，故 prompt 前必须真正订阅。
+    if (!this.subscribed.has(sessionId)) {
+      try {
+        await this.subscribe(sessionId);
+      } catch (error) {
+        console.warn("[KimiCodeServerClient] prompt 前建立会话订阅失败，继续发送（首波增量可经快照兜底）:", error);
+      }
+    }
     const content = await toServerPromptContent(
       input as Parameters<typeof toServerPromptContent>[0],
       (file) => this.uploadFile(file),
