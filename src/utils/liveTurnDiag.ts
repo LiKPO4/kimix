@@ -195,8 +195,8 @@ export function noteLiveDisplayMode(input: {
     to: input.mode,
     sid: input.sessionId?.slice(-8),
     key: input.key.slice(-24),
-    // 字段名避免 *body*：writeDiag 默认 redact 会吞掉 bodyLen
-    contentChars: input.bodyLen ?? 0,
+    // 字段名避免 *body*/*content*：writeDiag 默认 redact 会吞掉长度
+    textChars: input.bodyLen ?? 0,
     isComplete: Boolean(input.isComplete),
     durationMs: input.durationMs ?? undefined,
     wallElapsedMs: input.wallElapsedMs,
@@ -238,7 +238,7 @@ export function noteLiveStreamFrame(input: {
     kind,
     rawType: input.rawType,
     mappedType: input.mappedType,
-    contentChars: input.bodyLen ?? 0,
+    textChars: input.bodyLen ?? 0,
     isComplete: Boolean(input.isComplete),
     isThinking: Boolean(input.isThinking),
     volatile: input.volatile,
@@ -278,7 +278,7 @@ export function noteLiveSilence(input: {
     ? {
         openAssistants: input.turn.openAssistants,
         completeAssistants: input.turn.completeAssistants,
-        contentChars: input.turn.latestBodyLen,
+        textChars: input.turn.latestBodyLen,
         latestIsComplete: input.turn.latestIsComplete,
         latestDurationMs: input.turn.latestDurationMs,
         latestTimestamp: input.turn.latestTimestamp,
@@ -322,7 +322,7 @@ export function noteLiveSettle(input: {
     ? {
         openAssistants: input.turn.openAssistants,
         completeAssistants: input.turn.completeAssistants,
-        contentChars: input.turn.latestBodyLen,
+        textChars: input.turn.latestBodyLen,
         latestIsComplete: input.turn.latestIsComplete,
         latestDurationMs: input.turn.latestDurationMs,
         latestTimestamp: input.turn.latestTimestamp,

@@ -15,6 +15,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  resolveEngineStatusAfterPromptCompleted,
   resolvePromptModel,
   resolveServerEngineStatus,
   resolveServerModelRefresh,
@@ -252,6 +253,27 @@ describe("resolveServerEngineStatus", () => {
     expect(resolveServerEngineStatus({ busy: false, status: "running" })).toBe("idle");
     expect(resolveServerEngineStatus({ busy: false, status: "completed" })).toBe("completed");
     expect(resolveServerEngineStatus({ busy: false, status: "failed" })).toBe("error");
+  });
+});
+
+describe("resolveEngineStatusAfterPromptCompleted", () => {
+  it("does not terminalize while Server busy is still true (pseudo-body + stuck 已连接)", () => {
+    // Live diag: prompt.completed → settled_complete/已连接, then watchdog
+    // recoverSnapshot still delivers tool.call.started (tool counts keep rising).
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: true })).toBe("running");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: true, status: "idle" })).toBe("running");
+  });
+
+  it("maps true terminal busy=false to completed for renderer settle", () => {
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: false })).toBe("completed");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: false, status: "completed" })).toBe("completed");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: false, status: "aborted" })).toBe("interrupted");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: false, status: "failed" })).toBe("error");
+  });
+
+  it("keeps running when activity is unknown rather than faking completed", () => {
+    expect(resolveEngineStatusAfterPromptCompleted({})).toBe("running");
+    expect(resolveEngineStatusAfterPromptCompleted({ status: "unknown-future" })).toBe("running");
   });
 });
 

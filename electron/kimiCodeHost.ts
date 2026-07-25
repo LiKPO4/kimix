@@ -2820,17 +2820,73 @@ function handleServerFrame(frame: ServerFrame) {
   if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event, "prompt");
+  // Live tool frames after a premature completed status prove the Server is still
+  // working (agent-core may keep tool work after a prompt.completed delivery
+  // barrier). Re-open running so the renderer does not stay on 已连接 / 输出完成
+  // while tools continue (diag: settled_complete then tool.call.started via
+  // watchdog recoverSnapshot, tool counts still climbing).
+  if (
+    (frame.type === "tool.call.started" || frame.type === "tool.call.delta" || frame.type === "thinking.delta" || frame.type === "assistant.delta")
+    && serverSessions.get(sessionId)?.status === "completed"
+  ) {
+    setStatus(sessionId, "running");
+  }
   if (frame.type === "prompt.completed") {
     // 0.29 实测：Swarm/Agent 子代理的 prompt.completed 携带子代理自己的 agentId。
-    // 只有主 Agent 的 prompt.completed 才代表本会话轮次完成；子代理的完成帧
+    // 只有主 Agent 的 prompt.completed 才可能结束本会话轮次；子代理的完成帧
     // 不得把仍在运行的主轮置为 completed（否则底部误显示「已完成」并抖动）。
+    //
+    // prompt.completed 是交付屏障，不是 engine 终态：v2 权威信号是 /status.busy。
+    // 立刻 setStatus(completed) 会清 runningSessionId、停 poll，UI 把中间 assistant
+    // 当最终正文；若 Server 仍 busy/后续还有 tool，表现为伪正文 + 折叠 + 卡住。
+    // 必须以 refresh 后的 busy 再落 engine 状态。
     const completedAgentId = typeof payload.agentId === "string" && payload.agentId ? payload.agentId : "main";
     if (completedAgentId === "main") {
-      const currentStatus = serverSessions.get(sessionId)?.status;
-      if (currentStatus !== "interrupted" && currentStatus !== "error") setStatus(sessionId, "completed");
-      void refreshServerSessionStatus(sessionId, true).catch((error) => {
-        console.warn(`[KimiCodeServerHost] refresh completed status failed for ${sessionId}:`, error);
+      void settleServerSessionAfterPromptCompleted(sessionId).catch((error) => {
+        console.warn(`[KimiCodeServerHost] settle after prompt.completed failed for ${sessionId}:`, error);
       });
+    }
+  }
+}
+
+/**
+ * Pure decision: after main-agent prompt.completed, map refreshed /status into
+ * the engine status we should publish. busy=true keeps running; unknown stays
+ * running (do not fake completed); idle maps to completed so the renderer
+ * terminal path (which ignores bare idle) still settles.
+ */
+export function resolveEngineStatusAfterPromptCompleted(
+  source: { status?: unknown; busy?: unknown },
+): KimiCodeEngineStatus {
+  const engine = resolveServerEngineStatus(source);
+  if (engine === "running" || engine === "waiting_approval" || engine === "waiting_question") return engine;
+  if (engine === "error" || engine === "interrupted") return engine;
+  if (engine === "unknown") return "running";
+  // idle / completed
+  return "completed";
+}
+
+/**
+ * After main-agent prompt.completed, ask Server /status (busy-authoritative) and
+ * only terminalize when activity is not active.
+ */
+async function settleServerSessionAfterPromptCompleted(sessionId: string): Promise<void> {
+  const managed = serverSessions.get(sessionId);
+  if (!managed) return;
+  const before = managed.status;
+  if (before === "interrupted" || before === "error") return;
+  try {
+    const status = await refreshServerSessionStatus(sessionId, true);
+    // re-read: concurrent cancel/error may have landed during refresh
+    const current = serverSessions.get(sessionId)?.status;
+    if (current === "interrupted" || current === "error") return;
+    setStatus(sessionId, resolveEngineStatusAfterPromptCompleted(status));
+  } catch (error) {
+    console.warn(`[KimiCodeServerHost] refresh after prompt.completed failed for ${sessionId}:`, error);
+    const current = serverSessions.get(sessionId)?.status;
+    if (current !== "interrupted" && current !== "error") {
+      // 无法确认 busy 时保守保持 running，避免假完成；poll 会再收敛
+      setStatus(sessionId, "running");
     }
   }
 }

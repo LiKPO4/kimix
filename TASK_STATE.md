@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：prompt.completed 过早 completed（伪正文+卡住，v2.20.10）
+
+- 用户 v2.20.9 截图：头「输出完成 5分19秒」+ 伪正文「发现两个要点…」+ 过程折叠 + 底「已连接」；实际卡住。
+- 日志：15:08:30 `prompt.completed` → display settled_complete；之后 **0 次 poll**；15:10/11/13/15 反复 watchdog，recover 仍出 `tool.call.started`（tool 418→486）——**Server 仍在跑，Kimix 已 completed**。
+- 根因：`handleServerFrame` 对 main `prompt.completed` 立刻 `setStatus(completed)`，未查 v2 `/status.busy`。交付屏障 ≠ engine 终态。
+- 修复：完成后 `refreshServerSessionStatus`，`resolveEngineStatusAfterPromptCompleted`（busy→running；idle→completed；unknown→running）；若仍 completed 又收到 tool/think/body 帧则 re-open running。
+- 待用户实测：长 review 中途不再「输出完成+已连接」假收口；忙时保持运行中；真结束后再完成。
+
 ## 2026-07-25 修复：中间 complete 步正文闪现再收进过程（v2.20.9）
 
 - 用户实测 v2.20.8：整轮更正常；唯一残留——中间汇报句（「代码部分已全部完成，正在跑最终验收」）先出现在正文位，续跑后又缩回折叠过程。
