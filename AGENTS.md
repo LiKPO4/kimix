@@ -79,7 +79,7 @@
      Kimix 场景反复出现旧窗口占用、dev 新窗口没真正打开的情况。
    - 构建缓存：`rmdir /S /Q out` + `rmdir /S /Q node_modules\.vite` + `rmdir /S /Q node_modules\.cache`。
    - 发图系统：用户截图系统偶发延迟。看到截图上的版本号和期望不一致时，**立即要求用户重发**，不要基于错图推理。
-   - **版本号锚定**：每一轮改动必须 bump 版本号（`package.json` + `Sidebar` + `SettingsPanel` 三处同步），差距要大（v0.1.7 → v1.0.0），方便一眼判断画面是不是最新。
+   - **版本号锚定**：每一轮软件本体改动必须 bump 版本号，**只迭代小版本（patch）**（如 v2.20.0 → v2.20.1），不要迭代中版本（minor）、不做大跨度跳跃。版本号唯一事实源是 `package.json`（`src/utils/appVersion.ts` 构建期注入，Sidebar/SettingsPanel 自动跟随，**无需三处手动同步**），方便一眼判断画面是不是最新。
    - Tailwind JIT 动态类名：Kimix 当前配置下，某些 spacing 类（如 `px-16`、`pb-8`、`pt-10`、`mt-4`、`gap-2`、`bottom-10`）会出现**不生成或旧缓存表现不一致**的情况。涉及 padding/margin/gap/定位数值调整时，**优先用 inline `style={{ paddingLeft: 20, marginTop: 14, gap: 8 }}` 或任意值语法 `[padding-left:20px]`**，不要用 `px-*`/`mt-*`/`gap-*`/`bottom-*` 这类 spacing scale 类作为唯一依据。
    - 连续两次只改子元素仍被反馈“没居中/没缝隙”时，立刻检查父级结构和 sibling 关系：是不是缺少列表容器、分区标题是不是不属于任何卡片、是不是只在按钮内部居中但按钮所在行没有居中。
 
@@ -96,7 +96,7 @@
 
 ## Git
 
-- **默认流程（无需逐轮询问）**：每轮有实际改动后，直接本地提交一次 git；**不推云端、不打 tag、不发 Release**。版本号递增只在**软件本体确实有更新**时做（`src/`、`electron/`、构建配置、依赖等会影响产物的改动）；纯文档、规则、知识库、过程记录类改动（如 `docs/`、`knowledge/`、`AGENTS.md`、`TASK_STATE.md`）**不递增版本**。推送远端、打 tag、发布 Release 必须等用户明确要求。Agent 按此默认执行即可，不要每轮再问“要不要提交”。
+- **默认流程（无需逐轮询问）**：每轮有实际改动后，直接本地提交一次 git；**不推云端、不打 tag、不发 Release**。版本号在**软件本体确实有更新**时递增**小版本（patch）**（`src/`、`electron/`、构建配置、依赖等会影响产物的改动），只改 `package.json` 一处（`appVersion.ts` 自动跟随）；纯文档、规则、知识库、过程记录类改动（如 `docs/`、`knowledge/`、`AGENTS.md`、`TASK_STATE.md`）**不递增版本**。推送远端、打 tag、发布 Release 必须等用户明确要求。Agent 按此默认执行即可，不要每轮再问“要不要提交”。
 - 即使改动很小，也要先提交再继续下一步，避免丢失内容。
 - 提交前必须查看 `git status` 和相关 `git diff`，确认只包含本轮改动。
 - 只 stage 本轮相关文件，避免 `git add .` 收进无关改动。
@@ -211,7 +211,7 @@
 
 ### 正确流程
 
-1. 确保版本号三处同步：`package.json` + `Sidebar.tsx` + `SettingsPanel.tsx`
+1. 确保版本号：`package.json` 为唯一事实源（`src/utils/appVersion.ts` 构建期注入，Sidebar/SettingsPanel 自动跟随，无需手动三处同步）；发布用 minor 及以上版本跳跃由用户决定，日常修复只迭代 patch。
 2. 新增或更新对应版本的 Release notes：`docs/release-notes/vX.Y.Z.md`，并确认标题和内容不是旧版本复制残留。Release notes **面向最终用户**：只写用户可感知的变动、影响与已知边界；变动范围从上一个**实际发布**的版本算起（撤版版本并入下一版说明）；不写「验证」「建议重点复验」等开发者视角小节
 3. 提交并推送代码到 `master`
 4. 推送标签：`git tag vX.Y.Z && git push origin vX.Y.Z`
