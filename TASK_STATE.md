@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 诊断：历史轮次正文"消失"（kimi-web 块模式误判单块合并正文为中间过程）
+
+- 现象（用户截图+官方 web 对照）：所有历史轮次只剩消息头+工具组+变更卡，assistant 正文全部不见；最后一轮只显示正文尾部两句（"简洁汇报。生效后..."）；与官方 kimi web 同轮对照，正文完整但 Kimix 未显示。
+- CDP 全链取证（9222 直连运行实例）：IDB 里 11 轮 assistant 正文全部完整（len 838-2170，isComplete）；React fiber 里 MessageBubble 的 event.content=1060 完整；但该轮 turnBlocks=[thinking(3248), text(1060,1事件), tool×5]——**正文合并成单块且排在全部工具块之前**。
+- 根因：MessageBubble.tsx:2674-2682 finalTextBlockContent——最后 text 块后存在 tool/subagent/approval 块时返回 ""（kimi-web 语义：无最终答案段，中间段收进过程详情）。mapHistoryEvents 把同轮所有 text delta 合并为单条 assistant_message 并置于数组首位（工具事件之前）→ 该唯一 text 块被误判为"中间过程"→ 底部正文为空，全文进过程摘要（折叠态只露尾部 teaser 两句）。过程摘要折叠即"正文消失"。
+- 修复方案（已定稿待执行）：isComplete && textBlocks.length===1 && hasTrailingProcessBlock 时返回该 text 块全文（单块即全部正文，含答案）；多块与运行中保持现有语义。同步验证过程详情展开时 text 段内联渲染正常。
+- 修复落地（`6018d6e`）：computeFinalTextBlockContent 提取纯函数，单块+trailing+isComplete 豁免返回全文；6 项定向测试；复审+独立复验通过。
+- 治本落地（`e47d3a3`+`aeabb20`）：用户追问确认新消息同样被合并为单块——实锤 sameTurnAssistantIndex（eventMapper.ts:1789）同 turn 未完成 assistant 跨工具吸收全部 text delta。mergeEvents 两处加 hasToolBoundary 断段（stableAssistantIndex 分支 :1829 + 后备路径 :1988），identity terminal 完成空帧不受影响，barrier/stable id/房间 scope 语义不变。新消息落库即官方多段结构 → turnBlocks 多块 → 穿插排版。4 项旧测试依赖跨工具合并旧行为已更新。aeabb20 修回 54 行 Tab 缩进污染（纯格式）。
+- 验证：typecheck ✓；全量 128 文件 1192 测试 ✓；build ✓。待用户实测：①旧会话 11 轮正文全文显示；②新消息多步工具轮次为官方穿插排版且重启后保持。
+- 遗留：①旧会话已合并单块无法还原分段（信息已丢），以全文显示为终态；②index 重复条目（43 条/19 唯一 id）脏数据另案。
+
 ## 2026-07-25 诊断：启动卡顿复发根因收敛（persist 风暴 × 永败 reconcile）
 
 - 现象：启动卡顿复发且更严重。KIMIX_PERF：启动 30s 窗口 21 个长任务共 26065ms、maxMs 1894，呈 ~1.7s 周期性（2.7s 持续到 27s+）；React 渲染仅 7 次、setState 仅 29 次。
