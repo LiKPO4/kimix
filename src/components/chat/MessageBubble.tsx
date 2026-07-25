@@ -1964,9 +1964,17 @@ function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
  */
 function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
-  const lastTextGroupIndex = useMemo(() => {
+  const finalTextGroupIndex = useMemo(() => {
     for (let i = groups.length - 1; i >= 0; i--) {
-      if (groups[i].type === "text") return i;
+      if (groups[i].type === "text") {
+        const hasTrailingProcess = groups.slice(i + 1).some(
+          (g) => g.type === "tool" || g.type === "subagent" || g.type === "approval"
+        );
+        if (!hasTrailingProcess) {
+          return i;
+        }
+        break;
+      }
     }
     return -1;
   }, [groups]);
@@ -1975,7 +1983,7 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
       {groups.map((group, index) => {
         if (group.type === "text") {
           // Skip the final answer segment; it is rendered as the bottom body.
-          if (index === lastTextGroupIndex) return null;
+          if (index === finalTextGroupIndex) return null;
           return <KimiWebIntermediateTextBlock key={group.key} content={group.content} />;
         }
         return (
@@ -2662,7 +2670,16 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   const finalTextBlockContent = useMemo(() => {
     if (!turnBlocks) return displayContent;
     const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
-    return textBlocks.at(-1)?.content ?? displayContent;
+    if (textBlocks.length === 0) return displayContent;
+    const lastTextBlockIndex = turnBlocks.findLastIndex((b) => b.kind === "text");
+    const hasTrailingProcessBlock = turnBlocks.slice(lastTextBlockIndex + 1).some(
+      (b) => b.kind === "tool" || b.kind === "subagent" || b.kind === "approval"
+    );
+    if (hasTrailingProcessBlock) {
+      return "";
+    }
+    const lastTextBlock = turnBlocks[lastTextBlockIndex];
+    return (lastTextBlock && lastTextBlock.kind === "text") ? lastTextBlock.content : displayContent;
   }, [turnBlocks, displayContent]);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
