@@ -91,6 +91,11 @@ export interface AppState {
   notificationShowContent: boolean;
   processDisplayMode: ProcessDisplayMode;
   collapseProcessWhileRunning: boolean;
+  /**
+   * 待使用模型：欢迎屏（无会话）底部切换的模型，只影响下一个新会话，
+   * 不写入官方默认配置。新会话创建消费后清除（一次性）。
+   */
+  pendingNewSessionModel: string | null;
   filePreviewExtensions: string[];
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;

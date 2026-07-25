@@ -263,6 +263,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const pendingNewSessionModel = useAppStore((s) => s.pendingNewSessionModel);
+  const setPendingNewSessionModel = useAppStore((s) => s.setPendingNewSessionModel);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
@@ -314,7 +316,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     sessionModel: displaySession?.switchedToModel || (displaySession?.model && displaySession.model !== "Kimi Code SDK" ? displaySession.model : null),
     modelSwitchedAt: displaySession?.modelSwitchedAt,
   });
-  const displayModel = (displaySession ? sessionModel : null) ?? defaultModel ?? FALLBACK_KIMI_MODEL;
+  const displayModel = (displaySession ? sessionModel : null) ?? (!displaySession ? (pendingNewSessionModel ?? defaultModel) : defaultModel) ?? FALLBACK_KIMI_MODEL;
   const compactDisplayModel = compactModelDisplayName(displayModel);
   const modelDisplayFontSize = compactDisplayModel.length > 28 ? 11 : compactDisplayModel.length > 20 ? 12 : 13;
   const modelTitle = mutationOwnerError
@@ -552,30 +554,19 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   };
 
   const handleSelectModel = async (model: string) => {
-    // 欢迎屏（无会话）：写入全局默认模型，下一个新会话将使用它。
+    // 欢迎屏（无会话）：不写官方默认模型，只设置「待使用模型」——
+    // 仅影响下一个新会话，创建消费后即清除；默认模型请在设置里修改。
     if (!activeSession) {
       if (switchingModel) return;
-      if (model === defaultModel) {
+      if (model === (pendingNewSessionModel ?? defaultModel)) {
         setModelMenuOpen(false);
         restoreComposerFocus();
         return;
       }
-      setSwitchingModel(model);
-      let res;
-      try {
-        res = await window.api.setKimiDefaultModel({ modelAlias: model });
-      } catch (error) {
-        res = { success: false as const, error: error instanceof Error ? error.message : String(error) };
-      }
-      setSwitchingModel(null);
-      if (!res.success) {
-        showToast(`切换默认模型失败：${res.error ?? "未知错误"}`);
-        return;
-      }
-      setDefaultModel(model);
+      setPendingNewSessionModel(model);
       setModelMenuOpen(false);
       restoreComposerFocus();
-      showToast(`默认模型已切换为 ${model}`);
+      showToast(`下一个新会话将使用 ${model}`);
       return;
     }
     if (activeSession.isLoading || switchingModel) return;
@@ -1018,7 +1009,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                         )}
                         <div className="flex flex-col" style={{ gap: 3 }}>
                           {group.models.map((option) => {
-                            const selected = option.id === sessionModel || (!sessionModel && option.id === defaultModel);
+                            const selected = option.id === sessionModel || (!sessionModel && option.id === (pendingNewSessionModel ?? defaultModel));
                             const switching = switchingModel === option.id;
                             return (
                               <button

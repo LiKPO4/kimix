@@ -9,6 +9,27 @@ const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
+const PENDING_NEW_SESSION_MODEL_KEY = "kimix_pending_new_session_model";
+
+function readPendingNewSessionModel(): string | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(PENDING_NEW_SESSION_MODEL_KEY);
+    return raw && raw.trim() ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingNewSessionModel(model: string | null) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    if (model && model.trim()) localStorage.setItem(PENDING_NEW_SESSION_MODEL_KEY, model.trim());
+    else localStorage.removeItem(PENDING_NEW_SESSION_MODEL_KEY);
+  } catch {
+    // Ignore local persistence errors; the in-memory value still updates.
+  }
+}
 
 function placeNewSubagentCard(order: RightSidebarCardId[], source: readonly RightSidebarCardId[]) {
   if (source.includes("subagent")) return order;
@@ -111,6 +132,7 @@ export interface AppStore extends AppState {
   setNotificationShowContent: (enabled: boolean) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setCollapseProcessWhileRunning: (enabled: boolean) => void;
+  setPendingNewSessionModel: (model: string | null) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
@@ -164,6 +186,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   notificationShowContent: false,
   processDisplayMode: readProcessDisplayMode(),
   collapseProcessWhileRunning: readCollapseProcessWhileRunning(),
+  pendingNewSessionModel: readPendingNewSessionModel(),
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
   longTaskInspectorOpen: false,
@@ -231,6 +254,10 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setCollapseProcessWhileRunning: (enabled) => {
     writeCollapseProcessWhileRunning(enabled);
     set({ collapseProcessWhileRunning: enabled });
+  },
+  setPendingNewSessionModel: (model) => {
+    writePendingNewSessionModel(model);
+    set({ pendingNewSessionModel: model && model.trim() ? model.trim() : null });
   },
   setFilePreviewExtensions: (extensions) => set({
     filePreviewExtensions: Array.from(new Set(extensions

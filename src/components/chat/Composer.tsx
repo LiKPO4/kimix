@@ -1172,7 +1172,10 @@ export function Composer() {
       return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
     }
     if (!currentProject) return null;
-    const model = await getDefaultKimiModel();
+    // 待使用模型（欢迎屏切换，只影响下一个新会话）优先于官方默认模型；
+    // 一次性消费：创建会话后立即清除。
+    const pendingModel = useAppStore.getState().pendingNewSessionModel;
+    const model = pendingModel ?? await getDefaultKimiModel();
     // Kimi Code 主链路：仅创建本地会话对象，真实官方 session 延迟到首条消息发送时再创建。
     const session: Session = {
       id: genId(),
@@ -1189,6 +1192,7 @@ export function Composer() {
     };
     addSession(session);
     setCurrentSession(session);
+    if (pendingModel) useAppStore.getState().setPendingNewSessionModel(null);
     return session;
   };
 

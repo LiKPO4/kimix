@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 功能：欢迎屏模型切换改「待使用模型」+ 运行中正文段全程折叠（v2.20.3/2.20.4）
+
+- 闪烁修复（`d33b2da`，v2.20.3）：用户实测流式正文段"偶尔出现在正文区、很快又被隐藏到折叠中"——根因：computeFinalTextBlockContent 把"当前最后 text 块"当答案段显示，工具块到达后判定翻转移进折叠（每段闪一次）。修复：运行中（!isComplete）一律返回 ""，text 段全程待在折叠过程详情，完成后最终答案一次性显示。取舍：流式期间正文区不再滚动显示正文（用户明确选择"一直放在折叠里面"）。2 项新测试。
+- 待使用模型（v2.20.4）：用户拍板"欢迎屏切换模型不应改默认模型，默认模型应在设置里切换"（选择"只影响下一个新会话"）。执行 agent 被中止无产出，我自行实施：① appStore 新增 pendingNewSessionModel（localStorage `kimix_pending_new_session_model` 持久化，trim/置空语义）；② ContextBar 欢迎屏分支移除 setKimiDefaultModel 调用，改写 pendingNewSessionModel，toast"下一个新会话将使用 X"，displayModel 与菜单选中态均改为 pendingNewSessionModel ?? defaultModel；③ Composer ensureSession（:1175 新会话唯一模型消费点）优先用 pendingNewSessionModel，addSession 后清除（一次性）；④ 4 项 store 测试。设置界面默认模型入口与有会话路径（本就只改当前会话）不动。
+- 验证：typecheck ✓；全量 1213 测试 ✓（新增 6）；build ✓（index-Q_ZKjFkZ.js）；Tab 0；AGENTS.md 版本规则更新提交（0c3bfe5）。
+- 待用户实测：①欢迎屏切换后设置里默认模型不变；②新会话用所选模型、再建会话回默认；③运行中正文段不再闪现；④"用 swarm 模式"轮汇总完整显示（v2.20.2 引用比较修复）。
+
 ## 2026-07-25 修复：同轮事件顺序错乱——汇总排在预告前致正文"缺失"
 
 - 现象（用户重启后仍缺失）："用 swarm 模式随便读点东西"轮只显示 33 字符预告（"读完汇总给你"），996 字符完整汇总不见。
