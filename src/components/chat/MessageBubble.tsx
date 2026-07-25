@@ -13,6 +13,7 @@ import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
+import { noteLiveDisplayMode, resolveLiveDisplayMode } from "@/utils/liveTurnDiag";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
@@ -1063,6 +1064,35 @@ function AssistantProcessLabel({
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
   const isSettledForDisplay = !isActiveAssistant && (event.isComplete || hasVisibleOutput);
+  // 症状 11：记录「输出完成」文案与 active/complete/duration 是否一致（假完成窗口）。
+  const displayMode = resolveLiveDisplayMode({
+    isActiveAssistant,
+    isComplete: event.isComplete,
+    hasVisibleOutput,
+    isThinking: event.isThinking,
+  });
+  useEffect(() => {
+    noteLiveDisplayMode({
+      key: event.id,
+      mode: displayMode,
+      sessionId: event.roomAgentId ? `${event.roomAgentId}:${event.id}` : event.id,
+      bodyLen: event.content.length,
+      isComplete: event.isComplete,
+      durationMs: eventDuration ?? event.durationMs,
+      wallElapsedMs: elapsed,
+      isActiveAssistant,
+    });
+  }, [
+    displayMode,
+    event.id,
+    event.roomAgentId,
+    event.content.length,
+    event.isComplete,
+    eventDuration,
+    event.durationMs,
+    elapsed,
+    isActiveAssistant,
+  ]);
   const durationLabel = isSettledForDisplay
     ? (completedDuration !== undefined ? formatAssistantTurnDuration(completedDuration) : "")
     : isActiveAssistant && elapsed >= 1000

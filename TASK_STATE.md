@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 一口 live 诊断 + 官方 client_id 对齐（v2.20.8）
+
+- 目标：用同一条 `diag.log` 录全症状 7/11/12/13，并对照官方 kimi-web 补复刻缺口，而不是再盲改显示层。
+- 官方对照（`.kimix-upstream-kimi-code-0.18.0/apps/kimi-web`）：
+  1. `buildWsUrl` 与 `client_hello.client_id` 同源 `web_*`（Kimix 曾 URL 用 web_、hello 用 kimix-*）→ 已对齐。
+  2. 官方 projector 有 `turnTextLen` + `alignDelta(offset)` 的 skip/gap（gap 触发 re-snapshot）；Kimix 用 merge offset 拼接，缺官方 gap→snapshot 自愈环——记为后续缺口，本轮先靠日志证伪。
+  3. 官方完成态跟 session/task/in_flight，不跟「非 active + 有可见输出」；Kimix `isSettledForDisplay` 会在假完成窗口写「输出完成」——`[live] display` 专抓。
+- 实现：`src/utils/liveTurnDiag.ts`；App stream/silence/settle；MessageBubble display；main `KIMIX_LIVE_DIAG` 默认 dev 开；帧摘要带 offset/dlen。
+- 用法：`pnpm dev` 复现 → 项目根或 userData 的 `diag.log` → `rg "\[live\]" diag.log`。
+- 待用户实测：假完成瞬间是否出现 `display … to=settled_visible` 且 `isComplete=false`；空白窗是否 `silence` + `stream counts.body=0`；卡死是否 `watchdog` 或长期 `silence`。
+
 ## 2026-07-25 根治：WS 假死致轮次卡"正在思考"（Server 在跑但 WS 停推，v2.20.7）
 
 - 现象：重任务（TodoList 9 项）卡"正在思考 9分28秒"+0/9 十几分钟，官方 web 同任务已 3/9 推进。

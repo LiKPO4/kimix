@@ -6343,7 +6343,7 @@ ipcMain.handle("kimi-code:getStatus", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
     const data = await kimiCodeHost.getStatus(sessionId);
-    if (process.env.KIMIX_FRAME_DIAG === "1") {
+    if (process.env.KIMIX_FRAME_DIAG === "1" || process.env.KIMIX_LIVE_DIAG === "1" || (process.env.KIMIX_LIVE_DIAG !== "0" && !app.isPackaged)) {
       const d = data as { engineStatus?: string; model?: string } | undefined;
       void enqueueDiagLine(`[${new Date().toISOString()}] [poll] sid=${sessionId.slice(-8)} engine=${d?.engineStatus ?? "?"} model=${d?.model ?? "?"}`);
     }
@@ -7678,15 +7678,40 @@ function enqueueDiagLine(line: string) {
   return queued;
 }
 
-// 帧级诊断（排查 WS/状态机问题用）：默认关闭，仅 KIMIX_FRAME_DIAG=1 时开启。
-// 本次"正文 delta 缺帧 / WS 假死"均靠它定位。
-if (process.env.KIMIX_FRAME_DIAG === "1") {
-  kimiCodeHost.setFrameDiagLogger((line) => {
-    void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
-  });
+// Live 一口诊断（症状 7/11/12/13）：
+// - KIMIX_LIVE_DIAG=1 或未设置且非打包：开启主进程 [wsc]/[wsbarrier]/[wssnap]/[poll] 与
+//   关键帧摘要；渲染层 [live] display/stream/silence/settle 始终可写（经 writeDiag）。
+// - KIMIX_FRAME_DIAG=1：额外记录每一条 [wsframe]（量大，仅深挖时开）。
+// - KIMIX_LIVE_DIAG=0：关闭主进程侧 live 帧/连接日志。
+const liveDiagEnabled = process.env.KIMIX_LIVE_DIAG === "1"
+  || (process.env.KIMIX_LIVE_DIAG !== "0" && !app.isPackaged);
+const frameDiagEnabled = process.env.KIMIX_FRAME_DIAG === "1";
+if (liveDiagEnabled || frameDiagEnabled) {
   setServerClientDiag((line) => {
     void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
   });
+}
+if (frameDiagEnabled) {
+  kimiCodeHost.setFrameDiagLogger((line) => {
+    void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
+  });
+} else if (liveDiagEnabled) {
+  // 非全量帧：只记 body/terminal/连接相关，控制体积仍覆盖 7/12/13。
+  kimiCodeHost.setFrameDiagLogger((line) => {
+    if (
+      line.includes("assistant.delta")
+      || line.includes("prompt.completed")
+      || line.includes("prompt.aborted")
+      || line.includes("turn.ended")
+      || line.includes("resync_required")
+      || line.includes("kimix.server.snapshot")
+    ) {
+      void enqueueDiagLine(`[${new Date().toISOString()}] ${line}`);
+    }
+  });
+}
+if (liveDiagEnabled) {
+  void enqueueDiagLine(`[${new Date().toISOString()}] [live] boot enabled frameDiag=${frameDiagEnabled ? 1 : 0} packaged=${app.isPackaged ? 1 : 0}`);
 }
 
 ipcMain.handle("app:writeDiag", async (_, request: unknown) => {

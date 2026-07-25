@@ -103,6 +103,7 @@ import {
   type RoomDeliveryOfficialEvidence,
 } from "@/utils/roomDelivery";
 import { getRoomAgentReconciliationTargets, getRunnableRoomAgentReconciliationTargets, isRoomAgentReconciliationStatus, settleStoppedRoomAgent, settleTerminalRoomAgent } from "@/utils/roomAgentControl";
+import { noteLiveSettle, noteLiveSilence, noteLiveStreamFrame, summarizeLiveTurn } from "@/utils/liveTurnDiag";
 
 function currentSessionPromptModel(sessionId: string): string | undefined {
   const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
@@ -2662,6 +2663,30 @@ function App() {
       if (mappedForRoom.type !== "status_update") {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
       }
+      // Live 一口：采样流式帧类别（body/think/tool/terminal），覆盖症状 7/12/13。
+      if (mappedForRoom.type === "assistant_message" || mappedForRoom.type === "tool_call" || mappedForRoom.type === "status_update" || mappedForRoom.type === "error") {
+        noteLiveStreamFrame({
+          runtimeSessionId: payload.sessionId,
+          rawType: typeof rawEvent?.type === "string" ? rawEvent.type : undefined,
+          mappedType: mappedForRoom.type,
+          bodyLen: mappedForRoom.type === "assistant_message" ? mappedForRoom.content.length : undefined,
+          isComplete: mappedForRoom.type === "assistant_message" ? mappedForRoom.isComplete : undefined,
+          isThinking: mappedForRoom.type === "assistant_message" ? mappedForRoom.isThinking : undefined,
+          volatile: rawEvent?.volatile === true,
+          offset: typeof rawEvent?.offset === "number" ? rawEvent.offset : undefined,
+        });
+      } else if (typeof rawEvent?.type === "string" && (
+        rawEvent.type === "prompt.completed"
+        || rawEvent.type === "prompt.aborted"
+        || rawEvent.type === "turn.ended"
+        || rawEvent.type === "TurnEnd"
+      )) {
+        noteLiveStreamFrame({
+          runtimeSessionId: payload.sessionId,
+          rawType: rawEvent.type,
+          mappedType: mappedForRoom.type,
+        });
+      }
       if (!shouldAppendRuntimeStatusToTimeline({
         rawType: typeof rawEvent?.type === "string" ? rawEvent.type : undefined,
         mappedEvent: mappedForRoom,
@@ -3341,6 +3366,14 @@ function App() {
           // silence (normal thinking!) this fired every ~4s and stalled the UI
           // for seconds at a time. 30s silence with a still-running status is a
           // far stronger "events were missed" signal and cuts the cost 10x.
+          // 10s 起记 silence：engine 仍 running 但无流式事件（症状 12/13）。
+          noteLiveSilence({
+            runtimeSessionId,
+            engineStatus: response.data.engineStatus,
+            streamAgeMs: now - lastStreamEventAt,
+            turn: summarizeLiveTurn(getRoomAgentEvents(session, roomAgentId)),
+            runningSessionId: useAppStore.getState().runningSessionId,
+          });
           if (
             response.data.engineStatus === "running" &&
             now - lastStreamEventAt >= 30_000 &&
@@ -3437,6 +3470,19 @@ function App() {
         ) return;
         flushStreamEvents();
         const settledAt = Date.now();
+        const turnSnap = summarizeLiveTurn(guardAgentEvents);
+        noteLiveSettle({
+          roomId: session.id,
+          runtimeSessionId,
+          roomAgentId,
+          terminalStatus,
+          terminalPolls,
+          turnReceivedBody,
+          turn: turnSnap,
+          runningSessionId: latestRunningId,
+          activityStatus: active?.status ?? null,
+          wallSinceStartMs: settledAt - reconciliationStartedAt,
+        });
         void window.api?.writeDiag?.({
           message: "[settle] terminal",
           data: {
@@ -3447,6 +3493,7 @@ function App() {
             turnReceivedBody,
             agentEventCount: guardAgentEvents.length,
             settledAt,
+            turn: turnSnap,
           },
         });
         updateSession(session.id, (item) => settleTerminalRoomAgent(item, {

@@ -2742,8 +2742,17 @@ function handleServerFrame(frame: ServerFrame) {
       const partType = typeof payload.part === "object" && payload.part !== null ? (payload.part as { type?: unknown }).type : undefined;
       const reason = typeof payload.reason === "string" ? payload.reason : "";
       const agentId = typeof payload.agentId === "string" ? payload.agentId : "";
+      const deltaLen = typeof payload.delta === "string" ? payload.delta.length
+        : typeof (payload.part as { text?: unknown } | undefined)?.text === "string"
+          ? String((payload.part as { text: string }).text).length
+          : undefined;
+      const offset = typeof frame.offset === "number" ? frame.offset : undefined;
       const summary = [partType ?? "", reason, agentId].filter(Boolean).join("/");
-      frameDiagLogger(`[wsframe] ${frame.type} sid=${sessionId ? sessionId.slice(-8) : "-"} known=${known} seq=${frame.seq ?? "-"} vol=${frame.volatile === true ? 1 : 0} ${summary}`);
+      const extra = [
+        offset !== undefined ? `off=${offset}` : "",
+        deltaLen !== undefined ? `dlen=${deltaLen}` : "",
+      ].filter(Boolean).join(" ");
+      frameDiagLogger(`[wsframe] ${frame.type} sid=${sessionId ? sessionId.slice(-8) : "-"} known=${known} seq=${frame.seq ?? "-"} vol=${frame.volatile === true ? 1 : 0} ${summary}${extra ? ` ${extra}` : ""}`);
     } catch { /* diag must never break frame handling */ }
   }
   if (!sessionId || !serverSessions.has(sessionId)) return;

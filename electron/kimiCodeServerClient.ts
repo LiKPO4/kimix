@@ -12,14 +12,21 @@ function sdiag(line: string) {
   try { serverClientDiag?.(line); } catch { /* diag must never break client logic */ }
 }
 
-// 官方 kimi-web 形态的 client_id（`web_` 前缀），用于解锁 Server 的 volatile
-// assistant.delta（正文实时帧）推送。优先复用官方设备 id，缺失时随机生成。
+// 官方 kimi-web：`buildWsUrl` 的 query client_id 与 `client_hello.payload.client_id`
+// 必须是同一个稳定 `web_*` 值（见 apps/kimi-web/src/api/config.ts + daemon/ws.ts）。
+// 只改 URL、hello 仍写 kimix-* 是复刻缺口。优先复用官方设备 id，缺失时进程内缓存随机值。
+let cachedKimixWsClientId: string | null = null;
 function kimixWsClientId(): string {
+  if (cachedKimixWsClientId) return cachedKimixWsClientId;
   try {
     const deviceId = fs.readFileSync(path.join(os.homedir(), ".kimi", "device_id"), "utf-8").trim();
-    if (deviceId) return `web_${deviceId}`;
+    if (deviceId) {
+      cachedKimixWsClientId = `web_${deviceId}`;
+      return cachedKimixWsClientId;
+    }
   } catch { /* fall through */ }
-  return `web_${randomUUID()}`;
+  cachedKimixWsClientId = `web_${randomUUID()}`;
+  return cachedKimixWsClientId;
 }
 
 export type ServerPromptPart =
@@ -1293,13 +1300,15 @@ export class KimiCodeServerClient {
       socket.addEventListener("error", () => reject(new Error("Kimi Server WebSocket 连接失败")), { once: true });
     });
     await this.waitFor((frame) => frame.type === "server_hello", CONTROL_TIMEOUT_MS);
+    // 与 URL ?client_id= 同源：官方 daemon 用同一字段识别 web 客户端与 volatile 推送。
+    const clientId = kimixWsClientId();
     const ack = await this.sendControl("client_hello", {
-      client_id: `kimix-${process.pid}-${Date.now()}`,
+      client_id: clientId,
       subscriptions: [...this.subscribed],
       cursors: this.cursorPayload(this.subscribed),
     });
     if (ack.code !== 0) throw new Error(`Kimi Server handshake 失败：${ack.msg ?? ack.code}`);
-    sdiag(`[wsc] connect ok subs=${this.subscribed.size} ack=${ack.code} reconnecting=${reconnecting}`);
+    sdiag(`[wsc] connect ok client_id=${clientId.slice(0, 12)}… subs=${this.subscribed.size} ack=${ack.code} reconnecting=${reconnecting}`);
     this.reconnectAttempt = 0;
     this.lastMessageAt = Date.now();
     this.armWsWatchdog();
