@@ -983,6 +983,7 @@ export class KimiCodeServerClient {
   }
 
   async prompt(sessionId: string, input: unknown, controls: Record<string, unknown>) {
+    this.subscribed.add(sessionId);
     const content = await toServerPromptContent(
       input as Parameters<typeof toServerPromptContent>[0],
       (file) => this.uploadFile(file),
