@@ -10,6 +10,16 @@
 - 遗留取证缺口：rejected 日志调用方 reason 被 "process-history-regression" 覆盖（kimiHistoryReconciliation.ts:622-627），无法区分 repair/startup/running-sample 调用源，修复时一并补。
 - 修复选项（待用户拍板）：A. reconcile 熔断/记忆（rejected 指纹持久化，canonical 未变不重试；repair 对永败目标登记不再每启动重试）；B. persist 触发收口（启动窗口内 archiveOrDeletionChanged 立即 flush 改合并；setState map 全原引用时复用旧数组）；C. persist 成本治本（按会话分键增量持久化或 strip/stringify 迁 Worker）；D. 日志补调用方 reason。建议 A+B 先行，C 立项。
 
+## 2026-07-25 启动卡顿根治（A+B+C+D 全量落地，v2.20.0）
+
+- 方案：按 docs/plan-startup-lag-rootfix.md 定稿计划，四路并行修复。
+- Phase D+A（d583ca1）：reconcile 熔断/记忆 + 归因补强。新建 `src/utils/reconcileCircuitBreaker.ts`——基于 (local,canonical) 指纹持久化到 localStorage（key `kimix_reconcile_circuit_v1`，LRU 500）。rejected 分支登记指纹，accepted 分支清除；`isCanonicalReconciliationCircuitOpen` 供 repair/startup/running-sample 4 处调用源在 reconcile 前检查，命中则整体跳过。rejected/accepted 日志全部补 `callerReason` 字段。
+- Phase B（0dc86bc）：persist 触发收口。useStatePersistence 订阅加逐项浅比较（pendingMessages 引用相同 + 每元素引用相同则 return）；启动窗口内 archiveOrDeletionChanged 合并到防抖 persist，窗口外保持立即 flush。
+- Phase C（4384265）：增量持久化。分键存储 `kimix_local_sessions_index` + `kimix_local_session_<id>`；runPersist 按引用缓存判断变化会话，仅 strip+写变化/新增/删除；loadLocalSessions 读 index 分批并行加载（20/批）；旧单键 `kimix_sessions` 自动迁移。persist.run 日志补 changedSessions/totalSessions。
+- Phase 4：package.json 2.19.5→2.20.0；streaming-render-pipeline.md 持久化段更新并新增不变量 A/B/C；knowledge/log.md 记录；docs/release-notes/v2.20.0.md。
+- 验证：typecheck × 4 轮均通过；kimiHistoryReconciliation 45/45 + persistence 14/14 + useStatePersistence 5/5 = 64 定向全绿。
+- 待用户重启实测：`KIMIX_PERF` 启动 30s 长任务总时长 <1500ms；persist.run ≤2 次且单次 <500ms；同指纹 rejected 日志每目标 ≤1 次。
+
 ## 2026-07-25 修复：自定义模型子代理未生效（外部 Server 缺实验 flag）
 
 - 现象：配置子代理用 deepseek（[secondary_model] deepseek/deepseek-v4-flash），跑任务后 deepseek 无账单，实际仍用 kimi 额度。
