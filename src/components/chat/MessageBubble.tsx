@@ -17,7 +17,7 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { turnBlocksEqual, buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -2668,19 +2668,8 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   // expanded process timeline. When blocks are unavailable, fall back to the
   // full merged content as before.
   const finalTextBlockContent = useMemo(() => {
-    if (!turnBlocks) return displayContent;
-    const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
-    if (textBlocks.length === 0) return displayContent;
-    const lastTextBlockIndex = turnBlocks.findLastIndex((b) => b.kind === "text");
-    const hasTrailingProcessBlock = turnBlocks.slice(lastTextBlockIndex + 1).some(
-      (b) => b.kind === "tool" || b.kind === "subagent" || b.kind === "approval"
-    );
-    if (hasTrailingProcessBlock) {
-      return "";
-    }
-    const lastTextBlock = turnBlocks[lastTextBlockIndex];
-    return (lastTextBlock && lastTextBlock.kind === "text") ? lastTextBlock.content : displayContent;
-  }, [turnBlocks, displayContent]);
+    return computeFinalTextBlockContent(turnBlocks, displayContent, event.isComplete);
+  }, [turnBlocks, displayContent, event.isComplete]);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;

@@ -172,3 +172,42 @@ export function turnBlocksEqual(prev: TurnBlock[] | undefined, next: TurnBlock[]
   }
   return true;
 }
+
+/**
+ * Determine the final visible text content for a turn body in kimi-web block
+ * mode. Rules:
+ * - No turnBlocks: return displayContent as-is.
+ * - No text blocks: return displayContent as-is.
+ * - Single complete text block with trailing process blocks (tool/subagent/
+ *   approval): that block IS the entire answer, show its full content
+ *   (regression: merged single-block turns where all text is before tools).
+ * - Incomplete (streaming) single text block with trailing process: return ""
+ *   because the final text segment hasn't arrived yet.
+ * - Multiple text blocks with trailing process: return "" (intermediate text
+ *   segments live inside the expanded process timeline).
+ * - No trailing process blocks: return the last text block content.
+ */
+export function computeFinalTextBlockContent(
+  turnBlocks: TurnBlock[] | undefined,
+  displayContent: string,
+  isComplete: boolean,
+): string {
+  if (!turnBlocks) return displayContent;
+  const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+  if (textBlocks.length === 0) return displayContent;
+  const lastTextBlockIndex = turnBlocks.findLastIndex((b) => b.kind === "text");
+  const hasTrailingProcessBlock = turnBlocks.slice(lastTextBlockIndex + 1).some(
+    (b) => b.kind === "tool" || b.kind === "subagent" || b.kind === "approval"
+  );
+  if (hasTrailingProcessBlock) {
+    // Single complete text block = the entire answer, show it.
+    if (isComplete && textBlocks.length === 1) {
+      return textBlocks[0].content;
+    }
+    // Streaming or multi-block: the final answer segment hasn't arrived yet
+    // or the text is intermediate fragments.
+    return "";
+  }
+  const lastTextBlock = turnBlocks[lastTextBlockIndex];
+  return (lastTextBlock && lastTextBlock.kind === "text") ? lastTextBlock.content : displayContent;
+}

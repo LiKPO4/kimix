@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems } from "@/components/chat/ChatThread";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { buildTurnBlocks, countTurnBlockKind, turnBlocksText, type TurnBlock } from "../turnBlocks";
+import { buildTurnBlocks, computeFinalTextBlockContent, countTurnBlockKind, turnBlocksText, type TurnBlock } from "../turnBlocks";
 
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -253,5 +253,50 @@ describe("buildRenderItems with official-order turn", () => {
     expect(bubble && bubble.type === "event" ? bubble.turnBlocks : undefined).toBeDefined();
     const blocks = bubble && bubble.type === "event" ? bubble.turnBlocks ?? [] : [];
     expect(blocks.map((block) => block.kind)).toEqual(EXPECTED_KIND_SEQUENCE);
+  });
+});
+
+describe("computeFinalTextBlockContent", () => {
+  const fullText = "这是完整正文，1060 字符的完整分析结果。";
+  const partialText = "中途分析文本";
+
+  function textBlock(content: string, key = "text-1"): TurnBlock {
+    return { kind: "text", key, events: [], content };
+  }
+  function toolBlock(key = "tool-1"): TurnBlock {
+    return { kind: "tool", key, tool: { type: "tool_call", toolCallId: "c1", toolName: "Read", timestamp: 1, status: "success", arguments: {} } as never };
+  }
+
+  it("returns displayContent when turnBlocks is undefined", () => {
+    expect(computeFinalTextBlockContent(undefined, "fallback", true)).toBe("fallback");
+  });
+
+  it("returns displayContent when turnBlocks has no text blocks", () => {
+    const blocks: TurnBlock[] = [toolBlock()];
+    expect(computeFinalTextBlockContent(blocks, "fallback", true)).toBe("fallback");
+  });
+
+  it("returns single complete text block content despite trailing tools (P0 bugfix)", () => {
+    // Single text block + trailing tools + isComplete=true → show the full text.
+    const blocks: TurnBlock[] = [textBlock(fullText), toolBlock(), toolBlock()];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe(fullText);
+  });
+
+  it("returns empty string for incomplete single text block with trailing tools", () => {
+    // Single text block + trailing tools + isComplete=false → the final answer
+    // segment hasn't arrived yet, suppress body.
+    const blocks: TurnBlock[] = [textBlock(partialText), toolBlock()];
+    expect(computeFinalTextBlockContent(blocks, "draft", false)).toBe("");
+  });
+
+  it("returns empty string for multiple text blocks with trailing tools", () => {
+    // Multiple text blocks + trailing tools → intermediate segments, suppress.
+    const blocks: TurnBlock[] = [textBlock("第一段中间分析"), textBlock("第二段中间分析"), toolBlock(), toolBlock()];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("");
+  });
+
+  it("returns last text block content when no trailing process blocks", () => {
+    const blocks: TurnBlock[] = [textBlock("中间正文"), textBlock("最终答案")];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终答案");
   });
 });
