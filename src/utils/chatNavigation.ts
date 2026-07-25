@@ -263,7 +263,9 @@ export function buildChatNavigationMarkers(
     ? geometry[0]
     : edges?.atBottom && !edges.atTop
       ? geometry.at(-1)
-      : geometry.find((entry) => entry.bottom >= readingLine) ?? geometry.at(-1);
+      : (geometry.find((entry) => entry.bottom > 24 && (entry.top === undefined || entry.top <= readingLine + 40))
+        ?? geometry.find((entry) => entry.bottom >= readingLine)
+        ?? geometry.at(-1));
   const renderedItems = items.filter((item) => geometryByKey.has(item.key));
 
   return renderedItems.map((item) => {

@@ -28,7 +28,7 @@ interface NavigationPreviewState {
 
 const PREVIEW_CLOSE_DELAY_MS = 90;
 const PREVIEW_EXIT_DURATION_MS = 140;
-const SCROLL_EDGE_THRESHOLD_PX = 3;
+const SCROLL_EDGE_THRESHOLD_PX = 80;
 const RAIL_VERTICAL_INSET_PX = 24;
 const RAIL_LEFT_OFFSET_PX = -46;
 

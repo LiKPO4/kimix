@@ -57,7 +57,7 @@ describe("chat navigation", () => {
       eventItem({ id: "assistant-1", type: "assistant_message", timestamp: 2, content: "回答", isThinking: false, isComplete: true }),
     ]);
     const markers = buildChatNavigationMarkers(items, [
-      { key: "user-1", bottom: 80 },
+      { key: "user-1", bottom: 10 },
       { key: "assistant-1", bottom: 520 },
     ], 120);
 
