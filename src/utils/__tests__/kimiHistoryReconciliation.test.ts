@@ -567,6 +567,102 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
     expect(patched.at(-1)).toMatchObject({ type: "status_update", message: "输出打断" });
   });
 
+  it("patches a later stable final segment without replacing richer local process history", () => {
+    const localUser: TimelineEvent = {
+      id: "local-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "全面了解项目",
+    };
+    const canonicalUser: TimelineEvent = {
+      ...localUser,
+      id: "canonical-user",
+      timestamp: 10_001,
+    };
+    const interim = assistant("推送完成。升版本并发布。", {
+      id: "interim",
+      timestamp: 10_100,
+      snapshotMessageId: "msg_session_000578",
+      snapshotMessageIdStable: true,
+    });
+    const final = assistant("完整的最终总结正文", {
+      id: "final",
+      timestamp: 10_300,
+      snapshotMessageId: "msg_session_000582",
+      snapshotMessageIdStable: true,
+    });
+    const localTool = {
+      ...toolCall(),
+      id: "local-rich-tool",
+      timestamp: 10_200,
+    };
+    const local: TimelineEvent[] = [localUser, interim, localTool];
+    const canonical: TimelineEvent[] = [canonicalUser, interim, final];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.slice(0, local.length)).toEqual(local);
+    expect(patched.at(-1)).toMatchObject({
+      snapshotMessageId: "msg_session_000582",
+      content: "完整的最终总结正文",
+    });
+    expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("patches a strictly newer identity-less wire tail in the same matched turn", () => {
+    const localUser: TimelineEvent = {
+      id: "local-user",
+      type: "user_message",
+      timestamp: 10_000,
+      content: "全面了解项目",
+    };
+    const canonicalUser: TimelineEvent = {
+      ...localUser,
+      id: "canonical-user",
+      timestamp: 10_001,
+    };
+    const local: TimelineEvent[] = [
+      localUser,
+      assistant("推送完成。升版本并发布。", {
+        id: "local-interim",
+        timestamp: 10_100,
+      }),
+      { ...toolCall(), id: "local-rich-tool", timestamp: 10_400 },
+    ];
+    const canonical: TimelineEvent[] = [
+      canonicalUser,
+      assistant("推送完成。升版本并发布。", {
+        id: "wire-interim",
+        timestamp: 10_100,
+      }),
+      assistant("来自 wire 的完整最终总结正文", {
+        id: "wire-final",
+        timestamp: 10_300,
+      }),
+    ];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.at(-1)).toMatchObject({
+      content: "来自 wire 的完整最终总结正文",
+      timestamp: 10_300,
+    });
+    expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("does not patch an identity-less wire assistant older than local Assistant output", () => {
+    const local: TimelineEvent[] = [
+      userMessage,
+      assistant("本地更新的正文", { timestamp: 20 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("较旧的 wire 正文", { timestamp: 10 }),
+    ];
+
+    expect(mergeMissingLatestCanonicalAssistant(local, canonical)).toBe(local);
+  });
+
   it("does not patch a different latest user turn", () => {
     const local: TimelineEvent[] = [{
       id: "local-user",

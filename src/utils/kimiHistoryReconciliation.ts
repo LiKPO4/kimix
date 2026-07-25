@@ -427,6 +427,12 @@ function sameMatchedUserTurn(
     Math.abs(local.timestamp - canonical.timestamp) <= 30_000;
 }
 
+function stableSnapshotSequence(snapshotMessageId?: string): { prefix: string; value: number } | null {
+  if (!snapshotMessageId) return null;
+  const match = /^(.*)_(\d+)$/.exec(snapshotMessageId);
+  return match ? { prefix: match[1], value: Number(match[2]) } : null;
+}
+
 function isVisibleTurnOutput(event: TimelineEvent): boolean {
   if (event.type === "assistant_message") {
     return Boolean(event.content.trim() || event.thinking?.trim() || event.thinkingParts?.some((part) => part.text.trim()));
@@ -494,8 +500,9 @@ export function removeIdentityCoveredDuplicateToolCalls(
  * When the complete canonical history is rejected by the monotonicity gate,
  * recover one otherwise invisible latest turn without touching older local
  * history. The latest user boundary must match by persisted identity or a
- * bounded content/time echo, while the Assistant itself must have an
- * immutable official message identity.
+ * bounded content/time echo. Prefer immutable official message identity;
+ * local wire mirrors without message ids may use a strictly newer Assistant
+ * timestamp within that matched turn.
  */
 export function mergeMissingLatestCanonicalAssistant(
   localEvents: TimelineEvent[],
@@ -518,21 +525,58 @@ export function mergeMissingLatestCanonicalAssistant(
   const canonicalTurnEvents = canonicalEvents.slice(canonicalUserIndex + 1);
   const canonicalAssistant = canonicalTurnEvents.findLast((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => (
     event.type === "assistant_message" &&
-    event.snapshotMessageIdStable === true &&
-    Boolean(event.snapshotMessageId) &&
     isVisibleTurnOutput(event)
   ));
-  if (!canonicalAssistant?.snapshotMessageId) return localEvents;
+  if (!canonicalAssistant) return localEvents;
 
   const localTurnEvents = localEvents.slice(localUserIndex + 1);
-  const mountedInLatestTurn = localTurnEvents.some((event) => (
+  const hasStableCanonicalIdentity = canonicalAssistant.snapshotMessageIdStable === true &&
+    Boolean(canonicalAssistant.snapshotMessageId);
+  const mountedInLatestTurn = hasStableCanonicalIdentity && localTurnEvents.some((event) => (
     event.type === "assistant_message" &&
     event.snapshotMessageIdStable === true &&
     event.snapshotMessageId === canonicalAssistant.snapshotMessageId
   ));
-  if (localTurnEvents.some(isVisibleTurnOutput) && !mountedInLatestTurn) return localEvents;
+  const hasVisibleLocalOutput = localTurnEvents.some(isVisibleTurnOutput);
+  if (hasVisibleLocalOutput && !mountedInLatestTurn) {
+    // A rejected whole-history replacement may still carry a later immutable
+    // Assistant segment that the local timeline lost during persistence. Only
+    // append the canonical tail when the latest local turn already shares the
+    // same official snapshot sequence and the candidate is strictly newer.
+    // This preserves richer local thinking/tools without guessing across turns
+    // or turning a tool-only local turn into an unrelated Assistant response.
+    const canonicalSeq = stableSnapshotSequence(canonicalAssistant.snapshotMessageId);
+    const localStableSeqs = localTurnEvents.flatMap((event) => {
+      if (
+        event.type !== "assistant_message" ||
+        event.snapshotMessageIdStable !== true
+      ) return [];
+      const seq = stableSnapshotSequence(event.snapshotMessageId);
+      return seq && canonicalSeq && seq.prefix === canonicalSeq.prefix ? [seq.value] : [];
+    });
+    const alreadyHasBody = localTurnEvents.some((event) => (
+      event.type === "assistant_message" &&
+      event.content.trim() === canonicalAssistant.content.trim() &&
+      canonicalAssistant.content.trim().length > 0
+    ));
+    const latestLocalAssistantTimestamp = localTurnEvents.reduce((latest, event) => (
+      event.type === "assistant_message" && isVisibleTurnOutput(event)
+        ? Math.max(latest, event.timestamp)
+        : latest
+    ), Number.NEGATIVE_INFINITY);
+    const stableTailIsNewer = Boolean(
+      canonicalSeq &&
+      localStableSeqs.length > 0 &&
+      canonicalSeq.value > Math.max(...localStableSeqs)
+    );
+    const wireTailIsNewer = !hasStableCanonicalIdentity &&
+      canonicalAssistant.timestamp > latestLocalAssistantTimestamp;
+    if ((!stableTailIsNewer && !wireTailIsNewer) || alreadyHasBody) return localEvents;
+  } else if (!hasVisibleLocalOutput && !hasStableCanonicalIdentity) {
+    return localEvents;
+  }
 
-  const alreadyMounted = flattenTimelineEvents(localEvents).some((event) => (
+  const alreadyMounted = hasStableCanonicalIdentity && flattenTimelineEvents(localEvents).some((event) => (
     event.type === "assistant_message" &&
     event.snapshotMessageIdStable === true &&
     event.snapshotMessageId === canonicalAssistant.snapshotMessageId
@@ -551,10 +595,11 @@ export function mergeMissingLatestCanonicalAssistant(
     ? withInterruptedStatus
     : mergeEvents(withInterruptedStatus, canonicalAssistant);
   if (patched === localEvents) return localEvents;
-  logEvent("kimiHistoryReconciliation.latestFailedTurnPatched", {
+  logEvent("kimiHistoryReconciliation.latestCanonicalAssistantPatched", {
     ...context,
     callerReason: context?.reason,
     snapshotMessageId: canonicalAssistant.snapshotMessageId,
+    canonicalTimestamp: canonicalAssistant.timestamp,
   });
   return patched;
 }

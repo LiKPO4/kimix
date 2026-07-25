@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：存量缺失正文无法从官方历史自愈（v2.20.14）
+
+- 用户 v2.20.13 重启实测：同一旧轮仍只剩“推送完成。升版本并发布 1.4.484。”一句。
+- 新快照证据：06:46 dev 窗口启动时 canonical reconciliation 接受更完整官方历史（本地 15831 → canonical 22544）并写入 7757 events；06:48 用户日常构建窗口重启后仍从另一 renderer origin 的 IndexedDB 加载旧 5831 events，目标轮仍为 1267 字。dev 与 built 的 renderer origin/IndexedDB 不同，不能用前者的恢复结果代表后者已修复。
+- 自愈阻塞根因：built 存储曾因 canonical thinking 较短触发 `thinking-history-regression`，旧 `kimix_reconcile_circuit_v1` 又永久跳过相同指纹；现有 additive fallback 只允许“本地最新轮完全无可见输出”时补一个官方 Assistant，遇到“已有阶段短句但缺最终段”会拒绝。
+- 修复：当本地与 canonical 最新 user turn 匹配时，有稳定消息 ID 则只补序号严格更大的最后一个 Assistant；官方 wire 无消息 ID 时，仅补时间戳严格晚于本地最后 Assistant 且正文尚不存在的尾段。保留本地更丰富的 thinking/tool/diff，不做整轮替换。reconcile circuit 升 v3，使升级后的新恢复算法获得一次重试。新增 stable 与 identity-less wire 两组幂等回归测试。
+- 待用户实测：启动 v2.20.14 后，该旧轮应直接从官方 wire 补回完整最终正文；再次重启后仍保留。
+
 ## 2026-07-26 修复：重启后最终正文被同 ID 去重（v2.20.13）
 
 - 用户 v2.20.12 实测：长工具轮结束时正文完整，重启后只剩阶段性短句，最终答案消失。

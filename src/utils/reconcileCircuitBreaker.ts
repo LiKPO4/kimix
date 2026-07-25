@@ -10,13 +10,15 @@
  * retry. An accepted reconciliation clears the entry so the circuit stays
  * closed for that target.
  *
- * Backed by localStorage (key kimix_reconcile_circuit_v1) with an LRU eviction
+ * Backed by localStorage (key kimix_reconcile_circuit_v3) with an LRU eviction
  * policy at 500 entries (~few KB).
  */
 import type { TimelineEvent } from "@/types/ui";
 import { kimiHistoryProcessEventCount } from "@/utils/kimiHistoryCache";
 
-const STORAGE_KEY = "kimix_reconcile_circuit_v1";
+// Bump when rejected-pair recovery semantics change so an older rejection
+// cannot suppress a newly capable additive repair after an app upgrade.
+const STORAGE_KEY = "kimix_reconcile_circuit_v3";
 const LRU_MAX = 500;
 
 type CircuitEntry = {
