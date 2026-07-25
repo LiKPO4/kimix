@@ -1990,6 +1990,48 @@ describe("mergeEvents", () => {
     expect(assistants[0]).toMatchObject({ content: "替换内容", isComplete: true });
   });
 
+  it("barrier binding sets official timestamp so later unseen stable events sort correctly (P0 order fix)", () => {
+    // Simulate the real session_6203... scenario:
+    // 1. user message → placeholder assistant (isComplete: false, ts=T0+40ms)
+    // 2. barrier replay binds f_000010 (summary, 996 chars, ts=T0+40s) →
+    //    must set incoming.timestamp so the event has its official time.
+    // 3. unseen stable f_000008 (preview, 33 chars, ts=T0+30s) arrives via
+    //    stableSnapshotId path → inserted by timestamp order BEFORE f_000010.
+    const T0 = 1000;
+    const existing: TimelineEvent[] = [
+      { id: "user-1", type: "user_message" as const, timestamp: T0, content: "开始" },
+      { id: "placeholder", type: "assistant_message" as const, timestamp: T0 + 40, content: "正在思考",
+        isThinking: false, isComplete: false, agentTurnId: "turn-1" },
+    ];
+
+    // Step 2: barrier frame f_000010 binds to placeholder.
+    const afterBarrier = mergeEvents(existing, {
+      id: "barrier-010", type: "assistant_message" as const,
+      timestamp: T0 + 40_000, snapshotMessageId: "f_000010",
+      snapshotMessageIdStable: true, completionBarrierReplay: true,
+      content: "完整汇总共996字符", isThinking: false, isComplete: true,
+    });
+    const boundEvent = afterBarrier[1] as Extract<TimelineEvent, { type: "assistant_message" }>;
+    expect(boundEvent.timestamp).toBe(T0 + 40_000);
+    expect(boundEvent.content).toBe("完整汇总共996字符");
+    expect(boundEvent.isComplete).toBe(true);
+
+    // Step 3: unseen stable f_000008 (preview, ts=T0+30s, no completionBarrierReplay).
+    const afterPreview = mergeEvents(afterBarrier, {
+      id: "stable-008", type: "assistant_message" as const,
+      timestamp: T0 + 30_000, snapshotMessageId: "f_000008",
+      snapshotMessageIdStable: true,
+      content: "33字符预告", isThinking: false, isComplete: true,
+    });
+
+    // f_000008 should be inserted before f_000010 (earlier timestamp).
+    const assistants = afterPreview.filter((e) => e.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    const previewIdx = afterPreview.findIndex((e) => e.type === "assistant_message" && e.content === "33字符预告");
+    const summaryIdx = afterPreview.findIndex((e) => e.type === "assistant_message" && e.content === "完整汇总共996字符");
+    expect(previewIdx).toBeLessThan(summaryIdx);
+  });
+
   it("break-segment: different roomAgentId does not merge", () => {
     const existing: TimelineEvent[] = [
       { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "A发言", isThinking: false, isComplete: false, roomAgentId: "agent-1", agentTurnId: "turn-1" },

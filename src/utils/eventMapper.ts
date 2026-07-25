@@ -1938,21 +1938,23 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         (!incoming.roomMessageId || event.roomMessageId === incoming.roomMessageId) &&
         (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId)
       ));
-      if (completionTargetIndex !== -1) {
-        const target = existing[completionTargetIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
-        const result = [...existing];
-        result[completionTargetIndex] = {
-          ...target,
-          snapshotMessageId: incoming.snapshotMessageId,
-          snapshotMessageIdStable: incoming.snapshotMessageIdStable,
-          completionBarrierReplay: true,
-          agentRole: incoming.agentRole ?? target.agentRole,
-          model: incoming.model ?? target.model,
-          content: incoming.content || target.content,
-          thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
-          thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
-          isThinking: target.isThinking || Boolean(incoming.thinking),
-        };
+	      if (completionTargetIndex !== -1) {
+	        const target = existing[completionTargetIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;
+	        const result = [...existing];
+	        result[completionTargetIndex] = {
+	          ...target,
+	          timestamp: incoming.timestamp ?? target.timestamp,
+	          snapshotMessageId: incoming.snapshotMessageId,
+	          snapshotMessageIdStable: incoming.snapshotMessageIdStable,
+	          completionBarrierReplay: true,
+	          agentRole: incoming.agentRole ?? target.agentRole,
+	          model: incoming.model ?? target.model,
+	          content: incoming.content || target.content,
+	          thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
+	          thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
+	          isThinking: target.isThinking || Boolean(incoming.thinking),
+	          isComplete: incoming.isComplete || target.isComplete,
+	        };
         return result;
       }
     }
