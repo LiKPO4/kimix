@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-25 修复：Kimi Web 未勾选「运行中折叠」时过程仍被自动折叠（v2.20.5）
+
+- 现象：用户 Kimi Web 模式 + 关闭「运行中折叠过程详情」（未勾选），运行中「k3 · 正在输出」仍折叠——期望「未勾选时 agent 反应期间思考/命令流全程实时展开，除非手动折叠」。
+- 根因：`AssistantProcessSummary` 的 `hasFinalContent` 由 MessageBubble.tsx:2728 传入 `hasContent`（displayContent 非空）——运行中第一段思考/预告到达即为 true：① `defaultExpanded` 的 `!hasFinalContent` 把 Kimi Web「最新一轮展开」短路；② `shouldCollapseKimiWebProcessOnFinalContent` 在 false→true 沿自动折叠。选项「运行中折叠」本身未失效（用户已关=false），被该语义 bug 掩盖。
+- 修复：新增纯函数 `resolveHasFinalProcessContent(isComplete, hasBodyContent) = isComplete && hasBodyContent`（liveThinkingViewport.ts），传入处改为 `hasFinalContent={resolveHasFinalProcessContent(event.isComplete, hasContent)}`——运行中恒 false（未勾选时全程展开、shouldCollapse 不触发，仅手动折叠有效），完成有正文时恒 true（自动折叠突出答案）；勾选「运行中折叠」时 collapseWhileRunning=true 仍运行中折叠（选项作用保留）。
+- 测试：resolveHasFinalProcessContent 四象限 + 现有 shouldCollapse 场景；liveThinkingViewport 6/6。
+- 验证：typecheck ✓；全量 1214 测试 ✓；build ✓（index-DQYjIV0p.js）；Tab 0。bump 2.20.5。
+- 待用户实测：Kimi Web 未勾选时发消息，运行中思考/工具流全程展开，完成后自动折叠；勾选项开启时运行中仍折叠。
+
 ## 2026-07-25 功能：欢迎屏模型切换改「待使用模型」+ 运行中正文段全程折叠（v2.20.3/2.20.4）
 
 - 闪烁修复（`d33b2da`，v2.20.3）：用户实测流式正文段"偶尔出现在正文区、很快又被隐藏到折叠中"——根因：computeFinalTextBlockContent 把"当前最后 text 块"当答案段显示，工具块到达后判定翻转移进折叠（每段闪一次）。修复：运行中（!isComplete）一律返回 ""，text 段全程待在折叠过程详情，完成后最终答案一次性显示。取舍：流式期间正文区不再滚动显示正文（用户明确选择"一直放在折叠里面"）。2 项新测试。

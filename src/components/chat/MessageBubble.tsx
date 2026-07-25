@@ -36,6 +36,7 @@ import { isRoomDeliveryWaitingBehindAgentWork } from "@/utils/roomDelivery";
 import {
   canLiveThinkingViewportConsumeWheel,
   LIVE_THINKING_MAX_HEIGHT_PX,
+  resolveHasFinalProcessContent,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
   shouldUseLiveThinkingViewport,
@@ -2725,7 +2726,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             displayMode={processDisplayMode}
             expandByDefault={expandProcessByDefault}
             isActiveAssistant={isActiveAssistant}
-            hasFinalContent={hasContent}
+            hasFinalContent={resolveHasFinalProcessContent(event.isComplete, hasContent)}
             isInterrupted={Boolean(isInterrupted)}
             collapseWhileRunning={collapseProcessWhileRunning}
             turnStartedAt={turnStartedAt}

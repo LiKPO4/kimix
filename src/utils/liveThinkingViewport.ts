@@ -65,3 +65,12 @@ export function shouldCollapseKimiWebProcessOnFinalContent({
 }) {
   return isKimiWeb && expanded && !manuallyExpanded && !previousHasFinalContent && hasFinalContent;
 }
+
+/**
+ * 判定一轮是否有「最终内容」（触发 Kimi Web 过程自动折叠的唯一条件）。
+ * 必须是「轮次完成且有正文」——运行中任何流式内容（思考、预告段）都不算，
+ * 否则第一个字到达就会误触发自动折叠，使「未勾选运行中折叠时全程展开」失效。
+ */
+export function resolveHasFinalProcessContent(isComplete: boolean, hasBodyContent: boolean): boolean {
+  return isComplete && hasBodyContent;
+}
