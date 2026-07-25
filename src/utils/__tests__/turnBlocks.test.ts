@@ -299,4 +299,17 @@ describe("computeFinalTextBlockContent", () => {
     const blocks: TurnBlock[] = [textBlock("中间正文"), textBlock("最终答案")];
     expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终答案");
   });
+
+  it("keeps all text segments folded while the turn is streaming (no trailing tools yet)", () => {
+    // Streaming turn (isComplete=false) with a text block that is currently the
+    // last block: showing it caused a flash-then-fold flip once tools arrived.
+    // All segments must stay in the collapsed process timeline while streaming.
+    const blocks: TurnBlock[] = [textBlock("你好霖江路，我先全面了解一下项目结构。")];
+    expect(computeFinalTextBlockContent(blocks, "draft", false)).toBe("");
+  });
+
+  it("keeps all text segments folded while streaming even with tools already present", () => {
+    const blocks: TurnBlock[] = [textBlock("预告段"), toolBlock(), textBlock("中段")];
+    expect(computeFinalTextBlockContent(blocks, "draft", false)).toBe("");
+  });
 });

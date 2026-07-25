@@ -181,8 +181,11 @@ export function turnBlocksEqual(prev: TurnBlock[] | undefined, next: TurnBlock[]
  * - Single complete text block with trailing process blocks (tool/subagent/
  *   approval): that block IS the entire answer, show its full content
  *   (regression: merged single-block turns where all text is before tools).
- * - Incomplete (streaming) single text block with trailing process: return ""
- *   because the final text segment hasn't arrived yet.
+ * - Incomplete (streaming) turns: ALL text segments stay in the collapsed
+ *   process timeline (return ""). Showing the latest segment here caused it
+ *   to flash in the body area and then get folded away as soon as a tool
+ *   block arrived after it — the user explicitly asked for segments to stay
+ *   folded for the whole streaming phase.
  * - Multiple text blocks with trailing process: return "" (intermediate text
  *   segments live inside the expanded process timeline).
  * - No trailing process blocks: return the last text block content.
@@ -195,6 +198,9 @@ export function computeFinalTextBlockContent(
   if (!turnBlocks) return displayContent;
   const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
   if (textBlocks.length === 0) return displayContent;
+  // Streaming turn: keep every text segment in the process timeline. A segment
+  // shown here before its tools arrive would visibly flash and then be folded.
+  if (!isComplete) return "";
   const lastTextBlockIndex = turnBlocks.findLastIndex((b) => b.kind === "text");
   const hasTrailingProcessBlock = turnBlocks.slice(lastTextBlockIndex + 1).some(
     (b) => b.kind === "tool" || b.kind === "subagent" || b.kind === "approval"
