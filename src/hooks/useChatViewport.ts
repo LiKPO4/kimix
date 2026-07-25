@@ -706,6 +706,8 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     updateAutoFollow(true);
     updateShowScrollToBottom(false);
     if (sessionId && viewportReady) {
+      userScrollRef.current = false;
+      autoFollowRef.current = true;
       sessionAutoBottomUntilRef.current = Date.now() + SESSION_OPEN_BOTTOM_MAX_WAIT_MS;
       const node = scrollRef.current;
       if (node) {
@@ -715,6 +717,10 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       settleSessionAtBottom();
       const primingSessionId = sessionId;
       window.requestAnimationFrame(() => {
+        const activeNode = scrollRef.current;
+        if (activeNode) {
+          activeNode.scrollTop = Math.max(0, activeNode.scrollHeight - activeNode.clientHeight);
+        }
         settleSessionAtBottom();
         window.api?.writeDiag?.({
           message: "[useChatViewport] rAF setPrimedSessionId",
@@ -725,7 +731,13 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
           },
         }).catch(logError("writeDiag"));
         setPrimedSessionId(primingSessionId);
-        window.requestAnimationFrame(settleSessionAtBottom);
+        window.requestAnimationFrame(() => {
+          const finalNode = scrollRef.current;
+          if (finalNode) {
+            finalNode.scrollTop = Math.max(0, finalNode.scrollHeight - finalNode.clientHeight);
+          }
+          settleSessionAtBottom();
+        });
       });
     }
     return () => {
@@ -770,10 +782,10 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       updateShowScrollToBottom(distance > 80);
       return;
     }
-    if (autoFollowRef.current && !userScrollRef.current) {
-      scrollToBottom("auto");
+    if (autoFollowRef.current && !userScrollRef.current && viewportReady) {
+      settleSessionAtBottom();
     }
-  }, [expandedInitialTailSessionId, sessionId, scrollToBottom, autoFollowRef, userScrollRef, pendingTailExpandScrollAnchorRef, updateShowScrollToBottom, scrollRef]);
+  }, [expandedInitialTailSessionId, sessionId, viewportReady, contentVersion, settleSessionAtBottom, scrollToBottom, autoFollowRef, userScrollRef, pendingTailExpandScrollAnchorRef, updateShowScrollToBottom, scrollRef]);
 
   useLayoutEffect(() => {
     noteStartupLayoutEffect();
