@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildSessionModelOptions, groupSessionModelOptions } from "../sessionModelCatalog";
+import {
+  buildModelContextLimitIndex,
+  buildSessionModelOptions,
+  groupSessionModelOptions,
+  resolveModelContextLimit,
+} from "../sessionModelCatalog";
 
 describe("session model catalog", () => {
   it("uses configured aliases and groups models by provider", () => {
@@ -118,5 +123,32 @@ describe("session model catalog", () => {
       supportEfforts: ["low", "high"],
       defaultEffort: "high",
     });
+  });
+
+  it("indexes configured and server model context limits by aliases", () => {
+    const index = buildModelContextLimitIndex({
+      configPath: "config.toml",
+      exists: true,
+      defaultModel: "kimi-code/k3",
+      providers: [],
+      models: [
+        { alias: "custom/grok-4.5", provider: "custom", model: "grok-4.5", displayName: "Grok 4.5", maxContextSize: 500_000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
+        { alias: "kimi-code/k3", provider: "kimi-code", model: "k3", displayName: "K3", maxContextSize: 256_000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: true },
+      ],
+      secondaryModel: null,
+    }, {
+      auth: { ready: true, providerCount: 1, defaultModel: "kimi-code/k3", managedProvider: null },
+      config: {},
+      models: [
+        { provider: "kimi-code", model: "k3", displayName: "K3", maxContextSize: 1_048_576, capabilities: ["thinking"], supportEfforts: [] },
+      ],
+      providers: [],
+    });
+
+    // The running catalog's effective override must beat stale persisted metadata.
+    expect(resolveModelContextLimit(index, ["kimi-code/k3"])).toBe(1_048_576);
+    expect(resolveModelContextLimit(index, ["k3"])).toBe(1_048_576);
+    expect(resolveModelContextLimit(index, ["custom/grok-4.5"])).toBe(500_000);
+    expect(resolveModelContextLimit(index, ["unknown"])).toBeUndefined();
   });
 });

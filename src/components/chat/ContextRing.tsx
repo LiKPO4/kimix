@@ -4,6 +4,10 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import { getSessionContextUsages, getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
+import {
+  buildModelContextLimitIndex,
+  type ModelContextLimitIndex,
+} from "@/utils/sessionModelCatalog";
 import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 
 function formatK(tokens: number): string {
@@ -62,11 +66,13 @@ function useAnimatedDots(active: boolean) {
 }
 
 const COMPACTION_STALE_MS = 5 * 60 * 1000;
+const EMPTY_MODEL_CONTEXT_LIMITS: ModelContextLimitIndex = new Map();
 
 export function ContextRing() {
   const [showTooltip, setShowTooltip] = useState(false);
   const [compactStatus, setCompactStatus] = useState<"idle" | "pending" | "requested" | "success" | "failed">("idle");
   const [compactError, setCompactError] = useState("");
+  const [modelContextLimits, setModelContextLimits] = useState<ModelContextLimitIndex>(EMPTY_MODEL_CONTEXT_LIMITS);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const compactStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -75,7 +81,10 @@ export function ContextRing() {
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
   const session = useLiveSession(currentSession?.id);
 
-  const contextUsages = useMemo(() => getSessionContextUsages(session), [session]);
+  const contextUsages = useMemo(
+    () => getSessionContextUsages(session, modelContextLimits),
+    [session, modelContextLimits],
+  );
   const primaryContextUsage = contextUsages.find((usage) => usage.isPrimary) ?? contextUsages[0];
 
   // 从事件流中判断是否在压缩中：最近一个 compaction 事件是 begin 且后面没有 end
@@ -102,6 +111,28 @@ export function ContextRing() {
   const compactRequestPending = compactStatus === "pending" || compactStatus === "requested";
   const canCompact = Boolean(currentSession && hasContextStatus && !isCurrentSessionRunning && !isCompacting && !compactRequestPending);
   const compactingDots = useAnimatedDots(isCompacting || compactRequestPending);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadModelContextLimits = async () => {
+      const [configResult, catalogResult] = await Promise.all([
+        window.api.getKimiModelConfig().catch(() => null),
+        window.api.getKimiCodeServerModelCatalog().catch(() => null),
+      ]);
+      if (cancelled) return;
+      setModelContextLimits(buildModelContextLimitIndex(
+        configResult?.success ? configResult.data : null,
+        catalogResult?.success ? catalogResult.data : null,
+      ));
+    };
+    void loadModelContextLimits();
+    const handleConfigChanged = () => void loadModelContextLimits();
+    window.addEventListener("kimix:kimi-model-config-changed", handleConfigChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("kimix:kimi-model-config-changed", handleConfigChanged);
+    };
+  }, []);
 
   const handleEnter = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -256,12 +287,14 @@ export function ContextRing() {
                     <span className="font-normal text-text-muted"> · {usage.modelLabel}</span>
                   </div>
                   <span className="kimix-tabular-nums shrink-0 text-[13px] text-text-secondary">
-                    {usage.hasContext ? `${usage.percent.toFixed(0)}%` : "--"}
+                    {usage.hasContext && usage.hasLimit ? `${usage.percent.toFixed(0)}%` : "--"}
                   </span>
                 </div>
                 <div className="kimix-tabular-nums text-[12.5px] text-text-muted" style={{ marginTop: 6 }}>
                   {usage.hasContext
-                    ? `已用 ${formatK(usage.used)} 标记，共 ${formatK(usage.limit)}`
+                    ? usage.hasLimit
+                      ? `已用 ${formatK(usage.used)} 标记，共 ${formatK(usage.limit)}`
+                      : `已用 ${formatK(usage.used)} 标记，窗口上限未知`
                     : "等待上下文数据"}
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover" style={{ marginTop: 8 }}>

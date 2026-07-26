@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-07-26T07:52:00+08:00"
+timestamp: "2026-07-26T08:00:00+08:00"
 ---
 
 # Runtime Routing
@@ -133,6 +133,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 89. Kimi Server 0.29 writes `full_compaction.begin/complete/cancel` to the session's main `wire.jsonl` but does not deliver those records through the subscribed WebSocket or current snapshot replay. A direct `:compact` adapter must therefore treat the HTTP response as acknowledgement, poll only the target wire tail for a terminal whose timestamp is at or after the request, emit that terminal through the ordinary event sink, and refresh Server status so the post-compaction context meter does not remain at “等待上下文数据”. Historical loading still parses the same wire records normally.
 90. A successful full compaction writes a session-scoped `usage.record` immediately before `full_compaction.complete`; Server status may still omit `context_tokens` afterward. That `usageScope:"session"` record is the authoritative post-compaction context measurement. The direct bridge emits the terminal first and then the captured usage so current-window metrics see it after the compaction boundary; history parsing retains the same record, and compaction-completion placement likewise moves the terminal before that usage. UI commands must not synthesize a second success status when the durable terminal notice already owns completion feedback.
 91. Rejected canonical history still hydrates missing usage metadata additively. Session-scoped compaction usage has a wire timestamp a few milliseconds before its completion record, but semantically belongs after that context boundary; additive merge must insert it immediately after the matching successful compaction end instead of using raw timestamp order. Otherwise a richer local Assistant body can correctly reject canonical replacement yet leave the context meter permanently empty.
+92. Context usage and context capacity have different owners. `StatusUpdate.context_usage` and `usage.record` report the amount used; they must never manufacture a fixed capacity from that value. The background context meter resolves capacity per active Agent/model from the persisted model configuration and official Server model catalog, with that authoritative model metadata overriding legacy synthetic limits already stored in local history. A real runtime-reported limit is the fallback when catalog metadata is unavailable. If neither source reports a limit, Kimix shows the used token count with an unknown capacity and no percentage instead of inventing a shared 256k window.
 
 # Main Components
 

@@ -300,6 +300,50 @@ describe("getSessionRecommendationMetrics", () => {
 });
 
 describe("getSessionContextUsages", () => {
+  it("prefers the active model catalog limit over a legacy synthetic 256k event limit", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "kimi-code/k3",
+      events: [{
+        id: "legacy-status",
+        type: "status_update",
+        timestamp: 1,
+        message: "模型：kimi-code/k3",
+        inputTokenCount: 25_080,
+        contextSize: 25_080,
+        contextLimit: 256_000,
+      }],
+    };
+    const limits = new Map([["kimi-code/k3", 1_048_576]]);
+
+    expect(getSessionContextUsages(session, limits)[0]).toEqual(expect.objectContaining({
+      used: 25_080,
+      limit: 1_048_576,
+      percent: expect.closeTo((25_080 / 1_048_576) * 100, 5),
+    }));
+  });
+
+  it("uses each model's own catalog limit instead of a shared fallback", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "grok-4.5",
+      events: [{
+        id: "grok-status",
+        type: "status_update",
+        timestamp: 1,
+        message: "模型：grok-4.5",
+        inputTokenCount: 198_570,
+        contextSize: 198_570,
+      }],
+    };
+
+    expect(getSessionContextUsages(session, new Map([["grok-4.5", 500_000]]))[0]).toEqual(expect.objectContaining({
+      used: 198_570,
+      limit: 500_000,
+      percent: expect.closeTo((198_570 / 500_000) * 100, 5),
+    }));
+  });
+
   it("returns independent context usage for every active room agent", () => {
     const session: Session = {
       ...makeSession([]),
@@ -398,6 +442,29 @@ describe("getSessionContextUsages", () => {
     expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
       hasContext: false,
       used: 0,
+      percent: 0,
+    }));
+  });
+
+  it("does not invent a context limit when neither runtime nor catalog reports one", () => {
+    const session: Session = {
+      ...makeSession([]),
+      model: "custom/unknown",
+      events: [{
+        id: "usage",
+        type: "status_update",
+        timestamp: 1,
+        message: "模型：custom/unknown",
+        inputTokenCount: 12_000,
+        contextSize: 12_000,
+      }],
+    };
+
+    expect(getSessionContextUsages(session)[0]).toEqual(expect.objectContaining({
+      hasContext: true,
+      hasLimit: false,
+      used: 12_000,
+      limit: 0,
       percent: 0,
     }));
   });

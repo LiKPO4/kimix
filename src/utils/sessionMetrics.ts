@@ -1,5 +1,9 @@
 import type { Session, TimelineEvent } from "@/types/ui";
 import { getPrimaryRoomAgent, getRoomAgentEvents, getRoomAgents } from "@/utils/collaborationRooms";
+import {
+  resolveModelContextLimit,
+  type ModelContextLimitIndex,
+} from "@/utils/sessionModelCatalog";
 
 export interface SessionRecommendationMetrics {
   turnCount: number;
@@ -41,6 +45,7 @@ export interface SessionContextUsage {
   modelLabel: string;
   isPrimary: boolean;
   hasContext: boolean;
+  hasLimit: boolean;
   used: number;
   limit: number;
   percent: number;
@@ -153,7 +158,10 @@ export function statusesAfterLatestContextBoundary(
   };
 }
 
-export function getSessionContextUsages(session: Session | undefined): SessionContextUsage[] {
+export function getSessionContextUsages(
+  session: Session | undefined,
+  modelContextLimits: ModelContextLimitIndex = new Map(),
+): SessionContextUsage[] {
   if (!session) return [];
   const primaryAgentId = getPrimaryRoomAgent(session).id;
   return getRoomAgents(session)
@@ -169,21 +177,31 @@ export function getSessionContextUsages(session: Session | undefined): SessionCo
         ?? getLatestMetricStatus(statusEvents.length > 0 || foundBoundary ? statusEvents : agentEvents);
       const contextSize = preferPositiveMetric(merged?.contextSize, merged?.inputTokenCount);
       const hasContext = typeof contextSize === "number" && Number.isFinite(contextSize) && contextSize > 0;
+      const modelFromStatus = merged?.message?.trim().match(/^模型[：:]\s*(.+)$/)?.[1]?.trim();
+      const modelLabel = agent.modelLabelSnapshot || agent.modelAlias || modelFromStatus || session.model || "模型未知";
+      const configuredLimit = resolveModelContextLimit(modelContextLimits, [
+        agent.modelAlias,
+        modelFromStatus,
+        session.model,
+        agent.modelLabelSnapshot,
+      ]);
       const reportedLimit = preferPositiveMetric(merged?.contextLimit, undefined);
-      const limit = typeof reportedLimit === "number" && Number.isFinite(reportedLimit) && reportedLimit > 0
-        ? reportedLimit
-        : 256000;
+      const limit = configuredLimit
+        ?? (typeof reportedLimit === "number" && Number.isFinite(reportedLimit) && reportedLimit > 0
+          ? reportedLimit
+          : 0);
       const used = hasContext
         ? Math.max(0, contextSize <= 1 ? contextSize * limit : contextSize)
         : 0;
+      const hasLimit = limit > 0;
       const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-      const modelFromStatus = merged?.message?.trim().match(/^模型[：:]\s*(.+)$/)?.[1]?.trim();
       return {
         agentId: agent.id,
         agentName: agent.displayName,
-        modelLabel: agent.modelLabelSnapshot || agent.modelAlias || modelFromStatus || session.model || "模型未知",
+        modelLabel,
         isPrimary: agent.id === primaryAgentId,
         hasContext,
+        hasLimit,
         used,
         limit,
         percent,

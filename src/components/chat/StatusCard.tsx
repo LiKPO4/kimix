@@ -26,7 +26,10 @@ function formatK(tokens: number): string {
 
 function formatContext(event: Extract<TimelineEvent, { type: "status_update" }>, detailed: boolean): string {
   const ratio = event.contextSize ?? 0;
-  const limit = event.contextLimit ?? 256000;
+  const limit = event.contextLimit;
+  if (limit === undefined || limit <= 0) {
+    return ratio <= 1 ? `${(ratio * 100).toFixed(2)}%` : formatK(ratio);
+  }
   if (detailed) {
     const used = ratio <= 1 ? ratio * limit : ratio;
     return `${formatK(used)}/${formatK(limit)}`;

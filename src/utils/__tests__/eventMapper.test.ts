@@ -220,6 +220,7 @@ describe("mapStreamEvent", () => {
     expect(status.tokenCount).toBe(50);
     expect(status.inputTokenCount).toBe(15);
     expect(status.contextSize).toBe(200);
+    expect(status.contextLimit).toBeUndefined();
   });
 
   it("keeps missing StatusUpdate context unknown instead of fabricating zero", () => {
