@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { makeActiveTurnDraftKey } from "../activeTurnDraftStore";
+import { buildTurnBlocks } from "../turnBlocks";
 import {
   canLiveThinkingViewportConsumeWheel,
   LIVE_THINKING_MAX_HEIGHT_PX,
   resolveHasFinalProcessContent,
+  resolveLiveThinkingBlockKey,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
   shouldSubscribeActiveTurnDraft,
@@ -111,5 +114,30 @@ describe("liveThinkingViewport", () => {
       sessionId: "session-1",
       turnId: "turn-1",
     })).toBe(false);
+  });
+});
+
+describe("resolveLiveThinkingBlockKey", () => {
+  it("matches the formal thinking group key of the committed draft segment", () => {
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const materializationId = "mat-1";
+    const liveKey = resolveLiveThinkingBlockKey(draftKey, materializationId);
+    const segmentEvent = {
+      id: `active-draft:${draftKey}:${materializationId}`,
+      type: "assistant_message",
+      timestamp: 1,
+      content: "",
+      thinking: "思考",
+      isThinking: true,
+      isComplete: false,
+    } as unknown as Parameters<typeof buildTurnBlocks>[0][number];
+    const blocks = buildTurnBlocks([segmentEvent]);
+    expect(blocks[0]?.kind).toBe("thinking");
+    expect(blocks[0]?.key).toBe(liveKey);
+  });
+
+  it("returns undefined without a draft key or materialization", () => {
+    expect(resolveLiveThinkingBlockKey(null, "mat-1")).toBeUndefined();
+    expect(resolveLiveThinkingBlockKey("key", undefined)).toBeUndefined();
   });
 });

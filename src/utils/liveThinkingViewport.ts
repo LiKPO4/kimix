@@ -66,6 +66,21 @@ export function shouldSubscribeActiveTurnDraft({
   return enabled && isActiveAssistant && Boolean(sessionId && turnId);
 }
 
+/**
+ * React group key shared by the appended live thinking block and the formal
+ * thinking group produced when the same draft segment later commits. Must stay
+ * in sync with turnBlocks' `thinking:${event.id}` and the draft segment id
+ * (`active-draft:${draftKey}:${materializationId}`) so the live→formal swap
+ * reuses the same DOM node instead of unmounting it (completion flicker).
+ */
+export function resolveLiveThinkingBlockKey(
+  draftKey: string | null,
+  materializationId?: string,
+): string | undefined {
+  if (!draftKey || !materializationId) return undefined;
+  return `thinking:active-draft:${draftKey}:${materializationId}`;
+}
+
 export function shouldCollapseKimiWebProcessOnFinalContent({
   previousHasFinalContent,
   hasFinalContent,

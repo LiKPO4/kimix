@@ -202,6 +202,102 @@ describe("commitActiveTurnDraftsToBatch", () => {
     ))).toEqual(["你好", "霖江路。我会补上焦点归还。", "tool_call"]);
   });
 
+  it("keeps first-delta timestamp order when identity migration reorders the draft map", () => {
+    const localKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-local");
+    const officialKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-official");
+    applyActiveTurnDraftDelta(localKey, assistant("你好", {
+      timestamp: 1000,
+      agentTurnId: "turn-local",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    applyActiveTurnDraftDelta(officialKey, assistant("霖江路。我来查", {
+      timestamp: 2000,
+      agentTurnId: "turn-official",
+      roomAgentId: "agent-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    // A later delta whose roomMessageId matches the local draft migrates it to a
+    // third key, moving the OLDER draft to the drafts-map tail.
+    const migratedKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-migrated");
+    applyActiveTurnDraftDelta(migratedKey, assistant("", {
+      timestamp: 3000,
+      agentTurnId: "turn-migrated",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>();
+    commitActiveTurnDraftsToBatch(batches);
+
+    const items = batches.get(JSON.stringify(["session-1", "agent-1"]))?.items ?? [];
+    expect(items.map((event) => (
+      event.type === "assistant_message" ? event.content : event.type
+    ))).toEqual(["你好", "霖江路。我来查"]);
+  });
+
+  it("never leapfrogs an older sibling draft when the commit is turn-filtered", () => {
+    const localKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-local");
+    const officialKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-official");
+    applyActiveTurnDraftDelta(localKey, assistant("你好", {
+      timestamp: 1000,
+      agentTurnId: "turn-local",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-local",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    applyActiveTurnDraftDelta(officialKey, assistant("霖江路。我来查", {
+      timestamp: 2000,
+      agentTurnId: "turn-official",
+      roomAgentId: "agent-1",
+      roomMessageId: "message-official",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>();
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-official",
+    });
+
+    const items = batches.get(JSON.stringify(["session-1", "agent-1"]))?.items ?? [];
+    expect(items.map((event) => (
+      event.type === "assistant_message" ? event.content : event.type
+    ))).toEqual(["你好", "霖江路。我来查"]);
+    expect(getActiveTurnDraft(localKey)).toBeNull();
+    expect(getActiveTurnDraft(officialKey)).toBeNull();
+  });
+
+  it("inserts draft segments behind an earlier formal assistant batch item", () => {
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(draftKey, assistant("霖江路。我来查", {
+      timestamp: 2000,
+      agentTurnId: "turn-1",
+      roomAgentId: "agent-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    // A formal assistant frame arrived BEFORE the draft's first delta (e.g. the
+    // first body delta carried no agentTurnId and took the formal path).
+    const formal = assistant("你好", {
+      id: "formal-early",
+      timestamp: 1000,
+      agentTurnId: "turn-0",
+      roomAgentId: "agent-1",
+    });
+    const batchKey = JSON.stringify(["session-1", "agent-1"]);
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>([[batchKey, {
+      roomId: "session-1",
+      roomAgentId: "agent-1",
+      items: [formal],
+    }]]);
+
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+    });
+
+    expect(batches.get(batchKey)?.items.map((event) => (
+      event.type === "assistant_message" ? event.content : event.type
+    ))).toEqual(["你好", "霖江路。我来查"]);
+  });
+
   it("gives repeated materializations of one turn unique persisted ids", () => {
     const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
     const materialize = (content: string, timestamp: number) => {
@@ -354,6 +450,73 @@ describe("enqueueStreamEvent subagent scope attribution", () => {
     expect(mainAssistant?.content).not.toContain("子代理最终答复");
     const card = session.events.find((event) => event.type === "subagent") as Extract<TimelineEvent, { type: "subagent" }>;
     expect(card.events.some((event) => event.type === "assistant_message" && event.content.includes("子代理最终答复"))).toBe(true);
+    unmount();
+  });
+});
+
+describe("enqueueStreamEvent authoritative body frames", () => {
+  beforeEach(() => {
+    resetActiveTurnDraftStoreForTests();
+    useSessionStore.setState({ sessions: [seedSession([])] });
+  });
+
+  afterEach(() => {
+    resetActiveTurnDraftStoreForTests();
+    useSessionStore.setState({ sessions: [] });
+  });
+
+  it("commits draft thinking ahead of a body-only authoritative frame instead of dropping it", () => {
+    const { result, unmount } = renderHook(() => useEventStream());
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("", {
+        id: "think-delta-1",
+        thinking: "最后一段思考",
+      }));
+    });
+    expect(getActiveTurnDraft(draftKey)?.thinking).toBe("最后一段思考");
+
+    // The final body frame owns the text but carries no thinking of its own.
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("最终正文", {
+        id: "final-body-1",
+        isComplete: true,
+      }));
+    });
+
+    const session = useSessionStore.getState().sessions[0];
+    const assistants = session.events.filter((event) => event.type === "assistant_message") as Extract<TimelineEvent, { type: "assistant_message" }>[];
+    expect(assistants.some((event) => (event.thinking ?? "").includes("最后一段思考"))).toBe(true);
+    expect(assistants.some((event) => event.content.includes("最终正文"))).toBe(true);
+    expect(getActiveTurnDraft(draftKey)).toBeNull();
+    unmount();
+  });
+
+  it("still drops the draft when the authoritative frame carries its own thinking", () => {
+    const { result, unmount } = renderHook(() => useEventStream());
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("", {
+        id: "think-delta-1",
+        thinking: "草稿思考",
+      }));
+    });
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("最终正文", {
+        id: "final-body-1",
+        isComplete: true,
+        thinking: "正式思考",
+      }));
+    });
+
+    const session = useSessionStore.getState().sessions[0];
+    const assistants = session.events.filter((event) => event.type === "assistant_message") as Extract<TimelineEvent, { type: "assistant_message" }>[];
+    const joinedThinking = assistants.map((event) => event.thinking ?? "").join("\n");
+    expect(joinedThinking).toContain("正式思考");
+    expect(joinedThinking).not.toContain("草稿思考");
+    expect(getActiveTurnDraft(draftKey)).toBeNull();
     unmount();
   });
 });

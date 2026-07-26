@@ -17,7 +17,8 @@ import { noteLiveDisplayMode, resolveLiveDisplayMode } from "@/utils/liveTurnDia
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
-import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
 import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
@@ -1240,17 +1241,13 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
 
 function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
-  const paragraphs = useMemo(() =>
-    block.text
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0),
+  // Official kimi-web ThinkingBlock.vue folds to the LAST paragraph; the shared
+  // rule also folds long single-paragraph streams (teaser = last non-empty
+  // line) so settled long thinking never becomes a fixed, non-clickable wall.
+  const { foldable: isFoldable, teaser } = useMemo(
+    () => resolveSettledThinkingFold(block.text),
     [block.text]
   );
-  // Official kimi-web ThinkingBlock.vue: fold only when there is more than one
-  // paragraph, and show the LAST paragraph (untruncated) as the teaser.
-  const isFoldable = paragraphs.length > 1;
-  const teaser = paragraphs.at(-1) ?? block.text;
   return (
     <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
       {isFoldable ? (
@@ -2054,7 +2051,7 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
   }
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; onExpandedChange?: (expanded: boolean) => void }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; liveThinkingBlockKey?: string; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
@@ -2088,7 +2085,11 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
         ...turnBlocks,
         {
           kind: "thinking" as const,
-          key: `thinking:live:${event.agentTurnId ?? event.id}`,
+          // Same group key the formal commit of this draft segment will use
+          // (turnBlocks' thinking:<event.id> with the segment's
+          // active-draft:<key>:<materializationId> id), so the live→formal
+          // swap reuses the DOM node instead of unmounting it.
+          key: liveThinkingBlockKey ?? `thinking:live:${event.agentTurnId ?? event.id}`,
           blocks: liveThinkingBlocks,
         },
       ];
@@ -2101,7 +2102,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     ];
     const built = buildTurnBlocks(syntheticEvents);
     return built.length > 0 ? built : undefined;
-  }, [turnBlocks, liveThinkingBlocks, event, tools, subagents, approvals]);
+  }, [turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, event, tools, subagents, approvals]);
 
   const blockThinking = useMemo(() => {
     if (!effectiveTurnBlocks) return undefined;
@@ -2446,6 +2447,7 @@ type AssistantProcessBlockProps = {
   activeStatusMessage?: string;
   turnBlocks?: TurnBlock[];
   liveThinkingBlocks?: ThinkingBlock[];
+  liveThinkingBlockKey?: string;
   onExpandedChange?: (expanded: boolean) => void;
 };
 
@@ -2461,6 +2463,7 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
     prev.liveThinkingBlocks === next.liveThinkingBlocks &&
+    prev.liveThinkingBlockKey === next.liveThinkingBlockKey &&
     prev.onExpandedChange === next.onExpandedChange &&
     turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
@@ -2499,6 +2502,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   activeStatusMessage,
   turnBlocks,
   liveThinkingBlocks,
+  liveThinkingBlockKey,
   onExpandedChange,
 }: AssistantProcessBlockProps) {
   const hasActualThinking = Boolean(
@@ -2540,6 +2544,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       label={processLabel}
       turnBlocks={turnBlocks}
       liveThinkingBlocks={liveThinkingBlocks}
+      liveThinkingBlockKey={liveThinkingBlockKey}
       onExpandedChange={onExpandedChange}
     />
   );
@@ -2700,6 +2705,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       timestamp: activeDraft.timestamp,
     });
   }, [activeDraft?.thinking, activeDraft?.thinkingParts, activeDraft?.timestamp]);
+  const liveThinkingBlockKey = resolveLiveThinkingBlockKey(draftKey, activeDraft?.materializationId);
   const displayContent = pickDraftText(activeDraft?.content, event.content);
   const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);
   const displayThinkingParts = (
@@ -2795,6 +2801,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             activeStatusMessage={activeStatus?.message}
             turnBlocks={turnBlocks}
             liveThinkingBlocks={liveThinkingBlocks}
+            liveThinkingBlockKey={liveThinkingBlockKey}
             onExpandedChange={setProcessExpanded}
           />
         )}

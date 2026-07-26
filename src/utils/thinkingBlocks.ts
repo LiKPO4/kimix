@@ -113,3 +113,36 @@ export function buildThinkingBlocks(input: {
     })
     .filter((block) => block.text.length > 0);
 }
+
+export const SETTLED_THINKING_FOLD_MAX_LINES = 5;
+export const SETTLED_THINKING_FOLD_MAX_CHARS = 200;
+
+/**
+ * Fold rule for settled (completed) thinking in kimi-web mode. Official
+ * kimi-web folds multi-paragraph blocks to their LAST paragraph. Streamed
+ * thinking often lands as one long single-paragraph block (single \n breaks
+ * or none); the old paragraph-only predicate then rendered the whole block
+ * as a fixed, non-clickable wall. Long blocks fold even without blank-line
+ * breaks — the teaser is the last non-empty line — and the full text stays
+ * one click away.
+ */
+export function resolveSettledThinkingFold(text: string): {
+  foldable: boolean;
+  teaser: string;
+} {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (paragraphs.length > 1) {
+    return { foldable: true, teaser: paragraphs.at(-1) ?? text };
+  }
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const foldable =
+    lines.length > SETTLED_THINKING_FOLD_MAX_LINES ||
+    text.length > SETTLED_THINKING_FOLD_MAX_CHARS;
+  return { foldable, teaser: lines.at(-1) ?? text };
+}

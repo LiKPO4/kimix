@@ -15,6 +15,7 @@ import {
   applyActiveTurnDraftDelta,
   clearActiveTurnDraft,
   draftToAssistantEvent,
+  getActiveTurnDraft,
   isAuthoritativeAssistantBodyEvent,
   listActiveTurnDraftKeys,
   makeActiveTurnDraftKey,
@@ -98,24 +99,53 @@ export function commitActiveTurnDraftsToBatch(
   batches: Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>,
   options?: { sessionId?: string; roomAgentId?: string; agentTurnId?: string },
 ): void {
-  const keys = listActiveTurnDraftKeys().filter((key) => {
+  // Identity eras (optimistic vs official turn id) can leave several drafts
+  // for the same room. Commit order must follow each draft's first-delta
+  // timestamp: a turn-filtered commit may never leapfrog an older sibling
+  // draft, and segments inserted into a batch must stay behind formal items
+  // that arrived earlier. Otherwise the merged body reads "f2,f1,f3" (e.g.
+  // "霖江路。你好…") until an authoritative frame rewrites it.
+  const candidates: {
+    key: string;
+    parsed: NonNullable<ReturnType<typeof parseActiveTurnDraftKey>>;
+    firstDeltaAt: number;
+  }[] = [];
+  for (const key of listActiveTurnDraftKeys()) {
     const parsed = parseActiveTurnDraftKey(key);
-    if (!parsed) return false;
-    if (options?.sessionId && parsed.sessionId !== options.sessionId) return false;
-    if (options?.roomAgentId !== undefined && parsed.roomAgentId !== options.roomAgentId) return false;
-    if (options?.agentTurnId && parsed.agentTurnId !== options.agentTurnId) return false;
-    return true;
-  });
+    if (!parsed) continue;
+    if (options?.sessionId && parsed.sessionId !== options.sessionId) continue;
+    if (options?.roomAgentId !== undefined && parsed.roomAgentId !== options.roomAgentId) continue;
+    const draft = getActiveTurnDraft(key);
+    if (!draft) continue;
+    if (!draft.content && !draft.thinking && !(draft.thinkingParts?.length)) continue;
+    candidates.push({ key, parsed, firstDeltaAt: draft.timestamp });
+  }
+
+  const matched = options?.agentTurnId
+    ? candidates.filter((candidate) => candidate.parsed.agentTurnId === options.agentTurnId)
+    : candidates;
+  if (matched.length === 0) return;
+  const selected = options?.agentTurnId
+    ? candidates.filter((candidate) =>
+        matched.some(
+          (hit) =>
+            hit.parsed.sessionId === candidate.parsed.sessionId &&
+            hit.parsed.roomAgentId === candidate.parsed.roomAgentId &&
+            candidate.firstDeltaAt <= hit.firstDeltaAt,
+        ),
+      )
+    : matched;
+  // Stable sort: same-millisecond drafts keep their creation (arrival) order.
+  const ordered = [...selected].sort((a, b) => a.firstDeltaAt - b.firstDeltaAt);
 
   const prependedByBatch = new Map<string, {
     roomId: string;
     roomAgentId: string;
     items: TimelineEvent[];
   }>();
-  for (const key of keys) {
-    const parsed = parseActiveTurnDraftKey(key);
+  for (const { key, parsed } of ordered) {
     const draft = takeActiveTurnDraft(key);
-    if (!parsed || !draft) continue;
+    if (!draft) continue;
     if (!draft.content && !draft.thinking && !(draft.thinkingParts?.length)) continue;
     const batchKey = JSON.stringify([parsed.sessionId, parsed.roomAgentId]);
     const prepended = prependedByBatch.get(batchKey) ?? {
@@ -132,9 +162,22 @@ export function commitActiveTurnDraftsToBatch(
 
   for (const [batchKey, prepended] of prependedByBatch) {
     const current = batches.get(batchKey);
-    batches.set(batchKey, current
-      ? { ...current, items: [...prepended.items, ...current.items] }
-      : prepended);
+    if (!current) {
+      batches.set(batchKey, prepended);
+      continue;
+    }
+    // Segments stay ahead of the triggering boundary, but never leap ahead
+    // of an assistant item that arrived earlier (same-millisecond ties keep
+    // the formal item's lead); both rules guard the "f2,f1,f3" inversion.
+    const items = [...current.items];
+    for (const segment of prepended.items) {
+      let insertAt = items.findIndex((item) =>
+        item.type === "assistant_message" && item.timestamp > segment.timestamp);
+      if (insertAt === -1) insertAt = items.findIndex((item) => item.type !== "assistant_message");
+      if (insertAt === -1) items.push(segment);
+      else items.splice(insertAt, 0, segment);
+    }
+    batches.set(batchKey, { ...current, items });
   }
 }
 
@@ -242,7 +285,35 @@ export function useEventStream() {
       // clear it (their authoritative body belongs to the subagent card) nor
       // force an early commit of it.
       if (draftKey && isAuthoritativeAssistantBodyEvent(scoped)) {
-        clearActiveTurnDraft(draftKey);
+        const draft = getActiveTurnDraft(draftKey);
+        const frameHasThinking = scoped.type === "assistant_message" &&
+          Boolean(scoped.thinking?.trim() || scoped.thinkingParts?.some((part) => part.text.trim()));
+        const draftHasThinking = Boolean(
+          draft && (draft.thinking?.trim() || draft.thinkingParts?.some((part) => part.text.trim())),
+        );
+        if (draft && draftHasThinking && !frameHasThinking) {
+          // The frame owns the BODY but carries no thinking. Commit only the
+          // draft's thinking ahead of it so the last reasoning phase does not
+          // vanish until a later snapshot restores it (completion flicker).
+          const taken = takeActiveTurnDraft(draftKey);
+          if (taken) {
+            const parsed = parseActiveTurnDraftKey(draftKey);
+            const segment = scopeEventToRoomAgent(
+              { ...draftToAssistantEvent(draftKey, taken), content: "" },
+              parsed?.roomAgentId ?? roomAgentId,
+            );
+            const segmentBatchKey = JSON.stringify([uiSessionId, roomAgentId]);
+            const segmentBatch = streamBatchRef.current.get(segmentBatchKey) ?? {
+              roomId: uiSessionId,
+              roomAgentId,
+              items: [] as TimelineEvent[],
+            };
+            segmentBatch.items.push(segment);
+            streamBatchRef.current.set(segmentBatchKey, segmentBatch);
+          }
+        } else {
+          clearActiveTurnDraft(draftKey);
+        }
       } else {
         commitActiveTurnDraftsToBatch(streamBatchRef.current, {
           sessionId: uiSessionId,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildThinkingBlocks } from "../thinkingBlocks";
+import { buildThinkingBlocks, resolveSettledThinkingFold } from "../thinkingBlocks";
 
 describe("buildThinkingBlocks", () => {
   it("keeps the complete live reasoning text available to the scroll viewport", () => {
@@ -106,5 +106,31 @@ describe("buildThinkingBlocks", () => {
         summary: "Events are displayed directly with title/body; no intro storylet automatically.",
       },
     ]);
+  });
+});
+
+describe("resolveSettledThinkingFold", () => {
+  it("folds multi-paragraph thinking to the last paragraph", () => {
+    const result = resolveSettledThinkingFold("第一段思考。\n\n第二段收尾。");
+    expect(result).toEqual({ foldable: true, teaser: "第二段收尾。" });
+  });
+
+  it("folds a long single-paragraph stream and teasers the last line", () => {
+    const text = Array.from({ length: 80 }, (_, index) => `第 ${index + 1} 行思考内容`).join("\n");
+    const result = resolveSettledThinkingFold(text);
+    expect(result.foldable).toBe(true);
+    expect(result.teaser).toBe("第 80 行思考内容");
+  });
+
+  it("folds a single long line by length", () => {
+    const text = "很长的思考".repeat(50);
+    const result = resolveSettledThinkingFold(text);
+    expect(result.foldable).toBe(true);
+    expect(result.teaser).toBe(text);
+  });
+
+  it("keeps short single-paragraph thinking fully visible", () => {
+    const result = resolveSettledThinkingFold("简短的一句思考。");
+    expect(result).toEqual({ foldable: false, teaser: "简短的一句思考。" });
   });
 });

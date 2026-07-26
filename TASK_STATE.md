@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：落盘思考可展开、完成闪烁与正文乱序（v2.20.24）
+
+- 用户 v2.20.23 GIF 验收反馈三点：长思考落盘后变成固定不可点开的块；思考完成瞬间闪烁一次（消失又出现）；工具前正文「霖江路。你好我来查…」乱序（应为「你好霖江路。我来查…」）。
+- 乱序根因快照（docs/issue-body-fragment-inversion-events-snapshot.md）：diag.log 帧级日志证明服务端按正确顺序发送（dlen 2→4→22→19，均无 offset），且持久化终态正确（完成屏障已修复）——乱序只发生在渲染层提交路径：按 turn 过滤的 draft 提交可越过更老的同房间身份代 draft；提交段也无条件 prepend 到 batch 头部，排到更早到达的 formal 事件之前。
+- 修复①乱序：commitActiveTurnDraftsToBatch 按 draft 首帧时间戳排序提交；turn 过滤提交自动带上更老的同房间 draft；段插入 batch 时不越过更早到达的 assistant 项，同时保持在触发边界之前。
+- 修复②落盘思考：新增 resolveSettledThinkingFold——多段思考取尾段为摘要（原行为），单段长文（>5 行或 >200 字符）取最后一非空行为摘要，点击展开全文；短思考保持原样。
+- 修复③闪烁：authoritative body 帧不带 thinking 时不再整体清空 draft，改为先提交仅含 thinking 的段；live 思考块 key 与该段正式提交后的 turnBlocks 组 key 对齐（thinking:active-draft:<key>:<materializationId>），live→formal 切换复用 DOM 不再卸载重挂。
+- 验证：全量 130 文件 1256 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-zyWUUe1_.js）、OKF 校验、git diff --check 通过。待用户 GIF 复验。
 ## 2026-07-26 修复：实时思考草稿未进入五行滚动区（v2.20.23）
 
 - 用户 v2.20.22 动图对比：Kimix 仍在工具边界处整段跳出思考；官方体验是思考逐行持续增长，超过五行后固定为内部可滚动区域，并可回看完整内容。
