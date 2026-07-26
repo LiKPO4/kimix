@@ -757,3 +757,34 @@ describe("reduceKimiCodeEvents", () => {
     expect(suspended.error).toBe("rate limit");
   });
 });
+
+describe("tool.result failure flag", () => {
+  const options = testOptions();
+
+  it("carries the wire is_error flag onto the tool_result event", () => {
+    const failed = mapKimiCodeEvent({
+      type: "tool.result",
+      toolCallId: "call-err",
+      output: "Failed to grep: rg: no such file (os error 2)",
+      is_error: true,
+    }, options);
+    expect(failed?.type).toBe("tool_result");
+    expect((failed as Extract<TimelineEvent, { type: "tool_result" }>).isError).toBe(true);
+
+    const ok = mapKimiCodeEvent({
+      type: "tool.result",
+      toolCallId: "call-ok",
+      output: "done",
+    }, options);
+    expect((ok as Extract<TimelineEvent, { type: "tool_result" }>).isError).toBeUndefined();
+  });
+
+  it("reads is_error from official message content parts", () => {
+    const failed = mapKimiCodeEvent({
+      type: "tool.result",
+      toolCallId: "call-part",
+      content: [{ type: "tool_result", tool_call_id: "call-part", output: "Failed to grep", is_error: true }],
+    }, options);
+    expect((failed as Extract<TimelineEvent, { type: "tool_result" }>).isError).toBe(true);
+  });
+});

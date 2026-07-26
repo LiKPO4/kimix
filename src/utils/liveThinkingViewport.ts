@@ -31,6 +31,8 @@ export function shouldFollowLiveThinkingViewport({
 }
 
 export function shouldUseLiveThinkingViewport({
+  groupIndex,
+  groupCount,
   isThinkingGroup,
   isActiveAssistant,
   preserveDuringFinalTransition = false,
@@ -42,11 +44,12 @@ export function shouldUseLiveThinkingViewport({
   hasFinalContent: boolean;
   preserveDuringFinalTransition?: boolean;
 }) {
-  // Every reasoning phase in the running turn keeps a bounded five-line
-  // viewport. A text/tool block may follow the latest thinking phase before
-  // the turn completes; tying this to "last group" or "no body yet" would
-  // expand that reasoning back into the outer chat and stop its live scroll.
-  return (preserveDuringFinalTransition || isActiveAssistant) && isThinkingGroup;
+  // Only the TRAILING (still-growing) thinking phase keeps the bounded
+  // five-line live viewport. Once a text/tool/subagent/approval block follows
+  // a phase, that phase is finished and must settle into the foldable teaser
+  // (official kimi-web behavior); keeping every phase in a live scroll box
+  // leaves permanent scrollbars on completed reasoning.
+  return (preserveDuringFinalTransition || isActiveAssistant) && isThinkingGroup && groupIndex === groupCount - 1;
 }
 
 export function shouldSubscribeActiveTurnDraft({

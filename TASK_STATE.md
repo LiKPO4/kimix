@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：思考阶段落盘摘要与失败工具打叉（v2.20.25）
+
+- 用户 v2.20.24 截图反馈两点：①已走完的思考阶段（后面已跟正文/工具卡）仍挂五行滚动区，没有落成官方那样的摘要；②失败的工具调用（官方 is_error=true，如 Grep 路径不存在）在 Kimix 显示绿色对勾，官方显示叉并标「有失败」。
+- 证据：官方 /messages 的 tool_result 内容分片带 `is_error: true`（msg_…_000767「Failed to grep: rg: … (os error 2)」）；Kimix 三条摄入路径（live WS 映射、快照回放、native/SDK 历史）都只取 output，丢失失败标记，merge 层永远落 success。
+- 修复①：shouldUseLiveThinkingViewport 只对**最后一组**（仍在生长的）思考阶段启用五行实时视口；已走完的阶段按 resolveSettledThinkingFold 落盘为尾部摘要、可点击展开全文。
+- 修复②：is_error 全链路透传——kimiCodeEventMapper/electron 快照回放/eventMapper(native+SDK) 提取到 ToolResultEvent.isError，mergeEvents 据此把关联 tool_call 落为 error；UI 行内图标改为 ✗（accent-danger），工具组头显示「有失败」并不再给整组绿勾。
+- 验证：相关 4 文件 262 项、全量 130 文件 1260 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-B5i0hR0u.js）、OKF 校验（336 链接）、git diff --check 通过。待用户截图复验。
 ## 2026-07-26 修复：落盘思考可展开、完成闪烁与正文乱序（v2.20.24）
 
 - 用户 v2.20.23 GIF 验收反馈三点：长思考落盘后变成固定不可点开的块；思考完成瞬间闪烁一次（消失又出现）；工具前正文「霖江路。你好我来查…」乱序（应为「你好霖江路。我来查…」）。

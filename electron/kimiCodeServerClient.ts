@@ -1907,12 +1907,23 @@ function snapshotMessageToServerFrames(
       firstContentStringField(message, "toolCallId");
     const output = contentToText(message.content);
     if (!toolCallId || !output) return [];
+    // 官方 tool_result 内容分片携带 is_error 失败标记，回放时必须透传，
+    // 否则失败工具在 UI 永远落成 success（对勾而非叉）。
+    const isError = Array.isArray(message.content) && message.content.some((part) =>
+      isRecord(part) && (part.is_error === true || part.isError === true));
     return [{
       type: "tool.result",
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ type: "tool.result", toolCallId, output }, replayMode, messageIdentity, output, role, messageTimestamp),
+      payload: snapshotReplayPayload(
+        isError ? { type: "tool.result", toolCallId, output, is_error: true } : { type: "tool.result", toolCallId, output },
+        replayMode,
+        messageIdentity,
+        output,
+        role,
+        messageTimestamp,
+      ),
     }];
   }
   return [];

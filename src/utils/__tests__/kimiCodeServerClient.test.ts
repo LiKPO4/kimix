@@ -1728,3 +1728,24 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 });
+
+describe("snapshot tool replay failure flag", () => {
+  it("preserves is_error when replaying official tool messages", () => {
+    const frames = snapshotMessagesToServerFrames({
+      as_of_seq: 42,
+      epoch: "epoch-1",
+      session: { id: "session-1", status: "idle" },
+      messages: {
+        items: [
+          {
+            id: "msg-tool-failed",
+            role: "tool",
+            content: [{ type: "tool_result", tool_call_id: "call-err", output: "Failed to grep: rg: no such file", is_error: true }],
+          },
+        ],
+      },
+    }, "session-1");
+    const toolFrame = frames.find((frame) => frame.type === "tool.result");
+    expect(toolFrame?.payload).toMatchObject({ toolCallId: "call-err", is_error: true });
+  });
+});

@@ -48,7 +48,7 @@ describe("liveThinkingViewport", () => {
     })).toBe(true);
   });
 
-  it("limits every thinking group for the whole active turn", () => {
+  it("limits only the trailing thinking group while the turn is active", () => {
     const base = {
       groupIndex: 2,
       groupCount: 3,
@@ -57,7 +57,8 @@ describe("liveThinkingViewport", () => {
       hasFinalContent: false,
     };
     expect(shouldUseLiveThinkingViewport(base)).toBe(true);
-    expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(true);
+    // 已走完的思考阶段（后面已有正文/工具）落盘为可折叠摘要，不再挂实时滚动区。
+    expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(false);
     expect(shouldUseLiveThinkingViewport({ ...base, isActiveAssistant: false })).toBe(false);
     expect(shouldUseLiveThinkingViewport({ ...base, hasFinalContent: true })).toBe(true);
     expect(shouldUseLiveThinkingViewport({

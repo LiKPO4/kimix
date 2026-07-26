@@ -456,6 +456,8 @@ export interface ToolResultEvent {
   toolCallId: string;
   toolName: string;
   result: unknown;
+  /** 官方 wire 的失败标记（tool_result content part 的 is_error）。 */
+  isError?: boolean;
   display?: ToolDisplay;
 }
 

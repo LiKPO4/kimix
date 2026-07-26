@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Trailing-phase live viewport and tool failure passthrough (v2.20.25)**: only the still-growing thinking phase keeps the five-line live scroll viewport; finished phases settle into the foldable last-part teaser (official kimi-web behavior). Official tool_result content parts carry `is_error`, which all three ingestion paths (live WS mapping, snapshot replay, native/SDK history) dropped — failed tools rendered as green checks. The flag now flows to `ToolResultEvent.isError`, merges into the linked tool_call as `error`, and renders as ✗ with a "有失败" group header. Invariant K revised. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **First-delta draft commit order, settled-thinking fold, flicker-free live→formal handoff (v2.20.24)**: a frame-level trace proved the Server sent a pre-tool body in the correct order (2/4/22/19-char deltas, no offsets) while the live UI rendered it inverted ("霖江路。你好…"); the inversion came from draft commits that could leapfrog older identity-era drafts and from unconditional batch prepends. Draft commits now follow first-delta timestamps, never skip older sibling drafts, and never jump ahead of earlier formal assistant items. Authoritative body frames without their own thinking now commit the draft’s thinking instead of dropping it, and the live thinking block shares its React group key with the segment’s later formal commit, ending the completion flicker. Settled long thinking folds to a last-part teaser and expands to full text. Invariants L–N added. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

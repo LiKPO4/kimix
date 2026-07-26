@@ -1205,7 +1205,7 @@ function kimiWebGroupStatusText(group: ProcessGroup) {
     ? group.tools.some((t) => t.status === "error")
     : group.subagents.some((s) => s.status === "error");
   if (isRunning) return "运行中";
-  if (hasError) return "失败";
+  if (hasError) return group.type === "tool" ? "有失败" : "失败";
   return "已完成";
 }
 
@@ -1479,7 +1479,7 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
       <span className="flex h-5 items-center" style={{ gap: 8 }}>
         {lineCount > 0 && <span className="kimix-tabular-nums text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{lineCount} 行</span>}
         {tool.status === "success" && <Check size={14} className="text-accent-success" />}
-        {tool.status === "error" && <span className="h-1.5 w-1.5 rounded-full bg-accent-danger" />}
+        {tool.status === "error" && <X size={14} className="text-accent-danger" />}
         {tool.status === "running" && <Loader2 size={14} className="kimix-spin text-accent-warning" />}
       </span>
       <span className="flex h-5 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -1535,7 +1535,8 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
 function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
   const [expanded, setExpanded] = useState(false);
   const statusText = kimiWebGroupStatusText({ type: "tool", tools });
-  const allDone = tools.every((t) => t.status === "success");
+  const hasError = tools.some((t) => t.status === "error");
+  const allDone = !hasError && tools.every((t) => t.status === "success");
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl">
       <button
@@ -1551,7 +1552,8 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
           <span className="truncate">{kimiWebGroupSummary({ type: "tool", tools })}</span>
         </span>
         <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
-          {statusText && <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>}
+          {statusText && <span className={hasError ? "text-[12px] leading-none text-accent-danger" : "text-[12px] leading-none text-[var(--kimix-panel-text-muted)]"}>{statusText}</span>}
+          {hasError && <X size={14} className="text-accent-danger" />}
           {allDone && <Check size={14} className="text-accent-success" />}
         </span>
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">

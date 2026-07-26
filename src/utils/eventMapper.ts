@@ -1377,6 +1377,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: payloadString(payload, source, "toolCallId") ?? payloadString(payload, source, "id") ?? "",
         toolName: payloadString(payload, source, "name") ?? payloadString(payload, source, "toolName") ?? "unknown",
         result: payloadValue(payload, source, "result") ?? payloadValue(payload, source, "output") ?? "",
+        isError: payloadValue(payload, source, "is_error") === true || payloadValue(payload, source, "isError") === true ? true : undefined,
         display: normalizeNativeToolDisplay(payload, source),
       };
 
@@ -1576,6 +1577,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         toolCallId: isString(payload.tool_call_id) ? payload.tool_call_id : "",
         toolName: "unknown",
         result: returnValue.output ?? "",
+        isError: returnValue.is_error === true || returnValue.isError === true ? true : undefined,
         display,
       };
     }
@@ -2267,7 +2269,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         : typeof resultRecord?.output === "string"
           ? resultRecord.output
           : "";
-      const isErrorResult = resultRecord?.isError === true;
+      const isErrorResult = incoming.isError === true || resultRecord?.isError === true;
       const isRecoveryInterruption = isErrorResult && /execution was interrupted|执行(?:已|被)?中断/i.test(resultText);
       result[callIndex] = {
         ...call,

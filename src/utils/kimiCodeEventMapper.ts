@@ -80,6 +80,27 @@ function normalizeResult(event: Record<string, unknown>): unknown {
   return result ?? "";
 }
 
+/**
+ * 官方 tool_result 的失败标记：顶层 is_error/isError、嵌套 result 记录，
+ * 或官方 /messages 内容分片（content parts）上的 is_error。
+ * normalizeResult 只取 output，失败标记必须单独透传。
+ */
+function resolveToolResultIsError(event: Record<string, unknown>): boolean | undefined {
+  const direct = event.is_error ?? event.isError;
+  if (typeof direct === "boolean") return direct;
+  const nested = isRecord(event.result) ? (event.result.is_error ?? event.result.isError) : undefined;
+  if (typeof nested === "boolean") return nested;
+  if (Array.isArray(event.content)) {
+    for (const part of event.content) {
+      if (isRecord(part)) {
+        const flag = part.is_error ?? part.isError;
+        if (typeof flag === "boolean") return flag;
+      }
+    }
+  }
+  return undefined;
+}
+
 function nestedString(value: unknown, key: string): string | undefined {
   if (!isRecord(value)) return undefined;
   const nestedValue = value[key];
@@ -601,6 +622,7 @@ export function mapKimiCodeEvent(
         toolCallId: isString(event.toolCallId) ? event.toolCallId : "",
         toolName: isString(event.name) ? event.name : "unknown",
         result: normalizeResult(event),
+        isError: resolveToolResultIsError(event),
         display: normalizeToolDisplay(event),
       };
 

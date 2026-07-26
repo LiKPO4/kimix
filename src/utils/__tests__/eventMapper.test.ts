@@ -3252,3 +3252,24 @@ describe("mergeEvents assistant thinking dedup", () => {
     expect(parts[0].text).toBe("片段一片段二");
   });
 });
+
+describe("tool_result wire failure flag", () => {
+  it("marks the linked tool_call as error when tool_result carries isError", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-err", toolName: "Grep", status: "running", arguments: {} },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-err",
+      toolName: "Grep",
+      result: "Failed to grep: rg: no such file (os error 2)",
+      isError: true,
+    };
+    const result = mergeEvents(existing, incoming);
+    const toolCall = result[0] as Extract<TimelineEvent, { type: "tool_call" }>;
+    expect(toolCall.status).toBe("error");
+    expect(toolCall.result).toBe("Failed to grep: rg: no such file (os error 2)");
+  });
+});
