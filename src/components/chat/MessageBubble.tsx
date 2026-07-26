@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type ReactNode } from "react";
-import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, Copy, Check, GitBranch, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2, X, Film, Play } from "lucide-react";
+import { Bot, Brain, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Copy, Check, GitBranch, Loader2, RotateCcw, ShieldCheck, SquareTerminal, Webhook, FileText, Trash2, X, Film, Play } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -8,7 +8,6 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
 import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
-import { QuestionCard } from "./QuestionCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
@@ -1889,6 +1888,88 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
   );
 }
 
+/**
+ * Settled question card inside the process timeline, styled consistently with
+ * the tool/approval group cards: one collapsible header row (提问 + answer
+ * status) and, when expanded, each question with its options — the submitted
+ * answer checked, the rest muted. The full interactive QuestionCard stays
+ * only for the pending standalone row.
+ */
+function KimiWebQuestionGroupCard({ question }: { question: QuestionEvent }) {
+  const [expanded, setExpanded] = useState(false);
+  const answerCount = question.questions.filter((item) => savedQuestionAnswer(question, item)).length;
+  const statusText = question.status === "answered"
+    ? `${Math.max(answerCount, 1)} 个回答`
+    : question.status === "skipped" ? "已跳过" : "已处理";
+  return (
+    <div className="kimix-soft-card overflow-hidden rounded-xl">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ gap: 9, padding: "8px 12px" }}
+      >
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          <CircleHelp size={14} />
+        </span>
+        <span className="flex h-5 min-w-0 flex-1 items-center">
+          <span className="truncate">提问</span>
+        </span>
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{statusText}</span>
+          {question.status === "answered" && <Check size={14} className="text-accent-success" />}
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="flex flex-col border-t border-[var(--kimix-panel-divider)]" style={{ gap: 12, padding: "10px 12px" }}>
+          {question.questions.map((item, index) => {
+            const saved = savedQuestionAnswer(question, item);
+            return (
+              <div key={item.id ?? index} className="flex flex-col" style={{ gap: 6 }}>
+                <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                  {item.header && <span className="text-[var(--kimix-panel-text-muted)]">{item.header} </span>}
+                  {item.question}
+                </div>
+                <div className="flex flex-col" style={{ gap: 4, paddingLeft: 12 }}>
+                  {item.options.map((option) => {
+                    const selected = Boolean(saved) && (option.label === saved || option.id === saved);
+                    return (
+                      <div key={option.id ?? option.label} className="flex items-baseline" style={{ gap: 8 }}>
+                        <span className="flex h-5 w-[14px] shrink-0 items-center justify-center">
+                          {selected ? <Check size={12} className="text-accent-success" /> : <span className="h-1 w-1 rounded-full bg-[var(--kimix-panel-text-muted)]" />}
+                        </span>
+                        <span className={selected ? "text-[13px] leading-5 text-[var(--kimix-panel-text)]" : "text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]"}>
+                          {option.label}
+                          {option.description ? `　${option.description}` : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {saved && !item.options.some((option) => option.label === saved || option.id === saved) && (
+                    <div className="flex items-baseline" style={{ gap: 8 }}>
+                      <span className="flex h-5 w-[14px] shrink-0 items-center justify-center">
+                        <Check size={12} className="text-accent-success" />
+                      </span>
+                      <span className="text-[13px] leading-5 text-[var(--kimix-panel-text)]">{saved}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 与 QuestionCard 的已提交答案读取规则一致：先按问题文本、再按问题 id。 */
+function savedQuestionAnswer(event: QuestionEvent, item: QuestionEvent["questions"][number]): string {
+  return event.answers?.[item.question]?.trim() || (item.id ? event.answers?.[item.id]?.trim() : undefined) || "";
+}
 function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: boolean }) {
   switch (group.type) {
     case "thinking":
@@ -2020,7 +2101,7 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
     case "thinking":
       return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
     case "question":
-      return <QuestionCard event={group.question} />;
+      return <KimiWebQuestionGroupCard question={group.question} />;
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":

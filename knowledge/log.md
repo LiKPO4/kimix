@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **In-flow question card matches tool cards (v2.20.28)**: the settled question block inside the process timeline now renders as a collapsible group card (header 提问 + N 个回答/已跳过, expand for questions and options with the submitted answer checked), reusing the tool/approval card visual tokens. The standalone interactive QuestionCard remains for pending questions only.
+
+
 * **Intermediate body text never folds (v2.20.27)**: official kimi-web renders text messages in full via MessageResponse — no fold or length exemption exists (only reasoning and tool cards collapse). KimiWebIntermediateTextBlock dropped its last-paragraph fold and always renders the full segment; settled THINKING keeps the teaser+expand fold (accepted design). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 
