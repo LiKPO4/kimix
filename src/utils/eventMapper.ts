@@ -1919,7 +1919,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         const hasToolBoundary = existing.slice(stableAssistantIndex + 1).some(
           (e) => e.type === "tool_call" || e.type === "subagent" || e.type === "approval_request"
         );
-        if (hasToolBoundary) {
+        if (hasToolBoundary && incoming.completionBarrierReplay !== true) {
           // Fall through to append path (lines 1846+) — the incoming frame becomes
           // a new entry in the timeline, preserving the tool break order.
         } else {
@@ -1954,21 +1954,17 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       }
 
     if (stableSnapshotId && incoming.completionBarrierReplay) {
-      // Bind the live placeholder to the first official barrier message only.
-      // Later steps have different stable message IDs and must stay separate so
-      // mergeAssistantProcessEvents can join every step's thinking + tools.
+      // Bind each chronological official barrier message to its matching live
+      // segment, including a segment already closed by a following tool. The
+      // completed-message API replays pre-tool messages after the live turn has
+      // moved on; restricting this to open drafts leaves that older message at
+      // the array tail, where it is mistaken for the final answer.
       const completionTargetIndex = existing.findLastIndex((event) => (
         event.type === "assistant_message" &&
-        !event.isComplete &&
         event.snapshotMessageIdStable !== true &&
         (!incoming.roomAgentId || event.roomAgentId === incoming.roomAgentId) &&
         (!incoming.roomMessageId || event.roomMessageId === incoming.roomMessageId) &&
         (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId) &&
-        !existing.slice(existing.indexOf(event) + 1).some(
-          (candidate) => candidate.type === "tool_call" ||
-            candidate.type === "subagent" ||
-            candidate.type === "approval_request"
-        ) &&
         // A reconnect snapshot replays every official step in the current user
         // turn. Never let an older pre-tool step claim the newest live draft
         // merely because both share agentTurnId/roomMessageId.

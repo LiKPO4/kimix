@@ -2090,6 +2090,68 @@ describe("mergeEvents", () => {
     ))).toBe(true);
   });
 
+  it("binds completed pre-tool replay to its live segment instead of making it the final answer", () => {
+    // Live stream has already closed the short pre-tool sentence and moved on
+    // to the final draft when /messages replays both official messages.
+    const existing: TimelineEvent[] = [
+      { id: "user", type: "user_message", timestamp: 1_000, content: "说明两件装备" },
+      {
+        id: "live-pre-tool", type: "assistant_message", timestamp: 1_100,
+        content: "两个的具体效果如下：", isThinking: false, isComplete: true,
+        agentTurnId: "turn-1",
+      },
+      {
+        id: "tool", type: "tool_call", timestamp: 1_200,
+        toolCallId: "read-1", toolName: "Read", status: "success", arguments: {},
+      },
+      {
+        id: "live-final", type: "assistant_message", timestamp: 1_300,
+        content: "玉垒诀的完整效果", isThinking: false, isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+
+    const withPreTool = mergeEvents(existing, {
+      id: "replay-pre-tool", type: "assistant_message", timestamp: 1_050,
+      content: "", thinking: "先核对代码实现。", isThinking: true, isComplete: false,
+      snapshotMessageId: "msg_session-x_000728", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+    const withPreToolText = mergeEvents(withPreTool, {
+      id: "replay-pre-tool-text", type: "assistant_message", timestamp: 1_050,
+      content: "两个的具体效果如下（已核对实现）：", isThinking: false, isComplete: false,
+      snapshotMessageId: "msg_session-x_000728", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+    const completedPreTool = mergeEvents(withPreToolText, {
+      id: "replay-pre-tool-end", type: "assistant_message", timestamp: 1_050,
+      content: "", isThinking: false, isComplete: true,
+      snapshotMessageId: "msg_session-x_000728", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+    const withFinal = mergeEvents(completedPreTool, {
+      id: "replay-final", type: "assistant_message", timestamp: 1_250,
+      content: "玉垒诀与雷龟盾的 592 字完整效果。", isThinking: false, isComplete: true,
+      snapshotMessageId: "msg_session-x_000730", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+
+    const assistants = withFinal.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    expect(assistants[0]).toMatchObject({
+      id: "live-pre-tool",
+      snapshotMessageId: "msg_session-x_000728",
+      content: "两个的具体效果如下（已核对实现）：",
+      isComplete: true,
+    });
+    expect(assistants[1]).toMatchObject({
+      id: "live-final",
+      snapshotMessageId: "msg_session-x_000730",
+      content: "玉垒诀与雷龟盾的 592 字完整效果。",
+      isComplete: true,
+    });
+  });
+
   it("break-segment: different roomAgentId does not merge", () => {
     const existing: TimelineEvent[] = [
       { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "A发言", isThinking: false, isComplete: false, roomAgentId: "agent-1", agentTurnId: "turn-1" },
