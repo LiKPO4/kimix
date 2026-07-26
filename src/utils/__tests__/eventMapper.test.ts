@@ -2043,6 +2043,53 @@ describe("mergeEvents", () => {
     expect(previewIdx).toBeLessThan(summaryIdx);
   });
 
+  it("does not bind an older pre-tool snapshot step to the newest live draft", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 1, content: "检查" },
+      {
+        id: "old-step", type: "assistant_message", timestamp: 10,
+        content: "", thinking: "旧步骤", isThinking: false, isComplete: true,
+        snapshotMessageId: "f_000710", snapshotMessageIdStable: true,
+        agentTurnId: "turn-1",
+      },
+      {
+        id: "tool-1", type: "tool_call", timestamp: 20,
+        toolCallId: "call-1", toolName: "Read", status: "success", arguments: {},
+      },
+      {
+        id: "live-draft", type: "assistant_message", timestamp: 30,
+        content: "", thinking: "当前步骤", isThinking: true, isComplete: false,
+        agentTurnId: "turn-1",
+      },
+    ];
+    const result = mergeEvents(existing, {
+      id: "replayed-old-step",
+      type: "assistant_message",
+      timestamp: 10,
+      content: "",
+      thinking: "旧步骤的官方全文",
+      isThinking: false,
+      isComplete: true,
+      snapshotMessageId: "f_000711",
+      snapshotMessageIdStable: true,
+      completionBarrierReplay: true,
+      agentTurnId: "turn-1",
+    });
+    const liveDraft = result.find((event) => event.id === "live-draft");
+    expect(liveDraft).toMatchObject({
+      type: "assistant_message",
+      thinking: "当前步骤",
+      isComplete: false,
+    });
+    expect(liveDraft && "snapshotMessageIdStable" in liveDraft
+      ? liveDraft.snapshotMessageIdStable
+      : undefined).toBeUndefined();
+    expect(result.some((event) => (
+      event.type === "assistant_message" &&
+      event.snapshotMessageId === "f_000711"
+    ))).toBe(true);
+  });
+
   it("break-segment: different roomAgentId does not merge", () => {
     const existing: TimelineEvent[] = [
       { id: "a1", type: "assistant_message" as const, timestamp: 2, content: "A发言", isThinking: false, isComplete: false, roomAgentId: "agent-1", agentTurnId: "turn-1" },
@@ -3054,6 +3101,14 @@ describe("mergeAssistantThinkingParts", () => {
     const existing = [part("a", "思考A"), part("b", "思考B")];
     const merged = mergeAssistantThinkingParts(existing, [part("c", "思考C")]);
     expect(merged?.map((item) => item.text)).toEqual(["思考A", "思考B", "思考C"]);
+  });
+
+  it("restores no-offset thinking fragments to source timestamp order", () => {
+    const merged = mergeAssistantThinkingParts(
+      [part("later", " observations", 2)],
+      [part("earlier", "Key", 1)],
+    );
+    expect(merged?.map((item) => item.text)).toEqual(["Key", " observations"]);
   });
 
   it("still upgrades a same-id part in place when the text grew", () => {

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：新轮订阅静默与重连快照错序（v2.20.21）
+
+- 用户 v2.20.20 实测：新轮仍需约 20 秒才整批出现输出，且过程文本出现 ``registeredInteresting``、句首半截等非自然拼接。
+- 根因快照：prompt 前建立的 WS 在新轮只收到首条状态，之后 17 秒无帧；官方历史增长后 v2.20.20 watchdog 重连，重连后的独立 WS 可持续收到约 0.2–1 秒一条增量，证明延迟是旧订阅跨轮失活。官方 messages 中原文完整；IndexedDB 本地事件却把较早 snapshot 步骤吸进当前 live draft，并把无 offset、时间戳 1ms 倒序的 thinking parts 按到达顺序连接，确认错文发生在 Kimix 归属/拼装层。
+- 修复：HTTP prompt 接受后立即重建 WS 订阅，不再等待官方历史持久化后由 watchdog 判定；未见过的 stable snapshot ID 必须经过带工具/子代理/审批边界与时间边界的 guarded binding，禁止 same-turn 快捷路径绕过；无 offset thinking parts 按源时间戳稳定恢复顺序，同 ID 增长更新保留原始位置。版本升至 v2.20.21。
+- 验证：定向 2 文件 212 项、全量 131 文件 1244 项通过；Node/Renderer 严格类型检查、生产构建（renderer `assets/index-CGsF8wBH.js`）、OKF 严格校验（11 概念、19 Markdown、332 链接）和 `git diff --check` 通过。待用户真实长任务实测。
+
 ## 2026-07-26 修复：WS 假死期间每 30 秒批量补输出（v2.20.20）
 
 - 用户 v2.20.19 实测：运行约 30 秒后正文、思考和 5 个工具结果整批出现，怀疑没有实时同步。

@@ -298,6 +298,9 @@ export function mergeAssistantThinkingParts(
         result[sameIdIndex] = {
           ...current,
           ...part,
+          // A same-id update extends the original thought; keep its source
+          // position instead of moving it behind later parts.
+          timestamp: current.timestamp,
           text: part.text,
         };
       }
@@ -336,7 +339,14 @@ export function mergeAssistantThinkingParts(
 
     result.push(part);
   }
-  return result;
+  // Volatile 0.29 thinking frames do not carry a stream offset. Reconnect and
+  // renderer scheduling can therefore deliver adjacent fragments in reverse
+  // order. Their source timestamps are still monotonic, so restore that order
+  // before the UI concatenates the parts. Modern JS sort is stable, preserving
+  // arrival order for fragments that genuinely share a timestamp.
+  return result.some((part, index) => index > 0 && part.timestamp < result[index - 1].timestamp)
+    ? result.sort((left, right) => left.timestamp - right.timestamp)
+    : result;
 }
 
 function isInsideUnclosedInlineCode(content: string) {
@@ -1871,7 +1881,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
          (incoming.roomMessageId && event.roomMessageId === incoming.roomMessageId))
       ))
       : -1;
-    const stableAssistantIndex = stableAssistantIndexBySnapshot !== -1
+    // An unseen stable replay identity must pass through the guarded
+    // completion-binding path below. Falling back to sameTurn here bypasses
+    // all step-boundary checks and lets an old snapshot step absorb the newest
+    // live draft.
+    const stableAssistantIndex = stableSnapshotId
       ? stableAssistantIndexBySnapshot
       : sameTurnAssistantIndex;
     const latestUserTimestamp = existing.reduce<number | undefined>((latest, event) => (
@@ -1949,7 +1963,22 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         event.snapshotMessageIdStable !== true &&
         (!incoming.roomAgentId || event.roomAgentId === incoming.roomAgentId) &&
         (!incoming.roomMessageId || event.roomMessageId === incoming.roomMessageId) &&
-        (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId)
+        (!incoming.agentTurnId || event.agentTurnId === incoming.agentTurnId) &&
+        !existing.slice(existing.indexOf(event) + 1).some(
+          (candidate) => candidate.type === "tool_call" ||
+            candidate.type === "subagent" ||
+            candidate.type === "approval_request"
+        ) &&
+        // A reconnect snapshot replays every official step in the current user
+        // turn. Never let an older pre-tool step claim the newest live draft
+        // merely because both share agentTurnId/roomMessageId.
+        !existing.some((candidate) => (
+          (candidate.type === "tool_call" ||
+            candidate.type === "subagent" ||
+            candidate.type === "approval_request") &&
+          candidate.timestamp > incoming.timestamp &&
+          candidate.timestamp <= event.timestamp
+        ))
       ));
       if (completionTargetIndex !== -1) {
         const target = existing[completionTargetIndex] as Extract<TimelineEvent, { type: "assistant_message" }>;

@@ -1152,6 +1152,14 @@ export class KimiCodeServerClient {
       body: JSON.stringify({ content, ...controls }),
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
+    // 0.29 daemon 偶发保留“已连接但不再推送下一轮 volatile delta”的旧订阅。
+    // prompt 已落盘后立即建立一条新 WS，让新轮次从开头进入实时流；不能等到
+    // 历史消息持久化后再由静默 watchdog 补救，否则用户会先空等约 20 秒。
+    try {
+      await this.refreshSubscriptionAfterAcceptedPrompt(sessionId);
+    } catch (error) {
+      console.warn("[KimiCodeServerClient] prompt 接受后刷新实时订阅失败，继续等待（watchdog/快照仍会兜底）:", error);
+    }
     // The accepted prompt has persisted its user message. Remember the newest
     // lightweight history marker so later WS silence can be distinguished
     // from normal model thinking without pulling the entire snapshot.
@@ -1193,6 +1201,21 @@ export class KimiCodeServerClient {
       }
     }
     return result;
+  }
+
+  private async refreshSubscriptionAfterAcceptedPrompt(sessionId: string): Promise<void> {
+    if (!this.subscribed.has(sessionId)) return;
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    sdiag(`[wsc] prompt accepted ${sessionId.slice(-8)} → refresh live subscription`);
+    socket.close();
+    // WebSocket implementations dispatch close asynchronously. Apply the
+    // transition now as well; a later close event is ignored once socket
+    // identity changes.
+    this.handleSocketClose(socket);
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    await this.ensureConnected();
   }
 
   async steer(sessionId: string, input: unknown, controls: Record<string, unknown>) {

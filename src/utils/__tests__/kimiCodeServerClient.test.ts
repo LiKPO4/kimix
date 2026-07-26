@@ -498,7 +498,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
     warn.mockRestore();
   });
 
-  it("does not resubscribe an already-subscribed session before prompting", async () => {
+  it("refreshes an already-subscribed live connection after the prompt is accepted", async () => {
     const promptId = "msg_01SUBBED";
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       expect(url).toContain("/api/v1/sessions/session-1/prompts");
@@ -511,10 +511,12 @@ describe("KimiCodeServerClient protocol adapters", () => {
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     const internals = client as unknown as {
       subscribed: Set<string>;
+      refreshSubscriptionAfterAcceptedPrompt: (sessionId: string) => Promise<void>;
       receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
     };
     internals.subscribed.add("session-1");
     const subscribe = vi.spyOn(client, "subscribe");
+    const refresh = vi.spyOn(internals, "refreshSubscriptionAfterAcceptedPrompt").mockResolvedValue();
     const dispatched = client.prompt("session-1", "数到 300", {});
     internals.receive({
       type: "prompt.aborted",
@@ -525,6 +527,7 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
     expect(subscribe).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledWith("session-1");
   });
 
   it("delivers the completed prompt's authoritative assistant before prompt.completed", async () => {

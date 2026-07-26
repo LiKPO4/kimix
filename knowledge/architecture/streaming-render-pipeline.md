@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-26T06:51:33+08:00"
+timestamp: "2026-07-26T08:45:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -106,6 +106,18 @@ fire first, because a fat, duplicated row needs repair, not a skip. History
 reconciliation compares the canonical timeline against a deduplicated local
 timeline so a locally duplicated (and therefore longer) thinking history cannot
 win the regression guard and fossilize duplicates into the persisted state.
+
+Reconnect replay adds two stricter ownership rules. An unseen stable snapshot
+message ID may not use the generic same-turn open-Assistant shortcut: it must
+pass the guarded completion-binding path, and any tool/subagent/approval whose
+timestamp lies between the replayed official step and the live draft proves
+they are different materializations. Otherwise an older official step can be
+spliced into the newest process sentence even though the Server history is
+clean. For current 0.29 frames that omit `offset`, thinking parts retain their
+source timestamps; merges restore a stable timestamp order (equal timestamps
+keep arrival order), and a growing same-ID part keeps its original position.
+This fallback is limited to `thinkingParts`; offset-bearing body/thinking streams
+continue to use the turn-global anchor rules below.
 
 ## Offset-anchored volatile deltas take precedence over order-based merging
 
