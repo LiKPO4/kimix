@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-26T11:42:05+08:00"
+timestamp: "2026-07-26T12:25:54+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -88,6 +88,14 @@ flow through the formal batch path into their own subagent card. Because the
 draft key has no subagent dimension, admitting them would splice a subagent's
 delta into the main turn's buffer in arrival order (interleaved, duplicated
 body), and their boundary frames would clear or commit the main draft early.
+
+Server v2 intermediate Assistant steps can carry `isComplete:true` while the
+session runtime remains active. Active-draft subscription is therefore owned
+solely by runtime activity plus session/turn identity; step completion must not
+detach the bubble. When formal `turnBlocks` already exist, the current draft's
+thinking blocks are appended as one transient live block rather than discarded
+in favor of the formal list. A tool boundary atomically clears that transient
+draft and commits the same materialization into formal order.
 
 ## Thinking merges are idempotent; canonical replay replaces, never appends
 
@@ -202,8 +210,9 @@ New invariants:
 - **Invariant H (draft identity is per materialization, not per turn)**: the active-draft key locates the current in-memory buffer for `(session, room agent, Agent turn)`, but it is not a durable event identity. One Agent turn can cross many tool/status boundaries, and each boundary commits the current draft before a later segment reuses the same buffer key. Every newly created draft segment therefore gets a cross-process unique `materializationId`; its persisted `active-draft:` event ID remains stable while that segment grows, but differs from every earlier/later materialization of the same turn—even if the app restarts while that turn is still resumable. Reusing the bare turn key as the event ID lets live `mergeEvents` display all boundary-separated segments, then makes startup `deduplicateTimelineEvents` discard every later segment—including the final answer—as duplicate IDs.
 - **Invariant I (rejected canonical history may still repair a missing tail)**: whole-history monotonicity remains conservative—shorter canonical thinking/tool history must not replace richer local history—but rejection does not forbid a bounded additive repair. When the latest user turn matches, a canonical last Assistant may be appended without replacing local process history through either of two evidence channels: (1) its stable snapshot sequence is strictly newer than every local stable Assistant in the same sequence, or (2) a local wire mirror has no message IDs but its last Assistant timestamp is strictly newer than the local turn's last visible Assistant and its exact body is absent. This repairs persisted “progress sentence remains, final answer missing” turns while rejecting cross-turn, older/equal wire tails, identity-less empty local turns, and equal-body guesses. Persistent reconciliation-circuit keys are algorithm-versioned; changing additive recovery semantics must bump the key so an old rejected fingerprint cannot suppress the new repair. Development and built renderers use different origins/IndexedDB stores, so a recovery observed in `pnpm dev` is not evidence that the daily built window's local history was repaired.
 - **Invariant J (completion replay preserves live materialization order)**: a chronological prompt-completion replay must bind each stable Assistant message to the matching unowned live segment, including a pre-tool segment already marked complete. It may not require “no later tool anywhere”; it rejects a candidate only when a tool/subagent/approval falls temporally between the official message and that candidate. After identity binding, later think/text/terminal parts with the same stable ID continue updating that exact segment even when tools follow it. Otherwise an early progress sentence is appended after the final answer and becomes the last text block shown at completion.
+- **Invariant K (runtime activity owns live-thinking subscription)**: an active Server v2 turn continues reading `activeTurnDraftStore` even when its latest formal Assistant step is already complete. The transient draft thinking must be appended after formal `turnBlocks`, not hidden by them. Every thinking phase in an active turn uses a five-line (120px) internal scroll viewport, follows the bottom until the user scrolls upward, and retains the complete text; character-tail truncation is forbidden because it makes earlier reasoning permanently inaccessible.
 
-Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on production reproductions: an earlier immediate-boundary bug caused 395 flushes/10s at 14ms each; a later 5,500-event long turn still spent 6–7s of every 10s rebuilding render items while running tool arguments flushed 38–42 times. Running tool/status/subagent-only batches therefore use a 500ms cadence, while Assistant text keeps the 80ms cadence and true boundaries remain synchronous. Live thinking renders only the tail (`capLiveThinkingRenderText`, 2000 chars — the viewport is 144px). When the user is not scrolling, draft notifications publish on the next animation frame (matching official web's immediate per-event state update while coalescing same-frame fragments); active scrolling alone switches them to the 250ms yield timer.
+Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on production reproductions: an earlier immediate-boundary bug caused 395 flushes/10s at 14ms each; a later 5,500-event long turn still spent 6–7s of every 10s rebuilding render items while running tool arguments flushed 38–42 times. Running tool/status/subagent-only batches therefore use a 500ms cadence, while Assistant text keeps the 80ms cadence and true boundaries remain synchronous. Live thinking keeps its full text but constrains layout growth inside a 120px five-line scroll viewport, so the outer conversation does not reflow taller after the fifth line. When the user is not scrolling, draft notifications publish on the next animation frame (matching official web's immediate per-event state update while coalescing same-frame fragments); active outer-chat scrolling alone switches them to the 250ms yield timer.
 
 ## Streaming markdown is plain until settled
 

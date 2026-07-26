@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildThinkingBlocks } from "../thinkingBlocks";
 
 describe("buildThinkingBlocks", () => {
+  it("keeps the complete live reasoning text available to the scroll viewport", () => {
+    const fullText = Array.from({ length: 80 }, (_, index) => `第 ${index + 1} 行思考内容`).join("\n");
+    const blocks = buildThinkingBlocks({
+      thinkingParts: [{ id: "live-full", timestamp: 1, text: fullText }],
+      timestamp: 1,
+    });
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.text).toBe(fullText);
+  });
+
   it("uses the final summary paragraph as the title before a tool boundary", () => {
     const blocks = buildThinkingBlocks({
       timestamp: 1_000,

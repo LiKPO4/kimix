@@ -17,7 +17,7 @@ import { noteLiveDisplayMode, resolveLiveDisplayMode } from "@/utils/liveTurnDia
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
-import { buildThinkingBlocks, capLiveThinkingRenderText, type ThinkingBlock } from "@/utils/thinkingBlocks";
+import { buildThinkingBlocks, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
@@ -40,6 +40,7 @@ import {
   resolveHasFinalProcessContent,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
+  shouldSubscribeActiveTurnDraft,
   shouldUseLiveThinkingViewport,
 } from "@/utils/liveThinkingViewport";
 import {
@@ -1224,6 +1225,20 @@ const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
 };
 
 function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: boolean }) {
+  if (isLive) {
+    return (
+      <div
+        className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+        style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+      >
+        {block.text}
+      </div>
+    );
+  }
+  return <KimiWebSettledThinkingItem block={block} />;
+}
+
+function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
   const [expanded, setExpanded] = useState(false);
   const paragraphs = useMemo(() =>
     block.text
@@ -1236,16 +1251,6 @@ function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: 
   // paragraph, and show the LAST paragraph (untruncated) as the teaser.
   const isFoldable = paragraphs.length > 1;
   const teaser = paragraphs.at(-1) ?? block.text;
-  if (isLive) {
-    return (
-      <div
-        className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
-        style={KIMI_WEB_THINKING_SUMMARY_STYLE}
-      >
-        {capLiveThinkingRenderText(block.text)}
-      </div>
-    );
-  }
   return (
     <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
       {isFoldable ? (
@@ -2049,7 +2054,7 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
   }
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; onExpandedChange?: (expanded: boolean) => void }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
@@ -2077,7 +2082,17 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     anchor: "summary" | "content";
   } | null>(null);
   const effectiveTurnBlocks = useMemo(() => {
-    if (turnBlocks && turnBlocks.length > 0) return turnBlocks;
+    if (turnBlocks && turnBlocks.length > 0) {
+      if (!liveThinkingBlocks?.length) return turnBlocks;
+      return [
+        ...turnBlocks,
+        {
+          kind: "thinking" as const,
+          key: `thinking:live:${event.agentTurnId ?? event.id}`,
+          blocks: liveThinkingBlocks,
+        },
+      ];
+    }
     const syntheticEvents: TimelineEvent[] = [
       event,
       ...tools,
@@ -2086,7 +2101,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     ];
     const built = buildTurnBlocks(syntheticEvents);
     return built.length > 0 ? built : undefined;
-  }, [turnBlocks, event, tools, subagents, approvals]);
+  }, [turnBlocks, liveThinkingBlocks, event, tools, subagents, approvals]);
 
   const blockThinking = useMemo(() => {
     if (!effectiveTurnBlocks) return undefined;
@@ -2430,6 +2445,7 @@ type AssistantProcessBlockProps = {
   turnStartedAt?: number;
   activeStatusMessage?: string;
   turnBlocks?: TurnBlock[];
+  liveThinkingBlocks?: ThinkingBlock[];
   onExpandedChange?: (expanded: boolean) => void;
 };
 
@@ -2444,6 +2460,7 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.collapseWhileRunning === next.collapseWhileRunning &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
+    prev.liveThinkingBlocks === next.liveThinkingBlocks &&
     prev.onExpandedChange === next.onExpandedChange &&
     turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
@@ -2481,6 +2498,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   turnStartedAt,
   activeStatusMessage,
   turnBlocks,
+  liveThinkingBlocks,
   onExpandedChange,
 }: AssistantProcessBlockProps) {
   const hasActualThinking = Boolean(
@@ -2521,6 +2539,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       collapseWhileRunning={collapseWhileRunning}
       label={processLabel}
       turnBlocks={turnBlocks}
+      liveThinkingBlocks={liveThinkingBlocks}
       onExpandedChange={onExpandedChange}
     />
   );
@@ -2666,14 +2685,21 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       : undefined
   );
   const draftTurnId = event.agentTurnId ?? activityTurnId;
-  const draftKey = (
-    isActiveTurnDraftEnabled() &&
-    isActiveAssistant &&
-    !event.isComplete &&
-    sessionId &&
-    draftTurnId
-  ) ? makeActiveTurnDraftKey(sessionId, event.roomAgentId, draftTurnId) : null;
+  const draftKey = shouldSubscribeActiveTurnDraft({
+    enabled: isActiveTurnDraftEnabled(),
+    isActiveAssistant,
+    sessionId,
+    turnId: draftTurnId,
+  }) ? makeActiveTurnDraftKey(sessionId!, event.roomAgentId, draftTurnId!) : null;
   const activeDraft = useActiveTurnDraft(draftKey);
+  const liveThinkingBlocks = useMemo(() => {
+    if (!activeDraft?.thinking?.trim() && !activeDraft?.thinkingParts?.some((part) => part.text.trim())) return undefined;
+    return buildThinkingBlocks({
+      thinking: activeDraft.thinking,
+      thinkingParts: activeDraft.thinkingParts,
+      timestamp: activeDraft.timestamp,
+    });
+  }, [activeDraft?.thinking, activeDraft?.thinkingParts, activeDraft?.timestamp]);
   const displayContent = pickDraftText(activeDraft?.content, event.content);
   const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);
   const displayThinkingParts = (
@@ -2762,12 +2788,13 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             displayMode={processDisplayMode}
             expandByDefault={expandProcessByDefault}
             isActiveAssistant={isActiveAssistant}
-            hasFinalContent={resolveHasFinalProcessContent(event.isComplete, hasContent)}
+            hasFinalContent={resolveHasFinalProcessContent(event.isComplete, hasContent, isActiveAssistant)}
             isInterrupted={Boolean(isInterrupted)}
             collapseWhileRunning={collapseProcessWhileRunning}
             turnStartedAt={turnStartedAt}
             activeStatusMessage={activeStatus?.message}
             turnBlocks={turnBlocks}
+            liveThinkingBlocks={liveThinkingBlocks}
             onExpandedChange={setProcessExpanded}
           />
         )}

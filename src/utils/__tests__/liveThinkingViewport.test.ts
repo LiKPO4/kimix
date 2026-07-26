@@ -5,29 +5,30 @@ import {
   resolveHasFinalProcessContent,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
+  shouldSubscribeActiveTurnDraft,
   shouldUseLiveThinkingViewport,
 } from "../liveThinkingViewport";
 
 describe("liveThinkingViewport", () => {
-  it("uses a six-line viewport based on the Kimi Web line height", () => {
-    expect(LIVE_THINKING_MAX_HEIGHT_PX).toBe(144);
+  it("uses a five-line viewport based on the Kimi Web line height", () => {
+    expect(LIVE_THINKING_MAX_HEIGHT_PX).toBe(120);
   });
 
   it("consumes wheel input only while the inner viewport can move", () => {
     expect(canLiveThinkingViewportConsumeWheel({
       scrollTop: 40,
       scrollHeight: 300,
-      clientHeight: 144,
+      clientHeight: 120,
     }, -20)).toBe(true);
     expect(canLiveThinkingViewportConsumeWheel({
       scrollTop: 0,
       scrollHeight: 300,
-      clientHeight: 144,
+      clientHeight: 120,
     }, -20)).toBe(false);
     expect(canLiveThinkingViewportConsumeWheel({
-      scrollTop: 156,
+      scrollTop: 180,
       scrollHeight: 300,
-      clientHeight: 144,
+      clientHeight: 120,
     }, 20)).toBe(false);
   });
 
@@ -35,16 +36,16 @@ describe("liveThinkingViewport", () => {
     expect(shouldFollowLiveThinkingViewport({
       scrollTop: 100,
       scrollHeight: 300,
-      clientHeight: 144,
+      clientHeight: 120,
     })).toBe(false);
     expect(shouldFollowLiveThinkingViewport({
-      scrollTop: 146,
+      scrollTop: 170,
       scrollHeight: 300,
-      clientHeight: 144,
+      clientHeight: 120,
     })).toBe(true);
   });
 
-  it("limits only the active final thinking group before final output", () => {
+  it("limits every thinking group for the whole active turn", () => {
     const base = {
       groupIndex: 2,
       groupCount: 3,
@@ -53,9 +54,9 @@ describe("liveThinkingViewport", () => {
       hasFinalContent: false,
     };
     expect(shouldUseLiveThinkingViewport(base)).toBe(true);
-    expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(false);
+    expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(true);
     expect(shouldUseLiveThinkingViewport({ ...base, isActiveAssistant: false })).toBe(false);
-    expect(shouldUseLiveThinkingViewport({ ...base, hasFinalContent: true })).toBe(false);
+    expect(shouldUseLiveThinkingViewport({ ...base, hasFinalContent: true })).toBe(true);
     expect(shouldUseLiveThinkingViewport({
       ...base,
       isActiveAssistant: false,
@@ -94,5 +95,21 @@ describe("liveThinkingViewport", () => {
     expect(resolveHasFinalProcessContent(false, false)).toBe(false);
     expect(resolveHasFinalProcessContent(true, false)).toBe(false);
     expect(resolveHasFinalProcessContent(true, true)).toBe(true);
+    expect(resolveHasFinalProcessContent(true, true, true)).toBe(false);
+  });
+
+  it("keeps the active draft subscription independent from intermediate step completion", () => {
+    expect(shouldSubscribeActiveTurnDraft({
+      enabled: true,
+      isActiveAssistant: true,
+      sessionId: "session-1",
+      turnId: "turn-1",
+    })).toBe(true);
+    expect(shouldSubscribeActiveTurnDraft({
+      enabled: true,
+      isActiveAssistant: false,
+      sessionId: "session-1",
+      turnId: "turn-1",
+    })).toBe(false);
   });
 });

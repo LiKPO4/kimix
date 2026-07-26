@@ -1,5 +1,5 @@
 export const LIVE_THINKING_LINE_HEIGHT_PX = 24;
-export const LIVE_THINKING_MAX_LINES = 6;
+export const LIVE_THINKING_MAX_LINES = 5;
 export const LIVE_THINKING_MAX_HEIGHT_PX = LIVE_THINKING_LINE_HEIGHT_PX * LIVE_THINKING_MAX_LINES;
 
 type ScrollMetrics = {
@@ -31,11 +31,8 @@ export function shouldFollowLiveThinkingViewport({
 }
 
 export function shouldUseLiveThinkingViewport({
-  groupIndex,
-  groupCount,
   isThinkingGroup,
   isActiveAssistant,
-  hasFinalContent,
   preserveDuringFinalTransition = false,
 }: {
   groupIndex: number;
@@ -45,9 +42,28 @@ export function shouldUseLiveThinkingViewport({
   hasFinalContent: boolean;
   preserveDuringFinalTransition?: boolean;
 }) {
-  return (preserveDuringFinalTransition || (isActiveAssistant && !hasFinalContent)) &&
-    isThinkingGroup &&
-    groupIndex === groupCount - 1;
+  // Every reasoning phase in the running turn keeps a bounded five-line
+  // viewport. A text/tool block may follow the latest thinking phase before
+  // the turn completes; tying this to "last group" or "no body yet" would
+  // expand that reasoning back into the outer chat and stop its live scroll.
+  return (preserveDuringFinalTransition || isActiveAssistant) && isThinkingGroup;
+}
+
+export function shouldSubscribeActiveTurnDraft({
+  enabled,
+  isActiveAssistant,
+  sessionId,
+  turnId,
+}: {
+  enabled: boolean;
+  isActiveAssistant: boolean;
+  sessionId?: string;
+  turnId?: string;
+}) {
+  // Server v2 may mark an intermediate Assistant step complete while the
+  // session keeps running. Completion belongs to the step, not the active
+  // draft subscription; only runtime activity controls that subscription.
+  return enabled && isActiveAssistant && Boolean(sessionId && turnId);
 }
 
 export function shouldCollapseKimiWebProcessOnFinalContent({
@@ -71,6 +87,10 @@ export function shouldCollapseKimiWebProcessOnFinalContent({
  * 必须是「轮次完成且有正文」——运行中任何流式内容（思考、预告段）都不算，
  * 否则第一个字到达就会误触发自动折叠，使「未勾选运行中折叠时全程展开」失效。
  */
-export function resolveHasFinalProcessContent(isComplete: boolean, hasBodyContent: boolean): boolean {
-  return isComplete && hasBodyContent;
+export function resolveHasFinalProcessContent(
+  isComplete: boolean,
+  hasBodyContent: boolean,
+  isActiveAssistant = false,
+): boolean {
+  return isComplete && !isActiveAssistant && hasBodyContent;
 }
