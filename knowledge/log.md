@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Intermediate body text never folds (v2.20.27)**: official kimi-web renders text messages in full via MessageResponse — no fold or length exemption exists (only reasoning and tool cards collapse). KimiWebIntermediateTextBlock dropped its last-paragraph fold and always renders the full segment; settled THINKING keeps the teaser+expand fold (accepted design). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Resolved questions land in the turn stream (v2.20.26)**: `buildTurnBlocks` now emits a `question` block for non-pending question_request events (pending ones stay as standalone interactive cards, same rule as approvals), and ChatThread folds resolved questions into the assistant process flow at their wire position instead of rendering a trailing row. Mirrors the resolvedApprovals pattern. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

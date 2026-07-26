@@ -1284,48 +1284,18 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
 /**
  * Intermediate body text that appears inside the expanded process timeline.
  * It is NOT the final answer, so it uses the same secondary style as thinking
- * summaries and follows the same fold-to-last-paragraph rule as official
- * kimi-web ThinkingBlock.vue. No side indent: it shares the process timeline
+ * summaries. Official kimi-web renders intermediate text in FULL via
+ * MessageResponse — no fold, no teaser exemption — so we never collapse it.
+ * No side indent: it shares the process timeline
  * column with thinking teasers and tool cards.
  */
 function KimiWebIntermediateTextBlock({ content }: { content: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const paragraphs = useMemo(() =>
-    content
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0),
-    [content]
-  );
-  const isFoldable = paragraphs.length > 1;
-  const teaser = paragraphs.at(-1) ?? content;
   return (
-    <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
-      {isFoldable ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
-          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
-        >
-          {teaser}
-        </button>
-      ) : (
-        <div
-          className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
-          style={KIMI_WEB_THINKING_SUMMARY_STYLE}
-        >
-          {content}
-        </div>
-      )}
-      {expanded && isFoldable && (
-        <div
-          className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
-          style={{ whiteSpace: "pre-wrap" }}
-        >
-          {content}
-        </div>
-      )}
+    <div
+      className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+      style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+    >
+      {content}
     </div>
   );
 }

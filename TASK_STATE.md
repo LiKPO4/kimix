@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：中间正文段不再折叠（v2.20.27）
+
+- 用户 v2.20.26 截图反馈：过程流里的中间正文段（如「尸气专项测试和 analyze 已通过…改动范围确认一下…全绿后走 1.4.486 发布流程。」）被默认折叠成尾段摘要，官方则全段直接展示。
+- 官方对照（kimi-code web 仓库 assistant-message.tsx）：正文消息经 MessageResponse 全量渲染，没有任何折叠/截断/行数豁免；可折叠的只有 reasoning（标签式）和工具卡。即官方对中间正文没有「豁免逻辑」——它从不折叠。
+- 修复：KimiWebIntermediateTextBlock 删除折叠逻辑（段落判定、teaser 按钮、展开态），始终全量渲染。思考的落盘折叠（resolveSettledThinkingFold）保持不变——那是用户已验收的摘要+可展开设计。
+- 验证：全量 130 文件 1262 项、Node/Renderer typecheck、生产构建（renderer assets/index-_cTNCM5q.js）、OKF 校验（338 链接）、git diff --check 通过。待用户截图复验。
 ## 2026-07-26 修复：已回答提问落盘进过程流（v2.20.26）
 
 - 用户 v2.20.25 截图反馈：已回答的提问卡片（需要你确认一下/已提交）挂在消息最末尾（消息处理中之后），官方则按提问发生的位置落在过程流中间。
