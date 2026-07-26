@@ -8,6 +8,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
 import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
+import { QuestionCard } from "./QuestionCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
@@ -756,6 +757,7 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
 type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 type ApprovalEvent = Extract<TimelineEvent, { type: "approval_request" }>;
+type QuestionEvent = Extract<TimelineEvent, { type: "question_request" }>;
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 
 type ProcessItem =
@@ -1957,7 +1959,8 @@ type TurnBlockGroup =
   | { type: "text"; key: string; content: string }
   | { type: "tool"; key: string; tools: ToolEvent[] }
   | { type: "subagent"; key: string; subagents: SubagentEvent[] }
-  | { type: "approval"; key: string; approvals: ApprovalEvent[] };
+  | { type: "approval"; key: string; approvals: ApprovalEvent[] }
+  | { type: "question"; key: string; question: QuestionEvent };
 
 /**
  * Group only adjacent same-kind blocks, mirroring the official kimi-web
@@ -1983,6 +1986,8 @@ function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
     } else if (block.kind === "approval") {
       if (last?.type === "approval") last.approvals.push(block.approval);
       else groups.push({ type: "approval", key: block.key, approvals: [block.approval] });
+    } else if (block.kind === "question") {
+      groups.push({ type: "question", key: block.key, question: block.question });
     }
   }
   return groups;
@@ -2044,6 +2049,8 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
   switch (group.type) {
     case "thinking":
       return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
+    case "question":
+      return <QuestionCard event={group.question} />;
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":

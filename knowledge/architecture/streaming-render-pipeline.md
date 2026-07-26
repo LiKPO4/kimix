@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-26T20:15:00+08:00"
+timestamp: "2026-07-26T20:52:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -19,14 +19,16 @@ invariants the code now depends on.
 
 A kimi-code turn is rendered from an ordered `TurnBlock[]` built by walking the
 turn's event array once (`src/utils/turnBlocks.ts`). Each block is one of
-thinking / text / tool / subagent / approval, and adjacent same-kind blocks may
+thinking / text / tool / subagent / approval / question, and adjacent same-kind blocks may
 merge, but **timestamp sorting is forbidden**: official wire data stamps a
 think part and its following tool call with the same millisecond, so any
 timestamp-based reordering (or tool-timestamp cutting of thinking phases)
 scrambles the sequence into multiple split tool groups and mis-ordered Swarm
 cards. Continuous tool blocks still aggregate into one "N 个工具调用" card;
 a thinking/text/subagent boundary starts a new run — the same rule as official
-kimi-web `assistantRenderBlocks`.
+kimi-web `assistantRenderBlocks`. Non-pending approval/question_request cards
+become blocks at their own wire position (folded into the assistant process
+flow); pending ones stay as standalone interactive cards below the body.
 
 Agent/Task/AgentSwarm tool calls are absorbed into the matching subagent card
 via `parentToolCallId` at the tool-call position (official treats the Agent

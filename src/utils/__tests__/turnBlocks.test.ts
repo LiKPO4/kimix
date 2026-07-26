@@ -322,3 +322,27 @@ describe("computeFinalTextBlockContent", () => {
     expect(computeFinalTextBlockContent(blocks, "draft", false)).toBe("");
   });
 });
+
+describe("question_request turn blocks", () => {
+  it("keeps resolved questions in stream position and skips pending ones", () => {
+    const question = (id: string, status: "pending" | "answered"): TimelineEvent => ({
+      id,
+      type: "question_request",
+      timestamp: nextTimestamp(),
+      requestId: id,
+      rpcRequestId: `${id}-rpc`,
+      toolCallId: "call-q",
+      questions: [{ id: "q1", question: "反噬打谁？", options: [] }],
+      status,
+    });
+    const events: TimelineEvent[] = [
+      assistant("a1", "先分析", "思考"),
+      question("q-resolved", "answered"),
+      assistant("a2", "继续改"),
+      question("q-pending", "pending"),
+    ];
+    const blocks = buildTurnBlocks(events);
+    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "question", "text"]);
+    expect(blocks[2]).toMatchObject({ kind: "question", key: "question:q-resolved" });
+  });
+});

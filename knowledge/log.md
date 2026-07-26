@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Resolved questions land in the turn stream (v2.20.26)**: `buildTurnBlocks` now emits a `question` block for non-pending question_request events (pending ones stay as standalone interactive cards, same rule as approvals), and ChatThread folds resolved questions into the assistant process flow at their wire position instead of rendering a trailing row. Mirrors the resolvedApprovals pattern. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Trailing-phase live viewport and tool failure passthrough (v2.20.25)**: only the still-growing thinking phase keeps the five-line live scroll viewport; finished phases settle into the foldable last-part teaser (official kimi-web behavior). Official tool_result content parts carry `is_error`, which all three ingestion paths (live WS mapping, snapshot replay, native/SDK history) dropped — failed tools rendered as green checks. The flag now flows to `ToolResultEvent.isError`, merges into the linked tool_call as `error`, and renders as ✗ with a "有失败" group header. Invariant K revised. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

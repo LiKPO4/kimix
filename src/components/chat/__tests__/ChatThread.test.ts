@@ -254,3 +254,32 @@ describe("buildRenderItems turn metrics", () => {
     });
   });
 });
+
+describe("question_request folding", () => {
+  it("folds a resolved question into the assistant turn blocks instead of a standalone row", () => {
+    const question = (id: string, status: "pending" | "answered", timestamp: number): TimelineEvent => ({
+      id,
+      type: "question_request",
+      timestamp,
+      requestId: id,
+      rpcRequestId: `${id}-rpc`,
+      toolCallId: "call-q",
+      questions: [{ id: "q1", question: "反噬打谁？", options: [] }],
+      status,
+    });
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "改 bug" } as TimelineEvent,
+      assistantEvent("先分析", { id: "assistant-1", timestamp: 2 }),
+      question("q-resolved", "answered", 3),
+      question("q-pending", "pending", 4),
+    ];
+    const items = buildRenderItems(events, "kimi-code");
+    const questionRows = items.filter((item) => item.type === "event" && item.event.type === "question_request");
+    // 已回答的提问折进过程流，只有待回答的保持独立可交互卡片。
+    expect(questionRows.map((item) => (item.type === "event" ? item.event.id : ""))).toEqual(["q-pending"]);
+    const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const blocks = assistantItem?.type === "event" ? assistantItem.turnBlocks : undefined;
+    expect(blocks?.some((block) => block.kind === "question" && block.question.id === "q-resolved")).toBe(true);
+    expect(blocks?.some((block) => block.kind === "question" && block.question.id === "q-pending")).toBe(false);
+  });
+});

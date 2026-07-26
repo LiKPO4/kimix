@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-26 修复：已回答提问落盘进过程流（v2.20.26）
+
+- 用户 v2.20.25 截图反馈：已回答的提问卡片（需要你确认一下/已提交）挂在消息最末尾（消息处理中之后），官方则按提问发生的位置落在过程流中间。
+- 原因：buildTurnBlocks 只处理 approval_request（pending 跳过），没有 question_request 分支；ChatThread 把提问事件一律渲染为 assistant 气泡之后的独立行。
+- 修复（完全镜像 resolvedApprovals 既有模式）：buildTurnBlocks 新增 question 块（pending 跳过）；TurnBlocksTimeline 按流内位置用 QuestionCard 渲染；ChatThread 对已回答/已跳过的提问折叠进过程流，只有 pending 保持独立可交互卡片；turnBlocksEqual 补 question 分支。
+- 验证：相关 2 文件 37 项、全量 130 文件 1262 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-D62AKiHN.js）、OKF 校验（337 链接）、git diff --check 通过。待用户截图复验。
 ## 2026-07-26 修复：思考阶段落盘摘要与失败工具打叉（v2.20.25）
 
 - 用户 v2.20.24 截图反馈两点：①已走完的思考阶段（后面已跟正文/工具卡）仍挂五行滚动区，没有落成官方那样的摘要；②失败的工具调用（官方 is_error=true，如 Grep 路径不存在）在 Kimix 显示绿色对勾，官方显示叉并标「有失败」。

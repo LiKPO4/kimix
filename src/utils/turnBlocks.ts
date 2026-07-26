@@ -4,6 +4,7 @@ import { buildThinkingBlocks, type ThinkingBlock } from "./thinkingBlocks";
 export type AssistantMessageEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 export type SubagentTimelineEvent = Extract<TimelineEvent, { type: "subagent" }>;
 export type ApprovalTimelineEvent = Extract<TimelineEvent, { type: "approval_request" }>;
+export type QuestionTimelineEvent = Extract<TimelineEvent, { type: "question_request" }>;
 
 /**
  * A turn's renderable content in official kimi-web order: thinking teasers,
@@ -18,7 +19,8 @@ export type TurnBlock =
   | { kind: "text"; key: string; events: AssistantMessageEvent[]; content: string }
   | { kind: "tool"; key: string; tool: ToolCallEvent }
   | { kind: "subagent"; key: string; subagent: SubagentTimelineEvent; tool?: ToolCallEvent }
-  | { kind: "approval"; key: string; approval: ApprovalTimelineEvent };
+  | { kind: "approval"; key: string; approval: ApprovalTimelineEvent }
+  | { kind: "question"; key: string; question: QuestionTimelineEvent };
 
 /**
  * Build the ordered block list for one turn body.
@@ -34,8 +36,8 @@ export type TurnBlock =
  *   the Agent tool as the task card itself). Otherwise it stays a tool block.
  * - subagent: emitted at its own position only when not already absorbed by
  *   its dispatching tool call.
- * - approval_request: resolved (non-pending) approvals stay in position;
- *   pending ones render as standalone interactive cards elsewhere.
+ * - approval_request / question_request: resolved (non-pending) cards stay in
+ *   position; pending ones render as standalone interactive cards elsewhere.
  * - Everything else (status, compaction, steer, hooks, diffs…) keeps its
  *   existing render placement outside the block list.
  */
@@ -114,6 +116,11 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
       blocks.push({ kind: "approval", key: `approval:${event.id}`, approval: event });
       continue;
     }
+    if (event.type === "question_request") {
+      if (event.status === "pending") continue;
+      blocks.push({ kind: "question", key: `question:${event.id}`, question: event });
+      continue;
+    }
   }
   return blocks;
 }
@@ -168,6 +175,8 @@ export function turnBlocksEqual(prev: TurnBlock[] | undefined, next: TurnBlock[]
       if (a.subagent !== b.subagent || a.tool !== b.tool) return false;
     } else if (a.kind === "approval" && b.kind === "approval") {
       if (a.approval !== b.approval) return false;
+    } else if (a.kind === "question" && b.kind === "question") {
+      if (a.question !== b.question) return false;
     }
   }
   return true;
