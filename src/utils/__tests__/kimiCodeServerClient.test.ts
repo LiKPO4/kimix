@@ -9,6 +9,8 @@ import {
   normalizeServerTerminalCreateError,
   recoveredPromptCompletedFrame,
   resolveServerPromptIdleTimeout,
+  serverMessageProgressMarker,
+  shouldReconnectForMissedServerProgress,
   snapshotMessagesToServerFrames,
   snapshotToHistoryFrames,
   toServerConfigPatch,
@@ -235,6 +237,63 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(classifyServerSessionActivity(undefined)).toBe("unknown");
   });
 
+  it("reconnects only when official history advances during websocket silence", () => {
+    const baseline = serverMessageProgressMarker({
+      id: "msg-10",
+      session_id: "session-1",
+      role: "assistant",
+      created_at: "2026-07-26T00:00:00Z",
+      content: [{ type: "text", text: "old" }],
+    });
+    const same = serverMessageProgressMarker({
+      id: "msg-10",
+      session_id: "session-1",
+      role: "assistant",
+      created_at: "2026-07-26T00:00:00Z",
+      content: [{ type: "text", text: "old" }],
+    });
+    const advanced = serverMessageProgressMarker({
+      id: "msg-11",
+      session_id: "session-1",
+      role: "assistant",
+      created_at: "2026-07-26T00:00:09Z",
+      content: [{ type: "text", text: "new output" }],
+    });
+    const sameMessageAdvanced = serverMessageProgressMarker({
+      id: "msg-10",
+      session_id: "session-1",
+      role: "assistant",
+      created_at: "2026-07-26T00:00:00Z",
+      content: [{ type: "text", text: "old but now longer" }],
+    });
+
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 30_000,
+      baselineMarker: baseline,
+      latestMarker: same,
+    })).toBe(false);
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 7_999,
+      baselineMarker: baseline,
+      latestMarker: advanced,
+    })).toBe(false);
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 8_000,
+      baselineMarker: baseline,
+      latestMarker: advanced,
+    })).toBe(true);
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 8_000,
+      baselineMarker: baseline,
+      latestMarker: sameMessageAdvanced,
+    })).toBe(true);
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 30_000,
+      baselineMarker: undefined,
+      latestMarker: advanced,
+    })).toBe(false);
+  });
+
   it("keeps silent prompts open when status is active, unknown, or unavailable", async () => {
     const recoverSnapshot = vi.fn(async () => undefined);
 
@@ -402,6 +461,12 @@ describe("KimiCodeServerClient protocol adapters", () => {
   it("still sends the prompt when the pre-prompt subscription fails", async () => {
     const promptId = "msg_01SUBFAIL";
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/messages?")) {
+        return new Response(JSON.stringify({ code: 0, data: { items: [], has_more: false } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       expect(url).toContain("/api/v1/sessions/session-1/prompts");
       return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
         status: 200,
@@ -427,7 +492,8 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
     expect(subscribe).toHaveBeenCalledWith("session-1");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/messages?page_size=1");
     expect(warn).toHaveBeenCalledWith("[KimiCodeServerClient] prompt 前建立会话订阅失败，继续发送（首波增量可经快照兜底）:", failure);
     warn.mockRestore();
   });

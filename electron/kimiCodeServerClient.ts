@@ -357,10 +357,35 @@ export type ServerSnapshot = {
 const CONTROL_TIMEOUT_MS = 5_000;
 const PROMPT_TIMEOUT_MS = 120_000;
 const UPLOAD_TIMEOUT_MS = 300_000;
+const WS_PROGRESS_PROBE_SILENCE_MS = 8_000;
+const WS_PROGRESS_PROBE_INTERVAL_MS = 3_000;
 // WS 假死检测：连接 OPEN 但超过该时长无任何帧（含 thinking/durable 帧）则判定推送停滞并重连。
 // 90s 覆盖 llm 长考期间 thinking.delta 的正常推送间隔；误判代价仅为一次重连+快照补全（无害）。
 const WS_SILENCE_LIMIT_MS = 90_000;
-const WS_WATCHDOG_INTERVAL_MS = 10_000;
+const WS_WATCHDOG_INTERVAL_MS = 2_000;
+
+export function serverMessageProgressMarker(
+  message: ServerMessageSummary | null | undefined,
+): string | null {
+  if (!message) return null;
+  let contentSize = 0;
+  try {
+    contentSize = JSON.stringify(message.content ?? null).length;
+  } catch {
+    // Message identity and creation time still provide a stable marker.
+  }
+  return `${message.id}|${message.created_at ?? ""}|${contentSize}`;
+}
+
+export function shouldReconnectForMissedServerProgress(input: {
+  silenceMs: number;
+  baselineMarker: string | null | undefined;
+  latestMarker: string | null;
+}): boolean {
+  return input.silenceMs >= WS_PROGRESS_PROBE_SILENCE_MS &&
+    input.baselineMarker !== undefined &&
+    input.latestMarker !== input.baselineMarker;
+}
 
 class ServerSessionIdleTimeoutError extends Error {
   constructor(readonly idleTimeoutMs: number) {
@@ -748,6 +773,10 @@ export class KimiCodeServerClient {
   // WS 假死检测：连接未断但持续无帧时（Server 端推送停滞）自动重连补全。
   private lastMessageAt = 0;
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private watchdogProgressProbeInFlight = false;
+  private lastWatchdogProgressProbeAt = 0;
+  private readonly serverProgressMarkers = new Map<string, string | null>();
+  private readonly lastSessionFrameAt = new Map<string, number>();
 
   private armWsWatchdog() {
     if (this.watchdogTimer) return;
@@ -755,11 +784,79 @@ export class KimiCodeServerClient {
       if (this.closing || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
       if (this.subscribed.size === 0) return;
       const silenceMs = Date.now() - this.lastMessageAt;
-      if (silenceMs < WS_SILENCE_LIMIT_MS) return;
-      sdiag(`[wsc] watchdog 假死判定 silence=${Math.round(silenceMs / 1000)}s subs=${this.subscribed.size} → 主动重连`);
-      this.socket.close();
-      this.handleSocketClose(this.socket);
+      if (silenceMs >= WS_SILENCE_LIMIT_MS) {
+        this.forceWatchdogReconnect(`固定静默上限 silence=${Math.round(silenceMs / 1000)}s`);
+        return;
+      }
+      const silentSessions = [...this.subscribed].flatMap((sessionId) => {
+        const sessionSilenceMs = Date.now() - (this.lastSessionFrameAt.get(sessionId) ?? this.lastMessageAt);
+        return sessionSilenceMs >= WS_PROGRESS_PROBE_SILENCE_MS
+          ? [{ sessionId, silenceMs: sessionSilenceMs }]
+          : [];
+      });
+      if (
+        silentSessions.length === 0 ||
+        this.watchdogProgressProbeInFlight ||
+        Date.now() - this.lastWatchdogProgressProbeAt < WS_PROGRESS_PROBE_INTERVAL_MS
+      ) return;
+      void this.probeMissedServerProgress(silentSessions);
     }, WS_WATCHDOG_INTERVAL_MS);
+  }
+
+  private forceWatchdogReconnect(reason: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const socket = this.socket;
+    sdiag(`[wsc] watchdog 假死判定 ${reason} subs=${this.subscribed.size} → 主动重连`);
+    socket.close();
+    this.handleSocketClose(socket);
+  }
+
+  private async readLatestServerProgressMarker(sessionId: string): Promise<string | null> {
+    const response = await this.listMessages(sessionId, 1);
+    return serverMessageProgressMarker(response.items[0]);
+  }
+
+  private async captureServerProgressMarker(sessionId: string): Promise<void> {
+    try {
+      this.serverProgressMarkers.set(sessionId, await this.readLatestServerProgressMarker(sessionId));
+    } catch (error) {
+      this.serverProgressMarkers.delete(sessionId);
+      sdiag(`[wsc] progress baseline failed ${sessionId.slice(-8)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async probeMissedServerProgress(
+    targets: Array<{ sessionId: string; silenceMs: number }>,
+  ): Promise<void> {
+    this.watchdogProgressProbeInFlight = true;
+    this.lastWatchdogProgressProbeAt = Date.now();
+    try {
+      for (const { sessionId, silenceMs } of targets) {
+        if (!this.subscribed.has(sessionId)) continue;
+        const observedSessionFrameAt = this.lastSessionFrameAt.get(sessionId);
+        const latestMarker = await this.readLatestServerProgressMarker(sessionId);
+        // A frame arrived while the HTTP probe was in flight: the connection
+        // proved itself live, so this now-stale comparison must not reconnect.
+        if (this.lastSessionFrameAt.get(sessionId) !== observedSessionFrameAt) continue;
+        const hasBaseline = this.serverProgressMarkers.has(sessionId);
+        const baselineMarker = this.serverProgressMarkers.get(sessionId);
+        if (!hasBaseline) {
+          this.serverProgressMarkers.set(sessionId, latestMarker);
+          continue;
+        }
+        if (shouldReconnectForMissedServerProgress({ silenceMs, baselineMarker, latestMarker })) {
+          this.serverProgressMarkers.set(sessionId, latestMarker);
+          this.forceWatchdogReconnect(
+            `官方历史已增长 sid=${sessionId.slice(-8)} silence=${Math.round(silenceMs / 1000)}s`,
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      sdiag(`[wsc] progress probe failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.watchdogProgressProbeInFlight = false;
+    }
   }
 
   private disarmWsWatchdog() {
@@ -1030,6 +1127,8 @@ export class KimiCodeServerClient {
   async unsubscribe(sessionId: string): Promise<void> {
     this.subscribed.delete(sessionId);
     this.cursors.delete(sessionId);
+    this.serverProgressMarkers.delete(sessionId);
+    this.lastSessionFrameAt.delete(sessionId);
     if (!this.socket) return;
     await this.sendControl("unsubscribe", { session_ids: [sessionId] }).catch(() => undefined);
   }
@@ -1053,6 +1152,11 @@ export class KimiCodeServerClient {
       body: JSON.stringify({ content, ...controls }),
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
+    // The accepted prompt has persisted its user message. Remember the newest
+    // lightweight history marker so later WS silence can be distinguished
+    // from normal model thinking without pulling the entire snapshot.
+    await this.captureServerProgressMarker(sessionId);
+    this.lastSessionFrameAt.set(sessionId, Date.now());
     // 长静默不等于死亡：v2 轮次在超长工具/无增量阶段可能数分钟无帧（实测单轮 616s）。
     // 空闲超时时先查官方 status。只有明确终态且快照成功补齐后，才能合成
     // prompt.completed；查询失败、未知状态或快照失败都不能伪装成完成。
@@ -1101,6 +1205,8 @@ export class KimiCodeServerClient {
       body: JSON.stringify({ content, ...controls }),
       timeoutMs: PROMPT_TIMEOUT_MS,
     });
+    await this.captureServerProgressMarker(sessionId);
+    this.lastSessionFrameAt.set(sessionId, Date.now());
     await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
       method: "POST",
       body: JSON.stringify({ prompt_ids: [queued.prompt_id] }),
@@ -1242,6 +1348,8 @@ export class KimiCodeServerClient {
     this.connected = null;
     this.subscribed.clear();
     this.cursors.clear();
+    this.serverProgressMarkers.clear();
+    this.lastSessionFrameAt.clear();
     this.recoveringSnapshots.clear();
     for (const waiter of this.waiters) {
       clearTimeout(waiter.timer);
@@ -1312,6 +1420,7 @@ export class KimiCodeServerClient {
     sdiag(`[wsc] connect ok client_id=${clientId.slice(0, 12)}… subs=${this.subscribed.size} ack=${ack.code} reconnecting=${reconnecting}`);
     this.reconnectAttempt = 0;
     this.lastMessageAt = Date.now();
+    for (const sessionId of this.subscribed) this.lastSessionFrameAt.set(sessionId, this.lastMessageAt);
     this.armWsWatchdog();
     await this.handleAckResync(ack);
     this.runtimeFailureNotified = false;
@@ -1329,6 +1438,21 @@ export class KimiCodeServerClient {
 
   private receive(frame: ServerFrame) {
     this.lastMessageAt = Date.now();
+    if (frame.session_id) this.lastSessionFrameAt.set(frame.session_id, this.lastMessageAt);
+    if (
+      frame.session_id &&
+      (
+        frame.type === "assistant.delta" ||
+        frame.type === "thinking.delta" ||
+        frame.type === "content.part" ||
+        frame.type.startsWith("tool.") ||
+        frame.type.startsWith("subagent.")
+      )
+    ) {
+      // Real streamed progress proves this connection is live. If it stalls
+      // later, the first lightweight probe establishes a fresh baseline.
+      this.serverProgressMarkers.delete(frame.session_id);
+    }
     const payload = isRecord(frame.payload) ? frame.payload : {};
     if (
       frame.type === "prompt.completed" &&
