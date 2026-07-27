@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { buildContentVersion, buildRenderItems, buildSubagentRegressionDiagnosticData, findSubagentContentRegressionSnapshots } from "@/components/chat/ChatThread";
+import {
+  buildContentVersion,
+  buildRenderItems,
+  buildSubagentRegressionDiagnosticData,
+  findSubagentContentRegressionSnapshots,
+  shouldRetryAsRoomDelivery,
+} from "@/components/chat/ChatThread";
 import type { RenderItem } from "@/types/chatRender";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
@@ -40,6 +46,25 @@ function subagentStub(overrides: Partial<Extract<TimelineEvent, { type: "subagen
     ...overrides,
   };
 }
+
+describe("shouldRetryAsRoomDelivery", () => {
+  const scopedError: Extract<TimelineEvent, { type: "error" }> = {
+    id: "error-1",
+    type: "error",
+    timestamp: 1,
+    message: "Kimi Server WebSocket 已关闭",
+    roomMessageId: "room-message-1",
+    roomAgentId: "room-agent-1",
+  };
+
+  it("does not treat scoped metadata as proof of a collaboration room", () => {
+    expect(shouldRetryAsRoomDelivery(false, scopedError)).toBe(false);
+  });
+
+  it("uses room delivery retry only for a real collaboration room", () => {
+    expect(shouldRetryAsRoomDelivery(true, scopedError)).toBe(true);
+  });
+});
 
 describe("findSubagentContentRegressionSnapshots", () => {
   it("returns an empty array when there is no subagent-backed assistant item", () => {

@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Retry scope and acknowledgement are authoritative (v2.20.32)**: a single-Agent error carried `roomMessageId/roomAgentId`, so the error card misrouted retry through the collaboration action event; Composer rejected the non-room session while the fire-and-forget caller had already shown “已重新发送”. Room scope now requires actual `Session.collaboration`, ordinary sessions use their direct retry path, and room retry waits for persistence plus the requested Agent delivery result through a bounded completion receipt. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
+
 * **Merged process timelines retain full turn duration (v2.20.31)**: target wire timestamps prove the recovered 1.4.486 turn runs from `1785069209683` to `1785069687392` (`477,709ms`, displayed as 7m58s). v2.20.30 exposed that multi-step Assistant merging selected the first cumulative segment duration (`269,463ms`, 4m29s) even though the final mapped Assistant and user→final projection both carried the full value. Merging now takes the maximum reliable segment duration and compares it with the passive-event-filtered whole-turn projection. Invariant O updated. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

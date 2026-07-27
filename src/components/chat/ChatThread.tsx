@@ -31,6 +31,7 @@ import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
+import { requestRoomDeliveryAction } from "@/utils/roomDeliveryAction";
 import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 
@@ -557,7 +558,14 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
   );
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning, turnBlocks }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean; turnBlocks?: TurnBlock[] }) {
+export function shouldRetryAsRoomDelivery(
+  isCollaborationRoom: boolean,
+  event: Extract<TimelineEvent, { type: "error" }>,
+): boolean {
+  return isCollaborationRoom && Boolean(event.roomMessageId && event.roomAgentId);
+}
+
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning, isCollaborationRoom, turnBlocks }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean; isCollaborationRoom?: boolean; turnBlocks?: TurnBlock[] }) {
   switch (event.type) {
     case "user_message":
       return (
@@ -596,16 +604,15 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
       return (
         <ErrorCard
           event={event}
-          onRetry={event.roomMessageId && event.roomAgentId
+          onRetry={shouldRetryAsRoomDelivery(Boolean(isCollaborationRoom), event)
             ? async () => {
-                window.dispatchEvent(new CustomEvent("kimix:room-delivery-action", {
-                  detail: {
-                    action: "retry",
-                    sessionId,
-                    roomMessageId: event.roomMessageId,
-                    roomAgentId: event.roomAgentId,
-                  },
-                }));
+                await requestRoomDeliveryAction({
+                  action: "retry",
+                  sessionId,
+                  roomMessageId: event.roomMessageId!,
+                  roomAgentId: event.roomAgentId!,
+                });
+                onDismissError?.(event.id);
               }
             : async () => {
                 if (!onRetryError) return;
@@ -1848,7 +1855,7 @@ export const ChatThread = memo(function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId ?? undefined} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} turnBlocks={item.turnBlocks} />
+                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} isCollaborationRoom={Boolean(session.collaboration)} turnBlocks={item.turnBlocks} />
               }
             </div>
           ))}

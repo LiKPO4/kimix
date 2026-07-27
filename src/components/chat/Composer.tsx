@@ -76,7 +76,9 @@ import {
   dispatchQueuedRoomDelivery,
   getDispatchableRoomDeliveries,
   retryRoomDelivery,
+  type RoomDeliverySendResult,
 } from "@/utils/roomDelivery";
+import { ROOM_DELIVERY_ACTION_EVENT, type RoomDeliveryActionDetail } from "@/utils/roomDeliveryAction";
 import { resolveRoomPromptRoute } from "@/utils/roomRouting";
 import { detachRoomAgentAsSession, roomHasActiveAgentWork, roomHasExecutingAgentWork } from "@/utils/sessionArchive";
 import {
@@ -1239,15 +1241,23 @@ export function Composer() {
     return resumed.data.sessionId;
   };
 
-  const dispatchRoomDeliveryTarget = async (roomId: string, roomMessageId: string, roomAgentId: string) => {
+  const dispatchRoomDeliveryTarget = async (
+    roomId: string,
+    roomMessageId: string,
+    roomAgentId: string,
+  ): Promise<RoomDeliverySendResult> => {
     const dispatchKey = `${roomId}:${roomAgentId}`;
-    if (roomDispatchingRef.current.has(dispatchKey)) return;
+    if (roomDispatchingRef.current.has(dispatchKey)) {
+      return { success: false, certainty: "not-sent", error: "目标 Agent 正在派发其他消息" };
+    }
     roomDispatchingRef.current.add(dispatchKey);
     try {
       const initial = useSessionStore.getState().sessions.find((session) => session.id === roomId);
       const message = initial?.collaboration?.messages.find((candidate) => candidate.id === roomMessageId);
       const agent = initial ? getRoomAgent(initial, roomAgentId) : undefined;
-      if (!initial || !message || !agent) return;
+      if (!initial || !message || !agent) {
+        return { success: false, certainty: "not-sent", error: "找不到待重试的房间消息或目标 Agent" };
+      }
       let runtimeSessionId = agent.runtimeSessionId ?? agent.officialSessionId;
       const promptImages = (message.images ?? [])
         .filter((image): image is typeof image & { dataUrl: string } => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
@@ -1367,6 +1377,7 @@ export function Composer() {
         }
         window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `发送给 ${agent.displayName} 失败：${result.error}` }));
       }
+      return result;
     } finally {
       roomDispatchingRef.current.delete(dispatchKey);
     }
@@ -1374,10 +1385,13 @@ export function Composer() {
 
   const dispatchAvailableRoomDeliveries = async (roomId: string) => {
     const latest = useSessionStore.getState().sessions.find((session) => session.id === roomId);
-    if (!latest?.collaboration) return;
+    if (!latest?.collaboration) return [];
     const targets = getDispatchableRoomDeliveries(latest, Object.values(useAppStore.getState().roomAgentActivities))
       .filter((target) => !roomDispatchingRef.current.has(`${roomId}:${target.roomAgentId}`));
-    await Promise.all(targets.map((target) => dispatchRoomDeliveryTarget(roomId, target.roomMessageId, target.roomAgentId)));
+    return Promise.all(targets.map(async (target) => ({
+      ...target,
+      result: await dispatchRoomDeliveryTarget(roomId, target.roomMessageId, target.roomAgentId),
+    })));
   };
 
   const sendRoomPrompt = async (
@@ -1432,16 +1446,14 @@ export function Composer() {
 
   useEffect(() => {
     const handleRoomDeliveryAction = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        action?: "cancel" | "retry";
-        sessionId?: string;
-        roomMessageId?: string;
-        roomAgentId?: string;
-      }>).detail;
+      const detail = (event as CustomEvent<RoomDeliveryActionDetail>).detail;
       if (!detail?.action || !detail.sessionId || !detail.roomMessageId || !detail.roomAgentId) return;
       void (async () => {
         const previous = useSessionStore.getState().sessions.find((session) => session.id === detail.sessionId);
-        if (!previous?.collaboration) return;
+        if (!previous?.collaboration) {
+          detail.complete?.({ success: false, error: "当前会话不是协作房间，无法按房间投递重试" });
+          return;
+        }
         try {
           const next = detail.action === "cancel"
             ? cancelQueuedRoomDelivery(previous, detail.roomMessageId!, detail.roomAgentId!)
@@ -1459,16 +1471,27 @@ export function Composer() {
             await persistLocalConversationState();
             throw new Error(persisted.error);
           }
-          if (detail.action === "retry") await dispatchAvailableRoomDeliveries(previous.id);
+          if (detail.action === "retry") {
+            const outcomes = await dispatchAvailableRoomDeliveries(previous.id);
+            const outcome = outcomes.find((candidate) =>
+              candidate.roomMessageId === detail.roomMessageId
+              && candidate.roomAgentId === detail.roomAgentId
+            );
+            if (!outcome) throw new Error("重试消息未进入派发队列");
+            if (!outcome.result.success) throw new Error(outcome.result.error);
+          }
+          detail.complete?.({ success: true });
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          detail.complete?.({ success: false, error: message });
           window.dispatchEvent(new CustomEvent("kimix:toast", {
-            detail: `${detail.action === "retry" ? "重试" : "取消排队"}失败：${error instanceof Error ? error.message : String(error)}`,
+            detail: `${detail.action === "retry" ? "重试" : "取消排队"}失败：${message}`,
           }));
         }
       })();
     };
-    window.addEventListener("kimix:room-delivery-action", handleRoomDeliveryAction);
-    return () => window.removeEventListener("kimix:room-delivery-action", handleRoomDeliveryAction);
+    window.addEventListener(ROOM_DELIVERY_ACTION_EVENT, handleRoomDeliveryAction);
+    return () => window.removeEventListener(ROOM_DELIVERY_ACTION_EVENT, handleRoomDeliveryAction);
   }, [removeRoomAgentActivity, updateSession]);
 
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; postUserStatusMessage?: string }) => {

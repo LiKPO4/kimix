@@ -3,7 +3,7 @@ type: Architecture
 title: Collaboration Room Routing
 description: Defines identity, event ownership, history authority, lifecycle, and compatibility invariants for user-controlled multi-Agent rooms.
 tags: [architecture, collaboration, multi-agent, events, persistence]
-timestamp: "2026-07-18T11:03:00+08:00"
+timestamp: "2026-07-27T10:12:00+08:00"
 ---
 
 # Collaboration Room Routing
@@ -58,6 +58,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 * Local search indexes every Agent event partition instead of the legacy top-level primary mirror. Matches carry Agent and model labels plus the exact event ID; opening a result selects the source Agent before using the shared timeline focus path. Global official-session results resolve secondary runtime IDs back to the existing room instead of creating duplicate standalone sessions.
 * Room Markdown export projects the shared display timeline while retaining recipient, Agent, Provider, and model ownership. Official Kimi debug ZIP export remains session-scoped: a collaboration room must present every exportable Agent and require an explicit choice before selecting that Agent's runtime or official session ID.
 * Delivery transitions are monotonic after acceptance and terminal settlement. Only an explicit user retry may replace an indeterminate, failed, or cancelled attempt; the retry creates a new `dispatchAttemptId` and `agentTurnId` while preserving the previous attempt as durable audit history.
+* `roomMessageId`, `roomAgentId`, and `agentTurnId` are event ownership metadata, not proof that the containing Session is a collaboration room: single-Agent sessions also use scoped runtime identities. A room delivery action is legal only when the current Session has authoritative `collaboration` state and the referenced message/Agent belongs to it. UI retry success must await persistence plus the requested delivery's actual dispatch result through a bounded completion receipt; dispatching a renderer event is never itself success. Missing handlers, wrong session type, target mismatch, transport failure, and receipt timeout remain visible failures rather than optimistic “已重新发送” states.
 * Cancel, steer, approval, question response, permission mutation, model mutation, Plan, Goal, Swarm, and slash session mutation require an explicit Agent/runtime owner.
 * A terminal event or Server-to-SDK migration for one Agent cannot clear or replace another Agent's activity or runtime binding.
 * Startup, background repair, running snapshots, and resume all derive an ordered runtime/official candidate list per Agent. A stale runtime may fall back only to another identity owned by the same Agent; recovery never borrows another participant's session.
