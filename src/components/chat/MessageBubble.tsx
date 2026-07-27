@@ -19,7 +19,7 @@ import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/mod
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { resolveLiveTextBlockKey, resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
-import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, mergeLiveDraftBlocks, type TurnBlock } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, groupTurnBlocks, mergeLiveDraftBlocks, type TurnBlock, type TurnBlockGroup } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -1772,6 +1772,77 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
   );
 }
 
+/**
+ * Official-style 任务 card for a SINGLE Agent dispatch: the Agent tool call
+ * itself is the task card. Header shows 任务 + task name + agent type + status;
+ * the expanded body shows the full delegation prompt (what was actually
+ * delegated — the core information of the official card), the sub-agent's
+ * internal activity, and the result summary once completed. Multi-dispatch
+ * runs keep the Swarm group card instead.
+ */
+function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; tool?: ToolEvent }) {
+  const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
+  const [expanded, setExpanded] = useState(isRunning);
+  const taskName = subagent.description?.trim() || subagent.agentName || "子任务";
+  const prompt = typeof tool?.arguments?.prompt === "string" ? tool.arguments.prompt.trim() : "";
+  const statusText = subagent.status === "queued"
+    ? "排队中"
+    : subagent.status === "suspended"
+      ? "已暂停"
+      : subagent.status === "running"
+        ? "运行中"
+        : subagent.status === "error"
+          ? "失败"
+          : "已完成";
+  return (
+    <div className="kimix-soft-card overflow-hidden rounded-xl">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        style={{ gap: 9, padding: "8px 12px" }}
+      >
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          <GitBranch size={14} />
+        </span>
+        <span className="flex h-5 min-w-0 flex-1 items-center">
+          <span className="truncate"><strong className="font-medium text-[var(--kimix-panel-text)]">任务</strong><span className="text-[var(--kimix-panel-text-muted)]"> · </span>{taskName}</span>
+        </span>
+        <span className="flex h-5 shrink-0 items-center" style={{ gap: 8 }}>
+          <span className="text-[12px] leading-none text-[var(--kimix-panel-text-muted)]">{subagent.agentName}</span>
+          <span className={subagent.status === "error" ? "text-[12px] leading-none text-accent-danger" : "text-[12px] leading-none text-[var(--kimix-panel-text-muted)]"}>{statusText}</span>
+          {isRunning && <Loader2 size={13} className="kimix-spin text-accent-warning" />}
+          {subagent.status === "error" && <X size={13} className="text-accent-danger" />}
+          {subagent.status === "completed" && <Check size={13} className="text-accent-success" />}
+        </span>
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="flex flex-col border-t border-[var(--kimix-panel-divider)]" style={{ gap: 10, padding: "10px 14px 12px" }}>
+          {prompt && (
+            <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ whiteSpace: "pre-wrap" }}>
+              {prompt}
+            </div>
+          )}
+          {subagent.events.length > 0 && <KimiWebSubagentDetails subagent={subagent} />}
+          {subagent.status === "completed" && subagent.resultSummary && (
+            <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ whiteSpace: "pre-wrap" }}>
+              {subagent.resultSummary}
+            </div>
+          )}
+          {subagent.status === "error" && subagent.error && (
+            <div className="text-[13px] leading-6 text-accent-danger" style={{ whiteSpace: "pre-wrap" }}>
+              {subagent.error}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] }) {
   const activeCount = subagents.filter((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended").length;
   const completedCount = subagents.filter((subagent) => subagent.status === "completed").length;
@@ -1979,7 +2050,9 @@ function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: b
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":
-      return <KimiWebSubagentGroupCard subagents={group.subagents} />;
+      return group.subagents.length === 1
+        ? <KimiWebTaskCard subagent={group.subagents[0]} />
+        : <KimiWebSubagentGroupCard subagents={group.subagents} />;
     case "approval":
       return <KimiWebApprovalGroupCard approvals={group.approvals} />;
   }
@@ -2005,45 +2078,6 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserv
       ))}
     </div>
   );
-}
-
-type TurnBlockGroup =
-  | { type: "thinking"; key: string; blocks: ThinkingBlock[] }
-  | { type: "text"; key: string; content: string }
-  | { type: "tool"; key: string; tools: ToolEvent[] }
-  | { type: "subagent"; key: string; subagents: SubagentEvent[] }
-  | { type: "approval"; key: string; approvals: ApprovalEvent[] }
-  | { type: "question"; key: string; question: QuestionEvent };
-
-/**
- * Group only adjacent same-kind blocks, mirroring the official kimi-web
- * assistantRenderBlocks rule: a tool run aggregates into one "N 个工具调用"
- * card only while uninterrupted; a thinking/text/subagent boundary starts a
- * new run. Order comes from the event array, never from timestamps.
- */
-function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
-  const groups: TurnBlockGroup[] = [];
-  for (const block of blocks) {
-    const last = groups.at(-1);
-    if (block.kind === "thinking") {
-      if (last?.type === "thinking") last.blocks.push(...block.blocks);
-      else groups.push({ type: "thinking", key: block.key, blocks: [...block.blocks] });
-    } else if (block.kind === "text") {
-      groups.push({ type: "text", key: block.key, content: block.content });
-    } else if (block.kind === "tool") {
-      if (last?.type === "tool") last.tools.push(block.tool);
-      else groups.push({ type: "tool", key: block.key, tools: [block.tool] });
-    } else if (block.kind === "subagent") {
-      if (last?.type === "subagent") last.subagents.push(block.subagent);
-      else groups.push({ type: "subagent", key: block.key, subagents: [block.subagent] });
-    } else if (block.kind === "approval") {
-      if (last?.type === "approval") last.approvals.push(block.approval);
-      else groups.push({ type: "approval", key: block.key, approvals: [block.approval] });
-    } else if (block.kind === "question") {
-      groups.push({ type: "question", key: block.key, question: block.question });
-    }
-  }
-  return groups;
 }
 
 /**
@@ -2112,7 +2146,9 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":
-      return <KimiWebSubagentGroupCard subagents={group.subagents} />;
+      return group.subagents.length === 1
+        ? <KimiWebTaskCard subagent={group.subagents[0]} tool={group.tools[0]} />
+        : <KimiWebSubagentGroupCard subagents={group.subagents} />;
     case "approval":
       return <KimiWebApprovalGroupCard approvals={group.approvals} />;
   }

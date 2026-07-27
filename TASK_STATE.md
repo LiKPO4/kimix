@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-07-27 功能：单次委派渲染为「任务」卡（v2.20.40）
+
+- 用户对比截图指出：官方单次 Agent 委派是「任务」卡（主内容为完整委派 prompt，子代理类型作标签，内部活动收进查看/状态行），Kimix 一律标「Swarm」且只显示进度条+子代理行、prompt 不可见。经运行会话实证：Agent 工具 arguments 含 description/prompt(1305 字)/subagent_type，数据现成。用户拍板：单个叫任务，多个仍叫 Swarm。
+- 实现：groupTurnBlocks 迁入 turnBlocks.ts 并让 subagent 组按索引保留派发 Agent 工具（含 prompt）；新增 KimiWebTaskCard——头部「任务 · 描述 + 子代理类型 + 状态」（运行中默认展开），展开体显示完整委派 prompt + 子代理内部活动（复用 KimiWebSubagentDetails）+ 完成后的 resultSummary / 失败的 error；两个渲染分派点（TurnBlocksProcessGroup、KimiWebProcessGroup）均按 subagents.length===1 走任务卡，多个保留 Swarm 组卡（进度条、0/N）。
+- 验证：相关 31 项、全量 130 文件 1306 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-DIqAgfCw.js）、OKF 校验（349 链接）、git diff --check 通过。待用户截图复验。
 ## 2026-07-27 功能：归档面板对齐官方新版 UX（v2.20.39）
 
 - 用户要求对照官方新版「已归档会话」面板优化 Kimix 归档区（先只读分析后实施）。关键发现：用户截图的官方客户端比仓库 v1.49.0 克隆新，克隆里只有侧栏 Archived 折叠区；截图版有搜索/工作区筛选/三种排序/分组计数/归档时间。Kimix 现状：平铺列表无时间无搜索，计数徽标为官方+本地直接相加（有重复虚高），archivedAt 实为 updated_at（Server 0.29.1 无 archived_at 字段）。

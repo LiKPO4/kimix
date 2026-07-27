@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Single Agent dispatch renders as a 任务 card (v2.20.40)**: matching the official UX, one Agent delegation now renders as a 任务 card whose expanded body shows the full delegation prompt (previously invisible) plus internal activity and result summary; multi-dispatch runs keep the Swarm group card. groupTurnBlocks moved to src/utils/turnBlocks.ts and preserves each dispatching Agent tool call (index-aligned) in subagent groups. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Archive panel matches the newer official UX (v2.20.39)**: settings 官方归档 gains search (title + project path), sort modes (归档时间/创建时间/按字母), workspace grouping with counts plus a workspace filter, and per-item time labels. Server 0.29.1 exposes no archived_at, so locally archived sessions show true 归档于 (local archivedAt) while others are honestly labeled 最后活动 instead of passing updated_at off as archive time. The badge dedupes official ∪ local ids, and a successful restore now offers 打开该对话 (switch project + select session). Logic lives in src/utils/archivedSessions.ts.
 
 

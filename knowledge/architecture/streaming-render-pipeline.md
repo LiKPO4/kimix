@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-27T18:03:00+08:00"
+timestamp: "2026-07-27T21:21:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -33,7 +33,12 @@ flow); pending ones stay as standalone interactive cards below the body.
 Agent/Task/AgentSwarm tool calls are absorbed into the matching subagent card
 via `parentToolCallId` at the tool-call position (official treats the Agent
 tool itself as the task card). Unmatched Agent calls fall back to plain tool
-blocks. Subagent-internal assistant content is **never** promoted into the
+blocks. At render time a single-dispatch subagent
+group becomes an official-style 任务 card (KimiWebTaskCard: 任务 + agent type +
+status header, expanded full delegation prompt, internal activity, result
+summary); multi-dispatch groups keep the Swarm progress card. groupTurnBlocks
+lives in src/utils/turnBlocks.ts and keeps each dispatching Agent tool call
+index-aligned in subagent groups so the task card can show the full prompt. Subagent-internal assistant content is **never** promoted into the
 main timeline body: `createSubagentOnlyAssistantEvent` is gone, and a tool- or
 subagent-only turn renders an empty-content process container with the ordered
 blocks. History cache mapping version 17 forces re-hydration of sessions that

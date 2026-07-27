@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems } from "@/components/chat/ChatThread";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, mergeLiveDraftBlocks, turnBlocksText, type TurnBlock } from "../turnBlocks";
+import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, groupTurnBlocks, mergeLiveDraftBlocks, turnBlocksText, type TurnBlock } from "../turnBlocks";
 
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -453,5 +453,38 @@ describe("mergeLiveDraftBlocks", () => {
   it("returns the formal blocks untouched when there is no live content", () => {
     const formal = buildTurnBlocks([assistant("a1", "正文")]);
     expect(mergeLiveDraftBlocks(formal, {})).toEqual(formal);
+  });
+});
+
+describe("groupTurnBlocks", () => {
+  it("keeps each dispatching Agent tool call index-aligned in subagent groups", () => {
+    const ts = nextTimestamp();
+    const events: TimelineEvent[] = [
+      agentTool("tool-agent-1", "call-1", "摸清机制", ts),
+      subagent("sub-1", "call-1", "摸清机制", "内部输出", ts),
+      agentTool("tool-agent-2", "call-2", "并行二", ts + 1),
+      subagent("sub-2", "call-2", "并行二", "内部输出", ts + 1),
+    ];
+    const groups = groupTurnBlocks(buildTurnBlocks(events));
+    expect(groups).toHaveLength(1);
+    const group = groups[0];
+    if (group.type !== "subagent") throw new Error("expected subagent group");
+    expect(group.subagents.map((s) => s.id)).toEqual(["sub-1", "sub-2"]);
+    expect(group.tools.map((tool) => tool?.id)).toEqual(["tool-agent-1", "tool-agent-2"]);
+  });
+
+  it("exposes the dispatch tool prompt for a single task card", () => {
+    const ts = nextTimestamp();
+    const dispatch = agentTool("tool-agent-1", "call-1", "摸清机制", ts);
+    const events: TimelineEvent[] = [
+      dispatch,
+      subagent("sub-1", "call-1", "摸清机制", "内部输出", ts),
+    ];
+    const groups = groupTurnBlocks(buildTurnBlocks(events));
+    const group = groups[0];
+    if (group.type !== "subagent") throw new Error("expected subagent group");
+    expect(group.subagents).toHaveLength(1);
+    expect(group.tools[0]?.id).toBe("tool-agent-1");
+    expect(group.tools[0]?.arguments).toMatchObject({ description: "摸清机制" });
   });
 });

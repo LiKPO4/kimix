@@ -220,6 +220,52 @@ export function computeStreamingTrailingTextContent(turnBlocks: TurnBlock[] | un
   return "";
 }
 
+
+export type TurnBlockGroup =
+  | { type: "thinking"; key: string; blocks: ThinkingBlock[] }
+  | { type: "text"; key: string; content: string }
+  | { type: "tool"; key: string; tools: ToolCallEvent[] }
+  | { type: "subagent"; key: string; subagents: SubagentTimelineEvent[]; tools: (ToolCallEvent | undefined)[] }
+  | { type: "approval"; key: string; approvals: ApprovalTimelineEvent[] }
+  | { type: "question"; key: string; question: QuestionTimelineEvent };
+
+/**
+ * Group only adjacent same-kind blocks, mirroring the official kimi-web
+ * assistantRenderBlocks rule: a tool run aggregates into one "N 个工具调用"
+ * card only while uninterrupted; a thinking/text/subagent boundary starts a
+ * new run. Order comes from the event array, never from timestamps. Subagent
+ * groups keep each dispatching Agent tool call (index-aligned) so a single
+ * dispatch can render as an official-style 任务 card with its full prompt.
+ */
+export function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
+  const groups: TurnBlockGroup[] = [];
+  for (const block of blocks) {
+    const last = groups.at(-1);
+    if (block.kind === "thinking") {
+      if (last?.type === "thinking") last.blocks.push(...block.blocks);
+      else groups.push({ type: "thinking", key: block.key, blocks: [...block.blocks] });
+    } else if (block.kind === "text") {
+      groups.push({ type: "text", key: block.key, content: block.content });
+    } else if (block.kind === "tool") {
+      if (last?.type === "tool") last.tools.push(block.tool);
+      else groups.push({ type: "tool", key: block.key, tools: [block.tool] });
+    } else if (block.kind === "subagent") {
+      if (last?.type === "subagent") {
+        last.subagents.push(block.subagent);
+        last.tools.push(block.tool);
+      } else {
+        groups.push({ type: "subagent", key: block.key, subagents: [block.subagent], tools: [block.tool] });
+      }
+    } else if (block.kind === "approval") {
+      if (last?.type === "approval") last.approvals.push(block.approval);
+      else groups.push({ type: "approval", key: block.key, approvals: [block.approval] });
+    } else if (block.kind === "question") {
+      groups.push({ type: "question", key: block.key, question: block.question });
+    }
+  }
+  return groups;
+}
+
 /**
  * Append the live (uncommitted) draft tail to a turn's formal blocks while the
  * turn is active. The live thinking phase goes after the formal blocks; the
