@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Intermediate text uses primary body color (v2.20.36)**: official kimi-web has no final-body area at all — every text message renders in place in the flat stream, and the last one is simply the answer; Kimix’s body/process split is a local product decision. To match official hierarchy, intermediate text blocks now render in the primary text color (black body text, never clickable, always full), distinct from gray thinking.
+
+
 * **Rich markdown while streaming, interval-throttled (v2.20.35)**: the body no longer shows raw markdown symbols during streaming. The existing block-memoized StreamingRichMarkdown path (Lexer.lex split + per-block memo) becomes the default, with visible content advanced on a 300ms cadence that yields to user scrolling; plain text remains an explicit fallback (`kimix_streaming_plain_markdown=1` or `kimix_streaming_rich_markdown=0`). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

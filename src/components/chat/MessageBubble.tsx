@@ -1283,16 +1283,17 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
 
 /**
  * Intermediate body text that appears inside the expanded process timeline.
- * It is NOT the final answer, so it uses the same secondary style as thinking
+ * It is NOT the final answer, but official renders it as ordinary black body
+ * text (primary color, never clickable), distinct from the gray thinking
  * summaries. Official kimi-web renders intermediate text in FULL via
  * MessageResponse — no fold, no teaser exemption — so we never collapse it.
- * No side indent: it shares the process timeline
- * column with thinking teasers and tool cards.
+ * No side indent: it shares the process timeline column with thinking
+ * teasers and tool cards.
  */
 function KimiWebIntermediateTextBlock({ content }: { content: string }) {
   return (
     <div
-      className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+      className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text)]"
       style={KIMI_WEB_THINKING_SUMMARY_STYLE}
     >
       {content}
