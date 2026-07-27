@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Task card survives restore via display-layer synthesis (v2.20.41)**: subagent events only come from live frames — snapshot replay and history mapping never rebuild them, so a reloaded turn degraded an Agent dispatch to a plain tool card. buildTurnBlocks now synthesizes a subagent block from any SETTLED unmatched Agent/Task/AgentSwarm call (description/agentName from arguments, resultSummary/error from the tool result); running unmatched calls stay plain tool blocks until the real subagent event arrives. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Single Agent dispatch renders as a 任务 card (v2.20.40)**: matching the official UX, one Agent delegation now renders as a 任务 card whose expanded body shows the full delegation prompt (previously invisible) plus internal activity and result summary; multi-dispatch runs keep the Swarm group card. groupTurnBlocks moved to src/utils/turnBlocks.ts and preserves each dispatching Agent tool call (index-aligned) in subagent groups. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

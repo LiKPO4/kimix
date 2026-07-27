@@ -164,13 +164,16 @@ describe("buildTurnBlocks", () => {
     expect(counts).toEqual({ thinking: 5, tools: 3, subagents: 4, approvals: 0 });
   });
 
-  it("keeps an unmatched Agent call as a plain tool block (historical fallback)", () => {
+  it("synthesizes a task subagent block for an unmatched settled Agent call (restore path)", () => {
     const events: TimelineEvent[] = [
       assistant("a1", "正文", "思考"),
       agentTool("tool-agent-x", "call-x", "孤立任务", fixtureTimestamp),
     ];
     const blocks = buildTurnBlocks(events);
-    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "tool"]);
+    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "subagent"]);
+    const block = blocks[2] as Extract<TurnBlock, { kind: "subagent" }>;
+    expect(block.subagent.description).toBe("孤立任务");
+    expect(block.subagent.status).toBe("completed");
   });
 
   it("keeps subagent-internal output out of every top-level text block", () => {
@@ -486,5 +489,73 @@ describe("groupTurnBlocks", () => {
     expect(group.subagents).toHaveLength(1);
     expect(group.tools[0]?.id).toBe("tool-agent-1");
     expect(group.tools[0]?.arguments).toMatchObject({ description: "摸清机制" });
+  });
+});
+
+describe("agent dispatch synthesis on restore", () => {
+  it("synthesizes a subagent block for a settled Agent call with no subagent event", () => {
+    const ts = nextTimestamp();
+    const blocks = buildTurnBlocks([
+      assistant("a1", "我先委派探索。", "思考"),
+      {
+        id: "tool-agent-restore",
+        type: "tool_call",
+        timestamp: ts,
+        toolCallId: "call-restore",
+        toolName: "Agent",
+        status: "success",
+        arguments: { description: "摸清机制", prompt: "完整委派指令", subagent_type: "explore" },
+        result: "子代理最终报告",
+        agentTurnId: "turn-1",
+      } as TimelineEvent,
+    ]);
+    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "subagent"]);
+    const block = blocks[2] as Extract<TurnBlock, { kind: "subagent" }>;
+    expect(block.subagent).toMatchObject({
+      parentToolCallId: "call-restore",
+      description: "摸清机制",
+      agentName: "explore",
+      status: "completed",
+      resultSummary: "子代理最终报告",
+    });
+    expect(block.tool?.id).toBe("tool-agent-restore");
+  });
+
+  it("keeps a running unmatched Agent call as a plain tool block (live-safe)", () => {
+    const ts = nextTimestamp();
+    const blocks = buildTurnBlocks([
+      {
+        id: "tool-agent-live",
+        type: "tool_call",
+        timestamp: ts,
+        toolCallId: "call-live",
+        toolName: "Agent",
+        status: "running",
+        arguments: { description: "摸清机制", subagent_type: "explore" },
+        agentTurnId: "turn-1",
+      } as TimelineEvent,
+    ]);
+    expect(blocks.map((block) => block.kind)).toEqual(["tool"]);
+  });
+
+  it("marks a failed Agent dispatch as an errored subagent", () => {
+    const ts = nextTimestamp();
+    const blocks = buildTurnBlocks([
+      {
+        id: "tool-agent-failed",
+        type: "tool_call",
+        timestamp: ts,
+        toolCallId: "call-failed",
+        toolName: "Agent",
+        status: "error",
+        arguments: { description: "摸清机制", subagent_type: "explore" },
+        result: "Failed to launch: model unavailable",
+        agentTurnId: "turn-1",
+      } as TimelineEvent,
+    ]);
+    const block = blocks[0] as Extract<TurnBlock, { kind: "subagent" }>;
+    expect(block.subagent.status).toBe("error");
+    expect(block.subagent.error).toBe("Failed to launch: model unavailable");
+    expect(block.subagent.resultSummary).toBeUndefined();
   });
 });

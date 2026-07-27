@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-27 修复：恢复后任务卡退化为工具卡（v2.20.41）
+
+- 用户 v2.20.40 实测：重新加载会话后单次 Agent 委派显示为「1 个工具调用」而非任务卡。CDP 实证：持久化记录里 Agent tool_call 仍在（toolCallId、arguments 含 description/prompt/subagent_type），但 subagent 事件整体消失。
+- 根因：subagent 事件只来自实时帧（subagent.started 等）；快照回放（snapshotMessagesToServerFrames）不发 subagent 帧（快照里有 subagents 字段但未被映射），mapHistoryEvents 也无法从官方 /messages 重建。记录被规范历史替换后 subagent 事件丢失，Agent 调用走「未匹配回退」变成普通工具块。
+- 修复（显示层合成，零数据迁移）：buildTurnBlocks 对 settled（success/error）且未匹配的 Agent/Task/AgentSwarm 调用，用工具自身合成 subagent 块（description/agentName 取自 arguments，resultSummary/error 取自工具 result，key 稳定）——所有恢复路径自动生效。running 的未匹配调用不合成（live 安全：等真实 subagent 事件到达再吸收，避免中途 remount）。旧测试「未匹配 Agent 回退为普通工具块」钉住的正是该缺陷，已更新为新预期。
+- 验证：相关 34 项、全量 130 文件 1309 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-BKtuOdvp.js）、OKF 校验（349 链接）、git diff --check 通过。待用户截图复验（重载会话后应显示任务卡）。
 ## 2026-07-27 功能：单次委派渲染为「任务」卡（v2.20.40）
 
 - 用户对比截图指出：官方单次 Agent 委派是「任务」卡（主内容为完整委派 prompt，子代理类型作标签，内部活动收进查看/状态行），Kimix 一律标「Swarm」且只显示进度条+子代理行、prompt 不可见。经运行会话实证：Agent 工具 arguments 含 description/prompt(1305 字)/subagent_type，数据现成。用户拍板：单个叫任务，多个仍叫 Swarm。

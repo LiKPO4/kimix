@@ -23,6 +23,42 @@ export type TurnBlock =
   | { kind: "approval"; key: string; approval: ApprovalTimelineEvent }
   | { kind: "question"; key: string; question: QuestionTimelineEvent };
 
+const AGENT_DISPATCH_TOOL_NAMES = new Set(["Agent", "Task", "AgentSwarm"]);
+
+/**
+ * Official history and snapshot replays carry the Agent dispatch itself
+ * (tool_use with description/prompt/subagent_type) but not Kimix's live
+ * subagent event — replay pipelines (snapshotMessagesToServerFrames,
+ * mapHistoryEvents) emit only tool.call/tool.result frames. Without synthesis
+ * a restored turn degrades the dispatch to a plain tool block and the task
+ * card (with its full prompt) disappears. Build a display-layer subagent from
+ * the SETTLED tool call; live turns never reach this branch because a running
+ * dispatch is skipped and the real subagent event matches parentToolCallId
+ * once it arrives.
+ */
+function synthesizeSubagentFromAgentCall(event: ToolCallEvent): SubagentTimelineEvent {
+  const args = event.arguments ?? {};
+  const description = typeof args.description === "string" && args.description.trim()
+    ? args.description.trim()
+    : undefined;
+  const subagentType = typeof args.subagent_type === "string" && args.subagent_type.trim()
+    ? args.subagent_type.trim()
+    : undefined;
+  const resultText = typeof event.result === "string" ? event.result : "";
+  return {
+    id: `subagent:tool:${event.id}`,
+    type: "subagent",
+    timestamp: event.timestamp,
+    parentToolCallId: event.toolCallId || undefined,
+    description,
+    agentName: subagentType ?? "子代理",
+    status: event.status === "error" ? "error" : "completed",
+    resultSummary: event.status === "error" ? undefined : resultText || undefined,
+    error: event.status === "error" ? resultText || undefined : undefined,
+    events: [],
+  };
+}
+
 /**
  * Build the ordered block list for one turn body.
  *
@@ -36,7 +72,11 @@ export type TurnBlock =
  *   is absorbed into subagent block(s) at its own position (official renders
  *   the Agent tool as the task card itself). Otherwise it stays a tool block.
  * - subagent: emitted at its own position only when not already absorbed by
- *   its dispatching tool call.
+ *   its dispatching tool call. A SETTLED Agent/Task/AgentSwarm call with no
+ *   matching subagent (official history / snapshot replays carry no subagent
+ *   events) synthesizes a display-layer subagent so the task card survives
+ *   restore; running unmatched calls stay plain tool blocks until the real
+ *   subagent event arrives.
  * - approval_request / question_request: resolved (non-pending) cards stay in
  *   position; pending ones render as standalone interactive cards elsewhere.
  * - Everything else (status, compaction, steer, hooks, diffs…) keeps its
@@ -101,6 +141,11 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
           absorbedSubagentIds.add(subagent.id);
           blocks.push({ kind: "subagent", key: `subagent:${subagent.id}`, subagent, tool: event });
         }
+        continue;
+      }
+      if (event.status !== "running" && AGENT_DISPATCH_TOOL_NAMES.has(event.toolName)) {
+        const synthesized = synthesizeSubagentFromAgentCall(event);
+        blocks.push({ kind: "subagent", key: `subagent:${synthesized.id}`, subagent: synthesized, tool: event });
         continue;
       }
       blocks.push({ kind: "tool", key: `tool:${event.id}`, tool: event });
