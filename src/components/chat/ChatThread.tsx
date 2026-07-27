@@ -765,9 +765,16 @@ export function buildRenderItems(
     const model = [...visible].reverse().find((event) => event.model?.trim())?.model
       ?? first.model
       ?? last.model;
-    const durationMs = [...visible]
+    const reliableDurations = [...visible]
       .map((event) => reliableAssistantDurationMs(event.durationMs))
-      .find((value) => value !== undefined);
+      .filter((value): value is number => value !== undefined);
+    // Mapped multi-step history carries cumulative turn duration on each
+    // Assistant segment. The first visible segment is necessarily shorter;
+    // selecting it makes a restored full process timeline shrink the footer
+    // from the real turn duration to an early-step duration.
+    const durationMs = reliableDurations.length > 0
+      ? Math.max(...reliableDurations)
+      : undefined;
     return {
       ...first,
       id: first.agentTurnId || first.roomMessageId ? `assistant:${first.agentTurnId ?? first.roomMessageId}` : first.id,
@@ -907,9 +914,13 @@ export function buildRenderItems(
     const derivedDurationMs = (turnStartedAt && turnEndedAt > turnStartedAt)
       ? reliableAssistantDurationBetween(turnStartedAt, turnEndedAt)
       : undefined;
+    const mergedDurationMs = reliableAssistantDurationMs(mergedAssistantEvent?.durationMs);
+    const fullTurnDurationMs = mergedDurationMs !== undefined && derivedDurationMs !== undefined
+      ? Math.max(mergedDurationMs, derivedDurationMs)
+      : (mergedDurationMs ?? derivedDurationMs);
     const baseAssistant = mergedAssistantEvent
-      ? (mergedAssistantEvent.durationMs === undefined && derivedDurationMs !== undefined)
-        ? { ...mergedAssistantEvent, durationMs: derivedDurationMs }
+      ? fullTurnDurationMs !== mergedAssistantEvent.durationMs
+        ? { ...mergedAssistantEvent, durationMs: fullTurnDurationMs }
         : mergedAssistantEvent
       : undefined;
     const renderAssistantEvent = baseAssistant

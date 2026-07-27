@@ -1075,6 +1075,45 @@ describe("buildRenderItems room Agent turns", () => {
 });
 
 describe("assistant footer fallback", () => {
+  it("keeps the full room-turn duration instead of the first Assistant segment duration", () => {
+    const rendered = buildRenderItems([{
+      id: "user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "处理完整轮次",
+    }, {
+      id: "assistant-progress",
+      type: "assistant_message",
+      timestamp: 66_232,
+      content: "先处理第一阶段。",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 269_463,
+    }, {
+      id: "tool",
+      type: "tool_call",
+      timestamp: 300_000,
+      toolCallId: "call-1",
+      toolName: "Bash",
+      status: "success",
+      arguments: {},
+    }, {
+      id: "assistant-final",
+      type: "assistant_message",
+      timestamp: 478_709,
+      content: "完整最终正文",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 477_709,
+    }], "kimi-code");
+    const assistantItem = rendered.find(
+      (item) => item.type === "event" && item.event.type === "assistant_message",
+    );
+    expect(assistantItem?.type).toBe("event");
+    if (assistantItem?.type !== "event" || assistantItem.event.type !== "assistant_message") return;
+    expect(assistantItem.event.durationMs).toBe(477_709);
+  });
+
   it("does not extend a completed turn with late passive status snapshots", () => {
     const rendered = buildRenderItems([{
       id: "user",

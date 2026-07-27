@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Merged process timelines retain full turn duration (v2.20.31)**: target wire timestamps prove the recovered 1.4.486 turn runs from `1785069209683` to `1785069687392` (`477,709ms`, displayed as 7m58s). v2.20.30 exposed that multi-step Assistant merging selected the first cumulative segment duration (`269,463ms`, 4m29s) even though the final mapped Assistant and user→final projection both carried the full value. Merging now takes the maximum reliable segment duration and compares it with the passive-event-filtered whole-turn projection. Invariant O updated. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Missing turns recover atomically with expandable process history (v2.20.30)**: v2.20.29 restored only the missing user boundary and final Assistant, so the body and duration were correct but the recovered turn had no thinking/tools to expand. Rejected-history recovery now treats a missing user boundary as a missing turn: when local remnants are passive only, it adopts that canonical turn tail atomically while preserving every older local turn; when local remnants contain richer visible output, it reanchors them behind the recovered user and adds only the final body. Existing v2.20.29 body-only tails self-upgrade when canonical supplies expandable process history. Circuit key advances to v5. Invariant I updated. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 
