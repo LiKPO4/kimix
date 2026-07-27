@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Prompt-boundary streams survive stale subscriptions and duplicate local owners (v2.20.33)**: a v2.20.32 retry accepted at `02:16:38.484`, official Assistant history advanced at `02:16:38.486`, yet the UI remained empty until the 30-second running sample. The post-accept baseline could skip that 1ms Assistant, status heartbeats could mask content silence, and duplicate copies of the same logical Session caused already-received deltas to be rejected as ambiguous ownership. Existing subscriptions now refresh before Prompt POST; accepted prompts use a short, bounded, current-prompt message probe and only meaningful stream frames refresh their progress clock. Runtime ownership deduplicates identical `{roomId, roomAgentId}` claims while preserving real cross-owner conflicts. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
+
 * **Retry scope and acknowledgement are authoritative (v2.20.32)**: a single-Agent error carried `roomMessageId/roomAgentId`, so the error card misrouted retry through the collaboration action event; Composer rejected the non-room session while the fire-and-forget caller had already shown “已重新发送”. Room scope now requires actual `Session.collaboration`, ordinary sessions use their direct retry path, and room retry waits for persistence plus the requested Agent delivery result through a bounded completion receipt. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
 
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoomAgent, RoomAgentDeliveryAttempt, RoomUserMessage, Session, TimelineEvent } from "@/types/ui";
 import {
   createCollaborationStateFromSession,
+  findRoomRuntimeOwners,
   getEventRoomAgentId,
   getPrimaryRoomAgent,
   getRoomAgentRuntimeId,
@@ -439,6 +440,20 @@ describe("collaborationRooms", () => {
         updatedAt: 40,
       },
     })?.roomId).toBe(original.id);
+  });
+
+  it("deduplicates repeated store entries for the same logical runtime owner", () => {
+    const room = legacySession();
+    const duplicate = {
+      ...room,
+      events: [...room.events],
+    };
+
+    expect(findRoomRuntimeOwners([room, duplicate, room], "runtime-primary")).toHaveLength(1);
+    expect(resolveRoomRuntimeOwner([room, duplicate, room], "runtime-primary")).toMatchObject({
+      roomId: room.id,
+      roomAgentId: getPrimaryRoomAgent(room).id,
+    });
   });
 
   it("treats unscoped events as primary and does not overwrite an explicit owner", () => {

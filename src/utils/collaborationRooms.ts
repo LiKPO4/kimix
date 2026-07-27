@@ -436,6 +436,7 @@ export function findRoomRuntimeOwners(
     [runtimeSessionId, officialSessionId ?? undefined].filter((value): value is string => Boolean(value)),
   );
   const owners: RoomRuntimeOwner[] = [];
+  const seenOwners = new Set<string>();
 
   for (const session of sessions) {
     if (session.archivedAt || session.longTask) continue;
@@ -452,6 +453,13 @@ export function findRoomRuntimeOwners(
         || Boolean(session.officialSessionId && identities.has(session.officialSessionId))
       );
       if (!matchesAgent && !matchesLegacyPrimary) continue;
+      // Session hydration/reconciliation can transiently expose the same
+      // logical room more than once. Those duplicate array entries are not
+      // competing runtime owners and must not make live frames look
+      // ambiguous. Keep genuinely different room/agent claims distinct.
+      const ownerKey = `${session.id}\u0000${agent.id}`;
+      if (seenOwners.has(ownerKey)) continue;
+      seenOwners.add(ownerKey);
       owners.push({
         roomId: session.id,
         roomAgentId: agent.id,

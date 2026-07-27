@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  acceptedPromptProgressBaseline,
   classifyServerSessionActivity,
   completedPromptMessagesToServerFrames,
   flattenServerEvent,
+  inFlightPromptMessagesToServerFrames,
   isKimiCodeServerSessionRoutingEnabled,
+  isServerStreamProgressFrame,
   KimiCodeServerClient,
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   recoveredPromptCompletedFrame,
   resolveServerPromptIdleTimeout,
   serverMessageProgressMarker,
+  type ServerMessageSummary,
   shouldReconnectForMissedServerProgress,
   snapshotMessagesToServerFrames,
   snapshotToHistoryFrames,
@@ -278,6 +282,12 @@ describe("KimiCodeServerClient protocol adapters", () => {
       latestMarker: advanced,
     })).toBe(false);
     expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 1_500,
+      baselineMarker: baseline,
+      latestMarker: advanced,
+      minimumSilenceMs: 1_500,
+    })).toBe(true);
+    expect(shouldReconnectForMissedServerProgress({
       silenceMs: 8_000,
       baselineMarker: baseline,
       latestMarker: advanced,
@@ -292,6 +302,53 @@ describe("KimiCodeServerClient protocol adapters", () => {
       baselineMarker: undefined,
       latestMarker: advanced,
     })).toBe(false);
+  });
+
+  it("keeps a pre-prompt baseline when the first Assistant persisted before the post-accept read", () => {
+    const prePromptMarker = "msg-previous|2026-07-27T02:12:54Z|100";
+    const fastAssistant: ServerMessageSummary = {
+      id: "msg-assistant-first",
+      session_id: "session-1",
+      role: "assistant",
+      created_at: "2026-07-27T02:16:38.486Z",
+      content: [{ type: "think", think: "first progress" }],
+    };
+    const acceptedUser: ServerMessageSummary = {
+      id: "msg-user",
+      session_id: "session-1",
+      role: "user",
+      created_at: "2026-07-27T02:16:38.485Z",
+      content: [{ type: "text", text: "review" }],
+    };
+
+    const fastBaseline = acceptedPromptProgressBaseline(prePromptMarker, fastAssistant);
+    expect(fastBaseline).toBe(prePromptMarker);
+    expect(shouldReconnectForMissedServerProgress({
+      silenceMs: 8_000,
+      baselineMarker: fastBaseline,
+      latestMarker: serverMessageProgressMarker(fastAssistant),
+    })).toBe(true);
+    expect(acceptedPromptProgressBaseline(prePromptMarker, acceptedUser))
+      .toBe(serverMessageProgressMarker(acceptedUser));
+  });
+
+  it("does not let status heartbeats mask a silent body/thinking/tool stream", () => {
+    expect(isServerStreamProgressFrame({
+      type: "agent.status.updated",
+      session_id: "session-1",
+    })).toBe(false);
+    expect(isServerStreamProgressFrame({
+      type: "ping",
+      session_id: "session-1",
+    })).toBe(false);
+    expect(isServerStreamProgressFrame({
+      type: "thinking.delta",
+      session_id: "session-1",
+    })).toBe(true);
+    expect(isServerStreamProgressFrame({
+      type: "tool.call.delta",
+      session_id: "session-1",
+    })).toBe(true);
   });
 
   it("keeps silent prompts open when status is active, unknown, or unavailable", async () => {
@@ -493,15 +550,24 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
     expect(subscribe).toHaveBeenCalledWith("session-1");
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]?.[0]).toContain("/messages?page_size=1");
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/v1/sessions/session-1/prompts");
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/messages?page_size=20");
     expect(warn).toHaveBeenCalledWith("[KimiCodeServerClient] prompt 前建立会话订阅失败，继续发送（首波增量可经快照兜底）:", failure);
     warn.mockRestore();
   });
 
-  it("refreshes an already-subscribed live connection after the prompt is accepted", async () => {
+  it("refreshes an already-subscribed live connection before posting the prompt", async () => {
     const promptId = "msg_01SUBBED";
+    const order: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/messages?")) {
+        return new Response(JSON.stringify({ code: 0, data: { items: [], has_more: false } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       expect(url).toContain("/api/v1/sessions/session-1/prompts");
+      order.push("http:prompt");
       return new Response(JSON.stringify({ code: 0, data: { prompt_id: promptId } }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -511,12 +577,14 @@ describe("KimiCodeServerClient protocol adapters", () => {
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     const internals = client as unknown as {
       subscribed: Set<string>;
-      refreshSubscriptionAfterAcceptedPrompt: (sessionId: string) => Promise<void>;
+      refreshSubscriptionBeforePrompt: (sessionId: string) => Promise<void>;
       receive: (frame: { type: string; session_id: string; seq: number; epoch: string; payload: unknown }) => void;
     };
     internals.subscribed.add("session-1");
     const subscribe = vi.spyOn(client, "subscribe");
-    const refresh = vi.spyOn(internals, "refreshSubscriptionAfterAcceptedPrompt").mockResolvedValue();
+    const refresh = vi.spyOn(internals, "refreshSubscriptionBeforePrompt").mockImplementation(async () => {
+      order.push("ws:refresh");
+    });
     const dispatched = client.prompt("session-1", "数到 300", {});
     internals.receive({
       type: "prompt.aborted",
@@ -528,6 +596,43 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
     expect(subscribe).not.toHaveBeenCalled();
     expect(refresh).toHaveBeenCalledWith("session-1");
+    expect(order).toEqual(["ws:refresh", "http:prompt"]);
+  });
+
+  it("replays only the accepted prompt's persisted progress as an active turn", () => {
+    const promptId = "msg-prompt";
+    const frames = inFlightPromptMessagesToServerFrames([
+      {
+        id: "msg-assistant",
+        role: "assistant",
+        created_at: "2026-07-27T02:16:38.486Z",
+        content: [
+          { type: "thinking", thinking: "已开始分析。" },
+          { type: "text", text: "第一段正文" },
+        ],
+      },
+      {
+        id: promptId,
+        role: "user",
+        created_at: "2026-07-27T02:16:38.485Z",
+        content: [{ type: "text", text: "review" }],
+      },
+      {
+        id: "msg-previous-assistant",
+        role: "assistant",
+        created_at: "2026-07-27T02:15:00.000Z",
+        content: [{ type: "text", text: "上一轮正文" }],
+      },
+    ], "session-1", promptId, 42, "epoch-1");
+
+    expect(frames.map((frame) => frame.type)).toEqual(["content.part", "content.part"]);
+    expect(frames.every((frame) => (
+      (frame.payload as Record<string, unknown>).snapshotReplay === "in_flight" &&
+      (frame.payload as Record<string, unknown>).kimixMissedProgressRecovery === true
+    ))).toBe(true);
+    expect(JSON.stringify(frames)).toContain("第一段正文");
+    expect(JSON.stringify(frames)).not.toContain("上一轮正文");
+    expect(frames.some((frame) => frame.type === "turn.ended")).toBe(false);
   });
 
   it("delivers the completed prompt's authoritative assistant before prompt.completed", async () => {

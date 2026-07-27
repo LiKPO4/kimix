@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-07-27 修复：重试/新轮 WS 静默后 30 秒成批补输出（v2.20.33）
+
+- 用户在 v2.20.32 实测：重试能真实启动，但新一轮“正在思考 32秒”后才一次出现正文、思考和工具块，回归到此前修过的 30 秒批量补历史症状。
+- 三层快照确认：prompt 在 `02:16:38.484` 接受并立即重连，官方 Assistant 在 `02:16:38.486` 已落盘；新 WS 只收到 seq=150 snapshot，renderer 到 27 秒仍正文为 0；`02:17:08.983` 的 30 秒 `running-sample` 才把 local size `42,983` 补到 `43,019`。
+- 根因：接受后基线可能已越过 1ms 内落盘的首个 Assistant；watchdog 把状态心跳也当实时进度；会话 hydration/reconciliation 还会短暂产生同一 room/Agent 的重复 store 项，owner 查询误判为多归属并丢弃已经收到的 `thinking.delta` / `assistant.delta`。
+- 修复：已有订阅在 Prompt POST 前重建；接受后保留 prompt-specific “尚未看到输出”标记，并以 1.5 秒短探针读取当前 prompt 的最近消息增量后再重连；只有正文/思考/工具等真实进度刷新静默时钟。runtime owner 按 `roomId + roomAgentId` 去重，同一 owner 的重复数组项不再触发歧义，不同 owner 冲突仍拒绝路由。
+- 回归：定向 2 文件 78 项、全量 131 文件 1278 项、Node/Renderer typecheck、生产构建、OKF 校验通过。
+- 真实目标会话验收：`02:47:32.361` 官方开始模型请求，`02:47:41.544` 首个思考增量进入当前 turn，`02:47:42.448` 正文开始流入，`02:47:43.007` 以 23 字完整正文结束；该轮 `kimiRuntimeOwner.ambiguous=0`，没有等 30 秒 running-sample 才显示。
+
 ## 2026-07-27 修复：错误卡“重试上一条”虚假成功（v2.20.32）
 
 - 用户在 `session_cc972967-b75e-4f8d-a834-1fb615ec8ada` 点击错误卡“重试上一条”后，界面显示“已重新发送上一条消息”，但没有新一轮。
