@@ -13,9 +13,10 @@ import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreAssistantProgressParagraphs, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
-import { isStreamingPlainMarkdownEnabled } from "@/utils/perfFlags";
+import { isStreamingPlainMarkdownEnabled, shouldUsePlainStreamingMarkdown } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 import { renderStreamingPlainBlockToHtml, splitStreamingPlainBlocks } from "@/utils/streamingPlainMarkdown";
+import { nextStreamingRichTickDelay } from "@/utils/streamingRichThrottle";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 
 interface MarkdownRendererProps {
@@ -168,6 +169,69 @@ function StreamingMarkdown({
   );
 }
 
+/**
+ * Bound the rich streaming cadence: the block-memoized renderer already skips
+ * finished blocks, but the whole-content lex/normalize pass and the growing
+ * tail block still run per content revision. Advancing the visible content at
+ * a bounded interval (and yielding while the user scrolls) keeps that work at
+ * a few Hz instead of per-token; the settled (non-active) state always syncs
+ * the full content immediately.
+ */
+function useThrottledStreamingContent(content: string, active: boolean): string {
+  const [throttled, setThrottled] = useState(content);
+  const throttledRef = useRef(content);
+  const lastTickRef = useRef(0);
+  const timerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (!active) {
+      throttledRef.current = content;
+      setThrottled(content);
+      return;
+    }
+    if (throttledRef.current === content) return;
+    const schedule = () => {
+      const delay = nextStreamingRichTickDelay({
+        now: Date.now(),
+        lastTickAt: lastTickRef.current,
+        scrollActive: isUserScrollActive(),
+      });
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = null;
+        if (isUserScrollActive()) {
+          schedule();
+          return;
+        }
+        lastTickRef.current = Date.now();
+        throttledRef.current = content;
+        setThrottled(content);
+      }, delay);
+    };
+    const delay = nextStreamingRichTickDelay({
+      now: Date.now(),
+      lastTickAt: lastTickRef.current,
+      scrollActive: isUserScrollActive(),
+    });
+    if (delay === 0) {
+      lastTickRef.current = Date.now();
+      throttledRef.current = content;
+      setThrottled(content);
+      return;
+    }
+    schedule();
+    return () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [content, active]);
+  return active ? throttled : content;
+}
+
 function isNearViewport(node: HTMLElement, margin = DEFERRED_RENDER_MARGIN) {
   const rect = node.getBoundingClientRect();
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -279,15 +343,16 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   // Delay StreamingPlain -> SettledRich while the user is actively scrolling.
   const [settleRichAllowed, setSettleRichAllowed] = useState(() => !isUserScrollActive());
   const wasStreamingRef = useRef(streaming);
-  const usePlainStreaming = streaming && isStreamingPlainMarkdownEnabled();
+  const usePlainStreaming = streaming && shouldUsePlainStreamingMarkdown();
   const renderAsStreaming = streaming || (wasStreamingRef.current && !settleRichAllowed && isStreamingPlainMarkdownEnabled());
   const plainPath = usePlainStreaming || (renderAsStreaming && !streaming && !settleRichAllowed);
   // The plain streaming path renders raw text with a fence-aware splitter, so
   // the full markdown-repair stack (tables/fences/heading normalization, which
   // is O(content) regex work per frame) is skipped until the settled rich pass.
+  const liveContent = useThrottledStreamingContent(content, streaming && !usePlainStreaming);
   const normalizedContent = useMemo(
-    () => (plainPath ? content : normalizeMarkdownContent(content, normalizeAssistantProgress)),
-    [content, normalizeAssistantProgress, plainPath],
+    () => (plainPath ? liveContent : normalizeMarkdownContent(liveContent, normalizeAssistantProgress)),
+    [liveContent, normalizeAssistantProgress, plainPath],
   );
 
   useEffect(() => {

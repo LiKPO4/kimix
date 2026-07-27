@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-27 功能：流式期间富 Markdown 渲染（v2.20.35）
+
+- 用户实测反馈：流式期间正文区显示原始 Markdown 符号（##、**、反引号），长最终答案全程都是原始内容；官方 kimi web 流式即渲染。用户建议按间隔渲染而非每 token 渲染。
+- 结论：仓库里早已存在块级 memo 的富流式渲染器（StreamingRichMarkdown，Lexer.lex 分块 + 每块 memo 的 ReactMarkdown），只是默认走了纯文本路径。残剩成本是全内容 lex/normalize（每修订一次）和增长的尾块重渲染。
+- 修复：① 默认切换到富流式路径（新增 shouldUsePlainStreamingMarkdown 解析：仅当用户显式 plain=1 或 rich=0 时回退纯文本，新 flag kimix_streaming_rich_markdown 默认开）；② 新增 useThrottledStreamingContent，可见内容按 300ms 节拍前进、滚动中暂停推进（150ms 复查）、settle 立即同步全量——把全内容 lex/normalize 与尾块渲染压到每秒几次而非每 token。不完整 Markdown 的瞬态（未闭合加粗/围栏）随下一拍自愈，settle 后仍由完整渲染接管。
+- 验证：相关 7 项、全量 130 文件 1289 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-RJdoYdU-.js）、OKF 校验（346 链接）、git diff --check 通过。待用户实测复验（重点：长答案流式期格式是否渐进渲染、滚动是否依旧流畅）。
 ## 2026-07-27 修复：最终正文流式输出（v2.20.29）
 
 - 用户实测反馈：过程内容（思考/工具）已经流式，但最终正文在回合结束时一瞬间全部吐出，观感像卡住。要求最终正文也流式，并先分析根因、确保改动安全稳定。

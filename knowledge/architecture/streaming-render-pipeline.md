@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-27T11:44:00+08:00"
+timestamp: "2026-07-27T13:24:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -225,12 +225,17 @@ New invariants:
 
 Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on production reproductions: an earlier immediate-boundary bug caused 395 flushes/10s at 14ms each; a later 5,500-event long turn still spent 6–7s of every 10s rebuilding render items while running tool arguments flushed 38–42 times. Running tool/status/subagent-only batches therefore use a 500ms cadence, while Assistant text keeps the 80ms cadence and true boundaries remain synchronous. Live thinking keeps its full text but constrains layout growth inside a 120px five-line scroll viewport, so the outer conversation does not reflow taller after the fifth line. When the user is not scrolling, draft notifications publish on the next animation frame (matching official web's immediate per-event state update while coalescing same-frame fragments); active outer-chat scrolling alone switches them to the 250ms yield timer.
 
-## Streaming markdown is plain until settled
+## Streaming markdown is rich and interval-throttled while active
 
-While an assistant turn is active, the body renders through a fence-aware plain
-path (no remark-math / katex / highlight, no full-document `Lexer.lex`), then
-upgrades to the full ReactMarkdown stack once complete and not scrolling.
-Feature flags (localStorage, default on): `kimix_streaming_plain_markdown`,
+While an assistant turn is active, the body renders RICH markdown by default
+through the block-memoized StreamingRichMarkdown path (`Lexer.lex` block split +
+per-block memoized ReactMarkdown), with the visible content advanced on a bounded
+300ms cadence that pauses while the user scrolls — whole-content lex/normalize and
+the growing tail block run a few times per second, not per token. The fence-aware
+plain path remains as an explicit fallback (`kimix_streaming_plain_markdown=1` or
+`kimix_streaming_rich_markdown=0`). Settled content upgrades to the full
+ReactMarkdown stack once complete and not scrolling, as before.
+Feature flags (localStorage): `kimix_streaming_rich_markdown` (default on), `kimix_streaming_plain_markdown`,
 `kimix_scroll_yield`, `kimix_active_turn_draft`; diagnostics behind
 `kimix_perf_diag` (`getPerfDiagSnapshot()`). "运行中折叠过程详情"
 (`kimix_collapse_process_while_running`) is a user setting, default on, and only

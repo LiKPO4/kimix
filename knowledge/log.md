@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Rich markdown while streaming, interval-throttled (v2.20.35)**: the body no longer shows raw markdown symbols during streaming. The existing block-memoized StreamingRichMarkdown path (Lexer.lex split + per-block memo) becomes the default, with visible content advanced on a 300ms cadence that yields to user scrolling; plain text remains an explicit fallback (`kimix_streaming_plain_markdown=1` or `kimix_streaming_rich_markdown=0`). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Final body streams while trailing (v2.20.29)**: the final answer no longer appears all at once at settle. The trailing text segment (no process block after it; thinking does not demote) streams live in the body area from formal text plus the draft tail; a later tool/approval/question boundary moves it back into the process timeline via the existing skip logic. Invariant O added. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 
