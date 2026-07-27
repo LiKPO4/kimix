@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Archive panel matches the newer official UX (v2.20.39)**: settings 官方归档 gains search (title + project path), sort modes (归档时间/创建时间/按字母), workspace grouping with counts plus a workspace filter, and per-item time labels. Server 0.29.1 exposes no archived_at, so locally archived sessions show true 归档于 (local archivedAt) while others are honestly labeled 最后活动 instead of passing updated_at off as archive time. The badge dedupes official ∪ local ids, and a successful restore now offers 打开该对话 (switch project + select session). Logic lives in src/utils/archivedSessions.ts.
+
+
 * **Circuit-breaker fingerprint covers all gate statistics (v2.20.38)**: the reconciliation fingerprint now includes thinking history size and displayable user image count — the two statistics the rejection gates compare — so a canonical history that regains thinking content or a lost user image shifts the fingerprint and earns a retry instead of being suppressed forever. Storage key bumped to kimix_reconcile_circuit_v6; Invariant B’s stale v1/timestamp description corrected, and Invariant A now states store sessions must never be mutated in place. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 
