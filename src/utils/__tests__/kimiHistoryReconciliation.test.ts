@@ -650,7 +650,7 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
     expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
   });
 
-  it("restores a strictly newer canonical user boundary with its final body", () => {
+  it("restores a strictly newer canonical user boundary with its complete process tail", () => {
     const local: TimelineEvent[] = [
       {
         id: "local-previous-user",
@@ -679,6 +679,16 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
       id: "canonical-latest-final",
       timestamp: 78_000,
     });
+    const canonicalThinking = assistant("", {
+      id: "canonical-latest-thinking",
+      timestamp: 71_000,
+      thinking: "先核对反噬的伤害来源。",
+    });
+    const canonicalTool = {
+      ...toolCall(),
+      id: "canonical-latest-tool",
+      timestamp: 74_000,
+    };
     const canonical: TimelineEvent[] = [
       {
         id: "canonical-previous-user",
@@ -691,19 +701,124 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
         timestamp: 20_000,
       }),
       canonicalLatestUser,
-      assistant("正在完成发布闭环。", {
-        id: "canonical-latest-progress",
-        timestamp: 72_000,
-      }),
+      canonicalThinking,
+      canonicalTool,
       canonicalFinal,
     ];
 
     const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
 
-    expect(patched.slice(0, local.length)).toEqual(local);
-    expect(patched.at(-2)).toEqual(canonicalLatestUser);
+    expect(patched.slice(0, 2)).toEqual(local.slice(0, 2));
+    expect(patched.at(-4)).toEqual(canonicalLatestUser);
+    expect(patched.at(-3)).toEqual(canonicalThinking);
+    expect(patched.at(-2)).toEqual(canonicalTool);
     expect(patched.at(-1)).toEqual(canonicalFinal);
     expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("upgrades a previously body-only recovered turn to the complete canonical process tail", () => {
+    const latestUser: TimelineEvent = {
+      id: "canonical-latest-user",
+      type: "user_message",
+      timestamp: 70_000,
+      content: "召唤物和盟友的反噬应该打向伤害来源",
+    };
+    const final = assistant("1.4.486 发布闭环完成，完整最终正文。", {
+      id: "canonical-latest-final",
+      timestamp: 78_000,
+    });
+    const canonicalThinking = assistant("", {
+      id: "canonical-latest-thinking",
+      timestamp: 71_000,
+      thinking: "先核对反噬的伤害来源。",
+    });
+    const canonicalTool = {
+      ...toolCall(),
+      id: "canonical-latest-tool",
+      timestamp: 74_000,
+    };
+    const local: TimelineEvent[] = [
+      {
+        id: "local-previous-user",
+        type: "user_message",
+        timestamp: 10_000,
+        content: "旧一轮问题",
+      },
+      assistant("旧一轮完整正文", {
+        id: "local-previous-final",
+        timestamp: 20_000,
+      }),
+      {
+        id: "misplaced-late-status",
+        type: "status_update",
+        timestamp: 75_000,
+        message: "模型：k3",
+      },
+      latestUser,
+      final,
+    ];
+    const canonical: TimelineEvent[] = [
+      {
+        id: "canonical-previous-user",
+        type: "user_message",
+        timestamp: 10_001,
+        content: "旧一轮问题",
+      },
+      latestUser,
+      canonicalThinking,
+      canonicalTool,
+      final,
+    ];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.slice(0, 2)).toEqual(local.slice(0, 2));
+    expect(patched.slice(2)).toEqual([
+      latestUser,
+      canonicalThinking,
+      canonicalTool,
+      final,
+    ]);
+    expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
+  it("reanchors richer local remnants instead of replacing them with a thinner canonical tail", () => {
+    const localTool = {
+      ...toolCall(),
+      id: "local-only-tool",
+      timestamp: 75_000,
+    };
+    const canonicalUser: TimelineEvent = {
+      id: "canonical-new-user",
+      type: "user_message",
+      timestamp: 70_000,
+      content: "更新的问题",
+    };
+    const canonicalFinal = assistant("官方最终正文", {
+      id: "canonical-final",
+      timestamp: 78_000,
+    });
+    const local: TimelineEvent[] = [
+      {
+        id: "local-old-user",
+        type: "user_message",
+        timestamp: 10_000,
+        content: "旧问题",
+      },
+      assistant("旧正文", { timestamp: 20_000 }),
+      localTool,
+    ];
+    const canonical: TimelineEvent[] = [
+      canonicalUser,
+      canonicalFinal,
+    ];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.slice(0, 2)).toEqual(local.slice(0, 2));
+    expect(patched.at(-3)).toEqual(canonicalUser);
+    expect(patched.at(-2)).toEqual(localTool);
+    expect(patched.at(-1)).toEqual(canonicalFinal);
   });
 
   it("does not patch an identity-less wire assistant older than local Assistant output", () => {

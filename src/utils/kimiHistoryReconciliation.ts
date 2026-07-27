@@ -449,6 +449,23 @@ function isVisibleTurnOutput(event: TimelineEvent): boolean {
     event.type === "diff";
 }
 
+function visibleProcessEventCount(events: TimelineEvent[]): number {
+  return flattenTimelineEvents(events).filter(isVisibleTurnOutput).length;
+}
+
+function removeRecoveredTurnCandidates(
+  events: TimelineEvent[],
+  afterUserIndex: number,
+  canonicalUserTimestamp: number,
+  beforeIndex = events.length,
+): TimelineEvent[] {
+  return events.filter((event, index) => (
+    index <= afterUserIndex ||
+    index >= beforeIndex ||
+    event.timestamp < canonicalUserTimestamp
+  ));
+}
+
 export function removeIdentityCoveredDuplicateToolCalls(
   localEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
@@ -501,9 +518,11 @@ export function removeIdentityCoveredDuplicateToolCalls(
  * recover one otherwise invisible latest turn without touching older local
  * history. Prefer a matching persisted user boundary; when the local timeline
  * missed that boundary entirely, only a strictly newer canonical user with a
- * visible final body may be appended. Prefer immutable official Assistant
- * identity; local wire mirrors without message ids may use a strictly newer
- * Assistant timestamp within a matched turn.
+ * visible final body may be restored. That recovery is turn-atomic: thinking,
+ * tools and the final body move together whenever the canonical tail is at
+ * least as rich as locally misplaced output. Prefer immutable official
+ * Assistant identity; local wire mirrors without message ids may use a
+ * strictly newer Assistant timestamp within a matched turn.
  */
 export function mergeMissingLatestCanonicalAssistant(
   localEvents: TimelineEvent[],
@@ -539,24 +558,74 @@ export function mergeMissingLatestCanonicalAssistant(
       canonicalAssistant.content.trim().length > 0;
     if (!isStrictlyNewerCompleteTurn) return localEvents;
 
-    // This path repairs a locally missing turn boundary after conservative
-    // whole-history reconciliation rejected a thinner canonical history. It is
-    // deliberately bounded to the boundary and the last visible body: richer
-    // local tools/thinking remain untouched, and streaming assembly is not
-    // replayed or rewritten.
-    const withUserBoundary = mergeEvents(localEvents, canonicalUser);
-    if (withUserBoundary === localEvents) return localEvents;
-    const patched = mergeEvents(withUserBoundary, canonicalAssistant);
+    const localCandidateEvents = localEvents.slice(localUserIndex + 1)
+      .filter((event) => event.timestamp >= canonicalUser.timestamp);
+    const canonicalTailCanReplaceLocalRemnants = visibleProcessEventCount(localCandidateEvents) === 0;
+    const baseEvents = removeRecoveredTurnCandidates(
+      localEvents,
+      localUserIndex,
+      canonicalUser.timestamp,
+    );
+    // A missing user boundary is a missing turn, not merely a missing body.
+    // Restore the canonical tail atomically when local post-boundary remnants
+    // contain no visible output, so expandable thinking/tools cannot remain
+    // stranded in the previous turn. If local remnants are richer, preserve
+    // and re-anchor them behind the recovered boundary, then use the narrower
+    // final-body fallback.
+    const patched = canonicalTailCanReplaceLocalRemnants
+      ? [...baseEvents, canonicalUser, ...canonicalTurnEvents]
+      : mergeEvents([...baseEvents, canonicalUser, ...localCandidateEvents], canonicalAssistant);
     logEvent("kimiHistoryReconciliation.latestCanonicalTurnPatched", {
       ...context,
       callerReason: context?.reason,
       canonicalUserTimestamp: canonicalUser.timestamp,
       canonicalAssistantTimestamp: canonicalAssistant.timestamp,
+      canonicalTailRestored: canonicalTailCanReplaceLocalRemnants,
     });
     return patched;
   }
 
   const localTurnEvents = localEvents.slice(localUserIndex + 1);
+  const canonicalHasExpandableProcess = canonicalTurnEvents.some((event) => (
+    event.type === "tool_call" ||
+    event.type === "subagent" ||
+    (event.type === "assistant_message" && Boolean(
+      event.thinking?.trim() ||
+      event.thinkingParts?.some((part) => part.text.trim())
+    ))
+  ));
+  const localHasExpandableProcess = localTurnEvents.some((event) => (
+    event.type === "tool_call" ||
+    event.type === "subagent" ||
+    (event.type === "assistant_message" && Boolean(
+      event.thinking?.trim() ||
+      event.thinkingParts?.some((part) => part.text.trim())
+    ))
+  ));
+  const localHasCanonicalFinalBody = localTurnEvents.some((event) => (
+    event.type === "assistant_message" &&
+    event.content.trim().length > 0 &&
+    event.content.trim() === canonicalAssistant.content.trim()
+  ));
+  if (canonicalHasExpandableProcess && !localHasExpandableProcess && localHasCanonicalFinalBody) {
+    const previousLocalUserIndex = localEvents
+      .slice(0, localUserIndex)
+      .findLastIndex((event) => event.type === "user_message");
+    const preservedPrefix = removeRecoveredTurnCandidates(
+      localEvents.slice(0, localUserIndex),
+      previousLocalUserIndex,
+      canonicalUser.timestamp,
+    );
+    const patched = [...preservedPrefix, localUser, ...canonicalTurnEvents];
+    logEvent("kimiHistoryReconciliation.latestCanonicalTurnProcessPatched", {
+      ...context,
+      callerReason: context?.reason,
+      canonicalUserTimestamp: canonicalUser.timestamp,
+      canonicalProcessEvents: visibleProcessEventCount(canonicalTurnEvents),
+    });
+    return patched;
+  }
+
   const hasStableCanonicalIdentity = canonicalAssistant.snapshotMessageIdStable === true &&
     Boolean(canonicalAssistant.snapshotMessageId);
   const mountedInLatestTurn = hasStableCanonicalIdentity && localTurnEvents.some((event) => (
