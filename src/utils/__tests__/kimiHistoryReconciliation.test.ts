@@ -650,6 +650,62 @@ describe("mergeMissingLatestCanonicalAssistant", () => {
     expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
   });
 
+  it("restores a strictly newer canonical user boundary with its final body", () => {
+    const local: TimelineEvent[] = [
+      {
+        id: "local-previous-user",
+        type: "user_message",
+        timestamp: 10_000,
+        content: "旧一轮问题",
+      },
+      assistant("旧一轮的完整最终正文", {
+        id: "local-previous-final",
+        timestamp: 20_000,
+      }),
+      {
+        id: "late-status-from-missing-turn",
+        type: "status_update",
+        timestamp: 80_000,
+        message: "模型：k3",
+      },
+    ];
+    const canonicalLatestUser: TimelineEvent = {
+      id: "canonical-latest-user",
+      type: "user_message",
+      timestamp: 70_000,
+      content: "召唤物和盟友的反噬应该打向伤害来源",
+    };
+    const canonicalFinal = assistant("1.4.486 发布闭环完成，完整最终正文。", {
+      id: "canonical-latest-final",
+      timestamp: 78_000,
+    });
+    const canonical: TimelineEvent[] = [
+      {
+        id: "canonical-previous-user",
+        type: "user_message",
+        timestamp: 10_001,
+        content: "旧一轮问题",
+      },
+      assistant("官方较短的旧轮历史", {
+        id: "canonical-previous-final",
+        timestamp: 20_000,
+      }),
+      canonicalLatestUser,
+      assistant("正在完成发布闭环。", {
+        id: "canonical-latest-progress",
+        timestamp: 72_000,
+      }),
+      canonicalFinal,
+    ];
+
+    const patched = mergeMissingLatestCanonicalAssistant(local, canonical);
+
+    expect(patched.slice(0, local.length)).toEqual(local);
+    expect(patched.at(-2)).toEqual(canonicalLatestUser);
+    expect(patched.at(-1)).toEqual(canonicalFinal);
+    expect(mergeMissingLatestCanonicalAssistant(patched, canonical)).toEqual(patched);
+  });
+
   it("does not patch an identity-less wire assistant older than local Assistant output", () => {
     const local: TimelineEvent[] = [
       userMessage,

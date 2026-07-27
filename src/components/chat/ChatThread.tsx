@@ -888,9 +888,22 @@ export function buildRenderItems(
           agentTurnId,
         }
       : undefined;
-    const turnEndedAt = turnEvents.reduce((max, event) => (
-      event.type !== "user_message" ? Math.max(max, event.timestamp) : max
-    ), 0);
+    const turnEndedAt = turnEvents.reduce((max, event) => {
+      // Status/usage snapshots and derived render artifacts may be replayed
+      // minutes after the Agent has completed. They belong to the turn for
+      // display, but are not execution-time boundaries.
+      if (
+        event.type === "user_message" ||
+        event.type === "status_update" ||
+        event.type === "change_summary" ||
+        event.type === "diff" ||
+        event.type === "todo" ||
+        event.type === "session_recommendation"
+      ) {
+        return max;
+      }
+      return Math.max(max, event.timestamp);
+    }, 0);
     const derivedDurationMs = (turnStartedAt && turnEndedAt > turnStartedAt)
       ? reliableAssistantDurationBetween(turnStartedAt, turnEndedAt)
       : undefined;

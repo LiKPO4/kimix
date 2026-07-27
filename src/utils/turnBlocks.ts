@@ -209,7 +209,23 @@ export function computeFinalTextBlockContent(
   if (textBlocks.length === 0) return displayContent;
   // Streaming turn: keep every text segment in the process timeline.
   if (!isComplete) return "";
-  const lastTextBlock = textBlocks[textBlocks.length - 1];
-  // Complete: always show the last text segment as the final body.
-  return lastTextBlock?.content || displayContent;
+  // Snapshot/reconciliation events can arrive after a newer live final body
+  // while retaining their older official timestamp. Array order still owns
+  // the process timeline, but completed-body selection must not let such an
+  // appended historical step replace the actual chronological final answer.
+  // `>=` deliberately keeps the later array item when timestamps are equal,
+  // preserving official same-millisecond wire order.
+  let finalTextBlock = textBlocks[0];
+  let finalTimestamp = Math.max(
+    -Infinity,
+    ...finalTextBlock.events.map((event) => event.timestamp),
+  );
+  for (const block of textBlocks.slice(1)) {
+    const timestamp = Math.max(-Infinity, ...block.events.map((event) => event.timestamp));
+    if (timestamp >= finalTimestamp) {
+      finalTextBlock = block;
+      finalTimestamp = timestamp;
+    }
+  }
+  return finalTextBlock.content || displayContent;
 }

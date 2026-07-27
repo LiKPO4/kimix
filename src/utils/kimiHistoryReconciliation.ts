@@ -499,10 +499,11 @@ export function removeIdentityCoveredDuplicateToolCalls(
 /**
  * When the complete canonical history is rejected by the monotonicity gate,
  * recover one otherwise invisible latest turn without touching older local
- * history. The latest user boundary must match by persisted identity or a
- * bounded content/time echo. Prefer immutable official message identity;
- * local wire mirrors without message ids may use a strictly newer Assistant
- * timestamp within that matched turn.
+ * history. Prefer a matching persisted user boundary; when the local timeline
+ * missed that boundary entirely, only a strictly newer canonical user with a
+ * visible final body may be appended. Prefer immutable official Assistant
+ * identity; local wire mirrors without message ids may use a strictly newer
+ * Assistant timestamp within a matched turn.
  */
 export function mergeMissingLatestCanonicalAssistant(
   localEvents: TimelineEvent[],
@@ -518,8 +519,7 @@ export function mergeMissingLatestCanonicalAssistant(
   const localUser = localEvents[localUserIndex];
   if (
     canonicalUser.type !== "user_message" ||
-    localUser.type !== "user_message" ||
-    !sameMatchedUserTurn(localUser, canonicalUser)
+    localUser.type !== "user_message"
   ) return localEvents;
 
   const canonicalTurnEvents = canonicalEvents.slice(canonicalUserIndex + 1);
@@ -528,6 +528,33 @@ export function mergeMissingLatestCanonicalAssistant(
     isVisibleTurnOutput(event)
   ));
   if (!canonicalAssistant) return localEvents;
+
+  if (!sameMatchedUserTurn(localUser, canonicalUser)) {
+    const canonicalUserAlreadyMounted = localEvents.some((event) => (
+      event.type === "user_message" && sameMatchedUserTurn(event, canonicalUser)
+    ));
+    const isStrictlyNewerCompleteTurn = !canonicalUserAlreadyMounted &&
+      canonicalUser.timestamp > localUser.timestamp &&
+      canonicalAssistant.timestamp >= canonicalUser.timestamp &&
+      canonicalAssistant.content.trim().length > 0;
+    if (!isStrictlyNewerCompleteTurn) return localEvents;
+
+    // This path repairs a locally missing turn boundary after conservative
+    // whole-history reconciliation rejected a thinner canonical history. It is
+    // deliberately bounded to the boundary and the last visible body: richer
+    // local tools/thinking remain untouched, and streaming assembly is not
+    // replayed or rewritten.
+    const withUserBoundary = mergeEvents(localEvents, canonicalUser);
+    if (withUserBoundary === localEvents) return localEvents;
+    const patched = mergeEvents(withUserBoundary, canonicalAssistant);
+    logEvent("kimiHistoryReconciliation.latestCanonicalTurnPatched", {
+      ...context,
+      callerReason: context?.reason,
+      canonicalUserTimestamp: canonicalUser.timestamp,
+      canonicalAssistantTimestamp: canonicalAssistant.timestamp,
+    });
+    return patched;
+  }
 
   const localTurnEvents = localEvents.slice(localUserIndex + 1);
   const hasStableCanonicalIdentity = canonicalAssistant.snapshotMessageIdStable === true &&

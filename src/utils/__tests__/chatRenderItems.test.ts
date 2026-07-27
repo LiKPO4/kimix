@@ -1075,6 +1075,33 @@ describe("buildRenderItems room Agent turns", () => {
 });
 
 describe("assistant footer fallback", () => {
+  it("does not extend a completed turn with late passive status snapshots", () => {
+    const rendered = buildRenderItems([{
+      id: "user",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "处理问题",
+    }, {
+      id: "assistant",
+      type: "assistant_message",
+      timestamp: 31_000,
+      content: "完整最终正文",
+      isThinking: false,
+      isComplete: true,
+    }, {
+      id: "late-status",
+      type: "status_update",
+      timestamp: 101_000,
+      message: "已连接",
+    }], "kimi-code");
+    const assistantItem = rendered.find(
+      (item) => item.type === "event" && item.event.type === "assistant_message",
+    );
+    expect(assistantItem?.type).toBe("event");
+    if (assistantItem?.type !== "event" || assistantItem.event.type !== "assistant_message") return;
+    expect(assistantItem.event.durationMs).toBe(30_000);
+  });
+
   it("uses the official turn model instead of an unreliable long duration for room Agents", () => {
     expect(assistantFooterFallbackLabel({
       id: "assistant-room",

@@ -263,6 +263,14 @@ describe("computeFinalTextBlockContent", () => {
   function textBlock(content: string, key = "text-1"): TurnBlock {
     return { kind: "text", key, events: [], content };
   }
+  function timestampedTextBlock(content: string, timestamp: number, key: string): TurnBlock {
+    return {
+      kind: "text",
+      key,
+      events: [assistant(`${key}-event`, content, undefined, timestamp)],
+      content,
+    };
+  }
   function toolBlock(key = "tool-1"): TurnBlock {
     return { kind: "tool", key, tool: { type: "tool_call", toolCallId: "c1", toolName: "Read", timestamp: 1, status: "success", arguments: {} } as never };
   }
@@ -307,6 +315,22 @@ describe("computeFinalTextBlockContent", () => {
   it("returns last text block content when no trailing process blocks", () => {
     const blocks: TurnBlock[] = [textBlock("中间正文"), textBlock("最终答案")];
     expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终答案");
+  });
+
+  it("keeps the chronologically final body when an older stable snapshot is appended late", () => {
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("最终完整正文", 300, "text-final"),
+      timestampedTextBlock("较早阶段短句", 200, "text-late-replay"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终完整正文");
+  });
+
+  it("preserves array order for text blocks with the same official timestamp", () => {
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("同毫秒第一段", 300, "text-first"),
+      timestampedTextBlock("同毫秒第二段", 300, "text-second"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("同毫秒第二段");
   });
 
   it("keeps all text segments folded while the turn is streaming (no trailing tools yet)", () => {

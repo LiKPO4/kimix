@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Missing newest user boundary and final body recover additively (v2.20.29)**: target-session wire forensics proved the official canonical history retained the newer user turn and its complete 493-character `1.4.486` final body, while built-window IndexedDB missed both and retained only late statuses. Whole-history replacement correctly rejected thinner canonical process history, but the former additive fallback required matching latest users and could not self-heal. Rejected-history recovery now appends only a strictly newer, locally absent canonical user boundary and its non-empty final Assistant, leaving richer local process history untouched; circuit key v4 lets previously rejected pairs retry once. A second display-layer defect let an older 24-character stable snapshot replace the local 721-character `1.4.485` body and let passive statuses inflate its duration to 102m41s; completed-body selection now uses the greatest Assistant timestamp and derived duration ignores passive/derived artifacts. Streaming/draft/offset/barrier paths are unchanged. Invariants I and O updated. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **In-flow question card matches tool cards (v2.20.28)**: the settled question block inside the process timeline now renders as a collapsible group card (header 提问 + N 个回答/已跳过, expand for questions and options with the submitted answer checked), reusing the tool/approval card visual tokens. The standalone interactive QuestionCard remains for pending questions only.
 
 
