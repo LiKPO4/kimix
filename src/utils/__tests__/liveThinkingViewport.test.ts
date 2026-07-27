@@ -5,6 +5,7 @@ import {
   canLiveThinkingViewportConsumeWheel,
   LIVE_THINKING_MAX_HEIGHT_PX,
   resolveHasFinalProcessContent,
+  resolveLiveTextBlockKey,
   resolveLiveThinkingBlockKey,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
@@ -140,5 +141,24 @@ describe("resolveLiveThinkingBlockKey", () => {
   it("returns undefined without a draft key or materialization", () => {
     expect(resolveLiveThinkingBlockKey(null, "mat-1")).toBeUndefined();
     expect(resolveLiveThinkingBlockKey("key", undefined)).toBeUndefined();
+  });
+});
+
+describe("resolveLiveTextBlockKey", () => {
+  it("matches the formal text block key of the committed draft segment", () => {
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const materializationId = "mat-1";
+    const liveKey = resolveLiveTextBlockKey(draftKey, materializationId);
+    const segmentEvent = {
+      id: `active-draft:${draftKey}:${materializationId}`,
+      type: "assistant_message",
+      timestamp: 1,
+      content: "正文",
+      isThinking: false,
+      isComplete: false,
+    } as unknown as Parameters<typeof buildTurnBlocks>[0][number];
+    const blocks = buildTurnBlocks([segmentEvent]);
+    expect(blocks[0]?.kind).toBe("text");
+    expect(blocks[0]?.key).toBe(liveKey);
   });
 });

@@ -84,6 +84,15 @@ export function resolveLiveThinkingBlockKey(
   return `thinking:active-draft:${draftKey}:${materializationId}`;
 }
 
+/** Text-block counterpart of resolveLiveThinkingBlockKey (turnBlocks' text:<event.id>). */
+export function resolveLiveTextBlockKey(
+  draftKey: string | null,
+  materializationId?: string,
+): string | undefined {
+  if (!draftKey || !materializationId) return undefined;
+  return `text:active-draft:${draftKey}:${materializationId}`;
+}
+
 export function shouldCollapseKimiWebProcessOnFinalContent({
   previousHasFinalContent,
   hasFinalContent,

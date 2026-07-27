@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Trailing text streams in flow, single copy at settle (v2.20.37)**: option C per user decision. The timeline no longer skips the trailing text group while a turn is active — it streams in place via mergeLiveDraftBlocks (prefix-safe tail continuation or think→text append, commit-aligned keys). At settle the flow copy is skipped exactly when the body takes over, so the final answer never renders twice. With the process collapsed the body streams the candidate instead; expanded, it stays empty. Invariant O rewritten. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Intermediate text uses primary body color (v2.20.36)**: official kimi-web has no final-body area at all — every text message renders in place in the flat stream, and the last one is simply the answer; Kimix’s body/process split is a local product decision. To match official hierarchy, intermediate text blocks now render in the primary text color (black body text, never clickable, always full), distinct from gray thinking.
 
 

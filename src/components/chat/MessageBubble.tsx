@@ -18,8 +18,8 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
-import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, type TurnBlock } from "@/utils/turnBlocks";
+import { resolveLiveTextBlockKey, resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, mergeLiveDraftBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -2058,6 +2058,11 @@ function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
 function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
   const finalTextGroupIndex = useMemo(() => {
+    // Only skip the final text group once the turn has settled. While the turn
+    // is active the trailing text streams IN FLOW at its own position (option
+    // C); at settle the flow copy is skipped and the body takes over, so the
+    // final answer never renders twice.
+    if (!hasFinalContent) return -1;
     for (let i = groups.length - 1; i >= 0; i--) {
       if (groups[i].type === "text") {
         const hasTrailingProcess = groups.slice(i + 1).some(
@@ -2113,7 +2118,7 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
   }
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; liveThinkingBlockKey?: string; onExpandedChange?: (expanded: boolean) => void }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, liveTextTail, liveTextBlockKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; liveThinkingBlockKey?: string; liveTextTail?: string; liveTextBlockKey?: string; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
@@ -2142,19 +2147,13 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   } | null>(null);
   const effectiveTurnBlocks = useMemo(() => {
     if (turnBlocks && turnBlocks.length > 0) {
-      if (!liveThinkingBlocks?.length) return turnBlocks;
-      return [
-        ...turnBlocks,
-        {
-          kind: "thinking" as const,
-          // Same group key the formal commit of this draft segment will use
-          // (turnBlocks' thinking:<event.id> with the segment's
-          // active-draft:<key>:<materializationId> id), so the live→formal
-          // swap reuses the DOM node instead of unmounting it.
-          key: liveThinkingBlockKey ?? `thinking:live:${event.agentTurnId ?? event.id}`,
-          blocks: liveThinkingBlocks,
-        },
-      ];
+      if (!liveThinkingBlocks?.length && !liveTextTail?.trim()) return turnBlocks;
+      return mergeLiveDraftBlocks(turnBlocks, {
+        thinkingBlocks: liveThinkingBlocks,
+        thinkingBlockKey: liveThinkingBlockKey,
+        textTail: liveTextTail,
+        textBlockKey: liveTextBlockKey,
+      });
     }
     const syntheticEvents: TimelineEvent[] = [
       event,
@@ -2164,7 +2163,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     ];
     const built = buildTurnBlocks(syntheticEvents);
     return built.length > 0 ? built : undefined;
-  }, [turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, event, tools, subagents, approvals]);
+  }, [turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, liveTextTail, liveTextBlockKey, event, tools, subagents, approvals]);
 
   const blockThinking = useMemo(() => {
     if (!effectiveTurnBlocks) return undefined;
@@ -2510,6 +2509,8 @@ type AssistantProcessBlockProps = {
   turnBlocks?: TurnBlock[];
   liveThinkingBlocks?: ThinkingBlock[];
   liveThinkingBlockKey?: string;
+  liveTextTail?: string;
+  liveTextBlockKey?: string;
   onExpandedChange?: (expanded: boolean) => void;
 };
 
@@ -2526,6 +2527,8 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.activeStatusMessage === next.activeStatusMessage &&
     prev.liveThinkingBlocks === next.liveThinkingBlocks &&
     prev.liveThinkingBlockKey === next.liveThinkingBlockKey &&
+    prev.liveTextTail === next.liveTextTail &&
+    prev.liveTextBlockKey === next.liveTextBlockKey &&
     prev.onExpandedChange === next.onExpandedChange &&
     turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
@@ -2565,6 +2568,8 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   turnBlocks,
   liveThinkingBlocks,
   liveThinkingBlockKey,
+  liveTextTail,
+  liveTextBlockKey,
   onExpandedChange,
 }: AssistantProcessBlockProps) {
   const hasActualThinking = Boolean(
@@ -2607,6 +2612,8 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       turnBlocks={turnBlocks}
       liveThinkingBlocks={liveThinkingBlocks}
       liveThinkingBlockKey={liveThinkingBlockKey}
+      liveTextTail={liveTextTail}
+      liveTextBlockKey={liveTextBlockKey}
       onExpandedChange={onExpandedChange}
     />
   );
@@ -2723,9 +2730,10 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
 function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false, turnBlocks }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean; turnBlocks?: TurnBlock[] }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
-  // processExpanded is tracked only so the process summary can notify the
-  // bubble of expand/collapse transitions; the body no longer depends on it.
-  const [, setProcessExpanded] = useState(false);
+  // Option C: when the process detail is expanded, the trailing text streams
+  // in flow and the body stays empty; when it is collapsed (the flow copy is
+  // invisible), the body streams the candidate instead. Never both.
+  const [processExpanded, setProcessExpanded] = useState(false);
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
@@ -2768,6 +2776,10 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     });
   }, [activeDraft?.thinking, activeDraft?.thinkingParts, activeDraft?.timestamp]);
   const liveThinkingBlockKey = resolveLiveThinkingBlockKey(draftKey, activeDraft?.materializationId);
+  // Option C: while the turn is active the trailing text streams in flow; the
+  // draft's uncommitted text tail appends to the same live block.
+  const liveTextTail = isActiveAssistant ? (activeDraft?.content ?? "") : "";
+  const liveTextBlockKey = resolveLiveTextBlockKey(draftKey, activeDraft?.materializationId);
   const displayContent = pickDraftText(activeDraft?.content, event.content);
   const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);
   const displayThinkingParts = (
@@ -2876,6 +2888,8 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             turnBlocks={turnBlocks}
             liveThinkingBlocks={liveThinkingBlocks}
             liveThinkingBlockKey={liveThinkingBlockKey}
+            liveTextTail={liveTextTail}
+            liveTextBlockKey={liveTextBlockKey}
             onExpandedChange={setProcessExpanded}
           />
         )}
@@ -2892,7 +2906,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             // is active it streams the trailing text candidate live. Copy/export
             // still receives the full displayContent so the clipboard keeps
             // everything including intermediate text segments.
-            content={finalTextBlockContent || streamingBodyContent}
+            content={finalTextBlockContent || (processExpanded ? "" : streamingBodyContent)}
             thinking={displayThinking || undefined}
             thinkingParts={displayThinkingParts}
             timestamp={event.timestamp}

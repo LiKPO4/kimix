@@ -1,4 +1,5 @@
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
+import { appendStreamingText } from "./activeTurnDraftStore";
 import { buildThinkingBlocks, type ThinkingBlock } from "./thinkingBlocks";
 
 export type AssistantMessageEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
@@ -217,6 +218,39 @@ export function computeStreamingTrailingTextContent(turnBlocks: TurnBlock[] | un
     if (block.kind === "tool" || block.kind === "subagent" || block.kind === "approval" || block.kind === "question") return "";
   }
   return "";
+}
+
+/**
+ * Append the live (uncommitted) draft tail to a turn's formal blocks while the
+ * turn is active. The live thinking phase goes after the formal blocks; the
+ * live text tail continues the trailing formal text block (prefix-safe) when
+ * no thinking phase sits between, otherwise it starts a new text block AFTER
+ * the thinking — the wire order of a step is think → text. Keys match the
+ * formal commit of the same segment so the live→formal swap reuses the DOM.
+ */
+export function mergeLiveDraftBlocks(
+  turnBlocks: TurnBlock[],
+  live: {
+    thinkingBlocks?: ThinkingBlock[];
+    thinkingBlockKey?: string;
+    textTail?: string;
+    textBlockKey?: string;
+  },
+): TurnBlock[] {
+  const blocks = [...turnBlocks];
+  if (live.thinkingBlocks?.length) {
+    blocks.push({ kind: "thinking", key: live.thinkingBlockKey ?? "thinking:live:draft", blocks: live.thinkingBlocks });
+  }
+  const tail = live.textTail?.trim() ? live.textTail ?? "" : "";
+  if (tail) {
+    const last = blocks.at(-1);
+    if (!live.thinkingBlocks?.length && last?.kind === "text") {
+      blocks[blocks.length - 1] = { ...last, content: appendStreamingText(last.content, tail) };
+    } else {
+      blocks.push({ kind: "text", key: live.textBlockKey ?? "text:live:draft", events: [], content: tail });
+    }
+  }
+  return blocks;
 }
 
 export function computeFinalTextBlockContent(

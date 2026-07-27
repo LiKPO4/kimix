@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems } from "@/components/chat/ChatThread";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, turnBlocksText, type TurnBlock } from "../turnBlocks";
+import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, mergeLiveDraftBlocks, turnBlocksText, type TurnBlock } from "../turnBlocks";
 
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -416,5 +416,42 @@ describe("computeStreamingTrailingTextContent", () => {
       readTool("tool-1", "call-1", "a.ts", nextTimestamp()),
     ]))).toBe("");
     expect(computeStreamingTrailingTextContent(undefined)).toBe("");
+  });
+});
+
+describe("mergeLiveDraftBlocks", () => {
+  it("continues the trailing formal text block with the draft tail", () => {
+    const formal = buildTurnBlocks([assistant("a1", "正式前半", "思考")]);
+    const merged = mergeLiveDraftBlocks(formal, { textTail: "，尾巴" });
+    expect(merged.map((block) => block.kind)).toEqual(["thinking", "text"]);
+    expect((merged[1] as Extract<TurnBlock, { kind: "text" }>).content).toBe("正式前半，尾巴");
+  });
+
+  it("appends the draft text AFTER a live thinking phase", () => {
+    const formal = buildTurnBlocks([assistant("a1", "正式正文")]);
+    const merged = mergeLiveDraftBlocks(formal, {
+      thinkingBlocks: [{ id: "t1", timestamp: 1, text: "新思考", summary: "新思考" }],
+      thinkingBlockKey: "thinking:live:k",
+      textTail: "新段落",
+      textBlockKey: "text:live:k",
+    });
+    expect(merged.map((block) => block.kind)).toEqual(["text", "thinking", "text"]);
+    expect(merged[1].key).toBe("thinking:live:k");
+    expect(merged[2].key).toBe("text:live:k");
+    expect((merged[2] as Extract<TurnBlock, { kind: "text" }>).content).toBe("新段落");
+  });
+
+  it("starts a new text block when the formal tail is a tool", () => {
+    const formal = buildTurnBlocks([
+      assistant("a1", "过渡句"),
+      readTool("tool-1", "call-1", "a.ts", nextTimestamp()),
+    ]);
+    const merged = mergeLiveDraftBlocks(formal, { textTail: "新段" });
+    expect(merged.map((block) => block.kind)).toEqual(["text", "tool", "text"]);
+  });
+
+  it("returns the formal blocks untouched when there is no live content", () => {
+    const formal = buildTurnBlocks([assistant("a1", "正文")]);
+    expect(mergeLiveDraftBlocks(formal, {})).toEqual(formal);
   });
 });
