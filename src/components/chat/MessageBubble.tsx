@@ -19,7 +19,7 @@ import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/mod
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
-import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, type TurnBlock } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, type TurnBlock } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -49,6 +49,7 @@ import {
   type ChatProcessCollapseViewportDetail,
 } from "@/utils/chatViewportTransaction";
 import {
+  appendStreamingText,
   makeActiveTurnDraftKey,
   pickDraftText,
   useActiveTurnDraft,
@@ -2799,6 +2800,18 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       event.isComplete && !isActiveAssistant,
     );
   }, [turnBlocks, displayContent, event.isComplete, isActiveAssistant]);
+  // While the turn is active, stream the trailing text candidate in the body
+  // instead of withholding everything until settle. Formal committed text and
+  // the uncommitted draft tail are disjoint (a commit takes the draft), so a
+  // prefix-safe append covers both. When a tool/subagent/approval/question
+  // block lands after the text, this becomes "" and the segment moves back
+  // into the process timeline automatically.
+  const streamingBodyContent = useMemo(() => {
+    if (!isActiveAssistant) return "";
+    const formalTrailing = computeStreamingTrailingTextContent(turnBlocks);
+    if (activeDraft?.content?.trim()) return appendStreamingText(formalTrailing, activeDraft.content);
+    return formalTrailing;
+  }, [isActiveAssistant, turnBlocks, activeDraft?.content]);
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
@@ -2874,10 +2887,11 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
 
         {shouldShowBodyFooter && (
           <AssistantBodyBlock
-            // The bottom body is the final answer segment only. Copy/export
+            // The bottom body shows the final answer segment; while the turn
+            // is active it streams the trailing text candidate live. Copy/export
             // still receives the full displayContent so the clipboard keeps
             // everything including intermediate text segments.
-            content={finalTextBlockContent}
+            content={finalTextBlockContent || streamingBodyContent}
             thinking={displayThinking || undefined}
             thinkingParts={displayThinkingParts}
             timestamp={event.timestamp}

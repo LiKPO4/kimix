@@ -199,6 +199,26 @@ export function turnBlocksEqual(prev: TurnBlock[] | undefined, next: TurnBlock[]
  * - Intermediate text segments remain available inside the process timeline
  *   when expanded; the bottom body only surfaces the last text segment.
  */
+/**
+ * Streaming counterpart of computeFinalTextBlockContent. While a turn is still
+ * active, the TRAILING text segment (no tool/subagent/approval/question block
+ * after it) is the candidate final answer and should stream live in the body
+ * area instead of being withheld until settle — otherwise the whole answer
+ * appears at once when the turn ends. A following thinking phase does NOT
+ * demote the segment (reasoning may precede more work but does not by itself
+ * move text back into the process timeline); a real process boundary does, and
+ * then this returns "" so the body hides and the segment renders in-flow.
+ */
+export function computeStreamingTrailingTextContent(turnBlocks: TurnBlock[] | undefined): string {
+  if (!turnBlocks) return "";
+  for (let index = turnBlocks.length - 1; index >= 0; index -= 1) {
+    const block = turnBlocks[index];
+    if (block.kind === "text") return block.content;
+    if (block.kind === "tool" || block.kind === "subagent" || block.kind === "approval" || block.kind === "question") return "";
+  }
+  return "";
+}
+
 export function computeFinalTextBlockContent(
   turnBlocks: TurnBlock[] | undefined,
   displayContent: string,

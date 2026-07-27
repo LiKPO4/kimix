@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-27 修复：最终正文流式输出（v2.20.29）
+
+- 用户实测反馈：过程内容（思考/工具）已经流式，但最终正文在回合结束时一瞬间全部吐出，观感像卡住。要求最终正文也流式，并先分析根因、确保改动安全稳定。
+- 根因（三条规则叠加）：① computeFinalTextBlockContent 在未 complete 时返回空（turnBlocks.ts:210，刻意扣留最终段）；② TurnBlocksTimeline 总是跳过末位文本组（为正文区保留），于是流式期间末段文本在过程区也不可见；③ resolveHasFinalProcessContent 要求 complete 且非 active，正文区只在 settle 后点亮——于是最终答案在模型撰写期间完全不可见，结束时一次出现。
+- 修复（trailing 候选正文流式上屏）：新增 computeStreamingTrailingTextContent——末位 text 块在没有任何 tool/subagent/approval/question 跟随其后时即为候选最终正文（thinking 阶段不降级，避免 think/text 交替闪烁）；active 期间正文区流式渲染「正式末段 + draft 未提交尾巴」（appendStreamingText 前缀安全拼接，提交点天然互斥）。一旦工具/子代理/审批/提问落在文本之后，该段自动回到过程区（既有跳过逻辑自然接管），settle 后由既有 finalTextBlockContent + 完整 Markdown 接管。legacy 无 turnBlocks 路径原本就流式，不受影响。
+- 取舍说明（已告知用户）：text→tool 过渡短句会先在正文区流式、工具启动后收回过程区——这是保留「正文区/过程区」分离结构的固有代价，换来最终答案全程可见；官方无正文区分离因此无此问题。
+- 验证：相关 25 项、全量 130 文件 1282 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-CJofiutt.js）、OKF 校验（345 链接）、git diff --check 通过。待用户实测复验。
 ## 2026-07-27 修复：重试/新轮 WS 静默后 30 秒成批补输出（v2.20.33）
 
 - 用户在 v2.20.32 实测：重试能真实启动，但新一轮“正在思考 32秒”后才一次出现正文、思考和工具块，回归到此前修过的 30 秒批量补历史症状。

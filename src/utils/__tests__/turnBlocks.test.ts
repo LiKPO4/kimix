@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems } from "@/components/chat/ChatThread";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { buildTurnBlocks, computeFinalTextBlockContent, countTurnBlockKind, turnBlocksText, type TurnBlock } from "../turnBlocks";
+import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, turnBlocksText, type TurnBlock } from "../turnBlocks";
 
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -368,5 +368,53 @@ describe("question_request turn blocks", () => {
     const blocks = buildTurnBlocks(events);
     expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "question", "text"]);
     expect(blocks[2]).toMatchObject({ kind: "question", key: "question:q-resolved" });
+  });
+});
+
+describe("computeStreamingTrailingTextContent", () => {
+  it("streams the trailing text segment while the turn is active", () => {
+    const blocks = buildTurnBlocks([
+      assistant("a1", "中间过渡句", "思考"),
+      readTool("tool-1", "call-1", "a.ts", nextTimestamp()),
+      assistant("a2", "最终答案的前半"),
+    ]);
+    expect(computeStreamingTrailingTextContent(blocks)).toBe("最终答案的前半");
+  });
+
+  it("keeps the text when only a thinking phase follows it", () => {
+    const blocks = buildTurnBlocks([
+      assistant("a1", "候选正文", undefined),
+      assistant("a2", "", "后续思考"),
+    ]);
+    expect(computeStreamingTrailingTextContent(blocks)).toBe("候选正文");
+  });
+
+  it("demotes the text once a tool, approval, or question follows", () => {
+    const withTool = buildTurnBlocks([
+      assistant("a1", "过渡句"),
+      readTool("tool-1", "call-1", "a.ts", nextTimestamp()),
+    ]);
+    expect(computeStreamingTrailingTextContent(withTool)).toBe("");
+    const withQuestion = buildTurnBlocks([
+      assistant("a1", "过渡句"),
+      {
+        id: "q1",
+        type: "question_request",
+        timestamp: nextTimestamp(),
+        requestId: "q1",
+        rpcRequestId: "q1-rpc",
+        toolCallId: "call-q",
+        questions: [{ id: "q1", question: "继续？", options: [] }],
+        status: "answered",
+      } as TimelineEvent,
+    ]);
+    expect(computeStreamingTrailingTextContent(withQuestion)).toBe("");
+  });
+
+  it("returns empty for no text and for missing blocks", () => {
+    expect(computeStreamingTrailingTextContent(buildTurnBlocks([
+      readTool("tool-1", "call-1", "a.ts", nextTimestamp()),
+    ]))).toBe("");
+    expect(computeStreamingTrailingTextContent(undefined)).toBe("");
   });
 });
