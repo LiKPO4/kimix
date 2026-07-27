@@ -182,3 +182,40 @@ describe("rawCanonicalEvents alignment", () => {
     expect(isCanonicalReconciliationCircuitOpen("sess-raw", "agent-a", localEvents, differentCanonical)).toBe(false);
   });
 });
+
+describe("fingerprint covers every rejection-gate statistic", () => {
+  it("allows retry when canonical regains thinking with unchanged body size and process count", () => {
+    const withThinking = (text: string): TimelineEvent => ({
+      id: "a-think",
+      type: "assistant_message",
+      timestamp: 200,
+      content: "world",
+      thinking: text,
+      isThinking: true,
+      isComplete: true,
+    } as TimelineEvent);
+    const local = [user("hello"), toolCall(), withThinking("完整思考过程")];
+    const canonicalThin = [user("hello"), withThinking("")];
+    markReconciliationRejected("sess-1", "agent-a", local, canonicalThin);
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonicalThin)).toBe(true);
+    // canonical 补回 thinking：body 长度与过程数不变，但指纹必须翻转放行。
+    const canonicalFull = [user("hello"), withThinking("完整思考过程")];
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonicalFull)).toBe(false);
+  });
+
+  it("allows retry when canonical regains a lost user image", () => {
+    const userWithImage = (withImage: boolean): TimelineEvent => ({
+      id: "u-img",
+      type: "user_message",
+      timestamp: 100,
+      content: "hello",
+      images: withImage ? [{ dataUrl: "data:image/png;base64,AAA" }] : [],
+    } as TimelineEvent);
+    const local = [userWithImage(true), assistant("world")];
+    const canonicalThin = [userWithImage(false), assistant("world")];
+    markReconciliationRejected("sess-1", "agent-a", local, canonicalThin);
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonicalThin)).toBe(true);
+    const canonicalFull = [userWithImage(true), assistant("world")];
+    expect(isCanonicalReconciliationCircuitOpen("sess-1", "agent-a", local, canonicalFull)).toBe(false);
+  });
+});

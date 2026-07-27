@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Circuit-breaker fingerprint covers all gate statistics (v2.20.38)**: the reconciliation fingerprint now includes thinking history size and displayable user image count — the two statistics the rejection gates compare — so a canonical history that regains thinking content or a lost user image shifts the fingerprint and earns a retry instead of being suppressed forever. Storage key bumped to kimix_reconcile_circuit_v6; Invariant B’s stale v1/timestamp description corrected, and Invariant A now states store sessions must never be mutated in place. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Trailing text streams in flow, single copy at settle (v2.20.37)**: option C per user decision. The timeline no longer skips the trailing text group while a turn is active — it streams in place via mergeLiveDraftBlocks (prefix-safe tail continuation or think→text append, commit-aligned keys). At settle the flow copy is skipped exactly when the body takes over, so the final answer never renders twice. With the process collapsed the body streams the candidate instead; expanded, it stays empty. Invariant O rewritten. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

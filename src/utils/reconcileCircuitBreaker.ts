@@ -10,7 +10,7 @@
  * retry. An accepted reconciliation clears the entry so the circuit stays
  * closed for that target.
  *
- * Backed by localStorage (key kimix_reconcile_circuit_v5) with an LRU eviction
+ * Backed by localStorage (key kimix_reconcile_circuit_v6) with an LRU eviction
  * policy at 500 entries (~few KB).
  */
 import type { TimelineEvent } from "@/types/ui";
@@ -18,7 +18,7 @@ import { kimiHistoryProcessEventCount } from "@/utils/kimiHistoryCache";
 
 // Bump when rejected-pair recovery semantics change so an older rejection
 // cannot suppress a newly capable additive repair after an app upgrade.
-const STORAGE_KEY = "kimix_reconcile_circuit_v5";
+const STORAGE_KEY = "kimix_reconcile_circuit_v6";
 const LRU_MAX = 500;
 
 type CircuitEntry = {
@@ -49,15 +49,40 @@ function assistantBodySize(events: TimelineEvent[]): number {
     .reduce((sum, event) => sum + event.content.trim().length, 0);
 }
 
+/** Inline duplicate of kimiHistoryReconciliation.thinkingHistorySize (same circular-import constraint). */
+function thinkingHistorySize(events: TimelineEvent[]): number {
+  return flattenTimelineEvents(events)
+    .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+    .reduce((sum, event) => {
+      const text = event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "";
+      return sum + text.trim().length;
+    }, 0);
+}
+
+/** Inline duplicate of kimiHistoryReconciliation.displayableUserImageCount. */
+function displayableUserImageCount(events: TimelineEvent[]): number {
+  return events
+    .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
+      event.type === "user_message" || event.type === "steer_message"
+    ))
+    .reduce((sum, event) => sum + (event.images ?? []).filter((image) => (
+      typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/")
+    )).length, 0);
+}
+
 /**
  * Derive a lightweight change-detection fingerprint from local and canonical
  * event arrays. Uses content statistics (assistant body size + process event
- * count) which are invariant under patch operations like
- * mergeMissingUsageStatusEvents (which appends status events but does not
- * change body size or process count). Explicitly avoids last-event timestamps:
- * the repair loop's rejected path appends usage status events with
- * Date.now() timestamps, which would make the fingerprint change every
- * ~70ms and defeat the circuit breaker.
+ * count + thinking history size + displayable user image count) which are
+ * invariant under patch operations like mergeMissingUsageStatusEvents (which
+ * appends status events but changes none of them). The last two are required
+ * because the rejection gates in shouldReplaceWithCanonicalKimiHistory compare
+ * exactly them — a canonical that regains thinking content or a lost user
+ * image flips the verdict, and the fingerprint MUST shift to allow the retry;
+ * without them that repair was suppressed forever. Explicitly avoids
+ * last-event timestamps: the repair loop's rejected path appends usage status
+ * events with Date.now() timestamps, which would make the fingerprint change
+ * every ~70ms and defeat the circuit breaker.
  */
 function computeFingerprint(
   localEvents: TimelineEvent[],
@@ -69,7 +94,12 @@ function computeFingerprint(
   const canonicalBodySize = assistantBodySize(canonicalEvents);
   const canonicalProcessCount = kimiHistoryProcessEventCount(canonicalEvents);
 
-  return `l=${localBodySize},${localProcessCount}|c=${canonicalBodySize},${canonicalProcessCount}`;
+  const localThinkingSize = thinkingHistorySize(localEvents);
+  const localImageCount = displayableUserImageCount(localEvents);
+  const canonicalThinkingSize = thinkingHistorySize(canonicalEvents);
+  const canonicalImageCount = displayableUserImageCount(canonicalEvents);
+
+  return `l=${localBodySize},${localProcessCount},${localThinkingSize},${localImageCount}|c=${canonicalBodySize},${canonicalProcessCount},${canonicalThinkingSize},${canonicalImageCount}`;
 }
 
 function loadCircuit(): CircuitData {
