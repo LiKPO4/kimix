@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：更新记录版本格式统一与模型探测代理兼容（v2.20.42）
+
+- 用户反馈两点：①「更新记录」里 Kimix 本体卡版本行（最新版本：…）与 Kimi Code 卡（当前：…· 最新可安装：…）格式不一致，要求统一；②第三方供应商 Base URL 为本地代理（127.0.0.1:15722）时模型探测报 404 失败，询问是否代理转发所致、能否兼容。
+- 修复①：本体卡版本行改为「当前：{appInfo.version} · 最新可安装：{tagName} · {发布日期}」，与 Kimi Code 卡同构。
+- 修复②：确认代理只实现 /chat/completions、不实现 /models（两个候选端点均 404「Models endpoint is not available」）。新增 ModelListEndpointUnsupportedError（全部候选均 404 时抛出，区别于真实连接/凭据失败），主进程转换为 { unsupported: true } 结构化结果，前端显示「该 Base URL 未实现模型列表接口（部分代理转发不提供 /models），连接本身不受影响，可手动添加模型」——不再显示「模型探测失败」。
+- 验证：相关 6+8 项、全量 130 文件 1316 项通过；Node/Renderer typecheck、生产构建（renderer assets/index-DnPBr9lX.js）、OKF 校验、git diff --check 通过。待用户截图复验。
 ## 2026-07-28 修复：官方 Web 会话模型被全局默认覆盖、自动压缩失败无提示（v2.20.42）
 
 - 目标会话事件流证明：进入 Kimix 前最近 20 轮均为官方 `kimi-code/k3`；Kimix 恢复会话时没有等待/返回官方 `/status.model`，恢复后的本地状态因而回退到全局默认 `opencode-go/deepseek-v4-pro`，发送路径再将该别名写回官方 profile。

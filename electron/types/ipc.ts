@@ -461,6 +461,8 @@ export type DiscoverKimiProviderModelsResponse = {
   data: {
     endpoint: string;
     models: DiscoveredKimiProviderModel[];
+    /** true 表示该 Base URL 未实现模型列表接口（部分代理转发不提供 /models），非连接失败。 */
+    unsupported?: boolean;
   };
 } | {
   success: false;

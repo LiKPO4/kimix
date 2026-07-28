@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildOpenAiModelListUrls,
   discoverOpenAiModels,
+  ModelListEndpointUnsupportedError,
   parseOpenAiModelList,
 } from "../../../electron/providerModelDiscovery";
 
@@ -70,5 +71,36 @@ describe("provider model discovery", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
       Authorization: "Bearer secret-key",
     });
+  });
+});
+
+describe("model list endpoint unsupported", () => {
+  it("throws ModelListEndpointUnsupportedError when every candidate answers 404", async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ error: { message: "Models endpoint is not available" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      })));
+
+    const error = await discoverOpenAiModels({
+      baseUrl: "http://127.0.0.1:15722",
+      apiKey: "secret-key",
+    }, fetchMock).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(ModelListEndpointUnsupportedError);
+    expect((error as ModelListEndpointUnsupportedError).failures).toHaveLength(2);
+  });
+
+  it("keeps the generic failure when only some candidates 404", async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "not found" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response("gateway timeout", { status: 502 }));
+
+    await expect(discoverOpenAiModels({
+      baseUrl: "https://api.example.com",
+      apiKey: "secret-key",
+    }, fetchMock)).rejects.not.toBeInstanceOf(ModelListEndpointUnsupportedError);
   });
 });

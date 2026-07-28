@@ -35,7 +35,7 @@ import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
 import { getWindowsVsCodeCandidates } from "../src/utils/editorLaunch";
 import { buildOfficialRoomMetadata, deriveRoomAgentSessionId, parseRoomMetadataRequest } from "./roomSessionMetadata";
 import { activateWindow } from "./windowActivation";
-import { discoverOpenAiModels } from "./providerModelDiscovery";
+import { discoverOpenAiModels, ModelListEndpointUnsupportedError } from "./providerModelDiscovery";
 import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
 import { mergeRuntimeAndDiskModelConfig } from "../src/utils/modelConfigSummary";
 import {
@@ -1933,7 +1933,14 @@ async function discoverProviderModels(input: unknown) {
   const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
   const apiKey = config.apiKey?.trim() || await resolveSavedProviderApiKeyForBaseUrl(current, config.providerName, config.baseUrl);
   if (!apiKey) throw new Error("API Key 为空，无法探测模型列表。");
-  return discoverOpenAiModels({ baseUrl: config.baseUrl, apiKey });
+  try {
+    return await discoverOpenAiModels({ baseUrl: config.baseUrl, apiKey });
+  } catch (error) {
+    if (error instanceof ModelListEndpointUnsupportedError) {
+      return { endpoint: "", models: [], unsupported: true as const };
+    }
+    throw error;
+  }
 }
 
 function summarizeKimiPromptOutput(output: string) {

@@ -275,6 +275,12 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         setMessage(`模型探测失败：${res.error}`);
         return;
       }
+      if (res.data.unsupported) {
+        setDiscoveredModels([]);
+        setDiscoveredEndpoint("");
+        setMessage("该 Base URL 未实现模型列表接口（部分代理转发不提供 /models），连接本身不受影响，可手动添加模型。");
+        return;
+      }
       setDiscoveredModels(res.data.models);
       setDiscoveredEndpoint(res.data.endpoint);
       setMessage(`已从接口发现 ${res.data.models.length} 个模型，选择后将自动解析填入 Context 上下文大小。`);

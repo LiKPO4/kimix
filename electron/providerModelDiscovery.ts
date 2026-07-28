@@ -12,6 +12,23 @@ export type OpenAiModelDiscoveryResult = {
   models: DiscoveredOpenAiModel[];
 };
 
+/**
+ * Every candidate endpoint answered HTTP 404: the Base URL (typically a local
+ * relay/proxy) simply does not implement the models-listing API. This is NOT a
+ * connectivity or credential failure — the provider may still serve
+ * /chat/completions fine — so it gets a dedicated error type the IPC layer can
+ * translate into a friendly "add models manually" outcome instead of an
+ * alarming "探测失败" banner.
+ */
+export class ModelListEndpointUnsupportedError extends Error {
+  readonly failures: string[];
+  constructor(failures: string[]) {
+    super("该 Base URL 未实现模型列表接口（部分代理转发不提供 /models）");
+    this.name = "ModelListEndpointUnsupportedError";
+    this.failures = failures;
+  }
+}
+
 function appendPath(url: URL, suffix: string) {
   const next = new URL(url.href);
   next.search = "";
@@ -144,6 +161,9 @@ export async function discoverOpenAiModels(
     } catch (error) {
       failures.push(`${new URL(endpoint).pathname}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+  if (failures.length > 0 && failures.every((failure) => failure.includes("HTTP 404"))) {
+    throw new ModelListEndpointUnsupportedError(failures);
   }
   throw new Error(`无法从 Base URL 探测模型：${failures.join("；")}`);
 }

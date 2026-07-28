@@ -384,3 +384,24 @@ describe("ModelProviderManager", () => {
     await act(async () => root.unmount());
   });
 });
+
+it("shows a friendly manual-add hint when the Base URL has no models endpoint", async () => {
+  const discoverKimiProviderModels = vi.fn().mockResolvedValue({
+    success: true,
+    data: { endpoint: "", models: [], unsupported: true },
+  });
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: { discoverKimiProviderModels },
+  });
+  const { container, root } = await renderManager(emptyProviderConfig);
+
+  const discoverButton = buttonByText(container, "探测模型") as HTMLButtonElement;
+  await act(async () => discoverButton.click());
+
+  expect(container.textContent).toContain("该 Base URL 未实现模型列表接口");
+  expect(container.textContent).toContain("可手动添加模型");
+  expect(container.textContent).not.toContain("模型探测失败");
+  expect((buttonByText(container, "探测模型") as HTMLButtonElement).disabled).toBe(false);
+  await act(async () => root.unmount());
+});

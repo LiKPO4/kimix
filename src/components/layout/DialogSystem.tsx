@@ -429,7 +429,7 @@ function HelpDialogPanel({
                 <div className="min-w-0">
                   <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimix 本体</div>
                   <div className="font-semibold text-text-primary">{updateState.message}</div>
-                  {updateState.latest && <div className="mt-1 text-[13px] text-text-muted">最新版本：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
+                  {updateState.latest && <div className="mt-1 text-[13px] text-text-muted">当前：{appInfo.version} · 最新可安装：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
                   {updateState.downloadProgress && (
                     <div className="mt-2 text-[12.5px] text-text-muted">
                       {formatDownloadDetail(updateState.downloadProgress)}

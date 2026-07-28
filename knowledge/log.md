@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Version-card format unified; model discovery tolerates proxies without /models (v2.20.42)**: the update panel’s Kimix card now reads 当前：x · 最新可安装：y like the Kimi Code card. When every models-list candidate answers HTTP 404 (typical for local relay proxies that only forward /chat/completions), discovery raises ModelListEndpointUnsupportedError and the UI shows a friendly "endpoint not implemented, add models manually" note instead of a failure banner.
+
+
 * **Official session model ownership and auto-compaction failure visibility (v2.20.42)**: a K3 conversation created in official Kimi Web was resumed without hydrating `/status.model`; Kimix then substituted its global DeepSeek default and wrote that alias back through the prompt profile, causing the official daemon's later automatic compaction to use a Provider that rejected both the original and reduced requests. Existing sessions now hydrate and return the official status model before resume completes, global defaults apply only to new sessions, and only an explicit model request may mutate a resumed profile. `full_compaction.begin.source` now survives terminal merging, so an automatic cancel renders a persistent failure notice while manual cancellation stays neutral. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 
