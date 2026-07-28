@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/ipc";
-import { formatDownloadPercent, formatDownloadDetail, formatReleaseDate, type DownloadProgressInfo } from "@/utils/format";
+import { formatDownloadPercent, formatDownloadDetail, type DownloadProgressInfo } from "@/utils/format";
 import { useRef } from "react";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -429,7 +429,7 @@ function HelpDialogPanel({
                 <div className="min-w-0">
                   <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimix 本体</div>
                   <div className="font-semibold text-text-primary">{updateState.message}</div>
-                  {updateState.latest && <div className="mt-1 text-[13px] text-text-muted">当前：{appInfo.version} · 最新可安装：{updateState.latest.tagName} · {formatReleaseDate(updateState.latest.publishedAt)}</div>}
+                  {updateState.latest && <div className="mt-1 text-[13px] text-text-muted">当前：{appInfo.version} · 最新可安装：{updateState.latest.tagName}</div>}
                   {updateState.downloadProgress && (
                     <div className="mt-2 text-[12.5px] text-text-muted">
                       {formatDownloadDetail(updateState.downloadProgress)}
@@ -553,7 +553,6 @@ function HelpDialogPanel({
                         <span className="min-w-0 truncate">{release.name || release.tagName}</span>
                         <ExternalLink size={14} className="shrink-0" />
                       </button>
-                      <span className="text-[13px] text-text-muted">{formatReleaseDate(release.publishedAt)}</span>
                     </div>
                     <div className="min-w-0 text-[14px] text-text-secondary" style={{ marginTop: 12 }}>
                       <MarkdownRenderer content={stripReleaseImages(release.body.trim() || "该版本没有填写更新说明。")} wrapLongLines />

@@ -1,5 +1,9 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：更新记录移除日期显示（v2.20.45）
+
+- 用户反馈：本体卡「最新可安装」后的发布日期换行难看，且 Release 条目行的日期也不需要。移除两处日期显示（版本行与 Release 条目行），formatReleaseDate 不再被该面板使用。
+- 验证：全量 130 文件 1329 项、Node/Renderer typecheck、生产构建（renderer assets/index-BFXlsQoL.js）、OKF 校验（353 链接）、git diff --check 通过。
 ## 2026-07-28 修复：旧流式重复未被 v2.20.43 完整清理（v2.20.44）
 
 - 用户用 v2.20.43 复验后，旧会话仍显示两份相同 IPC 思考/正文。安装版 IndexedDB 实证剩余 2425 个事件、6 组完整语义重复，以及同一 delivery 下 19 份正文相同但思考不同的历史草稿。
