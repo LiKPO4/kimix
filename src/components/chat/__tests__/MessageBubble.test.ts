@@ -30,6 +30,7 @@ describe("KimiWebIntermediateTextBlock", () => {
       }));
     });
 
+    expect((container.firstElementChild as HTMLElement).style.whiteSpace).toBe("normal");
     expect(container.querySelector(".kimix-streaming-markdown")).not.toBeNull();
     expect(container.querySelector("strong")?.textContent).toBe("文案改动");
     expect(container.querySelectorAll("li")).toHaveLength(2);

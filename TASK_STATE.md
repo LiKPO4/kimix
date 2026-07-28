@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：流程富文本异常空行（v2.20.47）
+
+- 用户用 v2.20.46 复验后，Markdown 语义已正确，但段落和列表之间出现远多于官方的空白行。
+- 根因：流程正文容器复用了原始思考文本的 `KIMI_WEB_THINKING_SUMMARY_STYLE`，其中 `whiteSpace: pre-wrap` 会把 ReactMarkdown 在段落、列表及 loose-list `<li><p>` 之间生成的 HTML 分隔换行也渲染出来；再叠加正常 Markdown margin 后形成异常大间距，并非解析器错误或源内容包含大量空行。
+- 修复：仅在 `KimiWebIntermediateTextBlock` 覆盖为 `whiteSpace: normal`，让 Markdown 元素自身管理段落与列表间距；思考原文继续保留 `pre-wrap`，最终正文、工具卡和全局 Markdown 样式不变。
+- 验证：定向流程正文与 Markdown 回归 2 文件 4 项、全量 135 文件 1330 项、Node/Renderer typecheck、生产构建（renderer `assets/index-CF3n4vEJ.js`）、OKF 校验（355 链接）均通过。
+
 ## 2026-07-28 修复：流程内正文恢复富文本渲染（v2.20.46）
 
 - 用户对照官方 Kimi Code 后反馈：过程流里的正文原样显示 `**`、`-`、反引号等 Markdown 标记，而官方会渲染为粗体、列表与行内代码。

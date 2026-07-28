@@ -1299,6 +1299,10 @@ export function KimiWebIntermediateTextBlock({ content, streaming = false }: { c
       className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text)]"
       style={{
         ...KIMI_WEB_THINKING_SUMMARY_STYLE,
+        // Markdown already owns paragraph/list whitespace. Inheriting the
+        // raw-thinking pre-wrap style exposes ReactMarkdown's separator
+        // newlines as visual blank rows, especially around loose lists.
+        whiteSpace: "normal",
         "--kimix-chat-font-size": "14.5px",
       } as CSSProperties}
     >

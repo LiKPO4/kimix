@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Rich process text collapses renderer separator whitespace (v2.20.47)**: the v2.20.46 wrapper reused raw-thinking `white-space: pre-wrap`, causing ReactMarkdown's structural separator newlines—especially around loose-list `<li><p>` nodes—to become visible blank rows in addition to normal Markdown margins. Process Markdown now explicitly uses `white-space: normal`; raw thinking retains pre-wrap and global/final Markdown spacing is unchanged. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Process-timeline body shares the rich Markdown renderer (v2.20.46)**: `KimiWebIntermediateTextBlock` previously emitted raw strings, so Markdown markers remained visible even though the bottom Assistant body had rich streaming support. Every in-flow text segment now uses `MarkdownRenderer`; only the currently growing trailing group enables its existing throttled streaming mode, while immutable earlier groups render settled-rich immediately. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 
