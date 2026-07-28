@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Turn-global offset replay no longer rematerializes stream text (v2.20.43)**: Server 0.29 offsets span an entire Agent turn. After a tool boundary commits the visible draft, a reconnect can replay `offset=0`; treating that old prefix as a new segment minted a fresh `active-draft:` materialization each time and persisted identical progress/thinking blocks. An empty accumulator with a retained turn anchor now rejects that replay, same-batch thinking parts are idempotently merged, and hydration removes only exact protocol-generated duplicates within the same room/message/turn identity. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Version-card format unified; model discovery tolerates proxies without /models (v2.20.42)**: the update panel’s Kimix card now reads 当前：x · 最新可安装：y like the Kimi Code card. When every models-list candidate answers HTTP 404 (typical for local relay proxies that only forward /chat/completions), discovery raises ModelListEndpointUnsupportedError and the UI shows a friendly "endpoint not implemented, add models manually" note instead of a failure banner.
 
 

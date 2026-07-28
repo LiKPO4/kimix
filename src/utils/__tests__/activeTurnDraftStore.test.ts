@@ -239,6 +239,21 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(key)?.content).toBe("再看调用方。");
   });
 
+  it("does not rematerialize a committed segment when reconnect replays offset 0", () => {
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const firstText = "先找版本文案，再看模型探测。";
+    applyActiveTurnDraftDelta(key, delta(firstText, { streamOffset: 0 }));
+    expect(takeActiveTurnDraft(key)?.content).toBe(firstText);
+
+    // 0.29 的 offset 是 turn-global。工具边界后从 0 重放的是旧前缀，
+    // 不能生成一个新 materialization；真正的新片段从旧锚点继续。
+    applyActiveTurnDraftDelta(key, delta(firstText, { streamOffset: 0 }));
+    expect(getActiveTurnDraft(key)).toBeNull();
+
+    applyActiveTurnDraftDelta(key, delta("继续检查 IPC。", { streamOffset: firstText.length }));
+    expect(getActiveTurnDraft(key)?.content).toBe("继续检查 IPC。");
+  });
+
   it("marks complete/barrier bodies as authoritative", () => {
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { isComplete: true }))).toBe(true);
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { completionBarrierReplay: true }))).toBe(true);

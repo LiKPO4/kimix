@@ -178,7 +178,8 @@ type StreamAnchor = number | null;
 /**
  * 0.29 Server 的 volatile delta 携带累计 offset（协议：offset < 本地长度=重复，
  * 跳过；offset > 本地长度=中间缺帧）。对齐官方 web 的 turnLen 锚定模型：
- * offset===0 视为流（重）起点——重试/重连后旧流作废，以新流替换；
+ * offset===0 在当前视觉段仍挂载时视为流（重）起点，以新流替换；
+ * 视觉段已提交但 turn anchor 仍存在时则是旧前缀回放，必须跳过；
  * offset===锚点 顺序追加；offset<锚点 跳过重复尾部；
  * offset>锚点 说明缺帧；残片不能安全拼接，等待权威快照/offset 0 自愈。
  * 无锚点且本地段为空时允许从非零 offset 接续：权威快照可能已经承载前文。
@@ -188,23 +189,33 @@ function anchorStreamText(
   delta: string,
   offset: number,
   anchor: StreamAnchor,
-): { text: string; anchor: StreamAnchor } {
-  if (offset === 0) return { text: delta, anchor: delta.length };
+): { text: string; anchor: StreamAnchor; accepted: boolean } {
+  if (offset === 0) {
+    // While a visual segment is mounted, offset 0 means the Server restarted
+    // that live stream and the replacement must win. After the segment has
+    // already been committed, however, the turn-global anchor remains while
+    // `acc` is empty: offset 0 is then a reconnect/resync replay of the old
+    // turn prefix. Accepting it would create a fresh materialization at every
+    // tool boundary (the same status/thought rendered many times).
+    return !acc && anchor !== null
+      ? { text: acc, anchor, accepted: false }
+      : { text: delta, anchor: delta.length, accepted: true };
+  }
   if (anchor === null) {
     return acc
-      ? { text: acc, anchor: null }
-      : { text: delta, anchor: offset + delta.length };
+      ? { text: acc, anchor: null, accepted: false }
+      : { text: delta, anchor: offset + delta.length, accepted: true };
   }
-  if (offset === anchor) return { text: acc + delta, anchor: anchor + delta.length };
-  if (offset < anchor) return { text: acc, anchor };
-  return { text: acc, anchor };
+  if (offset === anchor) return { text: acc + delta, anchor: anchor + delta.length, accepted: true };
+  if (offset < anchor) return { text: acc, anchor, accepted: false };
+  return { text: acc, anchor, accepted: false };
 }
 
 function applyStreamOffsetDelta(
   base: AssistantMessage,
   event: AssistantMessage,
   anchors: { content: StreamAnchor; think: StreamAnchor },
-): { event: AssistantMessage; contentAnchor: StreamAnchor; thinkAnchor: StreamAnchor } {
+): { event: AssistantMessage; contentAnchor: StreamAnchor; thinkAnchor: StreamAnchor; accepted: boolean } {
   const offset = event.streamOffset as number;
   if (event.thinking && !event.content) {
     const merged = anchorStreamText(
@@ -235,6 +246,7 @@ function applyStreamOffsetDelta(
       },
       contentAnchor: anchors.content,
       thinkAnchor: merged.anchor,
+      accepted: merged.accepted,
     };
   }
   const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content);
@@ -249,13 +261,14 @@ function applyStreamOffsetDelta(
     },
     contentAnchor: merged.anchor,
     thinkAnchor: anchors.think,
+    accepted: merged.accepted,
   };
 }
 
 export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
-): ActiveTurnDraft {
+): ActiveTurnDraft | null {
   let previous = drafts.get(key);
   let migratedFromKey: string | null = null;
   if (!previous && event.roomMessageId) {
@@ -316,9 +329,18 @@ export function applyActiveTurnDraftDelta(
   let merged: TimelineEvent[];
   if (isAppendOnlyDelta && typeof event.streamOffset === "number") {
     const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor });
-    merged = [applied.event];
     contentAnchor = applied.contentAnchor;
     thinkAnchor = applied.thinkAnchor;
+    streamAnchors.set(key, { content: contentAnchor, think: thinkAnchor });
+    if (!applied.accepted) {
+      if (previous) {
+        drafts.set(key, previous);
+        if (migratedFromKey) notify(migratedFromKey);
+        scheduleNotify(key);
+      }
+      return previous ?? null;
+    }
+    merged = [applied.event];
   } else {
     merged = isAppendOnlyDelta
       ? [{

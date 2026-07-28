@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：流式草稿回放被重复物化（v2.20.43）
+
+- 目标会话官方 wire 中，截图所示英文思考与中文进度都只出现一次；当前源码从真实 wire 投影也只有一份。安装版 IndexedDB 却有一个 Assistant 内两份完全相同的 3012 字 thinking part，以及同一 Agent turn 下 16 个不同 `active-draft:` ID、正文完全相同的 51 字进度事件，确认是 Kimix 本地解析/持久化重复。
+- 根因：Server 0.29 offset 是 turn-global；工具边界提交可视草稿后 accumulator 为空但 anchor 保留，重连的 `offset=0` 旧前缀却被当作新视觉片段，持续生成新 materialization。另有 thinking parts 合并在 existing 为空时绕过了 incoming batch 内部去重。
+- 修复：挂载中的流仍允许 `offset=0` 重启替换；已提交且 anchor 保留时拒绝该旧前缀回放，不创建草稿。thinking parts 始终经过幂等合并；hydration 仅清理同 room/message/turn 下正文与思考完全相同的 `active-draft:` 协议产物，不对普通 Assistant 或跨轮同文做全局去重。
+- 根因快照：`docs/issue-active-draft-offset-zero-replay-duplication-snapshot.md`。
+- 验证：定向 2 文件 188 项（含协议回放、批内重复、旧数据修复、跨轮同文保留和无身份事件保留）、全量 134 文件 1322 项、Node/Renderer typecheck 通过；生产构建（renderer `assets/index-B-B-o6zF.js`）、OKF 校验（352 链接）通过。
+
 ## 2026-07-28 修复：更新记录版本格式统一与模型探测代理兼容（v2.20.42）
 
 - 用户反馈两点：①「更新记录」里 Kimix 本体卡版本行（最新版本：…）与 Kimi Code 卡（当前：…· 最新可安装：…）格式不一致，要求统一；②第三方供应商 Base URL 为本地代理（127.0.0.1:15722）时模型探测报 404 失败，询问是否代理转发所致、能否兼容。

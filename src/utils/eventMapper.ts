@@ -283,9 +283,9 @@ export function mergeAssistantThinkingParts(
   incoming: AssistantThinkingPart[] | undefined,
 ): AssistantThinkingPart[] | undefined {
   if (!incoming?.length) return existing;
-  if (!existing?.length) return incoming;
-  let result = [...existing];
-  for (const part of incoming) {
+  const source = [...(existing ?? []), ...incoming];
+  let result: AssistantThinkingPart[] = [];
+  for (const part of source) {
     const partText = normalizeThinkingWhitespace(part.text);
     if (!partText) continue;
 
@@ -344,9 +344,17 @@ export function mergeAssistantThinkingParts(
   // order. Their source timestamps are still monotonic, so restore that order
   // before the UI concatenates the parts. Modern JS sort is stable, preserving
   // arrival order for fragments that genuinely share a timestamp.
-  return result.some((part, index) => index > 0 && part.timestamp < result[index - 1].timestamp)
+  const ordered = result.some((part, index) => index > 0 && part.timestamp < result[index - 1].timestamp)
     ? result.sort((left, right) => left.timestamp - right.timestamp)
     : result;
+  if (
+    !existing?.length &&
+    ordered.length === incoming.length &&
+    ordered.every((part, index) => part === incoming[index])
+  ) {
+    return incoming;
+  }
+  return ordered;
 }
 
 function isInsideUnclosedInlineCode(content: string) {
@@ -2486,6 +2494,7 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
   const userRecordsByContent = new Map<string, UserRecord[]>();
   const userRecordByResultIndex = new Map<number, UserRecord>();
   const userRecordByDelivery = new Map<string, UserRecord>();
+  const seenActiveDraftBodies = new Set<string>();
   const result: TimelineEvent[] = [];
 
   const moveRecordToContentBucket = (record: UserRecord, previousContent: string) => {
@@ -2516,7 +2525,37 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
     if (deliveryKey) userRecordByDelivery.set(deliveryKey, record);
   };
 
-  for (const event of events) {
+  for (const rawEvent of events) {
+    const repairedThinkingParts = rawEvent.type === "assistant_message"
+      ? mergeAssistantThinkingParts(undefined, rawEvent.thinkingParts)
+      : undefined;
+    const event = rawEvent.type === "assistant_message" && repairedThinkingParts !== rawEvent.thinkingParts
+      ? { ...rawEvent, thinkingParts: repairedThinkingParts }
+      : rawEvent;
+    if (event.type === "assistant_message" && event.id.startsWith("active-draft:")) {
+      const content = event.content.trim();
+      const thinking = normalizeThinkingWhitespace(event.thinking ?? "");
+      const partTexts = (event.thinkingParts ?? [])
+        .map((part) => normalizeThinkingWhitespace(part.text))
+        .filter(Boolean);
+      const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId);
+      if (hasDeliveryIdentity && (content || thinking || partTexts.length > 0)) {
+        // Active-draft ids describe renderer materializations, not immutable
+        // model messages. A reconnect can replay offset 0 after every tool
+        // boundary and mint a new id for the same body. Within one delivery
+        // turn that exact body is therefore a provable transport duplicate.
+        const fingerprint = JSON.stringify([
+          event.roomAgentId ?? "",
+          event.roomMessageId ?? "",
+          event.agentTurnId ?? "",
+          content,
+          thinking,
+          partTexts,
+        ]);
+        if (seenActiveDraftBodies.has(fingerprint)) continue;
+        seenActiveDraftBodies.add(fingerprint);
+      }
+    }
     if (event.type === "user_message") {
       const sameIdIndex = event.id ? seenIds.get(event.id) : undefined;
       if (sameIdIndex !== undefined) {

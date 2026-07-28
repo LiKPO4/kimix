@@ -3107,6 +3107,105 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     expect(once).toHaveLength(3);
     expect(deduplicateTimelineEvents(once)).toHaveLength(3);
   });
+
+  it("deduplicateTimelineEvents repairs duplicate thinking parts inside one persisted assistant", () => {
+    const text = "Let me check the IPC registration.";
+    const events: TimelineEvent[] = [{
+      id: "assistant-damaged",
+      type: "assistant_message",
+      timestamp: 1000,
+      content: "",
+      thinking: text,
+      thinkingParts: [
+        { id: "part-a", timestamp: 1000, text },
+        { id: "part-b", timestamp: 1000, text },
+      ],
+      isThinking: false,
+      isComplete: true,
+    }];
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result[0]).toMatchObject({
+      type: "assistant_message",
+      thinkingParts: [{ id: "part-a", timestamp: 1000, text }],
+    });
+  });
+
+  it("deduplicateTimelineEvents removes replayed active-draft materializations from one turn", () => {
+    const repeated = "先找版本文案，再看模型探测。";
+    const events: TimelineEvent[] = [{
+      id: "active-draft:session:turn:materialization-a",
+      type: "assistant_message",
+      timestamp: 1000,
+      content: repeated,
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+      agentTurnId: "turn-1",
+    }, {
+      id: "tool-1",
+      type: "tool_call",
+      timestamp: 1100,
+      toolCallId: "call-1",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+    }, {
+      id: "active-draft:session:turn:materialization-b",
+      type: "assistant_message",
+      timestamp: 1200,
+      content: repeated,
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+      agentTurnId: "turn-1",
+    }];
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result.filter((event) => event.type === "assistant_message")).toHaveLength(1);
+    expect(result.map((event) => event.id)).toEqual([
+      "active-draft:session:turn:materialization-a",
+      "tool-1",
+    ]);
+  });
+
+  it("deduplicateTimelineEvents preserves identical active-draft text across distinct turns", () => {
+    const repeated = "先找版本文案，再看模型探测。";
+    const makeDraft = (turnId: string, timestamp: number): TimelineEvent => ({
+      id: `active-draft:session:${turnId}:materialization`,
+      type: "assistant_message",
+      timestamp,
+      content: repeated,
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: `message-${turnId}`,
+      agentTurnId: turnId,
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeDraft("turn-1", 1000),
+      makeDraft("turn-2", 2000),
+    ])).toHaveLength(2);
+  });
+
+  it("deduplicateTimelineEvents preserves anonymous active drafts without delivery identity", () => {
+    const makeAnonymousDraft = (id: string, timestamp: number): TimelineEvent => ({
+      id,
+      type: "assistant_message",
+      timestamp,
+      content: "无法证明归属时不要按正文去重。",
+      isThinking: false,
+      isComplete: true,
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeAnonymousDraft("active-draft:anonymous:a", 1000),
+      makeAnonymousDraft("active-draft:anonymous:b", 2000),
+    ])).toHaveLength(2);
+  });
 });
 
 describe("mergeAssistantThinkingText", () => {
@@ -3143,6 +3242,15 @@ describe("mergeAssistantThinkingText", () => {
 
 describe("mergeAssistantThinkingParts", () => {
   const part = (id: string, text: string, timestamp = 1) => ({ id, timestamp, text });
+
+  it("deduplicates an incoming batch that already contains the same full replay twice", () => {
+    const full = "The discovery tries /models and /v1/models.";
+    const merged = mergeAssistantThinkingParts(undefined, [
+      part("replay-1", full, 10),
+      part("replay-2", full, 10),
+    ]);
+    expect(merged).toEqual([part("replay-1", full, 10)]);
+  });
 
   it("a full replay removes every fragment it covers instead of only the first", () => {
     const fragments = [part("f1", "片段一"), part("f2", "片段二"), part("f3", "片段三")];
