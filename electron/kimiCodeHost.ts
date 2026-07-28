@@ -167,6 +167,7 @@ export type KimiCodeEngineSession = {
   sessionId: string;
   workDir: string;
   status: KimiCodeEngineStatus;
+  model?: string;
   additionalDirs?: readonly string[];
 };
 
@@ -785,7 +786,13 @@ export async function createSession(options: CreateKimiCodeSessionOptions): Prom
 
 export async function resumeSession(sessionId: string, options: { additionalDirs?: readonly string[] } = {}): Promise<KimiCodeEngineSession> {
   const existingServer = serverSessions.get(sessionId);
-  if (existingServer) return toServerEngineSession(existingServer);
+  if (existingServer) {
+    await refreshServerSessionStatus(sessionId, true).catch((error) => {
+      if (isKimiCodeSessionMissingError(error)) throw error;
+      console.warn(`[KimiCodeServerHost] refresh resumed status failed for ${sessionId}:`, error);
+    });
+    return toServerEngineSession(existingServer);
+  }
   if (shouldRouteNewSessionToServer()) {
     try {
       const client = getServerClient();
@@ -799,7 +806,7 @@ export async function resumeSession(sessionId: string, options: { additionalDirs
     }
   }
   const existing = sessions.get(sessionId);
-  if (existing) return toEngineSession(existing.session, existing.status);
+  if (existing) return toEngineSession(existing.session, existing.status, existing.model);
 
   const sdkHarness = await getHarness();
   const session = await sdkHarness.resumeSession({ id: sessionId, additionalDirs: options.additionalDirs });
@@ -2671,7 +2678,7 @@ function registerSession(
   };
   sessions.set(session.id, managed);
   emitStatus(session.id, initialStatus);
-  return toEngineSession(session, initialStatus);
+  return toEngineSession(session, initialStatus, managed.model);
 }
 
 async function registerServerSession(
@@ -2699,11 +2706,11 @@ async function registerServerSession(
   };
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
-  void refreshServerSessionStatus(session.id, true).catch((error) => {
+  await refreshServerSessionStatus(session.id, true).catch((error) => {
     if (isKimiCodeSessionMissingError(error)) {
       serverSessions.delete(session.id);
       console.warn(`[KimiCodeServerHost] session ${session.id} vanished during initial status refresh; removed stale Server binding.`);
-      return;
+      throw error;
     }
     console.warn(`[KimiCodeServerHost] refresh initial status failed for ${session.id}:`, error);
   });
@@ -3036,7 +3043,13 @@ export function resolveServerEngineStatus(source: { status?: unknown; busy?: unk
 }
 
 function toServerEngineSession(managed: ServerManagedSession): KimiCodeEngineSession {
-  return { sessionId: managed.session.id, workDir: managed.workDir, status: managed.status, additionalDirs: managed.additionalDirs };
+  return {
+    sessionId: managed.session.id,
+    workDir: managed.workDir,
+    status: managed.status,
+    model: managed.model,
+    additionalDirs: managed.additionalDirs,
+  };
 }
 
 function sanitizeSkillActivationTitle(title?: string) {
@@ -3363,11 +3376,16 @@ function emitStatus(sessionId: string, status: KimiCodeEngineStatus) {
   statusSink?.({ sessionId, status });
 }
 
-function toEngineSession(session: KimiCodeSessionLike, status: KimiCodeEngineStatus): KimiCodeEngineSession {
+function toEngineSession(
+  session: KimiCodeSessionLike,
+  status: KimiCodeEngineStatus,
+  model?: string,
+): KimiCodeEngineSession {
   return {
     sessionId: session.id,
     workDir: session.workDir,
     status,
+    model,
     additionalDirs: session.summary?.additionalDirs ?? [],
   };
 }

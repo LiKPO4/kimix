@@ -1,5 +1,5 @@
 import { memo, Profiler, useRef, useEffect, useMemo, useState, useCallback } from "react";
-import { ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowDown, ChevronDown, ChevronRight, Wrench, Loader2, Bot, FileText, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
@@ -401,7 +401,9 @@ function CompactionLabel({
   const dots = useAnimatedDots(event.phase === "begin" && !isStale);
   if (isStale) return <>上下文压缩可能已卡住，可重新尝试</>;
   if (event.phase === "end") {
-    if (event.outcome === "cancelled") return <>上下文压缩已取消</>;
+    if (event.outcome === "cancelled") {
+      return <>{event.source === "auto" ? "自动上下文压缩失败" : "上下文压缩已取消"}</>;
+    }
     return <>{event.summary ? "上下文压缩完成，已生成摘要" : "上下文压缩完成"}</>;
   }
   if (isLongRunning) {
@@ -428,6 +430,43 @@ function CompactionNotice({
   isSessionRunning?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  if (event.phase === "end" && event.outcome === "cancelled" && event.source === "auto") {
+    return (
+      <div className="flex justify-center" style={{ paddingTop: 7, paddingBottom: 7 }}>
+        <div
+          className="grid w-full max-w-[680px] rounded-xl border"
+          style={{
+            gridTemplateColumns: "18px minmax(0, 1fr)",
+            gap: 12,
+            borderColor: "var(--kimix-warning-border)",
+            background: "var(--kimix-warning-bg)",
+            color: "var(--kimix-warning-text)",
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+          }}
+        >
+          <AlertTriangle size={16} style={{ marginTop: 1 }} />
+          <div className="min-w-0">
+            <div style={{ fontSize: 13, fontWeight: 600, lineHeight: "18px" }}>
+              <CompactionLabel event={event} isSessionRunning={isSessionRunning} />
+            </div>
+            <div
+              style={{
+                color: "var(--kimix-warning-text-secondary)",
+                fontSize: 12,
+                lineHeight: "19px",
+                marginTop: 6,
+              }}
+            >
+              官方 Kimi 服务未完成本次压缩，当前上下文仍保持原状。请重试压缩；若持续失败，请切换模型或新建会话。
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (event.phase === "end" && event.summary) {
     return (
       <div className="flex justify-center" style={{ paddingTop: 4, paddingBottom: 4 }}>

@@ -713,6 +713,7 @@ export function mapKimiCodeEvent(
         type: "compaction",
         timestamp,
         phase: "begin",
+        source: event.source === "auto" || event.source === "manual" ? event.source : undefined,
       };
 
     case "compaction.completed":

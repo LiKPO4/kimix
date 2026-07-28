@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：官方 Web 会话模型被全局默认覆盖、自动压缩失败无提示（v2.20.42）
+
+- 目标会话事件流证明：进入 Kimix 前最近 20 轮均为官方 `kimi-code/k3`；Kimix 恢复会话时没有等待/返回官方 `/status.model`，恢复后的本地状态因而回退到全局默认 `opencode-go/deepseek-v4-pro`，发送路径再将该别名写回官方 profile。
+- 官方 daemon 随后用被覆盖的代理模型执行自动压缩：原始 1028 messages 返回 413，丢弃 246 条后的 782 messages 重试返回 400，最终写出 `full_compaction.cancel`。自动压缩算法与请求完全属于官方逻辑，Kimix 只负责事件转发和显示。
+- 修复：Server 会话注册在返回前完成一次官方 status hydration，并将模型随恢复结果返回；全局默认模型只用于新会话，恢复已有会话时仅显式 `request.model` 才允许修改官方 profile。自动压缩 `source:auto` 会传递到无 source 的终止事件，并显示持久的“自动上下文压缩失败”提示；手动取消仍显示普通取消。本轮按用户要求不新增首 token 等待提示。
+- 根因快照：`docs/issue-web-session-model-compaction-events-snapshot.md`。
+- 验证：定向 3 文件 228 项、全量 134 文件 1313 项、Node/Renderer typecheck、生产构建（renderer `assets/index-C0XkYdvZ.js`）、OKF 校验（351 链接）和 `git diff --check` 均通过。待用户安装版截图复验。
+
 ## 2026-07-27 修复：恢复后任务卡退化为工具卡（v2.20.41）
 
 - 用户 v2.20.40 实测：重新加载会话后单次 Agent 委派显示为「1 个工具调用」而非任务卡。CDP 实证：持久化记录里 Agent tool_call 仍在（toolCallId、arguments 含 description/prompt/subagent_type），但 subagent 事件整体消失。

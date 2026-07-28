@@ -450,11 +450,13 @@ export function findUnmatchedCompactionBeginIndex(events: TimelineEvent[]): numb
 export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
   const beginIndex = findUnmatchedCompactionBeginIndex(events);
   if (beginIndex === -1) return events;
+  const begin = events[beginIndex] as Extract<TimelineEvent, { type: "compaction" }>;
   const endEvent: TimelineEvent = {
     id: Math.random().toString(36).substring(2, 11),
     type: "compaction",
     timestamp: Date.now(),
     phase: "end",
+    source: begin.source,
   };
   return [...events.slice(0, beginIndex + 1), endEvent, ...events.slice(beginIndex + 1)];
 }

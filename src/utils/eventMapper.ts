@@ -1382,13 +1382,16 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       };
 
     case "compaction.started":
-    case "full_compaction.begin":
+    case "full_compaction.begin": {
+      const compactionSource = payloadString(payload, source, "source");
       return {
         id: generateId(),
         type: "compaction",
         timestamp: eventTimestamp,
         phase: "begin",
+        source: compactionSource === "auto" || compactionSource === "manual" ? compactionSource : undefined,
       };
+    }
 
     case "compaction.completed":
     case "full_compaction.complete":
@@ -1844,7 +1847,11 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     const unmatchedBeginIndex = findUnmatchedCompactionBeginIndex(existing);
     if (incoming.phase === "end" && unmatchedBeginIndex !== -1) {
       const result = [...existing];
-      result.splice(unmatchedBeginIndex + 1, 0, incoming);
+      const begin = existing[unmatchedBeginIndex] as Extract<TimelineEvent, { type: "compaction" }>;
+      const aligned = incoming.source || !begin.source
+        ? incoming
+        : { ...incoming, source: begin.source };
+      result.splice(unmatchedBeginIndex + 1, 0, aligned);
       return result;
     }
   }

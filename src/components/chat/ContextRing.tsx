@@ -181,7 +181,9 @@ export function ContextRing() {
     if (latestCompactionEvent.phase !== "end") return;
     if (compactStatusTimerRef.current) clearTimeout(compactStatusTimerRef.current);
     if (latestCompactionEvent.outcome === "cancelled") {
-      setCompactError("Server 取消了本次上下文压缩。");
+      setCompactError(latestCompactionEvent.source === "auto"
+        ? "自动上下文压缩失败，当前上下文未被压缩。"
+        : "Server 取消了本次上下文压缩。");
       setCompactStatus("failed");
       compactStatusTimerRef.current = setTimeout(() => {
         setCompactStatus("idle");

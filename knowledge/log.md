@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Official session model ownership and auto-compaction failure visibility (v2.20.42)**: a K3 conversation created in official Kimi Web was resumed without hydrating `/status.model`; Kimix then substituted its global DeepSeek default and wrote that alias back through the prompt profile, causing the official daemon's later automatic compaction to use a Provider that rejected both the original and reduced requests. Existing sessions now hydrate and return the official status model before resume completes, global defaults apply only to new sessions, and only an explicit model request may mutate a resumed profile. `full_compaction.begin.source` now survives terminal merging, so an automatic cancel renders a persistent failure notice while manual cancellation stays neutral. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+
 * **Task card survives restore via display-layer synthesis (v2.20.41)**: subagent events only come from live frames — snapshot replay and history mapping never rebuild them, so a reloaded turn degraded an Agent dispatch to a plain tool card. buildTurnBlocks now synthesizes a subagent block from any SETTLED unmatched Agent/Task/AgentSwarm call (description/agentName from arguments, resultSummary/error from the tool result); running unmatched calls stay plain tool blocks until the real subagent event arrives. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

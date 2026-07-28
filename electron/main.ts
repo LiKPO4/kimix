@@ -13,6 +13,7 @@ import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "./sessionHistoryFallback";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
+import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
@@ -6829,10 +6830,16 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
     const sameWorkDir = (a: string, b: string) =>
       normalizePathForComparison(path.resolve(a)) === normalizePathForComparison(path.resolve(b));
     const modelSummary = await readKimiModelConfigWithSdk().catch(() => readKimiModelConfig());
-    const selectedModelAlias = request.model || modelSummary.defaultModel || undefined;
+    const requestedModelAlias = typeof request.model === "string" ? request.model.trim() || undefined : undefined;
+    const freshModelPolicy = resolveRuntimeModelPolicy({
+      isResume: false,
+      requestedModel: requestedModelAlias,
+      defaultModel: modelSummary.defaultModel,
+    });
+    const selectedModelAlias = freshModelPolicy.effectiveModel;
     const rawThinkingEffort = typeof request.thinkingEffort === "string" ? request.thinkingEffort.trim() : "";
     const requestedThinkingEffort = rawThinkingEffort && rawThinkingEffort !== "on" ? rawThinkingEffort : undefined;
-    const thinking = requestedThinkingEffort ?? (isDeepSeekModelConfig(modelSummary, selectedModelAlias)
+    const createThinking = requestedThinkingEffort ?? (isDeepSeekModelConfig(modelSummary, selectedModelAlias)
       ? "off"
       : request.thinking === false
         ? "off"
@@ -6840,18 +6847,31 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
     const createFresh = () => kimiCodeHost.createSession({
       workDir: request.workDir,
       model: selectedModelAlias,
-      thinking,
+      thinking: createThinking,
       permission,
       planMode: !!request.planMode,
       additionalDirs,
     });
-    const applyResumeProfile = async (sessionId: string) => {
-      if (selectedModelAlias) await kimiCodeHost.setModel(sessionId, selectedModelAlias);
+    const applyResumeProfile = async (session: kimiCodeHost.KimiCodeEngineSession) => {
+      const modelPolicy = resolveRuntimeModelPolicy({
+        isResume: true,
+        requestedModel: requestedModelAlias,
+        resumedModel: session.model,
+        defaultModel: modelSummary.defaultModel,
+      });
+      if (modelPolicy.modelToApply) await kimiCodeHost.setModel(session.sessionId, modelPolicy.modelToApply);
       // Keep the resumed session's permission in sync with the requested mode.
-      await kimiCodeHost.setPermission(sessionId, permission).catch(() => {});
-      if (thinking) await kimiCodeHost.setThinking(sessionId, thinking).catch(() => {});
+      await kimiCodeHost.setPermission(session.sessionId, permission).catch(() => {});
+      const resumeThinking = requestedThinkingEffort ?? (isDeepSeekModelConfig(modelSummary, modelPolicy.effectiveModel)
+        ? "off"
+        : request.thinking === false
+          ? "off"
+          : undefined);
+      if (resumeThinking) await kimiCodeHost.setThinking(session.sessionId, resumeThinking).catch(() => {});
+      return modelPolicy.effectiveModel;
     };
     let engineSession;
+    let effectiveModel = selectedModelAlias;
     if (request.sessionId) {
       let resumed = null;
       try {
@@ -6870,18 +6890,27 @@ ipcMain.handle("kimi-code:startRuntime", async (_, request: { workDir: string; s
       } else {
         engineSession = resumed;
         try {
-          await applyResumeProfile(resumed.sessionId);
+          effectiveModel = await applyResumeProfile(resumed);
         } catch (err) {
           if (!kimiCodeHost.isKimiCodeSessionMissingError(err)) throw err;
           console.warn(`[Kimi Code] resumed session ${resumed.sessionId} vanished while applying profile; creating a fresh runtime for ${request.workDir}:`, err);
           await kimiCodeHost.closeSession(resumed.sessionId).catch(() => {});
           engineSession = await createFresh();
+          effectiveModel = selectedModelAlias;
         }
       }
     } else {
       engineSession = await createFresh();
     }
-    return { success: true, data: { sessionId: engineSession.sessionId, workDir: engineSession.workDir, model: selectedModelAlias ?? null, slashCommands: [] as const } };
+    return {
+      success: true,
+      data: {
+        sessionId: engineSession.sessionId,
+        workDir: engineSession.workDir,
+        model: kimiCodeHost.getSessionModel(engineSession.sessionId) ?? effectiveModel ?? null,
+        slashCommands: [] as const,
+      },
+    };
   } catch (err) {
     console.error(`[kimi-code:startRuntime] failed for ${request?.workDir}:`, err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };

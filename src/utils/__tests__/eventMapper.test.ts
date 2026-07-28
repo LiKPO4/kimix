@@ -293,7 +293,7 @@ describe("mapStreamEvent", () => {
     const end = mapStreamEvent({ type: "full_compaction.complete", time: 200 });
     const cancelled = mapStreamEvent({ type: "full_compaction.cancel", time: 300 });
 
-    expect(begin).toMatchObject({ type: "compaction", phase: "begin", timestamp: 100 });
+    expect(begin).toMatchObject({ type: "compaction", phase: "begin", source: "manual", timestamp: 100 });
     expect(end).toMatchObject({ type: "compaction", phase: "end", outcome: "completed", timestamp: 200 });
     expect(cancelled).toMatchObject({ type: "compaction", phase: "end", outcome: "cancelled", timestamp: 300 });
   });
@@ -345,6 +345,28 @@ describe("mapStreamEvent", () => {
 });
 
 describe("mergeEvents", () => {
+  it("carries an automatic compaction source onto a source-less cancellation", () => {
+    const begin: TimelineEvent = {
+      id: "compact-begin",
+      type: "compaction",
+      timestamp: 100,
+      phase: "begin",
+      source: "auto",
+    };
+    const cancelled: TimelineEvent = {
+      id: "compact-cancel",
+      type: "compaction",
+      timestamp: 200,
+      phase: "end",
+      outcome: "cancelled",
+    };
+
+    expect(mergeEvents([begin], cancelled)).toEqual([
+      begin,
+      { ...cancelled, source: "auto" },
+    ]);
+  });
+
   it("appends non-duplicate events", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "user_message", timestamp: 1, content: "Hi" },

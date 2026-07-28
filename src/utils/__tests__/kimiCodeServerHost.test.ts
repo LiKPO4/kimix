@@ -21,6 +21,7 @@ import {
   resolveServerModelRefresh,
   shouldApplyServerModelRefresh,
 } from "../../../electron/kimiCodeHost";
+import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
@@ -278,6 +279,39 @@ describe("resolveEngineStatusAfterPromptCompleted", () => {
 });
 
 describe("server prompt model ownership", () => {
+  it("keeps the resumed official model instead of applying the global default", () => {
+    expect(resolveRuntimeModelPolicy({
+      isResume: true,
+      resumedModel: "kimi-code/k3",
+      defaultModel: "opencode-go/deepseek-v4-pro",
+    })).toEqual({
+      effectiveModel: "kimi-code/k3",
+      modelToApply: undefined,
+    });
+  });
+
+  it("only mutates a resumed session for an explicitly requested model", () => {
+    expect(resolveRuntimeModelPolicy({
+      isResume: true,
+      requestedModel: "opencode-go/deepseek-v4-pro",
+      resumedModel: "kimi-code/k3",
+      defaultModel: "kimi-code/k3",
+    })).toEqual({
+      effectiveModel: "opencode-go/deepseek-v4-pro",
+      modelToApply: "opencode-go/deepseek-v4-pro",
+    });
+  });
+
+  it("uses the configured default when creating a fresh session", () => {
+    expect(resolveRuntimeModelPolicy({
+      isResume: false,
+      defaultModel: "opencode-go/deepseek-v4-pro",
+    })).toEqual({
+      effectiveModel: "opencode-go/deepseek-v4-pro",
+      modelToApply: undefined,
+    });
+  });
+
   it("uses the renderer-selected model as the immutable prompt override", () => {
     expect(resolvePromptModel("opencode-go/deepseek-v4-pro", "opencode-go/deepseek-v4-flash"))
       .toBe("opencode-go/deepseek-v4-pro");
