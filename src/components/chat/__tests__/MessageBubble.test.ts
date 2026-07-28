@@ -3,9 +3,33 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { KimiWebIntermediateTextBlock } from "../MessageBubble";
+import type { SubagentEvent, TimelineEvent } from "@/types/ui";
+import {
+  KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX,
+  KimiWebIntermediateTextBlock,
+  KimiWebSubagentDetails,
+} from "../MessageBubble";
 
-describe("KimiWebIntermediateTextBlock", () => {
+function makeSubagent(detailCount: number): SubagentEvent {
+  const events: TimelineEvent[] = Array.from({ length: detailCount }, (_, index) => ({
+    id: `assistant-${index}`,
+    type: "assistant_message",
+    timestamp: index + 1,
+    content: `第 ${index + 1} 条子事件详情`,
+    isThinking: false,
+    isComplete: true,
+  }));
+  return {
+    id: "subagent-1",
+    type: "subagent",
+    timestamp: 1,
+    agentName: "explore",
+    status: "running",
+    events,
+  };
+}
+
+describe("MessageBubble Kimi Web rendering", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -36,5 +60,58 @@ describe("KimiWebIntermediateTextBlock", () => {
     expect(container.querySelectorAll("li")).toHaveLength(2);
     expect(container.querySelector("code")?.textContent).toBe("gambler");
     expect(container.textContent).not.toContain("**");
+  });
+
+  it("keeps a stable inner viewport from the eighth subagent detail onward", async () => {
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent: makeSubagent(8) }));
+    });
+
+    const initialViewport = container.querySelector<HTMLElement>('[aria-label="子任务最新事件"]');
+    expect(initialViewport).not.toBeNull();
+    expect(initialViewport?.style.height).toBe(`${KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX}px`);
+    expect(initialViewport?.style.overflowY).toBe("auto");
+
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent: makeSubagent(9) }));
+    });
+
+    const updatedViewport = container.querySelector<HTMLElement>('[aria-label="子任务最新事件"]');
+    expect(updatedViewport).toBe(initialViewport);
+    expect(updatedViewport?.style.height).toBe(`${KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX}px`);
+    expect(updatedViewport?.children).toHaveLength(9);
+    expect(container.textContent).toContain("显示全部 9 条子事件（还有 1 条）");
+    const showAllButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.startsWith("显示全部"));
+    expect(showAllButton?.style.height).toBe("32px");
+    expect(showAllButton?.style.whiteSpace).toBe("nowrap");
+  });
+
+  it("follows new subagent details only while the inner viewport remains at the bottom", async () => {
+    let scrollHeight = 400;
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent: makeSubagent(8) }));
+    });
+
+    const viewport = container.querySelector<HTMLElement>('[aria-label="子任务最新事件"]');
+    expect(viewport).not.toBeNull();
+    Object.defineProperties(viewport!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, get: () => KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX },
+    });
+
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent: makeSubagent(9) }));
+    });
+    expect(viewport?.scrollTop).toBe(400);
+
+    viewport!.scrollTop = 80;
+    act(() => viewport!.dispatchEvent(new Event("scroll", { bubbles: true })));
+    scrollHeight = 500;
+
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent: makeSubagent(10) }));
+    });
+    expect(viewport?.scrollTop).toBe(80);
   });
 });

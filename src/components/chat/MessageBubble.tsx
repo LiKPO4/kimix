@@ -1557,7 +1557,8 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
   );
 }
 
-const KIMI_WEB_SUBAGENT_DETAIL_LIMIT = 8;
+export const KIMI_WEB_SUBAGENT_DETAIL_LIMIT = 8;
+export const KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX = 202;
 
 type KimiWebSubagentDetailItem = {
   id: string;
@@ -1672,11 +1673,48 @@ function KimiWebSubagentDetailIcon({ item }: { item: KimiWebSubagentDetailItem }
   return <Bot size={12} className={className} />;
 }
 
-function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
+export function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
   const [showAll, setShowAll] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
   const details = useMemo(() => buildKimiWebSubagentDetails(subagent), [subagent]);
-  const visibleDetails = showAll ? details : details.slice(-KIMI_WEB_SUBAGENT_DETAIL_LIMIT);
-  const hiddenCount = Math.max(0, details.length - visibleDetails.length);
+  const isBounded = !showAll && details.length >= KIMI_WEB_SUBAGENT_DETAIL_LIMIT;
+  const hiddenCount = Math.max(0, details.length - KIMI_WEB_SUBAGENT_DETAIL_LIMIT);
+  const contentVersion = useMemo(
+    () => details.map((item) => `${item.id}:${item.label}:${item.detail ?? ""}`).join("|"),
+    [details],
+  );
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!isBounded || !viewport) return;
+    followLatestRef.current = true;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [isBounded, subagent.id]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!isBounded || !viewport || !followLatestRef.current) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [contentVersion, isBounded]);
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (canLiveThinkingViewportConsumeWheel(event.currentTarget, event.deltaY)) {
+      event.stopPropagation();
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const deltaY = ["ArrowUp", "PageUp", "Home"].includes(event.key)
+      ? -1
+      : ["ArrowDown", "PageDown", "End"].includes(event.key)
+        ? 1
+        : 0;
+    if (deltaY && canLiveThinkingViewportConsumeWheel(event.currentTarget, deltaY)) {
+      event.stopPropagation();
+    }
+  };
+
   if (details.length === 0) {
     return (
       <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "0 12px 10px 26px" }}>
@@ -1690,8 +1728,31 @@ function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
         className="min-w-0"
         style={{ paddingLeft: 12 }}
       >
-        <div className="flex flex-col" style={{ gap: 6 }}>
-          {visibleDetails.map((item) => (
+        <div
+          ref={viewportRef}
+          className={`flex min-w-0 flex-col${isBounded ? " kimix-subagent-detail-scroll" : ""}`}
+          style={{
+            gap: 6,
+            ...(isBounded ? {
+              height: KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX,
+              overflowX: "hidden",
+              overflowY: "auto",
+              paddingRight: 6,
+              scrollbarGutter: "stable",
+            } : {}),
+          }}
+          role={isBounded ? "region" : undefined}
+          aria-label={isBounded ? "子任务最新事件" : undefined}
+          tabIndex={isBounded ? 0 : undefined}
+          onScroll={isBounded ? (event) => {
+            followLatestRef.current = shouldFollowLiveThinkingViewport(event.currentTarget);
+          } : undefined}
+          onWheel={isBounded ? handleWheel : undefined}
+          onKeyDown={isBounded ? handleKeyDown : undefined}
+          onTouchStart={isBounded ? (event) => event.stopPropagation() : undefined}
+          onTouchMove={isBounded ? (event) => event.stopPropagation() : undefined}
+        >
+          {details.map((item) => (
             <div
               key={item.id}
               className="grid min-w-0 items-start text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
@@ -1709,8 +1770,17 @@ function KimiWebSubagentDetails({ subagent }: { subagent: SubagentEvent }) {
           <button
             type="button"
             onClick={() => setShowAll((value) => !value)}
-            className="kimix-muted-action rounded-md text-[12.5px]"
-            style={{ minHeight: 28, marginTop: 8, paddingLeft: 8, paddingRight: 8 }}
+            className="kimix-muted-action rounded-md text-[12.5px] tabular-nums"
+            style={{
+              height: 32,
+              maxWidth: "100%",
+              marginTop: 8,
+              overflow: "hidden",
+              paddingLeft: 12,
+              paddingRight: 12,
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
           >
             {showAll ? "收起部分子事件" : `显示全部 ${details.length} 条子事件（还有 ${hiddenCount} 条）`}
           </button>
