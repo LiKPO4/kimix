@@ -3104,8 +3104,9 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
       id: "a1", type: "assistant_message", timestamp: 6000, content: "回答", isThinking: false, isComplete: true,
     }];
     const once = deduplicateTimelineEvents(events);
+    expect(once).toBe(events);
     expect(once).toHaveLength(3);
-    expect(deduplicateTimelineEvents(once)).toHaveLength(3);
+    expect(deduplicateTimelineEvents(once)).toBe(once);
   });
 
   it("deduplicateTimelineEvents repairs duplicate thinking parts inside one persisted assistant", () => {
@@ -3191,6 +3192,26 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     ])).toHaveLength(2);
   });
 
+  it("deduplicateTimelineEvents preserves same-moment drafts from conflicting turn identities", () => {
+    const makeDraft = (turnId: string): TimelineEvent => ({
+      id: `active-draft:session:${turnId}:materialization`,
+      type: "assistant_message",
+      timestamp: 1000,
+      content: "相同正文",
+      thinking: "相同思考",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "shared-message",
+      agentTurnId: turnId,
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeDraft("turn-1"),
+      makeDraft("turn-2"),
+    ])).toHaveLength(2);
+  });
+
   it("deduplicateTimelineEvents preserves anonymous active drafts without delivery identity", () => {
     const makeAnonymousDraft = (id: string, timestamp: number): TimelineEvent => ({
       id,
@@ -3204,6 +3225,151 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
     expect(deduplicateTimelineEvents([
       makeAnonymousDraft("active-draft:anonymous:a", 1000),
       makeAnonymousDraft("active-draft:anonymous:b", 2000),
+    ])).toHaveLength(2);
+  });
+
+  it("deduplicateTimelineEvents folds an identity-less canonical mirror into its live materialization", () => {
+    const thinking = "先定位 IPC 注册，再检查响应类型。";
+    const events: TimelineEvent[] = [{
+      id: "active-draft:session:turn:materialization",
+      type: "assistant_message",
+      timestamp: 1000,
+      content: "看 IPC 注册、响应类型和消息展示样式。",
+      thinking,
+      thinkingParts: [
+        { id: "fragment-a", timestamp: 900, text: "先定位 IPC 注册，" },
+        { id: "fragment-b", timestamp: 1000, text: "再检查响应类型。" },
+      ],
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+      agentTurnId: "turn-1",
+    }, {
+      id: "tool-1",
+      type: "tool_call",
+      timestamp: 1500,
+      toolCallId: "call-1",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+    }, {
+      id: "canonical-mirror",
+      type: "assistant_message",
+      timestamp: 2000,
+      content: "看 IPC 注册、响应类型和消息展示样式。",
+      thinking,
+      thinkingParts: [{ id: "canonical-part", timestamp: 2000, text: thinking }],
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+    }];
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result.map((event) => event.id)).toEqual([
+      "active-draft:session:turn:materialization",
+      "tool-1",
+    ]);
+  });
+
+  it("deduplicateTimelineEvents folds an identity-less canonical mirror into a regular delivery event", () => {
+    const makeAssistant = (
+      id: string,
+      timestamp: number,
+      identity?: { roomMessageId: string; agentTurnId: string },
+    ): TimelineEvent => ({
+      id,
+      type: "assistant_message",
+      timestamp,
+      content: "先找更新记录，再检查代理。",
+      thinking: "定位两个调用链。",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      ...identity,
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeAssistant("live-step", 1000, { roomMessageId: "message-1", agentTurnId: "turn-1" }),
+      makeAssistant("canonical-mirror", 100_000),
+    ]).map((event) => event.id)).toEqual(["live-step"]);
+  });
+
+  it("deduplicateTimelineEvents removes replayed active-draft content but keeps its distinct thinking", () => {
+    const events: TimelineEvent[] = [{
+      id: "live-step",
+      type: "assistant_message",
+      timestamp: 1000,
+      content: "先找版本文案，再看模型探测。",
+      thinking: "第一段思考",
+      thinkingParts: [{ id: "part-a", timestamp: 1000, text: "第一段思考" }],
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+      agentTurnId: "turn-1",
+    }, {
+      id: "tool-1",
+      type: "tool_call",
+      timestamp: 1500,
+      toolCallId: "call-1",
+      toolName: "Read",
+      status: "success",
+      arguments: {},
+    }, {
+      id: "active-draft:session:turn:materialization-b",
+      type: "assistant_message",
+      timestamp: 2000,
+      content: "先找版本文案，再看模型探测。",
+      thinking: "第二段独立思考",
+      thinkingParts: [{ id: "part-b", timestamp: 2000, text: "第二段独立思考" }],
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+      roomMessageId: "message-1",
+      agentTurnId: "turn-1",
+    }];
+
+    const result = deduplicateTimelineEvents(events);
+    expect(result.filter((event) => event.type === "assistant_message")).toEqual([
+      expect.objectContaining({ id: "live-step", content: "先找版本文案，再看模型探测。", thinking: "第一段思考" }),
+      expect.objectContaining({ id: "active-draft:session:turn:materialization-b", content: "", thinking: "第二段独立思考" }),
+    ]);
+  });
+
+  it("deduplicateTimelineEvents removes exact same-moment identity-less assistant copies", () => {
+    const makeCopy = (id: string): TimelineEvent => ({
+      id,
+      type: "assistant_message",
+      timestamp: 1000,
+      content: "同一个实时步骤",
+      thinking: "同一段思考",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeCopy("copy-a"),
+      makeCopy("copy-b"),
+    ]).map((event) => event.id)).toEqual(["copy-a"]);
+  });
+
+  it("deduplicateTimelineEvents preserves later identity-less assistants with intentional repeated text", () => {
+    const makeCopy = (id: string, timestamp: number): TimelineEvent => ({
+      id,
+      type: "assistant_message",
+      timestamp,
+      content: "可以重复出现的正文",
+      thinking: "可以重复出现的思考",
+      isThinking: false,
+      isComplete: true,
+      roomAgentId: "agent-1",
+    });
+
+    expect(deduplicateTimelineEvents([
+      makeCopy("step-a", 1000),
+      makeCopy("step-b", 2000),
     ])).toHaveLength(2);
   });
 });

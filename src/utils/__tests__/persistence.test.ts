@@ -696,6 +696,79 @@ describe("persistLocalConversationState reference guard", () => {
     expect(bodies).toEqual(["问", "预告", "汇总"]);
   });
 
+  it("persists assistant replay repairs after hydration instead of only fixing memory", async () => {
+    const repeated = "先找版本文案，再看模型探测。";
+    const damaged: Session = {
+      ...guardSession,
+      id: "assistant-replay-repair-session",
+      events: [{
+        id: "user-1",
+        type: "user_message",
+        timestamp: 1000,
+        content: "检查两个问题",
+      }, {
+        id: "live-step",
+        type: "assistant_message",
+        timestamp: 1100,
+        content: repeated,
+        thinking: "第一段思考",
+        thinkingParts: [{ id: "part-a", timestamp: 1100, text: "第一段思考" }],
+        isThinking: false,
+        isComplete: true,
+        roomAgentId: "agent-1",
+        roomMessageId: "message-1",
+        agentTurnId: "turn-1",
+      }, {
+        id: "tool-1",
+        type: "tool_call",
+        timestamp: 1200,
+        toolCallId: "call-1",
+        toolName: "Read",
+        status: "success",
+        arguments: {},
+      }, {
+        id: "active-draft:session:turn:materialization",
+        type: "assistant_message",
+        timestamp: 1300,
+        content: repeated,
+        thinking: "第二段独立思考",
+        thinkingParts: [{ id: "part-b", timestamp: 1300, text: "第二段独立思考" }],
+        isThinking: false,
+        isComplete: true,
+        roomAgentId: "agent-1",
+        roomMessageId: "message-1",
+        agentTurnId: "turn-1",
+      }],
+    };
+    getStateItemMock.mockImplementation((key: string) => {
+      if (key === "kimix_local_sessions_index") return Promise.resolve(null);
+      if (key === "kimix_sessions") return Promise.resolve([damaged]);
+      return Promise.resolve(null);
+    });
+
+    const {
+      consumeHydrationRepairSessionIds,
+      loadLocalSessions,
+      markConversationSessionsDirty,
+      markConversationStatePersisted,
+      persistLocalConversationState,
+    } = await import("@/utils/persistence");
+    const loaded = await loadLocalSessions();
+    const repairIds = consumeHydrationRepairSessionIds();
+    expect(repairIds).toEqual(new Set([damaged.id]));
+    expect((loaded[0].events[3] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("");
+
+    markConversationStatePersisted(loaded, useSessionStore.getState().pendingMessages);
+    useSessionStore.setState({ sessions: loaded });
+    markConversationSessionsDirty(repairIds);
+    expect((await persistLocalConversationState()).success).toBe(true);
+    expect(commitStateMock).toHaveBeenCalledTimes(1);
+
+    const entries = commitStateMock.mock.calls[0][0] as Array<{ key: string; value: unknown }>;
+    const stored = sessionEntryById(entries, damaged.id) as Session;
+    expect((stored.events[3] as Extract<TimelineEvent, { type: "assistant_message" }>).content).toBe("");
+  });
+
   it("does not delete images referenced by unchanged sessions (P1-c GC regression)", async () => {
     const { markConversationStatePersisted, persistLocalConversationState } = await import("@/utils/persistence");
 

@@ -52,7 +52,9 @@ import {
   resetStaleSessionRecommendationEvents,
   loadLocalSessions,
   loadLocalPendingMessages,
+  consumeHydrationRepairSessionIds,
   markConversationStatePersisted,
+  markConversationSessionsDirty,
 } from "@/utils/persistence";
 import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -2419,8 +2421,10 @@ function App() {
     });
 
     void (async () => {
+      let hydrationRepairSessionIds = new Set<string>();
       try {
         const parsed = await loadLocalSessions();
+        hydrationRepairSessionIds = consumeHydrationRepairSessionIds();
         if (parsed.length > 0) {
           const restoringActiveSessionId = STARTUP_ACTIVE_CONTEXT?.sessionId;
           const visibleSessions = parsed
@@ -2466,6 +2470,11 @@ function App() {
         useSessionStore.setState({ pendingMessages });
       } catch {
         // ignore
+      } finally {
+        if (hydrationRepairSessionIds.size > 0) {
+          markConversationSessionsDirty(hydrationRepairSessionIds);
+          void persistLocalConversationState();
+        }
       }
     })();
 

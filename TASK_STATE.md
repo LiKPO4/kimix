@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：旧流式重复未被 v2.20.43 完整清理（v2.20.44）
+
+- 用户用 v2.20.43 复验后，旧会话仍显示两份相同 IPC 思考/正文。安装版 IndexedDB 实证剩余 2425 个事件、6 组完整语义重复，以及同一 delivery 下 19 份正文相同但思考不同的历史草稿。
+- v2.20.43 缺口：只比较多个 `active-draft:` 的完整 payload，并把 `thinkingParts` 碎片结构纳入指纹；未覆盖“身份完整实时事件 + 身份缺失 canonical 镜像”，也不能在保留不同思考的同时移除重复正文。此外 hydration 修复后的 session 被误标为已持久化，清理未保证写回 IndexedDB。
+- 修复：同一去重后用户轮次内按规范化正文+完整思考识别有界实时/canonical 镜像，不受 parts 分片数量影响；后续同 delivery active draft 只回放旧正文时清空正文、保留独立思考；跨轮、跨 delivery、跨 Agent 和普通不同时间 identity-less Assistant 均保留。修复 session 在 pending hydration 后单独标脏并增量持久化。
+- 根因快照：`docs/issue-active-draft-offset-zero-replay-duplication-snapshot.md` 已补充 v2.20.43 缺口和 v2.20.44 规则。
+- 验证：定向 eventMapper + persistence 191 项、全量 134 文件 1329 项、Node/Renderer typecheck、生产构建（renderer `assets/index-D6HBGrg2.js`）、OKF 校验（353 链接）均通过。真实目标会话重载后 IndexedDB 事件 2425→2404，完整语义重复组 6→0、同轮重复正文组 19→0，且清理结果已持久化。
+
 ## 2026-07-28 修复：流式草稿回放被重复物化（v2.20.43）
 
 - 目标会话官方 wire 中，截图所示英文思考与中文进度都只出现一次；当前源码从真实 wire 投影也只有一份。安装版 IndexedDB 却有一个 Assistant 内两份完全相同的 3012 字 thinking part，以及同一 Agent turn 下 16 个不同 `active-draft:` ID、正文完全相同的 51 字进度事件，确认是 Kimix 本地解析/持久化重复。

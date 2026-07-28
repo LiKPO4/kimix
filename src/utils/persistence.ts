@@ -547,6 +547,22 @@ export function markConversationStatePersisted(sessions?: Session[], pendingMess
   if (pendingMessages !== undefined) lastPersistedPendingRef = pendingMessages;
 }
 
+export function consumeHydrationRepairSessionIds(): Set<string> {
+  const repaired = pendingHydrationRepairSessionIds;
+  pendingHydrationRepairSessionIds = new Set<string>();
+  return repaired;
+}
+
+export function markConversationSessionsDirty(sessionIds: ReadonlySet<string>): void {
+  if (sessionIds.size === 0) return;
+  // Hydration first registers the restored array as durable to suppress the
+  // startup 0→N flush. Once pending messages are also loaded, invalidate only
+  // repaired sessions and the array-level fast path so one bounded persist
+  // writes the cleaned timelines back to IndexedDB.
+  lastPersistedSessionsRef = null;
+  for (const sessionId of sessionIds) hydratedSessionRefs.delete(sessionId);
+}
+
 type SessionIndexEntry = {
   id: string;
   updatedAt: number;
@@ -576,6 +592,7 @@ function sessionKey(id: string): string {
 // runPersist compares current session references against this cache to skip
 // unchanged sessions. Module-level to survive across persist calls.
 let hydratedSessionRefs = new Map<string, Session>();
+let pendingHydrationRepairSessionIds = new Set<string>();
 
 // Per-session image refs cache: avoids re-traversing unchanged sessions for GC.
 // Updated when a session is stripped (changed), reused for unchanged sessions.
@@ -866,6 +883,31 @@ export async function persistLocalConversationState(): Promise<PersistResult> {
 }
 
 export async function loadLocalSessions(): Promise<Session[]> {
+  pendingHydrationRepairSessionIds.clear();
+  const repairHydratedSession = (session: Session): Session => {
+    const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
+    if (!session.collaboration) {
+      // Reference comparison, not length: repairStableAssistantOrder swaps
+      // event objects in place (same length), so a length check would drop
+      // the repair. Idempotent helpers return the original array reference.
+      return events === session.events ? session : { ...session, events };
+    }
+    const agentEntries = Object.entries(session.collaboration.agentEvents);
+    const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => (
+      [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]
+    )));
+    const changed = events !== session.events ||
+      agentEntries.some(([agentId, list]) => agentEvents[agentId] !== list);
+    return changed
+      ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } }
+      : session;
+  };
+  const repairHydratedSessions = (hydrated: Session[]) => hydrated.map((session) => {
+    const repaired = repairHydratedSession(session);
+    if (repaired !== session) pendingHydrationRepairSessionIds.add(session.id);
+    return repaired;
+  });
+
   // Try new per-session format first.
   const indexData = await getStateItem<SessionIndex>(LOCAL_SESSIONS_INDEX_KEY);
   if (indexData?.version === 2 && Array.isArray(indexData.entries) && indexData.entries.length > 0) {
@@ -886,20 +928,7 @@ export async function loadLocalSessions(): Promise<Session[]> {
     const refs = new Set<string>();
     collectImageRefsFromSessions(rawSessions, refs);
     const dataUrlById = await loadImages(Array.from(refs));
-    const sessions = hydrateSessions(rawSessions, dataUrlById).map((session) => {
-      const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
-      if (!session.collaboration) {
-        // Reference comparison, not length: repairStableAssistantOrder swaps
-        // event objects in place (same length), so a length check would drop
-        // the repair. Idempotent helpers return the original array reference.
-        return events === session.events ? session : { ...session, events };
-      }
-      const agentEntries = Object.entries(session.collaboration.agentEvents);
-      const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
-      const changed = events !== session.events ||
-        agentEntries.some(([agentId, list]) => agentEvents[agentId] !== list);
-      return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
-    });
+    const sessions = repairHydratedSessions(hydrateSessions(rawSessions, dataUrlById));
     // Establish the session reference cache so the first persist skips all sessions.
     // Also pre-populate image refs cache to avoid first-time lazy traversal on GC.
     for (let i = 0; i < sessions.length; i++) {
@@ -923,17 +952,7 @@ export async function loadLocalSessions(): Promise<Session[]> {
   const dataUrlById = await loadImages(Array.from(refs));
   // Replay duplication repair: histories written before the snapshot user
   // dedup guards may contain repeated user messages; clean once on load.
-  const sessions = hydrateSessions(raw, dataUrlById).map((session) => {
-    const events = repairStableAssistantOrder(deduplicateTimelineEvents(session.events));
-    if (!session.collaboration) {
-      return events === session.events ? session : { ...session, events };
-    }
-    const agentEntries = Object.entries(session.collaboration.agentEvents);
-    const agentEvents = Object.fromEntries(agentEntries.map(([agentId, list]) => [agentId, repairStableAssistantOrder(deduplicateTimelineEvents(list))]));
-    const changed = events !== session.events ||
-      agentEntries.some(([agentId, list]) => agentEvents[agentId] !== list);
-    return changed ? { ...session, events, collaboration: { ...session.collaboration, agentEvents } } : session;
-  });
+  const sessions = repairHydratedSessions(hydrateSessions(raw, dataUrlById));
   // Establish cache from old format too.
   for (let i = 0; i < sessions.length; i++) {
     const session = sessions[i];

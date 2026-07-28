@@ -2443,11 +2443,16 @@ function generateId(): string {
  */
 export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
   type UserEvent = Extract<TimelineEvent, { type: "user_message" }>;
+  type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
   type UserRecord = {
     resultIndex: number;
     event: UserEvent;
     content: string;
     echoMatched: boolean;
+  };
+  type AssistantRecord = {
+    resultIndex: number;
+    event: AssistantEvent;
   };
 
   const hasDeliveryIdentity = (event: UserEvent) => Boolean(
@@ -2489,12 +2494,84 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
       recipientAgentIds: preferred.recipientAgentIds ?? fallback.recipientAgentIds,
     };
   };
+  const isActiveDraft = (event: AssistantEvent) => event.id.startsWith("active-draft:");
+  const assistantIdentityScore = (event: AssistantEvent) => {
+    let score = 0;
+    if (event.snapshotMessageIdStable === true && event.snapshotMessageId) score += 64;
+    if (event.roomMessageId) score += 16;
+    if (event.agentTurnId) score += 16;
+    if (event.dispatchAttemptId) score += 8;
+    if (isActiveDraft(event)) score += 4;
+    return score;
+  };
+  const hasAssistantReplayIdentity = (event: AssistantEvent) => Boolean(
+    (event.snapshotMessageIdStable === true && event.snapshotMessageId) ||
+    event.roomMessageId ||
+    event.agentTurnId ||
+    event.dispatchAttemptId
+  );
+  const hasConflictingAssistantDelivery = (left: AssistantEvent, right: AssistantEvent) => Boolean(
+    (left.roomMessageId && right.roomMessageId && left.roomMessageId !== right.roomMessageId) ||
+    (left.agentTurnId && right.agentTurnId && left.agentTurnId !== right.agentTurnId) ||
+    (left.dispatchAttemptId && right.dispatchAttemptId && left.dispatchAttemptId !== right.dispatchAttemptId)
+  );
+  const sameAssistantDelivery = (left: AssistantEvent, right: AssistantEvent) => {
+    if (hasConflictingAssistantDelivery(left, right)) return false;
+    return Boolean(
+      (left.roomMessageId && left.roomMessageId === right.roomMessageId) ||
+      (left.agentTurnId && left.agentTurnId === right.agentTurnId) ||
+      (left.dispatchAttemptId && left.dispatchAttemptId === right.dispatchAttemptId)
+    );
+  };
+  const assistantBodyKey = (event: AssistantEvent) => {
+    const content = normalizeThinkingWhitespace(event.content);
+    const thinkingSource = event.thinking?.trim()
+      ? event.thinking
+      : event.thinkingParts?.map((part) => part.text).join("") ?? "";
+    const thinking = normalizeThinkingWhitespace(
+      thinkingSource
+    );
+    if (!content && !thinking) return null;
+    return JSON.stringify([event.roomAgentId ?? "", content, thinking]);
+  };
+  const assistantDeliveryContentKey = (event: AssistantEvent) => {
+    const content = normalizeThinkingWhitespace(event.content);
+    if (!content || (!event.roomMessageId && !event.agentTurnId)) return null;
+    return JSON.stringify([
+      event.roomAgentId ?? "",
+      event.roomMessageId ?? "",
+      event.agentTurnId ?? "",
+      content,
+    ]);
+  };
+  const mergeAssistantReplayCopies = (
+    current: AssistantEvent,
+    incoming: AssistantEvent,
+  ): AssistantEvent => {
+    const preferIncoming = assistantIdentityScore(incoming) > assistantIdentityScore(current);
+    const preferred = preferIncoming ? incoming : current;
+    const fallback = preferIncoming ? current : incoming;
+    return {
+      ...fallback,
+      ...preferred,
+      roomAgentId: preferred.roomAgentId ?? fallback.roomAgentId,
+      roomMessageId: preferred.roomMessageId ?? fallback.roomMessageId,
+      agentTurnId: preferred.agentTurnId ?? fallback.agentTurnId,
+      dispatchAttemptId: preferred.dispatchAttemptId ?? fallback.dispatchAttemptId,
+      snapshotMessageId: preferred.snapshotMessageId ?? fallback.snapshotMessageId,
+      snapshotMessageIdStable: preferred.snapshotMessageIdStable ?? fallback.snapshotMessageIdStable,
+      thinkingParts: mergeAssistantThinkingParts(current.thinkingParts, incoming.thinkingParts),
+      isComplete: current.isComplete || incoming.isComplete,
+      durationMs: Math.max(current.durationMs ?? 0, incoming.durationMs ?? 0) || undefined,
+    };
+  };
 
   const seenIds = new Map<string, number>();
   const userRecordsByContent = new Map<string, UserRecord[]>();
   const userRecordByResultIndex = new Map<number, UserRecord>();
   const userRecordByDelivery = new Map<string, UserRecord>();
-  const seenActiveDraftBodies = new Set<string>();
+  const assistantRecordsByBody = new Map<string, AssistantRecord[]>();
+  const seenAssistantContentByDelivery = new Set<string>();
   const result: TimelineEvent[] = [];
 
   const moveRecordToContentBucket = (record: UserRecord, previousContent: string) => {
@@ -2529,33 +2606,69 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
     const repairedThinkingParts = rawEvent.type === "assistant_message"
       ? mergeAssistantThinkingParts(undefined, rawEvent.thinkingParts)
       : undefined;
-    const event = rawEvent.type === "assistant_message" && repairedThinkingParts !== rawEvent.thinkingParts
+    let event: TimelineEvent = rawEvent.type === "assistant_message" && repairedThinkingParts !== rawEvent.thinkingParts
       ? { ...rawEvent, thinkingParts: repairedThinkingParts }
       : rawEvent;
-    if (event.type === "assistant_message" && event.id.startsWith("active-draft:")) {
-      const content = event.content.trim();
-      const thinking = normalizeThinkingWhitespace(event.thinking ?? "");
-      const partTexts = (event.thinkingParts ?? [])
-        .map((part) => normalizeThinkingWhitespace(part.text))
-        .filter(Boolean);
-      const hasDeliveryIdentity = Boolean(event.roomMessageId || event.agentTurnId);
-      if (hasDeliveryIdentity && (content || thinking || partTexts.length > 0)) {
-        // Active-draft ids describe renderer materializations, not immutable
-        // model messages. A reconnect can replay offset 0 after every tool
-        // boundary and mint a new id for the same body. Within one delivery
-        // turn that exact body is therefore a provable transport duplicate.
-        const fingerprint = JSON.stringify([
-          event.roomAgentId ?? "",
-          event.roomMessageId ?? "",
-          event.agentTurnId ?? "",
-          content,
-          thinking,
-          partTexts,
-        ]);
-        if (seenActiveDraftBodies.has(fingerprint)) continue;
-        seenActiveDraftBodies.add(fingerprint);
+
+    if (event.type === "assistant_message") {
+      const incomingAssistant = event;
+      const bodyKey = assistantBodyKey(incomingAssistant);
+      const records = bodyKey ? assistantRecordsByBody.get(bodyKey) ?? [] : [];
+      const replayRecord = records.findLast((record) => {
+        const previous = record.event;
+        const distance = Math.abs(previous.timestamp - incomingAssistant.timestamp);
+        if (distance === 0 && !hasConflictingAssistantDelivery(previous, incomingAssistant)) return true;
+        const identityBridge = (
+          hasAssistantReplayIdentity(previous) !==
+          hasAssistantReplayIdentity(incomingAssistant)
+        );
+        const materializationBridge = (
+          (isActiveDraft(previous) || isActiveDraft(incomingAssistant)) &&
+          sameAssistantDelivery(previous, incomingAssistant)
+        );
+        return materializationBridge || (identityBridge && distance <= 120_000);
+      });
+      if (replayRecord) {
+        const merged = mergeAssistantReplayCopies(replayRecord.event, event);
+        result[replayRecord.resultIndex] = merged;
+        replayRecord.event = merged;
+        if (event.id) seenIds.set(event.id, replayRecord.resultIndex);
+        continue;
       }
+
+      const deliveryContentKey = assistantDeliveryContentKey(event);
+      if (deliveryContentKey && isActiveDraft(event)) {
+        if (seenAssistantContentByDelivery.has(deliveryContentKey)) {
+          // Old offset-0 damage can replay the previous text into every later
+          // materialization while each segment still owns distinct thinking.
+          // Remove only the replayed body; keep the process/thinking segment.
+          event = { ...event, content: "" };
+          if (
+            !event.thinking?.trim() &&
+            !event.thinkingParts?.some((part) => part.text.trim())
+          ) {
+            continue;
+          }
+        } else {
+          seenAssistantContentByDelivery.add(deliveryContentKey);
+        }
+      } else if (deliveryContentKey) {
+        seenAssistantContentByDelivery.add(deliveryContentKey);
+      }
+
+      if (event.id && seenIds.has(event.id)) continue;
+      const resultIndex = result.length;
+      result.push(event);
+      if (event.id) seenIds.set(event.id, resultIndex);
+      const repairedBodyKey = assistantBodyKey(event);
+      if (repairedBodyKey) {
+        const bucket = assistantRecordsByBody.get(repairedBodyKey) ?? [];
+        bucket.push({ resultIndex, event });
+        assistantRecordsByBody.set(repairedBodyKey, bucket);
+      }
+      continue;
     }
+
     if (event.type === "user_message") {
       const sameIdIndex = event.id ? seenIds.get(event.id) : undefined;
       if (sameIdIndex !== undefined) {
@@ -2608,6 +2721,10 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
       if (deliveryKey) userRecordByDelivery.set(deliveryKey, record);
       if (event.id) seenIds.set(event.id, record.resultIndex);
       result.push(event);
+      // Assistant replay matching is bounded to one deduplicated user turn.
+      // Intentional repeated answers in later turns must remain independent.
+      assistantRecordsByBody.clear();
+      seenAssistantContentByDelivery.clear();
       continue;
     }
 
@@ -2615,5 +2732,7 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
     if (event.id) seenIds.set(event.id, result.length);
     result.push(event);
   }
-  return result;
+  return result.length === events.length && result.every((event, index) => event === events[index])
+    ? events
+    : result;
 }

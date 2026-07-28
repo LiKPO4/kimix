@@ -105,3 +105,45 @@ reconnect/resync replays old turn prefix
 - authoritative body / clear 重置 anchor 后，下一个流仍可正常从 0 或非 0 offset 建立新基线。
 - `thinkingParts` 必须对同一 incoming batch 内的完整重复保持幂等。
 - 对已持久化损坏数据，只在相同 room/message/turn 下清理正文与思考完全相同的 `active-draft:` materialization；普通 Assistant 和不同轮次的同文消息必须保留。
+
+## v2.20.43 旧数据修复缺口
+
+v2.20.43 阻止了新的 offset 0 回放物化，也清理了多个
+`active-draft:` 之间正文、思考和 parts 结构都完全相同的记录，但安装版
+IndexedDB 复验仍有两种历史形态未覆盖：
+
+1. 同一个官方步骤同时保存为身份完整的实时事件和身份缺失的 canonical
+   镜像。两者正文、合并后的思考完全相同，但一个有多个碎片
+   `thinkingParts`，另一个只有一个完整 part；按 parts 数组做指纹无法相等。
+2. offset 0 在每个工具边界重放同一正文，同时每段确实携带不同的新思考。
+   整条删除会丢思考，只按完整 payload 去重又会保留重复正文。
+
+v2.20.43 安装版中的目标会话复验：
+
+```text
+events: 2425
+semantic duplicate groups: 6
+same delivery repeated body copies: 19
+```
+
+典型残留：
+
+```text
+active-draft(identity complete, thinkingParts=3)
+tool boundary
+canonical mirror(identity absent, thinkingParts=1)
+content equal, normalized thinking equal
+```
+
+## v2.20.44 补充修复
+
+- Assistant 镜像指纹使用规范化正文与完整思考语义，不再把
+  `thinkingParts` 的碎片数量当成正文身份。
+- 同一去重后用户轮次内，身份完整事件与 120 秒内的身份缺失镜像完全相同
+  时合并；两个身份缺失事件只有在同一时间戳且 payload 完全相同时合并。
+- 同一 delivery 的后续 `active-draft:` 若只重放了旧正文但拥有不同思考，
+  只清空正文并保留该思考片段和工具顺序。
+- 不同用户轮次、不同 delivery、不同 room Agent，以及不同时间戳的普通
+  identity-less Assistant 都保持独立。
+- hydration 记录真正发生修复的 session；待 pending messages 同步完成后，
+  只把这些 session 标脏并执行一次增量持久化，使清理结果落回 IndexedDB。
