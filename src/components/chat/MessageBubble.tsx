@@ -1287,16 +1287,27 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
  * text (primary color, never clickable), distinct from the gray thinking
  * summaries. Official kimi-web renders intermediate text in FULL via
  * MessageResponse — no fold, no teaser exemption — so we never collapse it.
+ * Keep it on the shared MarkdownRenderer path as well: outputting the source
+ * string here exposes markdown markers and diverges from both the final body
+ * and official kimi-web.
  * No side indent: it shares the process timeline column with thinking
  * teasers and tool cards.
  */
-function KimiWebIntermediateTextBlock({ content }: { content: string }) {
+export function KimiWebIntermediateTextBlock({ content, streaming = false }: { content: string; streaming?: boolean }) {
   return (
     <div
       className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text)]"
-      style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+      style={{
+        ...KIMI_WEB_THINKING_SUMMARY_STYLE,
+        "--kimix-chat-font-size": "14.5px",
+      } as CSSProperties}
     >
-      {content}
+      <MarkdownRenderer
+        content={content}
+        streaming={streaming}
+        collapsibleThreshold={0}
+        normalizeAssistantProgress
+      />
     </div>
   );
 }
@@ -2116,7 +2127,13 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
         if (group.type === "text") {
           // Skip the final answer segment; it is rendered as the bottom body.
           if (index === finalTextGroupIndex) return null;
-          return <KimiWebIntermediateTextBlock key={group.key} content={group.content} />;
+          return (
+            <KimiWebIntermediateTextBlock
+              key={group.key}
+              content={group.content}
+              streaming={isActiveAssistant && !hasFinalContent && index === groups.length - 1}
+            />
+          );
         }
         return (
           <TurnBlocksProcessGroup

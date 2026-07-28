@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Process-timeline body shares the rich Markdown renderer (v2.20.46)**: `KimiWebIntermediateTextBlock` previously emitted raw strings, so Markdown markers remained visible even though the bottom Assistant body had rich streaming support. Every in-flow text segment now uses `MarkdownRenderer`; only the currently growing trailing group enables its existing throttled streaming mode, while immutable earlier groups render settled-rich immediately. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Legacy live/canonical Assistant mirrors repair durably (v2.20.44)**: v2.20.43 stopped new turn-global offset replays but its hydration cleanup compared raw `thinkingParts` and only matched active-draft pairs. Old histories can hold one identity-rich live materialization plus an identity-less canonical mirror with the same body/thinking but different part fragmentation, or many later drafts that replay the old body while carrying distinct new thinking. Hydration now folds only bounded same-turn semantic mirrors, clears only the repeated body from distinct-thinking drafts, preserves ordinary/different-turn messages, and incrementally persists repaired session ids after pending-message hydration. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

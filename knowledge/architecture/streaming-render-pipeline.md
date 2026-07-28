@@ -1,10 +1,10 @@
 ---
 type: Architecture
 title: Streaming Render Pipeline
-description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, plain streaming markdown, and scroll-yield viewport gates.
+description: How streaming output stays cheap through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield]
-timestamp: "2026-07-28T18:50:00+08:00"
+timestamp: "2026-07-28T21:28:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -258,6 +258,15 @@ the growing tail block run a few times per second, not per token. The fence-awar
 plain path remains as an explicit fallback (`kimix_streaming_plain_markdown=1` or
 `kimix_streaming_rich_markdown=0`). Settled content upgrades to the full
 ReactMarkdown stack once complete and not scrolling, as before.
+
+Every visible Assistant text route must use this shared renderer, including
+`KimiWebIntermediateTextBlock` inside the expanded process timeline; directly
+emitting its source string exposes Markdown markers and creates a renderer split.
+Only the active trailing text group receives `streaming=true`. Earlier
+intermediate groups are immutable and render immediately through the settled rich
+path, preserving the existing streaming cost boundary and leaving
+thinking/tool-card expansion untouched.
+
 Feature flags (localStorage): `kimix_streaming_rich_markdown` (default on), `kimix_streaming_plain_markdown`,
 `kimix_scroll_yield`, `kimix_active_turn_draft`; diagnostics behind
 `kimix_perf_diag` (`getPerfDiagSnapshot()`). "运行中折叠过程详情"

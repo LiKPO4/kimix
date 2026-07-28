@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-07-28 修复：流程内正文恢复富文本渲染（v2.20.46）
+
+- 用户对照官方 Kimi Code 后反馈：过程流里的正文原样显示 `**`、`-`、反引号等 Markdown 标记，而官方会渲染为粗体、列表与行内代码。
+- 根因：`KimiWebIntermediateTextBlock` 在 v2.20.36 调整正文层级时仍直接输出字符串，绕过了项目已有的 `MarkdownRenderer`；此前 v2.20.35 的富流式修复只覆盖底部 Assistant 正文，因此流程内文本形成了独立缺口。
+- 修复：流程正文统一接入 `MarkdownRenderer`；仅活动轮次中仍在增长的末位文本组启用现有 300ms 节流富流式路径，已结束的中间文本立即使用完整 Markdown，且不恢复折叠、不改变思考/工具卡的展开行为。
+- 验证：定向组件与 Markdown 回归 2 文件 4 项、全量 135 文件 1330 项、Node/Renderer typecheck、生产构建（renderer `assets/index-CPvnb_d0.js`）、OKF 校验（354 链接）均通过。
+
 ## 2026-07-28 修复：更新记录移除日期显示（v2.20.45）
 
 - 用户反馈：本体卡「最新可安装」后的发布日期换行难看，且 Release 条目行的日期也不需要。移除两处日期显示（版本行与 Release 条目行），formatReleaseDate 不再被该面板使用。
