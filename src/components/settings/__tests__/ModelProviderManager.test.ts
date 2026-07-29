@@ -54,7 +54,43 @@ function StatefulManager({ initialConfig, onConfigChange }: {
   });
 }
 
+function PersistentModelPage({ config }: { config: KimiModelConfigSummary }) {
+  const [hidden, setHidden] = useState(false);
+  return createElement(
+    "div",
+    null,
+    createElement("button", { type: "button", onClick: () => setHidden((value) => !value) }, "切换设置页"),
+    createElement(
+      "section",
+      { hidden, "data-testid": "persistent-model-page" },
+      createElement(ModelProviderManager, { config, onConfigChange: vi.fn() }),
+    ),
+  );
+}
+
 describe("ModelProviderManager", () => {
+  it("keeps an unsaved provider draft when the settings page is hidden and restored", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(PersistentModelPage, { config: emptyProviderConfig })));
+
+    await act(async () => buttonByText(container, "添加供应商")?.click());
+    const nameInput = container.querySelector('input[placeholder="例如 openai"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(nameInput, "draft-provider");
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await act(async () => buttonByText(container, "切换设置页")?.click());
+    expect((nameInput.closest('[data-testid="persistent-model-page"]') as HTMLElement).hidden).toBe(true);
+    await act(async () => buttonByText(container, "切换设置页")?.click());
+
+    expect((nameInput.closest('[data-testid="persistent-model-page"]') as HTMLElement).hidden).toBe(false);
+    expect(nameInput.value).toBe("draft-provider");
+    await act(async () => root.unmount());
+  });
+
   it("lets the user select a model discovered from the configured Base URL", async () => {
     const discoveredConfig: KimiModelConfigSummary = {
       ...emptyProviderConfig,

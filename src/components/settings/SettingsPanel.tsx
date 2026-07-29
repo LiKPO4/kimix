@@ -1328,6 +1328,34 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <p>{activeSettingsPage.description}</p>
                     </div>
                   </div>
+                  {activeSettingsPageId === "models" && (
+                    <div className="kimix-settings-page-actions">
+                      <div className="kimix-settings-model-meta">
+                        <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
+                          {modelConfig?.defaultModel ?? "未设置默认模型"}
+                        </span>
+                        <small>{modelConfig?.providers.length ?? 0} 个 Provider</small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDoctorModelConfig()}
+                        disabled={modelDoctorLoading}
+                        className="kimix-settings-check-button"
+                      >
+                        <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
+                        <span>诊断</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void refreshModelConfig({ showLoading: true })}
+                        disabled={modelConfigLoading}
+                        className="kimix-settings-check-button"
+                      >
+                        <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
+                        <span>刷新</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2108,66 +2136,77 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
               </div>
 
               <div className="kimix-settings-section" {...settingsSectionProps("model", 3, modelSettingsRef)}>
-                <div className="kimix-settings-row-title">
-                  <div className="kimix-settings-section-title">
-                    <Terminal size={16} className="text-text-muted" />
-                    <span>模型配置</span>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end" style={{ gap: 8, paddingLeft: 12 }}>
-                    <button
-                      type="button"
-                      onClick={() => void handleDoctorModelConfig()}
-                      disabled={modelDoctorLoading}
-                      className="kimix-settings-check-button"
-                    >
-                      <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
-                      <span>诊断</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void refreshModelConfig({ showLoading: true })}
-                      disabled={modelConfigLoading}
-                      className="kimix-settings-check-button"
-                    >
-                      <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
-                      <span>刷新</span>
-                    </button>
-                    {settingsDragHandle("model", "模型配置")}
-                  </div>
-                </div>
-                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
-                  <div className="flex items-start" style={{ gap: 12 }}>
-                    <Terminal size={18} className="mt-0.5 shrink-0 text-text-muted" />
-                    <div className="kimix-settings-permission-copy">
-                      <div className="kimix-settings-permission-label">Kimi Code 模型配置</div>
-                      <div className="kimix-settings-permission-desc">
-                        管理当前模型、Provider 与连接凭据
-                      </div>
+                {variant === "modal" && (
+                  <div className="kimix-settings-row-title">
+                    <div className="kimix-settings-section-title">
+                      <Terminal size={16} className="text-text-muted" />
+                      <span>模型配置</span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end" style={{ gap: 8, paddingLeft: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => void handleDoctorModelConfig()}
+                        disabled={modelDoctorLoading}
+                        className="kimix-settings-check-button"
+                      >
+                        <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
+                        <span>诊断</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void refreshModelConfig({ showLoading: true })}
+                        disabled={modelConfigLoading}
+                        className="kimix-settings-check-button"
+                      >
+                        <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
+                        <span>刷新</span>
+                      </button>
+                      {settingsDragHandle("model", "模型配置")}
                     </div>
                   </div>
+                )}
+                <div
+                  className={variant === "workspace" ? "kimix-model-settings-shell" : "kimix-settings-card"}
+                  style={variant === "workspace" ? undefined : { padding: "18px 16px" }}
+                >
+                  {variant === "modal" && (
+                    <div className="flex items-start" style={{ gap: 12 }}>
+                      <Terminal size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                      <div className="kimix-settings-permission-copy">
+                        <div className="kimix-settings-permission-label">Kimi Code 模型配置</div>
+                        <div className="kimix-settings-permission-desc">
+                          管理当前模型、Provider 与连接凭据
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  <div className="flex flex-col" style={{ gap: 10, marginTop: variant === "workspace" ? 0 : 14 }}>
                     {modelConfigLoading ? (
-                      <div className="kimix-settings-permission-desc">正在读取模型配置...</div>
+                      <div className="kimix-settings-card kimix-model-settings-loading">正在读取模型配置...</div>
                     ) : modelConfig && modelConfig.exists ? (
                       <>
-                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>当前使用</div>
-                          <div className="kimix-settings-permission-label break-all text-[13px]">{modelConfig.defaultModel ?? "未设置"}</div>
-                        </div>
-                        <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
-                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Provider</div>
-                          <div className="kimix-settings-permission-label text-[13px]">
-                            {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasEnv || provider.hasOauth).length} 个已配置凭据
+                        {variant === "modal" && (
+                          <div className="kimix-model-settings-overview">
+                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10 }}>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>当前使用</div>
+                              <div className="kimix-settings-permission-label break-all text-[13px]">{modelConfig.defaultModel ?? "未设置"}</div>
+                            </div>
+                            <div className="grid min-w-0" style={{ gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10, marginTop: 10 }}>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>Provider</div>
+                              <div className="kimix-settings-permission-label text-[13px]">
+                                {modelConfig.providers.length} 个，{modelConfig.providers.filter((provider) => provider.hasApiKey || provider.hasEnv || provider.hasOauth).length} 个已配置凭据
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                         {modelConfigMessage && (
-                          <div className="kimix-settings-permission-desc" style={{ marginTop: 0 }}>{modelConfigMessage}</div>
+                          <div className="kimix-model-settings-message">{modelConfigMessage}</div>
                         )}
                         <ModelProviderManager config={modelConfig} onConfigChange={handleModelProviderConfigChange} />
                       </>
                     ) : (
-                      <div className="kimix-settings-permission-desc">{modelConfigMessage || "未读取到模型配置。"}</div>
+                      <div className="kimix-settings-card kimix-model-settings-loading">{modelConfigMessage || "未读取到模型配置。"}</div>
                     )}
                   </div>
 
