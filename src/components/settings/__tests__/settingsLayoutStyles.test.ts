@@ -13,7 +13,16 @@ describe("settings workspace scroll layout", () => {
       /\.kimix-settings-layout\.is-workspace\s*\{[^}]*display:\s*grid;[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
     );
     expect(css).toMatch(
-      /\.kimix-settings-layout\.is-workspace \.kimix-settings-page\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s,
+      /\.kimix-settings-layout\.is-workspace \.kimix-settings-page\s*\{[^}]*display:\s*flex;[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*flex-direction:\s*column;[^}]*overflow-y:\s*auto;/s,
+    );
+  });
+
+  it("pins the footer to the viewport bottom without detaching it from overflowing content", () => {
+    expect(css).toMatch(
+      /\.kimix-settings-columns\.is-workspace\s*\{[^}]*flex-shrink:\s*0;[^}]*padding-bottom:\s*18px;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-panel\.is-workspace \.kimix-settings-footer\s*\{[^}]*flex-shrink:\s*0;[^}]*margin-top:\s*auto;/s,
     );
   });
 });
