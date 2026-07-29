@@ -62,4 +62,15 @@ describe("settings workspace scroll layout", () => {
     expect(activePermissionRule).not.toContain("box-shadow");
     expect(searchFocusRule).not.toContain("box-shadow");
   });
+
+  it("pins experimental status badges to a fixed right-side action column", () => {
+    expect(settingsPanel.match(/kimix-settings-permission-with-status/g)).toHaveLength(2);
+    expect(settingsPanel.match(/kimix-settings-permission-status/g)).toHaveLength(2);
+    expect(css).toMatch(
+      /\.kimix-settings-permission-with-status\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-permission-status\s*\{[^}]*justify-self:\s*end;/s,
+    );
+  });
 });

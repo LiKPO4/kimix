@@ -2254,6 +2254,16 @@ button.bg-accent-primary:disabled:hover,
               border-color var(--duration-base) var(--ease-hover);
 }
 
+.kimix-settings-permission-with-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.kimix-settings-permission-status {
+  justify-self: end;
+  flex-shrink: 0;
+}
+
 .kimix-settings-permission:hover {
   background: var(--surface-hover);
 }

@@ -1984,7 +1984,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     aria-pressed={experimentalKimiToolSelect}
                     onClick={() => void saveExperimentalToolSelect(!experimentalKimiToolSelect)}
                     disabled={experimentalSettingsLoading || experimentalSettingsSaving}
-                    className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
+                    className={`kimix-settings-permission kimix-settings-permission-with-status ${experimentalKimiToolSelect ? "is-active" : ""}`}
                     style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
                   >
                     <SelectionIndicator selected={experimentalKimiToolSelect} />
@@ -1994,7 +1994,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         支持的模型只在需要时加载 MCP 工具定义，可减少上下文占用并改善提示词缓存；默认关闭。
                       </div>
                     </div>
-                    <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                    <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {experimentalKimiToolSelect ? "已开启" : "关闭"}
                     </span>
                   </button>
@@ -2005,7 +2005,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       const next = !multiAgentRoomUiEnabled;
                       if (setMultiAgentRoomUiEnabled(next)) setMultiAgentRoomUiEnabledState(next);
                     }}
-                    className={`kimix-settings-permission ${multiAgentRoomUiEnabled ? "is-active" : ""}`}
+                    className={`kimix-settings-permission kimix-settings-permission-with-status ${multiAgentRoomUiEnabled ? "is-active" : ""}`}
                     style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
                   >
                     <SelectionIndicator selected={multiAgentRoomUiEnabled} />
@@ -2018,7 +2018,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         在 Composer 的 + 菜单开放“添加 Agent”；关闭后隐藏创建入口，已有房间仍可正常使用。
                       </div>
                     </div>
-                    <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                    <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {multiAgentRoomUiEnabled ? "已开启" : "关闭"}
                     </span>
                   </button>
