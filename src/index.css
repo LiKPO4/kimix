@@ -1262,9 +1262,208 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-panel.is-workspace .kimix-settings-body {
   max-height: none;
   height: calc(100% - 61px);
-  overflow-y: auto;
+  overflow: hidden;
   overflow-x: hidden;
   padding: 18px 24px 22px;
+}
+
+.kimix-settings-layout.is-workspace {
+  display: grid;
+  width: min(1180px, 100%);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.kimix-settings-navigation {
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  padding: 14px;
+  scrollbar-width: thin;
+}
+
+.kimix-settings-search {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-base);
+  padding-left: 12px;
+  padding-right: 12px;
+  color: var(--text-muted);
+  transition-property: border-color, box-shadow, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+
+.kimix-settings-search:focus-within {
+  border-color: var(--accent-primary-soft);
+  background: var(--surface-elevated);
+  box-shadow: 0 0 0 2px var(--surface-hover);
+}
+
+.kimix-settings-search input {
+  min-width: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  line-height: 20px;
+  outline: none;
+}
+
+.kimix-settings-search input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.kimix-settings-navigation-groups,
+.kimix-settings-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.kimix-settings-navigation-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kimix-settings-navigation-group-label {
+  padding-left: 10px;
+  padding-right: 10px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.kimix-settings-navigation-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kimix-settings-navigation-item,
+.kimix-settings-search-result {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  transition-property: background-color, color, scale;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+
+.kimix-settings-navigation-item {
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding-left: 12px;
+  padding-right: 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.kimix-settings-navigation-item:hover,
+.kimix-settings-search-result:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-settings-navigation-item:active,
+.kimix-settings-search-result:active {
+  scale: 0.96;
+}
+
+.kimix-settings-navigation-item.is-active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent-primary-soft);
+}
+
+.kimix-settings-search-result {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+.kimix-settings-search-result small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kimix-settings-search-empty {
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 20px;
+  padding: 16px;
+  text-align: center;
+}
+
+.kimix-settings-page {
+  min-width: 0;
+  min-height: 0;
+}
+
+.kimix-settings-layout.is-workspace .kimix-settings-page {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.kimix-settings-page-header {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 4px 4px 16px;
+}
+
+.kimix-settings-page-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kimix-settings-page-heading > svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.kimix-settings-page-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 28px;
+  text-wrap: balance;
+}
+
+.kimix-settings-page-heading p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-wrap: pretty;
 }
 
 .kimix-settings-columns {
@@ -1279,10 +1478,10 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-columns.is-workspace {
   display: grid;
-  width: min(920px, 100%);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 16px;
   align-items: stretch;
 }
 
@@ -1294,11 +1493,11 @@ button.bg-accent-primary:disabled:hover,
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-elevated);
-  padding: 12px 16px;
+  padding: 14px 16px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-footer {
-  width: min(920px, 100%);
+  width: 100%;
   margin-left: auto;
   margin-right: auto;
   margin-top: 18px;
@@ -1308,9 +1507,53 @@ button.bg-accent-primary:disabled:hover,
   margin-top: 0;
 }
 
-@media (max-width: 720px) {
-  .kimix-settings-columns.is-workspace {
-    width: 100%;
+@media (max-width: 860px) {
+  .kimix-settings-layout.is-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .kimix-settings-navigation {
+    overflow: visible;
+  }
+
+  .kimix-settings-navigation-groups {
+    gap: 10px;
+  }
+
+  .kimix-settings-navigation-group-label {
+    display: none;
+  }
+
+  .kimix-settings-navigation-items {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .kimix-settings-navigation-item {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .kimix-settings-layout.is-workspace .kimix-settings-page {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .kimix-settings-panel.is-workspace .kimix-settings-body {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .kimix-settings-panel.is-workspace .kimix-settings-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .kimix-settings-navigation-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

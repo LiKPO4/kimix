@@ -34,6 +34,14 @@ import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/r
 import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 import { ModelProviderManager } from "./ModelProviderManager";
+import {
+  getSettingsPage,
+  getSettingsPageForSection,
+  searchSettings,
+  SETTINGS_PAGES,
+  type SettingsPageId,
+  type SettingsSectionId,
+} from "./settingsNavigation";
 
 type FreezeReport = {
   at: string;
@@ -54,29 +62,12 @@ type ArchivedSessionSummary = {
 
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const SETTINGS_SECTION_ORDER_KEY = "kimix_settings_section_order";
+const SETTINGS_ACTIVE_PAGE_KEY = "kimix_settings_active_page";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
-
-type SettingsSectionId =
-  | "connection"
-  | "auth"
-  | "experiment"
-  | "model"
-  | "theme"
-  | "permission"
-  | "context"
-  | "message"
-  | "processDisplay"
-  | "filePreview"
-  | "newSession"
-  | "notification"
-  | "voice"
-  | "archived"
-  | "migration"
-  | "freeze";
 
 const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "connection",
@@ -171,6 +162,23 @@ function writeSettingsSectionOrder(order: SettingsSectionId[]) {
     localStorage.setItem(SETTINGS_SECTION_ORDER_KEY, JSON.stringify(order));
   } catch {
     // The in-memory order still updates if local persistence is unavailable.
+  }
+}
+
+function readActiveSettingsPage(): SettingsPageId {
+  try {
+    const stored = localStorage.getItem(SETTINGS_ACTIVE_PAGE_KEY) as SettingsPageId | null;
+    return SETTINGS_PAGES.some((page) => page.id === stored) ? stored! : "general";
+  } catch {
+    return "general";
+  }
+}
+
+function writeActiveSettingsPage(pageId: SettingsPageId) {
+  try {
+    localStorage.setItem(SETTINGS_ACTIVE_PAGE_KEY, pageId);
+  } catch {
+    // Navigation still works for the current window when persistence is unavailable.
   }
 }
 
@@ -343,6 +351,17 @@ function SelectionIndicator({ selected }: { selected: boolean }) {
   );
 }
 
+function SettingsPageIcon({ pageId }: { pageId: SettingsPageId }) {
+  if (pageId === "appearance") return <Sun size={16} />;
+  if (pageId === "conversation") return <MessageSquare size={16} />;
+  if (pageId === "account") return <ShieldCheck size={16} />;
+  if (pageId === "models") return <Terminal size={16} />;
+  if (pageId === "experiments") return <Zap size={16} />;
+  if (pageId === "data") return <Archive size={16} />;
+  if (pageId === "diagnostics") return <AlertCircle size={16} />;
+  return <Settings size={16} />;
+}
+
 function normalizeFilePreviewExtensions(value: string | string[]) {
   const parts = Array.isArray(value) ? value : value.split(/[\s,，;；]+/);
   const candidates = parts
@@ -451,6 +470,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
   const [roomDeliveryInspectorOpen, setRoomDeliveryInspectorOpen] = useState(false);
+  const [activeSettingsPageId, setActiveSettingsPageId] = useState<SettingsPageId>(() => readActiveSettingsPage());
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
 
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -465,6 +486,29 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [connection, setConnection] = useState<KimiConnectionStatus>(
     settingsStatusCache.connection ?? { loading: true, available: null, verified: false, message: "正在查找 Kimi Code" },
   );
+  const activeSettingsPage = getSettingsPage(activeSettingsPageId);
+  const settingsSearchResults = useMemo(() => searchSettings(settingsSearchQuery), [settingsSearchQuery]);
+  const settingsNavigationGroups = useMemo(() => (
+    (["基础设置", "Kimi Code", "高级"] as const).map((group) => ({
+      group,
+      pages: SETTINGS_PAGES.filter((page) => page.group === group),
+    }))
+  ), []);
+
+  const navigateToSettingsPage = (pageId: SettingsPageId) => {
+    writeActiveSettingsPage(pageId);
+    setActiveSettingsPageId(pageId);
+  };
+
+  const focusSettingsSection = (sectionId: SettingsSectionId, block: ScrollLogicalPosition = "start") => {
+    navigateToSettingsPage(getSettingsPageForSection(sectionId));
+    window.setTimeout(() => {
+      const section = settingsSectionRefs.current.get(sectionId);
+      section?.scrollIntoView({ behavior: "smooth", block });
+      section?.focus({ preventScroll: true });
+    }, 0);
+  };
+
   useEffect(() => () => {
     settingsDragCleanupRef.current?.();
     settingsDragCleanupRef.current = null;
@@ -522,7 +566,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         else settingsSectionRefs.current.delete(id);
       },
       "data-settings-section-id": id,
+      "data-settings-page-id": getSettingsPageForSection(id),
       "data-settings-drop-position": dropActive ?? undefined,
+      hidden: variant === "workspace" && getSettingsPageForSection(id) !== activeSettingsPageId,
+      tabIndex: -1,
       style: {
         order: settingsSectionOrderValue(id, fallbackOrder),
         position: "relative" as const,
@@ -1081,24 +1128,20 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   useEffect(() => {
     const handleFocusModelSettings = () => {
-      window.setTimeout(() => {
-        modelSettingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 0);
+      focusSettingsSection("model");
     };
     window.addEventListener("kimix:focus-model-settings", handleFocusModelSettings);
     return () => window.removeEventListener("kimix:focus-model-settings", handleFocusModelSettings);
-  }, []);
+  }, [activeSettingsPageId]);
 
   useEffect(() => {
     const handleFocusAuthSettings = () => {
       void refreshAuth({ showLoading: false });
-      window.setTimeout(() => {
-        authSettingsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 0);
+      focusSettingsSection("auth", "center");
     };
     window.addEventListener("kimix:focus-auth-settings", handleFocusAuthSettings);
     return () => window.removeEventListener("kimix:focus-auth-settings", handleFocusAuthSettings);
-  }, []);
+  }, [activeSettingsPageId]);
 
   if (!settingsPresence.mounted && variant === "modal") return null;
 
@@ -1211,7 +1254,81 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         </div>
 
         <div className="kimix-settings-body">
-          <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
+          <div className={`kimix-settings-layout ${variant === "workspace" ? "is-workspace" : ""}`}>
+            {variant === "workspace" && (
+              <aside className="kimix-settings-navigation" aria-label="设置分类">
+                <div className="kimix-settings-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    value={settingsSearchQuery}
+                    onChange={(event) => setSettingsSearchQuery(event.target.value)}
+                    placeholder="搜索设置..."
+                    aria-label="搜索设置"
+                  />
+                </div>
+
+                {settingsSearchQuery.trim() ? (
+                  <div className="kimix-settings-search-results" aria-live="polite">
+                    <div className="kimix-settings-navigation-group-label">
+                      搜索结果 · {settingsSearchResults.length}
+                    </div>
+                    {settingsSearchResults.length > 0 ? settingsSearchResults.map((result) => (
+                      <button
+                        key={result.id}
+                        type="button"
+                        className="kimix-settings-search-result"
+                        onClick={() => {
+                          focusSettingsSection(result.sectionId, "center");
+                          setSettingsSearchQuery("");
+                        }}
+                      >
+                        <span>{result.label}</span>
+                        <small>{getSettingsPage(result.pageId).label}</small>
+                      </button>
+                    )) : (
+                      <div className="kimix-settings-search-empty">没有匹配的设置</div>
+                    )}
+                  </div>
+                ) : (
+                  <nav className="kimix-settings-navigation-groups">
+                    {settingsNavigationGroups.map(({ group, pages }) => (
+                      <div key={group} className="kimix-settings-navigation-group">
+                        <div className="kimix-settings-navigation-group-label">{group}</div>
+                        <div className="kimix-settings-navigation-items">
+                          {pages.map((page) => (
+                            <button
+                              key={page.id}
+                              type="button"
+                              aria-current={activeSettingsPageId === page.id ? "page" : undefined}
+                              className={`kimix-settings-navigation-item ${activeSettingsPageId === page.id ? "is-active" : ""}`}
+                              onClick={() => navigateToSettingsPage(page.id)}
+                            >
+                              <SettingsPageIcon pageId={page.id} />
+                              <span>{page.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </nav>
+                )}
+              </aside>
+            )}
+
+            <main className="kimix-settings-page">
+              {variant === "workspace" && (
+                <div className="kimix-settings-page-header">
+                  <div className="kimix-settings-page-heading">
+                    <SettingsPageIcon pageId={activeSettingsPage.id} />
+                    <div className="min-w-0">
+                      <h3>{activeSettingsPage.label}</h3>
+                      <p>{activeSettingsPage.description}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
             <div className="kimix-settings-col">
               <div className="kimix-settings-section" {...settingsSectionProps("theme", 3)}>
                 <div className="kimix-settings-section-title">
@@ -2220,7 +2337,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             </div>
           </div>
 
-          <div className="kimix-settings-footer">Kimix v{APP_VERSION} · 设置将自动保存到本地</div>
+              <div className="kimix-settings-footer">Kimix v{APP_VERSION} · 设置将自动保存到本地</div>
+            </main>
+          </div>
         </div>
       </div>
   );
