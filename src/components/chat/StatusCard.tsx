@@ -2,7 +2,7 @@ import { memo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 import { compactModelText } from "@/utils/modelDisplay";
-import { isEmptyStatusUpdate, shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
+import { hasMetricStatus, isEmptyStatusUpdate, shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 
 interface StatusCardProps {
   event: Extract<TimelineEvent, { type: "status_update" }>;
@@ -51,18 +51,22 @@ export function getStatusCardDetailTexts(
   ].filter(Boolean);
 }
 
+export function getStatusCardToneClass(event: Extract<TimelineEvent, { type: "status_update" }>): string {
+  // Token/context footers are neutral measurements. This display-side guard
+  // also repairs persisted legacy rows whose adjacent runtime notification
+  // leaked source/tone into a later usage snapshot.
+  if (hasMetricStatus(event)) return "bg-surface-hover text-text-muted";
+  if (event.tone === "info" || event.source === "slash") return "bg-accent-primary-light text-accent-primary";
+  if (event.tone === "success") return "bg-accent-success-light text-accent-success";
+  if (event.tone === "warning") return "bg-accent-warning-light text-accent-warning";
+  if (event.tone === "danger") return "bg-accent-danger-light text-accent-danger";
+  return "bg-surface-hover text-text-muted";
+}
+
 export const StatusCard = memo(function StatusCard({ event, inline = false, allowModelOnly = false }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
   if (allowModelOnly ? !shouldShowInlineStatusUpdate(event) : isEmptyStatusUpdate(event)) return null;
-  const toneClass = event.tone === "info" || event.source === "slash"
-    ? "bg-accent-primary-light text-accent-primary"
-    : event.tone === "success"
-      ? "bg-accent-success-light text-accent-success"
-      : event.tone === "warning"
-        ? "bg-accent-warning-light text-accent-warning"
-        : event.tone === "danger"
-          ? "bg-accent-danger-light text-accent-danger"
-          : "bg-surface-hover text-text-muted";
+  const toneClass = getStatusCardToneClass(event);
   const details = getStatusCardDetailTexts(event, detailedContext).map((text) => ({
     text,
     tabular: text.startsWith("输入:") || text.startsWith("输出:") || text.startsWith("Context:"),

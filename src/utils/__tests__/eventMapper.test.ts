@@ -1737,6 +1737,41 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "status_update" }>).tokenCount).toBe(20);
   });
 
+  it("does not leak notification semantics into an adjacent usage status", () => {
+    const existing: TimelineEvent[] = [{
+      id: "notification",
+      type: "status_update",
+      timestamp: 1,
+      message: "定时任务触发：检查构建状态",
+      source: "runtime",
+      tone: "info",
+      parentEventId: "user-1",
+    }];
+    const incoming: TimelineEvent = {
+      id: "usage",
+      type: "status_update",
+      timestamp: 2,
+      message: "模型：kimi-code/k3",
+      inputTokenCount: 622_188,
+      tokenCount: 140,
+      usageScope: "turn",
+    };
+
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(1);
+    const merged = result[0] as Extract<TimelineEvent, { type: "status_update" }>;
+    expect(merged).toMatchObject({
+      id: "usage",
+      message: "模型：kimi-code/k3",
+      inputTokenCount: 622_188,
+      tokenCount: 140,
+      usageScope: "turn",
+    });
+    expect(merged.source).toBeUndefined();
+    expect(merged.tone).toBeUndefined();
+    expect(merged.parentEventId).toBeUndefined();
+  });
+
   it("drops a subagent-scoped assistant event when no matching card exists", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "assistant_message", timestamp: 1, content: "主 turn 正文", isThinking: false, isComplete: false },

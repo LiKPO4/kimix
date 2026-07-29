@@ -2347,6 +2347,13 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         inputTokenCount: preferPositiveMetric(incoming.inputTokenCount, last.inputTokenCount),
         contextSize: preferPositiveMetric(incoming.contextSize, last.contextSize),
         contextLimit: preferPositiveMetric(incoming.contextLimit, last.contextLimit),
+        // Source/tone/parent describe the incoming status itself, not the
+        // accumulated metric dimensions. Leaving an omitted property from the
+        // previous status made a neutral usage.record inherit an adjacent
+        // runtime notification's blue/green semantic styling.
+        source: incoming.source,
+        tone: incoming.tone,
+        parentEventId: incoming.parentEventId,
       };
       return [...existing.slice(0, -1), merged];
     }

@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Usage footers no longer inherit notification colors (v2.20.49)**: consecutive status merging still accumulates model/input/output/context dimensions, but presentation metadata (`source`, `tone`, `parentEventId`) now belongs only to the incoming status. Token/context pills always render with the neutral metric treatment, which also repairs previously persisted blue/green usage rows without rewriting session data; genuine semantic notices keep their status colors. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+
 * **Live Swarm details stop reflowing the outer chat (v2.20.48)**: once nested activity reaches eight entries, the card keeps a fixed-height inner viewport rather than replacing a variable-height last-eight slice in the outer document flow. The inner viewport follows new events only while the user remains at its bottom; outer bottom-follow and detached anchoring continue to own genuine top-level layout changes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 
