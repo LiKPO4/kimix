@@ -80,11 +80,19 @@ export function chatNavigationTargetId(item: RenderItem): string {
   return item.id;
 }
 
+export function chatNavigationEventIds(item: RenderItem): string[] {
+  if (item.type === "event") {
+    return Array.from(new Set([item.event.id, ...(item.sourceEventIds ?? [])]));
+  }
+  if (item.type === "tool_group") {
+    return Array.from(new Set(item.tools.map((tool) => tool.id)));
+  }
+  return [item.id];
+}
+
 export function chatNavigationContainsEventId(item: RenderItem, eventId: string | null) {
   if (!eventId) return false;
-  if (item.type === "event") return item.event.id === eventId;
-  if (item.type === "tool_group") return item.tools.some((tool) => tool.id === eventId);
-  return item.id === eventId;
+  return chatNavigationEventIds(item).includes(eventId);
 }
 
 function chatNavigationKind(item: RenderItem): ChatNavigationKind {

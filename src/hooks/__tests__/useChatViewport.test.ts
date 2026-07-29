@@ -60,6 +60,7 @@ function TestComponent({ options }: { options: UseChatViewportOptions }) {
           key: item.type === "event" ? item.event.id : "x",
           "data-kimix-render-key": item.type === "event" ? item.event.id : "x",
           "data-kimix-event-id": item.type === "event" ? item.event.id : undefined,
+          "data-kimix-event-ids": item.type === "event" ? item.sourceEventIds?.join(" ") : undefined,
           style: { height: 100 },
         }),
       ),
@@ -404,6 +405,46 @@ describe("useChatViewport", () => {
     });
 
     expect(onHighlight).toHaveBeenCalledWith("target-event");
+  });
+
+  it("reveals a collapsed merged event before selecting its exact search text", async () => {
+    const onHighlight = vi.fn();
+    const merged = eventRenderItem("assistant:turn-1");
+    if (merged.type !== "event") return;
+    merged.sourceEventIds = ["assistant-step-2"];
+    const { viewport, container, scroll } = renderTest({
+      renderItems: [merged],
+      onHighlightEvent: onHighlight,
+    });
+    scroll.scrollTo = vi.fn();
+    const target = container.querySelector<HTMLElement>("[data-kimix-event-id='assistant:turn-1']")!;
+    const reveal = document.createElement("button");
+    reveal.dataset.kimixSearchExpand = "true";
+    reveal.setAttribute("aria-expanded", "false");
+    reveal.addEventListener("click", () => {
+      reveal.setAttribute("aria-expanded", "true");
+      const detail = document.createElement("span");
+      detail.textContent = "这里是精准命中的内容";
+      target.appendChild(detail);
+    });
+    target.appendChild(reveal);
+    Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top: 100, height: 16 }),
+    });
+
+    act(() => {
+      expect(viewport().focusTimelineEvent("assistant-step-2", "精准命中")).toBe(false);
+    });
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+
+    expect(reveal.getAttribute("aria-expanded")).toBe("true");
+    expect(window.getSelection()?.toString()).toBe("精准命中");
+    expect(onHighlight).toHaveBeenCalledWith("assistant-step-2");
   });
 
   it("prepare expand helpers capture anchors without throwing", () => {

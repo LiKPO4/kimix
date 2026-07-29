@@ -1478,6 +1478,7 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
 
   return (
     <div
+      data-kimix-event-id={tool.id}
       className="flex flex-col"
       style={{ borderBottom: isLast ? "none" : "1px solid var(--kimix-panel-divider)" }}
     >
@@ -1485,6 +1486,8 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          data-kimix-search-expand="true"
           className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
           style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
@@ -1507,6 +1510,8 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
             <button
               type="button"
               onClick={() => setShowFullDetails((value) => !value)}
+              aria-expanded={showFullDetails}
+              data-kimix-search-expand="true"
               className="kimix-icon-text-button ml-[38px] text-[12px] text-[var(--kimix-panel-text-muted)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
               style={{ marginBottom: 8 }}
             >
@@ -1530,6 +1535,8 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        data-kimix-search-expand="true"
         className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
         style={{ gap: 9, padding: "8px 12px" }}
       >
@@ -2202,26 +2209,28 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
           // Skip the final answer segment; it is rendered as the bottom body.
           if (index === finalTextGroupIndex) return null;
           return (
-            <KimiWebIntermediateTextBlock
-              key={group.key}
-              content={group.content}
-              streaming={isActiveAssistant && !hasFinalContent && index === groups.length - 1}
-            />
+            <div key={group.key} data-kimix-event-ids={group.sourceEventIds.join(" ")}>
+              <KimiWebIntermediateTextBlock
+                content={group.content}
+                streaming={isActiveAssistant && !hasFinalContent && index === groups.length - 1}
+              />
+            </div>
           );
         }
         return (
-          <TurnBlocksProcessGroup
-            key={group.key}
-            group={group}
-            isLive={shouldUseLiveThinkingViewport({
-              groupIndex: index,
-              groupCount: groups.length,
-              isThinkingGroup: group.type === "thinking",
-              isActiveAssistant,
-              hasFinalContent,
-              preserveDuringFinalTransition,
-            })}
-          />
+          <div key={group.key} data-kimix-event-ids={group.sourceEventIds.join(" ")}>
+            <TurnBlocksProcessGroup
+              group={group}
+              isLive={shouldUseLiveThinkingViewport({
+                groupIndex: index,
+                groupCount: groups.length,
+                isThinkingGroup: group.type === "thinking",
+                isActiveAssistant,
+                hasFinalContent,
+                preserveDuringFinalTransition,
+              })}
+            />
+          </div>
         );
       })}
     </div>
@@ -2457,6 +2466,8 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
           ref={summaryAnchorRef}
           type="button"
           onClick={() => toggleWithStableAnchor(!expanded, "summary")}
+          aria-expanded={expanded}
+          data-kimix-search-expand="true"
           className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
         >
           {summaryContent}

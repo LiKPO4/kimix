@@ -30,7 +30,7 @@ import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUs
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
-import { chatNavigationContainsEventId, chatNavigationTargetId } from "@/utils/chatNavigation";
+import { chatNavigationContainsEventId, chatNavigationEventIds, chatNavigationTargetId } from "@/utils/chatNavigation";
 import { requestRoomDeliveryAction } from "@/utils/roomDeliveryAction";
 import type { LongTaskSessionMeta, RoomAgentActivity, Session, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
@@ -790,7 +790,17 @@ export function buildRenderItems(
   ) => {
     if (tools.length === 0 && subagents.length === 0) return;
     if (sessionEngine === "kimi-code") {
-      items.push({ type: "event", event: createToolOnlyAssistantEvent(tools, isTurnActive, subagents), turnStartedAt, isAssistantActive: isTurnActive, leadingTools: tools, leadingSubagents: subagents, trailingStatuses: [], turnBlocks });
+      items.push({
+        type: "event",
+        event: createToolOnlyAssistantEvent(tools, isTurnActive, subagents),
+        sourceEventIds: [...tools.map((tool) => tool.id), ...subagents.map((subagent) => subagent.id)],
+        turnStartedAt,
+        isAssistantActive: isTurnActive,
+        leadingTools: tools,
+        leadingSubagents: subagents,
+        trailingStatuses: [],
+        turnBlocks,
+      });
       return;
     }
     if (tools.length > 0) {
@@ -850,6 +860,7 @@ export function buildRenderItems(
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
     hasLaterUserBoundary = false,
   ) => {
+    const turnSourceEventIds = turnEvents.map((event) => event.id);
     turnEvents
       .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
       .forEach((event) => items.push({ type: "event", event }));
@@ -1040,6 +1051,7 @@ export function buildRenderItems(
       items.push({
         type: "event",
         event: projectedFailureAssistant,
+        sourceEventIds: turnSourceEventIds,
         turnStartedAt,
         isAssistantActive: false,
         leadingTools: tools,
@@ -1077,6 +1089,7 @@ export function buildRenderItems(
       items.push({
         type: "event",
         event: pendingAssistantEvent,
+        sourceEventIds: turnSourceEventIds,
         turnStartedAt,
         isAssistantActive: true,
         leadingTools: tools,
@@ -1114,6 +1127,7 @@ export function buildRenderItems(
         items.push({
           type: "event",
           event: renderAssistantEvent,
+          sourceEventIds: turnSourceEventIds,
           turnStartedAt,
           isAssistantActive: !turnSettled,
           leadingTools: assistantAttached ? [] : tools,
@@ -1878,7 +1892,7 @@ export const ChatThread = memo(function ChatThread() {
               key={renderItemKey(item)}
               data-kimix-render-key={renderItemKey(item)}
               data-kimix-event-id={chatNavigationTargetId(item)}
-              data-kimix-event-ids={item.type === "event" ? item.event.id.split(":").join(" ") : item.type === "tool_group" ? item.tools.map((tool) => tool.id).join(" ") : undefined}
+              data-kimix-event-ids={chatNavigationEventIds(item).join(" ")}
               style={{
                 borderRadius: 12,
                 outline: chatNavigationContainsEventId(item, highlightedEventId)

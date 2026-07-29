@@ -16,7 +16,7 @@ export type QuestionTimelineEvent = Extract<TimelineEvent, { type: "question_req
  * so any timestamp-based reordering scrambles the sequence.
  */
 export type TurnBlock =
-  | { kind: "thinking"; key: string; blocks: ThinkingBlock[] }
+  | { kind: "thinking"; key: string; blocks: ThinkingBlock[]; sourceEventIds?: string[] }
   | { kind: "text"; key: string; events: AssistantMessageEvent[]; content: string }
   | { kind: "tool"; key: string; tool: ToolCallEvent }
   | { kind: "subagent"; key: string; subagent: SubagentTimelineEvent; tool?: ToolCallEvent }
@@ -110,8 +110,9 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
         const tail = blocks.at(-1);
         if (tail?.kind === "thinking") {
           tail.blocks.push(...thinkingBlocks);
+          tail.sourceEventIds = Array.from(new Set([...(tail.sourceEventIds ?? []), event.id]));
         } else {
-          blocks.push({ kind: "thinking", key: `thinking:${event.id}`, blocks: thinkingBlocks });
+          blocks.push({ kind: "thinking", key: `thinking:${event.id}`, blocks: thinkingBlocks, sourceEventIds: [event.id] });
         }
         textBoundaryPending = false;
       }
@@ -267,12 +268,12 @@ export function computeStreamingTrailingTextContent(turnBlocks: TurnBlock[] | un
 
 
 export type TurnBlockGroup =
-  | { type: "thinking"; key: string; blocks: ThinkingBlock[] }
-  | { type: "text"; key: string; content: string }
-  | { type: "tool"; key: string; tools: ToolCallEvent[] }
-  | { type: "subagent"; key: string; subagents: SubagentTimelineEvent[]; tools: (ToolCallEvent | undefined)[] }
-  | { type: "approval"; key: string; approvals: ApprovalTimelineEvent[] }
-  | { type: "question"; key: string; question: QuestionTimelineEvent };
+  | { type: "thinking"; key: string; blocks: ThinkingBlock[]; sourceEventIds: string[] }
+  | { type: "text"; key: string; content: string; sourceEventIds: string[] }
+  | { type: "tool"; key: string; tools: ToolCallEvent[]; sourceEventIds: string[] }
+  | { type: "subagent"; key: string; subagents: SubagentTimelineEvent[]; tools: (ToolCallEvent | undefined)[]; sourceEventIds: string[] }
+  | { type: "approval"; key: string; approvals: ApprovalTimelineEvent[]; sourceEventIds: string[] }
+  | { type: "question"; key: string; question: QuestionTimelineEvent; sourceEventIds: string[] };
 
 /**
  * Group only adjacent same-kind blocks, mirroring the official kimi-web
@@ -287,25 +288,44 @@ export function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
   for (const block of blocks) {
     const last = groups.at(-1);
     if (block.kind === "thinking") {
-      if (last?.type === "thinking") last.blocks.push(...block.blocks);
-      else groups.push({ type: "thinking", key: block.key, blocks: [...block.blocks] });
+      if (last?.type === "thinking") {
+        last.blocks.push(...block.blocks);
+        last.sourceEventIds = Array.from(new Set([...last.sourceEventIds, ...(block.sourceEventIds ?? [])]));
+      } else {
+        groups.push({ type: "thinking", key: block.key, blocks: [...block.blocks], sourceEventIds: [...(block.sourceEventIds ?? [])] });
+      }
     } else if (block.kind === "text") {
-      groups.push({ type: "text", key: block.key, content: block.content });
+      groups.push({ type: "text", key: block.key, content: block.content, sourceEventIds: block.events.map((event) => event.id) });
     } else if (block.kind === "tool") {
-      if (last?.type === "tool") last.tools.push(block.tool);
-      else groups.push({ type: "tool", key: block.key, tools: [block.tool] });
+      if (last?.type === "tool") {
+        last.tools.push(block.tool);
+        last.sourceEventIds.push(block.tool.id);
+      } else {
+        groups.push({ type: "tool", key: block.key, tools: [block.tool], sourceEventIds: [block.tool.id] });
+      }
     } else if (block.kind === "subagent") {
       if (last?.type === "subagent") {
         last.subagents.push(block.subagent);
         last.tools.push(block.tool);
+        last.sourceEventIds.push(block.subagent.id, ...(block.tool ? [block.tool.id] : []));
       } else {
-        groups.push({ type: "subagent", key: block.key, subagents: [block.subagent], tools: [block.tool] });
+        groups.push({
+          type: "subagent",
+          key: block.key,
+          subagents: [block.subagent],
+          tools: [block.tool],
+          sourceEventIds: [block.subagent.id, ...(block.tool ? [block.tool.id] : [])],
+        });
       }
     } else if (block.kind === "approval") {
-      if (last?.type === "approval") last.approvals.push(block.approval);
-      else groups.push({ type: "approval", key: block.key, approvals: [block.approval] });
+      if (last?.type === "approval") {
+        last.approvals.push(block.approval);
+        last.sourceEventIds.push(block.approval.id);
+      } else {
+        groups.push({ type: "approval", key: block.key, approvals: [block.approval], sourceEventIds: [block.approval.id] });
+      }
     } else if (block.kind === "question") {
-      groups.push({ type: "question", key: block.key, question: block.question });
+      groups.push({ type: "question", key: block.key, question: block.question, sourceEventIds: [block.question.id] });
     }
   }
   return groups;

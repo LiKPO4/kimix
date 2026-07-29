@@ -1141,6 +1141,49 @@ describe("assistant footer fallback", () => {
     expect(assistantItem.event.durationMs).toBe(30_000);
   });
 
+  it("preserves original event ids when a Kimi turn is merged for rendering", () => {
+    const rendered = buildRenderItems([{
+      id: "user",
+      type: "user_message",
+      timestamp: 1,
+      content: "处理问题",
+    }, {
+      id: "assistant-thinking",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "",
+      thinking: "先检查",
+      isThinking: true,
+      isComplete: true,
+    }, {
+      id: "tool",
+      type: "tool_call",
+      timestamp: 3,
+      toolCallId: "call-1",
+      toolName: "Read",
+      arguments: { path: "README.md" },
+      status: "success",
+    }, {
+      id: "assistant-final",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "检查完成",
+      isThinking: false,
+      isComplete: true,
+    }], "kimi-code");
+    const assistantItem = rendered.find(
+      (item) => item.type === "event" && item.event.type === "assistant_message",
+    );
+
+    expect(assistantItem?.type).toBe("event");
+    if (assistantItem?.type !== "event") return;
+    expect(assistantItem.sourceEventIds).toEqual([
+      "assistant-thinking",
+      "tool",
+      "assistant-final",
+    ]);
+  });
+
   it("uses the official turn model instead of an unreliable long duration for room Agents", () => {
     expect(assistantFooterFallbackLabel({
       id: "assistant-room",

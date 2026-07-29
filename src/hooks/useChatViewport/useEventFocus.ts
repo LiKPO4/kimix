@@ -37,14 +37,33 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
   const focusTimelineEventStateRef = useRef<{ eventId: string; attemptCount: number; startTime: number } | null>(null);
   const highlightClearTimerRef = useRef<number | null>(null);
 
-  const findRenderedEventNode = useCallback((eventId: string): HTMLElement | null => {
+  const findRenderedEventNode = useCallback((eventId: string, searchText?: string): HTMLElement | null => {
     const node = scrollRef.current;
     if (!node) return null;
     const escaped = globalThis.CSS?.escape ? globalThis.CSS.escape(eventId) : eventId.replace(/["\\]/g, "\\$&");
-    const direct = node.querySelector<HTMLElement>(`[data-kimix-event-id="${escaped}"]`);
-    if (direct) return direct;
-    return Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-event-ids]"))
-      .find((item) => (item.dataset.kimixEventIds ?? "").split(" ").includes(eventId)) ?? null;
+    const directCandidates = Array.from(
+      node.querySelectorAll<HTMLElement>(`[data-kimix-event-id="${escaped}"]`),
+    );
+    const sourceCandidates = Array.from(node.querySelectorAll<HTMLElement>("[data-kimix-event-ids]"))
+      .filter((item) => (item.dataset.kimixEventIds ?? "").split(" ").includes(eventId))
+      .filter((item) => !directCandidates.includes(item));
+    const candidates = [...directCandidates, ...sourceCandidates];
+    if (candidates.length === 0) return null;
+    const mostSpecific = (items: HTMLElement[]) => items.reduce((selected, candidate) => (
+      selected.contains(candidate) ? candidate : selected
+    ));
+    const needle = searchText?.trim().toLowerCase();
+    if (needle) {
+      const directTextMatch = directCandidates.filter((item) => item.textContent?.toLowerCase().includes(needle));
+      if (directTextMatch.length > 0) return mostSpecific(directTextMatch);
+      const sourceTextMatch = sourceCandidates.filter((item) => item.textContent?.toLowerCase().includes(needle));
+      if (sourceTextMatch.length > 0) return mostSpecific(sourceTextMatch);
+    }
+    if (directCandidates.length > 0) return mostSpecific(directCandidates);
+    // Nested process blocks are appended after their outer turn container.
+    // Prefer the deepest mounted candidate so a tool/thinking hit focuses the
+    // exact block rather than the whole assistant turn.
+    return mostSpecific(sourceCandidates);
   }, [scrollRef]);
 
   const selectTextInNode = useCallback((target: HTMLElement, searchText?: string): boolean => {
@@ -129,7 +148,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       return false;
     }
 
-    const target = findRenderedEventNode(eventId);
+    const target = findRenderedEventNode(eventId, searchText);
     if (!target) {
       if (hasMoreOlderItems) {
         onExpandOlderItemsToEnd();
@@ -146,6 +165,21 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
 
     focusTimelineEventStateRef.current = null;
     const didSelectText = selectTextInNode(target, searchText);
+    if (!didSelectText && searchText?.trim()) {
+      const revealControl = target.querySelector<HTMLButtonElement>(
+        '[data-kimix-search-expand="true"][aria-expanded="false"]',
+      );
+      if (revealControl) {
+        // Keep this focus transaction alive while React mounts the next
+        // collapsed layer (turn process -> tool group -> tool detail).
+        focusTimelineEventStateRef.current = currentState;
+        revealControl.click();
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => focusTimelineEvent(eventId, searchText, alignment));
+        });
+        return false;
+      }
+    }
     if (!didSelectText) {
       const scrollNode = scrollRef.current;
       if (alignment === "start" && scrollNode) {

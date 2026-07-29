@@ -4,6 +4,8 @@ import type { TimelineEvent } from "@/types/ui";
 import {
   buildChatNavigationItems,
   buildChatNavigationMarkers,
+  chatNavigationContainsEventId,
+  chatNavigationEventIds,
   chatNavigationGroupHeight,
   chatNavigationMarkerGap,
   chatNavigationPreviewPosition,
@@ -39,6 +41,27 @@ describe("chat navigation", () => {
     expect(items[1]).toMatchObject({ title: "Agent 回复", preview: "回答", fileLabels: [] });
     expect(items[2]).toMatchObject({ title: "工具过程 1 项" });
     expect(items[3]).toMatchObject({ title: "文件变更 0 项" });
+  });
+
+  it("keeps every source event identity represented by a merged turn", () => {
+    const item = eventItem({
+      id: "assistant:turn-1",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "回答",
+      isThinking: false,
+      isComplete: true,
+    });
+    if (item.type !== "event") return;
+    item.sourceEventIds = ["assistant-step-1", "tool-1", "assistant-step-2"];
+
+    expect(chatNavigationEventIds(item)).toEqual([
+      "assistant:turn-1",
+      "assistant-step-1",
+      "tool-1",
+      "assistant-step-2",
+    ]);
+    expect(chatNavigationContainsEventId(item, "assistant-step-2")).toBe(true);
   });
 
   it("omits high-frequency or non-rendering events from the rail", () => {

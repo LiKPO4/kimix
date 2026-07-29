@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Search hits keep exact source identity through merged turns (v2.20.60)**: project search indexes stored event IDs, while the chat display merges multi-step Assistant, thinking, tool and status events into turn containers. Render items and turn-block groups now retain complete source-event IDs (including colon-bearing snapshot IDs), and focus expands collapsed history/process/tool layers before selecting the query in the deepest matching source block. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Usage footers no longer inherit notification colors (v2.20.49)**: consecutive status merging still accumulates model/input/output/context dimensions, but presentation metadata (`source`, `tone`, `parentEventId`) now belongs only to the incoming status. Token/context pills always render with the neutral metric treatment, which also repairs previously persisted blue/green usage rows without rewriting session data; genuine semantic notices keep their status colors. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 
