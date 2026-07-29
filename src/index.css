@@ -1490,10 +1490,10 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-columns.is-workspace .kimix-settings-section {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-elevated);
-  padding: 14px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-footer {
@@ -1607,38 +1607,67 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-panel.is-workspace .kimix-settings-section-title,
 .kimix-settings-panel.is-workspace .kimix-settings-row-title {
-  min-height: 30px;
+  min-height: 34px;
+  padding-left: 2px;
+  padding-right: 2px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-section > .kimix-settings-section-title + *,
 .kimix-settings-panel.is-workspace .kimix-settings-section > .kimix-settings-row-title + * {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-theme-grid {
-  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  margin-top: 10px;
+  padding: 6px;
+  gap: 6px;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-theme {
   height: 44px;
   flex-direction: row;
   gap: 8px;
+  border: 0;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-permissions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  margin-top: 8px;
-  gap: 8px;
-}
-
-.kimix-settings-panel.is-workspace .kimix-settings-permission,
-.kimix-settings-panel.is-workspace .kimix-settings-connection {
-  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  margin-top: 10px;
+  gap: 0;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-permission {
-  min-height: 58px;
+  min-height: 66px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 13px 16px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-permission + .kimix-settings-permission {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-permission.is-active {
+  background: var(--accent-primary-light);
+  box-shadow: inset 3px 0 0 var(--accent-primary-soft);
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-connection {
+  padding: 14px 16px;
+}
+
+.kimix-settings-panel.is-workspace .kimix-settings-drag-handle {
+  display: none;
 }
 
 .kimix-settings-section + .kimix-settings-section {

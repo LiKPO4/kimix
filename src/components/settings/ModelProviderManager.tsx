@@ -520,6 +520,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             <button
               key={group.provider.name}
               type="button"
+              aria-pressed={selectedProviderName === group.provider.name}
               onClick={() => handleSelectProvider(group.provider.name)}
               className={`kimix-model-provider-item ${selectedProviderName === group.provider.name ? "is-active" : ""}`}
               style={{ padding: "10px 12px" }}
@@ -537,6 +538,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             <button
               key={group.provider.name}
               type="button"
+              aria-pressed={selectedProviderName === group.provider.name}
               onClick={() => handleSelectProvider(group.provider.name)}
               className={`kimix-model-provider-item ${selectedProviderName === group.provider.name ? "is-active" : ""}`}
               style={{ padding: "10px 12px" }}

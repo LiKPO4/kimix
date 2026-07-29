@@ -571,7 +571,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       hidden: variant === "workspace" && getSettingsPageForSection(id) !== activeSettingsPageId,
       tabIndex: -1,
       style: {
-        order: settingsSectionOrderValue(id, fallbackOrder),
+        order: variant === "workspace"
+          ? activeSettingsPage.sections.indexOf(id)
+          : settingsSectionOrderValue(id, fallbackOrder),
         position: "relative" as const,
         opacity: dragSettingsSectionId === id ? 0.55 : 1,
       },
@@ -1338,7 +1340,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
                 <div className="kimix-settings-theme-grid">
                   {themes.map((t) => (
-                    <button key={t.value} onClick={() => setTheme(t.value)} className={`kimix-settings-theme ${theme === t.value ? "is-active" : ""}`}>
+                    <button
+                      key={t.value}
+                      type="button"
+                      aria-pressed={theme === t.value}
+                      onClick={() => setTheme(t.value)}
+                      className={`kimix-settings-theme ${theme === t.value ? "is-active" : ""}`}
+                    >
                       <t.icon size={18} />
                       <span>{t.label}</span>
                     </button>
@@ -1383,6 +1391,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     >
                       <button
                         type="button"
+                        aria-pressed={themePalette === palette.value}
                         onClick={() => setThemePalette(palette.value)}
                         className="kimix-settings-palette"
                         title={palette.description}
@@ -1505,7 +1514,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
                 <div className="kimix-settings-permissions">
                   {permissions.map((p) => (
-                    <button key={p.value} title={p.tooltip} onClick={() => setPermissionMode(p.value)} className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}>
+                    <button
+                      key={p.value}
+                      type="button"
+                      aria-pressed={permissionMode === p.value}
+                      title={p.tooltip}
+                      onClick={() => setPermissionMode(p.value)}
+                      className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}
+                    >
                       <SelectionIndicator selected={permissionMode === p.value} />
                       <p.icon size={18} className={`mt-0.5 shrink-0 ${permissionMode === p.value ? "text-accent-primary" : "text-text-muted"}`} />
                       <div className="kimix-settings-permission-copy">
@@ -1524,21 +1540,21 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {settingsDragHandle("message", "消息信息")}
                 </div>
                 <div className="kimix-settings-permissions">
-                  <button onClick={() => setStatusUpdateDisplay("turn_end")} className={`kimix-settings-permission ${statusUpdateDisplay === "turn_end" ? "is-active" : ""}`}>
+                  <button type="button" aria-pressed={statusUpdateDisplay === "turn_end"} onClick={() => setStatusUpdateDisplay("turn_end")} className={`kimix-settings-permission ${statusUpdateDisplay === "turn_end" ? "is-active" : ""}`}>
                     <SelectionIndicator selected={statusUpdateDisplay === "turn_end"} />
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">每轮末尾显示一次</div>
                       <div className="kimix-settings-permission-desc">默认选项，只保留本轮最后一条 Tokens 和 Context 信息</div>
                     </div>
                   </button>
-                  <button onClick={() => setStatusUpdateDisplay("each")} className={`kimix-settings-permission ${statusUpdateDisplay === "each" ? "is-active" : ""}`}>
+                  <button type="button" aria-pressed={statusUpdateDisplay === "each"} onClick={() => setStatusUpdateDisplay("each")} className={`kimix-settings-permission ${statusUpdateDisplay === "each" ? "is-active" : ""}`}>
                     <SelectionIndicator selected={statusUpdateDisplay === "each"} />
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">实时显示每条消息信息</div>
                       <div className="kimix-settings-permission-desc">适合调试上下文增长，会在对话中多次显示状态胶囊</div>
                     </div>
                   </button>
-                  <button onClick={() => setStatusUpdateDisplay("never")} className={`kimix-settings-permission ${statusUpdateDisplay === "never" ? "is-active" : ""}`}>
+                  <button type="button" aria-pressed={statusUpdateDisplay === "never"} onClick={() => setStatusUpdateDisplay("never")} className={`kimix-settings-permission ${statusUpdateDisplay === "never" ? "is-active" : ""}`}>
                     <SelectionIndicator selected={statusUpdateDisplay === "never"} />
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">永不显示</div>
@@ -1559,6 +1575,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <button
                       key={mode.value}
                       type="button"
+                      aria-pressed={processDisplayMode === mode.value}
                       onClick={() => setProcessDisplayMode(mode.value)}
                       className={`kimix-settings-permission ${processDisplayMode === mode.value ? "is-active" : ""}`}
                     >
@@ -1571,6 +1588,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   ))}
                   <button
                     type="button"
+                    aria-pressed={collapseProcessWhileRunning}
                     onClick={() => setCollapseProcessWhileRunning(!collapseProcessWhileRunning)}
                     className={`kimix-settings-permission ${collapseProcessWhileRunning ? "is-active" : ""}`}
                   >
@@ -1641,11 +1659,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {settingsDragHandle("newSession", "新对话建议")}
                 </div>
                 <div
-                  className={`kimix-settings-card ${sessionRecommendationEnabled ? "is-active" : ""}`}
+                  className="kimix-settings-card"
                   style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 112px", gap: 16, alignItems: "center", padding: "14px 16px" }}
                 >
                   <button
                     type="button"
+                    aria-pressed={sessionRecommendationEnabled}
                     onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
                     className="flex min-w-0 items-center text-left"
                     style={{ gap: 12 }}
@@ -2050,6 +2069,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <div style={{ marginTop: 14 }}>
                     <button
                       type="button"
+                      aria-pressed={experimentalKimiToolSelect}
                       onClick={() => void saveExperimentalToolSelect(!experimentalKimiToolSelect)}
                       disabled={experimentalSettingsLoading || experimentalSettingsSaving}
                       className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
@@ -2070,6 +2090,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 14, paddingTop: 14 }}>
                     <button
                       type="button"
+                      aria-pressed={multiAgentRoomUiEnabled}
                       onClick={() => {
                         const next = !multiAgentRoomUiEnabled;
                         if (setMultiAgentRoomUiEnabled(next)) setMultiAgentRoomUiEnabledState(next);
@@ -2182,7 +2203,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {settingsDragHandle("context", "上下文显示")}
                 </div>
                 <div className="kimix-settings-permissions">
-                  <button onClick={() => setDetailedContext(false)} className={`kimix-settings-permission ${!detailedContext ? "is-active" : ""}`}>
+                  <button type="button" aria-pressed={!detailedContext} onClick={() => setDetailedContext(false)} className={`kimix-settings-permission ${!detailedContext ? "is-active" : ""}`}>
                     <SelectionIndicator selected={!detailedContext} />
                     <Terminal size={18} className={`mt-0.5 shrink-0 ${!detailedContext ? "text-accent-primary" : "text-text-muted"}`} />
                     <div className="kimix-settings-permission-copy">
@@ -2190,7 +2211,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-desc">默认选项，显示当前 Context 百分比</div>
                     </div>
                   </button>
-                  <button onClick={() => setDetailedContext(true)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
+                  <button type="button" aria-pressed={detailedContext} onClick={() => setDetailedContext(true)} className={`kimix-settings-permission ${detailedContext ? "is-active" : ""}`}>
                     <SelectionIndicator selected={detailedContext} />
                     <Terminal size={18} className={`mt-0.5 shrink-0 ${detailedContext ? "text-accent-primary" : "text-text-muted"}`} />
                     <div className="kimix-settings-permission-copy">
@@ -2212,6 +2233,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <button
                       key={mode.value}
                       type="button"
+                      aria-pressed={notificationMode === mode.value}
                       onClick={() => setNotificationMode(mode.value)}
                       className={`kimix-settings-permission ${notificationMode === mode.value ? "is-active" : ""}`}
                     >
@@ -2224,6 +2246,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   ))}
                   <button
                     type="button"
+                    aria-pressed={notificationShowContent}
                     onClick={() => setNotificationShowContent(!notificationShowContent)}
                     className={`kimix-settings-permission ${notificationShowContent ? "is-active" : ""}`}
                   >
