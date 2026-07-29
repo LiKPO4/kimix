@@ -268,3 +268,14 @@ export function searchSettings(query: string): SettingsSearchResult[] {
       .includes(normalized)
   ));
 }
+
+export function getNextSettingsPageId(
+  currentPageId: SettingsPageId,
+  key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Home" | "End",
+): SettingsPageId {
+  if (key === "Home") return SETTINGS_PAGES[0].id;
+  if (key === "End") return SETTINGS_PAGES[SETTINGS_PAGES.length - 1].id;
+  const currentIndex = Math.max(0, SETTINGS_PAGES.findIndex((page) => page.id === currentPageId));
+  const direction = key === "ArrowUp" || key === "ArrowLeft" ? -1 : 1;
+  return SETTINGS_PAGES[(currentIndex + direction + SETTINGS_PAGES.length) % SETTINGS_PAGES.length].id;
+}

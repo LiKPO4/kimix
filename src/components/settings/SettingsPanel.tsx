@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, RefObject } from "react";
+import type { DragEvent, KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, Settings, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
@@ -37,6 +37,7 @@ import { ModelProviderManager } from "./ModelProviderManager";
 import {
   getSettingsPage,
   getSettingsPageForSection,
+  getNextSettingsPageId,
   searchSettings,
   SETTINGS_PAGES,
   type SettingsPageId,
@@ -499,6 +500,20 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const navigateToSettingsPage = (pageId: SettingsPageId) => {
     writeActiveSettingsPage(pageId);
     setActiveSettingsPageId(pageId);
+  };
+
+  const handleSettingsNavigationKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    pageId: SettingsPageId,
+  ) => {
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextPageId = getNextSettingsPageId(
+      pageId,
+      event.key as "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Home" | "End",
+    );
+    navigateToSettingsPage(nextPageId);
+    document.querySelector<HTMLButtonElement>(`[data-settings-page-button="${nextPageId}"]`)?.focus();
   };
 
   const focusSettingsSection = (sectionId: SettingsSectionId, block: ScrollLogicalPosition = "start") => {
@@ -1265,6 +1280,17 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <input
                     value={settingsSearchQuery}
                     onChange={(event) => setSettingsSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setSettingsSearchQuery("");
+                        return;
+                      }
+                      const firstResult = settingsSearchResults[0];
+                      if (event.key !== "Enter" || !firstResult) return;
+                      event.preventDefault();
+                      focusSettingsSection(firstResult.sectionId, "center");
+                      setSettingsSearchQuery("");
+                    }}
                     placeholder="搜索设置..."
                     aria-label="搜索设置"
                   />
@@ -1303,8 +1329,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                               key={page.id}
                               type="button"
                               aria-current={activeSettingsPageId === page.id ? "page" : undefined}
+                              data-settings-page-button={page.id}
                               className={`kimix-settings-navigation-item ${activeSettingsPageId === page.id ? "is-active" : ""}`}
                               onClick={() => navigateToSettingsPage(page.id)}
+                              onKeyDown={(event) => handleSettingsNavigationKeyDown(event, page.id)}
                             >
                               <SettingsPageIcon pageId={page.id} />
                               <span>{page.label}</span>
@@ -1688,7 +1716,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {settingsDragHandle("newSession", "新对话建议")}
                 </div>
                 <div
-                  className="kimix-settings-card"
+                  className="kimix-settings-card kimix-settings-two-column-card"
                   style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 112px", gap: 16, alignItems: "center", padding: "14px 16px" }}
                 >
                   <button
@@ -1752,7 +1780,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   </div>
                   <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
-                    <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
+                    <div className="kimix-settings-archive-filters">
                       <div className="kimix-settings-input flex h-9 min-w-0 items-center rounded-lg" style={{ gap: 8, paddingLeft: 12, paddingRight: 12 }}>
                         <Search size={14} className="shrink-0 text-text-muted" />
                         <input
@@ -1921,14 +1949,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     background: migrationDragActive ? "var(--accent-primary-light)" : undefined,
                   }}
                 >
-                  <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 14 }}>
+                  <div className="kimix-settings-migration-row">
                     <div className="min-w-0">
                       <div className="text-[14.5px] font-medium leading-5 text-[var(--kimix-panel-text)]">导出全部，合并导入</div>
                       <div className="mt-1 text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">
                         当前可迁移 {migrationSessionCount} 个会话、{migrationArchivedCount} 个归档、{migrationPendingCount} 条待发送队列、{migrationProjectCount} 个项目。
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center justify-end" style={{ gap: 8 }}>
+                    <div className="kimix-settings-migration-actions">
                       <button
                         type="button"
                         onClick={() => void handleExportSessionBackup()}
@@ -2283,7 +2311,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <span>语音输入</span>
                     {settingsDragHandle("voice", "语音输入")}
                   </div>
-                  <div className="kimix-settings-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
+                  <div className="kimix-settings-card kimix-settings-voice-card" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 174px", gap: 16, alignItems: "center", padding: "14px 16px" }}>
                     <div className="flex min-w-0 items-start" style={{ gap: 12 }}>
                       <Keyboard size={18} className="mt-0.5 shrink-0 text-text-muted" />
                       <div className="min-w-0 flex-1">
@@ -2314,7 +2342,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   {settingsDragHandle("identity", "房间投递身份")}
                 </div>
                 <div
-                  className="kimix-settings-card"
+                  className="kimix-settings-card kimix-settings-two-column-card"
                   style={{
                     display: "grid",
                     gridTemplateColumns: "minmax(0, 1fr) auto",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSettingsPage,
   getSettingsPageForSection,
+  getNextSettingsPageId,
   searchSettings,
   SETTINGS_PAGES,
 } from "../settingsNavigation";
@@ -25,5 +26,12 @@ describe("settingsNavigation", () => {
     expect(searchSettings("卡顿").map((item) => item.id)).toContain("freeze");
     expect(searchSettings("上下文").map((item) => item.id)).toEqual(expect.arrayContaining(["new-session", "tool-select"]));
     expect(searchSettings("   ")).toEqual([]);
+  });
+
+  it("支持循环方向键和 Home/End 设置导航", () => {
+    expect(getNextSettingsPageId("general", "ArrowUp")).toBe("diagnostics");
+    expect(getNextSettingsPageId("general", "ArrowRight")).toBe("appearance");
+    expect(getNextSettingsPageId("models", "Home")).toBe("general");
+    expect(getNextSettingsPageId("models", "End")).toBe("diagnostics");
   });
 });

@@ -65,6 +65,21 @@ describe("sortArchivedSessions", () => {
 });
 
 describe("groupArchivedSessionsByWorkspace", () => {
+  it("handles empty, single-item, and multi-item archive states", () => {
+    expect(groupArchivedSessionsByWorkspace([])).toEqual([]);
+
+    const single = groupArchivedSessionsByWorkspace([item("only")]);
+    expect(single).toHaveLength(1);
+    expect(single[0].items.map((entry) => entry.id)).toEqual(["only"]);
+
+    const multiple = groupArchivedSessionsByWorkspace([
+      item("newer", { archivedAt: "2026-07-26T10:00:00+08:00" }),
+      item("older", { archivedAt: "2026-07-20T10:00:00+08:00" }),
+    ]);
+    expect(multiple).toHaveLength(1);
+    expect(multiple[0].items.map((entry) => entry.id)).toEqual(["newer", "older"]);
+  });
+
   it("orders groups by latest archive time and keeps 其他 last", () => {
     const items = [
       item("a", { projectPath: "", archivedAt: "2026-07-26T10:00:00+08:00" }),

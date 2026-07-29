@@ -1550,6 +1550,16 @@ button.bg-accent-primary:disabled:hover,
   border-radius: 0;
   background: transparent;
   padding: 0 2px;
+  scroll-margin-top: 16px;
+  transition-property: box-shadow, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+
+.kimix-settings-columns.is-workspace .kimix-settings-section:focus {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 2px var(--accent-primary-light);
+  outline: none;
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-footer {
@@ -2226,6 +2236,30 @@ button.bg-accent-primary:disabled:hover,
   border-radius: 999px;
   background: var(--surface-hover);
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.kimix-settings-archive-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 220px) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.kimix-settings-migration-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.kimix-settings-migration-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .kimix-settings-input {
@@ -2380,6 +2414,76 @@ button.bg-accent-primary:disabled:hover,
   .kimix-model-row > :last-child {
     grid-column: 1 / -1;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .kimix-settings-page-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+
+  .kimix-settings-page-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .kimix-settings-model-meta {
+    width: 100%;
+    max-width: none;
+    align-items: flex-start;
+    padding-right: 0;
+  }
+
+  .kimix-settings-archive-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kimix-settings-archive-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .kimix-settings-migration-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-settings-migration-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .kimix-settings-two-column-card,
+  .kimix-settings-voice-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .kimix-settings-voice-card label,
+  .kimix-settings-voice-card .kimix-settings-hint {
+    text-align: left;
+  }
+
+  .kimix-settings-panel.is-workspace .kimix-settings-row-title {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .kimix-settings-archive-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-settings-archive-filters > :first-child {
+    grid-column: auto;
+  }
+
+  .kimix-settings-palette-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kimix-settings-migration-actions > button {
+    flex: 1 1 140px;
   }
 }
 
