@@ -24,6 +24,7 @@ import { getSidebarProjectClickAction, persistSidebarExpandedProjectPaths, readS
 import { getPrimaryRoomAgent, getRoomAgentRuntimeId, updateRoomAgent } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 import { APP_VERSION } from "@/utils/appVersion";
+import { SettingsWorkspaceSidebar } from "@/components/settings/SettingsWorkspaceSidebar";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -535,6 +536,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     return { visibleSessions: visible, sessionsByProjectPath: byProject };
   }, [currentSession, sessions]);
 
+  if (workspaceView === "settings") {
+    return <SettingsWorkspaceSidebar width={sidebarOpen ? width : 52} collapsed={!sidebarOpen} />;
+  }
+
   if (!sidebarOpen) {
     return (
       <aside
@@ -597,7 +602,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         <div style={{ marginTop: "auto", height: 36 }}>
           <button
             onClick={() => toggleWorkspaceView("settings")}
-            className={`${collapsedSettingsItemClass} ${workspaceView === "settings" ? "bg-surface-hover text-text-primary" : ""}`}
+            className={collapsedSettingsItemClass}
             style={collapsedSettingsButtonStyle}
             title="设置"
             aria-label="设置"
@@ -1101,7 +1106,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
         <button
           onClick={() => toggleWorkspaceView("settings")}
-          className={`kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors ${workspaceView === "settings" ? "bg-surface-hover" : ""}`}
+          className="kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors"
           style={{ height: 36 }}
         >
           <Settings size={18} className="text-text-secondary" />

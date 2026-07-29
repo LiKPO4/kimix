@@ -1,12 +1,6 @@
-export type SettingsPageId =
-  | "general"
-  | "appearance"
-  | "conversation"
-  | "account"
-  | "models"
-  | "experiments"
-  | "data"
-  | "diagnostics";
+import type { SettingsPageId } from "@/types/ui";
+
+export type { SettingsPageId } from "@/types/ui";
 
 export type SettingsSectionId =
   | "connection"
@@ -43,6 +37,8 @@ export type SettingsSearchResult = {
   sectionId: SettingsSectionId;
   keywords: string[];
 };
+
+export const SETTINGS_FOCUS_SECTION_EVENT = "kimix:focus-settings-section";
 
 export const SETTINGS_PAGES: SettingsPageDefinition[] = [
   {

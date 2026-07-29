@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
@@ -10,6 +10,35 @@ const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus"
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
 const PENDING_NEW_SESSION_MODEL_KEY = "kimix_pending_new_session_model";
+const SETTINGS_ACTIVE_PAGE_KEY = "kimix_settings_active_page";
+const SETTINGS_PAGE_IDS = new Set<SettingsPageId>([
+  "general",
+  "appearance",
+  "conversation",
+  "account",
+  "models",
+  "experiments",
+  "data",
+  "diagnostics",
+]);
+
+function readActiveSettingsPage(): SettingsPageId {
+  try {
+    if (typeof localStorage === "undefined") return "general";
+    const stored = localStorage.getItem(SETTINGS_ACTIVE_PAGE_KEY) as SettingsPageId | null;
+    return stored && SETTINGS_PAGE_IDS.has(stored) ? stored : "general";
+  } catch {
+    return "general";
+  }
+}
+
+function writeActiveSettingsPage(pageId: SettingsPageId) {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(SETTINGS_ACTIVE_PAGE_KEY, pageId);
+  } catch {
+    // Ignore local persistence errors; the in-memory page still updates.
+  }
+}
 
 function readPendingNewSessionModel(): string | null {
   try {
@@ -141,6 +170,7 @@ export interface AppStore extends AppState {
   setRightSidebarCardOrder: (order: RightSidebarCardId[]) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
   setWorkspaceView: (view: WorkspaceView) => void;
+  setActiveSettingsPageId: (pageId: SettingsPageId) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   setThemePalette: (palette: ThemePaletteId) => void;
@@ -195,6 +225,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   rightSidebarCardOrder: readRightSidebarCardOrder(),
   handoffSessionId: null,
   workspaceView: "chat",
+  activeSettingsPageId: readActiveSettingsPage(),
   sidebarOpen: true,
   theme: cachedThemeSnapshot.theme,
   themePalette: cachedThemeSnapshot.themePalette,
@@ -291,6 +322,10 @@ export const useAppStore = create<AppStore>((rawSet) => {
   },
   setHandoffSessionId: (sessionId) => set({ handoffSessionId: sessionId }),
   setWorkspaceView: (view) => set({ workspaceView: view }),
+  setActiveSettingsPageId: (pageId) => {
+    writeActiveSettingsPage(pageId);
+    set({ activeSettingsPageId: pageId });
+  },
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),
