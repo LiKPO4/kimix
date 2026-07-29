@@ -85,6 +85,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "voice",
   "archived",
   "migration",
+  "identity",
   "freeze",
 ];
 
@@ -2056,76 +2057,53 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     {settingsDragHandle("experiment", "实验功能")}
                   </div>
                 </div>
-                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
-                  <div className="flex items-start" style={{ gap: 12 }}>
-                    <Zap size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                <div className="kimix-settings-permissions">
+                  <button
+                    type="button"
+                    aria-pressed={experimentalKimiToolSelect}
+                    onClick={() => void saveExperimentalToolSelect(!experimentalKimiToolSelect)}
+                    disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                    className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                  >
+                    <SelectionIndicator selected={experimentalKimiToolSelect} />
                     <div className="kimix-settings-permission-copy">
-                      <div className="kimix-settings-permission-label">MCP 工具按需加载</div>
+                      <div className="kimix-settings-permission-label">工具按需加载（select_tools）</div>
                       <div className="kimix-settings-permission-desc">
-                        新会话会自动优先使用官方 Server，并在不可用时回退兼容链路，无需手动选择路由。
+                        支持的模型只在需要时加载 MCP 工具定义，可减少上下文占用并改善提示词缓存；默认关闭。
                       </div>
                     </div>
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <button
-                      type="button"
-                      aria-pressed={experimentalKimiToolSelect}
-                      onClick={() => void saveExperimentalToolSelect(!experimentalKimiToolSelect)}
-                      disabled={experimentalSettingsLoading || experimentalSettingsSaving}
-                      className={`kimix-settings-permission ${experimentalKimiToolSelect ? "is-active" : ""}`}
-                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
-                    >
-                      <SelectionIndicator selected={experimentalKimiToolSelect} />
-                      <div className="kimix-settings-permission-copy">
-                        <div className="kimix-settings-permission-label">工具按需加载（select_tools）</div>
-                        <div className="kimix-settings-permission-desc">
-                          实验功能。支持的模型只在需要时加载 MCP 工具定义，可减少上下文占用并改善提示词缓存；默认关闭。
-                        </div>
+                    <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                      {experimentalKimiToolSelect ? "已开启" : "关闭"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={multiAgentRoomUiEnabled}
+                    onClick={() => {
+                      const next = !multiAgentRoomUiEnabled;
+                      if (setMultiAgentRoomUiEnabled(next)) setMultiAgentRoomUiEnabledState(next);
+                    }}
+                    className={`kimix-settings-permission ${multiAgentRoomUiEnabled ? "is-active" : ""}`}
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                  >
+                    <SelectionIndicator selected={multiAgentRoomUiEnabled} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
+                        <Bot size={14} className="text-text-muted" />
+                        <span>多 Agent 房间</span>
                       </div>
-                      <span className={`rounded-full text-[11.5px] leading-5 ${experimentalKimiToolSelect ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                        {experimentalKimiToolSelect ? "已开启" : "关闭"}
-                      </span>
-                    </button>
-                  </div>
-                  <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 14, paddingTop: 14 }}>
-                    <button
-                      type="button"
-                      aria-pressed={multiAgentRoomUiEnabled}
-                      onClick={() => {
-                        const next = !multiAgentRoomUiEnabled;
-                        if (setMultiAgentRoomUiEnabled(next)) setMultiAgentRoomUiEnabledState(next);
-                      }}
-                      className={`kimix-settings-permission ${multiAgentRoomUiEnabled ? "is-active" : ""}`}
-                      style={{ padding: "13px 14px", gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
-                    >
-                      <SelectionIndicator selected={multiAgentRoomUiEnabled} />
-                      <div className="kimix-settings-permission-copy">
-                        <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
-                          <Bot size={14} className="text-text-muted" />
-                          <span>多 Agent 房间</span>
-                        </div>
-                        <div className="kimix-settings-permission-desc">
-                          在 Composer 的 + 菜单开放“添加 Agent”，默认开启。关闭后普通会话隐藏创建入口，已有房间仍可正常使用。
-                        </div>
+                      <div className="kimix-settings-permission-desc">
+                        在 Composer 的 + 菜单开放“添加 Agent”；关闭后隐藏创建入口，已有房间仍可正常使用。
                       </div>
-                      <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
-                        {multiAgentRoomUiEnabled ? "已开启" : "关闭"}
-                      </span>
-                    </button>
-                  </div>
-                  <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 14, paddingTop: 14 }}>
-                    <button
-                      type="button"
-                      onClick={() => setRoomDeliveryInspectorOpen(true)}
-                      className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
-                    >
-                      <Bot size={14} />
-                      房间投递身份诊断
-                    </button>
-                  </div>
-                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
-                    {experimentalSettingsMessage || "读取工具加载设置中..."}
-                  </div>
+                    </div>
+                    <span className={`rounded-full text-[11.5px] leading-5 ${multiAgentRoomUiEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center" }}>
+                      {multiAgentRoomUiEnabled ? "已开启" : "关闭"}
+                    </span>
+                  </button>
+                </div>
+                <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
+                  {experimentalSettingsMessage || "读取工具加载设置中..."}
                 </div>
               </div>
 
@@ -2290,7 +2268,40 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               )}
 
-              <div className="kimix-settings-section" {...settingsSectionProps("freeze", 13)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("identity", 13)}>
+                <div className="kimix-settings-section-title">
+                  <Bot size={16} className="text-text-muted" />
+                  <span>房间投递身份</span>
+                  {settingsDragHandle("identity", "房间投递身份")}
+                </div>
+                <div
+                  className="kimix-settings-card"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    gap: 16,
+                    alignItems: "center",
+                    padding: "16px 16px",
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div className="kimix-settings-permission-label">检查多 Agent 消息归属</div>
+                    <div className="kimix-settings-permission-desc">
+                      查看房间消息的发送者、接收者和投递身份，用于排查消息进入错误 Agent 的问题。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRoomDeliveryInspectorOpen(true)}
+                    className="kimix-icon-text-button is-compact shrink-0 text-text-secondary hover:bg-surface-hover"
+                  >
+                    <Bot size={14} />
+                    打开诊断
+                  </button>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("freeze", 14)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <AlertCircle size={16} className="text-text-muted" />
