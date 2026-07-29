@@ -163,7 +163,7 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         />
       </div>
 
-      <div className="kimix-settings-sidebar-scroll">
+      <div className="kimix-settings-sidebar-scroll kimix-stable-scrollbar">
         {searchQuery.trim() ? (
           <div className="kimix-settings-search-results" aria-live="polite">
             <div className="kimix-settings-navigation-group-label">

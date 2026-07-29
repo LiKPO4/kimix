@@ -1209,7 +1209,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
           </div>
         )}
 
-        <div className="kimix-settings-body">
+        <div className={`kimix-settings-body ${variant === "workspace" ? "kimix-stable-scrollbar" : ""}`}>
           <div className={`kimix-settings-layout ${variant === "workspace" ? "is-workspace" : ""}`}>
             <main className="kimix-settings-page">
               {variant === "workspace" && (
