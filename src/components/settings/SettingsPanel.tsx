@@ -1252,7 +1252,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               )}
 
-              <div className={`kimix-settings-columns ${variant === 'workspace' ? 'is-workspace' : ''}`}>
+              <div
+                className={`kimix-settings-columns ${variant === "workspace" ? "is-workspace" : ""} ${
+                  variant === "workspace" && activeSettingsPageId === "models" ? "is-models-page" : ""
+                }`}
+              >
             <div className="kimix-settings-col">
               <div className="kimix-settings-section" {...settingsSectionProps("theme", 3)}>
                 <div className="kimix-settings-section-title">

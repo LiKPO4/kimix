@@ -34,6 +34,21 @@ describe("settings workspace scroll layout", () => {
     );
   });
 
+  it("lets the model provider page consume the space above the pinned footer", () => {
+    expect(settingsPanel).toContain(
+      'variant === "workspace" && activeSettingsPageId === "models" ? "is-models-page" : ""',
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-columns\.is-workspace\.is-models-page\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1 0 auto;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-columns\.is-workspace\.is-models-page\s+\.kimix-settings-section\[data-settings-page-id="models"\]\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-columns\.is-workspace\.is-models-page \.kimix-model-provider-manager\s*\{[^}]*flex:\s*1;/s,
+    );
+  });
+
   it("reuses the native Kimix scrollbar instead of overriding it with a settings-only width", () => {
     expect(settingsPanel).toContain(
       'className={`kimix-settings-body ${variant === "workspace" ? "kimix-stable-scrollbar" : ""}`}',

@@ -1640,6 +1640,30 @@ button.bg-accent-primary:disabled:hover,
   padding-bottom: 18px;
 }
 
+.kimix-settings-columns.is-workspace.is-models-page {
+  display: flex;
+  flex: 1 0 auto;
+}
+
+.kimix-settings-columns.is-workspace.is-models-page
+  .kimix-settings-section[data-settings-page-id="models"] {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
+.kimix-settings-columns.is-workspace.is-models-page .kimix-model-settings-shell,
+.kimix-settings-columns.is-workspace.is-models-page .kimix-model-settings-shell > .flex {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.kimix-settings-columns.is-workspace.is-models-page .kimix-model-provider-manager {
+  flex: 1;
+}
+
 .kimix-settings-columns.is-workspace .kimix-settings-col {
   display: contents;
 }
