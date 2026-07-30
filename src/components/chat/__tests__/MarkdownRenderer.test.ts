@@ -71,4 +71,20 @@ describe("MarkdownRenderer streaming blocks", () => {
     expect(normalizeMarkdownContent(content, true)).toBe(repaired);
     expect(normalizeMarkdownContent(content, false)).toBe(repaired);
   });
+
+  it("lets markdown columns size themselves from their content", async () => {
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: [
+          "| 文件名 | 场景 | 提示词 |",
+          "| --- | --- | --- |",
+          "| merchant.webp | 落难商人 | A much longer prompt that should receive more room. |",
+        ].join("\n"),
+      }));
+    });
+
+    const table = container.querySelector<HTMLTableElement>("table");
+    expect(table?.style.tableLayout).toBe("auto");
+    expect(table?.parentElement?.className).toContain("overflow-x-auto");
+  });
 });

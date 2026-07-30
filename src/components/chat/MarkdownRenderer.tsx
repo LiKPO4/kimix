@@ -564,7 +564,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
               margin: 0,
               minWidth: "100%",
               width: "100%",
-              tableLayout: "fixed",
+              tableLayout: "auto",
               overflowWrap: "anywhere",
               wordBreak: "break-word",
             }}
