@@ -150,7 +150,7 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
           <div
             ref={scrollbarTrackRef}
             className="kimix-composer-input-scrollbar"
-            style={{ position: "absolute", top: 3, right: -11, bottom: 6, width: 8 }}
+            style={{ position: "absolute", top: 3, right: -11, bottom: 6 }}
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) return;
               const trackBounds = event.currentTarget.getBoundingClientRect();
