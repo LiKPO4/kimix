@@ -100,6 +100,8 @@
   --kimix-composer-shadow: 0 1px 2px rgba(25, 23, 20, 0.06);
   --kimix-scrollbar-size: 8px;
   --kimix-scrollbar-thumb-inset: 2px;
+  --kimix-primary-scrollbar-thumb: var(--accent-primary);
+  --kimix-primary-scrollbar-thumb-hover: var(--accent-primary-dark);
   --kimix-float-shadow: 0 16px 42px rgba(25, 23, 20, 0.12);
   --kimix-overlay-strong: rgba(12, 12, 14, 0.72);
   --kimix-process-bg: var(--surface-base);
@@ -407,6 +409,18 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
+}
+
+.kimix-chat-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--kimix-primary-scrollbar-thumb);
+  border: var(--kimix-scrollbar-thumb-inset) solid transparent;
+  background-clip: content-box;
+}
+
+.kimix-chat-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: var(--kimix-primary-scrollbar-thumb-hover);
+  border: var(--kimix-scrollbar-thumb-inset) solid transparent;
+  background-clip: content-box;
 }
 
 /* Only detached mode disables Chromium's implicit anchor: it otherwise races
@@ -2653,12 +2667,16 @@ button.bg-accent-primary:disabled:hover,
   right: 0;
   width: calc(var(--kimix-scrollbar-size) - 2 * var(--kimix-scrollbar-thumb-inset));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  background: var(--kimix-primary-scrollbar-thumb);
   cursor: grab;
 }
 
+.kimix-composer-input-scrollbar-thumb:hover {
+  background: var(--kimix-primary-scrollbar-thumb-hover);
+}
+
 .kimix-composer-input-scrollbar-thumb:active {
-  background: color-mix(in srgb, var(--text-secondary) 82%, transparent);
+  background: var(--kimix-primary-scrollbar-thumb-hover);
   cursor: grabbing;
 }
 

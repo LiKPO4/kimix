@@ -23,6 +23,8 @@ describe("Kimix scrollbar styles", () => {
     )?.[1] ?? "";
     expect(thumbRule).toContain("border: var(--kimix-scrollbar-thumb-inset) solid transparent");
     expect(thumbRule).toContain("background-clip: content-box");
+    expect(thumbRule).toContain("var(--kimix-panel-text-muted)");
+    expect(thumbRule).not.toContain("var(--kimix-primary-scrollbar-thumb)");
   });
 
   it("uses the same visible width for the composer overlay thumb", () => {
@@ -33,5 +35,24 @@ describe("Kimix scrollbar styles", () => {
     expect(thumbRule).toContain(
       "width: calc(var(--kimix-scrollbar-size) - 2 * var(--kimix-scrollbar-thumb-inset))",
     );
+  });
+
+  it("uses the primary thumb treatment for peer chat and composer scrollers", () => {
+    expect(css).toMatch(
+      /--kimix-primary-scrollbar-thumb:\s*var\(--accent-primary\);/,
+    );
+    expect(css).toMatch(
+      /--kimix-primary-scrollbar-thumb-hover:\s*var\(--accent-primary-dark\);/,
+    );
+
+    const chatThumbRule = css.match(
+      /\.kimix-chat-scroll-area::-webkit-scrollbar-thumb\s*\{([^}]*)\}/s,
+    )?.[1] ?? "";
+    const composerThumbRule = css.match(
+      /\.kimix-composer-input-scrollbar-thumb\s*\{([^}]*)\}/s,
+    )?.[1] ?? "";
+
+    expect(chatThumbRule).toContain("background: var(--kimix-primary-scrollbar-thumb)");
+    expect(composerThumbRule).toContain("background: var(--kimix-primary-scrollbar-thumb)");
   });
 });
