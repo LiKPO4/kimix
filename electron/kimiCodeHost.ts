@@ -1,11 +1,13 @@
 import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
+import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
@@ -140,7 +142,17 @@ export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 export type KimiCodePromptPart =
   | { type: "text"; text: string }
   | { type: "image_url"; imageUrl: { url: string; id?: string } }
-  | { type: "video_url"; videoUrl: { url?: string; id?: string; fileId?: string } };
+  | { type: "video_url"; videoUrl: { url?: string; id?: string; fileId?: string } }
+  | {
+      type: "file";
+      file: {
+        name: string;
+        filePath?: string;
+        fileId?: string;
+        mediaType?: string;
+        size?: number;
+      };
+    };
 
 export type KimiCodeEngineStatus =
   | "idle"
@@ -1119,6 +1131,83 @@ export async function materializeVideoFileReferences(input: string | KimiCodePro
   }));
 }
 
+async function sdkSessionDir(sessionId: string, workDir: string): Promise<string> {
+  const direct = sessions.get(sessionId)?.session.summary?.sessionDir;
+  if (direct) return direct;
+  const summaries = await (await getHarness()).listSessions({ sessionId });
+  const summary = summaries.find((item) => item.id === sessionId && item.sessionDir);
+  if (summary?.sessionDir) return summary.sessionDir;
+  for (const shareDir of candidateKimiShareDirs()) {
+    const found = await findKimiCodeSessionDir(shareDir, workDir, sessionId);
+    if (found) return found;
+  }
+  throw new Error(`无法定位会话 ${sessionId} 的附件目录`);
+}
+
+export async function materializeSdkFilePartInDirectory(
+  attachmentsDir: string,
+  file: Extract<KimiCodePromptPart, { type: "file" }>["file"],
+): Promise<Extract<KimiCodePromptPart, { type: "text" }>> {
+  const safeName = safeGenericAttachmentName(file.name, file.filePath);
+  await fs.promises.mkdir(attachmentsDir, { recursive: true });
+
+  let size: number;
+  let mediaType = file.mediaType?.trim() || genericAttachmentMediaType(safeName);
+  let targetPath: string;
+  if (file.filePath?.trim()) {
+    const sourcePath = path.resolve(file.filePath.trim());
+    const stat = await fs.promises.stat(sourcePath);
+    if (!stat.isFile()) throw new Error(`附件不是普通文件：${file.name}`);
+    if (stat.size > MAX_GENERIC_ATTACHMENT_BYTES) {
+      throw new Error(`附件“${file.name}”超过 50MB 上限`);
+    }
+    size = stat.size;
+    const fingerprint = createHash("sha256")
+      .update(`${sourcePath}\0${stat.size}\0${stat.mtimeMs}`)
+      .digest("hex")
+      .slice(0, 32);
+    targetPath = path.join(attachmentsDir, `${fingerprint}-${safeName}`);
+    const existing = await fs.promises.stat(targetPath).catch(() => null);
+    if (!existing || existing.size !== stat.size) await fs.promises.copyFile(sourcePath, targetPath);
+  } else if (file.fileId?.trim()) {
+    if (file.size !== undefined && file.size > MAX_GENERIC_ATTACHMENT_BYTES) {
+      throw new Error(`附件“${file.name}”超过 50MB 上限`);
+    }
+    const downloaded = await loadServerFile(file.fileId.trim());
+    const match = downloaded.dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
+    if (!match) throw new Error(`无法读取附件“${file.name}”`);
+    const bytes = Buffer.from(match[2], "base64");
+    if (bytes.byteLength > MAX_GENERIC_ATTACHMENT_BYTES) {
+      throw new Error(`附件“${file.name}”超过 50MB 上限`);
+    }
+    size = bytes.byteLength;
+    mediaType = file.mediaType?.trim() || match[1] || mediaType;
+    const fingerprint = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
+    targetPath = path.join(attachmentsDir, `${fingerprint}-${safeName}`);
+    const existing = await fs.promises.stat(targetPath).catch(() => null);
+    if (!existing || existing.size !== size) await fs.promises.writeFile(targetPath, bytes);
+  } else {
+    throw new Error(`附件“${file.name}”缺少可读取的文件路径`);
+  }
+
+  return {
+    type: "text",
+    text: `Attached file "${safeName}" (${mediaType}, ${size} bytes): ${targetPath} — open it with the Read tool`,
+  };
+}
+
+export async function materializeSdkFileReferences(
+  sessionId: string,
+  input: string | KimiCodePromptPart[],
+): Promise<string | KimiCodePromptPart[]> {
+  if (typeof input === "string" || !input.some((part) => part.type === "file")) return input;
+  const workDir = getManagedSession(sessionId).session.workDir;
+  const attachmentsDir = path.join(await sdkSessionDir(sessionId, workDir), "attachments");
+  return Promise.all(input.map((part) => (
+    part.type === "file" ? materializeSdkFilePartInDirectory(attachmentsDir, part.file) : Promise.resolve(part)
+  )));
+}
+
 const normalizedModelOutputLimits = new Set<string>();
 
 export function missingOpenAiModelOutputLimitPatch(
@@ -1225,7 +1314,8 @@ export async function sendPrompt(
   scheduleServerRecovery();
   setStatus(sessionId, "running");
   try {
-    await managed.session.prompt(await materializeVideoFileReferences(input));
+    const materializedFiles = await materializeSdkFileReferences(sessionId, input);
+    await managed.session.prompt(await materializeVideoFileReferences(materializedFiles));
     const serverStatus = kimiCodeServerHost.getStatus();
     return {
       route: "sdk",
@@ -1315,7 +1405,7 @@ export async function swarm(sessionId: string, input: string | KimiCodePromptPar
   if (!managed.session.swarm) throw new Error("当前兼容链路不支持 Swarm。");
   setStatus(sessionId, "running");
   try {
-    await managed.session.swarm(input);
+    await managed.session.swarm(await materializeSdkFileReferences(sessionId, input));
     sdkPinnedSessionIds.add(sessionId);
   } catch (error) {
     setStatus(sessionId, "error");
@@ -1364,7 +1454,8 @@ export async function askBtw(
   managed.btwRuns.set(agentId, run);
 
   try {
-    await runWithInteractiveAgent(sdkHarness, agentId, () => managed.session.prompt(input));
+    const materializedInput = await materializeSdkFileReferences(sessionId, input);
+    await runWithInteractiveAgent(sdkHarness, agentId, () => managed.session.prompt(materializedInput));
     await waitForBtwRun(run, options.timeoutMs ?? 120_000);
     if (run.error) throw new Error(run.error);
     return {
@@ -1406,7 +1497,8 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
   }
   const managed = getManagedSession(sessionId);
   const startedAt = Date.now();
-  const materializedInput = await materializeVideoFileReferences(input);
+  const materializedFiles = await materializeSdkFileReferences(sessionId, input);
+  const materializedInput = await materializeVideoFileReferences(materializedFiles);
   await managed.session.steer(materializedInput);
   eventSink?.({ sessionId, event: syntheticSteerRecord(materializedInput, startedAt) });
   void waitForOfficialSteerRecord(sessionId, managed.session.workDir, materializedInput, startedAt)

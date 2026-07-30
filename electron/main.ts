@@ -11,6 +11,7 @@ import { z } from "zod";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
+import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "./sessionHistoryFallback";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
@@ -5856,12 +5857,14 @@ function toKimiCodePromptInput(
   content: string,
   images: { name: string; dataUrl: string }[] = [],
   videos: { name: string; dataUrl?: string; fileId?: string }[] = [],
+  files: { name: string; filePath?: string; fileId?: string; mediaType?: string; size?: number }[] = [],
 ) {
-  if (images.length === 0 && videos.length === 0) return content;
+  if (images.length === 0 && videos.length === 0 && files.length === 0) return content;
   return [
     ...(content ? [{ type: "text" as const, text: content }] : []),
     ...images.map((image) => ({ type: "image_url" as const, imageUrl: { url: image.dataUrl, id: image.name } })),
     ...videos.map((video) => ({ type: "video_url" as const, videoUrl: { url: video.dataUrl, fileId: video.fileId, id: video.name } })),
+    ...files.map((file) => ({ type: "file" as const, file })),
   ];
 }
 
@@ -5934,6 +5937,35 @@ function parseKimiCodeVideos(value: unknown) {
           (typeof (item as { fileId?: unknown }).fileId === "string" && Boolean((item as { fileId: string }).fileId.trim())))
       )
     : [];
+}
+
+function parseKimiCodeFiles(value: unknown) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("附件列表格式无效");
+  if (value.length > 20) throw new Error("单次最多发送 20 个附件");
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object") throw new Error(`附件 ${index + 1} 格式无效`);
+    const source = item as Record<string, unknown>;
+    const rawName = typeof source.name === "string" ? source.name.trim().slice(0, 255) : "";
+    const filePath = typeof source.filePath === "string" ? source.filePath.trim() : "";
+    const fileId = typeof source.fileId === "string" ? source.fileId.trim() : "";
+    if (!rawName) throw new Error(`附件 ${index + 1} 缺少文件名`);
+    const name = safeGenericAttachmentName(rawName, filePath);
+    if (!filePath && !fileId) throw new Error(`无法读取附件“${name}”的本地路径，请重新选择文件`);
+    const mediaType = typeof source.mediaType === "string" && source.mediaType.trim()
+      ? source.mediaType.trim().slice(0, 200)
+      : undefined;
+    const size = typeof source.size === "number" && Number.isFinite(source.size) && source.size >= 0
+      ? source.size
+      : undefined;
+    return {
+      name,
+      filePath: filePath || undefined,
+      fileId: fileId || undefined,
+      mediaType,
+      size,
+    };
+  });
 }
 
 function normalizeAdditionalDirs(value: unknown): string[] {
@@ -6040,15 +6072,16 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
     const videos = parseKimiCodeVideos(req.videos);
+    const files = parseKimiCodeFiles(req.files);
     const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
-    if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
+    if (!sessionId || (!content && images.length === 0 && videos.length === 0 && files.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
     const trySend = async (
       promptContent: string,
       promptImages: { name: string; dataUrl: string }[],
       promptVideos: { name: string; dataUrl?: string; fileId?: string }[],
     ) => {
-      const input = toKimiCodePromptInput(promptContent, promptImages, promptVideos);
+      const input = toKimiCodePromptInput(promptContent, promptImages, promptVideos, files);
       const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
       const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
       return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);
@@ -6120,23 +6153,24 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     const content = typeof req.content === "string" ? req.content : "";
     const images = parseKimiCodeImages(req.images);
     const videos = parseKimiCodeVideos(req.videos);
-    if (!sessionId || (!content && images.length === 0 && videos.length === 0)) return { success: false, error: "Missing sessionId or content" };
+    const files = parseKimiCodeFiles(req.files);
+    if (!sessionId || (!content && images.length === 0 && videos.length === 0 && files.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const steerModel = kimiCodeHost.getSessionModel(sessionId);
     const steerAdapted = adaptPromptForModel(content, images, videos, steerModel);
     try {
-      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, steerAdapted.videos));
+      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, steerAdapted.videos, files));
       return { success: true, data: undefined };
     } catch (err) {
       if (steerAdapted.videos.length > 0 && isVideoUnsupportedError(err)) {
         markModelAsNonVideo(steerModel);
         const fallback = adaptPromptForModel(content, images, videos, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos));
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
         return { success: true, data: undefined };
       }
       if (isImageUnsupportedError(err)) {
         markModelAsNonVision(steerModel);
         const fallback = adaptPromptForModel(content, images, videos, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos));
+        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
         return { success: true, data: undefined };
       }
       throw err;

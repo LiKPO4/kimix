@@ -126,20 +126,16 @@ function promptVideos(attachments: UserMessageImage[] = []) {
     .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
 }
 
-function contentWithFileAttachments(content: string, attachments: UserMessageImage[] = []) {
-  const files = attachments.filter((image) => image.kind === "file");
-  if (files.length === 0) return content;
-  const fileLines = files.map((file, index) => {
-    const filePath = file.filePath?.trim();
-    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
-  });
-  return [
-    content.trim(),
-    "附件文件：",
-    ...fileLines,
-    "",
-    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
-  ].filter(Boolean).join("\n");
+function promptFiles(attachments: UserMessageImage[] = []) {
+  return attachments
+    .filter((attachment) => attachment.kind === "file")
+    .map((file) => ({
+      name: file.name,
+      filePath: file.filePath,
+      fileId: file.fileId,
+      mediaType: file.mediaType,
+      size: file.size,
+    }));
 }
 
 function extractSwarmModeStatus(value: unknown): boolean | undefined {
@@ -1944,9 +1940,10 @@ function App() {
     const timer = setTimeout(() => {
       sendKimiCodePromptWithRetry({
         sessionId: runtimeSessionId,
-        content: contentWithFileAttachments(next.content, next.images),
+        content: next.content,
         images: promptImages(next.images),
         videos: promptVideos(next.images),
+        files: promptFiles(next.images),
         model: currentSessionPromptModel(uiSessionId),
       }).then((res) => {
         if (res.success) return;
@@ -2002,9 +1999,10 @@ function App() {
             syncCurrentSessionFromStore(uiSessionId);
             const retryRes = await sendKimiCodePromptWithRetry({
               sessionId: recoveryRes.data.sessionId,
-              content: contentWithFileAttachments(next.content, next.images),
+              content: next.content,
               images: promptImages(next.images),
               videos: promptVideos(next.images),
+              files: promptFiles(next.images),
               model: currentSessionPromptModel(uiSessionId),
             });
             if (retryRes.success) return;
@@ -3194,9 +3192,10 @@ function App() {
             const runtimeSessionId = resolveRuntimeSessionId(uiSessionId);
             const sendPromise = sendKimiCodePromptWithRetry({
               sessionId: runtimeSessionId,
-              content: contentWithFileAttachments(next.content, next.images),
+              content: next.content,
               images: promptImages(next.images),
               videos: promptVideos(next.images),
+              files: promptFiles(next.images),
               model: currentSessionPromptModel(uiSessionId),
             });
             sendPromise.then((res) => {

@@ -6,6 +6,7 @@ import { logEvent } from "@/utils/reportError";
 import { preferPositiveMetric } from "@/utils/sessionMetrics";
 import { normalizePathForComparison } from "./pathCase";
 import { countUnifiedDiffChanges } from "./diff";
+import { extractFileAttachmentText } from "./userFileAttachments";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -1135,15 +1136,20 @@ function stripOfficialSystemReminders(content: string): string {
 }
 
 function sanitizeUserMessageText(content: string): string {
-  return stripOfficialSystemReminders(stripKimixClarificationInstruction(content));
+  return extractFileAttachmentText(
+    stripOfficialSystemReminders(stripKimixClarificationInstruction(content)),
+  ).content;
 }
 
 function extractUserMessage(input: unknown): ExtractedUserMessage {
   if (isString(input)) {
     const parsed = parseRoomDeliveryPrompt(input);
+    const extracted = extractFileAttachmentText(
+      stripOfficialSystemReminders(stripKimixClarificationInstruction(parsed.currentPrompt)),
+    );
     return {
-      content: sanitizeUserMessageText(parsed.currentPrompt),
-      images: [],
+      content: extracted.content,
+      images: extracted.files,
       deliveryIdentity: parsed.deliveryIdentity,
     };
   }
@@ -1156,9 +1162,35 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
     if (!isRecord(part)) return;
     if (part.type === "text" && isString(part.text)) {
       const parsed = parseRoomDeliveryPrompt(part.text);
-      const text = sanitizeUserMessageText(parsed.currentPrompt);
+      const extracted = extractFileAttachmentText(
+        stripOfficialSystemReminders(stripKimixClarificationInstruction(parsed.currentPrompt)),
+      );
+      const text = extracted.content;
       deliveryIdentity ??= parsed.deliveryIdentity;
       if (text) textParts.push(text);
+      images.push(...extracted.files);
+      return;
+    }
+    if (part.type === "file") {
+      const file = isRecord(part.file) ? part.file : part;
+      const name = isString(file.name) ? file.name : `附件 ${index + 1}`;
+      const fileId = isString(file.file_id)
+        ? file.file_id
+        : isString(file.fileId)
+          ? file.fileId
+          : undefined;
+      const filePath = isString(file.file_path)
+        ? file.file_path
+        : isString(file.filePath)
+          ? file.filePath
+          : undefined;
+      const mediaType = isString(file.media_type)
+        ? file.media_type
+        : isString(file.mediaType)
+          ? file.mediaType
+          : undefined;
+      const size = typeof file.size === "number" && Number.isFinite(file.size) ? file.size : undefined;
+      images.push({ kind: "file", name, fileId, filePath, mediaType, size });
       return;
     }
     if (part.type === "image_url") {
@@ -1234,8 +1266,9 @@ function extractUserMessage(input: unknown): ExtractedUserMessage {
 }
 
 function normalizeUserContent(content: string): string {
-  const attachmentMarkerIndex = content.search(/(?:^|\n)附件文件：/);
-  const visibleContent = attachmentMarkerIndex >= 0 ? content.slice(0, attachmentMarkerIndex) : content;
+  const extracted = extractFileAttachmentText(content).content;
+  const legacyMarker = extracted.search(/(?:^|\n)附件文件：/);
+  const visibleContent = legacyMarker >= 0 ? extracted.slice(0, legacyMarker) : extracted;
   return visibleContent
     .split("\n")
     .map((line) => line.trim())

@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Generic attachments use structured transport and session-managed copies (v2.20.63)**: renderer-visible user text is now isolated from attachment instructions. Server sessions upload local files and submit official `file` parts; SDK sessions copy files into their own `attachments/` directory before generating the model-only Read notice. Canonical replay reconstructs file cards while hiding both official notices and legacy Kimix path blocks. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+
 * **Thinking-part merging uses an incremental immutable index (v2.20.61)**: each canonical `thinkingParts` array now carries an ephemeral `WeakMap` index of normalized text and IDs, so a new streaming fragment no longer rebuilds and renormalizes the entire history. A 240-fragment fixture fell from about 944 ms to about 2.1 ms on the reference machine, then verified that a complete replay still collapses all covered fragments into one ordered part. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

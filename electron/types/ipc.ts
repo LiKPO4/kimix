@@ -1843,6 +1843,7 @@ export type KimiCodePromptRequest = {
   content: string;
   images?: { name: string; dataUrl: string }[];
   videos?: { name: string; dataUrl?: string; fileId?: string; mediaType?: string }[];
+  files?: { name: string; filePath?: string; fileId?: string; mediaType?: string; size?: number }[];
   /** Renderer-selected session model; immutable for this prompt dispatch. */
   model?: string;
 };

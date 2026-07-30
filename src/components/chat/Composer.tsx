@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection } from "@/types/ui";
+import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection, UserMessageImage } from "@/types/ui";
 import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
@@ -316,6 +316,7 @@ type ImageAttachment = {
   filePath?: string;
   fileId?: string;
   mediaType?: string;
+  size?: number;
   url?: string;
 };
 
@@ -332,26 +333,6 @@ function isVideoAttachment(attachment: ImageAttachment): attachment is ImageAtta
   return attachment.kind === "video" && Boolean(attachment.dataUrl?.startsWith("data:video/"));
 }
 
-function attachmentFilePath(attachment: ImageAttachment) {
-  return attachment.filePath?.trim() || "";
-}
-
-function buildAttachmentPromptContent(content: string, attachments: ImageAttachment[]) {
-  const files = attachments.filter((attachment) => attachment.kind === "file");
-  if (files.length === 0) return content;
-  const fileLines = files.map((file, index) => {
-    const filePath = attachmentFilePath(file);
-    return `${index + 1}. ${file.name}${filePath ? `\n   绝对路径：${filePath}` : "\n   绝对路径：未能从系统拖拽事件读取，请提示用户重新选择文件"}`;
-  });
-  return [
-    content.trim(),
-    "附件文件：",
-    ...fileLines,
-    "",
-    "请直接使用上述绝对路径读取附件内容，不要只按文件名搜索。",
-  ].filter(Boolean).join("\n");
-}
-
 function toPromptImages(attachments: ImageAttachment[]) {
   return attachments
     .filter(isImageAttachment)
@@ -364,6 +345,18 @@ function toPromptVideos(attachments: ImageAttachment[]) {
     .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
 }
 
+function toPromptFiles(attachments: Array<ImageAttachment | UserMessageImage>) {
+  return attachments
+    .filter((attachment) => attachment.kind === "file")
+    .map((file) => ({
+      name: file.name,
+      filePath: file.filePath,
+      fileId: file.fileId,
+      mediaType: file.mediaType,
+      size: file.size,
+    }));
+}
+
 function toUserAttachments(attachments: ImageAttachment[]) {
   return attachments.map((attachment) => ({
     id: attachment.id,
@@ -373,6 +366,7 @@ function toUserAttachments(attachments: ImageAttachment[]) {
     filePath: attachment.filePath,
     fileId: attachment.fileId,
     mediaType: attachment.mediaType,
+    size: attachment.size,
     url: attachment.url,
   }));
 }
@@ -772,7 +766,7 @@ export function Composer() {
       const detail = (event as CustomEvent<{
         sessionId?: string;
         content?: string;
-        images?: Array<{ id?: string; kind?: "image" | "video" | "file"; name: string; dataUrl?: string; filePath?: string; fileId?: string; mediaType?: string; url?: string }>;
+        images?: Array<{ id?: string; kind?: "image" | "video" | "file"; name: string; dataUrl?: string; filePath?: string; fileId?: string; mediaType?: string; size?: number; url?: string }>;
       }>).detail;
       if (!detail?.sessionId || useAppStore.getState().currentSession?.id !== detail.sessionId) return;
       setInput(detail.content ?? "");
@@ -784,6 +778,7 @@ export function Composer() {
         filePath: image.filePath,
         fileId: image.fileId,
         mediaType: image.mediaType,
+        size: image.size,
         url: image.url,
       })));
       window.requestAnimationFrame(() => inputRef.current?.focus());
@@ -1115,6 +1110,8 @@ export function Composer() {
         kind: "file" as const,
         name: file.name || filePath.split(/[\\/]/).pop() || "附件文件",
         filePath,
+        mediaType: file.type || undefined,
+        size: file.size,
       };
     });
     setImageAttachments((prev) => [...prev, ...attachments]);
@@ -1265,6 +1262,7 @@ export function Composer() {
       const promptVideos = (message.images ?? [])
         .filter((media): media is typeof media & { dataUrl: string } => media.kind === "video" && Boolean(media.dataUrl?.startsWith("data:video/")))
         .map((video) => ({ name: video.name, dataUrl: video.dataUrl, mediaType: video.mediaType }));
+      const promptFiles = toPromptFiles(message.images ?? []);
       const result = await dispatchQueuedRoomDelivery({
         roomMessageId,
         roomAgentId,
@@ -1310,6 +1308,7 @@ export function Composer() {
             content: outboundPrompt,
             images: promptImages,
             videos: promptVideos,
+            files: promptFiles,
             model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
           });
           if (!response.success && /not active|not found|session/i.test(response.error)) {
@@ -1333,6 +1332,7 @@ export function Composer() {
               content: outboundPrompt,
               images: promptImages,
               videos: promptVideos,
+              files: promptFiles,
               model: agent.switchedToModel ?? agent.modelAlias ?? undefined,
             });
           }
@@ -1413,12 +1413,11 @@ export function Composer() {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "请在 @Agent 之后输入要处理的任务。" }));
       return false;
     }
-    const contentWithAttachments = buildAttachmentPromptContent(options?.outboundContent ?? route.outboundContent, images);
     let created: ReturnType<typeof createRoomMessageDispatch>;
     try {
       created = createRoomMessageDispatch(session, {
         content,
-        outboundContent: contentWithAttachments,
+        outboundContent: options?.outboundContent ?? route.outboundContent,
         images: toUserAttachments(images),
         recipientAgentIds: route.recipientAgentIds,
         contextShareSelection: roomContextShareSelection,
@@ -1583,8 +1582,7 @@ export function Composer() {
     targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
 
     const effectiveEngine = "kimi-code";
-    const contentWithAttachments = buildAttachmentPromptContent(content, images);
-    const outboundContent = options?.outboundContent ?? contentWithAttachments;
+    const outboundContent = options?.outboundContent ?? content;
     const writePrimaryPromptActivity = (
       status: RoomAgentActivity["status"],
       runtimeSessionId = getRuntimeSessionId(targetSession) ?? undefined,
@@ -1612,6 +1610,7 @@ export function Composer() {
     if (effectiveEngine === "kimi-code") {
       const imagesForApi = toPromptImages(images);
       const videosForApi = toPromptVideos(images);
+      const filesForApi = toPromptFiles(images);
       const sameWorkDir = (a?: string, b?: string) => isSamePath(a, b);
       const updateLinkStatus = (message: string, tone: Extract<TimelineEvent, { type: "status_update" }>["tone"] = "info") => {
         const timestamp = Date.now();
@@ -1777,6 +1776,7 @@ export function Composer() {
           content: outboundContent,
           images: imagesForApi,
           videos: videosForApi,
+          files: filesForApi,
           model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
         });
         if (!res.success && /not active|not found|session/i.test(res.error)) {
@@ -1789,6 +1789,7 @@ export function Composer() {
             content: outboundContent,
             images: imagesForApi,
             videos: videosForApi,
+            files: filesForApi,
             model: getPrimaryRoomAgent(targetSession).switchedToModel ?? getPrimaryRoomAgent(targetSession).modelAlias ?? undefined,
           });
         }
@@ -3508,9 +3509,10 @@ export function Composer() {
     inputRef.current?.reset();
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      content: buildAttachmentPromptContent(trimmed, imagesToSend),
+      content: trimmed,
       images: toPromptImages(imagesToSend),
       videos: toPromptVideos(imagesToSend),
+      files: toPromptFiles(imagesToSend),
     });
     if (!res.success) {
       updateSteerStatus(activeSession.id, steerId, "failed", res.error, roomTarget);
@@ -4118,6 +4120,7 @@ export function Composer() {
           filePath: image.filePath,
           fileId: image.fileId,
           mediaType: image.mediaType,
+          size: image.size,
           url: image.url,
         })),
       roomTarget,
@@ -4125,7 +4128,8 @@ export function Composer() {
     removePendingMessage(id);
     const res = await window.api.steerKimiCode({
       sessionId: runtimeSessionId,
-      content: buildAttachmentPromptContent(pending.content, (pending.images ?? []).map((image) => ({
+      content: pending.content,
+      files: toPromptFiles((pending.images ?? []).map((image) => ({
         id: image.id ?? genId(),
         kind: image.kind ?? (image.dataUrl ? "image" as const : "file" as const),
         name: image.name,
@@ -4133,6 +4137,7 @@ export function Composer() {
         filePath: image.filePath,
         fileId: image.fileId,
         mediaType: image.mediaType,
+        size: image.size,
         url: image.url,
       }))),
       images: (pending.images ?? [])

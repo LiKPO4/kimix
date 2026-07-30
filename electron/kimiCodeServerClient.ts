@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES } from "./kimiCodeFileAttachments";
 
 // 帧级诊断（KIMIX_FRAME_DIAG=1 开启）：定位"多 step 轮次完成状态机误判"。
 let serverClientDiag: ((line: string) => void) | null = null;
@@ -32,9 +33,15 @@ function kimixWsClientId(): string {
 export type ServerPromptPart =
   | { type: "text"; text: string }
   | { type: "image"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } }
-  | { type: "video"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } };
+  | { type: "video"; source: { kind: "url"; url: string } | { kind: "base64"; media_type: string; data: string } | { kind: "file"; file_id: string } }
+  | { type: "file"; file_id: string; name: string; media_type: string; size: number };
 
-type ServerPromptUpload = (input: { name: string; mediaType: string; data: string }) => Promise<{ id: string }>;
+type ServerPromptUpload = (input: { name: string; mediaType: string; data: string | Buffer }) => Promise<{
+  id: string;
+  name?: string;
+  media_type?: string;
+  size?: number;
+}>;
 type ServerClientOptions = {
   onReconnecting?: () => void;
   onReconnected?: () => void;
@@ -505,6 +512,35 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
 // base64 内嵌回退的上限：13M base64 文本 ≈ 10MB 二进制。超过则不回退，
 // 避免更大 body 撞上 Server 另一个限制，保留原始 upload 错误信息。
 const MAX_BASE64_FALLBACK_DATA_LENGTH = 13_000_000;
+const GENERIC_FILE_UPLOAD_CACHE_TTL_MS = 5 * 60_000;
+const GENERIC_FILE_UPLOAD_CACHE_LIMIT = 64;
+const genericFileUploadCache = new Map<string, {
+  expiresAt: number;
+  upload: ReturnType<ServerPromptUpload>;
+}>();
+
+function cachedGenericFileUpload(
+  key: string,
+  upload: () => ReturnType<ServerPromptUpload>,
+): ReturnType<ServerPromptUpload> {
+  const now = Date.now();
+  for (const [cachedKey, cached] of genericFileUploadCache) {
+    if (cached.expiresAt <= now) genericFileUploadCache.delete(cachedKey);
+  }
+  const existing = genericFileUploadCache.get(key);
+  if (existing) return existing.upload;
+  const pending = upload();
+  genericFileUploadCache.set(key, { expiresAt: now + GENERIC_FILE_UPLOAD_CACHE_TTL_MS, upload: pending });
+  void pending.catch(() => {
+    if (genericFileUploadCache.get(key)?.upload === pending) genericFileUploadCache.delete(key);
+  });
+  while (genericFileUploadCache.size > GENERIC_FILE_UPLOAD_CACHE_LIMIT) {
+    const oldest = genericFileUploadCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    genericFileUploadCache.delete(oldest);
+  }
+  return pending;
+}
 
 export async function toServerPromptContent(
   input: string | Array<{
@@ -512,12 +548,45 @@ export async function toServerPromptContent(
     text?: string;
     imageUrl?: { url: string; id?: string };
     videoUrl?: { url?: string; id?: string; fileId?: string };
+    file?: { name: string; filePath?: string; fileId?: string; mediaType?: string; size?: number };
   }>,
   upload?: ServerPromptUpload,
 ): Promise<ServerPromptPart[]> {
   if (typeof input === "string") return [{ type: "text", text: input }];
-  return Promise.all(input.map(async (part) => {
+  return Promise.all(input.map(async (part): Promise<ServerPromptPart> => {
     if (part.type === "text") return { type: "text", text: part.text ?? "" };
+    if (part.type === "file" && part.file) {
+      const file = part.file;
+      if (file.fileId?.trim()) {
+        return {
+          type: "file",
+          file_id: file.fileId.trim(),
+          name: file.name,
+          media_type: file.mediaType?.trim() || genericAttachmentMediaType(file.name),
+          size: file.size ?? 0,
+        };
+      }
+      if (!file.filePath?.trim()) throw new Error(`附件“${file.name}”缺少可读取的文件路径`);
+      if (!upload) throw new Error(`附件“${file.name}”无法上传到 Kimi Server`);
+      const filePath = path.resolve(file.filePath.trim());
+      const stat = await fs.promises.stat(filePath);
+      if (!stat.isFile()) throw new Error(`附件不是普通文件：${file.name}`);
+      if (stat.size > MAX_GENERIC_ATTACHMENT_BYTES) throw new Error(`附件“${file.name}”超过 50MB 上限`);
+      const mediaType = file.mediaType?.trim() || genericAttachmentMediaType(file.name);
+      const uploadKey = `${filePath}\0${stat.size}\0${stat.mtimeMs}\0${file.name}\0${mediaType}`;
+      const uploaded = await cachedGenericFileUpload(uploadKey, async () => upload({
+        name: file.name,
+        mediaType,
+        data: await fs.promises.readFile(filePath),
+      }));
+      return {
+        type: "file",
+        file_id: uploaded.id,
+        name: uploaded.name || file.name,
+        media_type: uploaded.media_type || mediaType,
+        size: uploaded.size ?? stat.size,
+      };
+    }
     const isVideo = part.type === "video_url";
     const media = isVideo ? part.videoUrl : part.imageUrl;
     if (isVideo && part.videoUrl?.fileId) {
@@ -1024,10 +1093,13 @@ export class KimiCodeServerClient {
     });
   }
 
-  uploadFile(input: { name: string; mediaType: string; data: string }): Promise<{ id: string; name: string; media_type: string; size: number }> {
+  uploadFile(input: { name: string; mediaType: string; data: string | Buffer }): Promise<{ id: string; name: string; media_type: string; size: number }> {
     const form = new FormData();
     form.append("name", input.name);
-    form.append("file", new Blob([Buffer.from(input.data, "base64")], { type: input.mediaType }), input.name);
+    const bytes = Buffer.isBuffer(input.data) ? input.data : Buffer.from(input.data, "base64");
+    const payload = new Uint8Array(bytes.byteLength);
+    payload.set(bytes);
+    form.append("file", new Blob([payload], { type: input.mediaType }), input.name);
     return this.request("/api/v1/files", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
   }
 

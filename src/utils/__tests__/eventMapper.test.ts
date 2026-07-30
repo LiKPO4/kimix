@@ -223,6 +223,61 @@ describe("mapStreamEvent", () => {
     expect(status.contextLimit).toBeUndefined();
   });
 
+  it("hides official attachment notices and restores the file metadata", () => {
+    const fileId = "f_550e8400-e29b-41d4-a716-446655440000";
+    const path = `C:\\sessions\\s1\\attachments\\${fileId}-report.pdf`;
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "请总结" },
+          {
+            type: "text",
+            text: `Attached file "report.pdf" (application/pdf, 24 bytes): ${path} — open it with the Read tool`,
+          },
+        ],
+      },
+    }) as Extract<TimelineEvent, { type: "user_message" }>;
+
+    expect(event.content).toBe("请总结");
+    expect(event.images).toEqual([{
+      kind: "file",
+      name: "report.pdf",
+      filePath: path,
+      fileId,
+      mediaType: "application/pdf",
+      size: 24,
+    }]);
+  });
+
+  it("restores structured generic file parts", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "查看附件" },
+          {
+            type: "file",
+            file_id: "f_01KWK39A0ZC8R2ATZEQMD8716C",
+            name: "spec.yaml",
+            media_type: "application/yaml",
+            size: 42,
+          },
+        ],
+      },
+    }) as Extract<TimelineEvent, { type: "user_message" }>;
+
+    expect(event.content).toBe("查看附件");
+    expect(event.images).toEqual([{
+      kind: "file",
+      name: "spec.yaml",
+      fileId: "f_01KWK39A0ZC8R2ATZEQMD8716C",
+      filePath: undefined,
+      mediaType: "application/yaml",
+      size: 42,
+    }]);
+  });
+
   it("keeps missing StatusUpdate context unknown instead of fabricating zero", () => {
     const event = mapStreamEvent({
       type: "StatusUpdate",

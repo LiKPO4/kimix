@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   acceptedPromptProgressBaseline,
@@ -239,6 +242,59 @@ describe("KimiCodeServerClient protocol adapters", () => {
     expect(classifyServerSessionActivity({ status: "future-paused-state" })).toBe("unknown");
     expect(classifyServerSessionActivity({})).toBe("unknown");
     expect(classifyServerSessionActivity(undefined)).toBe("unknown");
+  });
+
+  it("uploads generic files and sends the official structured file part", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-file-upload-"));
+    const filePath = path.join(tempDir, "spec.md");
+    fs.writeFileSync(filePath, "# Spec\n", "utf-8");
+    const upload = vi.fn(async () => ({
+      id: "f_uploaded",
+      name: "spec.md",
+      media_type: "text/markdown",
+      size: 7,
+    }));
+    try {
+      const input = [{
+        type: "file",
+        file: { name: "spec.md", filePath, mediaType: "text/markdown", size: 7 },
+      }];
+      const expected = [{
+        type: "file",
+        file_id: "f_uploaded",
+        name: "spec.md",
+        media_type: "text/markdown",
+        size: 7,
+      }];
+      await expect(toServerPromptContent(input, upload)).resolves.toEqual(expected);
+      await expect(toServerPromptContent(input, upload)).resolves.toEqual(expected);
+      expect(upload).toHaveBeenCalledWith({
+        name: "spec.md",
+        mediaType: "text/markdown",
+        data: Buffer.from("# Spec\n"),
+      });
+      expect(upload).toHaveBeenCalledTimes(1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reuses a restored official file id without reading a local path", async () => {
+    await expect(toServerPromptContent([{
+      type: "file",
+      file: {
+        name: "report.pdf",
+        fileId: "f_restored",
+        mediaType: "application/pdf",
+        size: 24,
+      },
+    }])).resolves.toEqual([{
+      type: "file",
+      file_id: "f_restored",
+      name: "report.pdf",
+      media_type: "application/pdf",
+      size: 24,
+    }]);
   });
 
   it("reconnects only when official history advances during websocket silence", () => {

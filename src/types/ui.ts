@@ -391,6 +391,7 @@ export interface UserMessageImage {
   filePath?: string;
   fileId?: string;
   mediaType?: string;
+  size?: number;
   url?: string;
 }
 

@@ -1,6 +1,7 @@
 import type { TimelineEvent } from "@/types/ui";
 import { reliableAssistantDurationMs } from "./duration";
 import { STALE_TIMELINE_WORK_MS } from "./sessionActivity";
+import { extractFileAttachmentText } from "./userFileAttachments";
 
 export function isLegacyKimiWorkDirError(message: string) {
   return /unknown option\s+['"]?--work-dir['"]?/i.test(message);
@@ -220,9 +221,10 @@ export function isLatestUserInputEvent(events: TimelineEvent[], userEventId: str
  * history: strip the attachment section and collapse whitespace.
  */
 function normalizeUserContentForEcho(content: string): string {
-  const attachmentMarkerIndex = content.search(/(?:^|\n)附件文件：/);
-  const visible = attachmentMarkerIndex >= 0 ? content.slice(0, attachmentMarkerIndex) : content;
-  return visible.replace(/\s+/g, " ").trim();
+  const extracted = extractFileAttachmentText(content).content;
+  const legacyMarker = extracted.search(/(?:^|\n)附件文件：/);
+  const visibleContent = legacyMarker >= 0 ? extracted.slice(0, legacyMarker) : extracted;
+  return visibleContent.replace(/\s+/g, " ").trim();
 }
 
 /**
