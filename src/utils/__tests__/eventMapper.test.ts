@@ -3444,6 +3444,35 @@ describe("mergeAssistantThinkingText", () => {
 describe("mergeAssistantThinkingParts", () => {
   const part = (id: string, text: string, timestamp = 1) => ({ id, timestamp, text });
 
+  it("keeps 240 independently streamed thinking parts ordered before a full replay", () => {
+    let merged: ReturnType<typeof mergeAssistantThinkingParts>;
+    const startedAt = performance.now();
+    for (let index = 0; index < 240; index += 1) {
+      const token = index.toString().padStart(4, "0");
+      merged = mergeAssistantThinkingParts(merged, [
+        part(`part-${token}`, `独立推理片段 ${token} :: ${"x".repeat(80)}`, index),
+      ]);
+    }
+    const sequentialMs = performance.now() - startedAt;
+
+    expect(merged).toHaveLength(240);
+    expect(merged?.map((item) => item.id)).toEqual(
+      Array.from({ length: 240 }, (_, index) => `part-${index.toString().padStart(4, "0")}`),
+    );
+
+    const fullText = merged?.map((item) => item.text).join("") ?? "";
+    const replayStartedAt = performance.now();
+    const replayed = mergeAssistantThinkingParts(merged, [part("full-replay", fullText, 1_000)]);
+    const replayMs = performance.now() - replayStartedAt;
+    expect(replayed).toHaveLength(1);
+    expect(replayed?.[0]).toMatchObject({ id: "full-replay", text: fullText, timestamp: 1_000 });
+    // The former full-history rebuild took ~944 ms for this fixture on the
+    // reference machine. Keep a wide CI margin while still catching that
+    // algorithmic regression; the indexed path is normally below 10 ms.
+    expect(sequentialMs).toBeLessThan(250);
+    expect(replayMs).toBeLessThan(100);
+  });
+
   it("deduplicates an incoming batch that already contains the same full replay twice", () => {
     const full = "The discovery tries /models and /v1/models.";
     const merged = mergeAssistantThinkingParts(undefined, [

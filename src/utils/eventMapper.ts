@@ -277,25 +277,57 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   return left + right;
 }
 
-/** Append thinking parts across multi-step barrier frames; upgrade supersets in place. */
-export function mergeAssistantThinkingParts(
-  existing: AssistantThinkingPart[] | undefined,
-  incoming: AssistantThinkingPart[] | undefined,
-): AssistantThinkingPart[] | undefined {
-  if (!incoming?.length) return existing;
-  const source = [...(existing ?? []), ...incoming];
-  let result: AssistantThinkingPart[] = [];
-  for (const part of source) {
-    const partText = normalizeThinkingWhitespace(part.text);
+type AssistantThinkingPartsIndex = {
+  parts: AssistantThinkingPart[];
+  normalized: string[];
+  byId: Map<string, number>;
+};
+
+const normalizedThinkingPartCache = new WeakMap<AssistantThinkingPart, string>();
+const assistantThinkingPartsIndexCache = new WeakMap<AssistantThinkingPart[], AssistantThinkingPartsIndex>();
+const EMPTY_ASSISTANT_THINKING_PARTS_INDEX: AssistantThinkingPartsIndex = {
+  parts: [],
+  normalized: [],
+  byId: new Map(),
+};
+
+function normalizedThinkingPart(part: AssistantThinkingPart): string {
+  const cached = normalizedThinkingPartCache.get(part);
+  if (cached !== undefined) return cached;
+  const normalized = normalizeThinkingWhitespace(part.text);
+  normalizedThinkingPartCache.set(part, normalized);
+  return normalized;
+}
+
+function sameThinkingPartOrder(left: AssistantThinkingPart[], right: AssistantThinkingPart[]): boolean {
+  return left.length === right.length && left.every((part, index) => part === right[index]);
+}
+
+/**
+ * Apply one incoming batch to an already canonical, indexed part array.
+ * Normalized existing text is reused from the array-identity cache; each new
+ * part is normalized once and compared with the current result in one pass.
+ */
+function mergeAssistantThinkingPartBatch(
+  base: AssistantThinkingPartsIndex,
+  incoming: AssistantThinkingPart[],
+): AssistantThinkingPartsIndex {
+  let parts = [...base.parts];
+  let normalized = [...base.normalized];
+  let byId = new Map(base.byId);
+  let changed = false;
+
+  for (const part of incoming) {
+    const partText = normalizedThinkingPart(part);
     if (!partText) continue;
 
     // Same id means a streaming update of the same thought: replace in place
     // only when the incoming text grew, otherwise keep the existing version.
-    const sameIdIndex = result.findIndex((item) => item.id === part.id);
-    if (sameIdIndex !== -1) {
-      const current = result[sameIdIndex];
+    const sameIdIndex = byId.get(part.id);
+    if (sameIdIndex !== undefined) {
+      const current = parts[sameIdIndex];
       if (part.text.length > current.text.length) {
-        result[sameIdIndex] = {
+        const replacement = {
           ...current,
           ...part,
           // A same-id update extends the original thought; keep its source
@@ -303,58 +335,103 @@ export function mergeAssistantThinkingParts(
           timestamp: current.timestamp,
           text: part.text,
         };
+        parts[sameIdIndex] = replacement;
+        normalized[sameIdIndex] = normalizedThinkingPart(replacement);
+        changed = true;
       }
       continue;
     }
 
     // A fragment already covered by an existing part contributes nothing.
-    const alreadyCovered = result.some((item) => {
-      const itemText = normalizeThinkingWhitespace(item.text);
-      return itemText.length >= partText.length && itemText.includes(partText);
-    });
+    let alreadyCovered = false;
+    for (let index = 0; index < parts.length; index += 1) {
+      const itemText = normalized[index];
+      if (itemText.length >= partText.length && itemText.includes(partText)) {
+        alreadyCovered = true;
+        break;
+      }
+    }
     if (alreadyCovered) continue;
 
-    // A full replay supersedes every earlier fragment it covers (normalized
-    // whitespace comparison): drop them all and insert at the first covered
-    // position so ordering stays stable.
-    let insertIndex = -1;
-    const coveredIndexes = new Set<number>();
-    result.forEach((item, index) => {
-      const itemText = normalizeThinkingWhitespace(item.text);
+    // A full replay supersedes every earlier fragment it covers. Find all
+    // covered positions in one pass, then rebuild the arrays and id index once.
+    const coveredIndexes: number[] = [];
+    for (let index = 0; index < parts.length; index += 1) {
+      const itemText = normalized[index];
       if (itemText && partText.length > itemText.length && partText.includes(itemText)) {
-        coveredIndexes.add(index);
-        if (insertIndex === -1) insertIndex = index;
+        coveredIndexes.push(index);
       }
-    });
-    if (coveredIndexes.size > 0) {
-      const firstCovered = result[insertIndex];
-      result = result.filter((_, index) => !coveredIndexes.has(index));
-      result.splice(insertIndex, 0, {
+    }
+    if (coveredIndexes.length > 0) {
+      const insertIndex = coveredIndexes[0];
+      const firstCovered = parts[insertIndex];
+      const covered = new Set(coveredIndexes);
+      parts = parts.filter((_, index) => !covered.has(index));
+      normalized = normalized.filter((_, index) => !covered.has(index));
+      const replacement = {
         ...firstCovered,
         ...part,
         text: part.text,
-      });
+      };
+      parts.splice(insertIndex, 0, replacement);
+      normalized.splice(insertIndex, 0, normalizedThinkingPart(replacement));
+      byId = new Map(parts.map((item, index) => [item.id, index]));
+      changed = true;
       continue;
     }
 
-    result.push(part);
+    byId.set(part.id, parts.length);
+    parts.push(part);
+    normalized.push(partText);
+    changed = true;
   }
+
   // Volatile 0.29 thinking frames do not carry a stream offset. Reconnect and
   // renderer scheduling can therefore deliver adjacent fragments in reverse
   // order. Their source timestamps are still monotonic, so restore that order
   // before the UI concatenates the parts. Modern JS sort is stable, preserving
   // arrival order for fragments that genuinely share a timestamp.
-  const ordered = result.some((part, index) => index > 0 && part.timestamp < result[index - 1].timestamp)
-    ? result.sort((left, right) => left.timestamp - right.timestamp)
-    : result;
-  if (
-    !existing?.length &&
-    ordered.length === incoming.length &&
-    ordered.every((part, index) => part === incoming[index])
-  ) {
-    return incoming;
+  const needsSort = parts.some((part, index) => index > 0 && part.timestamp < parts[index - 1].timestamp);
+  if (needsSort) {
+    const ordered = parts.map((part, index) => ({ part, normalized: normalized[index] }))
+      .sort((left, right) => left.part.timestamp - right.part.timestamp);
+    parts = ordered.map((entry) => entry.part);
+    normalized = ordered.map((entry) => entry.normalized);
+    byId = new Map(parts.map((part, index) => [part.id, index]));
+    changed = true;
   }
-  return ordered;
+
+  return changed ? { parts, normalized, byId } : base;
+}
+
+function prepareAssistantThinkingParts(parts: AssistantThinkingPart[]): AssistantThinkingPartsIndex {
+  const cached = assistantThinkingPartsIndexCache.get(parts);
+  if (cached) return cached;
+  const prepared = mergeAssistantThinkingPartBatch(EMPTY_ASSISTANT_THINKING_PARTS_INDEX, parts);
+  const indexed = sameThinkingPartOrder(prepared.parts, parts)
+    ? { ...prepared, parts }
+    : prepared;
+  assistantThinkingPartsIndexCache.set(parts, indexed);
+  if (indexed.parts !== parts) assistantThinkingPartsIndexCache.set(indexed.parts, indexed);
+  return indexed;
+}
+
+/** Append thinking parts across multi-step barrier frames; upgrade supersets in place. */
+export function mergeAssistantThinkingParts(
+  existing: AssistantThinkingPart[] | undefined,
+  incoming: AssistantThinkingPart[] | undefined,
+): AssistantThinkingPart[] | undefined {
+  if (!incoming?.length) return existing;
+  const base = existing?.length
+    ? prepareAssistantThinkingParts(existing)
+    : EMPTY_ASSISTANT_THINKING_PARTS_INDEX;
+  const merged = mergeAssistantThinkingPartBatch(base, incoming);
+  const output = !existing?.length && sameThinkingPartOrder(merged.parts, incoming)
+    ? incoming
+    : merged.parts;
+  const indexed = output === merged.parts ? merged : { ...merged, parts: output };
+  assistantThinkingPartsIndexCache.set(output, indexed);
+  return output;
 }
 
 function isInsideUnclosedInlineCode(content: string) {

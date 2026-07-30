@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Thinking-part merging uses an incremental immutable index (v2.20.61)**: each canonical `thinkingParts` array now carries an ephemeral `WeakMap` index of normalized text and IDs, so a new streaming fragment no longer rebuilds and renormalizes the entire history. A 240-fragment fixture fell from about 944 ms to about 2.1 ms on the reference machine, then verified that a complete replay still collapses all covered fragments into one ordered part. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+
 * **Search hits keep exact source identity through merged turns (v2.20.60)**: project search indexes stored event IDs, while the chat display merges multi-step Assistant, thinking, tool and status events into turn containers. Render items and turn-block groups now retain complete source-event IDs (including colon-bearing snapshot IDs), and focus expands collapsed history/process/tool layers before selecting the query in the deepest matching source block. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
 
 

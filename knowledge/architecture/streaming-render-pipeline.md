@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-07-29T22:55:00+08:00"
+timestamp: "2026-07-30T09:15:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -137,6 +137,17 @@ reconciliation compares the canonical timeline against a deduplicated local
 timeline so a locally duplicated (and therefore longer) thinking history cannot
 win the regression guard and fossilize duplicates into the persisted state.
 
+Thinking-part merging is incremental by immutable array identity. A `WeakMap`
+keeps the canonical part order, normalized text, and id-to-position index for
+each returned array; the next streaming batch processes only its incoming
+parts, normalizes each new object once, and rebuilds the full index only after
+a rare superset replacement or timestamp reorder. An uncached history array is
+canonicalized once before it enters this path. The cache is deliberately
+ephemeral and never persisted, and callers must keep treating both part objects
+and their arrays as immutable. The 240-independent-part regression fixture also
+ends with a full replay, so performance work cannot weaken deduplication,
+whitespace normalization, source timestamp ordering, or replay coverage.
+
 Reconnect replay adds two stricter ownership rules. An unseen stable snapshot
 message ID may not use the generic same-turn open-Assistant shortcut: it must
 pass the guarded completion-binding path, and any tool/subagent/approval whose
@@ -257,6 +268,7 @@ New invariants:
 - **Invariant N (live thinking group key matches its formal commit)**: the appended live thinking block uses the same React group key (`thinking:active-draft:<draftKey>:<materializationId>`) that `buildTurnBlocks` assigns once that draft segment commits, so the live→formal swap reuses the DOM node instead of unmounting it. Settled (completed) thinking folds by `resolveSettledThinkingFold`: multi-paragraph blocks teaser their last paragraph (official kimi-web rule), and long single-paragraph streams (>5 lines or >200 chars) teaser their last non-empty line — settled long reasoning is never a fixed, non-clickable wall, and the full text stays one click away.
 - **Invariant O (completed body and duration ignore late passive replay order)**: `TurnBlock[]` keeps official array order and is never timestamp-sorted, but the completed bottom body chooses the text block whose source Assistant timestamp is greatest; equal timestamps keep the later array block. This is a display-only backstop for an unseen non-barrier stable snapshot that arrives after a newer live final materialization. Derived turn duration likewise ends at the last actual Agent/process event, not at status/usage samples or derived change/diff/todo/recommendation artifacts that may be appended minutes after completion—or, after a locally missing user boundary, accidentally grouped into the previous turn. Mapped multi-step Assistant segments carry cumulative duration as of each segment; merging them must use the maximum reliable value, then compare it with the user→actual-process-end projection. The first segment's shorter cumulative value must never replace the complete turn duration. Neither rule changes draft assembly, WebSocket delivery, completion binding, or the expanded process timeline.
 - **Invariant P (search keeps source-event addressability across render merging)**: search results carry the original stored event ID. Any display projection that absorbs that event into another `RenderItem` or `TurnBlockGroup` must retain and expose the complete source ID; punctuation inside an ID is data, not a delimiter. Exact search focus expands only the target history/process/tool ancestry, retries after each mount, and selects the query inside the deepest matching source block. Falling back directly from a source ID to the merged turn container makes repeated terms land on the wrong occurrence and is forbidden.
+- **Invariant Q (thinking-part indexes follow immutable array identity)**: `mergeAssistantThinkingParts` may reuse a `WeakMap` index only for the exact part-array object it canonicalized or returned. Existing normalized text and id positions are not recomputed for every token; only the incoming batch is processed. Callers must never mutate a cached array or part object in place. A full replay still removes every covered fragment in one batch, same-id growth stays at its original source position, out-of-order timestamps are stably sorted, and an uncached persisted array is canonicalized once before incremental merging.
 
 Layout and text shaping are the dominant streaming cost once JS is cheap. Measured on production reproductions: an earlier immediate-boundary bug caused 395 flushes/10s at 14ms each; a later 5,500-event long turn still spent 6–7s of every 10s rebuilding render items while running tool arguments flushed 38–42 times. Running tool/status/subagent-only batches therefore use a 500ms cadence, while Assistant text keeps the 80ms cadence and true boundaries remain synchronous. Live thinking keeps its full text but constrains layout growth inside a 120px five-line scroll viewport, so the outer conversation does not reflow taller after the fifth line. When the user is not scrolling, draft notifications publish on the next animation frame (matching official web's immediate per-event state update while coalescing same-frame fragments); active outer-chat scrolling alone switches them to the 250ms yield timer.
 
