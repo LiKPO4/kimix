@@ -473,33 +473,35 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           </button>
         </div>
         {hasStructuredDiff && diffExpanded && (
-          <div className="bg-surface-base" style={{ padding: "0 18px 14px 40px" }}>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="overflow-hidden rounded-lg border border-accent-danger/30 bg-surface-elevated">
-                <div style={{ padding: "10px 12px" }} className="border-b border-accent-danger/20 text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
-                <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                  {renderDiffColumn(diffLines, "old")}
-                </div>
+          <div
+            data-change-preview-surface="structured"
+            className="grid border-t border-border-subtle bg-surface-elevated md:grid-cols-2"
+          >
+            <div className="min-w-0 overflow-hidden border-b border-border-subtle md:border-b-0 md:border-r">
+              <div style={{ padding: "10px 16px" }} className="border-b border-accent-danger/20 text-[12px] font-medium leading-5 text-accent-danger">修改前</div>
+              <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                {renderDiffColumn(diffLines, "old")}
               </div>
-              <div className="overflow-hidden rounded-lg border border-accent-success/30 bg-surface-elevated">
-                <div style={{ padding: "10px 12px" }} className="border-b border-accent-success/20 text-[12px] font-medium leading-5 text-accent-success">修改后</div>
-                <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                  {renderDiffColumn(diffLines, "new")}
-                </div>
+            </div>
+            <div className="min-w-0 overflow-hidden">
+              <div style={{ padding: "10px 16px" }} className="border-b border-accent-success/20 text-[12px] font-medium leading-5 text-accent-success">修改后</div>
+              <div className="max-h-72 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                {renderDiffColumn(diffLines, "new")}
               </div>
             </div>
           </div>
         )}
         {!hasStructuredDiff && loadedPreview && diffExpanded && (
-          <div className="bg-surface-base" style={{ padding: "0 18px 14px 40px" }}>
-            <div className="overflow-hidden rounded-lg border border-border-subtle bg-surface-elevated">
-              <div className="flex items-center justify-between border-b border-border-subtle text-[12px] leading-5 text-text-muted" style={{ minHeight: 36, paddingLeft: 12, paddingRight: 12, gap: 12 }}>
-                <span>{loadedPreview.source === "commit" ? `提交 ${loadedPreview.commitSha?.slice(0, 7) ?? ""}` : "当前工作区差异"}</span>
-                {loadedPreview.truncated && <span>内容过大，已截断</span>}
-              </div>
-              <div className="max-h-80 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                {renderGitPatch(loadedPreview.patch)}
-              </div>
+          <div
+            data-change-preview-surface="patch"
+            className="border-t border-border-subtle bg-surface-elevated"
+          >
+            <div className="flex items-center justify-between border-b border-border-subtle text-[12px] leading-5 text-text-muted" style={{ minHeight: 36, paddingLeft: 16, paddingRight: 16, gap: 12 }}>
+              <span>{loadedPreview.source === "commit" ? `提交 ${loadedPreview.commitSha?.slice(0, 7) ?? ""}` : "当前工作区差异"}</span>
+              {loadedPreview.truncated && <span>内容过大，已截断</span>}
+            </div>
+            <div className="max-h-80 overflow-auto" style={{ paddingTop: 8, paddingBottom: 8 }}>
+              {renderGitPatch(loadedPreview.patch)}
             </div>
           </div>
         )}

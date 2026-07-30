@@ -72,6 +72,38 @@ describe("ChangeCard", () => {
     expect(container.textContent).toContain("-1");
     expect(container.textContent).toContain("-before");
     expect(container.textContent).toContain("+after");
+    const previewSurface = container.querySelector('[data-change-preview-surface="patch"]');
+    expect(previewSurface).not.toBeNull();
+    expect(previewSurface?.parentElement?.style.padding).toBe("");
+    expect(previewSurface?.classList.contains("border-t")).toBe(true);
+    await act(async () => root.unmount());
+  });
+
+  it("renders a structured two-column diff as a full-width file surface", async () => {
+    useAppStore.setState({ currentProject: project, currentSession: null });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(createElement(ChangeCard, {
+      changes: [{
+        path: "src/example.ts",
+        oldText: "const value = 1;",
+        newText: "const value = 2;",
+      }],
+    })));
+    const previewButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "预览");
+    expect(previewButton).toBeDefined();
+    await act(async () => previewButton?.click());
+
+    const previewSurface = container.querySelector('[data-change-preview-surface="structured"]');
+    expect(previewSurface).not.toBeNull();
+    expect(previewSurface?.parentElement?.style.padding).toBe("");
+    expect(previewSurface?.classList.contains("border-t")).toBe(true);
+    expect(previewSurface?.children).toHaveLength(2);
+    expect(container.textContent).toContain("修改前");
+    expect(container.textContent).toContain("修改后");
     await act(async () => root.unmount());
   });
 });
