@@ -2640,6 +2640,34 @@ button.bg-accent-primary:disabled:hover,
   line-height: 1.45 !important;
 }
 
+.kimix-composer-input {
+  scrollbar-width: none;
+}
+
+.kimix-composer-input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.kimix-composer-input-scrollbar {
+  cursor: pointer;
+  touch-action: none;
+}
+
+.kimix-composer-input-scrollbar-thumb {
+  position: absolute;
+  right: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  cursor: grab;
+}
+
+.kimix-composer-input-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--text-secondary) 82%, transparent);
+  cursor: grabbing;
+}
+
 /* ── Floating Panel ── */
 
 .kimix-floating-panel {
