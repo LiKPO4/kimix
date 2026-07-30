@@ -39,16 +39,23 @@ import {
 
 type JsonObject = Record<string, unknown>;
 
+type KimiCodeHostIdentity = {
+  productName: string;
+  version: string;
+  platform: string;
+  userAgentSuffix?: string;
+};
+
 type KimiCodeSdkModule = {
   KimiHarness?: new (options: {
     homeDir?: string;
-    identity?: { userAgentProduct: string; version: string };
+    identity?: KimiCodeHostIdentity;
     uiMode?: string;
     skillDirs?: readonly string[];
   }) => KimiHarnessLike;
   createKimiHarness?: (options: {
     homeDir?: string;
-    identity?: { userAgentProduct: string; version: string };
+    identity?: KimiCodeHostIdentity;
     uiMode?: string;
     skillDirs?: readonly string[];
   }) => KimiHarnessLike;
@@ -3497,8 +3504,9 @@ async function getHarness(): Promise<KimiHarnessLike> {
   const options = {
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
-      userAgentProduct: "kimi-code-cli",
-      version: process.env.KIMI_CODE_SMOKE_VERSION ?? process.env.npm_package_version ?? "0.0.0",
+      productName: "Kimix",
+      version: process.env.KIMI_CODE_SMOKE_VERSION ?? app.getVersion(),
+      platform: "kimi_code_desktop",
     },
     uiMode: "kimix",
   };

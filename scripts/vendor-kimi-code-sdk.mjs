@@ -101,7 +101,10 @@ async function main() {
   if (!bundled.includes(upstreamMcpTimeout)) {
     throw new Error("Upstream MCP startup-timeout marker changed; review the Kimix vendor patch before publishing.");
   }
-  await writeFile(outFile, bundled.replace(upstreamMcpTimeout, kimixMcpTimeout), "utf8");
+  const patchedBundle = bundled
+    .replace(upstreamMcpTimeout, kimixMcpTimeout)
+    .replace(/[ \t]+$/gm, "");
+  await writeFile(outFile, patchedBundle, "utf8");
 
   const size = (await stat(outFile)).size;
   console.log(JSON.stringify({

@@ -14,7 +14,7 @@ function section(startMarker: string, endMarker: string): string {
   return bundle.slice(start, end);
 }
 
-describe("vendored Kimi Code 0.28 fallback", () => {
+describe("vendored Kimi Code 0.31 fallback", () => {
   it("为被中断但尚未执行的工具调用补齐 call/result 事件", () => {
     const recorder = section("async function recordUnexecutedToolCalls", "function preflightToolCall");
     expect(recorder).toContain('type: "tool.call"');
@@ -35,9 +35,9 @@ describe("vendored Kimi Code 0.28 fallback", () => {
 
   it("远程抓取的每次跳转都重新校验地址并固定 DNS 解析结果", () => {
     const fetcher = section("async requestWithValidatedRedirects", "extractMainContent(html)");
-    expect(fetcher).toContain("resolveSafeFetchTarget(currentUrl");
+    expect(fetcher).toMatch(/resolveSafeFetchTarget(?:\$\d+)?\(currentUrl/);
     expect(fetcher).toContain('redirect: "manual"');
     expect(fetcher).toContain("dispatcher: this.pinnedDispatcherFor(target, dispatchers)");
-    expect(fetcher).toContain("lookup: pinnedLookup(target.host, target.addresses)");
+    expect(fetcher).toMatch(/lookup: pinnedLookup(?:\$\d+)?\(target\.host, target\.addresses\)/);
   });
 });

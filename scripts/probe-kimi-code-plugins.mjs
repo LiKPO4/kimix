@@ -76,8 +76,9 @@ async function main() {
   const options = {
     homeDir,
     identity: {
-      userAgentProduct: "kimi-code-cli",
+      productName: "Kimix",
       version: process.env.KIMI_CODE_SMOKE_VERSION ?? "0.22.2",
+      platform: "kimi_code_desktop",
     },
     uiMode: "kimix-plugins-probe",
   };

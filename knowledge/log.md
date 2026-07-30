@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **SDK compatibility baseline upgraded to official Kimi Code 0.31.0 (v2.20.71)**: the vendored Node SDK now starts from the clean official `0.31.0` tag, so legacy SDK/Swarm routing inherits upstream custom Agents, plugin Agents/system prompts, secondary-model routing, quota and tool-loop fixes without the former Kimix feature overlays. Kimix keeps only its bounded MCP startup timeout and now sends the required desktop host identity. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+
 * **Generic attachments use structured transport and session-managed copies (v2.20.63)**: renderer-visible user text is now isolated from attachment instructions. Server sessions upload local files and submit official `file` parts; SDK sessions copy files into their own `attachments/` directory before generating the model-only Read notice. Canonical replay reconstructs file cards while hiding both official notices and legacy Kimix path blocks. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 
