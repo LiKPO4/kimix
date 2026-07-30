@@ -78,13 +78,21 @@ describe("MarkdownRenderer streaming blocks", () => {
         content: [
           "| 文件名 | 场景 | 提示词 |",
           "| --- | --- | --- |",
-          "| merchant.webp | 落难商人 | A much longer prompt that should receive more room. |",
+          "| `merchant.webp` | 落难商人 | A much longer prompt that should receive more room. |",
         ].join("\n"),
       }));
     });
 
     const table = container.querySelector<HTMLTableElement>("table");
+    const cells = Array.from(container.querySelectorAll<HTMLTableCellElement>("tbody td"));
     expect(table?.style.tableLayout).toBe("auto");
+    expect(table?.style.overflowWrap).toBe("break-word");
     expect(table?.parentElement?.className).toContain("overflow-x-auto");
+    expect(cells[0]?.className).toContain("kimix-markdown-table-cell-compact");
+    expect(cells[0]?.style.whiteSpace).toBe("nowrap");
+    expect(cells[1]?.className).toContain("kimix-markdown-table-cell-compact");
+    expect(cells[1]?.style.whiteSpace).toBe("nowrap");
+    expect(cells[2]?.className).not.toContain("kimix-markdown-table-cell-compact");
+    expect(cells[2]?.style.whiteSpace).toBe("normal");
   });
 });

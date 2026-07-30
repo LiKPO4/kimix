@@ -53,6 +53,19 @@ function nodeText(node: React.ReactNode): string {
   return "";
 }
 
+const COMPACT_TABLE_CELL_MAX_VISUAL_UNITS = 32;
+
+function isCompactTableCell(children: React.ReactNode): boolean {
+  const text = nodeText(children).trim();
+  if (!text || text.includes("\n")) return false;
+  let visualUnits = 0;
+  for (const character of text) {
+    visualUnits += /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff01-\uff60\uffe0-\uffe6]/u.test(character) ? 2 : 1;
+    if (visualUnits > COMPACT_TABLE_CELL_MAX_VISUAL_UNITS) return false;
+  }
+  return true;
+}
+
 function estimateMarkdownHeight(content: string) {
   const lineCount = content.split(/\r?\n/).length;
   const textRows = Math.ceil(content.length / 88);
@@ -565,8 +578,8 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
               minWidth: "100%",
               width: "100%",
               tableLayout: "auto",
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
+              overflowWrap: "break-word",
+              wordBreak: "normal",
             }}
           >
             {children}
@@ -574,8 +587,28 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
         </div>
       ),
       thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-bg-tertiary text-text-secondary font-medium">{children}</thead>,
-      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 text-left" style={{ border: "1px solid #e5e1d8", overflowWrap: "anywhere", wordBreak: "break-word", verticalAlign: "top" }}>{children}</th>,
-      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2" style={{ border: "1px solid #eee9e1", overflowWrap: "anywhere", wordBreak: "break-word", verticalAlign: "top" }}>{children}</td>,
+      th: ({ children }: { children?: React.ReactNode }) => {
+        const compact = isCompactTableCell(children);
+        return (
+          <th
+            className={`px-3 py-2 text-left ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
+            style={{ border: "1px solid #e5e1d8", overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
+          >
+            {children}
+          </th>
+        );
+      },
+      td: ({ children }: { children?: React.ReactNode }) => {
+        const compact = isCompactTableCell(children);
+        return (
+          <td
+            className={`px-3 py-2 ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
+            style={{ border: "1px solid #eee9e1", overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
+          >
+            {children}
+          </td>
+        );
+      },
       hr: () => <hr className="my-4 border-border-default" />,
       del: ({ children }: { children?: React.ReactNode }) => <span>~{children}~</span>,
     }),
