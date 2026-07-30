@@ -1,4 +1,4 @@
-import type { Session, TimelineEvent } from "@/types/ui";
+import type { RoomAgentActivity, RoomAgentActivityStatus, Session, TimelineEvent } from "@/types/ui";
 import type { KimiCodeEngineStatus } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "./runtimeSession";
 
@@ -29,6 +29,16 @@ export const STALE_TIMELINE_WORK_MS = 2 * 60 * 1000;
 
 type TerminalKimiCodeEngineStatus = Extract<KimiCodeEngineStatus, "completed" | "interrupted" | "error" | "idle">;
 type ActiveKimiCodeEngineStatus = Extract<KimiCodeEngineStatus, "running" | "waiting_approval" | "waiting_question">;
+
+const SIDEBAR_ACTIVE_ACTIVITY_STATUSES = new Set<RoomAgentActivityStatus>([
+  "creating",
+  "queued",
+  "sending",
+  "accepted",
+  "running",
+  "waiting_approval",
+  "waiting_question",
+]);
 
 export function isTerminalKimiCodeEngineStatus(
   status: KimiCodeEngineStatus | undefined,
@@ -89,6 +99,17 @@ export function hasActiveTimelineWork(session: Session, now = Date.now()) {
   return hasActiveTimelineWorkEvents(session.events, now);
 }
 
+export function getNextTimelineWorkExpiryAt(events: TimelineEvent[], now = Date.now()): number | null {
+  let nextExpiryAt: number | null = null;
+  for (const event of events) {
+    if (!isTimelineEventOpen(event)) continue;
+    const expiryAt = event.timestamp + STALE_TIMELINE_WORK_MS;
+    if (expiryAt <= now) continue;
+    if (nextExpiryAt === null || expiryAt < nextExpiryAt) nextExpiryAt = expiryAt;
+  }
+  return nextExpiryAt;
+}
+
 export function isSessionRuntimeRunning(session: Session | null | undefined, runningSessionId: string | null, now = Date.now()) {
   if (!session) return false;
   const runtimeSessionId = getRuntimeSessionId(session);
@@ -104,17 +125,38 @@ export function isSessionRuntimeTracked(session: Session | null | undefined, run
     Boolean(runtimeSessionId && runningSessionId === runtimeSessionId);
 }
 
+interface SessionSidebarBusyOptions {
+  runningSessionId: string | null;
+  currentSessionId?: string;
+  activities?: Iterable<RoomAgentActivity>;
+  now?: number;
+}
+
 export function isSessionSidebarBusy(
   session: Session,
-  runningSessionId: string | null,
-  currentSessionId?: string,
-  now = Date.now(),
+  {
+    runningSessionId,
+    currentSessionId,
+    activities = [],
+    now = Date.now(),
+  }: SessionSidebarBusyOptions,
 ) {
-  // Sidebar spinner must stay visible for any session with open timeline work,
-  // not just the single session tracked by runningSessionId. The active-work
-  // check used elsewhere has a 2-minute stale timeout, which causes long turns
-  // in concurrently running sessions to briefly lose their loading indicator.
-  return (session.isLoading && session.id === currentSessionId) ||
-    isSessionRuntimeRunning(session, runningSessionId, now) ||
-    hasOpenTimelineWork(session);
+  if (session.isLoading && session.id === currentSessionId) return true;
+  if (isSessionRuntimeTracked(session, runningSessionId)) return true;
+
+  let hasAuthoritativeActivity = false;
+  for (const activity of activities) {
+    if (activity.roomId !== session.id) continue;
+    hasAuthoritativeActivity = true;
+    if (SIDEBAR_ACTIVE_ACTIVITY_STATUSES.has(activity.status)) return true;
+  }
+  // Once a runtime status has been observed for this session, its terminal
+  // state is authoritative. An incomplete local assistant/tool/subagent may
+  // remain open to accept late stream frames, but it must not spin forever.
+  if (hasAuthoritativeActivity) return false;
+
+  // Before the first runtime status frame arrives, recent timeline work keeps
+  // the row responsive. The bounded fallback expires automatically instead of
+  // treating stale render residue as proof that the runtime is still active.
+  return hasActiveTimelineWork(session, now);
 }

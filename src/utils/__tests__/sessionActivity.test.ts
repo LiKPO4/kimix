@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { compareSessionsByRecentConversation, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -129,18 +129,68 @@ describe("sessionActivity", () => {
   it("shows transient loading only on the current session row", () => {
     const loading = { ...session(), isLoading: true };
 
-    expect(isSessionSidebarBusy(loading, null, "other-session", 1)).toBe(false);
-    expect(isSessionSidebarBusy(loading, null, loading.id, 1)).toBe(true);
-    expect(isSessionSidebarBusy({ ...loading, isLoading: false }, loading.runtimeSessionId ?? null, "other-session", 1)).toBe(true);
+    expect(isSessionSidebarBusy(loading, { runningSessionId: null, currentSessionId: "other-session", now: 1 })).toBe(false);
+    expect(isSessionSidebarBusy(loading, { runningSessionId: null, currentSessionId: loading.id, now: 1 })).toBe(true);
+    expect(isSessionSidebarBusy({ ...loading, isLoading: false }, {
+      runningSessionId: loading.runtimeSessionId ?? null,
+      currentSessionId: "other-session",
+      now: 1,
+    })).toBe(true);
   });
 
-  it("keeps sidebar busy for long-running open work beyond the active-work timeout", () => {
+  it("does not keep the sidebar busy from stale local timeline residue", () => {
     const longRunning = session([
       { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
     ]);
     const staleNow = 1 + 3 * 60 * 1000;
 
     expect(isSessionRuntimeRunning(longRunning, null, staleNow)).toBe(false);
-    expect(isSessionSidebarBusy(longRunning, null, undefined, staleNow)).toBe(true);
+    expect(isSessionSidebarBusy(longRunning, { runningSessionId: null, now: staleNow })).toBe(false);
+  });
+
+  it("keeps a genuinely long-running session busy from authoritative activity", () => {
+    const longRunning = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
+    ]);
+    const staleNow = 1 + 3 * 60 * 1000;
+
+    expect(isSessionSidebarBusy(longRunning, {
+      runningSessionId: null,
+      activities: [{
+        roomId: longRunning.id,
+        roomAgentId: "primary",
+        status: "running",
+        updatedAt: staleNow,
+      }],
+      now: staleNow,
+    })).toBe(true);
+  });
+
+  it("lets an authoritative terminal status override incomplete local events immediately", () => {
+    const residue = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 100, content: "Done", isThinking: false, isComplete: false },
+    ]);
+
+    expect(isSessionSidebarBusy(residue, {
+      runningSessionId: null,
+      activities: [{
+        roomId: residue.id,
+        roomAgentId: "primary",
+        status: "idle",
+        updatedAt: 110,
+      }],
+      now: 120,
+    })).toBe(false);
+  });
+
+  it("reports the next bounded fallback expiry so the sidebar can re-evaluate on time", () => {
+    const events: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 100, content: "", isThinking: false, isComplete: false },
+      { id: "tool-1", type: "tool_call", timestamp: 200, toolCallId: "call-1", toolName: "Read", status: "running", arguments: {} },
+    ];
+
+    expect(getNextTimelineWorkExpiryAt(events, 150)).toBe(100 + 2 * 60 * 1000);
+    expect(getNextTimelineWorkExpiryAt(events, 100 + 2 * 60 * 1000)).toBe(200 + 2 * 60 * 1000);
+    expect(getNextTimelineWorkExpiryAt(events, 200 + 2 * 60 * 1000)).toBeNull();
   });
 });

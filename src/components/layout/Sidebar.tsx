@@ -10,7 +10,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { compareSessionsByRecentConversation, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { backfillTurnModelsFromUsageStatuses, mergeMissingLatestCanonicalAssistant, mergeMissingUsageStatusEvents, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
@@ -148,6 +148,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const runningSessionId = useAppStore((s) => s.runningSessionId);
+  const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const creatingSessionProjectPath = useAppStore((s) => s.creatingSessionProjectPath);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
@@ -167,7 +168,28 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
+  const [timelineExpiryTick, setTimelineExpiryTick] = useState(0);
+  const sidebarActivityNow = Date.now();
+  const sidebarRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities), [roomAgentActivities]);
+  const nextTimelineExpiryAt = useMemo(() => {
+    const now = Date.now();
+    let nextExpiryAt: number | null = null;
+    for (const session of sessions) {
+      const expiryAt = getNextTimelineWorkExpiryAt(session.events, now);
+      if (expiryAt !== null && (nextExpiryAt === null || expiryAt < nextExpiryAt)) {
+        nextExpiryAt = expiryAt;
+      }
+    }
+    return nextExpiryAt;
+  }, [sessions, timelineExpiryTick]);
   const archiveSession = useArchiveSession();
+
+  useEffect(() => {
+    if (nextTimelineExpiryAt === null) return;
+    const delayMs = Math.max(0, nextTimelineExpiryAt - Date.now() + 10);
+    const timer = window.setTimeout(() => setTimelineExpiryTick((tick) => tick + 1), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [nextTimelineExpiryAt]);
   const updateSession = useSessionStore((s) => s.updateSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
 
@@ -987,7 +1009,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                             }}
                           >
                             {pSessions.map((s) => {
-                              const isSessionBusy = isSessionSidebarBusy(s, runningSessionId, currentSession?.id);
+                              const isSessionBusy = isSessionSidebarBusy(s, {
+                                runningSessionId,
+                                currentSessionId: currentSession?.id,
+                                activities: sidebarRoomAgentActivities,
+                                now: sidebarActivityNow,
+                              });
                               const isLongTaskSession = Boolean(s.longTask);
 
                               return (

@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Sidebar spinner follows authoritative per-session activity (v2.20.72)**: an observed terminal Agent activity now overrides incomplete local timeline residue, while genuinely active long-running sessions keep spinning from the per-session activity registry. Sessions that have not received a runtime status may use open timeline work only for the bounded two-minute fallback, with an expiry timer that forces re-evaluation even when no later state update arrives. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+
 * **SDK compatibility baseline upgraded to official Kimi Code 0.31.0 (v2.20.71)**: the vendored Node SDK now starts from the clean official `0.31.0` tag, so legacy SDK/Swarm routing inherits upstream custom Agents, plugin Agents/system prompts, secondary-model routing, quota and tool-loop fixes without the former Kimix feature overlays. Kimix keeps only its bounded MCP startup timeout and now sends the required desktop host identity. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 
