@@ -13,6 +13,7 @@ import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
+import { formatMessageTime, formatMessageTimeTitle } from "@/utils/messageTime";
 import { noteLiveDisplayMode, resolveLiveDisplayMode } from "@/utils/liveTurnDiag";
 import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
@@ -484,6 +485,8 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
   const previewImages = getPreviewImages(images);
   const hasText = event.content.trim().length > 0;
   const copyText = hasText ? [event.content, attachmentCopyText(images)].filter(Boolean).join("\n\n") : attachmentCopyText(images);
+  const messageTime = formatMessageTime(event.timestamp);
+  const messageTimeTitle = formatMessageTimeTitle(event.timestamp);
 
   const handleResend = async () => {
     if (resending) return;
@@ -649,7 +652,20 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
             {event.content}
           </div>
         )}
-        <div className="mt-1.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ gap: 4 }}>
+        <div
+          className="flex justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          style={{ gap: 4, marginTop: 6, minHeight: 28 }}
+        >
+          {messageTime && (
+            <span
+              className="kimix-tabular-nums flex items-center text-[12px] leading-none text-text-muted"
+              style={{ height: 28, paddingLeft: 4, paddingRight: 6 }}
+              title={messageTimeTitle}
+              aria-label={`发送时间 ${messageTimeTitle}`}
+            >
+              {messageTime}
+            </span>
+          )}
           <button
             onClick={() => trigger(copyText)}
             className="kimix-inline-icon-action text-text-muted hover:bg-bg-hover hover:text-text-primary"
