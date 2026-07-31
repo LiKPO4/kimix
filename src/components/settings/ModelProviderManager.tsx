@@ -139,6 +139,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const groups = useMemo(() => groupModelsByProvider(config), [config]);
   const [selectedProviderName, setSelectedProviderName] = useState(() => chooseInitialModelProvider(config));
   const [selectedModelAlias, setSelectedModelAlias] = useState("");
+  // 模型表单改为显式展开：只有选中模型、点击“添加模型”或选择探测结果后才显示，进入页面不再默认展示编辑卡片
+  const [addingModel, setAddingModel] = useState(false);
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>({ providerName: "", baseUrl: "", apiKey: "" });
   const [modelDraft, setModelDraft] = useState<ModelDraft>(() => createModelDraft());
   const [catalog, setCatalog] = useState<KimiProviderCatalogEntrySummary[]>([]);
@@ -172,11 +174,9 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       baseUrl: selectedGroup.provider.baseUrl ?? "",
       apiKey: "",
     });
+    // 不自动选中默认/首个模型：仅保留仍存在的当前选中，否则清空，等用户显式选择；无选中时保留正在输入的草稿
     setSelectedModelAlias((currentAlias) => {
-      const nextModel = selectedGroup.models.find((model) => model.alias === currentAlias)
-        ?? selectedGroup.models.find((model) => model.isDefault)
-        ?? selectedGroup.models[0]
-        ?? null;
+      const nextModel = currentAlias ? selectedGroup.models.find((model) => model.alias === currentAlias) ?? null : null;
       setModelDraft((currentDraft) => nextModel ? createModelDraft(nextModel) : (currentDraft.model ? currentDraft : createModelDraft()));
       return nextModel?.alias ?? "";
     });
@@ -204,6 +204,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleSelectProvider = (providerName: string) => {
     setSelectedProviderName(providerName);
     setSelectedModelAlias("");
+    setAddingModel(false);
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
@@ -213,6 +214,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleCreateProvider = () => {
     setSelectedProviderName(NEW_PROVIDER_ID);
     setSelectedModelAlias("");
+    setAddingModel(false);
     setProviderDraft({ providerName: "", baseUrl: "", apiKey: "" });
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
@@ -298,6 +300,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     const item = discoveredModels.find((m) => m.id === modelId);
     const inferredContext = inferModelContextSize(modelId, item?.contextLength);
     setSelectedModelAlias("");
+    setAddingModel(true);
     setModelDraft((current) => ({
       modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
       model: modelId,
@@ -375,6 +378,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         return;
       }
       setSelectedModelAlias(effectiveAlias);
+      setAddingModel(false);
       await applyConfigResult(res.data, "已保存 Provider 模型");
     } catch (error) {
       setMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
@@ -469,6 +473,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         }
         setRemovalTarget(null);
         setSelectedModelAlias("");
+        setAddingModel(false);
         await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
       } catch (error) {
         setRemovalTarget(null);
@@ -499,11 +504,13 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const handleSelectModel = (model: KimiModelAliasSummary) => {
     setSelectedModelAlias(model.alias);
+    setAddingModel(false);
     setModelDraft(createModelDraft(model));
   };
 
   const handleAddModel = () => {
     setSelectedModelAlias("");
+    setAddingModel(true);
     setModelDraft(createModelDraft());
     setMessage("填写模型 ID、别名和 Context 后保存；Provider 的连接信息会自动复用。");
   };
@@ -799,6 +806,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                   )}
                 </div>
 
+                {(selectedModelAlias || addingModel) && (
                 <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                     <div>
@@ -886,6 +894,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             )}
           </div>

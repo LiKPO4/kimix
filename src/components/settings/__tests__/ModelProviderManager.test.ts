@@ -128,15 +128,13 @@ describe("ModelProviderManager", () => {
     const onConfigChange = vi.fn();
     await act(async () => root.render(createElement(StatefulManager, { initialConfig: emptyProviderConfig, onConfigChange })));
 
+    // 初始不再默认显示编辑/添加模型卡片，探测卡片仍在；选择探测结果后卡片才展开
     const modelEditorTitle = Array.from(container.querySelectorAll("div"))
       .find((element) => element.textContent?.trim() === "添加模型");
     const discoveryTitle = Array.from(container.querySelectorAll("div"))
       .find((element) => element.textContent?.trim() === "从 Base URL 探测模型");
-    expect(modelEditorTitle?.closest(".kimix-settings-card")).not.toBeNull();
+    expect(modelEditorTitle).toBeUndefined();
     expect(discoveryTitle).toBeDefined();
-    expect(discoveryTitle && modelEditorTitle
-      ? Boolean(discoveryTitle.compareDocumentPosition(modelEditorTitle) & Node.DOCUMENT_POSITION_FOLLOWING)
-      : false).toBe(true);
     expect(buttonByText(container, "从官方目录选择模型")).toBeUndefined();
 
     await act(async () => buttonByText(container, "探测模型")?.click());
@@ -259,6 +257,7 @@ describe("ModelProviderManager", () => {
     expect(container.textContent).toContain("后台配置仍在同步");
     expect(document.querySelector('[aria-modal="true"]')).toBeNull();
 
+    await act(async () => buttonByText(container, "添加模型")?.click());
     const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
     await act(async () => {
       modelInput.focus();
@@ -301,6 +300,10 @@ describe("ModelProviderManager", () => {
     const onConfigChange = vi.fn();
     await act(async () => root.render(createElement(StatefulManager, { initialConfig, onConfigChange })));
 
+    // 初始不显示编辑卡片，点击模型行后才展开
+    expect(Array.from(container.querySelectorAll("div"))
+      .find((element) => element.textContent?.trim() === "编辑模型")).toBeUndefined();
+    await act(async () => (container.querySelector(".kimix-model-row") as HTMLElement).click());
     const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
       .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
     expect(card).toBeDefined();
@@ -403,6 +406,7 @@ describe("ModelProviderManager", () => {
     });
     const { container, root } = await renderManager(emptyProviderConfig);
 
+    await act(async () => buttonByText(container, "添加模型")?.click());
     const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "my-custom-model");
@@ -417,6 +421,38 @@ describe("ModelProviderManager", () => {
       model: "my-custom-model",
       modelAlias: "my-custom-model",
     }));
+    await act(async () => root.unmount());
+  });
+
+  it("hides the model form until a model is selected or the add action is used", async () => {
+    const existingModel = {
+      alias: "gateway/model-a",
+      provider: "gateway",
+      model: "model-a",
+      displayName: "gateway/model-a",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+      supportEfforts: null,
+      defaultEffort: null,
+    };
+    const { container, root } = await renderManager({ ...emptyProviderConfig, models: [existingModel] });
+
+    const editorTitle = () => Array.from(container.querySelectorAll("div"))
+      .find((element) => element.textContent?.trim() === "编辑模型" || element.textContent?.trim() === "添加模型");
+    // 即使是默认模型也不自动选中、不显示编辑卡片
+    expect(editorTitle()).toBeUndefined();
+    expect(container.querySelector(".kimix-model-row.is-active")).toBeNull();
+
+    // 点击模型行后显示编辑卡片并进入选中态
+    await act(async () => (container.querySelector(".kimix-model-row") as HTMLElement).click());
+    expect(editorTitle()?.textContent?.trim()).toBe("编辑模型");
+    expect(container.querySelector(".kimix-model-row.is-active")).not.toBeNull();
+
+    // 点击“添加模型”按钮切换为添加模式
+    await act(async () => buttonByText(container, "添加模型")?.click());
+    expect(editorTitle()?.textContent?.trim()).toBe("添加模型");
+    expect(container.querySelector(".kimix-model-row.is-active")).toBeNull();
     await act(async () => root.unmount());
   });
 });

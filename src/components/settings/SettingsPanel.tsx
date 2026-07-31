@@ -1225,7 +1225,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <div className="kimix-settings-page-actions">
                       <div className="kimix-settings-model-meta">
                         <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
-                          {modelConfig?.defaultModel ?? "未设置默认模型"}
+                          {modelConfig?.defaultModel ? `默认模型 ${modelConfig.defaultModel}` : "未设置默认模型"}
                         </span>
                         <small>{modelConfig?.providers.length ?? 0} 个 Provider</small>
                       </div>
