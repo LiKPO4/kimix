@@ -754,6 +754,10 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       title={model.isDefault ? "当前默认模型" : "设为默认模型"}
                       className="kimix-icon-text-button is-compact border text-text-secondary hover:bg-surface-hover disabled:opacity-55"
                       style={{
+                        // 固定宽度容纳“勾+默认”，打勾后仍保持同宽，右侧删除/箭头排列不齐
+                        width: 72,
+                        minWidth: 72,
+                        justifyContent: "center",
                         gap: 6,
                         paddingLeft: 12,
                         paddingRight: 12,

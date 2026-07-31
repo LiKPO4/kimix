@@ -1581,7 +1581,6 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-model-meta {
   display: flex;
   min-width: 0;
-  max-width: 240px;
   flex-direction: column;
   align-items: flex-end;
   padding-right: 6px;
@@ -1589,13 +1588,14 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-model-meta span {
   max-width: 100%;
-  overflow: hidden;
   color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 默认模型名完整显示，不再省略号截断；过长时按字符折行并保持右对齐 */
+  overflow-wrap: anywhere;
+  text-align: right;
+  white-space: normal;
 }
 
 .kimix-settings-model-meta small {
