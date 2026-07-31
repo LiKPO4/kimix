@@ -746,11 +746,10 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       </button>
                     )}
                     {model.isDefault ? (
-                      <span className="rounded-full bg-accent-primary text-[11px] leading-5 text-white" style={{ paddingLeft: 9, paddingRight: 9 }}>使用中</span>
+                      <span className="inline-flex items-center rounded-full bg-accent-primary text-[11px] leading-5 text-white" style={{ gap: 4, paddingLeft: 9, paddingRight: 10 }}><Check size={11} />默认</span>
                     ) : (
                       <button type="button" onClick={(event) => { event.stopPropagation(); void handleSetDefault(model.alias); }} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover">
-                        <Check size={13} />
-                        使用
+                        默认
                       </button>
                     )}
                     {!selectedProviderManaged && (
