@@ -72,7 +72,7 @@ function normalizeRoomAgent(value: unknown): RoomAgent | null {
   const lifecycleIssue = value.lifecycleIssue;
   if (lifecycleIssue !== undefined && (
     !isRecord(lifecycleIssue) ||
-    (lifecycleIssue.operation !== "archive" && lifecycleIssue.operation !== "restore") ||
+    (lifecycleIssue.operation !== "archive" && lifecycleIssue.operation !== "restore" && lifecycleIssue.operation !== "recover") ||
     typeof lifecycleIssue.message !== "string" ||
     !lifecycleIssue.message.trim() ||
     !isFiniteNumber(lifecycleIssue.updatedAt)
@@ -120,12 +120,11 @@ function normalizeRoomMessage(
     const status = rawDelivery.status;
     const agentTurnId = typeof rawDelivery.agentTurnId === "string" ? rawDelivery.agentTurnId.trim() : "";
     if (!ROOM_AGENT_DELIVERY_STATUSES.has(status as RoomAgentDeliveryStatus) || !agentTurnId) continue;
-    const dispatchAttemptId = rawDelivery.dispatchAttemptId === undefined
-      ? undefined
-      : typeof rawDelivery.dispatchAttemptId === "string" && rawDelivery.dispatchAttemptId.trim()
-        ? rawDelivery.dispatchAttemptId.trim()
-        : null;
-    if (dispatchAttemptId === null) continue;
+    // dispatchAttemptId 缺失（undefined）可容忍；存在但非法（空串/非字符串）时按缺失降级，
+    // 不丢弃该 Agent 的整条投递记录（缺失的身份可由 repairMissingRoomDeliveryAttemptIds 修复）。
+    const dispatchAttemptId = typeof rawDelivery.dispatchAttemptId === "string" && rawDelivery.dispatchAttemptId.trim()
+      ? rawDelivery.dispatchAttemptId.trim()
+      : undefined;
     const previousAttempts = rawDelivery.previousAttempts;
     if (previousAttempts !== undefined && (!Array.isArray(previousAttempts) || previousAttempts.some((attempt) => (
       !isRecord(attempt) ||

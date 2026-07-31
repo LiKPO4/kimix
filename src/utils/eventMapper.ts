@@ -948,9 +948,9 @@ function mergeSubagentLifecycle(
   return {
     ...current,
     ...incoming,
-    // 子代理名字在创建时确定，生命周期内不应变更；迟到事件若只带兜底名"子代理"，
-    // 优先保留已存在的更具体名字（例如 "coder"），没有时才退回 incoming 的兜底。
-    agentName: current.agentName ?? incoming.agentName,
+    // 子代理名字"首个具体名获胜"：首帧可能只带兜底名"子代理"，后续帧带到具体名
+    // （例如 "coder"）时纠正；一旦已是具体名则一律保留，不被迟到的兜底名覆盖。
+    agentName: current.agentName === "子代理" ? incoming.agentName : current.agentName,
     description: incoming.description ?? current.description,
     parentToolCallId: incoming.parentToolCallId ?? current.parentToolCallId,
     swarmIndex: incoming.swarmIndex ?? current.swarmIndex,
@@ -1846,12 +1846,32 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
       const subagentStatus = payload.status === "completed" || payload.status === "error"
         ? payload.status
         : "running";
+      // legacy SubagentEvent 的字段名 camelCase/snake_case 都可能出现，逐一探测补齐；
+      // 取不到的字段保持 undefined，不造兜底值。
+      const subagentId =
+        payloadString(payload, source, "agentId") ??
+        payloadString(payload, source, "agent_id") ??
+        payloadString(payload, source, "subagentId") ??
+        payloadString(payload, source, "subagent_id");
+      const parentToolCallId =
+        payloadString(payload, source, "parentToolCallId") ??
+        payloadString(payload, source, "parent_tool_call_id") ??
+        payloadString(payload, source, "toolCallId") ??
+        payloadString(payload, source, "tool_call_id");
+      const swarmIndexValue =
+        payloadValue(payload, source, "swarmIndex") ?? payloadValue(payload, source, "swarm_index");
       return {
         id: generateId(),
         type: "subagent",
         timestamp: eventTimestamp,
+        agentId: subagentId,
+        parentToolCallId,
+        swarmIndex: isNumber(swarmIndexValue) && Number.isFinite(swarmIndexValue) ? swarmIndexValue : undefined,
+        description: payloadString(payload, source, "description"),
         agentName: isString(payload.agent_name) ? payload.agent_name : "子代理",
         status: subagentStatus,
+        resultSummary: payloadString(payload, source, "resultSummary") ?? payloadString(payload, source, "result_summary"),
+        error: payloadString(payload, source, "error"),
         events: [],
       };
     }

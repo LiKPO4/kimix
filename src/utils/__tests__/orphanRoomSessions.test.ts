@@ -125,6 +125,15 @@ describe("orphan room sessions", () => {
       }),
     ]));
     expect(recovered.sessions[0].collaboration?.agentEvents["reviewer-agent"]).toEqual([]);
+    // 骨架恢复缺失模型信息：显式标记 lifecycleIssue，让用户可见"将使用默认模型"
+    expect(recovered.sessions[0].collaboration?.agents[1]).toMatchObject({
+      modelAlias: null,
+      lifecycleIssue: {
+        operation: "recover",
+        message: expect.stringContaining("默认模型"),
+        updatedAt: 10,
+      },
+    });
     const reconciled = reconcileOfficialSessionCatalog(recovered.sessions, [reviewer], "D:/project", { source: "server" });
     expect(reconciled).toHaveLength(1);
     expect(reconciled[0].collaboration?.agents[1]).toMatchObject({ officialSessionId: "reviewer-session" });

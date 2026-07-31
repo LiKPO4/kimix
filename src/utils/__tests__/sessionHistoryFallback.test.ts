@@ -1,9 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "../../../electron/sessionHistoryFallback";
 
 const event = { type: "TurnBegin", payload: { user_input: "hello" } };
 
 describe("session history fallback", () => {
+  it("logs a warning with the session label when the Server snapshot fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await expect(loadSessionHistoryWithFallback(
+        async () => { throw new Error("boom"); },
+        async () => [event],
+        8_000,
+        "session-42",
+      )).resolves.toEqual({ events: [event], source: "local" });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("session-42");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("uses local wire history when the Server snapshot is empty", async () => {
     await expect(loadSessionHistoryWithFallback(
       async () => ({ events: [], source: "server" }),

@@ -14,6 +14,7 @@ import {
   dispatchQueuedRoomDelivery,
   getDispatchableRoomDeliveries,
   isRoomDeliveryWaitingBehindAgentWork,
+  listLoadedCollaborationRoomIds,
   recoverInterruptedRoomDeliveries,
   retryRoomDelivery,
   setRoomDeliveryStatus,
@@ -322,6 +323,45 @@ describe("roomDelivery", () => {
     expect(normalized.collaboration!.messages[0].deliveries[primary.id].previousAttempts).toEqual(delivery.previousAttempts);
   });
 
+  it("显式重试保留投递级 contextShare（冻结上下文不丢失）", () => {
+    const primary = getPrimaryRoomAgent(room());
+    const created = createRoomMessageDispatch(room(), {
+      content: "执行",
+      recipientAgentIds: [primary.id],
+      timestamp: 100,
+      createId: deterministicIds(),
+    });
+    const messageId = created.message.id;
+    const contextShare = {
+      mode: "recent3" as const,
+      bridgeId: "bridge-1",
+      entryIds: ["entry-1", "entry-2"],
+      content: "冻结的房间正文",
+      contentChars: 7,
+      createdAt: 90,
+    };
+    const failed: Session = {
+      ...created.session,
+      collaboration: {
+        ...created.session.collaboration!,
+        messages: [{
+          ...created.message,
+          deliveries: {
+            [primary.id]: { ...created.message.deliveries[primary.id], status: "failed", contextShare },
+          },
+        }],
+      },
+    };
+    const retried = retryRoomDelivery(failed, messageId, primary.id, {
+      createId: deterministicIds(),
+      now: 200,
+    });
+    const delivery = retried.collaboration!.messages[0].deliveries[primary.id];
+
+    expect(delivery.status).toBe("queued");
+    expect(delivery.contextShare).toEqual(contextShare);
+  });
+
   it("indeterminate 在时间线显示明确错误，不伪装为仍在运行", () => {
     const primary = getPrimaryRoomAgent(room());
     const created = createRoomMessageDispatch(room(), {
@@ -455,4 +495,13 @@ describe("roomDelivery", () => {
     expect(cancelled.collaboration?.messages[0].deliveries["agent-2"].status).toBe("queued");
     expect(() => cancelQueuedRoomDelivery(cancelled, created.message.id, primary.id)).toThrow("只有排队中");
   });
+  it("listLoadedCollaborationRoomIds 只返回已进入 store 且加载完成的房间", () => {
+    const loaded = room();
+    const loading: Session = { ...room(), id: "room-loading", isLoading: true };
+    const plain: Session = { ...room(), id: "plain", collaboration: undefined };
+
+    expect(listLoadedCollaborationRoomIds([loaded, loading, plain])).toEqual(["room-1"]);
+    expect(listLoadedCollaborationRoomIds([])).toEqual([]);
+  });
+
 });

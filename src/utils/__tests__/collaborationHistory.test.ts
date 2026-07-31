@@ -647,4 +647,43 @@ describe("reconcileAgentCanonicalHistory", () => {
     expect(result.session.collaboration?.messages.map((message) => message.id)).toEqual(["message-b"]);
     expect(result.session.collaboration?.agentEvents[current.secondaryId].map((event) => event.id)).toEqual(["b-old"]);
   });
+  it("accepts first canonical load for an Agent without any runtime identity", () => {
+    const current = room();
+    // 未绑定任何 runtime/official session 的新 agent
+    const agent = current.session.collaboration!.agents.find((item) => item.id === current.secondaryId)!;
+    delete agent.runtimeSessionId;
+    delete agent.officialSessionId;
+    current.session.collaboration!.agentEvents[current.secondaryId] = [];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.secondaryId,
+      expectedRuntimeSessionId: "runtime-unknown",
+      canonicalEvents: [{ id: "first-load", type: "user_message", timestamp: 20, content: "First" }],
+      reason: "startup",
+    });
+
+    expect(result.applied).toBe(true);
+  });
+
+  it("rejects canonical history for an identity-less Agent that already has events", () => {
+    const current = room();
+    const agent = current.session.collaboration!.agents.find((item) => item.id === current.secondaryId)!;
+    delete agent.runtimeSessionId;
+    delete agent.officialSessionId;
+    // 分区已有事件（b-old），此时不能再无条件接受外来历史
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.secondaryId,
+      expectedRuntimeSessionId: "runtime-unknown",
+      canonicalEvents: [{ id: "foreign", type: "user_message", timestamp: 20, content: "Foreign" }],
+      reason: "startup",
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.discardedReason).toBe("runtime-changed");
+    expect(result.session).toBe(current.session);
+  });
+
 });

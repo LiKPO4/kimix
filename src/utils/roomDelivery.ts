@@ -172,6 +172,13 @@ export interface DispatchableRoomDelivery {
   roomAgentId: string;
 }
 
+// 崩溃重启后需要恢复 queued 投递的房间：已进入 store 且历史加载完成（启动恢复结束）。
+export function listLoadedCollaborationRoomIds(sessions: Session[]): string[] {
+  return sessions
+    .filter((session) => Boolean(session.collaboration) && !session.isLoading)
+    .map((session) => session.id);
+}
+
 export function getDispatchableRoomDeliveries(
   session: Session,
   activities: Iterable<RoomAgentActivity> = [],
@@ -345,6 +352,9 @@ export function retryRoomDelivery(
       createdAt: now,
       updatedAt: now,
       previousAttempts: [...(delivery.previousAttempts ?? []), attemptSnapshot(delivery, now)],
+      // updateDelivery 用 updater 返回值整体替换 delivery；contextShare 是投递级字段，必须显式保留，
+      // 否则重试后 Agent 丢失冻结的对话上下文。
+      contextShare: delivery.contextShare,
     };
   }, now);
 }

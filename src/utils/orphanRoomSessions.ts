@@ -99,6 +99,13 @@ export function recoverOrphanRoomsFromOfficialCatalog(
       displayName: `Agent ${index + 2}`,
       mentionName: `agent-${index + 2}`,
       modelAlias: null,
+      // 骨架恢复拿不到官方目录里的模型信息（modelAlias: null 会静默落到默认模型）；
+      // 标记 lifecycleIssue 让用户可见"将使用默认模型"，不在发送路径硬阻断。
+      lifecycleIssue: {
+        operation: "recover" as const,
+        message: "该 Agent 的模型信息缺失，发送时将使用默认模型。",
+        updatedAt: now,
+      },
       permissionMode: primarySession.permissionMode ?? "manual" as const,
       runtimeSessionId: official.id,
       officialSessionId: official.id,

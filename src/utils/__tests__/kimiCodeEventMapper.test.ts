@@ -480,6 +480,84 @@ describe("SDK request mapping", () => {
     expect(question.questions[0].question).toBe("下一步？");
     expect(question.questions[0].options.map((option) => option.label)).toEqual(["继续", "自定义"]);
   });
+
+  it("maps server snake_case approval payload fields", () => {
+    const event = mapKimiCodeApprovalRequest({
+      toolCallId: "call-server-1",
+      tool_name: "Bash",
+      action: "execute",
+      tool_input_display: "pnpm test:run",
+      created_at: "2026-07-30T10:00:00.000Z",
+    });
+
+    const approval = event as Extract<TimelineEvent, { type: "approval_request" }>;
+    expect(approval.toolName).toBe("Bash");
+    expect(approval.description).toBe("pnpm test:run");
+    expect(approval.display?.description).toBe("pnpm test:run");
+    expect(approval.timestamp).toBe(Date.parse("2026-07-30T10:00:00.000Z"));
+  });
+
+  it("merges record tool_input_display into approval display without overriding explicit display", () => {
+    const event = mapKimiCodeApprovalRequest({
+      toolCallId: "call-server-2",
+      tool_name: "WriteFile",
+      display: { description: "写入配置" },
+      tool_input_display: { description: "原始预览", path: "src/config.ts" },
+    }, testOptions());
+
+    const approval = event as Extract<TimelineEvent, { type: "approval_request" }>;
+    expect(approval.description).toBe("写入配置");
+    expect(approval.display?.path).toBe("src/config.ts");
+  });
+
+  it("keeps camelCase approval fields winning over snake_case fallbacks", () => {
+    const event = mapKimiCodeApprovalRequest({
+      toolCallId: "call-mixed",
+      toolName: "WriteFile",
+      tool_name: "Bash",
+      created_at: "2026-07-30T10:00:00.000Z",
+    }, testOptions());
+
+    const approval = event as Extract<TimelineEvent, { type: "approval_request" }>;
+    expect(approval.toolName).toBe("WriteFile");
+    expect(approval.timestamp).toBe(1000);
+  });
+
+  it("maps server snake_case question payload fields", () => {
+    const event = mapKimiCodeQuestionRequest({
+      toolCallId: "ask-server-1",
+      created_at: "2026-07-30T10:00:00.000Z",
+      questions: [{
+        id: "q-1",
+        question: "选择方案？",
+        options: [{ label: "继续" }],
+        other_label: "自定义",
+        other_id: "other-custom",
+        other_description: "手动输入",
+      }],
+    });
+
+    const question = event as Extract<TimelineEvent, { type: "question_request" }>;
+    expect(question.timestamp).toBe(Date.parse("2026-07-30T10:00:00.000Z"));
+    const other = question.questions[0].options[1];
+    expect(other.id).toBe("other-custom");
+    expect(other.label).toBe("自定义");
+    expect(other.description).toBe("手动输入");
+  });
+
+  it("keeps camelCase question other-option fields winning over snake_case fallbacks", () => {
+    const event = mapKimiCodeQuestionRequest({
+      toolCallId: "ask-mixed",
+      questions: [{
+        question: "选择？",
+        otherLabel: "自定义A",
+        other_label: "自定义B",
+      }],
+    }, testOptions());
+
+    const question = event as Extract<TimelineEvent, { type: "question_request" }>;
+    expect(question.questions[0].options[0].label).toBe("自定义A");
+  });
 });
 
 describe("reduceKimiCodeEvents", () => {

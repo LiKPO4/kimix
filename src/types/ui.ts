@@ -223,7 +223,7 @@ export interface RoomAgent {
     updatedAt: number;
   };
   lifecycleIssue?: {
-    operation: "archive" | "restore";
+    operation: "archive" | "restore" | "recover";
     message: string;
     updatedAt: number;
   };

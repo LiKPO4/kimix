@@ -114,4 +114,48 @@ describe("MessageBubble Kimi Web rendering", () => {
     });
     expect(viewport?.scrollTop).toBe(80);
   });
+
+  it("renders subagent approval and question events as read-only detail rows", async () => {
+    const subagent: SubagentEvent = {
+      id: "subagent-2",
+      type: "subagent",
+      timestamp: 1,
+      agentName: "coder",
+      status: "running",
+      events: [
+        {
+          id: "approval-1",
+          type: "approval_request",
+          timestamp: 2,
+          requestId: "call-1",
+          toolName: "WriteFile",
+          description: "写入 src/config.ts",
+          details: "write",
+          riskLevel: "high",
+          status: "pending",
+        },
+        {
+          id: "question-1",
+          type: "question_request",
+          timestamp: 3,
+          requestId: "ask-1",
+          rpcRequestId: "ask-1",
+          toolCallId: "call-2",
+          questions: [{ id: "q1", question: "继续按方案 A 实施？", options: [] }],
+          status: "pending",
+        },
+      ],
+    };
+
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentDetails, { subagent }));
+    });
+
+    expect(container.textContent).toContain("审批");
+    expect(container.textContent).toContain("写入 src/config.ts");
+    expect(container.textContent).toContain("提问");
+    expect(container.textContent).toContain("继续按方案 A 实施？");
+    // 只读展示：不渲染任何可交互的审批/提问按钮
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+  });
 });

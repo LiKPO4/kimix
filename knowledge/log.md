@@ -1,5 +1,11 @@
 # Kimix Knowledge Update Log
 
+* **Server approval/question fields and long-task state persistence restored (v2.20.74)**: the Server approval/question mapper now reads the snake_case payload (`tool_name`, `tool_input_display`, `other_label`, `created_at`) instead of falling back to "unknown"/generic descriptions/receive-time, and the long-task updateState schema accepts `recovery` — under `.strict()` every patch had been rejected, so no long-task state (stage, step, recovery) ever persisted. `isFinalStep` is no longer claimed while `targetStep` is unknown. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
+
+* **Settled body/flow dedupe by selected block key; subagent names are first-concrete-wins (v2.20.74)**: the process flow skips exactly the text block the bottom body selected via `computeFinalTextBlockIndex`, so a late trailing tool or a replayed older-timestamp step can neither double-render the final answer nor hide it; subagent lifecycle merging lets a later frame replace the placeholder name "子代理" with the concrete agent name. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md).
+
+* **Send queue and room delivery resilience (v2.20.74)**: failed dispatch requeues to the queue head (preserving order), active-turn send failures re-queue the user message instead of deleting it, and successful sends flush persistence immediately; room delivery retry preserves the frozen `contextShare`, empty runtime identities pass canonical reconciliation only on first load, terminal activity clears stale `roomMessageId`/`agentTurnId`, and queued deliveries resume for every loaded room. See [/architecture/collaboration-room-routing.md](/architecture/collaboration-room-routing.md).
+
 * **Sidebar spinner follows authoritative per-session activity (v2.20.72)**: an observed terminal Agent activity now overrides incomplete local timeline residue, while genuinely active long-running sessions keep spinning from the per-session activity registry. Sessions that have not received a runtime status may use open timeline work only for the bounded two-minute fallback, with an expiry timer that forces re-evaluation even when no later state update arrives. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md).
 
 

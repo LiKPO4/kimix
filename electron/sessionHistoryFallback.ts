@@ -9,6 +9,7 @@ export async function loadSessionHistoryWithFallback(
   loadServer: () => Promise<SessionHistoryResult>,
   loadLocal: () => Promise<SessionHistoryResult["events"]>,
   timeoutMs = 8_000,
+  sessionLabel?: string,
 ): Promise<SessionHistoryResult> {
   let serverHistory: SessionHistoryResult | null = null;
   try {
@@ -21,8 +22,9 @@ export async function loadSessionHistoryWithFallback(
     // 0.29 Server 快照只回最近 100 条（has_more）：窗口不能当完整权威历史，
     // 否则短 canonical 会被 no-shrink 门禁拒绝（丢新轮次）或被接受（丢窗口前老历史）。
     if (serverHistory.events.length > 0 && !serverHistory.truncated) return serverHistory;
-  } catch {
-    // Fall through to the SDK/local wire mirror.
+  } catch (error) {
+    // 回退前留痕，否则用户看到陈旧历史无从排查；只打会话标识与错误，不打消息正文
+    console.warn(`[kimi-code] Server history snapshot unavailable for ${sessionLabel ?? "unknown session"}; falling back to local wire mirror:`, error);
   }
 
   const localEvents = await loadLocal();

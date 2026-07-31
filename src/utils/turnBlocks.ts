@@ -364,33 +364,49 @@ export function mergeLiveDraftBlocks(
   return blocks;
 }
 
+/**
+ * Index of the text block the completed body actually selects: the block whose
+ * latest event timestamp is maximal (`>=` keeps the later array item on ties).
+ * The process timeline must skip exactly this block (by identity), not the
+ * "last text group in array order" — a late tool after the final text, or a
+ * reconciliation replay appending an older-timestamped step at the tail, would
+ * otherwise make body and timeline pick different blocks, rendering the same
+ * answer twice or the official final answer nowhere. Returns -1 when no block
+ * is selected (streaming, or no text blocks).
+ */
+export function computeFinalTextBlockIndex(
+  turnBlocks: TurnBlock[] | undefined,
+  isComplete: boolean,
+): number {
+  if (!turnBlocks || !isComplete) return -1;
+  // Snapshot/reconciliation events can arrive after a newer live final body
+  // while retaining their older official timestamp. Array order still owns
+  // the process timeline, but completed-body selection must not let such an
+  // appended historical step replace the actual chronological final answer.
+  let finalIndex = -1;
+  let finalTimestamp = -Infinity;
+  for (let index = 0; index < turnBlocks.length; index += 1) {
+    const block = turnBlocks[index];
+    if (block.kind !== "text") continue;
+    const timestamp = Math.max(-Infinity, ...block.events.map((event) => event.timestamp));
+    if (finalIndex === -1 || timestamp >= finalTimestamp) {
+      finalIndex = index;
+      finalTimestamp = timestamp;
+    }
+  }
+  return finalIndex;
+}
+
 export function computeFinalTextBlockContent(
   turnBlocks: TurnBlock[] | undefined,
   displayContent: string,
   isComplete: boolean,
 ): string {
   if (!turnBlocks) return displayContent;
-  const textBlocks = turnBlocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
-  if (textBlocks.length === 0) return displayContent;
+  if (!turnBlocks.some((block) => block.kind === "text")) return displayContent;
   // Streaming turn: keep every text segment in the process timeline.
   if (!isComplete) return "";
-  // Snapshot/reconciliation events can arrive after a newer live final body
-  // while retaining their older official timestamp. Array order still owns
-  // the process timeline, but completed-body selection must not let such an
-  // appended historical step replace the actual chronological final answer.
-  // `>=` deliberately keeps the later array item when timestamps are equal,
-  // preserving official same-millisecond wire order.
-  let finalTextBlock = textBlocks[0];
-  let finalTimestamp = Math.max(
-    -Infinity,
-    ...finalTextBlock.events.map((event) => event.timestamp),
-  );
-  for (const block of textBlocks.slice(1)) {
-    const timestamp = Math.max(-Infinity, ...block.events.map((event) => event.timestamp));
-    if (timestamp >= finalTimestamp) {
-      finalTextBlock = block;
-      finalTimestamp = timestamp;
-    }
-  }
-  return finalTextBlock.content || displayContent;
+  const finalIndex = computeFinalTextBlockIndex(turnBlocks, isComplete);
+  const finalBlock = finalIndex >= 0 ? turnBlocks[finalIndex] : undefined;
+  return (finalBlock?.kind === "text" ? finalBlock.content : "") || displayContent;
 }

@@ -67,4 +67,32 @@ describe("appStore room Agent activity", () => {
       activeTurnId: "turn-1",
     });
   });
+
+  it("clears the room turn identity when a terminal update writes undefined explicitly", () => {
+    const store = useAppStore.getState();
+    store.setRoomAgentActivity({
+      roomId: "room-1",
+      roomAgentId: "agent-a",
+      runtimeSessionId: "runtime-a",
+      status: "running",
+      roomMessageId: "message-1",
+      activeTurnId: "turn-1",
+      updatedAt: 10,
+    });
+    // 模拟 terminal 状态更新：浅合并下显式写 undefined 才会覆盖旧值
+    store.setRoomAgentActivity({
+      roomId: "room-1",
+      roomAgentId: "agent-a",
+      runtimeSessionId: "runtime-a",
+      status: "completed",
+      roomMessageId: undefined,
+      activeTurnId: undefined,
+      updatedAt: 20,
+    });
+
+    const activity = useAppStore.getState().roomAgentActivities[roomAgentActivityKey("room-1", "agent-a")];
+    expect(activity?.status).toBe("completed");
+    expect(activity?.roomMessageId).toBeUndefined();
+    expect(activity?.activeTurnId).toBeUndefined();
+  });
 });

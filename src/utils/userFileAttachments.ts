@@ -69,11 +69,36 @@ function extractLegacyAttachmentBlock(content: string): ExtractedFileAttachmentT
   };
 }
 
+// electron/main.ts 的 adaptPromptForModel 在非 vision 模型下把图片降级为
+// "图片：\n1. [图片: name.png]" 文本行写进正文；canonical 回放时据此还原附件卡片，
+// 避免用户气泡直接显示占位行。
+const NON_VISION_IMAGE_ITEM_RE = /^\d+\.\s+\[图片: (.+)\]$/;
+
+function extractNonVisionImageBlock(content: string): ExtractedFileAttachmentText {
+  const marker = content.search(/(?:^|\n)图片：\n/);
+  if (marker < 0) return { content, files: [] };
+  const blockStart = content.indexOf("图片：", marker);
+  const lines = content.slice(blockStart).split("\n");
+  const files: UserMessageImage[] = [];
+  let consumed = 1;
+  for (let index = 1; index < lines.length; index += 1) {
+    const item = lines[index]?.match(NON_VISION_IMAGE_ITEM_RE);
+    if (!item) break;
+    files.push({ kind: "image", name: item[1]?.trim() || "图片" });
+    consumed += 1;
+  }
+  if (files.length === 0) return { content, files: [] };
+  const before = content.slice(0, marker).trim();
+  const after = lines.slice(consumed).join("\n").trim();
+  return { content: [before, after].filter(Boolean).join("\n"), files };
+}
+
 export function extractFileAttachmentText(content: string): ExtractedFileAttachmentText {
   const legacy = extractLegacyAttachmentBlock(content);
-  const official = extractOfficialAttachmentNotices(legacy.content);
+  const nonVision = extractNonVisionImageBlock(legacy.content);
+  const official = extractOfficialAttachmentNotices(nonVision.content);
   return {
     content: official.content,
-    files: [...legacy.files, ...official.files],
+    files: [...legacy.files, ...nonVision.files, ...official.files],
   };
 }

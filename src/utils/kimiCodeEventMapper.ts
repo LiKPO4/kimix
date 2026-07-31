@@ -767,16 +767,26 @@ export function mapKimiCodeApprovalRequest(
 ): TimelineEvent | null {
   if (!isRecord(request)) return null;
   const display = isRecord(request.display) ? request.display : {};
-  const timestamp = options.now ?? Date.now();
+  // Server 审批载荷把工具输入预览放在 tool_input_display（string 或 record），
+  // 合成进 display，让审批卡能显示真实命令/路径而不是兜底文案。
+  const toolInputDisplay = request.tool_input_display;
+  let normalizedDisplay = normalizeApprovalDisplay(
+    isRecord(toolInputDisplay) ? { ...toolInputDisplay, ...display } : display,
+  );
+  if (isString(toolInputDisplay) && toolInputDisplay.trim() && !normalizedDisplay?.description) {
+    normalizedDisplay = { ...(normalizedDisplay ?? {}), description: toolInputDisplay.trim() };
+  }
+  const timestamp = options.now ?? readTimestampCandidate(request.created_at) ?? Date.now();
   const action = isString(request.action) ? request.action : "";
-  const normalizedDisplay = normalizeApprovalDisplay(display);
 
   return {
     id: getId(options),
     type: "approval_request",
     timestamp,
     requestId: isString(request.toolCallId) ? request.toolCallId : getId(options),
-    toolName: isString(request.toolName) ? request.toolName : "unknown",
+    toolName: isString(request.toolName)
+      ? request.toolName
+      : (isString(request.tool_name) ? request.tool_name : "unknown"),
     description: normalizedDisplay?.description ?? normalizedDisplay?.title ?? (normalizedDisplay?.kind === "plan_review" ? "审阅计划" : "需要审批"),
     details: action,
     riskLevel: action === "write" || action === "delete" ? "high" : "medium",
@@ -794,7 +804,7 @@ export function mapKimiCodeQuestionRequest(
     ? request.questions
     : (Array.isArray(request.fields) ? request.fields : []);
   const questions = rawQuestions.filter(isRecord);
-  const timestamp = options.now ?? Date.now();
+  const timestamp = options.now ?? readTimestampCandidate(request.created_at) ?? Date.now();
   const requestId = isString(request.toolCallId) ? request.toolCallId : getId(options);
 
   return {
@@ -804,28 +814,40 @@ export function mapKimiCodeQuestionRequest(
     requestId,
     rpcRequestId: requestId,
     toolCallId: isString(request.toolCallId) ? request.toolCallId : "",
-    questions: questions.map((question) => ({
-      id: isString(question.id) ? question.id : undefined,
-      question: isString(question.question)
-        ? question.question
-        : (isString(question.label) ? question.label : "请选择后续处理方式？"),
-      header: isString(question.header) ? question.header : undefined,
-      multiSelect: typeof question.multiSelect === "boolean"
-        ? question.multiSelect
-        : (typeof question.multi_select === "boolean" ? question.multi_select : false),
-      options: [
-        ...(Array.isArray(question.options) ? question.options.filter(isRecord) : []).map((option) => ({
-          id: isString(option.id) ? option.id : undefined,
-          label: isString(option.label) ? option.label : "选项",
-          description: isString(option.description) ? option.description : undefined,
-        })),
-        ...(isString(question.otherLabel) ? [{
-          id: isString(question.otherId) ? question.otherId : undefined,
-          label: question.otherLabel,
-          description: isString(question.otherDescription) ? question.otherDescription : undefined,
-        }] : []),
-      ],
-    })),
+    questions: questions.map((question) => {
+      // "其他"选项字段 camelCase/snake_case 都可能出现，逐一探测
+      const otherLabel = isString(question.otherLabel)
+        ? question.otherLabel
+        : (isString(question.other_label) ? question.other_label : undefined);
+      const otherId = isString(question.otherId)
+        ? question.otherId
+        : (isString(question.other_id) ? question.other_id : undefined);
+      const otherDescription = isString(question.otherDescription)
+        ? question.otherDescription
+        : (isString(question.other_description) ? question.other_description : undefined);
+      return {
+        id: isString(question.id) ? question.id : undefined,
+        question: isString(question.question)
+          ? question.question
+          : (isString(question.label) ? question.label : "请选择后续处理方式？"),
+        header: isString(question.header) ? question.header : undefined,
+        multiSelect: typeof question.multiSelect === "boolean"
+          ? question.multiSelect
+          : (typeof question.multi_select === "boolean" ? question.multi_select : false),
+        options: [
+          ...(Array.isArray(question.options) ? question.options.filter(isRecord) : []).map((option) => ({
+            id: isString(option.id) ? option.id : undefined,
+            label: isString(option.label) ? option.label : "选项",
+            description: isString(option.description) ? option.description : undefined,
+          })),
+          ...(otherLabel ? [{
+            id: otherId,
+            label: otherLabel,
+            description: otherDescription,
+          }] : []),
+        ],
+      };
+    }),
     status: "pending",
   };
 }

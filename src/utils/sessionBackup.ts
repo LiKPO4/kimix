@@ -606,7 +606,9 @@ function normalizeImportedSession(value: unknown, schemaVersion: number): Sessio
   const title = stringValue(value.title, "新会话");
   const projectPath = stringValue(value.projectPath);
   if (!id || !projectPath) return null;
-  const createdAt = numberValue(value.createdAt, Date.now());
+  // createdAt 缺失时优先回退到同记录已恢复的 updatedAt，避免损坏数据把老会话标记成"现在"而冲到排序最前；
+  // 回退方向保持单向：updatedAt 缺失仍回退到 createdAt，两者皆缺才用 Date.now()
+  const createdAt = numberValue(value.createdAt, numberValue(value.updatedAt, Date.now()));
   const updatedAt = numberValue(value.updatedAt, createdAt);
   const engine = value.engine === "prompt" || value.engine === "kimi-code" ? value.engine : undefined;
   const base = value as Partial<Session>;

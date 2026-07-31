@@ -31,6 +31,7 @@ export interface SessionStore {
   movePendingMessage: (id: string, direction: "up" | "down") => void;
   reorderPendingMessage: (dragId: string, targetId: string) => void;
   promotePendingMessage: (id: string) => void;
+  requeuePendingMessageFront: (message: PendingMessage) => void;
   shiftPendingMessage: (sessionId: string) => PendingMessage | undefined;
 }
 
@@ -145,6 +146,12 @@ export const useSessionStore = create<SessionStore>((rawSet) => {
       pendingMessages.unshift(item);
       return { pendingMessages };
     }),
+
+  // 失败重排：把刚取出的消息放回队首，保持其余消息原有相对顺序（不可变更新）。
+  requeuePendingMessageFront: (message) =>
+    set((state) => ({
+      pendingMessages: [message, ...state.pendingMessages.filter((msg) => msg.id !== message.id)],
+    })),
 
   shiftPendingMessage: (sessionId) => {
     let result: PendingMessage | undefined;

@@ -23,21 +23,9 @@ import { getHiddenHandoffSessionIds } from "@/utils/persistence";
 import { getSidebarProjectClickAction, persistSidebarExpandedProjectPaths, readSidebarExpandedProjectPaths } from "@/utils/sidebarProjectExpansion";
 import { getPrimaryRoomAgent, getRoomAgentRuntimeId, updateRoomAgent } from "@/utils/collaborationRooms";
 import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
+import { formatRelativeTime } from "@/utils/messageTime";
 import { APP_VERSION } from "@/utils/appVersion";
 import { SettingsWorkspaceSidebar } from "@/components/settings/SettingsWorkspaceSidebar";
-
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  const weeks = Math.floor(diff / 604800000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分`;
-  if (hours < 24) return `${hours} 小时`;
-  if (days < 7) return `${days} 天`;
-  return `${weeks} 周`;
-}
 
 const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-lg text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 const collapsedNavItemClass = "flex items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";

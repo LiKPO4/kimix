@@ -46,6 +46,7 @@ import {
   registerStartupBootstrapPublisher,
 } from "./startupBootstrap";
 import * as longTaskService from "./longTaskService";
+import { UpdateLongTaskStateSchema } from "./longTaskSchemas";
 import {
   electronBuilderLatestYmlName,
   mergeReleaseAssets,
@@ -4582,20 +4583,6 @@ const GetLongTaskDetailSchema = z.object({
   taskId: z.string().min(1).max(160),
 });
 
-const UpdateLongTaskStateSchema = z.object({
-  projectPath: z.string().min(1).max(4096),
-  taskId: z.string().min(1).max(160),
-  patch: z.object({
-    stage: z.enum(["drafting", "planning", "ready", "running", "reviewing", "paused", "completed"]).optional(),
-    activeAgent: z.enum(["executor", "reviewer"]).optional(),
-    currentStep: z.number().int().min(0).optional(),
-    targetStep: z.number().int().min(0).nullable().optional(),
-    reviewedReviewItems: z.array(z.string().max(20000)).max(500).optional(),
-    executorSessionId: z.string().min(1).max(160).optional(),
-    reviewerSessionId: z.string().min(1).max(160).optional(),
-  }).strict(),
-});
-
 const AppendLongTaskRoundSchema = z.object({
   projectPath: z.string().min(1).max(4096),
   taskId: z.string().min(1).max(160),
@@ -6740,7 +6727,7 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
     if (kimiCodeHost.isListingSessionsFromServer()) {
       const history = await loadSessionHistoryWithFallback(
         () => kimiCodeHost.loadServerSessionHistory(sessionId),
-        () => sessionHistory.getSessionHistory(workDir, sessionId),
+        () => sessionHistory.getSessionHistory(workDir, sessionId), 8_000, sessionId,
       );
       // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
       let events = history.events;

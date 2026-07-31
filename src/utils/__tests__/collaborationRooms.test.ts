@@ -142,6 +142,58 @@ describe("collaborationRooms", () => {
       expect.objectContaining({ id: "room-message:user-new", recipientAgentIds: [primary.id] }),
     ]);
   });
+  it("tolerates an invalid dispatchAttemptId by degrading to missing instead of dropping the delivery", () => {
+    const oldPrimary: TimelineEvent = { id: "user-old", type: "user_message", timestamp: 100, content: "Old" };
+    const session = legacySession([oldPrimary]);
+    const collaboration = createCollaborationStateFromSession(session);
+    const primary = collaboration.agents[0];
+    const secondary = secondaryAgent();
+    const room: Session = {
+      ...session,
+      collaboration: {
+        ...collaboration,
+        agents: [primary, secondary],
+        messages: [{
+          ...collaboration.messages[0],
+          recipientAgentIds: [primary.id, secondary.id],
+          deliveries: {
+            ...collaboration.messages[0].deliveries,
+            [secondary.id]: {
+              status: "queued",
+              agentTurnId: "turn-secondary",
+              dispatchAttemptId: "",
+            },
+          },
+        }],
+        agentEvents: {
+          ...collaboration.agentEvents,
+          [secondary.id]: [],
+        },
+      },
+    };
+
+    // 空串：按缺失降级，投递保留
+    const fromEmpty = normalizeLoadedSessionCollaboration(JSON.parse(JSON.stringify(room)) as Session);
+    expect(fromEmpty.unsupportedCollaboration).toBeUndefined();
+    const emptyDelivery = fromEmpty.collaboration?.messages[0].deliveries[secondary.id];
+    expect(emptyDelivery).toMatchObject({ status: "queued", agentTurnId: "turn-secondary" });
+    expect(emptyDelivery?.dispatchAttemptId).toBeUndefined();
+
+    // 非字符串：同样降级，不丢投递
+    const raw = JSON.parse(JSON.stringify(room));
+    raw.collaboration.messages[0].deliveries[secondary.id].dispatchAttemptId = 123;
+    const fromNonString = normalizeLoadedSessionCollaboration(raw as Session);
+    const nonStringDelivery = fromNonString.collaboration?.messages[0].deliveries[secondary.id];
+    expect(nonStringDelivery).toMatchObject({ status: "queued", agentTurnId: "turn-secondary" });
+    expect(nonStringDelivery?.dispatchAttemptId).toBeUndefined();
+
+    // 合法值：正常保留
+    const valid = JSON.parse(JSON.stringify(room));
+    valid.collaboration.messages[0].deliveries[secondary.id].dispatchAttemptId = "attempt-valid";
+    const fromValid = normalizeLoadedSessionCollaboration(valid as Session);
+    expect(fromValid.collaboration?.messages[0].deliveries[secondary.id]?.dispatchAttemptId).toBe("attempt-valid");
+  });
+
 
   it("preserves the primary delivery transaction when a newer legacy mirror has the same turn", () => {
     const primaryEvent: TimelineEvent = {

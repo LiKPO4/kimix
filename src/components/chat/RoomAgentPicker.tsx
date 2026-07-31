@@ -24,7 +24,7 @@ function agentStatus(agent: RoomAgent, activity?: RoomAgentActivity) {
   if (agent.provisioningError) return { label: "创建失败", tone: "text-accent-danger" };
   if (agent.recoveryIssue) return { label: agent.recoveryIssue.status === "unavailable" ? "模型不可用" : "恢复失败", tone: "text-accent-danger" };
   if (agent.lifecycleIssue) return {
-    label: agent.lifecycleIssue.operation === "archive" ? "归档失败" : "恢复失败",
+    label: agent.lifecycleIssue.operation === "archive" ? "归档失败" : agent.lifecycleIssue.operation === "recover" ? "恢复不完整" : "恢复失败",
     tone: "text-accent-danger",
   };
   if (agent.archivedAt) return { label: "已归档", tone: "text-[var(--kimix-panel-text-muted)]" };

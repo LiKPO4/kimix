@@ -200,6 +200,17 @@ describe("createSessionBackupImportPlan", () => {
     expect(plan.stats.addedSessions).toBe(1);
   });
 
+  it("falls back to updatedAt when an imported session is missing createdAt", () => {
+    const damaged = session({ id: "damaged-created-at", updatedAt: 4200 });
+    const plan = createSessionBackupImportPlan(snapshot([
+      { ...damaged, createdAt: undefined } as unknown as Session,
+    ]));
+
+    expect(plan.sessions).toHaveLength(1);
+    expect(plan.sessions[0].createdAt).toBe(4200);
+    expect(plan.sessions[0].updatedAt).toBe(4200);
+  });
+
   it("forks sessions when both sides added different events to the same identity", () => {
     useSessionStore.setState({
       sessions: [

@@ -55,7 +55,10 @@ function runtimeIdentityMatches(session: Session, roomAgentId: string, expectedR
     identities.push(session.runtimeSessionId, session.officialSessionId, session.id);
   }
   const known = identities.filter((value): value is string => Boolean(value));
-  return known.length === 0 || known.includes(expectedRuntimeSessionId);
+  if (known.length > 0) return known.includes(expectedRuntimeSessionId);
+  // agent 尚未绑定任何 runtime/official session：仅在其分区当前没有任何事件
+  // （首次加载）时放行；已有事件则拒绝，避免把别的会话历史覆盖到它名下。
+  return getRoomAgentEvents(session, roomAgentId).length === 0;
 }
 
 function normalizedMessageText(value: string): string {

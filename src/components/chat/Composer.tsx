@@ -27,6 +27,7 @@ import { classifySlashCommand, shouldActivateSkillBeforePrompt, slashCommandPatt
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
+import { hasRecentDuplicatePendingMessage } from "@/utils/promptQueue";
 import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
@@ -75,6 +76,7 @@ import {
   createRoomMessageDispatch,
   dispatchQueuedRoomDelivery,
   getDispatchableRoomDeliveries,
+  listLoadedCollaborationRoomIds,
   retryRoomDelivery,
   type RoomDeliverySendResult,
 } from "@/utils/roomDelivery";
@@ -1346,7 +1348,7 @@ export function Composer() {
             };
           }
           window.dispatchEvent(new CustomEvent("kimix:toast", {
-            detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route)}`,
+            detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route, undefined, "sent")}`,
           }));
           return { success: true as const };
         },
@@ -1442,6 +1444,21 @@ export function Composer() {
     if (!multiAgentRoomUiAvailable || !activeSession?.collaboration) return;
     void dispatchAvailableRoomDeliveries(activeSession.id);
   }, [activeRoomDispatchSignature, activeSession?.id, multiAgentRoomUiAvailable]);
+
+  // 崩溃重启后，非活动房间也可能滞留 queued 投递：任何房间会话进入 store（启动恢复、
+  // 加载完成）后都触发一次派发，不再要求用户先打开该房间。防重由 roomDispatchingRef、
+  // getDispatchableRoomDeliveries 的活动/状态过滤与 dispatchQueuedRoomDelivery 的 queued 复核共同保证。
+  const loadedRoomDispatchSignature = useSessionStore((state) =>
+    listLoadedCollaborationRoomIds(state.sessions).join("|"));
+
+  useEffect(() => {
+    if (!multiAgentRoomUiEnabled) return;
+    for (const roomId of listLoadedCollaborationRoomIds(useSessionStore.getState().sessions)) {
+      if (roomId === activeSession?.id && multiAgentRoomUiAvailable) continue; // 活动房间由上面的 effect 负责
+      void dispatchAvailableRoomDeliveries(roomId);
+    }
+  }, [loadedRoomDispatchSignature, multiAgentRoomUiEnabled, multiAgentRoomUiAvailable, activeSession?.id]);
+
 
   useEffect(() => {
     const handleRoomDeliveryAction = (event: Event) => {
@@ -1805,7 +1822,9 @@ export function Composer() {
             writePrimaryPromptActivity(status, kimiCodeSessionId);
           }
         }
-        updateLinkStatus(kimiCodeRouteStatus(res.data.route), "success");
+        updateLinkStatus(kimiCodeRouteStatus(res.data.route, undefined, "sent"), "success");
+        // 乐观插入的用户消息此前只靠 900ms 防抖落盘，发送成功后立即显式落盘，缩小崩溃丢失窗口。
+        void persistLocalConversationState();
         return true;
       } catch (err) {
         console.error("Kimi Code send failed:", err);
@@ -1823,8 +1842,10 @@ export function Composer() {
             updatedAt: Date.now(),
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+          // 乐观插入的用户事件已移除、输入框早已清空；把消息回补队列，避免用户文本彻底丢失。
+          addPendingMessage(targetSession.id, userEvent.content, userEvent.images);
           window.dispatchEvent(new CustomEvent("kimix:toast", {
-            detail: "上一轮仍在运行，请等待或停止后再发送。",
+            detail: "上一轮仍在运行，消息已加入队列，将在当前轮结束后发送。",
           }));
           return false;
         }
@@ -4071,10 +4092,22 @@ export function Composer() {
       mediaType: image.mediaType,
       url: image.url,
     }));
-    await sendPromptContent(pending.content, {
+    const sendStartedAt = Date.now();
+    const sent = await sendPromptContent(pending.content, {
       manualSubmitAutoScroll: false,
       images: pendingAttachments,
     });
+    if (!sent) {
+      // 发送失败回补到队首；若 active-turn 失败分支已把同内容消息重新入队，则不重复回补。
+      const alreadyRequeued = hasRecentDuplicatePendingMessage(
+        useSessionStore.getState().pendingMessages,
+        { sessionId: pending.sessionId, content: pending.content },
+        sendStartedAt,
+      );
+      if (!alreadyRequeued) {
+        useSessionStore.getState().requeuePendingMessageFront(pending);
+      }
+    }
   };
 
   const handleSteerPending = async (id: string, roomAgentId?: string) => {

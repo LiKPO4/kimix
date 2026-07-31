@@ -20,7 +20,7 @@ import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/mod
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
 import { resolveLiveTextBlockKey, resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
-import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, groupTurnBlocks, mergeLiveDraftBlocks, type TurnBlock, type TurnBlockGroup } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeFinalTextBlockIndex, computeStreamingTrailingTextContent, groupTurnBlocks, mergeLiveDraftBlocks, type TurnBlock, type TurnBlockGroup } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -1586,7 +1586,7 @@ export const KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX = 202;
 type KimiWebSubagentDetailItem = {
   id: string;
   timestamp: number;
-  kind: "assistant" | "thinking" | "tool" | "status" | "error";
+  kind: "assistant" | "thinking" | "tool" | "status" | "error" | "approval" | "question";
   label: string;
   detail?: string;
   tone?: "default" | "success" | "warning" | "danger";
@@ -1674,6 +1674,27 @@ function buildKimiWebSubagentDetails(subagent: SubagentEvent): KimiWebSubagentDe
         label: "错误",
         detail: compactSubagentText(event.message, 160),
         tone: "danger",
+      });
+      return;
+    }
+    // 子代理内部发起的审批/提问只读展示（不可交互），此前被静默丢弃
+    if (event.type === "approval_request") {
+      details.push({
+        id: event.id,
+        timestamp: event.timestamp,
+        kind: "approval",
+        label: "审批",
+        detail: compactSubagentText(event.description, 160),
+      });
+      return;
+    }
+    if (event.type === "question_request") {
+      details.push({
+        id: event.id,
+        timestamp: event.timestamp,
+        kind: "question",
+        label: "提问",
+        detail: compactSubagentText(event.questions[0]?.question ?? "", 160),
       });
     }
   });
@@ -2199,31 +2220,22 @@ function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserv
  */
 function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
-  const finalTextGroupIndex = useMemo(() => {
-    // Only skip the final text group once the turn has settled. While the turn
-    // is active the trailing text streams IN FLOW at its own position (option
-    // C); at settle the flow copy is skipped and the body takes over, so the
-    // final answer never renders twice.
-    if (!hasFinalContent) return -1;
-    for (let i = groups.length - 1; i >= 0; i--) {
-      if (groups[i].type === "text") {
-        const hasTrailingProcess = groups.slice(i + 1).some(
-          (g) => g.type === "tool" || g.type === "subagent" || g.type === "approval"
-        );
-        if (!hasTrailingProcess) {
-          return i;
-        }
-        break;
-      }
-    }
-    return -1;
-  }, [groups]);
+  // 与正文区 computeFinalTextBlockContent 选中同一块：按块 key 跳过，不再按
+  // "数组最后文本组"启发式。最后文本块后有迟到工具、或回放对账把旧时间戳
+  // step 追加到数组尾部时，正文区与过程流仍指向同一块，正文恰好显示一次。
+  // 仅在 turn 落定后跳过；活跃时尾部文本在流内原位流式渲染（option C）。
+  const finalTextBlockKey = useMemo(() => {
+    if (!hasFinalContent) return undefined;
+    const finalIndex = computeFinalTextBlockIndex(blocks, true);
+    const finalBlock = finalIndex >= 0 ? blocks[finalIndex] : undefined;
+    return finalBlock?.kind === "text" ? finalBlock.key : undefined;
+  }, [blocks, hasFinalContent]);
   return (
     <div className="flex min-w-0 flex-col" style={{ gap: 10 }}>
       {groups.map((group, index) => {
         if (group.type === "text") {
           // Skip the final answer segment; it is rendered as the bottom body.
-          if (index === finalTextGroupIndex) return null;
+          if (group.key === finalTextBlockKey) return null;
           return (
             <div key={group.key} data-kimix-event-ids={group.sourceEventIds.join(" ")}>
               <KimiWebIntermediateTextBlock

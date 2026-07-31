@@ -327,6 +327,47 @@ describe("mapStreamEvent", () => {
     expect((event as Extract<TimelineEvent, { type: "error" }>).message).toBe("Something broke");
   });
 
+  it("maps SubagentEvent with full legacy fields", () => {
+    const event = mapStreamEvent({
+      type: "SubagentEvent",
+      payload: {
+        agent_id: "agent-3",
+        agent_name: "reviewer",
+        parent_tool_call_id: "call-9",
+        description: "审查样式",
+        swarm_index: 2,
+        status: "completed",
+        result_summary: "发现两项问题",
+        error: "lint 失败",
+      },
+    });
+    expect(event?.type).toBe("subagent");
+    const subagent = event as Extract<TimelineEvent, { type: "subagent" }>;
+    expect(subagent.agentId).toBe("agent-3");
+    expect(subagent.agentName).toBe("reviewer");
+    expect(subagent.parentToolCallId).toBe("call-9");
+    expect(subagent.description).toBe("审查样式");
+    expect(subagent.swarmIndex).toBe(2);
+    expect(subagent.status).toBe("completed");
+    expect(subagent.resultSummary).toBe("发现两项问题");
+    expect(subagent.error).toBe("lint 失败");
+  });
+
+  it("maps SubagentEvent camelCase fields and keeps missing fields undefined", () => {
+    const event = mapStreamEvent({
+      type: "SubagentEvent",
+      payload: { agentId: "agent-4", toolCallId: "call-10", swarmIndex: 1 },
+    }) as Extract<TimelineEvent, { type: "subagent" }>;
+
+    expect(event.agentId).toBe("agent-4");
+    expect(event.parentToolCallId).toBe("call-10");
+    expect(event.swarmIndex).toBe(1);
+    expect(event.agentName).toBe("子代理");
+    expect(event.description).toBeUndefined();
+    expect(event.resultSummary).toBeUndefined();
+    expect(event.error).toBeUndefined();
+  });
+
   it("maps CompactionBegin and CompactionEnd", () => {
     const begin = mapStreamEvent({ type: "CompactionBegin", payload: {} });
     expect(begin?.type).toBe("compaction");
@@ -1892,6 +1933,30 @@ describe("mergeEvents", () => {
     const result = mergeEvents(existing, incoming);
     expect(result).toHaveLength(1);
     expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).status).toBe("completed");
+  });
+
+  it("corrects the fallback subagent name when a later frame carries the concrete name", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "subagent", timestamp: 1, agentId: "agent-9", agentName: "子代理", status: "running", events: [] },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "subagent", timestamp: 2, agentId: "agent-9", agentName: "coder", status: "running", events: [] };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).agentName).toBe("coder");
+  });
+
+  it("keeps the concrete subagent name when a later frame only carries the fallback name", () => {
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "subagent", timestamp: 1, agentId: "agent-10", agentName: "coder", status: "running", events: [] },
+    ];
+    const incoming: TimelineEvent = { id: "2", type: "subagent", timestamp: 2, agentId: "agent-10", agentName: "子代理", status: "completed", events: [] };
+
+    const result = mergeEvents(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect((result[0] as Extract<TimelineEvent, { type: "subagent" }>).agentName).toBe("coder");
   });
 
   it("merges a late terminal lifecycle event into an already settled subagent", () => {

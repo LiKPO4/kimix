@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderItems } from "@/components/chat/ChatThread";
 import type { TimelineEvent, ToolCallEvent } from "@/types/ui";
-import { buildTurnBlocks, computeFinalTextBlockContent, computeStreamingTrailingTextContent, countTurnBlockKind, groupTurnBlocks, mergeLiveDraftBlocks, turnBlocksText, type TurnBlock } from "../turnBlocks";
+import { buildTurnBlocks, computeFinalTextBlockContent, computeFinalTextBlockIndex, computeStreamingTrailingTextContent, countTurnBlockKind, groupTurnBlocks, mergeLiveDraftBlocks, turnBlocksText, type TurnBlock } from "../turnBlocks";
 
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
@@ -334,6 +334,44 @@ describe("computeFinalTextBlockContent", () => {
       timestampedTextBlock("同毫秒第二段", 300, "text-second"),
     ];
     expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("同毫秒第二段");
+  });
+
+  it("aligns the process-timeline skip with the body pick when tools arrive late (trigger A)", () => {
+    // 触发 A：最后文本块后还有迟到工具。正文区选中 text-final，过程流也必须
+    // 跳过 text-final；旧的"数组最后文本组 + 无尾随 process"启发式会漏跳，
+    // 导致同一正文在正文区和过程流各显示一次。
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("中段正文", 100, "text-mid"),
+      timestampedTextBlock("最终答案", 200, "text-final"),
+      toolBlock("tool-late"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终答案");
+    const finalIndex = computeFinalTextBlockIndex(blocks, true);
+    expect(finalIndex).toBe(1);
+    const finalKey = blocks[finalIndex].kind === "text" ? blocks[finalIndex].key : undefined;
+    // 过程流按 key 跳过的组正是正文区选中的那一块，其余文本组保持可见
+    const textGroups = groupTurnBlocks(blocks).filter((group) => group.type === "text");
+    expect(textGroups.map((group) => group.key)).toEqual(["text-mid", "text-final"]);
+    expect(textGroups.filter((group) => group.key === finalKey)).toHaveLength(1);
+    expect(textGroups.filter((group) => group.key !== finalKey).map((group) => group.key)).toEqual(["text-mid"]);
+  });
+
+  it("keeps the official final answer visible exactly once when replay appends an older step (trigger B)", () => {
+    // 触发 B：回放对账把带旧官方时间戳的 step 追加到数组尾部，"时间戳最大块 ≠
+    // 数组最后文本组"。正文区选中时间戳最大块 text-final，过程流按同一身份跳过；
+    // 数组尾部的旧 step 留在过程流可见，不再两边都不出现。
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("官方最终答案", 300, "text-final"),
+      timestampedTextBlock("较早阶段短句", 200, "text-late-replay"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("官方最终答案");
+    const finalIndex = computeFinalTextBlockIndex(blocks, true);
+    expect(finalIndex).toBe(0);
+    const finalKey = blocks[finalIndex].kind === "text" ? blocks[finalIndex].key : undefined;
+    const textGroups = groupTurnBlocks(blocks).filter((group) => group.type === "text");
+    expect(textGroups.map((group) => group.key)).toEqual(["text-final", "text-late-replay"]);
+    expect(textGroups.filter((group) => group.key === finalKey)).toHaveLength(1);
+    expect(textGroups.filter((group) => group.key !== finalKey).map((group) => group.key)).toEqual(["text-late-replay"]);
   });
 
   it("keeps all text segments folded while the turn is streaming (no trailing tools yet)", () => {

@@ -43,4 +43,31 @@ describe("extractFileAttachmentText", () => {
     const text = 'Attached file "a.pdf" (application/pdf, 3 bytes): C:\\tmp\\a.pdf - open it with the Read tool';
     expect(extractFileAttachmentText(text)).toEqual({ content: text, files: [] });
   });
+
+  it("restores non-vision image placeholder lines as attachment cards", () => {
+    expect(extractFileAttachmentText([
+      "请描述这几张图",
+      "图片：",
+      "1. [图片: name.png]",
+      "2. [图片: other.jpg]",
+    ].join("\n"))).toEqual({
+      content: "请描述这几张图",
+      files: [
+        { kind: "image", name: "name.png" },
+        { kind: "image", name: "other.jpg" },
+      ],
+    });
+  });
+
+  it("restores a non-vision image placeholder without preceding text", () => {
+    expect(extractFileAttachmentText("图片：\n1. [图片: solo.png]")).toEqual({
+      content: "",
+      files: [{ kind: "image", name: "solo.png" }],
+    });
+  });
+
+  it("keeps a 图片： line without numbered placeholder items untouched", () => {
+    const text = "图片：\n这是一段普通讨论图片的文字";
+    expect(extractFileAttachmentText(text)).toEqual({ content: text, files: [] });
+  });
 });
