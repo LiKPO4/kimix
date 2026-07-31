@@ -1770,6 +1770,7 @@ function App() {
       return false;
     }
 
+    // currentStep 为 0 是“未完成任何 Step”哨兵（Step 从 1 编号），|| 1 兜底到首个有效 Step；不可用 ??（0 ?? 1 仍得 0，会产生幽灵 Step 0 记录并重复派发 Step 1）
     const currentStep = Math.max(latestSession.longTask.currentStep || 1, 1);
     const targetStep = latestSession.longTask.targetStep;
     if (!targetStep) return false;

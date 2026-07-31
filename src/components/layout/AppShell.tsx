@@ -1226,6 +1226,7 @@ export function AppShell() {
 
   const buildNextLongTaskPrompt = () => {
     if (!longTaskMeta) return "";
+    // 同上：0 为“未开始”哨兵，Step 从 1 编号，|| 1 给出手动执行的第一步；不要用 ?? 1
     const nextStep = Math.max(longTaskMeta.currentStep || 1, 1);
     const target = longTaskMeta.targetStep ?? nextStep;
     const isFinalStep = nextStep >= target;

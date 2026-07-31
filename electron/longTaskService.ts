@@ -414,6 +414,7 @@ export function createLongTask(data: CreateLongTaskData): LongTaskSummary {
     reviewerSessionId: data.reviewerSessionId,
     stage: "drafting" satisfies LongTaskStage,
     activeAgent: "executor" satisfies LongTaskAgentRole,
+    // Step 从 1 开始编号（见 BIGPLAN 模板“### Step 1”）；0 是“尚未完成任何 Step”的哨兵而非第一步
     currentStep: 0,
     targetStep: null,
     reviewedReviewItems: [],
