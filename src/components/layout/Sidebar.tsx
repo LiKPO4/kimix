@@ -10,6 +10,7 @@ import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { resolveSidebarSessionListWindow } from "@/utils/sidebarSessionList";
 import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
@@ -156,6 +157,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setRecentProjects = useSessionStore((s) => s.setRecentProjects);
   const addSession = useSessionStore((s) => s.addSession);
   const sessions = useSessionStore((s) => s.sessions);
+  // 项目会话列表“展开全部”状态（默认只展示最近 5 个，超出折叠）
+  const [sessionListExpandedPaths, setSessionListExpandedPaths] = useState<ReadonlySet<string>>(new Set());
   const [timelineExpiryTick, setTimelineExpiryTick] = useState(0);
   const sidebarActivityNow = Date.now();
   const sidebarRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities), [roomAgentActivities]);
@@ -830,6 +833,20 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                     const isActive = currentProject?.id === project.id;
                     const isPinned = project.pinned ?? false;
                     const pSessions = projectSessions(project.path);
+                    // 默认只展示最近 5 个会话，超出折叠；当前打开会话在折叠区外时自动展开保护
+                    const sessionListWindow = resolveSidebarSessionListWindow(
+                      pSessions,
+                      currentSession?.id,
+                      sessionListExpandedPaths.has(projectPathKey),
+                    );
+                    const toggleSessionListExpanded = () => {
+                      setSessionListExpandedPaths((current) => {
+                        const next = new Set(current);
+                        if (next.has(projectPathKey)) next.delete(projectPathKey);
+                        else next.add(projectPathKey);
+                        return next;
+                      });
+                    };
                     const prev = recentProjects[projectIndex - 1];
                     const showRegionDivider = !isPinned && (prev?.pinned ?? false);
                     const isDragging = dragProjectId === project.id;
@@ -996,7 +1013,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               gap: 2,
                             }}
                           >
-                            {pSessions.map((s) => {
+                            {sessionListWindow.shownSessions.map((s) => {
                               const isSessionBusy = isSessionSidebarBusy(s, {
                                 runningSessionId,
                                 currentSessionId: currentSession?.id,
@@ -1103,6 +1120,16 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 </div>
                               );
                             })}
+                            {sessionListWindow.showToggle && (
+                              <button
+                                type="button"
+                                onClick={toggleSessionListExpanded}
+                                className="flex h-8 items-center rounded-lg text-[13px] text-text-muted transition-colors hover:bg-surface-hover"
+                                style={{ paddingLeft: 16, paddingRight: 10, gap: 6 }}
+                              >
+                                {sessionListWindow.collapsed ? `展开剩余 ${sessionListWindow.hiddenCount} 个对话` : "收起对话"}
+                              </button>
+                            )}
                           </div>
                         )}
                       </section>
