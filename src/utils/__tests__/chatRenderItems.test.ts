@@ -159,6 +159,28 @@ describe("buildRenderItems usage footer", () => {
     expect(previous.isAssistantActive).toBe(false);
   });
 
+  it("keeps usage status in the same turn when its inherited turn id differs from the assistant official turn id", () => {
+    // 根因场景（v2.20.75 回落“已完成”）：usage.record 无官方 turnId，status 继承本地乐观
+    // turn 身份，assistant 事件带官方 turnId。若 status 参与 turn 切分，会把 user 边界+usage
+    // 与 assistant 切成两个 turn，footer 丢用量回落成裸“已完成”、usage 独立飘出。
+    const conflictEvents: TimelineEvent[] = [{
+      id: "user-t13", type: "user_message", timestamp: 1, content: "继续处理",
+    }, {
+      id: "usage-inherited", type: "status_update", timestamp: 2,
+      agentTurnId: "local-uuid-t13", inputTokenCount: 99640, tokenCount: 2260, message: "模型：kimi-k3",
+    }, {
+      id: "assistant-t13", type: "assistant_message", timestamp: 3,
+      agentTurnId: "official-13", content: "最终答案", isThinking: false, isComplete: true, durationMs: 57000,
+    }];
+    const items = buildRenderItems(conflictEvents, "kimi-code", undefined, false);
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    const assistant = assistants[0];
+    if (assistant?.type !== "event") return;
+    // usage 状态未被切走，assistant footer 仍能拿到用量（不裸“已完成”）
+    expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-inherited"]);
+  });
+
   it("derives the active Assistant header when the latest user turn has lost its placeholder", () => {
     const nextUser: TimelineEvent = {
       id: "user-next",
@@ -1199,7 +1221,8 @@ describe("assistant footer fallback", () => {
     }, false)).toBe("模型：gpt-5");
   });
 
-  it("shows only completed when a room Agent has neither metrics nor an official model", () => {
+  it("shows reliable duration for a room Agent when no official model is present", () => {
+    // roomAgentId 不再提前回落裸“已完成”：有可靠 durationMs 时同样展示用时
     expect(assistantFooterFallbackLabel({
       id: "assistant-room",
       type: "assistant_message",
@@ -1207,7 +1230,21 @@ describe("assistant footer fallback", () => {
       content: "完成",
       isThinking: false,
       isComplete: true,
-      durationMs: 12_370_000,
+      durationMs: 65_000,
+      roomAgentId: "agent-a",
+      agentTurnId: "turn-a",
+    }, false)).toBe("已完成 · 用时 1分5秒");
+  });
+
+  it("shows only completed when a room Agent has neither an official model nor a reliable duration", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-room",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "完成",
+      isThinking: false,
+      isComplete: true,
+      durationMs: undefined,
       roomAgentId: "agent-a",
       agentTurnId: "turn-a",
     }, false)).toBe("已完成");

@@ -2649,9 +2649,8 @@ export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { typ
   // never sit on bare "已完成" when the assistant already knows its model.
   const model = compactModelDisplayName(event.model);
   if (model) return `模型：${model}`;
-  // Room Agents historically omit duration (often unreliable across multi-Agent
-  // clocks); keep the compact completed label when model is also missing.
-  if (event.roomAgentId) return "已完成";
+  // roomAgentId 场景（含单 Agent 主 Agent）同样展示可靠时长，不再提前回落裸“已完成”；
+  // 仅在 durationMs 不可得时才省略用时。
   const duration = reliableAssistantDurationMs(event.durationMs);
   if (duration !== undefined) return `已完成 · 用时 ${formatAssistantTurnDuration(duration)}`;
   return "已完成";

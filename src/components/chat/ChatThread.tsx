@@ -1321,10 +1321,14 @@ export function buildRenderItems(
       continue;
     }
 
-    if (event.agentTurnId && currentAgentTurnId && event.agentTurnId !== currentAgentTurnId) {
+    // status_update（用量/进度等伴随信息）不参与 turn 切分：官方 usage.record 不带 turnId，
+    // 实时帧继承的是本地乐观 turn 身份，与 assistant 事件的官方 turnId 不一致；
+    // 若允许它触发 flush，会把 user 边界+usage 与 assistant 内容切成两个 turn，
+    // 导致 footer 丢用量回落成裸“已完成”、usage 状态独立飘出。status 始终跟随当前 turn。
+    if (event.agentTurnId && currentAgentTurnId && event.agentTurnId !== currentAgentTurnId && event.type !== "status_update") {
       flushTurn(false);
     }
-    if (event.agentTurnId) currentAgentTurnId = event.agentTurnId;
+    if (event.agentTurnId && event.type !== "status_update") currentAgentTurnId = event.agentTurnId;
 
     turnBody.push(event);
   }
