@@ -66,7 +66,7 @@ export interface RoomAgentActivity {
 
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm";
-export type RightSidebarCardId = "longTaskStatus" | "background" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "subagent" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
+export type RightSidebarCardId = "longTaskStatus" | "background" | "subagentTasks" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "subagent" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 export type SettingsPageId = "general" | "appearance" | "conversation" | "account" | "models" | "experiments" | "data" | "diagnostics";
 

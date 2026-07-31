@@ -234,6 +234,8 @@ interface LongTaskInspectorPanelProps {
   backgroundTasks: LongTaskBackgroundTaskView[];
   backgroundTasksLoading: boolean;
   backgroundTasksError: string | null;
+  bashTasks: LongTaskBackgroundTaskView[];
+  subagentTasks: LongTaskBackgroundTaskView[];
   sessionDiffs: SessionDiffEntry[];
   btwState: BtwPanelState;
   btwDisabled: boolean;
@@ -301,6 +303,8 @@ export function LongTaskInspectorPanel({
   backgroundTasks,
   backgroundTasksLoading,
   backgroundTasksError,
+  bashTasks,
+  subagentTasks,
   sessionDiffs,
   btwState,
   btwDisabled,
@@ -1131,6 +1135,78 @@ export function LongTaskInspectorPanel({
     }
   };
 
+  // 后台任务行渲染：长程任务卡传「执行/审查 agent」作为 meta 标签（展示保持原样），
+  // 普通会话的任务卡传任务 kind 标签，并在状态徽章后追加耗时。
+  const renderBackgroundTaskItem = (task: LongTaskBackgroundTaskView, metaLabel: string, showDuration: boolean) => {
+    const tone = backgroundTaskTone(task);
+    const isDanger = tone === "danger";
+    const isSuccess = tone === "success";
+    const isWarning = tone === "warning";
+    const statusLabel = backgroundTaskStatusLabels[task.status] ?? task.status;
+    const durationLabel = showDuration ? backgroundTaskDurationLabel(task) : null;
+    return (
+      <div
+        key={`${task.runtimeSessionId}-${task.taskId}`}
+        className={`rounded-lg border ${isDanger ? "border-accent-danger/30 bg-accent-danger-light" : isSuccess ? "border-accent-success/30 bg-accent-success-light" : isWarning ? "border-accent-warning/30 bg-accent-warning-light" : "border-border-subtle bg-surface-elevated"}`}
+        style={{ padding: "12px 12px" }}
+      >
+        <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
+              {isDanger ? (
+                <AlertTriangle size={14} className="shrink-0 text-accent-danger" />
+              ) : (
+                <Terminal size={14} className={`shrink-0 ${isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} />
+              )}
+              <span className="truncate text-[13.5px] font-medium leading-5 text-text-primary">
+                {task.description || task.command || task.taskId}
+              </span>
+            </div>
+            <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 5 }}>
+              {metaLabel} · {task.transport === "server" ? "Server" : "SDK"} · {task.taskId}
+            </div>
+          </div>
+          <span className={`shrink-0 rounded-lg text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
+            {statusLabel}{durationLabel ? ` · ${durationLabel}` : ""}
+          </span>
+        </div>
+        <div className={`text-[12.5px] leading-5 ${isDanger ? "text-accent-danger" : isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} style={{ marginTop: 9 }}>
+          {backgroundTaskSummary(task)}
+        </div>
+        {task.outputPreview?.trim() ? (
+          <pre className="overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-base font-mono text-[11.5px] leading-5 text-text-secondary" style={{ maxHeight: 116, marginTop: 10, padding: "10px 12px" }}>
+            {task.outputPreview.trim()}
+          </pre>
+        ) : null}
+        <div className="flex flex-wrap items-center" style={{ gap: 10, marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => void onCopyBackgroundTaskOutput(task)}
+            className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
+          >
+            <ClipboardCopy size={13} />
+            输出
+          </button>
+          {!isBackgroundTaskTerminal(task.status) && (
+            <button
+              type="button"
+              onClick={() => void onStopBackgroundTask(task)}
+              className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-danger hover:bg-accent-danger-light"
+            >
+              <Square size={13} />
+              停止
+            </button>
+          )}
+          {task.exitCode !== null && (
+            <span className="rounded-lg bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
+              exit {task.exitCode}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
     {panelOpen && (
@@ -1300,75 +1376,7 @@ export function LongTaskInspectorPanel({
                 </div>
               ) : backgroundTasks.length > 0 ? (
                 <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
-                  {backgroundTasks.slice(0, 8).map((task) => {
-                    const tone = backgroundTaskTone(task);
-                    const isDanger = tone === "danger";
-                    const isSuccess = tone === "success";
-                    const isWarning = tone === "warning";
-                    const roleLabel = task.role === "reviewer" ? "审查" : "执行";
-                    const statusLabel = backgroundTaskStatusLabels[task.status] ?? task.status;
-                    return (
-                      <div
-                        key={`${task.runtimeSessionId}-${task.taskId}`}
-                        className={`rounded-lg border ${isDanger ? "border-accent-danger/30 bg-accent-danger-light" : isSuccess ? "border-accent-success/30 bg-accent-success-light" : isWarning ? "border-accent-warning/30 bg-accent-warning-light" : "border-border-subtle bg-surface-elevated"}`}
-                        style={{ padding: "12px 12px" }}
-                      >
-                        <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                          <div className="min-w-0">
-                            <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
-                              {isDanger ? (
-                                <AlertTriangle size={14} className="shrink-0 text-accent-danger" />
-                              ) : (
-                                <Terminal size={14} className={`shrink-0 ${isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} />
-                              )}
-                              <span className="truncate text-[13.5px] font-medium leading-5 text-text-primary">
-                                {task.description || task.command || task.taskId}
-                              </span>
-                            </div>
-                            <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 5 }}>
-                              {roleLabel} agent · {task.transport === "server" ? "Server" : "SDK"} · {task.taskId}
-                            </div>
-                          </div>
-                          <span className={`shrink-0 rounded-lg text-[12px] leading-5 ${isDanger ? "bg-white/60 text-accent-danger" : isSuccess ? "bg-white/60 text-accent-success" : isWarning ? "bg-white/60 text-accent-warning" : "bg-accent-primary-light text-accent-primary"}`} style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <div className={`text-[12.5px] leading-5 ${isDanger ? "text-accent-danger" : isSuccess ? "text-accent-success" : isWarning ? "text-accent-warning" : "text-text-muted"}`} style={{ marginTop: 9 }}>
-                          {backgroundTaskSummary(task)}
-                        </div>
-                        {task.outputPreview?.trim() ? (
-                          <pre className="overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-base font-mono text-[11.5px] leading-5 text-text-secondary" style={{ maxHeight: 116, marginTop: 10, padding: "10px 12px" }}>
-                            {task.outputPreview.trim()}
-                          </pre>
-                        ) : null}
-                        <div className="flex flex-wrap items-center" style={{ gap: 10, marginTop: 12 }}>
-                          <button
-                            type="button"
-                            onClick={() => void onCopyBackgroundTaskOutput(task)}
-                            className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
-                          >
-                            <ClipboardCopy size={13} />
-                            输出
-                          </button>
-                          {!isBackgroundTaskTerminal(task.status) && (
-                            <button
-                              type="button"
-                              onClick={() => void onStopBackgroundTask(task)}
-                              className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-danger hover:bg-accent-danger-light"
-                            >
-                              <Square size={13} />
-                              停止
-                            </button>
-                          )}
-                          {task.exitCode !== null && (
-                            <span className="rounded-lg bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ minHeight: 24, paddingLeft: 9, paddingRight: 9 }}>
-                              exit {task.exitCode}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {backgroundTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, `${task.role === "reviewer" ? "审查" : "执行"} agent`, false))}
                 </div>
               ) : (
                 <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
@@ -1786,11 +1794,91 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
+              <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">后台 Bash</div>
+                  <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
+                    {bashTasks.length > 0 ? `${bashTasks.length} 个任务` : "当前没有后台任务"}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={backgroundTasksLoading}
+                    onClick={() => onRefreshBackgroundTasks()}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
+                    刷新
+                  </button>
+                  {rightCardDragHandle("background", "后台 Bash")}
+                </div>
+              </div>
+              {backgroundTasksError ? (
+                <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  刷新失败：{backgroundTasksError}{bashTasks.length > 0 ? "（已保留上次结果）" : ""}
+                </div>
+              ) : null}
+              {backgroundTasksLoading && bashTasks.length === 0 ? (
+                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  正在读取后台任务...
+                </div>
+              ) : bashTasks.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  {bashTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
+                </div>
+              ) : (
+                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  当前没有后台任务。后台 Bash / 工具任务出现后会显示真实终态、失败原因和输出入口。
+                </div>
+              )}
+            </section>
+            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagentTasks", 2, { padding: "16px 16px 18px" })}>
+              <div className="flex items-start justify-between" style={{ gap: 12 }}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">子 Agent</div>
+                  <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
+                    {subagentTasks.length > 0 ? `${subagentTasks.length} 个任务` : "当前没有子 Agent 任务"}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={backgroundTasksLoading}
+                    onClick={() => onRefreshBackgroundTasks()}
+                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
+                    刷新
+                  </button>
+                  {rightCardDragHandle("subagentTasks", "子 Agent")}
+                </div>
+              </div>
+              {backgroundTasksError ? (
+                <div className="rounded-lg border border-accent-warning/30 bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  刷新失败：{backgroundTasksError}{subagentTasks.length > 0 ? "（已保留上次结果）" : ""}
+                </div>
+              ) : null}
+              {backgroundTasksLoading && subagentTasks.length === 0 ? (
+                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  正在读取子 Agent 任务...
+                </div>
+              ) : subagentTasks.length > 0 ? (
+                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                  {subagentTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
+                </div>
+              ) : (
+                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                  当前没有子 Agent 任务。通过 Agent 工具派发的子代理任务会显示在这里。
+                </div>
+              )}
+            </section>
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagent", 3, { padding: "16px 16px 18px" })}>
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <Bot size={15} className="shrink-0 text-accent-primary" />
-                  <div className="truncate text-[13px] font-medium leading-5 text-text-muted">子 Agent</div>
+                  <div className="truncate text-[13px] font-medium leading-5 text-text-muted">子 Agent 模型</div>
                 </div>
                 <span
                   className={`shrink-0 rounded-full text-[11.5px] leading-5 ${subagentModelDraft ? "bg-surface-base text-text-muted" : "bg-surface-base text-text-muted"}`}
@@ -1798,7 +1886,7 @@ export function LongTaskInspectorPanel({
                 >
                   {subagentModelDraft ? "已指定" : "跟随主 Agent"}
                 </span>
-                {rightCardDragHandle("subagent", "子 Agent")}
+                {rightCardDragHandle("subagent", "子 Agent 模型")}
               </div>
               <div className="flex flex-col" style={{ gap: 14, marginTop: 14 }}>
                 {subagentExternalServer && (
@@ -2580,6 +2668,20 @@ function backgroundTaskTone(task: LongTaskBackgroundTaskView) {
   if (["failed", "killed", "lost"].includes(task.status)) return "danger";
   if (task.status === "awaiting_approval") return "warning";
   return "primary";
+}
+
+function backgroundTaskKindLabel(task: LongTaskBackgroundTaskView) {
+  if (task.subagentType === "subagent") return "subagent";
+  if (task.subagentType?.trim()) return task.subagentType;
+  // SDK 兼容链路可能不带 kind 字段，兜底按普通后台任务展示
+  return "后台任务";
+}
+
+function backgroundTaskDurationLabel(task: LongTaskBackgroundTaskView) {
+  if (!task.startedAt) return null;
+  const end = task.endedAt ?? Date.now();
+  const seconds = Math.max(0, Math.round((end - task.startedAt) / 1000));
+  return `${seconds} s`;
 }
 
 function backgroundTaskSummary(task: LongTaskBackgroundTaskView) {

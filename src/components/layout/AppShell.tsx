@@ -23,6 +23,7 @@ import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
 import { type DownloadProgressInfo } from "@/utils/format";
@@ -976,6 +977,9 @@ export function AppShell() {
     : false;
   const longTaskMeta = liveCurrentSession?.longTask;
   const hasLongTaskMeta = Boolean(longTaskMeta);
+  // 后台任务拉取目标：长程任务仍取执行器会话，普通会话取当前会话的 runtime 会话（无则视为不可用）
+  const backgroundTasksRuntimeSessionId = longTaskMeta?.executorSessionId
+    ?? (liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : null);
   const liveCurrentSessionProjectPath = liveCurrentSession?.projectPath;
   const parsedLongTaskDetail = useMemo(() => parseLongTaskDetail(longTaskDetail), [longTaskDetail]);
   const reviewedReviewItems = useMemo(() => new Set((longTaskMeta?.reviewedReviewItems ?? []).map(normalizeReviewItem)), [longTaskMeta?.reviewedReviewItems]);
@@ -1381,16 +1385,17 @@ ${isFinalStep
     });
   };
 
+  // 拉取门槛已从「仅长程任务」放开到普通会话：state 名保留 longTaskBackgroundTasks 不改，
+  // 但数据已泛化为会话级（普通会话拉当前 runtime 会话的后台任务）。
   const refreshLongTaskBackgroundTasks = useCallback((options?: { silent?: boolean }) => {
-    const meta = liveCurrentSession?.longTask;
-    if (!longTaskInspectorOpen || !meta) {
+    if (!longTaskInspectorOpen || !backgroundTasksRuntimeSessionId) {
       setLongTaskBackgroundTasks([]);
       setLongTaskBackgroundTasksLoading(false);
       setLongTaskBackgroundTasksError(null);
       return;
     }
     const targets = [
-      { role: "executor" as const, runtimeSessionId: meta.executorSessionId },
+      { role: "executor" as const, runtimeSessionId: backgroundTasksRuntimeSessionId },
     ].filter((target, index, list) => (
       Boolean(target.runtimeSessionId) &&
       list.findIndex((item) => item.runtimeSessionId === target.runtimeSessionId) === index
@@ -1403,7 +1408,7 @@ ${isFinalStep
         activeOnly: false,
         limit: 20,
       });
-      if (!res.success) throw new Error(`长程任务：${res.error}`);
+      if (!res.success) throw new Error(hasLongTaskMeta ? `长程任务：${res.error}` : res.error);
       return res.data.map((task: KimiCodeBackgroundTaskInfo): LongTaskBackgroundTaskView => ({
         ...task,
         role: target.role,
@@ -1417,9 +1422,16 @@ ${isFinalStep
       if (!options?.silent) setLongTaskBackgroundTasksLoading(false);
     });
   }, [
-    liveCurrentSession?.longTask?.executorSessionId,
+    backgroundTasksRuntimeSessionId,
+    hasLongTaskMeta,
     longTaskInspectorOpen,
   ]);
+
+  // 按官方 tasks 的 kind 分组：subagent 进「子 Agent」卡，其余（bash/tool/未知）进「后台 Bash」卡
+  const { bashTasks, subagentTasks } = useMemo(
+    () => splitBackgroundTasksByKind(longTaskBackgroundTasks),
+    [longTaskBackgroundTasks],
+  );
 
   const copyBackgroundTaskOutput = async (task: LongTaskBackgroundTaskView) => {
     const res = await window.api.getKimiCodeBackgroundTaskOutput({
@@ -1546,11 +1558,11 @@ ${isFinalStep
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
 
   useEffect(() => {
-    if (!longTaskInspectorOpen || !liveCurrentSession?.longTask) return;
+    if (!longTaskInspectorOpen || !backgroundTasksRuntimeSessionId) return;
     const hasRunningTask = longTaskBackgroundTasks.some((task) => !isBackgroundTaskTerminalStatus(task.status));
     const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), hasRunningTask ? 2000 : 5000);
     return () => window.clearInterval(timer);
-  }, [longTaskBackgroundTasks, longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, refreshLongTaskBackgroundTasks]);
+  }, [backgroundTasksRuntimeSessionId, longTaskBackgroundTasks, longTaskInspectorOpen, liveCurrentSession?.id, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     if (!liveCurrentSession?.longTask) {
@@ -2028,6 +2040,8 @@ ${isFinalStep
             backgroundTasks={longTaskBackgroundTasks}
             backgroundTasksLoading={longTaskBackgroundTasksLoading}
             backgroundTasksError={longTaskBackgroundTasksError}
+            bashTasks={bashTasks}
+            subagentTasks={subagentTasks}
             sessionDiffs={sessionDiffs}
             btwState={btwState}
             btwDisabled={!liveCurrentSession || !activeMutationOwner || isMutationOwnerRunning}

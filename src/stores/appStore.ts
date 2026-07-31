@@ -6,7 +6,7 @@ import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
-const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "btw", "plan", "serverTree", "session", "diffs"];
+const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "subagentTasks", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
 const PENDING_NEW_SESSION_MODEL_KEY = "kimix_pending_new_session_model";
@@ -58,6 +58,15 @@ function writePendingNewSessionModel(model: string | null) {
   } catch {
     // Ignore local persistence errors; the in-memory value still updates.
   }
+}
+
+// 老用户迁移：把新增的「子 Agent」任务卡插到「后台 Bash」（background）之后，避免存量顺序里看不到新卡
+function placeSubagentTasksCard(order: RightSidebarCardId[], source: readonly RightSidebarCardId[]) {
+  if (source.includes("subagentTasks")) return order;
+  const withoutSubagentTasks: RightSidebarCardId[] = order.filter((item) => item !== "subagentTasks");
+  const backgroundIndex = withoutSubagentTasks.indexOf("background");
+  withoutSubagentTasks.splice(backgroundIndex >= 0 ? backgroundIndex + 1 : 0, 0, "subagentTasks");
+  return withoutSubagentTasks;
 }
 
 function placeNewSubagentCard(order: RightSidebarCardId[], source: readonly RightSidebarCardId[]) {
@@ -112,16 +121,16 @@ function readRightSidebarCardOrder(): RightSidebarCardId[] {
     const known = new Set<RightSidebarCardId>(DEFAULT_RIGHT_SIDEBAR_CARD_ORDER);
     const filtered = parsed.filter((item): item is RightSidebarCardId => known.has(item) && item !== ("goal" as unknown));
     if (!filtered.includes("longTaskStatus")) {
-      return placeNewSubagentCard([
+      return placeSubagentTasksCard(placeNewSubagentCard([
         "longTaskStatus",
         ...filtered,
         ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => item !== "longTaskStatus" && !filtered.includes(item)),
-      ], filtered);
+      ], filtered), filtered);
     }
-    return placeNewSubagentCard([
+    return placeSubagentTasksCard(placeNewSubagentCard([
       ...filtered,
       ...DEFAULT_RIGHT_SIDEBAR_CARD_ORDER.filter((item) => !filtered.includes(item)),
-    ], filtered);
+    ], filtered), filtered);
   } catch {
     return DEFAULT_RIGHT_SIDEBAR_CARD_ORDER;
   }
