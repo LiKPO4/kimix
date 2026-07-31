@@ -24,6 +24,7 @@ import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
+import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
 import { type DownloadProgressInfo } from "@/utils/format";
@@ -1417,6 +1418,12 @@ ${isFinalStep
     })).then((groups) => {
       setLongTaskBackgroundTasks(groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
     }).catch((err: unknown) => {
+      // 会话未激活/不存在是闲置会话的正常状态，静默回落为空态，不作为错误暴露给用户
+      if (isKimiCodeSessionUnavailableError(err)) {
+        setLongTaskBackgroundTasks([]);
+        setLongTaskBackgroundTasksError(null);
+        return;
+      }
       setLongTaskBackgroundTasksError(err instanceof Error ? err.message : String(err));
     }).finally(() => {
       if (!options?.silent) setLongTaskBackgroundTasksLoading(false);
