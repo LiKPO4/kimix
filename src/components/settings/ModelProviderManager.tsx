@@ -745,13 +745,26 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                         {model.adaptiveThinking ? "思考开" : "思考关"}
                       </button>
                     )}
-                    {model.isDefault ? (
-                      <span className="inline-flex items-center rounded-full bg-accent-primary text-[11px] leading-5 text-white" style={{ gap: 4, paddingLeft: 9, paddingRight: 10 }}><Check size={11} />默认</span>
-                    ) : (
-                      <button type="button" onClick={(event) => { event.stopPropagation(); void handleSetDefault(model.alias); }} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover">
-                        默认
-                      </button>
-                    )}
+                    {/* 与输入区 Swarm 模式同款：同一按钮组件，active 浅底色+勾 / 普通透明底，选中前后形式一致 */}
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); if (!model.isDefault) void handleSetDefault(model.alias); }}
+                      disabled={Boolean(busyAction)}
+                      aria-pressed={model.isDefault}
+                      title={model.isDefault ? "当前默认模型" : "设为默认模型"}
+                      className="kimix-icon-text-button is-compact border text-text-secondary hover:bg-surface-hover disabled:opacity-55"
+                      style={{
+                        gap: 6,
+                        paddingLeft: 12,
+                        paddingRight: 12,
+                        borderColor: model.isDefault ? "var(--accent-primary-soft)" : "transparent",
+                        backgroundColor: model.isDefault ? "var(--accent-primary-light)" : "transparent",
+                        color: model.isDefault ? "var(--accent-primary-dark)" : undefined,
+                      }}
+                    >
+                      {model.isDefault ? <Check size={13} /> : null}
+                      默认
+                    </button>
                     {!selectedProviderManaged && (
                       <button type="button" onClick={(event) => { event.stopPropagation(); void handleRemoveModel(model); }} disabled={Boolean(busyAction)} className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-accent-danger-light hover:text-accent-danger" aria-label={`删除 ${model.displayName || model.alias}`}>
                         <Trash2 size={13} />
