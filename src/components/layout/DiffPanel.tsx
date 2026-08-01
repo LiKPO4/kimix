@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, RefreshCw, X } from "lucide-react";
+import { ArrowUpDown, Check, FileText, RefreshCw, X } from "lucide-react";
 import type { PreviewFileInfo } from "@electron/types/ipc";
+import { PREVIEW_FILE_SORT_LABELS, PREVIEW_FILE_SORT_MODES, sortPreviewFiles, type PreviewFileSortMode } from "@/utils/previewFileSort";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -29,6 +30,8 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
   const [files, setFiles] = useState<PreviewFileInfo[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState("");
+  const [sortMode, setSortMode] = useState<PreviewFileSortMode>("default");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
 
   const loadFiles = async () => {
     if (!projectPath) {
@@ -57,6 +60,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPath, normalizedExtensions.join("|")]);
 
+  const sortedFiles = useMemo(() => sortPreviewFiles(files, sortMode), [files, sortMode]);
   const extensionText = normalizedExtensions.length > 0 ? normalizedExtensions.map((item) => `.${item}`).join("、") : "未配置";
 
   return (
@@ -98,15 +102,51 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
         <div className="kimix-soft-card" style={{ padding: "14px 14px 16px" }}>
           <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 12 }}>
             <div className="min-w-0 text-[13.5px] font-semibold leading-5 text-text-primary">可预览文件</div>
-            <span className="shrink-0 rounded-full bg-surface-hover text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
-              {files.length}
-            </span>
+            <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSortMenuOpen((open) => !open)}
+                  className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+                  aria-haspopup="menu"
+                  aria-expanded={sortMenuOpen}
+                  title="排序方式"
+                >
+                  <ArrowUpDown size={13} />
+                  {PREVIEW_FILE_SORT_LABELS[sortMode]}
+                </button>
+                {sortMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setSortMenuOpen(false)} />
+                    <div className="absolute right-0 z-50 rounded-xl border border-border-subtle bg-surface-elevated shadow-lg" style={{ top: "calc(100% + 6px)", minWidth: 118, padding: 6 }}>
+                      <div className="flex flex-col" style={{ gap: 2 }}>
+                        {PREVIEW_FILE_SORT_MODES.map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => { setSortMode(mode); setSortMenuOpen(false); }}
+                            className={`flex items-center rounded-lg text-left text-[13px] ${mode === sortMode ? "bg-accent-primary-light text-accent-primary" : "text-text-secondary hover:bg-surface-hover"}`}
+                            style={{ height: 32, paddingLeft: 10, paddingRight: 12, gap: 6 }}
+                          >
+                            <span className="flex w-4 shrink-0 items-center justify-center">{mode === sortMode ? <Check size={13} /> : null}</span>
+                            {PREVIEW_FILE_SORT_LABELS[mode]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <span className="shrink-0 rounded-full bg-surface-hover text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
+                {files.length}
+              </span>
+            </div>
           </div>
           {loadingList ? (
             <div className="text-[13px] leading-6 text-text-muted">正在读取文件列表...</div>
           ) : files.length > 0 ? (
             <div className="flex flex-col" style={{ gap: 8 }}>
-              {files.map((file) => (
+              {sortedFiles.map((file) => (
                 <button
                   key={file.path}
                   type="button"
