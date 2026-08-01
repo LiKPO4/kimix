@@ -276,35 +276,36 @@
 /* ── 界面风格覆盖 ── */
 /* 置于 [data-theme] 之后，保证浅色/深色下都生效；边框等变量会被色彩方案以内联样式写入根元素，需 !important 覆盖。 */
 
-/* 现代化：扁平干净（Linear/Notion 风）。中小圆角收紧、阴影基本去除、hairline 细边框 */
+/* 现代化：静谧效率（Linear/Raycast/Vercel 风）。hairline 细边框是唯一分层手段、几乎无阴影、统一中小圆角、零多余装饰 */
 [data-ui-style="modern"] {
-  --ui-radius-sm: 4px;
+  /* 统一中小圆角：不大不小求精确 */
+  --ui-radius-sm: 6px;
   --ui-radius-md: 6px;
   --ui-radius-lg: 6px;
   --ui-radius-xl: 8px;
   --ui-radius-2xl: 10px;
-  --ui-radius-sm-token: 4px;
+  --ui-radius-sm-token: 6px;
   --ui-radius-md-token: 6px;
   --ui-radius-lg-token: 10px;
   /* 同步收紧直接引用 var(--radius-*) 的位置 */
-  --radius-sm: 4px;
+  --radius-sm: 6px;
   --radius-md: 6px;
   --radius-lg: 10px;
-  /* 阴影基本去除：仅保留极浅浮层分离感 */
+  /* 几乎无阴影：浮层仅用 hairline ring 分离，无模糊投影 */
   --shadow-hover: none;
-  --shadow-elevated: 0 1px 2px rgba(25, 23, 20, 0.04);
-  --shadow-floating: 0 2px 8px rgba(25, 23, 20, 0.06);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(25, 23, 20, 0.06);
-  /* hairline 细分隔边框：基于配色推导值向面板底色混合 */
-  --border-subtle: color-mix(in srgb, var(--border-default) 35%, var(--surface-base)) !important;
+  --shadow-elevated: none;
+  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  /* hairline 细分隔边框：基于配色推导值向面板底色混合（30% 比默认更浅） */
+  --border-subtle: color-mix(in srgb, var(--border-default) 30%, var(--surface-base)) !important;
   /* 配色方案内联写入的浮层阴影一并扁平化 */
   --kimix-composer-shadow: none !important;
-  --kimix-float-shadow: 0 2px 8px rgba(25, 23, 20, 0.06) !important;
+  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* 复古：像素硬阴影。近直角、实线边框、无模糊纯偏移硬阴影；深色主题的硬阴影适配见下方叠加规则 */
+/* 复古：浮雕面板（Win95/98 经典 OS bevel 风）。直角、灰色面板基底、明暗双边框凹凸感；浮雕载体规则见下方 */
 [data-ui-style="retro"] {
-  /* 复古圆角统一为 0：彻底直角，避免 0 与 2px 混排造成的圆角不统一 */
+  /* 复古圆角统一为 0：彻底直角 */
   --ui-radius-sm: 0px;
   --ui-radius-md: 0px;
   --ui-radius-lg: 0px;
@@ -316,48 +317,70 @@
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
-  /* offset 硬阴影：无模糊纯偏移的像素色块 */
-  --shadow-hover: 2px 2px 0 rgba(0, 0, 0, 0.55);
-  --shadow-elevated: 3px 3px 0 rgba(0, 0, 0, 0.55);
-  --shadow-floating: 4px 4px 0 rgba(0, 0, 0, 0.55);
-  --shadow-overlay: 4px 4px 0 rgba(0, 0, 0, 0.55);
-  /* 硬朗实线边框：层级上移，仍跟随配色方案色相（沿用既有覆盖逻辑） */
-  --border-subtle: var(--border-default) !important;
-  --border-default: var(--border-strong) !important;
-  /* 配色方案内联写入的浮层阴影改为硬阴影 */
-  --kimix-composer-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55) !important;
-  --kimix-float-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55) !important;
+  /* 面板灰基底：向中性灰微调，营造经典桌面“面板灰”（配色方案内联注入需 !important） */
+  --surface-ground: #DEDCD7 !important;
+  --surface-base: #F0EFEA !important;
+  /* 去除模糊阴影：立体感全部由浮雕双色边承担，浮层仅保留外框 */
+  --shadow-hover: none;
+  --shadow-elevated: none;
+  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.28);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.28);
+  /* 浮雕外框色 */
+  --border-subtle: rgba(0, 0, 0, 0.20) !important;
+  --border-default: rgba(0, 0, 0, 0.28) !important;
+  /* 配色方案内联写入的浮层阴影一并去除 */
+  --kimix-composer-shadow: none !important;
+  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28) !important;
 }
 
-/* 深色主题下的复古硬阴影：改用半透明亮色偏移，保证深色背景上可见 */
+/* 深色主题下的复古：面板灰基底适配深色，浮雕亮/暗边反相（亮边半透明白、暗边半透明黑） */
 [data-theme="dark"][data-ui-style="retro"] {
-  --shadow-hover: 2px 2px 0 rgba(255, 255, 255, 0.28);
-  --shadow-elevated: 3px 3px 0 rgba(255, 255, 255, 0.28);
-  --shadow-floating: 4px 4px 0 rgba(255, 255, 255, 0.28);
-  --shadow-overlay: 4px 4px 0 rgba(255, 255, 255, 0.28);
-  --kimix-composer-shadow: 2px 2px 0 rgba(255, 255, 255, 0.28) !important;
-  --kimix-float-shadow: 4px 4px 0 rgba(255, 255, 255, 0.28) !important;
+  --surface-ground: #141311 !important;
+  --surface-base: #28261F !important;
+  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  --border-subtle: rgba(0, 0, 0, 0.40) !important;
+  --border-default: rgba(0, 0, 0, 0.55) !important;
+  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55) !important;
 }
 
-/* 复古载体：主要卡片/分区卡落实线边框 + 像素硬阴影 + 直角，一眼可辨像素风 */
+/* 复古浮雕·凸起 raised：主要卡片/面板（上左亮边、下右暗边）。注意 .kimix-settings-section 是透明布局容器，一律不施加浮雕 */
 [data-ui-style="retro"] .kimix-soft-card,
 [data-ui-style="retro"] .kimix-soft-card-strong,
 [data-ui-style="retro"] .kimix-settings-card,
 [data-ui-style="retro"] .kimix-settings-theme,
 [data-ui-style="retro"] .kimix-settings-uistyle,
 [data-ui-style="retro"] .kimix-settings-palette-wrap {
-  border: 1.5px solid var(--border-default);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 0 rgba(0, 0, 0, 0.22);
   border-radius: 0;
 }
 
+/* 复古浮雕·凹陷 sunken：输入框/文本域/聊天滚动区（上左暗边、下右亮边） */
+[data-ui-style="retro"] .kimix-settings-input,
+[data-ui-style="retro"] textarea,
+[data-ui-style="retro"] .kimix-chat-scroll-area {
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.16), inset -1px -1px 0 rgba(255, 255, 255, 0.6);
+  border-radius: 0;
+}
+
+/* 深色主题浮雕适配：亮/暗边反相（亮边半透明白、暗边半透明黑） */
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card-strong,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-theme,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-uistyle,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-palette-wrap {
-  box-shadow: 3px 3px 0 rgba(255, 255, 255, 0.12);
+  border-color: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.14), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-input,
+[data-theme="dark"][data-ui-style="retro"] textarea,
+[data-theme="dark"][data-ui-style="retro"] .kimix-chat-scroll-area {
+  border-color: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */
