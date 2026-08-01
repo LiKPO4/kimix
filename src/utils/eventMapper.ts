@@ -814,6 +814,36 @@ function createChangeSummaryFromToolCall(
   return null;
 }
 
+// 官方 tool_result 未带 display.diff 时（如 Server 路由），从 tool_call 参数派生近似 diff 事件，
+// 让「最近变更」与 change_preview 也能取到记录；与 change_summary 同 path，渲染层会去重。
+function createDiffEventFromToolCall(
+  call: Extract<TimelineEvent, { type: "tool_call" }>,
+  timestamp: number,
+  sourceId: string,
+): TimelineEvent | null {
+  const toolName = call.toolName.toLowerCase();
+  if (!["write", "edit", "multiedit"].some((name) => toolName.includes(name))) return null;
+  const args = call.arguments ?? {};
+  const path = firstStringValue(args, ["path", "filePath", "file_path"]);
+  if (!path) return null;
+  const newText = firstStringValue(args, ["content", "newString", "new_string", "replacement", "text"]);
+  // 删除/无新内容时不生成 diff（change_summary 已覆盖删除场景，且没有可对比的旧内容）
+  if (newText === undefined) return null;
+  const oldText = firstStringValue(args, ["oldString", "old_string", "oldText", "old_text"]) ?? "";
+  return {
+    id: derivedEventId(sourceId, "diff"),
+    type: "diff",
+    timestamp,
+    filePath: path,
+    oldText,
+    newText,
+    roomAgentId: call.roomAgentId,
+    roomMessageId: call.roomMessageId,
+    agentTurnId: call.agentTurnId,
+    dispatchAttemptId: call.dispatchAttemptId,
+  };
+}
+
 function toolResultText(result: unknown) {
   if (typeof result === "string") return result;
   if (isRecord(result) && typeof result.output === "string") return result.output;
@@ -2426,7 +2456,14 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       const fallbackChangeEvent = displayEvents.length === 0
         ? createChangeSummaryFromToolCall(call, incoming.timestamp, derivedSourceId)
         : null;
-      const merged = upsertDerivedToolEvents(result, incoming.toolCallId, fallbackChangeEvent ? [fallbackChangeEvent] : displayEvents);
+      const fallbackDiffEvent = displayEvents.length === 0
+        ? createDiffEventFromToolCall(call, incoming.timestamp, derivedSourceId)
+        : null;
+      const fallbackEvents = [
+        ...(fallbackChangeEvent ? [fallbackChangeEvent] : []),
+        ...(fallbackDiffEvent ? [fallbackDiffEvent] : []),
+      ];
+      const merged = upsertDerivedToolEvents(result, incoming.toolCallId, fallbackEvents.length > 0 ? fallbackEvents : displayEvents);
       const updatedCallIndex = merged.findIndex((event) => event.type === "tool_call" && event.toolCallId === incoming.toolCallId);
       const updatedCall = updatedCallIndex >= 0 && merged[updatedCallIndex].type === "tool_call" ? merged[updatedCallIndex] : null;
       const commitSha = updatedCall?.type === "tool_call" ? gitCommitShaFromToolCall(updatedCall) : undefined;

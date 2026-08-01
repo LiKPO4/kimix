@@ -1533,6 +1533,30 @@ describe("mergeEvents", () => {
     expect(diff.filePath).toBe("src/app.ts");
   });
 
+  it("derives change summary and diff from tool_call args when tool_result has no display.diff", () => {
+    // Server 路由的 tool_result 不带 display.diff：fallback 从 tool_call 参数同时派生
+    // change_summary（对话流变更卡）与 diff 事件（「最近变更」/change_preview），对齐两条链路。
+    const existing: TimelineEvent[] = [
+      { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-1", toolName: "Edit", status: "running", arguments: { file_path: "src/app.ts", old_string: "before", new_string: "after\nmore" } },
+    ];
+    const incoming: TimelineEvent = {
+      id: "2",
+      type: "tool_result",
+      timestamp: 2,
+      toolCallId: "tc-1",
+      toolName: "Edit",
+      result: "ok",
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary", "diff"]);
+    const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
+    expect(change.files[0].path).toBe("src/app.ts");
+    const diff = result[2] as Extract<TimelineEvent, { type: "diff" }>;
+    expect(diff.filePath).toBe("src/app.ts");
+    expect(diff.oldText).toBe("before");
+    expect(diff.newText).toBe("after\nmore");
+  });
+
   it("counts an equal-line structured replacement as both an addition and deletion", () => {
     const existing: TimelineEvent[] = [
       { id: "1", type: "tool_call", timestamp: 1, toolCallId: "tc-replace", toolName: "edit", status: "running", arguments: {} },
@@ -1648,10 +1672,14 @@ describe("mergeEvents", () => {
       result: "Wrote 4 bytes",
     };
     const result = mergeEvents(existing, incoming);
-    expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary"]);
+    // fallback 现在也同时派生 diff 事件（「最近变更」/change_preview 对齐）
+    expect(result.map((event) => event.type)).toEqual(["tool_call", "change_summary", "diff"]);
     const change = result[1] as Extract<TimelineEvent, { type: "change_summary" }>;
     expect(change.files[0].path).toBe("plans/next.md");
     expect(change.additions).toBe(2);
+    const diff = result[2] as Extract<TimelineEvent, { type: "diff" }>;
+    expect(diff.filePath).toBe("plans/next.md");
+    expect(diff.newText).toBe("a\nb\n");
   });
 
   it("keeps replayed changes beside their original tool instead of attaching them to a later failed turn", () => {
