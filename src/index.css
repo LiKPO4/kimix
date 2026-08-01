@@ -135,6 +135,8 @@
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 20px;
+  /* --ui-radius-* 由界面风格（[data-ui-style]）注入；默认风格不设置，
+     rounded-* 经 tailwind.config.ts 的 fallback 回退为 6/12/8/12/16px，视觉不变 */
 
   /* Shadow Tokens */
   --shadow-hover: 0 2px 8px rgba(25, 23, 20, 0.06);
@@ -274,32 +276,90 @@
 /* ── 界面风格覆盖 ── */
 /* 置于 [data-theme] 之后，保证浅色/深色下都生效；边框等变量会被色彩方案以内联样式写入根元素，需 !important 覆盖。 */
 
+/* 现代化：扁平干净（Linear/Notion 风）。中小圆角收紧、阴影基本去除、hairline 细边框 */
 [data-ui-style="modern"] {
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 26px;
-  --shadow-hover: 0 4px 14px rgba(25, 23, 20, 0.05);
-  --shadow-elevated: 0 12px 32px rgba(25, 23, 20, 0.07), 0 3px 8px rgba(25, 23, 20, 0.03);
-  --shadow-floating: 0 28px 72px rgba(25, 23, 20, 0.10), 0 10px 24px rgba(25, 23, 20, 0.05);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 28px 72px rgba(25, 23, 20, 0.10), 0 10px 24px rgba(25, 23, 20, 0.05);
-  /* 更浅更柔的细分隔边框：基于配色推导值向面板底色混合 */
-  --border-subtle: color-mix(in srgb, var(--border-default) 45%, var(--surface-base)) !important;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 6px;
+  --ui-radius-xl: 8px;
+  --ui-radius-2xl: 10px;
+  --ui-radius-sm-token: 4px;
+  --ui-radius-md-token: 6px;
+  --ui-radius-lg-token: 10px;
+  /* 同步收紧直接引用 var(--radius-*) 的位置 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  /* 阴影基本去除：仅保留极浅浮层分离感 */
+  --shadow-hover: none;
+  --shadow-elevated: 0 1px 2px rgba(25, 23, 20, 0.04);
+  --shadow-floating: 0 2px 8px rgba(25, 23, 20, 0.06);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(25, 23, 20, 0.06);
+  /* hairline 细分隔边框：基于配色推导值向面板底色混合 */
+  --border-subtle: color-mix(in srgb, var(--border-default) 35%, var(--surface-base)) !important;
+  /* 配色方案内联写入的浮层阴影一并扁平化 */
+  --kimix-composer-shadow: none !important;
+  --kimix-float-shadow: 0 2px 8px rgba(25, 23, 20, 0.06) !important;
 }
 
+/* 复古：像素硬阴影。近直角、实线边框、无模糊纯偏移硬阴影；深色主题的硬阴影适配见下方叠加规则 */
 [data-ui-style="retro"] {
+  --ui-radius-sm: 0px;
+  --ui-radius-md: 2px;
+  --ui-radius-lg: 0px;
+  --ui-radius-xl: 2px;
+  --ui-radius-2xl: 2px;
+  --ui-radius-sm-token: 0px;
+  --ui-radius-md-token: 2px;
+  --ui-radius-lg-token: 2px;
   --radius-sm: 0px;
   --radius-md: 2px;
   --radius-lg: 4px;
-  --shadow-hover: none;
-  --shadow-elevated: none;
-  --shadow-floating: 0 2px 10px rgba(0, 0, 0, 0.12);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.12);
-  /* 硬朗实线边框：整体提升一级对比度，仍跟随配色方案色相 */
+  /* offset 硬阴影：无模糊纯偏移的像素色块 */
+  --shadow-hover: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  --shadow-elevated: 3px 3px 0 rgba(0, 0, 0, 0.55);
+  --shadow-floating: 4px 4px 0 rgba(0, 0, 0, 0.55);
+  --shadow-overlay: 4px 4px 0 rgba(0, 0, 0, 0.55);
+  /* 硬朗实线边框：层级上移，仍跟随配色方案色相（沿用既有覆盖逻辑） */
   --border-subtle: var(--border-default) !important;
   --border-default: var(--border-strong) !important;
-  /* 扁平化配色方案内联写入的浮层阴影 */
-  --kimix-composer-shadow: none !important;
-  --kimix-float-shadow: 0 2px 10px rgba(0, 0, 0, 0.12) !important;
+  /* 配色方案内联写入的浮层阴影改为硬阴影 */
+  --kimix-composer-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55) !important;
+  --kimix-float-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55) !important;
+}
+
+/* 深色主题下的复古硬阴影：改用半透明亮色偏移，保证深色背景上可见 */
+[data-theme="dark"][data-ui-style="retro"] {
+  --shadow-hover: 2px 2px 0 rgba(255, 255, 255, 0.28);
+  --shadow-elevated: 3px 3px 0 rgba(255, 255, 255, 0.28);
+  --shadow-floating: 4px 4px 0 rgba(255, 255, 255, 0.28);
+  --shadow-overlay: 4px 4px 0 rgba(255, 255, 255, 0.28);
+  --kimix-composer-shadow: 2px 2px 0 rgba(255, 255, 255, 0.28) !important;
+  --kimix-float-shadow: 4px 4px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+/* 复古载体：主要卡片/分区卡落实线边框 + 像素硬阴影 + 直角，一眼可辨像素风 */
+[data-ui-style="retro"] .kimix-soft-card,
+[data-ui-style="retro"] .kimix-soft-card-strong,
+[data-ui-style="retro"] .kimix-settings-card,
+[data-ui-style="retro"] .kimix-settings-section {
+  border: 1.5px solid var(--border-default);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.16);
+  border-radius: 2px;
+}
+
+[data-theme="dark"][data-ui-style="retro"] .kimix-soft-card,
+[data-theme="dark"][data-ui-style="retro"] .kimix-soft-card-strong,
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-card,
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-section {
+  box-shadow: 3px 3px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */
+[data-ui-style="retro"] .kimix-settings-badge,
+[data-ui-style="retro"] .kimix-settings-section-title,
+[data-ui-style="retro"] .kimix-tabular-nums {
+  font-family: var(--font-mono);
 }
 
 /* ── Base ── */

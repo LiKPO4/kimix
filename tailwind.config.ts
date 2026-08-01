@@ -61,13 +61,16 @@ export default {
           composer: 'var(--bg-composer)',
         },
       },
+      /* 全部 rounded-* 映射到界面风格变量 --ui-radius-*；fallback 精确等于原固定值，保证默认风格视觉不变 */
       borderRadius: {
-        '2xl': '16px',
-        'xl': '12px',
-        'lg': '8px',
-        'md-token': 'var(--radius-md)',
-        'sm-token': 'var(--radius-sm)',
-        'lg-token': 'var(--radius-lg)',
+        'sm': 'var(--ui-radius-sm, 6px)',
+        'md': 'var(--ui-radius-md, 12px)',
+        'lg': 'var(--ui-radius-lg, 8px)',
+        'xl': 'var(--ui-radius-xl, 12px)',
+        '2xl': 'var(--ui-radius-2xl, 16px)',
+        'md-token': 'var(--ui-radius-md-token, var(--radius-md))',
+        'sm-token': 'var(--ui-radius-sm-token, var(--radius-sm))',
+        'lg-token': 'var(--ui-radius-lg-token, var(--radius-lg))',
       },
       boxShadow: {
         'hover-token': 'var(--shadow-hover)',

@@ -17,8 +17,8 @@ export interface UiStylePreset {
  */
 export const UI_STYLES: UiStylePreset[] = [
   { id: "default", label: "Kimix 默认", description: "当前视觉，柔和圆角与轻盈阴影。" },
-  { id: "modern", label: "现代化", description: "更圆润的边角、更柔和的浮感与边框。" },
-  { id: "retro", label: "复古", description: "近直角、去阴影、实线边框的硬朗扁平质感。" },
+  { id: "modern", label: "现代化", description: "扁平干净：去除阴影、hairline 细边框与收紧的中小圆角。" },
+  { id: "retro", label: "复古", description: "像素硬阴影：近直角、实线边框、偏移硬阴影与等宽字体点缀。" },
 ];
 
 export function normalizeUiStyleId(value: unknown): UiStyleId {
