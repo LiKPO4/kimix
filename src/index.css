@@ -330,14 +330,21 @@
 /* 现代化：Codex 式静谧工作台。
    以完整选中胶囊、大圆角内容壳、轻量悬浮层次建立身份；颜色仍完全来自当前主题。 */
 [data-ui-style="modern"] {
-  --ui-radius-sm: 10px;
-  --ui-radius-md: 14px;
-  --ui-radius-lg: 18px;
-  --ui-radius-xl: 20px;
-  --ui-radius-2xl: 22px;
-  --ui-radius-sm-token: 10px;
-  --ui-radius-md-token: 14px;
+  /* 通用 utility 圆角保持递进；大壳层使用下方角色 token，不再把所有 rounded-* 一起放大。 */
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 10px;
+  --ui-radius-lg: 12px;
+  --ui-radius-xl: 14px;
+  --ui-radius-2xl: 18px;
+  --ui-radius-sm-token: 8px;
+  --ui-radius-md-token: 12px;
   --ui-radius-lg-token: 18px;
+  --kimix-modern-control-radius: 10px;
+  --kimix-modern-card-radius: 14px;
+  --kimix-modern-panel-radius: 18px;
+  --kimix-modern-shell-radius: 20px;
+  --kimix-modern-segment-gap: 6px;
+  --kimix-modern-segment-radius: calc(var(--kimix-modern-control-radius) + var(--kimix-modern-segment-gap));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
@@ -409,7 +416,7 @@
 /* 主工作区像一张安静的桌面卡片；侧栏仍使用颜色主题提供的 ground 色。 */
 [data-ui-style="modern"] .kimix-app-shell-main {
   border: 1px solid var(--ui-shell-border-color);
-  border-radius: 20px;
+  border-radius: var(--kimix-modern-shell-radius);
   box-shadow: var(--kimix-modern-surface-shadow);
 }
 
@@ -425,13 +432,13 @@
 [data-ui-style="modern"] .kimix-settings-entry,
 [data-ui-style="modern"] .kimix-settings-navigation-item,
 [data-ui-style="modern"] .kimix-settings-search-result {
-  border-radius: var(--radius-sm);
+  border-radius: var(--kimix-modern-control-radius);
 }
 
 /* 输入区是主界面的轻悬浮锚点，textarea 不再成为第二层边框。 */
 [data-ui-style="modern"] .kimix-composer-card {
   border-color: transparent;
-  border-radius: 18px;
+  border-radius: var(--kimix-modern-panel-radius);
   box-shadow: var(--kimix-modern-elevated-shadow);
 }
 
@@ -456,30 +463,39 @@
 [data-ui-style="modern"] .kimix-onboarding-card,
 [data-ui-style="modern"] .kimix-settings-panel:not(.is-workspace) {
   border: var(--ui-popup-border);
-  border-radius: 18px !important;
+  border-radius: var(--kimix-modern-panel-radius) !important;
   background: var(--ui-popup-background);
   box-shadow: var(--ui-popup-shadow);
   backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 
 [data-ui-style="modern"] .kimix-menu-item {
-  border-radius: 10px;
+  border-radius: var(--kimix-modern-control-radius);
 }
 
 [data-ui-style="modern"] .kimix-soft-card,
 [data-ui-style="modern"] .kimix-soft-card-strong,
 [data-ui-style="modern"] .kimix-settings-card,
-[data-ui-style="modern"] .kimix-settings-theme,
 [data-ui-style="modern"] .kimix-settings-uistyle,
 [data-ui-style="modern"] .kimix-settings-palette-wrap {
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: var(--kimix-modern-card-radius);
   box-shadow: none;
+}
+
+/* 主题分段控件是明确的嵌套表面：16px 外壳 = 10px 选项 + 6px 内边距。 */
+[data-ui-style="modern"] .kimix-settings-panel.is-workspace .kimix-settings-theme-grid {
+  border-radius: var(--kimix-modern-segment-radius);
+  padding: var(--kimix-modern-segment-gap);
+}
+
+[data-ui-style="modern"] .kimix-settings-panel.is-workspace .kimix-settings-theme {
+  border-radius: var(--kimix-modern-control-radius);
 }
 
 [data-ui-style="modern"] .kimix-settings-input {
   border: var(--ui-field-border);
-  border-radius: 10px;
+  border-radius: var(--kimix-modern-control-radius);
   box-shadow: var(--ui-field-shadow);
 }
 
@@ -594,8 +610,7 @@
 }
 
 [data-ui-style="retro"] .kimix-app-shell-main {
-  border-color: var(--ui-shell-border-color);
-  border-left-width: 0;
+  border: 1px solid var(--ui-shell-border-color);
   box-shadow: none;
 }
 

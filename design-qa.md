@@ -1,53 +1,49 @@
-# Design QA — Modern / Codex-inspired interface v2.20.97
+# Design QA — Shell borders and nested radii v2.20.98
 
 final result: passed
 
 ## Source visual truth
 
-- Main workspace: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-442284a9-dcac-48e9-a22d-de0679bd8d1b.png`
-- Settings: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-d79ac185-03a9-4622-af9d-4a33ad3614ef.png`
-- Plugins: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-b412db64-3192-45fd-8402-e16ad482639e.png`
+- Retro clipped shell edge: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-555f9d8b-d1d2-4379-9014-e4dedb934fbe.png`
+- Modern reversed nested radii: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-3f74816f-b2d6-4a6f-8f09-c7127c5c0863.png`
 
 ## Implementation evidence
 
-- Main workspace: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22097/01-main.jpg`
-- Settings: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22097/02-settings.jpg`
-- Plugins: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22097/03-plugins.jpg`
-- Source screenshots are 1200 × 760 pixels. Kimix implementation screenshots are 1280 × 800 pixels at the app's 1280 × 800 CSS viewport and 1× capture density.
-- Comparison normalization: both sets were compared at native 1× density. The 80 × 40 viewport difference was treated as surrounding desktop-frame variance; major-region proportions, control scale, radii, and spacing rhythm were compared rather than raw coordinate equality.
-- State: light theme, warm-paper color scheme, Modern interface style selected. Main workspace idle; Settings on Appearance; Plugins on Skills.
+- Modern settings: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22098/01-modern-settings.png`
+- Retro settings: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22098/02-retro-settings.png`
+- Retro conversation: `C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22098/03-retro-main.png`
+- All implementation captures use the running v2.20.98 Electron window at 1280 × 800 and 1× capture density.
+- State: light theme, warm-paper color scheme; Settings on Appearance for both styles, then the existing conversation workspace in Retro.
+
+## Audit scope
+
+- Main shell: outer corners, all four structural edges, overflow clipping, title toolbar junction, settings and conversation variants.
+- Nested surfaces: theme segmented control, interface-style cards, palette cards with action columns, Composer, floating panels, menu items, navigation pills, split controls, and ContextBar.
+- Radius ownership: global utility scale versus role tokens for controls, cards, panels, and the main shell.
+- Color ownership: no interface-style rule takes control of theme surface, text, accent, semantic, or border colors.
 
 ## Full-view comparison evidence
 
-- Main workspace: the reference's warm quiet sidebar, complete selected navigation pill, large rounded content shell, restrained top controls, and floating composer are all represented. Kimix retains its own toolbar and ContextBar because this preset changes visual language rather than product structure.
-- Settings: the implementation carries the same flat left navigation, full-pill selection, large clean content shell, hairline cards, and generous rounded sections. The active warm-paper palette remains intentionally different because color themes are independently user-selectable.
-- Plugins: the implementation carries the same quiet sidebar, rounded main shell, flat header controls, and soft content surfaces. Kimix keeps its denser Skill-card information architecture rather than imitating Codex's marketplace rows.
-
-The full 1280 × 800 captures keep labels, radii, selection states, card spacing, and icon alignment readable, and the three separate page captures already isolate the key surfaces; additional crops were not needed.
-
-## Required fidelity surfaces
-
-- Fonts and typography: existing Kimix font ownership and hierarchy are preserved; no font substitution was made by the style preset. Text weights, truncation, antialiasing, and line heights remain coherent across all three pages.
-- Spacing and layout rhythm: 18–20px outer shells, 14px content cards, 10px navigation pills, and 18px floating panels establish the reference's calmer rhythm without collapsing Kimix's existing 12–16px internal spacing rules.
-- Colors and visual tokens: no `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` token is assigned by Modern. All visible colors continue to come from the selected warm-paper theme; only neutral translucent depth overlays are style-owned.
-- Image quality and asset fidelity: the target contains no required illustrative or photographic assets. Existing Lucide/product icons remain vector-sharp; no placeholder, CSS art, inline SVG substitute, or generated image was introduced.
-- Copy and content: all Kimix copy and real runtime content remain unchanged. Only the Modern preset description was updated to name its Codex-inspired shell language.
-- States and interactions: switching Default → Modern, returning to chat, navigating to Plugins, returning to an existing session, active project/session pills, toolbar split controls, and composer idle state were exercised in the running Electron app.
+- Retro settings and conversation now show the main shell's left edge continuously from the upper-left corner to the lower-left corner. The sidebar still has no independent decorative full-height divider, so the restored edge communicates the content shell rather than splitting the sidebar.
+- Modern's theme selector now has a 16px outer radius and a 10px option radius separated by 6px on every side. The active option no longer bulges beyond the outer contour.
+- Modern cards, panels, Composer, menus, and the main shell now use explicit 14px, 18px, and 20px role radii. Small generic controls use 10px or less, preventing a utility class from accidentally acquiring shell-scale curvature.
+- Full-bleed toolbar children clipped by the 20px main shell were treated as part of the shell, not as separate inset surfaces; no artificial inner corner was added where there is no visible inset.
 
 ## Findings
 
-- No actionable P0/P1/P2 findings remain.
-- [P3] Kimix Plugins remains a denser two-column card workspace while the Codex reference uses flatter marketplace rows. This is an intentional product-architecture difference; changing it belongs to a Plugins page redesign, not a global style preset.
-- [P3] The selected warm-paper theme produces a grayer main content field than the Codex reference. This is expected: the user explicitly requires interface style and color theme to remain orthogonal.
+- No actionable P0/P1/P2 findings remain in the audited shell/radius scope.
+- [P3] Retro and Modern intentionally keep different curvature density: Retro uses small Platinum corners, while Modern uses a large Codex-inspired shell. Their shared invariant is complete structural edges and role-correct nesting, not identical numeric radii.
+- [P3] Palette rows with dedicated action columns are one clipped card surface; transparent action cells therefore do not need their own inner radii.
+
+## Regression gates
+
+- [x] Retro main shell declares a complete 1px border and cannot reintroduce `border-left-width: 0`.
+- [x] Modern nested segment derives its outer radius from control radius plus inset.
+- [x] Modern utility radii remain monotonic and separate from role-specific shell radii.
+- [x] Interface styles remain color-theme-neutral.
+- [x] Running Electron verification covers Modern settings, Retro settings, and Retro conversation shell.
 
 ## Comparison history
 
-- Initial implementation review: no P0/P1/P2 mismatch was found after the first clean v2.20.97 build. The three implementation screenshots were compared in the same visual pass as their corresponding source screenshots, so no corrective iteration was required.
-
-## Implementation checklist
-
-- [x] Complete quiet navigation selection without a leading accent stripe.
-- [x] Large rounded main, composer, settings-card, menu, and floating-panel shells.
-- [x] Restrained flat controls plus softly elevated compound/floating surfaces.
-- [x] Color-theme ownership regression gate.
-- [x] Running Electron interaction and three-screen visual verification.
+- v2.20.97 exposed the defect: removing the retro divider was implemented by deleting a structural shell edge, while Modern enlarged global utility radii and produced a 10px outer / 14px inner segment.
+- v2.20.98 fixes both causes at the contract level. No screenshot-only compensating overlay, negative offset, or one-page exception was introduced.

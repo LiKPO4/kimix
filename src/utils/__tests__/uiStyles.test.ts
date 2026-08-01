@@ -48,11 +48,15 @@ describe("UI_STYLES", () => {
 
     expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
     expect(styleBlocks).toMatch(/--ui-selection-shadow:\s*none;/);
-    expect(styleBlocks).toMatch(/--ui-radius-lg:\s*18px;/);
+    expect(styleBlocks).toMatch(/--ui-radius-lg:\s*12px;/);
+    expect(styleBlocks).toMatch(/--kimix-modern-segment-radius:\s*calc\(var\(--kimix-modern-control-radius\) \+ var\(--kimix-modern-segment-gap\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
     expect(css).toContain('[data-ui-style="modern"] .kimix-app-shell-main');
     expect(css).toContain('[data-ui-style="modern"] .kimix-composer-card');
     expect(css).toContain('[data-ui-style="modern"] .kimix-floating-panel');
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);[^}]*padding:\s*var\(--kimix-modern-segment-gap\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme\s*\{[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);/s);
+    expect(css).not.toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-theme,/);
   });
 
   it("复古风格通过语义令牌覆盖控件且 Composer 输入区只有一个边界所有者", () => {
@@ -81,6 +85,8 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-sidebar-session-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar-project-row:hover/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar\s*\{[\s\S]*?box-shadow:\s*inset\s+-1px/);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-app-shell-main\s*\{[^}]*border:\s*1px solid var\(--ui-shell-border-color\);/s);
+    expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-app-shell-main\s*\{[^}]*border-left-width:\s*0;/s);
   });
 
   it("按钮开启态与纵向导航选中态使用不同的视觉语法", () => {

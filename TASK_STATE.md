@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 修复：复古壳层边框与现代嵌套圆角（v2.20.98）
+
+- 根因一：v2.20.96 为移除无语义的侧栏分隔线，错误地在复古 `.kimix-app-shell-main` 上设置 `border-left-width: 0`，把主内容壳本身的结构边框也一并删除，设置页与对话页左边缘因此像被裁切。
+- 根因二：v2.20.97 将 Modern 的全局 `rounded-*` 工具档位整体放大，同时把设置主题选项纳入通用卡片圆角，造成主题分段控件外壳 10px、内部选中块 14px 的反向嵌套；大壳层与小控件缺少角色化圆角边界。
+- 修复：复古主壳恢复完整 1px 四边结构边框，装饰分隔继续保持关闭；Modern 拆分 control/card/panel/shell 四级角色圆角，通用 utility 恢复递进尺度，主题分段控件固定为外 16px = 内 10px + 6px 间距。
+- 实机验收：Windows 直接操作 v2.20.98，现代设置页同心圆角、复古设置页完整左边框、复古对话页完整左边框均通过；证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22098/01-modern-settings.png`、`02-retro-settings.png`、`03-retro-main.png`。详细结论见根目录 `design-qa.md`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、清缓存生产构建（renderer CSS `assets/index-D_k4R3YX.css`、JS `assets/index--ouAyPud.js`）、OKF strict/audit 校验（12 concepts、375 links）通过。
+
 ## 2026-08-01 重做：现代化风格转向 Codex 式静谧工作台（v2.20.97）
 
 - 根因：旧“现代化”只把默认 Kimix 的圆角统一压到 6px、删除阴影并淡化 hairline，默认本身又已经是现代视觉，导致两者只有数值差异、没有可辨识的设计身份；同时旧规则直接覆盖 `--border-subtle`，越过了“界面风格不接管颜色主题”的边界。

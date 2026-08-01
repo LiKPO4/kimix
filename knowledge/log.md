@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Shell borders and nested radii are structural invariants (v2.20.98)**: removing an ornamental divider may not delete one edge of the main shell, and Modern now separates control/card/panel/shell radius roles instead of inflating every utility radius. Adjacent nested surfaces follow `outer radius = inner radius + inset`; the settings theme segment is fixed at 16px/10px/6px. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Modern is a Codex-inspired shell preset, not a flattened Default variant (v2.20.97)**: Modern now uses complete quiet navigation pills, 18–20px content/composer shells, softly elevated floating surfaces, and restrained flat controls while continuing to consume the active color theme. It does not redefine theme color tokens or restructure business layouts. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Navigation selection and button modes use separate state tokens (v2.20.96)**: `--ui-selection-*` is now directional and limited to vertical navigation, while `--ui-toggle-*` gives Swarm, Plan, pressed, and expanded buttons a complete recessed surface without a leading accent stripe. Ordinary navigation and window controls stay flat at rest; only compound launch/open controls retain a persistent shared boundary. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
