@@ -304,17 +304,18 @@
 
 /* 复古：像素硬阴影。近直角、实线边框、无模糊纯偏移硬阴影；深色主题的硬阴影适配见下方叠加规则 */
 [data-ui-style="retro"] {
+  /* 复古圆角统一为 0：彻底直角，避免 0 与 2px 混排造成的圆角不统一 */
   --ui-radius-sm: 0px;
-  --ui-radius-md: 2px;
+  --ui-radius-md: 0px;
   --ui-radius-lg: 0px;
-  --ui-radius-xl: 2px;
-  --ui-radius-2xl: 2px;
+  --ui-radius-xl: 0px;
+  --ui-radius-2xl: 0px;
   --ui-radius-sm-token: 0px;
-  --ui-radius-md-token: 2px;
-  --ui-radius-lg-token: 2px;
+  --ui-radius-md-token: 0px;
+  --ui-radius-lg-token: 0px;
   --radius-sm: 0px;
-  --radius-md: 2px;
-  --radius-lg: 4px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
   /* offset 硬阴影：无模糊纯偏移的像素色块 */
   --shadow-hover: 2px 2px 0 rgba(0, 0, 0, 0.55);
   --shadow-elevated: 3px 3px 0 rgba(0, 0, 0, 0.55);
@@ -342,16 +343,20 @@
 [data-ui-style="retro"] .kimix-soft-card,
 [data-ui-style="retro"] .kimix-soft-card-strong,
 [data-ui-style="retro"] .kimix-settings-card,
-[data-ui-style="retro"] .kimix-settings-section {
+[data-ui-style="retro"] .kimix-settings-theme,
+[data-ui-style="retro"] .kimix-settings-uistyle,
+[data-ui-style="retro"] .kimix-settings-palette-wrap {
   border: 1.5px solid var(--border-default);
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.16);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card-strong,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-card,
-[data-theme="dark"][data-ui-style="retro"] .kimix-settings-section {
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-theme,
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-uistyle,
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-palette-wrap {
   box-shadow: 3px 3px 0 rgba(255, 255, 255, 0.12);
 }
 
