@@ -89,6 +89,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   defaultPermissionMode: "manual" as const,
   theme: "light",
   themePalette: "warm-paper" as const,
+  uiStyle: "default" as const,
   customThemePalette: {
     primary: "#1982FF",
     surface: "#EDE9E0",

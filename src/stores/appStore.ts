@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
+import { normalizeUiStyleId } from "@/utils/uiStyles";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
@@ -182,6 +183,7 @@ export interface AppStore extends AppState {
   setActiveSettingsPageId: (pageId: SettingsPageId) => void;
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
+  setUiStyle: (id: UiStyleId) => void;
   setThemePalette: (palette: ThemePaletteId) => void;
   setCustomThemePalette: (colors: ThemePaletteColors) => void;
   setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
@@ -237,6 +239,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   activeSettingsPageId: readActiveSettingsPage(),
   sidebarOpen: true,
   theme: cachedThemeSnapshot.theme,
+  uiStyle: cachedThemeSnapshot.uiStyle,
   themePalette: cachedThemeSnapshot.themePalette,
   customThemePalette: cachedThemeSnapshot.customThemePalette,
   kimiThemePalettes: cachedThemeSnapshot.kimiThemePalettes,
@@ -341,6 +344,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setTheme: (theme) => set({ theme }),
+  setUiStyle: (id) => set({ uiStyle: normalizeUiStyleId(id) }),
   setThemePalette: (palette) => set({ themePalette: normalizeThemePaletteId(palette) }),
   setCustomThemePalette: (colors) => set({ customThemePalette: normalizeThemePaletteColors(colors) }),
   setKimiThemePalettes: (presets) => set({ kimiThemePalettes: normalizeKimiThemePresets(presets) }),

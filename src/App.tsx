@@ -1336,6 +1336,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
+  const setUiStyle = useAppStore((s) => s.setUiStyle);
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const setCustomThemePalette = useAppStore((s) => s.setCustomThemePalette);
   const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
@@ -1438,6 +1439,7 @@ function App() {
     useKeyboardShortcuts(toggleSidebar, () => setSearchOpen(true), handleEscape);
     const bootstrapSetters = useMemo(() => ({
       setTheme,
+      setUiStyle,
       setThemePalette,
       setCustomThemePalette,
       setKimiThemePalettes,
@@ -1457,7 +1459,7 @@ function App() {
       setFilePreviewExtensions,
       setRecentProjects,
     }), [
-      setTheme, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
+      setTheme, setUiStyle, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
       setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,

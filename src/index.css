@@ -271,6 +271,37 @@
   --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 24px 64px rgba(0, 0, 0, 0.28);
 }
 
+/* ── 界面风格覆盖 ── */
+/* 置于 [data-theme] 之后，保证浅色/深色下都生效；边框等变量会被色彩方案以内联样式写入根元素，需 !important 覆盖。 */
+
+[data-ui-style="modern"] {
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 26px;
+  --shadow-hover: 0 4px 14px rgba(25, 23, 20, 0.05);
+  --shadow-elevated: 0 12px 32px rgba(25, 23, 20, 0.07), 0 3px 8px rgba(25, 23, 20, 0.03);
+  --shadow-floating: 0 28px 72px rgba(25, 23, 20, 0.10), 0 10px 24px rgba(25, 23, 20, 0.05);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 28px 72px rgba(25, 23, 20, 0.10), 0 10px 24px rgba(25, 23, 20, 0.05);
+  /* 更浅更柔的细分隔边框：基于配色推导值向面板底色混合 */
+  --border-subtle: color-mix(in srgb, var(--border-default) 45%, var(--surface-base)) !important;
+}
+
+[data-ui-style="retro"] {
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --shadow-hover: none;
+  --shadow-elevated: none;
+  --shadow-floating: 0 2px 10px rgba(0, 0, 0, 0.12);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.10), 0 2px 10px rgba(0, 0, 0, 0.12);
+  /* 硬朗实线边框：整体提升一级对比度，仍跟随配色方案色相 */
+  --border-subtle: var(--border-default) !important;
+  --border-default: var(--border-strong) !important;
+  /* 扁平化配色方案内联写入的浮层阴影 */
+  --kimix-composer-shadow: none !important;
+  --kimix-float-shadow: 0 2px 10px rgba(0, 0, 0, 0.12) !important;
+}
+
 /* ── Base ── */
 
 * {
@@ -1932,6 +1963,56 @@ button.bg-accent-primary:disabled:hover,
   border-color: var(--accent-primary);
   background: var(--accent-primary-light);
   color: var(--accent-primary);
+}
+
+.kimix-settings-uistyle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: 10px;
+}
+
+.kimix-settings-uistyle {
+  display: flex;
+  min-height: 34px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
+              color var(--duration-base) var(--ease-hover);
+}
+
+.kimix-settings-uistyle:hover {
+  background: var(--surface-hover);
+}
+
+.kimix-settings-uistyle.is-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
+.kimix-settings-uistyle-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.kimix-settings-uistyle.is-active .kimix-settings-uistyle-label {
+  color: var(--accent-primary);
+}
+
+.kimix-settings-uistyle-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .kimix-settings-subsection-title {

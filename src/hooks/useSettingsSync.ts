@@ -10,6 +10,7 @@ export function useSettingsSync() {
         state.themePalette !== prev.themePalette ||
         state.customThemePalette !== prev.customThemePalette ||
         state.kimiThemePalettes !== prev.kimiThemePalettes ||
+        state.uiStyle !== prev.uiStyle ||
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
         state.defaultThinkingEffort !== prev.defaultThinkingEffort ||
@@ -29,12 +30,14 @@ export function useSettingsSync() {
           themePalette: state.themePalette,
           customThemePalette: state.customThemePalette,
           kimiThemePalettes: state.kimiThemePalettes,
+          uiStyle: state.uiStyle,
         });
         window.api.saveSettings({
           theme: state.theme,
           themePalette: state.themePalette,
           customThemePalette: state.customThemePalette,
           kimiThemePalettes: state.kimiThemePalettes,
+          uiStyle: state.uiStyle,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
           defaultThinkingEffort: state.defaultThinkingEffort,

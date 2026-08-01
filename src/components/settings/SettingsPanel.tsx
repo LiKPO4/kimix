@@ -8,6 +8,7 @@ import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreview
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
+import { UI_STYLES } from "@/utils/uiStyles";
 import {
   applySessionBackupImportPlan,
   buildSessionBackupSnapshot,
@@ -354,6 +355,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
   const theme = useAppStore((s) => s.theme);
   const setTheme = useAppStore((s) => s.setTheme);
+  const uiStyle = useAppStore((s) => s.uiStyle);
+  const setUiStyle = useAppStore((s) => s.setUiStyle);
   const themePalette = useAppStore((s) => s.themePalette);
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const customThemePalette = useAppStore((s) => s.customThemePalette);
@@ -1276,6 +1279,21 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     >
                       <t.icon size={18} />
                       <span>{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="kimix-settings-subsection-title" style={{ marginTop: 16 }}>界面风格</div>
+                <div className="kimix-settings-uistyle-grid">
+                  {UI_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      aria-pressed={uiStyle === style.id}
+                      onClick={() => setUiStyle(style.id)}
+                      className={`kimix-settings-uistyle ${uiStyle === style.id ? "is-active" : ""}`}
+                    >
+                      <span className="kimix-settings-uistyle-label">{style.label}</span>
+                      <span className="kimix-settings-uistyle-desc">{style.description}</span>
                     </button>
                   ))}
                 </div>

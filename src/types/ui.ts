@@ -1,5 +1,6 @@
 export type Theme = "dark" | "light" | "system";
 export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
+export type UiStyleId = "default" | "modern" | "retro";
 export interface ThemePaletteColors {
   primary: string;
   surface: string;
@@ -108,6 +109,7 @@ export interface AppState {
   activeSettingsPageId: SettingsPageId;
   sidebarOpen: boolean;
   theme: Theme;
+  uiStyle: UiStyleId;
   themePalette: ThemePaletteId;
   customThemePalette: ThemePaletteColors;
   kimiThemePalettes: KimiThemePreset[];

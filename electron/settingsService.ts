@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultPermissionMode: "manual",
   theme: "light",
   themePalette: "warm-paper",
+  uiStyle: "default",
   customThemePalette: {
     primary: "#1982FF",
     surface: "#EDE9E0",
@@ -129,6 +130,9 @@ export function loadSettings(): AppSettings {
     }
     if ((settings.themePalette as string) === "kimi") {
       settings.themePalette = settings.kimiThemePalettes[0]?.id ? `kimi:${settings.kimiThemePalettes[0].id}` : "warm-paper";
+    }
+    if (!["default", "modern", "retro"].includes(settings.uiStyle)) {
+      settings.uiStyle = "default";
     }
     if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {
       settings.defaultPermissionMode = "manual";
