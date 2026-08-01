@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 修复：未发送 Composer 草稿跨工作区持久保留（v2.20.105）
+
+- 根因：`AppShell` 在设置、插件等工作区与聊天工作区之间条件挂载，进入设置会卸载 `Composer`；正文和附件此前都只存在组件本地 state，重新挂载必然从空值开始。
+- 修复：新增会话级草稿边界，已有会话使用 `session:<id>`，尚未创建新会话时使用 `project:<id>:new`；每次正文变化同步写入内存与 `localStorage`，附件保留内存副本，工作区卸载只刷新、不清空。`Composer` 按会话/项目身份 remount，切换会话不会串草稿；只有明确发送或清空才删除对应草稿。
+- 实机验收：Windows v2.20.105 输入唯一未发送正文 `草稿保护验收-20260801-2107：切换设置后必须逐字保留`，打开设置再返回、杀死旧进程并重启开发应用后均逐字保留。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-draft-audit-22105/01-draft-restored.jpg`、`02-draft-restored-after-app-restart.jpg`。
+- 持久边界：正文可跨设置、工作区、renderer/app 重启恢复；附件可跨设置和会话往返恢复，但大附件未写入同步存储，完整进程重启后的附件持久化仍需独立 IndexedDB 方案。
+- 验证：草稿定向 6 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CO_RFeGP.css`、JS `assets/index-Bj0urN8U.js`）、OKF strict/audit 校验（13 concepts、384 links）通过。
+
 ## 2026-08-01 优化：现代内容圆角覆盖与轻量表格（v2.20.104）
 
 - 根因一：Modern 已有 control/card/panel/shell 四级圆角，但设置分组、连接卡、模型行、插件项及完整模型面板没有按语义角色登记，仍回退到旧的 `radius-sm/md`，导致设置页大圆角只覆盖部分容器。

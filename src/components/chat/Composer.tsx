@@ -83,6 +83,7 @@ import {
 import { ROOM_DELIVERY_ACTION_EVENT, type RoomDeliveryActionDetail } from "@/utils/roomDeliveryAction";
 import { resolveRoomPromptRoute } from "@/utils/roomRouting";
 import { detachRoomAgentAsSession, roomHasActiveAgentWork, roomHasExecutingAgentWork } from "@/utils/sessionArchive";
+import { readComposerDraft, resolveComposerDraftKey, writeComposerDraft, type ComposerDraftAttachment } from "@/utils/composerDraft";
 import {
   buildRoomDeliveryPrompt,
   estimateRoomContextShare,
@@ -310,17 +311,7 @@ function roomControlStatusLabel(status: RoomAgentControlTarget["status"]) {
   return "运行中";
 }
 
-type ImageAttachment = {
-  id: string;
-  kind?: "image" | "video" | "file";
-  name: string;
-  dataUrl?: string;
-  filePath?: string;
-  fileId?: string;
-  mediaType?: string;
-  size?: number;
-  url?: string;
-};
+type ImageAttachment = ComposerDraftAttachment;
 
 type RoomControlRequest =
   | { action: "stop" }
@@ -485,8 +476,26 @@ function getActiveCompletion(value: string): { mode: CompletionMode; query: stri
 }
 
 export function Composer() {
-  const [input, setInput] = useState("");
-  const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([]);
+  const currentProject = useAppStore((s) => s.currentProject);
+  const currentSession = useAppStore((s) => s.currentSession);
+  const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
+  const initialDraft = useRef(readComposerDraft(composerDraftKey)).current;
+  const [input, setInputState] = useState(initialDraft.content);
+  const [imageAttachments, setImageAttachmentsState] = useState<ImageAttachment[]>(initialDraft.attachments);
+  const inputValueRef = useRef(initialDraft.content);
+  const imageAttachmentsValueRef = useRef<ImageAttachment[]>(initialDraft.attachments);
+  const setInput = useCallback((next: string | ((value: string) => string)) => {
+    const value = typeof next === "function" ? next(inputValueRef.current) : next;
+    inputValueRef.current = value;
+    writeComposerDraft(composerDraftKey, { content: value, attachments: imageAttachmentsValueRef.current });
+    setInputState(value);
+  }, [composerDraftKey]);
+  const setImageAttachments = useCallback((next: ImageAttachment[] | ((value: ImageAttachment[]) => ImageAttachment[])) => {
+    const value = typeof next === "function" ? next(imageAttachmentsValueRef.current) : next;
+    imageAttachmentsValueRef.current = value;
+    writeComposerDraft(composerDraftKey, { content: inputValueRef.current, attachments: value });
+    setImageAttachmentsState(value);
+  }, [composerDraftKey]);
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
   const [slashCommands, setSlashCommands] = useState<CompletionItem[]>([]);
@@ -504,8 +513,6 @@ export function Composer() {
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
   const permissionMode = useAppStore((s) => s.permissionMode);
-  const currentProject = useAppStore((s) => s.currentProject);
-  const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const defaultThinkingEffort = useAppStore((s) => s.defaultThinkingEffort);
@@ -677,6 +684,13 @@ export function Composer() {
   const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
   const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner && !isMutationOwnerRunning;
+
+  useEffect(() => () => {
+    writeComposerDraft(composerDraftKey, {
+      content: inputValueRef.current,
+      attachments: imageAttachmentsValueRef.current,
+    });
+  }, [composerDraftKey]);
 
   useEffect(() => {
     const syncMultiAgentRoomGate = () => {
