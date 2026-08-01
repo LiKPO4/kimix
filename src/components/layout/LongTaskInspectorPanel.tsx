@@ -1790,6 +1790,7 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
+            {bashTasks.length > 0 && (
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
@@ -1816,20 +1817,12 @@ export function LongTaskInspectorPanel({
                   刷新失败：{backgroundTasksError}{bashTasks.length > 0 ? "（已保留上次结果）" : ""}
                 </div>
               ) : null}
-              {backgroundTasksLoading && bashTasks.length === 0 ? (
-                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  正在读取后台任务...
-                </div>
-              ) : bashTasks.length > 0 ? (
-                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
-                  {bashTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
-                </div>
-              ) : (
-                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  当前没有后台任务。后台 Bash / 工具任务出现后会显示真实终态、失败原因和输出入口。
-                </div>
-              )}
+              <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                {bashTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
+              </div>
             </section>
+            )}
+            {subagentTasks.length > 0 && (
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagentTasks", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
@@ -1856,20 +1849,11 @@ export function LongTaskInspectorPanel({
                   刷新失败：{backgroundTasksError}{subagentTasks.length > 0 ? "（已保留上次结果）" : ""}
                 </div>
               ) : null}
-              {backgroundTasksLoading && subagentTasks.length === 0 ? (
-                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  正在读取子 Agent 任务...
-                </div>
-              ) : subagentTasks.length > 0 ? (
-                <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
-                  {subagentTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
-                </div>
-              ) : (
-                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
-                  当前没有子 Agent 任务。通过 Agent 工具派发的子代理任务会显示在这里。
-                </div>
-              )}
+              <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
+                {subagentTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, backgroundTaskKindLabel(task), true))}
+              </div>
             </section>
+            )}
             <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagent", 3, { padding: "16px 16px 18px" })}>
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>

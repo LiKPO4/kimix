@@ -172,10 +172,11 @@ describe("LongTaskInspectorPanel 会话级后台任务卡", () => {
     expect(cardSection(container, "subagent")?.textContent).toContain("子 Agent 模型");
   });
 
-  it("普通会话模式空态分别显示「当前没有后台任务」「当前没有子 Agent 任务」", async () => {
+  it("普通会话模式没有任务时自动隐藏两个任务卡", async () => {
     const container = await renderPanel(createPanelProps());
-    expect(cardSection(container, "background")?.textContent).toContain("当前没有后台任务");
-    expect(cardSection(container, "subagentTasks")?.textContent).toContain("当前没有子 Agent 任务");
+    // 空态自动隐藏：无后台 bash / 子代理任务时两卡均不渲染
+    expect(cardSection(container, "background")).toBeNull();
+    expect(cardSection(container, "subagentTasks")).toBeNull();
   });
 
   it("长程任务模式保持「Kimi 后台任务」卡现状（不拆分、不渲染新卡）", async () => {
