@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern redistributes theme surfaces instead of redefining colors (v2.20.99)**: its chat, settings, Plugins, and Hooks canvas now derives a brighter presentation surface from the active theme's elevated/base tokens, while the sidebar remains on the theme ground. Source surface, text, accent, and border tokens remain owned exclusively by the color theme. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Shell borders and nested radii are structural invariants (v2.20.98)**: removing an ornamental divider may not delete one edge of the main shell, and Modern now separates control/card/panel/shell radius roles instead of inflating every utility radius. Adjacent nested surfaces follow `outer radius = inner radius + inset`; the settings theme segment is fixed at 16px/10px/6px. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Modern is a Codex-inspired shell preset, not a flattened Default variant (v2.20.97)**: Modern now uses complete quiet navigation pills, 18–20px content/composer shells, softly elevated floating surfaces, and restrained flat controls while continuing to consume the active color theme. It does not redefine theme color tokens or restructure business layouts. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

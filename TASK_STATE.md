@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 优化：现代模式亮面工作画布（v2.20.99）
+
+- 根因：Modern 虽已建立 Codex 式圆角和壳层，但主内容、工具栏、Footer、设置与插件工作区仍直接使用颜色主题的 `surface-base`；暖纸等主题在大面积铺开时压平了侧栏与画布的明度差，整体看起来灰蒙。
+- 修复：新增 `--kimix-modern-workspace-background` 呈现 token，浅色模式以 96% `surface-elevated` + 4% `surface-base` 生成接近白色但仍带主题底色的工作画布，深色模式使用 78%/22% 保持相对提亮；聊天主壳、工具栏、Footer、设置、插件与 Hooks 统一消费该 token，侧栏、选中态、强调色和所有颜色主题源 token 不变。
+- 实机验收：Windows 直接操作 v2.20.99，对照 Codex 参考检查空白对话主界面、外观设置和插件工作区；主画布明显提亮，外围主题色与卡片层级仍可辨，无漂白或边界消失。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22099/01-modern-main.png`、`02-modern-settings.png`、`03-modern-plugins.png`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BIpNiJJT.css`、JS `assets/index-D1OODTQw.js`）、OKF strict/audit 校验（12 concepts、376 links）通过。
+
 ## 2026-08-01 修复：复古壳层边框与现代嵌套圆角（v2.20.98）
 
 - 根因一：v2.20.96 为移除无语义的侧栏分隔线，错误地在复古 `.kimix-app-shell-main` 上设置 `border-left-width: 0`，把主内容壳本身的结构边框也一并删除，设置页与对话页左边缘因此像被裁切。

@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-01T20:05:00+08:00"
+timestamp: "2026-08-01T20:30:00+08:00"
 ---
 
 # Interface Style System
@@ -33,12 +33,13 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 * A structural shell border is indivisible. Removing an ornamental sidebar divider must never be implemented by clearing one edge of `.kimix-app-shell-main`; every preset keeps the shell's four structural edges intact and controls ornamental separation through `--ui-shell-divider` or a dedicated spacer.
 * Retro styling uses one signature device—the subtle Platinum title-bar stripe. Sidebars, window controls, ordinary toolbar actions, and content surfaces stay flat at rest; hover, active state, compound launch/open controls, and floating surfaces carry the tactile treatment. Enrolling a role must not make its boundary permanently visible.
 * Modern styling uses a Codex-inspired shell language: a complete navigation pill, 18–20px content/composer shells, quiet flat controls, and softly elevated floating surfaces. It may add neutral translucent depth overlays, but it must not redefine theme color tokens or restructure business layouts such as Skills cards and settings sections.
+* A preset may redistribute existing theme surfaces without becoming a color theme. Modern derives `--kimix-modern-workspace-background` only from `--surface-elevated` and `--surface-base`, then uses that brighter presentation surface for chat, settings, Plugins, and Hooks while leaving the sidebar on `--surface-ground`. It must never assign a new value to any `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` source token.
 * Modern radii are role-scoped instead of globally inflated: controls use 10px, cards 14px, panels 18px, and the main shell 20px. Generic `rounded-*` utilities keep a monotonic small-to-large scale and must not be used as a substitute for shell-role tokens.
 * Nested radii remain concentric where two adjacent surfaces are simultaneously visible. The invariant is `outer radius = inner radius + visible inset`; the settings theme segment is the canonical example at 16px outer, 10px inner, and 6px inset. A full-bleed child clipped by its parent is not a second nested surface. Interactive press feedback uses the existing `scale: 0.96` convention, and transitions name only the properties that change.
 
 # Regression Gates
 
-`src/utils/__tests__/uiStyles.test.ts` verifies that interface-style roots do not assign color-theme tokens, that Modern establishes its Codex-style shell without a navigation leading edge, that its nested theme segment derives the outer radius from inner control radius plus inset, that Retro consumes the semantic contract rather than skinning the global icon-text primitive, that Retro keeps all four structural shell borders, that active-plus-hover keeps each preset's navigation selection treatment, that button modes use `--ui-toggle-*` instead of `--ui-selection-*`, that the removed sidebar rule cannot return, that shell controls and navigation are enrolled, and that the Composer input remains borderless under its styled outer shell.
+`src/utils/__tests__/uiStyles.test.ts` verifies that interface-style roots do not assign color-theme tokens, that Modern derives and applies its brighter workspace presentation surface without mutating source colors, that Modern establishes its Codex-style shell without a navigation leading edge, that its nested theme segment derives the outer radius from inner control radius plus inset, that Retro consumes the semantic contract rather than skinning the global icon-text primitive, that Retro keeps all four structural shell borders, that active-plus-hover keeps each preset's navigation selection treatment, that button modes use `--ui-toggle-*` instead of `--ui-selection-*`, that the removed sidebar rule cannot return, that shell controls and navigation are enrolled, and that the Composer input remains borderless under its styled outer shell.
 
 # Main Components
 

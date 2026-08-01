@@ -345,6 +345,8 @@
   --kimix-modern-shell-radius: 20px;
   --kimix-modern-segment-gap: 6px;
   --kimix-modern-segment-radius: calc(var(--kimix-modern-control-radius) + var(--kimix-modern-segment-gap));
+  /* 颜色仍由主题提供；Modern 只把 elevated/base 重新分配为更亮的工作画布。 */
+  --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 96%, var(--surface-base));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
@@ -408,6 +410,7 @@
 }
 
 [data-theme="dark"][data-ui-style="modern"] {
+  --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 78%, var(--surface-base));
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 28px rgba(0, 0, 0, 0.22);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(255, 255, 255, 0.085), 0 20px 50px rgba(0, 0, 0, 0.32);
@@ -417,12 +420,21 @@
 [data-ui-style="modern"] .kimix-app-shell-main {
   border: 1px solid var(--ui-shell-border-color);
   border-radius: var(--kimix-modern-shell-radius);
+  background: var(--kimix-modern-workspace-background);
   box-shadow: var(--kimix-modern-surface-shadow);
 }
 
-[data-ui-style="modern"] .kimix-app-shell-toolbar {
+[data-ui-style="modern"] .kimix-app-shell-toolbar,
+[data-ui-style="modern"] .kimix-app-shell-footer {
   border-color: var(--ui-section-divider-color);
+  background: var(--kimix-modern-workspace-background);
   background-image: none;
+}
+
+/* 插件、Hooks、设置等整页工作区与对话画布使用同一亮面，外围侧栏继续保留颜色主题底色。 */
+[data-ui-style="modern"] .kimix-workspace-page,
+[data-ui-style="modern"] .kimix-settings-panel.is-workspace {
+  background: var(--kimix-modern-workspace-background);
 }
 
 /* Codex 式导航不使用方向性蓝条，选中与悬停都是完整、柔和的胶囊面。 */
