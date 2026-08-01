@@ -1,6 +1,10 @@
 # Kimix Knowledge Update Log
 
-* **Modern toolbar and canvas form one continuous surface (v2.20.100)**: the chat toolbar no longer draws a decorative full-width bottom rule in Modern. Global divider colors and local menu, list, and compound-control separators remain unchanged, so only the non-semantic shell seam is removed. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+* **Project empty-state suggestions have stable semantic slots (v2.20.102)**: project overview is always first, latest context contributes at most one normalized continue action, historical continue variants cannot consume extra slots, and remaining saved/default actions keep semantic icons even when their display copy changes. See [/project/kimix.md](/project/kimix.md).
+
+* **Divider ownership corrected after v2.20.100 (v2.20.102)**: the conversation toolbar bottom rule is structural and has been restored. The requested Codex-style simplification applies only inside launch/open split controls through `--ui-compound-divider-shadow`; Modern disables that local divider while Default and Retro retain it. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
+* **Superseded interpretation of the Modern separator (v2.20.100)**: this release removed the chat-toolbar bottom rule after misidentifying the user's target. v2.20.102 restores that structural boundary and moves the Modern-only suppression to the split-control divider role. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Modern redistributes theme surfaces instead of redefining colors (v2.20.99)**: its chat, settings, Plugins, and Hooks canvas now derives a brighter presentation surface from the active theme's elevated/base tokens, while the sidebar remains on the theme ground. Source surface, text, accent, and border tokens remain owned exclusively by the color theme. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 

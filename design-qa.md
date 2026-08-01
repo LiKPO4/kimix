@@ -1,24 +1,26 @@
-# Design QA — Empty-state semantic icons v2.20.101
+# Design QA — Divider ownership and empty-state slots v2.20.102
 
 final result: implementation verified; running-view confirmation pending
 
 ## Source visual truth
 
-- Issue capture: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-f989b8a1-7263-48fc-af42-6659d3ac679f.png`
-- State: Modern interface, project empty conversation, five project-aware suggestions restored from current and historical sessions.
+- Issue capture: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-61e9cafa-7996-4fc5-9cad-b7142ed1f1d6.png`
+- State: Modern interface, project empty conversation, historical suggestions present.
 
-## Root cause
+## Corrected interpretation
 
-Project suggestions persist across releases, but the icon resolver recognized only four exact current strings. Historical wording and truncated conversation prompts missed the map and all inherited the same Sparkles fallback.
+The toolbar-to-canvas horizontal rule is useful structure and must remain. The unwanted rules are the two vertical seams inside the launch/open split controls. They now have separate role ownership, so Modern can remove those seams without changing toolbar hierarchy or other presets.
 
-## Design decision
+## Empty-state composition
 
-Icons encode the action, not the row position. Continue-context prompts use RotateCcw, risk/review prompts use GitBranch, task-planning prompts use ListChecks, problem-analysis prompts use Bug, and general project discovery uses Sparkles. Repeated actions may intentionally share one icon; unrelated actions may not collapse to the fallback merely because their display copy changed.
+Suggestion rows now have content priority instead of insertion-order priority. Project overview has a permanent first slot. Continue context has at most one canonical `继续：…` row and prefers the latest project user message. Historical non-continue prompts fill the remaining personalized slots before unused defaults.
 
 ## Regression gates
 
-- [x] The exact legacy strings visible in the issue capture are covered by unit tests.
-- [x] Current built-in suggestions retain their intended icon mapping.
-- [x] Unknown suggestions retain one stable neutral fallback.
-- [x] Persisted suggestions are not deleted or rewritten.
-- [ ] User confirms icon rendering in the running v2.20.101 window.
+- [x] Modern no longer suppresses the toolbar bottom border.
+- [x] Split-control internal seams consume `--ui-compound-divider-shadow`.
+- [x] Modern sets only the compound divider token to `none`; Default and Retro retain a divider.
+- [x] Screenshot-equivalent data yields exactly one normalized continue row.
+- [x] Project overview remains first even when five or more saved candidates exist.
+- [x] Historical non-continue suggestions keep their semantic icons.
+- [ ] User confirms the running v2.20.102 view.

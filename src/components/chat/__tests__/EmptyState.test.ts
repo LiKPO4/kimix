@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Bug, GitBranch, ListChecks, RotateCcw, Sparkles } from "lucide-react";
-import { resolveSuggestionIcon } from "../EmptyState";
+import { buildProjectSuggestions, resolveSuggestionIcon } from "../EmptyState";
 
 describe("resolveSuggestionIcon", () => {
   it("兼容截图中的旧建议文案并按动作语义分配图标", () => {
@@ -14,5 +14,34 @@ describe("resolveSuggestionIcon", () => {
     expect(resolveSuggestionIcon("读取最近会话和 Git 改动，整理待办与下一步")).toBe(ListChecks);
     expect(resolveSuggestionIcon("快速全面了解一下当前的项目")).toBe(Sparkles);
     expect(resolveSuggestionIcon("帮我写一段发布说明")).toBe(Sparkles);
+  });
+
+  it("历史缓存含多个继续时只保留最新一条并固定保留项目概览", () => {
+    const suggestions = buildProjectSuggestions([
+      "接着上次这件事继续：你好呀",
+      "接着上次这件事继续：确认，开始执行吧",
+      "分析一下当前项目，并告诉我最应该先处理什么",
+      "检查最近改动是否有风险，并给出验证建议",
+    ], "发下8084吧");
+
+    expect(suggestions.map((item) => item.text)).toEqual([
+      "快速全面了解一下当前的项目",
+      "继续：发下8084吧",
+      "分析一下当前项目，并告诉我最应该先处理什么",
+      "检查最近改动是否有风险，并给出验证建议",
+      "读取最近会话和 Git 改动，整理待办与下一步",
+    ]);
+    expect(suggestions.filter((item) => item.text.startsWith("继续："))).toHaveLength(1);
+  });
+
+  it("没有最新消息时把第一条历史继续统一成继续格式", () => {
+    const suggestions = buildProjectSuggestions([
+      "接着上次这件事继续：确认，开始执行吧",
+      "继续：旧的第二条",
+    ]);
+
+    expect(suggestions[0].text).toBe("快速全面了解一下当前的项目");
+    expect(suggestions[1].text).toBe("继续：确认，开始执行吧");
+    expect(suggestions.filter((item) => item.text.startsWith("继续："))).toHaveLength(1);
   });
 });

@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-01T20:45:00+08:00"
+timestamp: "2026-08-01T21:05:00+08:00"
 ---
 
 # Interface Style System
@@ -30,7 +30,7 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 * Sidebar projects and sessions use one active-state grammar per preset. Default and Retro use a quiet selected surface plus one accent edge; Modern uses the Codex-style complete quiet pill with no directional marker. Active navigation must not stack a full outline, inset frame, and focus ring to communicate the same state.
 * Compound states have explicit precedence. For project and session rows, `.is-active:hover` consumes the same `--ui-selection-*` tokens as `.is-active`; hover must never replace the complete `box-shadow` and erase the active accent edge. Expanded and pressed toolbar controls keep their own `--ui-toggle-*` state when hovered.
 * Shell separation must communicate real structure. The sidebar does not draw a decorative full-height rule; `--ui-shell-divider` remains `none` unless a preset can justify the divider semantically. Separators inside split controls and menus use their dedicated role tokens and remain local to the grouped content.
-* Modern treats the chat toolbar and conversation canvas as one continuous workspace surface. It must not draw a full-width border between them unless that boundary communicates independent scrolling, resizing, or ownership; local menu, list, and compound-control separators remain role-scoped and visible.
+* The chat toolbar bottom rule is a structural boundary between navigation/actions and conversation content, so every preset keeps it. Split-control dividers are a separate role owned by `--ui-compound-divider-shadow`: Modern may set that local divider to `none` for a seamless Codex-style compound control, while Default and Retro may retain it. A request about one divider must not be implemented by removing another boundary at a different hierarchy.
 * A structural shell border is indivisible. Removing an ornamental sidebar divider must never be implemented by clearing one edge of `.kimix-app-shell-main`; every preset keeps the shell's four structural edges intact and controls ornamental separation through `--ui-shell-divider` or a dedicated spacer.
 * Retro styling uses one signature device—the subtle Platinum title-bar stripe. Sidebars, window controls, ordinary toolbar actions, and content surfaces stay flat at rest; hover, active state, compound launch/open controls, and floating surfaces carry the tactile treatment. Enrolling a role must not make its boundary permanently visible.
 * Modern styling uses a Codex-inspired shell language: a complete navigation pill, 18–20px content/composer shells, quiet flat controls, and softly elevated floating surfaces. It may add neutral translucent depth overlays, but it must not redefine theme color tokens or restructure business layouts such as Skills cards and settings sections.
@@ -40,7 +40,7 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 
 # Regression Gates
 
-`src/utils/__tests__/uiStyles.test.ts` verifies that interface-style roots do not assign color-theme tokens, that Modern derives and applies its brighter workspace presentation surface without mutating source colors, that Modern establishes its Codex-style shell without a navigation leading edge or a toolbar-to-canvas bottom rule, that its nested theme segment derives the outer radius from inner control radius plus inset, that Retro consumes the semantic contract rather than skinning the global icon-text primitive, that Retro keeps all four structural shell borders, that active-plus-hover keeps each preset's navigation selection treatment, that button modes use `--ui-toggle-*` instead of `--ui-selection-*`, that the removed sidebar rule cannot return, that shell controls and navigation are enrolled, and that the Composer input remains borderless under its styled outer shell.
+`src/utils/__tests__/uiStyles.test.ts` verifies that interface-style roots do not assign color-theme tokens, that Modern derives and applies its brighter workspace presentation surface without mutating source colors, that Modern establishes its Codex-style shell without a navigation leading edge, that the toolbar structural bottom rule is not suppressed, that split-control dividers consume the role token and Modern disables only that local divider, that its nested theme segment derives the outer radius from inner control radius plus inset, that Retro consumes the semantic contract rather than skinning the global icon-text primitive, that Retro keeps all four structural shell borders, that active-plus-hover keeps each preset's navigation selection treatment, that button modes use `--ui-toggle-*` instead of `--ui-selection-*`, that the removed sidebar rule cannot return, that shell controls and navigation are enrolled, and that the Composer input remains borderless under its styled outer shell.
 
 # Main Components
 

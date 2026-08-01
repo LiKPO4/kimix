@@ -52,11 +52,13 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).toMatch(/--kimix-modern-segment-radius:\s*calc\(var\(--kimix-modern-control-radius\) \+ var\(--kimix-modern-segment-gap\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-workspace-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 96%, var\(--surface-base\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
+    expect(styleBlocks).toMatch(/--ui-compound-divider-shadow:\s*none;/);
     expect(css).toContain('[data-ui-style="modern"] .kimix-app-shell-main');
     expect(css).toContain('[data-ui-style="modern"] .kimix-composer-card');
     expect(css).toContain('[data-ui-style="modern"] .kimix-floating-panel');
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-main\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
-    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-toolbar\s*\{[^}]*border-bottom:\s*0;/s);
+    expect(css).not.toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-toolbar\s*\{[^}]*border-bottom:\s*0;/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-workspace-page,\s*\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);[^}]*padding:\s*var\(--kimix-modern-segment-gap\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme\s*\{[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);/s);

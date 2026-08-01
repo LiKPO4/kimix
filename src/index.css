@@ -179,6 +179,7 @@
   --ui-compound-background: var(--ui-control-background);
   --ui-compound-background-image: var(--ui-control-background-image);
   --ui-compound-shadow: var(--ui-control-shadow);
+  --ui-compound-divider-shadow: inset 1px 0 0 color-mix(in srgb, var(--border-default) 58%, transparent);
   --ui-popup-border: 1px solid var(--border-default);
   --ui-popup-background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   --ui-popup-shadow: var(--shadow-floating);
@@ -392,6 +393,7 @@
   --ui-compound-background: var(--surface-elevated);
   --ui-compound-background-image: none;
   --ui-compound-shadow: var(--kimix-modern-surface-shadow);
+  --ui-compound-divider-shadow: none;
   --ui-popup-border: 1px solid var(--border-subtle);
   --ui-popup-background: var(--surface-elevated);
   --ui-popup-shadow: var(--kimix-modern-floating-shadow);
@@ -429,11 +431,6 @@
   border-color: var(--ui-section-divider-color);
   background: var(--kimix-modern-workspace-background);
   background-image: none;
-}
-
-/* 会话标题栏与画布属于同一连续表面；只移除这条整宽装饰线，不影响菜单等结构分隔。 */
-[data-ui-style="modern"] .kimix-app-shell-toolbar {
-  border-bottom: 0;
 }
 
 /* 插件、Hooks、设置等整页工作区与对话画布使用同一亮面，外围侧栏继续保留颜色主题底色。 */
@@ -575,6 +572,7 @@
   --ui-compound-background: var(--surface-base);
   --ui-compound-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.025));
   --ui-compound-shadow: var(--kimix-retro-control-shadow);
+  --ui-compound-divider-shadow: inset 1px 0 0 color-mix(in srgb, var(--border-default) 58%, transparent);
   --ui-popup-border: 1px solid var(--border-default);
   --ui-popup-background: var(--surface-elevated);
   --ui-popup-shadow: var(--shadow-floating);
@@ -1266,7 +1264,7 @@ body::before {
 }
 
 .kimix-split-control-part + .kimix-split-control-part {
-  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--border-default) 58%, transparent);
+  box-shadow: var(--ui-compound-divider-shadow);
 }
 
 /* 二元状态按钮统一依赖 aria-pressed；业务组件不再内联拼装选中边框。 */

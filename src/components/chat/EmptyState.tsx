@@ -8,11 +8,12 @@ import { kimiCodeRouteStatus } from "@/utils/kimiCodeRouteStatus";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 
-const FALLBACK_SUGGESTIONS = [
-  { icon: Sparkles, text: "快速全面了解一下当前的项目" },
-  { icon: ListChecks, text: "读取最近会话和 Git 改动，整理待办与下一步" },
-  { icon: GitBranch, text: "检查未提交改动风险，给出代码审查意见" },
-  { icon: Bug, text: "分析项目结构，找出 3 个最该优先处理的问题" },
+const PROJECT_OVERVIEW_SUGGESTION = "快速全面了解一下当前的项目";
+const DEFAULT_PROJECT_SUGGESTIONS = [
+  PROJECT_OVERVIEW_SUGGESTION,
+  "读取最近会话和 Git 改动，整理待办与下一步",
+  "检查未提交改动风险，给出代码审查意见",
+  "分析项目结构，找出 3 个最该优先处理的问题",
 ];
 
 const SUGGESTION_ICONS: Record<string, typeof Sparkles> = {
@@ -36,6 +37,39 @@ export function resolveSuggestionIcon(text: string): typeof Sparkles {
   if (/问题|故障|错误|复现|优先处理|分析.*项目|项目.*分析/i.test(text)) return Bug;
   return Sparkles;
 }
+
+function isContinueSuggestion(text: string): boolean {
+  return /^(继续|接着)/.test(text.trim());
+}
+
+function continuePayload(text: string): string {
+  return text
+    .trim()
+    .replace(/^接着上次(?:这件事)?继续\s*[:：]?\s*/, "")
+    .replace(/^继续\s*[:：]?\s*/, "")
+    .trim();
+}
+
+export function buildProjectSuggestions(saved: string[], latestUserMessage = "") {
+  const savedContinue = saved.find(isContinueSuggestion) ?? "";
+  const continuation = latestUserMessage.trim() || continuePayload(savedContinue);
+  const candidates = [
+    PROJECT_OVERVIEW_SUGGESTION,
+    continuation ? `继续：${continuation.slice(0, 28)}` : "",
+    ...saved.filter((text) => text.trim() && !isContinueSuggestion(text)),
+    ...DEFAULT_PROJECT_SUGGESTIONS.slice(1),
+  ].filter(Boolean);
+
+  return Array.from(new Set(candidates)).slice(0, 5).map((text) => ({
+    icon: resolveSuggestionIcon(text),
+    text,
+  }));
+}
+
+const FALLBACK_SUGGESTIONS = DEFAULT_PROJECT_SUGGESTIONS.map((text) => ({
+  icon: resolveSuggestionIcon(text),
+  text,
+}));
 
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -108,20 +142,10 @@ export function EmptyState() {
       .flatMap((session) => session.events.filter((event) => event.type === "user_message"))
       .sort((a, b) => b.timestamp - a.timestamp)[0];
 
-    const dynamic = [
-      ...savedSuggestions,
-      lastUserMessage?.type === "user_message" ? `继续：${lastUserMessage.content.slice(0, 28)}` : "",
-      "快速全面了解一下当前的项目",
-      "读取最近会话和 Git 改动，整理待办与下一步",
-      "检查未提交改动风险，给出代码审查意见",
-      "分析项目结构，找出 3 个最该优先处理的问题",
-    ].filter(Boolean);
-
-    const unique = Array.from(new Set(dynamic)).slice(0, 5);
-    return unique.map((text) => ({
-      icon: resolveSuggestionIcon(text),
-      text,
-    }));
+    return buildProjectSuggestions(
+      savedSuggestions,
+      lastUserMessage?.type === "user_message" ? lastUserMessage.content : "",
+    );
   }, [project, savedSuggestions, sessions]);
 
   const ensureSession = async (): Promise<Session | null> => {
