@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 调整：现代用户气泡降低表面色权重（v2.20.107）
+
+- 用户实机反馈 v2.20.106 气泡过深，短消息呈现为突出的灰色按钮，而非 Codex 参考中的轻灰输入层。
+- 修复：浅色模式 `surface-active` 权重从 82% 降至 48%，深色模式从 86% 降至 62%；继续保持主题派生、无描边和无阴影，仅降低与画布的明度差。
+- 实机验收：Windows v2.20.107 当前灰白主题下，短消息气泡已由中灰按钮感降为接近画布的轻灰层，同时仍可辨识作者输入。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22107/01-modern-user-bubble-light.jpg`。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-vNJGB5--.css`、JS `assets/index-DsfKRyLG.js`）、OKF strict/audit 校验（13 concepts、386 links）通过。
+
 ## 2026-08-01 优化：现代用户输入气泡与画布拉开明度（v2.20.106）
 
 - 根因：Modern 将主工作画布提亮为 96% `surface-elevated`，用户气泡仍直接使用 `surface-elevated`，两者在浅色主题下几乎同为白色，作者输入层级消失。

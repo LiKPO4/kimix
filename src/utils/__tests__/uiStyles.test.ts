@@ -51,7 +51,7 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).toMatch(/--ui-radius-lg:\s*12px;/);
     expect(styleBlocks).toMatch(/--kimix-modern-segment-radius:\s*calc\(var\(--kimix-modern-control-radius\) \+ var\(--kimix-modern-segment-gap\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-workspace-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 96%, var\(--surface-base\)\);/);
-    expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-active\) 82%, var\(--surface-elevated\)\);/);
+    expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-active\) 48%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
     expect(styleBlocks).toMatch(/--ui-compound-divider-shadow:\s*none;/);
     expect(css).toContain('[data-ui-style="modern"] .kimix-app-shell-main');
