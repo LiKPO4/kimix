@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 重构：全局控件状态与浮层骨架统一（v2.20.94）
+
+- 用户在 v2.20.93 截图中确认，项目选中态叠加边框/内框/主题刻度，Swarm/Plan 与套餐用量分别使用三套选中语法，各类菜单和小浮层仍由业务组件自行定义圆角、阴影及菜单项，导致默认 Kimix 与复古模式同时漂移。
+- 初版 Kimix 先建立共享角色：二元模式统一 `.kimix-state-button` + `aria-pressed`，下拉控件统一 `.kimix-control-button` + `aria-expanded`，菜单/浮层/弹窗统一 `.kimix-menu-panel`、`.kimix-menu-item`、`.kimix-floating-panel`、`.kimix-modal-card`；复古模式只覆盖这些角色的材质。侧栏项目/会话选中态收敛为单一浅表面与左侧主题刻度。
+- Composer、ContextBar、顶部菜单、侧栏项目菜单、文字/图片右键菜单、文件菜单、Diff 排序菜单及主要模态窗已接入共享骨架；颜色仍完全由主题 token 决定。
+- 验证：定向 2 文件 11 项、全量 152 文件 1455 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-QQs-QpyB.js`）、OKF strict/spec/audit 校验（12 concepts、371 links）通过；本机开发窗口已重启为 v2.20.94，视觉验收待用户截图确认。
+
 ## 2026-08-01 修复：复古风格组件语言统一（v2.20.93）
 
 - 用户截图确认 v2.20.92 仍有三类割裂：Composer 外壳与内部 textarea 同时描边形成“双框”；复古规则只覆盖 `.kimix-toolbar-button` / `.kimix-icon-text-button`，导致输入区部分按钮风格化、部分仍扁平；侧栏和 ContextBar 仍使用现代平面语言，局部 Platinum 控件像外贴皮肤。

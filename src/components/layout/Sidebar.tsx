@@ -889,7 +889,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         <div
                           className={`kimix-sidebar-project-row group/project relative flex h-9 w-full items-center text-[15px] ${
                             isActive
-                              ? "is-active bg-surface-hover text-text-primary"
+                              ? "is-active text-text-primary"
                               : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                           }`}
                         >
@@ -962,7 +962,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 : openProjectMenu.bottom + 4;
                               return (
                                 <div
-                                  className="w-48 rounded-xl border border-border-subtle bg-surface-elevated py-1.5 text-[13px] text-text-primary shadow-floating-token"
+                                  className="kimix-menu-panel w-48 text-[13px] text-text-primary"
                                   style={{
                                     position: "fixed",
                                     top: menuTop,
@@ -972,27 +972,27 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                   }}
                                   onMouseDown={(e) => e.stopPropagation()}
                                 >
-                                  <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => void (isPinned ? unpinProject(project) : pinProject(project))} className="kimix-menu-item gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <Pin size={14} className="text-text-secondary" />
                                     <span>{isPinned ? "取消置顶" : "置顶项目"}</span>
                                   </button>
-                                  <button onClick={() => void openProjectPath(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => void openProjectPath(project)} className="kimix-menu-item gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <FolderSearch size={14} className="text-text-secondary" />
                                     <span>在资源管理器中打开</span>
                                   </button>
-                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="kimix-menu-item gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <GitBranch size={14} className="text-text-secondary" />
                                     <span>创建永久工作树</span>
                                   </button>
-                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => { setOpenProjectMenu(null); toast("待实现"); }} className="kimix-menu-item gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <SquarePen size={14} className="text-text-secondary" />
                                     <span>重命名项目</span>
                                   </button>
-                                  <button onClick={() => void archiveProjectSessions(project)} className="flex h-10 w-full items-center gap-3 text-left transition-colors hover:bg-surface-hover" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => void archiveProjectSessions(project)} className="kimix-menu-item gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <Archive size={14} className="text-text-secondary" />
                                     <span>归档对话</span>
                                   </button>
-                                  <button onClick={() => void removeProject(project)} className="flex h-10 w-full items-center gap-3 text-left text-accent-danger transition-colors hover:bg-accent-danger-light" style={{ paddingLeft: 18, paddingRight: 18 }}>
+                                  <button onClick={() => void removeProject(project)} className="kimix-menu-item is-danger gap-3 text-left" style={{ paddingLeft: 18, paddingRight: 18 }}>
                                     <X size={14} />
                                     <span>移除</span>
                                   </button>
@@ -1030,7 +1030,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                     currentSession?.id === s.id
                                       ? isLongTaskSession
                                         ? "is-active bg-accent-primary-light text-accent-primary-dark"
-                                        : "is-active bg-surface-hover text-text-primary"
+                                        : "is-active text-text-primary"
                                       : isLongTaskSession
                                         ? "bg-accent-primary-light/60 text-accent-primary hover:bg-accent-primary-light hover:text-accent-primary-dark"
                                         : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"

@@ -114,13 +114,13 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
 
           {isOpen && (
             <div
-              className="absolute right-0 top-full z-[100] min-w-[210px] whitespace-nowrap rounded-xl border border-border bg-surface-elevated shadow-elevated-token animate-in fade-in zoom-in-95 duration-100"
+              className="kimix-menu-panel absolute right-0 top-full z-[100] min-w-[210px] whitespace-nowrap"
               style={{ marginTop: 8, padding: "8px 6px" }}
             >
               <button
                 type="button"
                 onClick={handleOpenDefault}
-                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                className="kimix-menu-item text-left text-[13.5px] font-medium whitespace-nowrap"
                 style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
                 <ExternalLink size={15} className="shrink-0 text-text-muted" />
@@ -129,7 +129,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               <button
                 type="button"
                 onClick={handleOpenInEditor}
-                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                className="kimix-menu-item text-left text-[13.5px] font-medium whitespace-nowrap"
                 style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
                 <Code size={15} className="shrink-0 text-text-muted" />
@@ -138,7 +138,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               <button
                 type="button"
                 onClick={handleRevealInFolder}
-                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                className="kimix-menu-item text-left text-[13.5px] font-medium whitespace-nowrap"
                 style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
                 <FolderOpen size={15} className="shrink-0 text-text-muted" />
@@ -148,7 +148,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               <button
                 type="button"
                 onClick={handleCopyFullPath}
-                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                className="kimix-menu-item text-left text-[13.5px] font-medium whitespace-nowrap"
                 style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
                 {copied === "full" ? <Check size={15} className="shrink-0 text-accent-primary" /> : <Copy size={15} className="shrink-0 text-text-muted" />}
@@ -157,7 +157,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               <button
                 type="button"
                 onClick={handleCopyRelativePath}
-                className="flex w-full items-center rounded-lg text-left text-[13.5px] font-medium text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap"
+                className="kimix-menu-item text-left text-[13.5px] font-medium whitespace-nowrap"
                 style={{ height: 36, gap: 10, paddingLeft: 14, paddingRight: 14 }}
               >
                 {copied === "relative" ? <Check size={15} className="shrink-0 text-accent-primary" /> : <Copy size={15} className="shrink-0 text-text-muted" />}

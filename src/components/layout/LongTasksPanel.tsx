@@ -326,7 +326,7 @@ export function LongTasksPanel() {
       aria-labelledby="long-tasks-title"
     >
       <div
-        className="flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+        className="kimix-modal-card flex max-h-[84vh] w-full max-w-[780px] flex-col overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "20px 24px" }}>

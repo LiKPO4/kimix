@@ -118,14 +118,16 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
                 {sortMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setSortMenuOpen(false)} />
-                    <div className="absolute right-0 z-50 rounded-xl border border-border-subtle bg-surface-elevated shadow-lg" style={{ top: "calc(100% + 6px)", minWidth: 118, padding: 6 }}>
+                    <div className="kimix-menu-panel absolute right-0 z-50" style={{ top: "calc(100% + 6px)", minWidth: 118, padding: 6 }}>
                       <div className="flex flex-col" style={{ gap: 2 }}>
                         {PREVIEW_FILE_SORT_MODES.map((mode) => (
                           <button
                             key={mode}
                             type="button"
+                            role="menuitemradio"
+                            aria-checked={mode === sortMode}
                             onClick={() => { setSortMode(mode); setSortMenuOpen(false); }}
-                            className={`flex items-center rounded-lg text-left text-[13px] ${mode === sortMode ? "bg-accent-primary-light text-accent-primary" : "text-text-secondary hover:bg-surface-hover"}`}
+                            className={`kimix-menu-item text-left text-[13px] ${mode === sortMode ? "bg-accent-primary-light text-accent-primary" : "text-text-secondary"}`}
                             style={{ height: 32, paddingLeft: 10, paddingRight: 12, gap: 6 }}
                           >
                             <span className="flex w-4 shrink-0 items-center justify-center">{mode === sortMode ? <Check size={13} /> : null}</span>

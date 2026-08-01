@@ -469,7 +469,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
           aria-modal="true"
         >
           <div
-            className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] shadow-floating-token"
+            className="kimix-modal-card flex max-h-[88vh] w-full max-w-5xl flex-col"
             style={{ padding: 20 }}
           >
             <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "center" }}>

@@ -154,7 +154,7 @@ export function TextContextMenu() {
     <div
       role="menu"
       aria-label="文字操作"
-      className="fixed z-[200] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
+      className="kimix-menu-panel fixed z-[200]"
       style={{ left: menu.x, top: menu.y, width: 176, padding: 7 }}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
@@ -165,7 +165,7 @@ export function TextContextMenu() {
           role="menuitem"
           autoFocus
           onClick={() => void handleCopy()}
-          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          className="kimix-menu-item justify-start text-text-primary"
           style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           <Copy size={15} />
@@ -177,7 +177,7 @@ export function TextContextMenu() {
           type="button"
           role="menuitem"
           onClick={() => void handleTranslate()}
-          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          className="kimix-menu-item justify-start text-text-primary"
           style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           <Languages size={15} />
@@ -188,7 +188,7 @@ export function TextContextMenu() {
         type="button"
         role="menuitem"
         onClick={handleSelectAll}
-        className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+        className="kimix-menu-item justify-start text-text-primary"
         style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
       >
         <TextSelect size={15} />
@@ -199,7 +199,7 @@ export function TextContextMenu() {
           type="button"
           role="menuitem"
           onClick={handleOpen}
-          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          className="kimix-menu-item justify-start text-text-primary"
           style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           <ExternalLink size={15} />
@@ -211,7 +211,7 @@ export function TextContextMenu() {
           type="button"
           role="menuitem"
           onClick={() => void handleReveal()}
-          className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+          className="kimix-menu-item justify-start text-text-primary"
           style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           <FolderOpen size={15} />

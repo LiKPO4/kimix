@@ -201,7 +201,7 @@ export function TopMenuBar({
                 {menu}
               </button>
               {openMenu === menu && (
-                <div className="kimix-top-menu absolute left-0 top-full z-[60] mt-2 min-w-[236px] overflow-hidden rounded-[15px] border border-border-subtle bg-surface-elevated py-3 text-[14px]">
+                <div className="kimix-top-menu kimix-menu-panel absolute left-0 top-full z-[60] mt-2 min-w-[236px] overflow-hidden text-[14px]">
                   {MENU_ITEMS[menu].map((item, index) =>
                     item.type === "separator" ? (
                       <div key={`separator-${index}`} className="my-2 border-t border-border-subtle" />
@@ -210,7 +210,7 @@ export function TopMenuBar({
                         key={item.label}
                         onClick={() => handleMenuClick(item)}
                         style={{ paddingLeft: 24, paddingRight: 22, paddingTop: 10, paddingBottom: 10 }}
-                        className={`flex min-h-10 w-full items-center justify-between gap-5 text-left leading-none transition-colors hover:bg-surface-hover ${
+                        className={`kimix-menu-item justify-between gap-5 text-left leading-none ${
                           item.disabled ? "text-text-muted" : "text-text-primary"
                         }`}
                       >

@@ -30,7 +30,7 @@ describe("ComposerToolbarPopover", () => {
     expect(panel.style.right).toBe("auto");
     expect(panel.style.marginBottom).toBe("8px");
     expect(panel.style.padding).toBe("16px");
-    expect(panel.style.borderRadius).toBe("16px");
+    expect(panel.style.borderRadius).toBe("var(--radius-lg)");
   });
 
   it("统一工具栏右侧弹窗的向上和向左展开规则", () => {

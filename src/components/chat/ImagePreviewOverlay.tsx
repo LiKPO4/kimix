@@ -196,7 +196,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
           <div
             role="menu"
             aria-label="图片操作"
-            className="fixed z-[160] rounded-lg border border-border bg-surface-elevated shadow-elevated-token"
+            className="kimix-menu-panel fixed z-[160]"
             style={{
               left: contextMenu.left,
               top: contextMenu.top,
@@ -211,7 +211,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
               role="menuitem"
               autoFocus
               onClick={() => void handleCopyImage()}
-              className="kimix-icon-text-button w-full justify-start rounded-md text-text-primary hover:bg-surface-hover"
+              className="kimix-menu-item justify-start text-text-primary"
               style={{ minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
             >
               <Copy size={15} />

@@ -2305,7 +2305,7 @@ export function LongTaskInspectorPanel({
     {gitDetailsOpen && (
       <div className="fixed inset-0 z-[86] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={closeGitDetails}>
         <div
-          className="w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+          className="kimix-modal-card w-full max-w-[760px] overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
         >
           <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
@@ -2508,7 +2508,7 @@ export function LongTaskInspectorPanel({
     {gitGraphOpen && (
       <div className="fixed inset-0 z-[87] flex items-start justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ paddingTop: 74, paddingLeft: 20, paddingRight: 20 }} onMouseDown={closeGitGraph}>
         <div
-          className="w-full max-w-[1020px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+          className="kimix-modal-card w-full max-w-[1020px] overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
         >
           <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>

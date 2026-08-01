@@ -798,6 +798,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
             style={{ gap: 8, height: 36, lineHeight: "20px", paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title={project?.path ?? "当前项目"}
             aria-label={project ? `当前项目：${projectDisplayName}` : "当前项目"}
+            aria-haspopup="dialog"
+            aria-expanded={workDirsOpen}
           >
             <FolderOpen size={16} className="shrink-0" />
             {!iconOnly && <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>}
@@ -858,10 +860,12 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
           <button
             type="button"
             onClick={toggleUsage}
-            className="kimix-icon-text-button kimix-muted-action is-compact min-w-0"
-            style={{ height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
+            className="kimix-contextbar-action kimix-muted-action flex min-w-0 items-center rounded-lg"
+            style={{ gap: 8, height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
             title="套餐用量"
             aria-label="套餐用量"
+            aria-haspopup="dialog"
+            aria-expanded={usageOpen}
           >
             <BarChart3 size={16} className="shrink-0" />
             {!iconOnly && <span className="truncate">套餐用量</span>}
@@ -1076,8 +1080,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       {session && (
         <button
           onClick={() => void handleExport()}
-          className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
-          style={{ height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
+          className="kimix-contextbar-action kimix-muted-action flex shrink-0 items-center rounded-lg"
+          style={{ gap: 8, height: 36, paddingLeft: iconOnly ? 10 : 12, paddingRight: iconOnly ? 10 : 12 }}
           title="导出 Markdown"
           aria-label="导出 Markdown"
         >

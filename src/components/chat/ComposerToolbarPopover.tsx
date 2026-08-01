@@ -4,7 +4,6 @@ export type ComposerToolbarPopoverAlign = "start" | "end";
 
 const COMPOSER_TOOLBAR_POPOVER_GAP = 8;
 const COMPOSER_TOOLBAR_POPOVER_PADDING = 16;
-const COMPOSER_TOOLBAR_POPOVER_RADIUS = 16;
 
 export function ComposerToolbarPopover({
   align,
@@ -37,7 +36,7 @@ export function ComposerToolbarPopover({
         maxWidth: "calc(100vw - 40px)",
         marginBottom: COMPOSER_TOOLBAR_POPOVER_GAP,
         padding,
-        borderRadius: COMPOSER_TOOLBAR_POPOVER_RADIUS,
+        borderRadius: "var(--radius-lg)",
       }}
     >
       {children}

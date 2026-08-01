@@ -358,9 +358,10 @@
   box-shadow: var(--kimix-retro-inset-shadow);
 }
 
-/* 相同角色使用相同控件语言：窗口工具键与 Composer 工具/模式键共享轻凹面。 */
+/* 相同角色使用相同控件语言：窗口工具键与明确标注的 Composer 控件共享轻凹面。
+   状态切换键（Swarm / Plan）保持段式按钮语义，不混入普通工具键。 */
 [data-ui-style="retro"] .kimix-toolbar-button,
-[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button,
+[data-ui-style="retro"] .kimix-control-button,
 [data-ui-style="retro"] .kimix-composer-tool-button {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
@@ -370,7 +371,7 @@
 }
 
 [data-ui-style="retro"] .kimix-toolbar-button:hover:not(:disabled),
-[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button:hover:not(:disabled),
+[data-ui-style="retro"] .kimix-control-button:hover:not(:disabled),
 [data-ui-style="retro"] .kimix-composer-tool-button:hover:not(:disabled) {
   background-color: var(--accent-primary-light);
   border-color: var(--accent-primary-soft);
@@ -379,7 +380,7 @@
 }
 
 [data-ui-style="retro"] .kimix-toolbar-button:active:not(:disabled),
-[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button:active:not(:disabled),
+[data-ui-style="retro"] .kimix-control-button:active:not(:disabled),
 [data-ui-style="retro"] .kimix-composer-tool-button:active:not(:disabled) {
   scale: 0.96;
   box-shadow: var(--kimix-retro-inset-shadow);
@@ -451,14 +452,14 @@
   box-shadow: var(--kimix-retro-control-shadow);
 }
 
-/* 侧栏维持平面信息密度，选中态用同一套内框和主题刻度建立归属。 */
+/* 侧栏维持平面信息密度；项目与会话只使用左侧主题刻度，不再叠整圈焦点框。 */
 [data-ui-style="retro"] .kimix-sidebar {
   box-shadow: inset -1px 0 0 var(--border-default);
 }
 
 [data-ui-style="retro"] .kimix-sidebar-project-row.is-active,
 [data-ui-style="retro"] .kimix-sidebar-session-row.is-active {
-  box-shadow: inset 2px 0 0 var(--accent-primary), inset 0 0 0 1px var(--border-subtle);
+  box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
 [data-ui-style="retro"] .kimix-sidebar-nav-item:hover,
@@ -486,10 +487,33 @@
 }
 
 [data-theme="dark"][data-ui-style="retro"] .kimix-toolbar-button,
-[data-theme="dark"][data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button,
+[data-theme="dark"][data-ui-style="retro"] .kimix-control-button,
 [data-theme="dark"][data-ui-style="retro"] .kimix-composer-tool-button {
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
   box-shadow: var(--kimix-retro-control-shadow);
+}
+
+/* 复古层只改变共享浮层骨架的材质，不要求每个业务弹窗单独适配。 */
+[data-ui-style="retro"] .kimix-floating-panel,
+[data-ui-style="retro"] .kimix-menu-panel,
+[data-ui-style="retro"] .kimix-modal-card,
+[data-ui-style="retro"] .kimix-onboarding-card,
+[data-ui-style="retro"] .kimix-settings-panel:not(.is-workspace) {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: none;
+}
+
+[data-ui-style="retro"] .kimix-menu-panel {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+[data-ui-style="retro"] .kimix-menu-item[aria-checked="true"],
+[data-ui-style="retro"] .kimix-menu-item[aria-selected="true"] {
+  box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
 /* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */
@@ -960,6 +984,43 @@ body::before {
   scale: 0.96;
 }
 
+/* 有下拉内容的工具控件。默认风格保持安静，展开态才显示边界。 */
+.kimix-control-button {
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.kimix-control-button:hover:not(:disabled),
+.kimix-control-button[aria-expanded="true"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-hover);
+}
+
+/* 二元状态按钮统一依赖 aria-pressed；业务组件不再内联拼装选中边框。 */
+.kimix-state-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.kimix-state-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-state-button[aria-pressed="true"] {
+  border-color: var(--accent-primary-soft);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary-dark);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+
+[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"] {
+  box-shadow: var(--kimix-retro-inset-shadow), inset 2px 0 0 var(--accent-primary);
+}
+
 @container (max-width: 480px) {
   .kimix-composer-toolbar {
     height: auto !important;
@@ -1168,7 +1229,8 @@ button.bg-accent-primary:disabled:hover,
               box-shadow var(--duration-base) var(--ease-hover);
 }
 
-.kimix-contextbar-action:hover {
+.kimix-contextbar-action:hover,
+.kimix-contextbar-action[aria-expanded="true"] {
   background: var(--surface-hover);
   box-shadow: var(--shadow-hover);
 }
@@ -1206,11 +1268,51 @@ button.bg-accent-primary:disabled:hover,
 /* ── Menus ── */
 
 .kimix-top-menu,
-.kimix-floating-menu {
+.kimix-floating-menu,
+.kimix-menu-panel {
   background: var(--surface-elevated);
-  border-color: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg) !important;
   color: var(--text-secondary);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: var(--shadow-floating);
+}
+
+.kimix-menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  transition-property: background-color, color, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-timing-function: var(--ease-hover);
+}
+
+.kimix-menu-item.grid {
+  display: grid;
+}
+
+.kimix-menu-item[aria-checked="true"] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-menu-item.is-danger {
+  color: var(--accent-danger);
+}
+
+.kimix-menu-item.is-danger:hover:not(:disabled) {
+  background: var(--accent-danger-light);
+}
+
+.kimix-menu-item:hover:not(:disabled),
+.kimix-menu-item[aria-selected="true"] {
+  background: var(--surface-hover);
+}
+
+.kimix-menu-item:active:not(:disabled) {
+  scale: 0.96;
 }
 
 .kimix-top-menu-trigger {
@@ -1276,6 +1378,13 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-sm);
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover);
+}
+
+.kimix-sidebar-project-row.is-active,
+.kimix-sidebar-session-row.is-active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
 .kimix-sidebar-project-row-actions {
@@ -2961,12 +3070,12 @@ button.bg-accent-primary:disabled:hover,
 /* ── Floating Panel ── */
 
 .kimix-floating-panel {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   color: var(--text-primary);
-  box-shadow: var(--shadow-elevated);
-  backdrop-filter: blur(10px);
-  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg) !important;
 }
 
 /* ── Soft Card ── */
@@ -3179,7 +3288,7 @@ button.bg-accent-primary:disabled:hover,
   border: 0;
   background: var(--surface-elevated);
   color: var(--text-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-overlay);
 }
 

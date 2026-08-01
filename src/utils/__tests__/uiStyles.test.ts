@@ -43,10 +43,28 @@ describe("UI_STYLES", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-icon-text-button\s*\{/);
+    expect(css).not.toContain('[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button');
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-composer-input[\s\S]*?border:\s*0\s*!important;/);
-    expect(css).toContain('[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-control-button');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"]');
     expect(css).toContain('[data-ui-style="retro"] .kimix-context-bar');
     expect(css).toContain('[data-ui-style="retro"] .kimix-sidebar-project-row.is-active');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-floating-panel');
+  });
+
+  it("初版与复古风格共享状态按钮、菜单和弹窗骨架", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+    const contextBar = readFileSync(resolve(process.cwd(), "src/components/chat/ContextBar.tsx"), "utf8");
+    const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
+
+    expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{/);
+    expect(css).toMatch(/\.kimix-menu-panel\s*\{/);
+    expect(css).toMatch(/\.kimix-floating-panel\s*\{/);
+    expect(composer).toContain("kimix-state-button");
+    expect(composer).toContain("kimix-control-button");
+    expect(contextBar).toContain("aria-expanded={usageOpen}");
+    expect(sidebar).toContain("kimix-menu-panel");
   });
 });
 

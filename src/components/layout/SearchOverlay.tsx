@@ -402,7 +402,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         role="dialog"
         aria-modal="true"
         aria-label="搜索会话"
-        className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--kimix-panel-border-soft)] bg-surface-elevated shadow-floating-token"
+        className="kimix-modal-card w-full max-w-[720px] overflow-hidden"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>

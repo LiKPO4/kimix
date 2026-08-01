@@ -4404,18 +4404,20 @@ export function Composer() {
                       className={`kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${pendingMoreId === msg.id ? "bg-[var(--kimix-panel-hover)]" : ""}`}
                       title="更多"
                       aria-label="更多"
+                      aria-haspopup="menu"
                       aria-expanded={pendingMoreId === msg.id}
                     >
                       <MoreHorizontal size={14} />
                     </button>
                     {pendingMoreId === msg.id && (
-                      <div className="absolute right-0 top-full z-10 mt-1 flex min-w-[120px] flex-col rounded-lg border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-bg)] py-1 shadow-lg" role="menu">
+                      <div className="kimix-menu-panel absolute right-0 top-full z-10 mt-1 flex min-w-[120px] flex-col" style={{ padding: 5 }} role="menu">
                         <button
                           type="button"
                           role="menuitem"
                           disabled={index === 0}
                           onClick={() => { promotePendingMessage(msg.id); setPendingMoreId(null); }}
-                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
                         >
                           移到最前
                         </button>
@@ -4424,7 +4426,8 @@ export function Composer() {
                           role="menuitem"
                           disabled={index === 0}
                           onClick={() => { movePendingMessage(msg.id, "up"); setPendingMoreId(null); }}
-                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
                         >
                           上移
                         </button>
@@ -4433,7 +4436,8 @@ export function Composer() {
                           role="menuitem"
                           disabled={index === pendingMessages.length - 1}
                           onClick={() => { movePendingMessage(msg.id, "down"); setPendingMoreId(null); }}
-                          className="px-3 py-1.5 text-left text-[13px] text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
                         >
                           下移
                         </button>
@@ -4853,13 +4857,15 @@ export function Composer() {
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={() => setShowPermissionMenu((v) => !v)}
-                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12 }}
                 title={!hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
                     ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可切换权限`
                     : activeMutationOwner ? `修改 ${activeMutationOwner.displayName} 的权限` : undefined}
+                aria-haspopup="menu"
+                aria-expanded={showPermissionMenu}
               >
                 {(() => {
                   const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
@@ -4873,7 +4879,7 @@ export function Composer() {
                   {PERMISSION_OPTIONS.map((opt) => {
                     const Icon = permissionMenuIcons[opt.value];
                     return (
-                      <button key={opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ gap: 10, minHeight: 34, paddingLeft: 10, paddingRight: 10, paddingTop: 6, paddingBottom: 6, borderRadius: 8 }} className={`flex w-full items-center text-left text-[13px] leading-none hover:bg-[var(--kimix-panel-hover)] ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+                      <button key={opt.value} role="menuitemradio" aria-checked={(mutationPermissionMode ?? permissionMode) === opt.value} title={opt.tooltip} onClick={() => void handleSetPermissionMode(opt.value)} style={{ gap: 10, minHeight: 34, paddingLeft: 10, paddingRight: 10, paddingTop: 6, paddingBottom: 6 }} className={`kimix-menu-item text-left text-[13px] leading-none ${(mutationPermissionMode ?? permissionMode) === opt.value ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}>
                         <Icon size={13} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate">{opt.label}</span>
                         {(mutationPermissionMode ?? permissionMode) === opt.value && <Check size={13} className="shrink-0 text-[var(--kimix-panel-text)]" />}
@@ -4915,7 +4921,7 @@ export function Composer() {
                 type="button"
                 disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
-                className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: 84,
                   minWidth: 84,
@@ -4924,10 +4930,6 @@ export function Composer() {
                   gap: 6,
                   paddingLeft: 12,
                   paddingRight: 12,
-                  borderColor: swarmModeEnabled ? "var(--accent-primary-soft)" : "transparent",
-                  backgroundColor: swarmModeEnabled ? "var(--accent-primary-light)" : "transparent",
-                  color: swarmModeEnabled ? "var(--accent-primary-dark)" : undefined,
-                  boxShadow: swarmModeEnabled ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
                 }}
                 title={swarmModePending
                   ? `${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}`
@@ -4944,7 +4946,7 @@ export function Composer() {
             <button
               disabled={!canTogglePlanMode}
               onClick={() => void handleTogglePlanMode()}
-              className="kimix-icon-text-button kimix-muted-action is-compact border disabled:cursor-not-allowed disabled:opacity-35"
+              className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
               style={{
                 width: 72,
                 minWidth: 72,
@@ -4953,10 +4955,6 @@ export function Composer() {
                 gap: 6,
                 paddingLeft: 12,
                 paddingRight: 12,
-                borderColor: mutationPlanMode ? "var(--accent-primary-soft)" : "transparent",
-                backgroundColor: mutationPlanMode ? "var(--accent-primary-light)" : "transparent",
-                color: mutationPlanMode ? "var(--accent-primary-dark)" : undefined,
-                boxShadow: mutationPlanMode ? "inset 0 0 0 1px rgba(25, 130, 255, 0.16)" : undefined,
               }}
               title={mutationPlanMode ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式` : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式`}
               aria-pressed={mutationPlanMode}
@@ -4968,7 +4966,7 @@ export function Composer() {
               <button
                 disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
                 onClick={toggleThinkingMenu}
-                className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: "100%",
                   height: 34,
@@ -5006,7 +5004,7 @@ export function Composer() {
                           role="menuitemradio"
                           aria-checked={selected}
                           onClick={() => void handleSetThinkingEffort(option.value)}
-                          className={`grid w-full items-center text-left hover:bg-[var(--kimix-panel-hover)] active:scale-[0.96] ${selected ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}
+                          className={`kimix-menu-item grid text-left ${selected ? "text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)]"}`}
                           style={{
                             gridTemplateColumns: "16px minmax(0, 1fr) 16px",
                             gap: 10,
@@ -5015,10 +5013,6 @@ export function Composer() {
                             paddingRight: 10,
                             paddingTop: 6,
                             paddingBottom: 6,
-                            borderRadius: 8,
-                            transitionProperty: "background-color, scale",
-                            transitionDuration: "150ms",
-                            transitionTimingFunction: "ease-out",
                           }}
                         >
                           <Brain size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
