@@ -22,6 +22,21 @@ const SUGGESTION_ICONS: Record<string, typeof Sparkles> = {
   "分析项目结构，找出 3 个最该优先处理的问题": Bug,
 };
 
+/**
+ * 已保存的建议会跨版本保留，不能依赖整句文案完全一致。
+ * 先保留内置建议的精确映射，再按稳定的动作语义兼容旧文案和截断文案。
+ */
+export function resolveSuggestionIcon(text: string): typeof Sparkles {
+  const exactIcon = SUGGESTION_ICONS[text];
+  if (exactIcon) return exactIcon;
+
+  if (/^(继续|接着)|继续[:：]|接着上次/.test(text)) return RotateCcw;
+  if (/风险|代码审查|检查.*改动|未提交|Git\s*改动/i.test(text)) return GitBranch;
+  if (/待办|下一步|整理/.test(text)) return ListChecks;
+  if (/问题|故障|错误|复现|优先处理|分析.*项目|项目.*分析/i.test(text)) return Bug;
+  return Sparkles;
+}
+
 function genId(): string {
   return Math.random().toString(36).substring(2, 11);
 }
@@ -104,7 +119,7 @@ export function EmptyState() {
 
     const unique = Array.from(new Set(dynamic)).slice(0, 5);
     return unique.map((text) => ({
-      icon: text.startsWith("继续：") ? RotateCcw : (SUGGESTION_ICONS[text] ?? Sparkles),
+      icon: resolveSuggestionIcon(text),
       text,
     }));
   }, [project, savedSuggestions, sessions]);
