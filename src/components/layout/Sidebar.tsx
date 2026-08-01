@@ -1127,7 +1127,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 className="flex h-8 items-center rounded-lg text-[13px] text-text-muted transition-colors hover:bg-surface-hover"
                                 style={{ paddingLeft: 16, paddingRight: 10, gap: 6 }}
                               >
-                                {sessionListWindow.collapsed ? `展开剩余 ${sessionListWindow.hiddenCount} 个对话` : "收起对话"}
+                                {sessionListWindow.collapsed ? `展开剩余 ${sessionListWindow.hiddenCount} 个对话` : `收起 ${sessionListWindow.hiddenCount} 个对话`}
                               </button>
                             )}
                           </div>
