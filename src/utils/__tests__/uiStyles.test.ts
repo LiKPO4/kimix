@@ -49,6 +49,8 @@ describe("UI_STYLES", () => {
     expect(css).toContain("--ui-nav-action-border:");
     expect(css).toContain("--ui-nav-list-hover-shadow:");
     expect(css).toContain("--ui-selection-shadow:");
+    expect(css).toContain("--ui-toggle-shadow:");
+    expect(css).toContain("--ui-compound-shadow:");
     expect(css).toContain("--ui-popup-border:");
     expect(css).toContain("--ui-menu-trigger-hover-shadow:");
     expect(css).toContain(":where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control)");
@@ -63,6 +65,15 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-sidebar-session-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar-project-row:hover/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar\s*\{[\s\S]*?box-shadow:\s*inset\s+-1px/);
+  });
+
+  it("按钮开启态与纵向导航选中态使用不同的视觉语法", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    expect(css).not.toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).toMatch(/:where\(\.kimix-toolbar-button, \.kimix-split-control\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
   });
 
   it("初版与其他风格共享导航、控件、菜单和弹窗骨架", () => {

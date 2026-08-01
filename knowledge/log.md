@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Navigation selection and button modes use separate state tokens (v2.20.96)**: `--ui-selection-*` is now directional and limited to vertical navigation, while `--ui-toggle-*` gives Swarm, Plan, pressed, and expanded buttons a complete recessed surface without a leading accent stripe. Ordinary navigation and window controls stay flat at rest; only compound launch/open controls retain a persistent shared boundary. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Interface presets now use a semantic style contract (v2.20.95)**: theme tokens remain the color authority, while controls, sidebar actions/lists, selection, popups, fields, menu triggers, and shell separators consume `--ui-*` role tokens. Window controls and launch/open split controls are enrolled, active-plus-hover explicitly preserves the selection accent edge, and the decorative full-height sidebar divider is removed. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Default and retro interfaces share semantic control and popup skeletons (v2.20.94)**: binary modes now use `.kimix-state-button` plus `aria-pressed`, disclosure controls use `.kimix-control-button` plus `aria-expanded`, and menus/popovers/dialogs use shared panel roles before any interface preset applies material styling. Sidebar selection is reduced to one quiet surface and one accent edge. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

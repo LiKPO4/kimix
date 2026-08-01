@@ -171,6 +171,14 @@
   --ui-selection-background: var(--surface-hover);
   --ui-selection-color: var(--text-primary);
   --ui-selection-shadow: inset 2px 0 0 var(--accent-primary);
+  --ui-toggle-border-color: var(--accent-primary-soft);
+  --ui-toggle-background: var(--accent-primary-light);
+  --ui-toggle-color: var(--accent-primary-dark);
+  --ui-toggle-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  --ui-compound-border: var(--ui-control-border);
+  --ui-compound-background: var(--ui-control-background);
+  --ui-compound-background-image: var(--ui-control-background-image);
+  --ui-compound-shadow: var(--ui-control-shadow);
   --ui-popup-border: 1px solid var(--border-default);
   --ui-popup-background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   --ui-popup-shadow: var(--shadow-floating);
@@ -373,27 +381,35 @@
   --shadow-overlay: 0 0 0 1px rgba(77, 80, 80, 0.16), 0 18px 42px rgba(38, 42, 44, 0.18);
   --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(40, 43, 45, 0.09) !important;
   --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16) !important;
-  --ui-control-border: 1px solid var(--border-default);
-  --ui-control-background: var(--surface-base);
-  --ui-control-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.035));
-  --ui-control-shadow: var(--kimix-retro-control-shadow);
-  --ui-control-hover-border-color: var(--accent-primary-soft);
-  --ui-control-hover-background: var(--accent-primary-light);
+  --ui-control-border: 1px solid transparent;
+  --ui-control-background: transparent;
+  --ui-control-background-image: none;
+  --ui-control-shadow: none;
+  --ui-control-hover-border-color: var(--border-default);
+  --ui-control-hover-background: var(--surface-hover);
   --ui-control-hover-shadow: var(--kimix-retro-control-shadow);
   --ui-control-active-shadow: var(--kimix-retro-inset-shadow);
-  --ui-nav-action-border: 1px solid var(--border-default);
-  --ui-nav-action-background: var(--surface-base);
-  --ui-nav-action-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.025));
-  --ui-nav-action-shadow: var(--kimix-retro-control-shadow);
-  --ui-nav-action-hover-border-color: var(--accent-primary-soft);
-  --ui-nav-action-hover-background: var(--accent-primary-light);
-  --ui-nav-action-hover-shadow: var(--kimix-retro-control-shadow);
-  --ui-nav-list-hover-border-color: var(--border-default);
+  --ui-nav-action-border: 1px solid transparent;
+  --ui-nav-action-background: transparent;
+  --ui-nav-action-background-image: none;
+  --ui-nav-action-shadow: none;
+  --ui-nav-action-hover-border-color: transparent;
+  --ui-nav-action-hover-background: var(--surface-hover);
+  --ui-nav-action-hover-shadow: none;
+  --ui-nav-list-hover-border-color: transparent;
   --ui-nav-list-hover-background: var(--surface-hover);
-  --ui-nav-list-hover-shadow: var(--kimix-retro-control-shadow);
-  --ui-selection-border-color: var(--border-default);
+  --ui-nav-list-hover-shadow: none;
+  --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-active);
-  --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), var(--kimix-retro-inset-shadow);
+  --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), inset 0 1px 1px rgba(40, 43, 45, 0.08);
+  --ui-toggle-border-color: var(--border-default);
+  --ui-toggle-background: var(--surface-active);
+  --ui-toggle-color: var(--text-primary);
+  --ui-toggle-shadow: var(--kimix-retro-inset-shadow);
+  --ui-compound-border: 1px solid var(--border-default);
+  --ui-compound-background: var(--surface-base);
+  --ui-compound-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.025));
+  --ui-compound-shadow: var(--kimix-retro-control-shadow);
   --ui-popup-border: 1px solid var(--border-default);
   --ui-popup-background: var(--surface-elevated);
   --ui-popup-shadow: var(--shadow-floating);
@@ -417,8 +433,7 @@
   --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 42px rgba(0, 0, 0, 0.42);
   --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.28) !important;
   --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.34) !important;
-  --ui-control-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
-  --ui-nav-action-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.07));
+  --ui-compound-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.07));
 }
 
 /* 内容面板只保留薄边界与轻微顶高光，避免“每一块都凸起”的机械感。 */
@@ -448,7 +463,8 @@
 
 [data-ui-style="retro"] .kimix-app-shell-main {
   border-color: var(--ui-shell-border-color);
-  box-shadow: var(--kimix-retro-panel-shadow);
+  border-left-width: 0;
+  box-shadow: none;
 }
 
 /* Composer 是一个整体：外壳聚焦，输入文本区不再形成第二个矩形。 */
@@ -1034,10 +1050,10 @@ body::before {
 :where(.kimix-control-button, .kimix-window-control)[aria-expanded="true"],
 :where(.kimix-toolbar-button, .kimix-split-control).is-expanded,
 :where(.kimix-toolbar-button, .kimix-window-control)[aria-pressed="true"] {
-  border-color: var(--ui-selection-border-color);
-  background-color: var(--ui-selection-background);
-  color: var(--ui-selection-color);
-  box-shadow: var(--ui-selection-shadow);
+  border-color: var(--ui-toggle-border-color);
+  background-color: var(--ui-toggle-background);
+  color: var(--ui-toggle-color);
+  box-shadow: var(--ui-toggle-shadow);
 }
 
 :where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control):active:not(:disabled) {
@@ -1052,7 +1068,26 @@ body::before {
 }
 
 .kimix-split-control {
+  border: var(--ui-compound-border);
+  background-color: var(--ui-compound-background);
+  background-image: var(--ui-compound-background-image);
+  box-shadow: var(--ui-compound-shadow);
   overflow: hidden;
+}
+
+.kimix-split-control:hover {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+.kimix-split-control.is-expanded,
+.kimix-split-control.is-expanded:hover {
+  border-color: var(--ui-toggle-border-color);
+  background-color: var(--ui-toggle-background);
+  background-image: none;
+  color: var(--ui-toggle-color);
+  box-shadow: var(--ui-toggle-shadow);
 }
 
 .kimix-split-control-part {
@@ -1084,10 +1119,10 @@ body::before {
 }
 
 .kimix-state-button[aria-pressed="true"] {
-  border-color: var(--ui-selection-border-color);
-  background: var(--ui-selection-background);
-  color: var(--ui-selection-color);
-  box-shadow: var(--ui-selection-shadow);
+  border-color: var(--ui-toggle-border-color);
+  background: var(--ui-toggle-background);
+  color: var(--ui-toggle-color);
+  box-shadow: var(--ui-toggle-shadow);
 }
 
 @container (max-width: 480px) {
