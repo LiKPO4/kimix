@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern content depth and Markdown tables are role-scoped (v2.20.104)**: grouped settings containers, standalone cards, and complete sub-regions now consume 16/14/18px semantic radius roles instead of generic fallback radii. Markdown rendering exposes frame/header/cell roles; Modern uses page-aligned, theme-derived horizontal rules without outer grid, header fill, or zebra striping, while Default and Retro retain independent treatments. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Project empty-state suggestions have stable semantic slots (v2.20.102)**: project overview is always first, latest context contributes at most one normalized continue action, historical continue variants cannot consume extra slots, and remaining saved/default actions keep semantic icons even when their display copy changes. See [/project/kimix.md](/project/kimix.md).
 
 * **Divider ownership corrected after v2.20.100 (v2.20.102)**: the conversation toolbar bottom rule is structural and has been restored. The requested Codex-style simplification applies only inside launch/open split controls through `--ui-compound-divider-shadow`; Modern disables that local divider while Default and Retro retain it. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

@@ -62,6 +62,13 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-workspace-page,\s*\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);[^}]*padding:\s*var\(--kimix-modern-segment-gap\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme\s*\{[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-permissions\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-connection,[\s\S]*?\.kimix-chat-banner\s*\{[^}]*border-radius:\s*var\(--kimix-modern-card-radius\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-model-provider-manager,[\s\S]*?\.kimix-runtime-error-card\s*\{[^}]*border-radius:\s*var\(--kimix-modern-panel-radius\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.markdown-body\s+\.kimix-markdown-table-frame\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.markdown-body\s+\.kimix-markdown-table-header-cell\s*\{[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.markdown-body\s+\.kimix-markdown-table-cell\s*\{[^}]*border-bottom:\s*1px solid color-mix\(in srgb, var\(--border-subtle\) 78%, transparent\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.markdown-body\s+tr,[\s\S]*?tr:nth-child\(even\)\s*\{[^}]*background:\s*transparent;/s);
     expect(css).not.toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-theme,/);
   });
 

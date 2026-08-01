@@ -88,7 +88,10 @@ describe("MarkdownRenderer streaming blocks", () => {
     expect(table?.style.tableLayout).toBe("auto");
     expect(table?.style.overflowWrap).toBe("break-word");
     expect(table?.parentElement?.className).toContain("overflow-x-auto");
+    expect(table?.parentElement?.className).toContain("kimix-markdown-table-frame");
+    expect(table?.className).toContain("kimix-markdown-table");
     expect(cells[0]?.className).toContain("kimix-markdown-table-cell-compact");
+    expect(cells[0]?.className).toContain("kimix-markdown-table-cell");
     expect(cells[0]?.style.whiteSpace).toBe("nowrap");
     expect(cells[1]?.className).toContain("kimix-markdown-table-cell-compact");
     expect(cells[1]?.style.whiteSpace).toBe("nowrap");

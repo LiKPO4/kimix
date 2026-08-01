@@ -503,6 +503,11 @@
   padding: var(--kimix-modern-segment-gap);
 }
 
+/* 分段选择与成组列表都是一个完整容器；满铺列表项由父层裁切，不再各自制造小圆角。 */
+[data-ui-style="modern"] .kimix-settings-panel.is-workspace .kimix-settings-permissions {
+  border-radius: var(--kimix-modern-segment-radius);
+}
+
 [data-ui-style="modern"] .kimix-settings-panel.is-workspace .kimix-settings-theme {
   border-radius: var(--kimix-modern-control-radius);
 }
@@ -511,6 +516,24 @@
   border: var(--ui-field-border);
   border-radius: var(--kimix-modern-control-radius);
   box-shadow: var(--ui-field-shadow);
+}
+
+/* 单层内容卡统一走 card 档；只接管形状，不覆盖各业务状态的颜色与边框。 */
+[data-ui-style="modern"] .kimix-settings-connection,
+[data-ui-style="modern"] .kimix-settings-custom-palette,
+[data-ui-style="modern"] .kimix-settings-theme-scan-message,
+[data-ui-style="modern"] .kimix-model-settings-message,
+[data-ui-style="modern"] .kimix-settings-list-item,
+[data-ui-style="modern"] .kimix-plugin-list-item,
+[data-ui-style="modern"] .kimix-model-row,
+[data-ui-style="modern"] .kimix-chat-banner {
+  border-radius: var(--kimix-modern-card-radius);
+}
+
+/* 承载完整子区域的容器使用 panel 档，和弹窗/Composer 的 18px 层级一致。 */
+[data-ui-style="modern"] .kimix-model-provider-manager,
+[data-ui-style="modern"] .kimix-runtime-error-card {
+  border-radius: var(--kimix-modern-panel-radius);
 }
 
 [data-ui-style="modern"] .kimix-context-bar {
@@ -3990,6 +4013,11 @@ button.bg-accent-primary:disabled:hover,
   font-size: 0.9em;
 }
 
+.markdown-body .kimix-markdown-table-frame {
+  border: 1px solid #ded8ce;
+  border-radius: var(--radius-sm);
+}
+
 .markdown-body th,
 .markdown-body td {
   padding: 0.5em 0.75em;
@@ -4002,6 +4030,18 @@ button.bg-accent-primary:disabled:hover,
   font-weight: 600;
 }
 
+.markdown-body .kimix-markdown-table-cell {
+  padding: 0.5em 0.75em;
+}
+
+.markdown-body .kimix-markdown-table-header-cell {
+  border-color: #e5e1d8;
+}
+
+.markdown-body .kimix-markdown-table td {
+  border-color: #eee9e1;
+}
+
 .markdown-body .kimix-markdown-table-cell-compact code {
   white-space: nowrap !important;
   overflow-wrap: normal !important;
@@ -4010,6 +4050,47 @@ button.bg-accent-primary:disabled:hover,
 
 .markdown-body tr:nth-child(even) {
   background-color: var(--surface-base);
+}
+
+/* Codex 式现代表格：内容直接落在页面上，只用安静的横向发丝线组织行。 */
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-frame {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-head {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-header-cell {
+  background: transparent;
+}
+
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-cell {
+  padding-top: 0.65em;
+  padding-bottom: 0.65em;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 78%, transparent);
+}
+
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-cell:first-child {
+  padding-left: 0;
+}
+
+[data-ui-style="modern"] .markdown-body .kimix-markdown-table-cell:last-child {
+  padding-right: 0;
+}
+
+[data-ui-style="modern"] .markdown-body tbody tr:last-child .kimix-markdown-table-cell {
+  border-bottom: 0;
+}
+
+[data-ui-style="modern"] .markdown-body tr,
+[data-ui-style="modern"] .markdown-body tr:nth-child(even) {
+  background: transparent;
 }
 
 .markdown-body hr {

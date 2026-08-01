@@ -567,13 +567,12 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       },
       table: ({ children }: { children?: React.ReactNode }) => (
         <div
-          className={`rounded-lg ${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"}`}
-          style={{ border: "1px solid #ded8ce", marginTop: 8, marginBottom: 14 }}
+          className={`kimix-markdown-table-frame ${wrapLongLines ? "overflow-x-hidden" : "overflow-x-auto"}`}
+          style={{ marginTop: 8, marginBottom: 14 }}
         >
           <table
-            className="w-full text-sm text-text-primary"
+            className="kimix-markdown-table w-full text-sm text-text-primary"
             style={{
-              borderColor: "#e5e1d8",
               margin: 0,
               minWidth: "100%",
               width: "100%",
@@ -586,13 +585,13 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
           </table>
         </div>
       ),
-      thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-bg-tertiary text-text-secondary font-medium">{children}</thead>,
+      thead: ({ children }: { children?: React.ReactNode }) => <thead className="kimix-markdown-table-head text-text-secondary font-medium">{children}</thead>,
       th: ({ children }: { children?: React.ReactNode }) => {
         const compact = isCompactTableCell(children);
         return (
           <th
-            className={`px-3 py-2 text-left ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
-            style={{ border: "1px solid #e5e1d8", overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
+            className={`kimix-markdown-table-cell kimix-markdown-table-header-cell text-left ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
+            style={{ overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
           >
             {children}
           </th>
@@ -602,8 +601,8 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
         const compact = isCompactTableCell(children);
         return (
           <td
-            className={`px-3 py-2 ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
-            style={{ border: "1px solid #eee9e1", overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
+            className={`kimix-markdown-table-cell ${compact ? "kimix-markdown-table-cell-compact" : ""}`}
+            style={{ overflowWrap: compact ? "normal" : "break-word", wordBreak: "normal", whiteSpace: compact ? "nowrap" : "normal", verticalAlign: "top" }}
           >
             {children}
           </td>

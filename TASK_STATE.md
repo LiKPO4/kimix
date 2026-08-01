@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 优化：现代内容圆角覆盖与轻量表格（v2.20.104）
+
+- 根因一：Modern 已有 control/card/panel/shell 四级圆角，但设置分组、连接卡、模型行、插件项及完整模型面板没有按语义角色登记，仍回退到旧的 `radius-sm/md`，导致设置页大圆角只覆盖部分容器。
+- 修复一：成组选择容器统一使用 16px segment 圆角，单层内容卡统一使用 14px card 圆角，完整子区域面板统一使用 18px panel 圆角；控件 10px 与主壳 20px 保持不变，颜色、布局、默认和复古风格不受影响。
+- 根因二：Markdown 表格把硬编码米灰外框、单元格四边框、灰表头与斑马纹叠在一起；Modern 即使圆角化，仍像旧式数据网格，且深灰偶数行压过正文层级。
+- 修复二：Markdown 表格暴露 frame/table/head/cell 语义角色；仅 Modern 移除卡片外框、竖线、表头底色与斑马纹，改为主题 `border-subtle` 派生的浅横线，首末列与正文边缘对齐。默认/复古保留既有网格表现。
+- 实机验收：Windows 直接操作 v2.20.104，模型与供应商、外观、对话与权限、对话表格四个状态均无裁切、反向嵌套或深色斑马纹。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-style-audit-22104/01-models.png` 至 `04-modern-table.png`，详细结论见 `design-qa.md`。
+- 验证：定向 Markdown/UI/设置样式 3 文件 22 项、全量 153 文件 1462 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CO_RFeGP.css`、JS `assets/index-CehvMEy_.js`）、OKF strict/audit 校验（12 concepts、380 links）通过。
+
 ## 2026-08-01 修正：现代分隔线目标与空态建议槽位（v2.20.102）
 
 - 纠错一：v2.20.100 误把用户所指分割线理解成会话标题栏底边并将其移除；实际目标是启动和打开两个 split button 主动作/下拉动作之间的竖线。现恢复标题栏原有结构横线，新增 `--ui-compound-divider-shadow` 角色 token，Modern 设为 `none`，默认与复古继续保留内部语义分隔。
