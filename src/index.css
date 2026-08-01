@@ -303,84 +303,107 @@
   --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* 复古：浮雕面板（Win95/98 经典 OS bevel 风）。直角、灰色面板基底、明暗双边框凹凸感；浮雕载体规则见下方 */
+/* 复古：借鉴 Classic Mac OS 8/9 Platinum 的克制层级与控件触感。
+   只调整形状、边框和阴影；所有背景、文字、强调色继续由颜色主题提供。 */
 [data-ui-style="retro"] {
-  /* 复古圆角统一为 0：彻底直角 */
-  --ui-radius-sm: 0px;
-  --ui-radius-md: 0px;
-  --ui-radius-lg: 0px;
-  --ui-radius-xl: 0px;
-  --ui-radius-2xl: 0px;
-  --ui-radius-sm-token: 0px;
-  --ui-radius-md-token: 0px;
-  --ui-radius-lg-token: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  /* 面板灰基底：向中性灰微调，营造经典桌面“面板灰”（配色方案内联注入需 !important） */
-  --surface-ground: #DEDCD7 !important;
-  --surface-base: #F0EFEA !important;
-  /* 去除模糊阴影：立体感全部由浮雕双色边承担，浮层仅保留外框 */
-  --shadow-hover: none;
-  --shadow-elevated: none;
-  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.28);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.28);
-  /* 浮雕外框色 */
-  --border-subtle: rgba(0, 0, 0, 0.20) !important;
-  --border-default: rgba(0, 0, 0, 0.28) !important;
-  /* 配色方案内联写入的浮层阴影一并去除 */
-  --kimix-composer-shadow: none !important;
-  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28) !important;
+  --ui-radius-sm: 3px;
+  --ui-radius-md: 4px;
+  --ui-radius-lg: 5px;
+  --ui-radius-xl: 6px;
+  --ui-radius-2xl: 6px;
+  --ui-radius-sm-token: 3px;
+  --ui-radius-md-token: 4px;
+  --ui-radius-lg-token: 6px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --shadow-hover: 0 1px 2px rgba(40, 43, 45, 0.10);
+  --shadow-elevated: 0 1px 0 rgba(255, 255, 255, 0.9), 0 3px 10px rgba(40, 43, 45, 0.10);
+  --shadow-floating: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16);
+  --shadow-overlay: 0 0 0 1px rgba(77, 80, 80, 0.16), 0 18px 42px rgba(38, 42, 44, 0.18);
+  --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(40, 43, 45, 0.09) !important;
+  --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16) !important;
 }
 
-/* 深色主题下的复古：面板灰基底适配深色，浮雕亮/暗边反相（亮边半透明白、暗边半透明黑） */
+/* 深色主题只调整阴影可见度，同样不覆盖任何颜色主题 token。 */
 [data-theme="dark"][data-ui-style="retro"] {
-  --surface-ground: #141311 !important;
-  --surface-base: #28261F !important;
-  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.55);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.55);
-  --border-subtle: rgba(0, 0, 0, 0.40) !important;
-  --border-default: rgba(0, 0, 0, 0.55) !important;
-  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55) !important;
+  --shadow-floating: 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.34);
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 42px rgba(0, 0, 0, 0.42);
+  --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.28) !important;
+  --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.34) !important;
 }
 
-/* 复古浮雕·凸起 raised：主要卡片/面板（上左亮边、下右暗边）。注意 .kimix-settings-section 是透明布局容器，一律不施加浮雕 */
+/* 内容面板只保留薄边界与轻微顶高光，避免“每一块都凸起”的机械感。 */
 [data-ui-style="retro"] .kimix-soft-card,
 [data-ui-style="retro"] .kimix-soft-card-strong,
 [data-ui-style="retro"] .kimix-settings-card,
 [data-ui-style="retro"] .kimix-settings-theme,
 [data-ui-style="retro"] .kimix-settings-uistyle,
 [data-ui-style="retro"] .kimix-settings-palette-wrap {
-  border: 1px solid rgba(0, 0, 0, 0.28);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 0 rgba(0, 0, 0, 0.22);
-  border-radius: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 1px 2px rgba(40, 43, 45, 0.06);
 }
 
-/* 复古浮雕·凹陷 sunken：输入框/文本域/聊天滚动区（上左暗边、下右亮边） */
+/* 输入类控件用窄内凹表达可编辑性，聊天内容区不再套凹槽。 */
 [data-ui-style="retro"] .kimix-settings-input,
-[data-ui-style="retro"] textarea,
-[data-ui-style="retro"] .kimix-chat-scroll-area {
-  border: 1px solid rgba(0, 0, 0, 0.28);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.16), inset -1px -1px 0 rgba(255, 255, 255, 0.6);
-  border-radius: 0;
+[data-ui-style="retro"] textarea {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 2px rgba(40, 43, 45, 0.12), 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
-/* 深色主题浮雕适配：亮/暗边反相（亮边半透明白、暗边半透明黑） */
+/* Platinum 的交互控件：中性明暗层只使用在按钮，hover 颜色来自当前主题强调色。 */
+[data-ui-style="retro"] .kimix-toolbar-button,
+[data-ui-style="retro"] .kimix-icon-text-button {
+  border-color: var(--border-default);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.035));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 1px 1px rgba(45, 48, 50, 0.08);
+}
+
+[data-ui-style="retro"] .kimix-toolbar-button:hover:not(:disabled),
+[data-ui-style="retro"] .kimix-icon-text-button:hover:not(:disabled) {
+  background-color: var(--accent-primary-light);
+  border-color: var(--accent-primary-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 1px 2px rgba(45, 48, 50, 0.10);
+  transform: none;
+}
+
+[data-ui-style="retro"] .kimix-app-shell-toolbar,
+[data-ui-style="retro"] .kimix-app-shell-footer {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(0, 0, 0, 0.025));
+  border-color: var(--border-default);
+}
+
+[data-ui-style="retro"] .kimix-sidebar-nav-item:hover,
+[data-ui-style="retro"] .kimix-sidebar-project-row:hover,
+[data-ui-style="retro"] .kimix-top-menu-trigger:hover,
+[data-ui-style="retro"] .kimix-top-menu-trigger.is-active {
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+/* 深色适配只降低高光，不改变组件层级。 */
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card-strong,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-theme,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-uistyle,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-palette-wrap {
-  border-color: rgba(0, 0, 0, 0.55);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.14), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+  border-color: var(--border-default);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-input,
-[data-theme="dark"][data-ui-style="retro"] textarea,
-[data-theme="dark"][data-ui-style="retro"] .kimix-chat-scroll-area {
-  border-color: rgba(0, 0, 0, 0.55);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.45), inset -1px -1px 0 rgba(255, 255, 255, 0.12);
+[data-theme="dark"][data-ui-style="retro"] textarea {
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"][data-ui-style="retro"] .kimix-toolbar-button,
+[data-theme="dark"][data-ui-style="retro"] .kimix-icon-text-button {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 1px rgba(0, 0, 0, 0.22);
 }
 
 /* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */

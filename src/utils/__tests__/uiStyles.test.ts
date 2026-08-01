@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { applyUiStyle, DEFAULT_UI_STYLE_ID, normalizeUiStyleId, UI_STYLE_ATTRIBUTE, UI_STYLES } from "../uiStyles";
 
 describe("normalizeUiStyleId", () => {
@@ -25,6 +27,16 @@ describe("UI_STYLES", () => {
       expect(item.label).toBeTruthy();
       expect(item.description).toBeTruthy();
     }
+  });
+
+  it("复古风格只改变形状质感，不覆盖颜色主题 token", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const styleBlocks = [
+      css.match(/\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+      css.match(/\[data-theme="dark"\]\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+    ].join("\n");
+
+    expect(styleBlocks).not.toMatch(/--(?:surface|text|accent|border)-/);
   });
 });
 

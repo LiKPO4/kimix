@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 重做：复古风格转向 Classic Mac OS Platinum（v2.20.92）
+
+- 用户截图反馈 v2.20.91 的 Win95/98 全局直角与双边框只顾风格化、整体不美观。参考 1997 Mac OS 8 Human Interface Guidelines 与 Classic Mac OS 8/9 Platinum，复古风格改为小圆角、薄边界、轻微顶高光和仅用于交互控件的克制层次，不再让所有内容卡片承担强浮雕。
+- 界面风格与颜色主题保持正交：复古规则不覆盖 `surface`、`text`、`accent`、`border` 颜色 token，新增源码门禁防止风格预设重新接管配色。
+- 验证：全量 152 文件 1453 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-RSanmFOM.js`）、OKF 校验（365 链接）通过；本机开发窗口已重启为 v2.20.92，视觉验收待用户截图确认。
+
 ## 2026-07-31 整理：TASK_STATE 早期记录归档至 TASK_HISTORY.md
 
 - TASK_STATE.md 从 6424 行精简至约千行；2026-06-11 至 2026-07-19（含原尾部乱序的 07-06/07-10 交接块）移入 TASK_HISTORY.md，仅搬运未改写；尾部乱序的 07-25 条目已摘回本文件 07-25 条目群。
