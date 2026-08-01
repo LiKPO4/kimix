@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 优化：现代用户输入气泡与画布拉开明度（v2.20.106）
+
+- 根因：Modern 将主工作画布提亮为 96% `surface-elevated`，用户气泡仍直接使用 `surface-elevated`，两者在浅色主题下几乎同为白色，作者输入层级消失。
+- 修复：新增仅属于 Modern 的用户气泡呈现 token，由当前颜色主题的 `surface-active` 与 `surface-elevated` 混合；浅色 82% active、深色 86% active，并保持无描边、无阴影。默认、复古和颜色主题源 token 均不改变。
+- 实机验收：Windows v2.20.106 当前暖纸主题下，用户气泡已与亮色画布形成稳定的浅灰层级，文字对比清晰且没有卡片化描边/投影。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22106/01-modern-user-bubble.jpg`。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BA0QW722.css`、JS `assets/index-BUkj_FYD.js`）、OKF strict/audit 校验（13 concepts、385 links）通过。
+
 ## 2026-08-01 修复：未发送 Composer 草稿跨工作区持久保留（v2.20.105）
 
 - 根因：`AppShell` 在设置、插件等工作区与聊天工作区之间条件挂载，进入设置会卸载 `Composer`；正文和附件此前都只存在组件本地 state，重新挂载必然从空值开始。

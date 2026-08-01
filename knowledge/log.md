@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern user prompts use a theme-derived reading surface (v2.20.106)**: the bright Modern workspace and user bubble no longer collapse into the same white plane. User prompts mix the active palette's active/elevated surfaces for Codex-like authorship contrast while remaining borderless and shadowless; Default, Retro, and source color-theme tokens are unchanged. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Unsent Composer text is session-owned durable data (v2.20.105)**: workspace navigation may unmount the chat tree, so drafts now live behind a session/project-new identity boundary instead of only inside `Composer`. Text is synchronously mirrored to memory and localStorage on every change, exact whitespace survives app restarts, attachments survive workspace unmounts in memory, and explicit clear/send transitions are the only removal path. See [/architecture/composer-draft-lifecycle.md](/architecture/composer-draft-lifecycle.md).
 
 * **Modern content depth and Markdown tables are role-scoped (v2.20.104)**: grouped settings containers, standalone cards, and complete sub-regions now consume 16/14/18px semantic radius roles instead of generic fallback radii. Markdown rendering exposes frame/header/cell roles; Modern uses page-aligned, theme-derived horizontal rules without outer grid, header fill, or zebra striping, while Default and Retro retain independent treatments. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

@@ -348,6 +348,7 @@
   --kimix-modern-segment-radius: calc(var(--kimix-modern-control-radius) + var(--kimix-modern-segment-gap));
   /* 颜色仍由主题提供；Modern 只把 elevated/base 重新分配为更亮的工作画布。 */
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 96%, var(--surface-base));
+  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-active) 82%, var(--surface-elevated));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
@@ -413,6 +414,7 @@
 
 [data-theme="dark"][data-ui-style="modern"] {
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 78%, var(--surface-base));
+  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-active) 86%, var(--surface-elevated));
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 28px rgba(0, 0, 0, 0.22);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(255, 255, 255, 0.085), 0 20px 50px rgba(0, 0, 0, 0.32);
@@ -468,6 +470,11 @@
   background: transparent;
   box-shadow: none !important;
   outline: none !important;
+}
+
+/* Codex 式用户输入层：用主题表面明度区分画布，不额外制造卡片描边。 */
+[data-ui-style="modern"] .kimix-user-bubble {
+  background: var(--kimix-modern-user-bubble-background);
 }
 
 /* 浮层、菜单、设置卡统一用同一套大圆角和低扩散阴影。 */
