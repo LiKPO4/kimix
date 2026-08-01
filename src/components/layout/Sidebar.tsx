@@ -29,8 +29,8 @@ import { APP_VERSION } from "@/utils/appVersion";
 import { SettingsWorkspaceSidebar } from "@/components/settings/SettingsWorkspaceSidebar";
 
 const navItemClass = "kimix-sidebar-nav-item flex h-10 w-full items-center rounded-lg text-[15px] text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40";
-const collapsedNavItemClass = "flex items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
-const collapsedSettingsItemClass = "flex items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary";
+const collapsedNavItemClass = "kimix-sidebar-nav-item flex items-center justify-center rounded-lg text-text-secondary disabled:cursor-not-allowed disabled:opacity-40";
+const collapsedSettingsItemClass = "kimix-settings-entry flex items-center justify-center rounded-lg text-text-secondary";
 const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight: 40, padding: 0 } as const;
 const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
 
@@ -586,7 +586,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           </button>
           <button
             onClick={() => void openPlugins()}
-            className={`${collapsedNavItemClass} ${pluginWorkspaceActive ? "bg-surface-hover text-text-primary" : ""}`}
+            className={`${collapsedNavItemClass} ${pluginWorkspaceActive ? "is-active" : ""}`}
             style={collapsedNavButtonStyle}
             title="插件"
             aria-label="插件"
@@ -595,7 +595,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           </button>
           <button
             onClick={() => toggleWorkspaceView("hooks")}
-            className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
+            className={`${collapsedNavItemClass} ${workspaceView === "hooks" ? "is-active" : ""}`}
             style={collapsedNavButtonStyle}
             title="Hooks"
             aria-label="Hooks"
@@ -791,7 +791,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
         <button
           onClick={() => void openPlugins()}
-          className={`${navItemClass} ${pluginWorkspaceActive ? "bg-surface-hover text-text-primary" : ""}`}
+          className={`${navItemClass} ${pluginWorkspaceActive ? "is-active" : ""}`}
           title="插件"
         >
           <LayoutGrid size={17} className="shrink-0 text-text-secondary" />
@@ -799,7 +799,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
         <button
           onClick={() => toggleWorkspaceView("hooks")}
-          className={`${navItemClass} ${workspaceView === "hooks" ? "bg-surface-hover text-text-primary" : ""}`}
+          className={`${navItemClass} ${workspaceView === "hooks" ? "is-active" : ""}`}
           title="Hooks"
         >
           <Webhook size={17} className="shrink-0 text-text-secondary" />
@@ -818,7 +818,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button
             onClick={handleOpenProject}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+            className="kimix-sidebar-icon-action flex h-7 w-7 items-center justify-center text-text-muted hover:text-text-primary"
             title="打开项目"
             aria-label="打开项目"
           >

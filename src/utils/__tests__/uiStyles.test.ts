@@ -36,27 +36,42 @@ describe("UI_STYLES", () => {
       css.match(/\[data-theme="dark"\]\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "",
     ].join("\n");
 
-    expect(styleBlocks).not.toMatch(/--(?:surface|text|accent|border)-/);
+    expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
   });
 
-  it("复古控件按组件角色接入且 Composer 输入区只有一个边界所有者", () => {
+  it("复古风格通过语义令牌覆盖控件且 Composer 输入区只有一个边界所有者", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-icon-text-button\s*\{/);
     expect(css).not.toContain('[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button');
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-composer-input[\s\S]*?border:\s*0\s*!important;/);
-    expect(css).toContain('[data-ui-style="retro"] .kimix-control-button');
-    expect(css).toContain('[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"]');
+    expect(css).toContain("--ui-control-border:");
+    expect(css).toContain("--ui-nav-action-border:");
+    expect(css).toContain("--ui-nav-list-hover-shadow:");
+    expect(css).toContain("--ui-selection-shadow:");
+    expect(css).toContain("--ui-popup-border:");
+    expect(css).toContain("--ui-menu-trigger-hover-shadow:");
+    expect(css).toContain(":where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control)");
     expect(css).toContain('[data-ui-style="retro"] .kimix-context-bar');
-    expect(css).toContain('[data-ui-style="retro"] .kimix-sidebar-project-row.is-active');
     expect(css).toContain('[data-ui-style="retro"] .kimix-floating-panel');
   });
 
-  it("初版与复古风格共享状态按钮、菜单和弹窗骨架", () => {
+  it("选中项目或会话悬停时仍由选中态令牌接管左侧标记", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-project-row\.is-active:hover,/);
+    expect(css).toMatch(/\.kimix-sidebar-session-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar-project-row:hover/);
+    expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar\s*\{[\s\S]*?box-shadow:\s*inset\s+-1px/);
+  });
+
+  it("初版与其他风格共享导航、控件、菜单和弹窗骨架", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
     const contextBar = readFileSync(resolve(process.cwd(), "src/components/chat/ContextBar.tsx"), "utf8");
     const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
+    const topMenuBar = readFileSync(resolve(process.cwd(), "src/components/layout/TopMenuBar.tsx"), "utf8");
+    const sessionToolbar = readFileSync(resolve(process.cwd(), "src/components/layout/SessionToolbar.tsx"), "utf8");
 
     expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{/);
     expect(css).toMatch(/\.kimix-menu-panel\s*\{/);
@@ -64,7 +79,16 @@ describe("UI_STYLES", () => {
     expect(composer).toContain("kimix-state-button");
     expect(composer).toContain("kimix-control-button");
     expect(contextBar).toContain("aria-expanded={usageOpen}");
+    expect(sidebar).toContain("kimix-sidebar-nav-item");
+    expect(sidebar).toContain("kimix-sidebar-project-row");
+    expect(sidebar).toContain("kimix-sidebar-session-row");
     expect(sidebar).toContain("kimix-menu-panel");
+    expect(topMenuBar).toContain("kimix-window-control");
+    expect(topMenuBar).toContain("kimix-top-menu-trigger");
+    expect(topMenuBar).toContain("kimix-menu-separator");
+    expect(sessionToolbar).toContain("kimix-split-control");
+    expect(sessionToolbar).toContain("kimix-toolbar-button");
+    expect(sessionToolbar).toContain("kimix-menu-panel");
   });
 });
 

@@ -144,6 +144,49 @@
   --shadow-floating: 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
   --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
 
+  /* Interface-style contract. Components consume these semantic tokens;
+     presets override them without taking ownership of theme colors. */
+  --ui-control-border: 1px solid transparent;
+  --ui-control-background: transparent;
+  --ui-control-background-image: none;
+  --ui-control-shadow: none;
+  --ui-control-hover-border-color: var(--border-subtle);
+  --ui-control-hover-background: var(--surface-hover);
+  --ui-control-hover-shadow: var(--shadow-hover);
+  --ui-control-active-shadow: none;
+  --ui-nav-action-border: 1px solid transparent;
+  --ui-nav-action-background: transparent;
+  --ui-nav-action-background-image: none;
+  --ui-nav-action-shadow: none;
+  --ui-nav-action-hover-border-color: transparent;
+  --ui-nav-action-hover-background: var(--surface-hover);
+  --ui-nav-action-hover-shadow: var(--shadow-hover);
+  --ui-nav-list-border: 1px solid transparent;
+  --ui-nav-list-background: transparent;
+  --ui-nav-list-shadow: none;
+  --ui-nav-list-hover-border-color: transparent;
+  --ui-nav-list-hover-background: var(--surface-hover);
+  --ui-nav-list-hover-shadow: none;
+  --ui-selection-border-color: transparent;
+  --ui-selection-background: var(--surface-hover);
+  --ui-selection-color: var(--text-primary);
+  --ui-selection-shadow: inset 2px 0 0 var(--accent-primary);
+  --ui-popup-border: 1px solid var(--border-default);
+  --ui-popup-background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+  --ui-popup-shadow: var(--shadow-floating);
+  --ui-popup-backdrop-filter: blur(12px);
+  --ui-field-border: 1px solid var(--border-strong);
+  --ui-field-shadow: none;
+  --ui-shell-divider: none;
+  --ui-shell-border-color: var(--border-subtle);
+  --ui-section-divider-color: var(--border-subtle);
+  --ui-menu-trigger-border: 1px solid transparent;
+  --ui-menu-trigger-background: transparent;
+  --ui-menu-trigger-shadow: none;
+  --ui-menu-trigger-hover-border-color: transparent;
+  --ui-menu-trigger-hover-background: var(--surface-hover);
+  --ui-menu-trigger-hover-shadow: var(--shadow-hover);
+
   /* Spacing Tokens (reference) */
   --space-1: 4px;
   --space-2: 8px;
@@ -301,6 +344,10 @@
   /* 配色方案内联写入的浮层阴影一并扁平化 */
   --kimix-composer-shadow: none !important;
   --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  --ui-control-hover-shadow: none;
+  --ui-nav-action-hover-shadow: none;
+  --ui-popup-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --ui-popup-backdrop-filter: none;
 }
 
 /* 复古：借鉴 Classic Mac OS 8/9 Platinum 的克制层级与控件触感。
@@ -326,6 +373,39 @@
   --shadow-overlay: 0 0 0 1px rgba(77, 80, 80, 0.16), 0 18px 42px rgba(38, 42, 44, 0.18);
   --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(40, 43, 45, 0.09) !important;
   --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16) !important;
+  --ui-control-border: 1px solid var(--border-default);
+  --ui-control-background: var(--surface-base);
+  --ui-control-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.035));
+  --ui-control-shadow: var(--kimix-retro-control-shadow);
+  --ui-control-hover-border-color: var(--accent-primary-soft);
+  --ui-control-hover-background: var(--accent-primary-light);
+  --ui-control-hover-shadow: var(--kimix-retro-control-shadow);
+  --ui-control-active-shadow: var(--kimix-retro-inset-shadow);
+  --ui-nav-action-border: 1px solid var(--border-default);
+  --ui-nav-action-background: var(--surface-base);
+  --ui-nav-action-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.025));
+  --ui-nav-action-shadow: var(--kimix-retro-control-shadow);
+  --ui-nav-action-hover-border-color: var(--accent-primary-soft);
+  --ui-nav-action-hover-background: var(--accent-primary-light);
+  --ui-nav-action-hover-shadow: var(--kimix-retro-control-shadow);
+  --ui-nav-list-hover-border-color: var(--border-default);
+  --ui-nav-list-hover-background: var(--surface-hover);
+  --ui-nav-list-hover-shadow: var(--kimix-retro-control-shadow);
+  --ui-selection-border-color: var(--border-default);
+  --ui-selection-background: var(--surface-active);
+  --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), var(--kimix-retro-inset-shadow);
+  --ui-popup-border: 1px solid var(--border-default);
+  --ui-popup-background: var(--surface-elevated);
+  --ui-popup-shadow: var(--shadow-floating);
+  --ui-popup-backdrop-filter: none;
+  --ui-field-border: 1px solid var(--border-strong);
+  --ui-field-shadow: var(--kimix-retro-inset-shadow);
+  --ui-shell-divider: none;
+  --ui-shell-border-color: var(--border-default);
+  --ui-section-divider-color: var(--border-default);
+  --ui-menu-trigger-hover-border-color: var(--border-default);
+  --ui-menu-trigger-hover-background: var(--surface-active);
+  --ui-menu-trigger-hover-shadow: var(--kimix-retro-inset-shadow);
 }
 
 /* 深色主题只调整阴影可见度，同样不覆盖任何颜色主题 token。 */
@@ -337,6 +417,8 @@
   --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 42px rgba(0, 0, 0, 0.42);
   --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.28) !important;
   --kimix-float-shadow: 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.34) !important;
+  --ui-control-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
+  --ui-nav-action-background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.07));
 }
 
 /* 内容面板只保留薄边界与轻微顶高光，避免“每一块都凸起”的机械感。 */
@@ -353,47 +435,19 @@
 
 /* 设置输入控件可内凹；Composer 由外壳承担边界，内部 textarea 必须保持无框。 */
 [data-ui-style="retro"] .kimix-settings-input {
-  border: 1px solid var(--border-strong);
+  border: var(--ui-field-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--kimix-retro-inset-shadow);
-}
-
-/* 相同角色使用相同控件语言：窗口工具键与明确标注的 Composer 控件共享轻凹面。
-   状态切换键（Swarm / Plan）保持段式按钮语义，不混入普通工具键。 */
-[data-ui-style="retro"] .kimix-toolbar-button,
-[data-ui-style="retro"] .kimix-control-button,
-[data-ui-style="retro"] .kimix-composer-tool-button {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  background-color: var(--surface-base);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.035));
-  box-shadow: var(--kimix-retro-control-shadow);
-}
-
-[data-ui-style="retro"] .kimix-toolbar-button:hover:not(:disabled),
-[data-ui-style="retro"] .kimix-control-button:hover:not(:disabled),
-[data-ui-style="retro"] .kimix-composer-tool-button:hover:not(:disabled) {
-  background-color: var(--accent-primary-light);
-  border-color: var(--accent-primary-soft);
-  box-shadow: var(--kimix-retro-control-shadow);
-  transform: none;
-}
-
-[data-ui-style="retro"] .kimix-toolbar-button:active:not(:disabled),
-[data-ui-style="retro"] .kimix-control-button:active:not(:disabled),
-[data-ui-style="retro"] .kimix-composer-tool-button:active:not(:disabled) {
-  scale: 0.96;
-  box-shadow: var(--kimix-retro-inset-shadow);
+  box-shadow: var(--ui-field-shadow);
 }
 
 /* 唯一的强风格记忆点：窗口标题栏使用 Platinum 的极淡水平细纹。 */
 [data-ui-style="retro"] .kimix-app-shell-toolbar {
   background-image: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0, rgba(255, 255, 255, 0.13) 1px, rgba(0, 0, 0, 0.018) 2px, transparent 3px);
-  border-color: var(--border-default);
+  border-color: var(--ui-section-divider-color);
 }
 
 [data-ui-style="retro"] .kimix-app-shell-main {
-  border-color: var(--border-strong);
+  border-color: var(--ui-shell-border-color);
   box-shadow: var(--kimix-retro-panel-shadow);
 }
 
@@ -452,24 +506,6 @@
   box-shadow: var(--kimix-retro-control-shadow);
 }
 
-/* 侧栏维持平面信息密度；项目与会话只使用左侧主题刻度，不再叠整圈焦点框。 */
-[data-ui-style="retro"] .kimix-sidebar {
-  box-shadow: inset -1px 0 0 var(--border-default);
-}
-
-[data-ui-style="retro"] .kimix-sidebar-project-row.is-active,
-[data-ui-style="retro"] .kimix-sidebar-session-row.is-active {
-  box-shadow: inset 2px 0 0 var(--accent-primary);
-}
-
-[data-ui-style="retro"] .kimix-sidebar-nav-item:hover,
-[data-ui-style="retro"] .kimix-sidebar-project-row:hover,
-[data-ui-style="retro"] .kimix-top-menu-trigger:hover,
-[data-ui-style="retro"] .kimix-top-menu-trigger.is-active {
-  background: var(--surface-hover);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 10%, transparent);
-}
-
 /* 深色适配只降低高光，不改变组件层级。 */
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-soft-card-strong,
@@ -486,24 +522,17 @@
   box-shadow: var(--kimix-retro-inset-shadow);
 }
 
-[data-theme="dark"][data-ui-style="retro"] .kimix-toolbar-button,
-[data-theme="dark"][data-ui-style="retro"] .kimix-control-button,
-[data-theme="dark"][data-ui-style="retro"] .kimix-composer-tool-button {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
-  box-shadow: var(--kimix-retro-control-shadow);
-}
-
 /* 复古层只改变共享浮层骨架的材质，不要求每个业务弹窗单独适配。 */
 [data-ui-style="retro"] .kimix-floating-panel,
 [data-ui-style="retro"] .kimix-menu-panel,
 [data-ui-style="retro"] .kimix-modal-card,
 [data-ui-style="retro"] .kimix-onboarding-card,
 [data-ui-style="retro"] .kimix-settings-panel:not(.is-workspace) {
-  border: 1px solid var(--border-strong);
+  border: var(--ui-popup-border);
   border-radius: var(--radius-lg);
-  background: var(--surface-elevated);
-  box-shadow: var(--shadow-floating);
-  backdrop-filter: none;
+  background: var(--ui-popup-background);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 
 [data-ui-style="retro"] .kimix-menu-panel {
@@ -984,17 +1013,61 @@ body::before {
   scale: 0.96;
 }
 
-/* 有下拉内容的工具控件。默认风格保持安静，展开态才显示边界。 */
-.kimix-control-button {
-  border: 1px solid transparent;
-  background: transparent;
+/* Shared control contract. Presets customize tokens once; every enrolled control follows. */
+:where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control) {
+  border: var(--ui-control-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--ui-control-background);
+  background-image: var(--ui-control-background-image);
+  box-shadow: var(--ui-control-shadow);
+  transition-property: background-color, border-color, color, box-shadow, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-timing-function: var(--ease-hover);
 }
 
-.kimix-control-button:hover:not(:disabled),
-.kimix-control-button[aria-expanded="true"] {
-  border-color: var(--border-subtle);
-  background: var(--surface-hover);
-  box-shadow: var(--shadow-hover);
+:where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control):hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+:where(.kimix-control-button, .kimix-window-control)[aria-expanded="true"],
+:where(.kimix-toolbar-button, .kimix-split-control).is-expanded,
+:where(.kimix-toolbar-button, .kimix-window-control)[aria-pressed="true"] {
+  border-color: var(--ui-selection-border-color);
+  background-color: var(--ui-selection-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-shadow);
+}
+
+:where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control):active:not(:disabled) {
+  scale: 0.96;
+  box-shadow: var(--ui-control-active-shadow);
+}
+
+.kimix-window-control.is-danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-danger) 28%, transparent);
+  background-color: var(--accent-danger-light);
+  color: var(--accent-danger);
+}
+
+.kimix-split-control {
+  overflow: hidden;
+}
+
+.kimix-split-control-part {
+  border-radius: calc(var(--radius-sm) - 1px);
+  transition-property: background-color, color;
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-hover);
+}
+
+.kimix-split-control-part:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--ui-control-hover-background) 72%, transparent);
+}
+
+.kimix-split-control-part + .kimix-split-control-part {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--border-default) 58%, transparent);
 }
 
 /* 二元状态按钮统一依赖 aria-pressed；业务组件不再内联拼装选中边框。 */
@@ -1011,14 +1084,10 @@ body::before {
 }
 
 .kimix-state-button[aria-pressed="true"] {
-  border-color: var(--accent-primary-soft);
-  background: var(--accent-primary-light);
-  color: var(--accent-primary-dark);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
-}
-
-[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"] {
-  box-shadow: var(--kimix-retro-inset-shadow), inset 2px 0 0 var(--accent-primary);
+  border-color: var(--ui-selection-border-color);
+  background: var(--ui-selection-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-shadow);
 }
 
 @container (max-width: 480px) {
@@ -1128,8 +1197,7 @@ body::before {
 
 .kimix-toolbar-button:hover:not(:disabled) {
   color: var(--kimix-panel-text);
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .kimix-toolbar-button:hover:not(:disabled) svg {
@@ -1138,7 +1206,6 @@ body::before {
 
 .kimix-toolbar-button:active:not(:disabled) {
   transform: translateY(0);
-  scale: 0.96;
 }
 
 .kimix-toolbar-button:disabled {
@@ -1270,11 +1337,12 @@ button.bg-accent-primary:disabled:hover,
 .kimix-top-menu,
 .kimix-floating-menu,
 .kimix-menu-panel {
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
+  background: var(--ui-popup-background);
+  border: var(--ui-popup-border);
   border-radius: var(--radius-lg) !important;
   color: var(--text-secondary);
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 
 .kimix-menu-item {
@@ -1315,13 +1383,20 @@ button.bg-accent-primary:disabled:hover,
   scale: 0.96;
 }
 
+.kimix-menu-separator {
+  border-top: 1px solid var(--ui-section-divider-color);
+}
+
 .kimix-top-menu-trigger {
   display: inline-flex;
   min-width: 52px;
   min-height: 34px;
   align-items: center;
   justify-content: center;
+  border: var(--ui-menu-trigger-border);
   border-radius: var(--radius-sm);
+  background: var(--ui-menu-trigger-background);
+  box-shadow: var(--ui-menu-trigger-shadow);
   padding-left: 14px;
   padding-right: 14px;
   line-height: 1;
@@ -1332,8 +1407,9 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-top-menu-trigger:hover,
 .kimix-top-menu-trigger.is-active {
-  background: rgba(25, 23, 20, 0.06);
-  box-shadow: var(--shadow-hover);
+  border-color: var(--ui-menu-trigger-hover-border-color);
+  background: var(--ui-menu-trigger-hover-background);
+  box-shadow: var(--ui-menu-trigger-hover-shadow);
   color: var(--text-primary);
 }
 
@@ -1343,6 +1419,7 @@ button.bg-accent-primary:disabled:hover,
   background: var(--surface-ground);
   color: var(--text-primary);
   font-size: var(--kimix-sidebar-font-size, 14px);
+  box-shadow: var(--ui-shell-divider);
 }
 
 .kimix-sidebar button,
@@ -1356,15 +1433,21 @@ button.bg-accent-primary:disabled:hover,
   padding-right: 16px;
   color: var(--text-primary);
   border-radius: var(--radius-sm);
+  border: var(--ui-nav-action-border);
+  background-color: var(--ui-nav-action-background);
+  background-image: var(--ui-nav-action-background-image);
+  box-shadow: var(--ui-nav-action-shadow);
   transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
               box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
   transform-origin: center;
 }
 
 .kimix-sidebar-nav-item:hover {
-  background: var(--surface-hover);
-  box-shadow: var(--shadow-hover);
+  border-color: var(--ui-nav-action-hover-border-color);
+  background-color: var(--ui-nav-action-hover-background);
+  box-shadow: var(--ui-nav-action-hover-shadow);
 }
 
 .kimix-sidebar-nav-item:active:not(:disabled) {
@@ -1376,15 +1459,39 @@ button.bg-accent-primary:disabled:hover,
   padding-left: 18px;
   padding-right: 6px;
   border-radius: var(--radius-sm);
+  border: var(--ui-nav-list-border);
+  background-color: var(--ui-nav-list-background);
+  box-shadow: var(--ui-nav-list-shadow);
   transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover);
 }
 
+.kimix-sidebar-project-row:hover,
+.kimix-sidebar-session-row:hover {
+  border-color: var(--ui-nav-list-hover-border-color);
+  background-color: var(--ui-nav-list-hover-background);
+  box-shadow: var(--ui-nav-list-hover-shadow);
+}
+
+.kimix-sidebar-session-row {
+  border: var(--ui-nav-list-border);
+  background-color: var(--ui-nav-list-background);
+  box-shadow: var(--ui-nav-list-shadow);
+  transition-property: background-color, border-color, box-shadow, color;
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-hover);
+}
+
 .kimix-sidebar-project-row.is-active,
-.kimix-sidebar-session-row.is-active {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  box-shadow: inset 2px 0 0 var(--accent-primary);
+.kimix-sidebar-project-row.is-active:hover,
+.kimix-sidebar-session-row.is-active,
+.kimix-sidebar-session-row.is-active:hover {
+  border-color: var(--ui-selection-border-color);
+  background-color: var(--ui-selection-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-shadow);
 }
 
 .kimix-sidebar-project-row-actions {
@@ -1411,6 +1518,30 @@ button.bg-accent-primary:disabled:hover,
   scale: 0.96;
 }
 
+.kimix-settings-entry {
+  border: var(--ui-nav-action-border);
+  background-color: var(--ui-nav-action-background);
+  background-image: var(--ui-nav-action-background-image);
+  box-shadow: var(--ui-nav-action-shadow);
+}
+
+.kimix-settings-entry:hover,
+.kimix-settings-entry.is-active {
+  border-color: var(--ui-nav-action-hover-border-color);
+  background-color: var(--ui-nav-action-hover-background);
+  box-shadow: var(--ui-nav-action-hover-shadow);
+}
+
+.kimix-sidebar-nav-item.is-active,
+.kimix-sidebar-nav-item.is-active:hover,
+.kimix-settings-entry.is-active,
+.kimix-settings-entry.is-active:hover {
+  border-color: var(--ui-selection-border-color);
+  background-color: var(--ui-selection-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-shadow);
+}
+
 /* ── App Shell ── */
 
 .kimix-app-shell {
@@ -1420,14 +1551,14 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-app-shell-main {
-  border-color: var(--border-subtle);
+  border-color: var(--ui-shell-border-color);
   background: var(--surface-base);
   border-radius: var(--radius-lg);
 }
 
 .kimix-app-shell-toolbar,
 .kimix-app-shell-footer {
-  border-color: var(--border-subtle);
+  border-color: var(--ui-section-divider-color);
   background: var(--surface-base);
 }
 
@@ -3070,11 +3201,11 @@ button.bg-accent-primary:disabled:hover,
 /* ── Floating Panel ── */
 
 .kimix-floating-panel {
-  border: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+  border: var(--ui-popup-border);
+  background: var(--ui-popup-background);
   color: var(--text-primary);
-  box-shadow: var(--shadow-floating);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: var(--ui-popup-backdrop-filter);
   border-radius: var(--radius-lg) !important;
 }
 
@@ -3285,11 +3416,12 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-modal-card,
 .kimix-onboarding-card {
-  border: 0;
-  background: var(--surface-elevated);
+  border: var(--ui-popup-border);
+  background: var(--ui-popup-background);
   color: var(--text-primary);
   border-radius: var(--radius-lg) !important;
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 
 .kimix-modal-close-button {

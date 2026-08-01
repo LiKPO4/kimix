@@ -168,7 +168,7 @@ export function TopMenuBar({
         <div className="flex items-center gap-2 text-text-muted">
           <button
             onClick={onToggleSidebar}
-            className="flex items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+            className="kimix-window-control flex items-center justify-center"
             style={{ width: 40, height: 40, minWidth: 40, padding: 0, marginLeft: sidebarOpen ? 8 : -2 }}
             aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
             title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
@@ -177,14 +177,14 @@ export function TopMenuBar({
           </button>
           <button
             onClick={onNavigateBack}
-            className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+            className="kimix-window-control ml-2 flex h-8 w-8 items-center justify-center"
             aria-label="后退"
           >
             <ArrowLeft size={17} />
           </button>
           <button
             onClick={onNavigateForward}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+            className="kimix-window-control flex h-8 w-8 items-center justify-center"
             aria-label="前进"
           >
             <ArrowRight size={17} />
@@ -197,6 +197,8 @@ export function TopMenuBar({
               <button
                 onClick={() => setOpenMenu((current) => (current === menu ? null : menu))}
                 className={`kimix-top-menu-trigger ${openMenu === menu ? "is-active" : ""}`}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === menu}
               >
                 {menu}
               </button>
@@ -204,7 +206,7 @@ export function TopMenuBar({
                 <div className="kimix-top-menu kimix-menu-panel absolute left-0 top-full z-[60] mt-2 min-w-[236px] overflow-hidden text-[14px]">
                   {MENU_ITEMS[menu].map((item, index) =>
                     item.type === "separator" ? (
-                      <div key={`separator-${index}`} className="my-2 border-t border-border-subtle" />
+                      <div key={`separator-${index}`} className="kimix-menu-separator" style={{ marginTop: 8, marginBottom: 8 }} />
                     ) : (
                       <button
                         key={item.label}
@@ -242,21 +244,21 @@ export function TopMenuBar({
       <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" as const, gap: 8, paddingRight: 8 }}>
         <button
           onClick={() => window.api.minimizeWindow()}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover"
+          className="kimix-window-control flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label="最小化"
         >
           <Minus size={14} />
         </button>
         <button
           onClick={() => window.api.maximizeWindow()}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover"
+          className="kimix-window-control flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label={isMaximized ? "还原" : "最大化"}
         >
           {isMaximized ? <Copy size={12} /> : <Square size={12} />}
         </button>
         <button
           onClick={() => window.api.closeWindow()}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-accent-red/10 hover:text-accent-red"
+          className="kimix-window-control is-danger flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label="关闭"
         >
           <X size={14} />

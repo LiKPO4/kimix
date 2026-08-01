@@ -433,24 +433,26 @@ export function SessionToolbar({
         <div ref={sessionMenuRef} className="relative shrink-0" onMouseDown={(e) => e.stopPropagation()}>
           <button
             onClick={() => setSessionMenuOpen((open) => !open)}
-            className={`kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg ${sessionMenuOpen ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : ""}`}
+            className="kimix-window-control flex h-8 w-8 items-center justify-center"
             title="更多"
             aria-label="更多"
+            aria-haspopup="menu"
+            aria-expanded={sessionMenuOpen}
           >
             <Ellipsis size={17} />
           </button>
           {sessionMenuOpen && (
-            <div className="kimix-floating-menu absolute left-0 top-full z-[65] mt-2 w-[332px] overflow-hidden rounded-[15px] py-3 text-[14px] text-[var(--kimix-panel-text)]">
+            <div className="kimix-menu-panel absolute left-0 top-full z-[65] mt-2 w-[332px] overflow-hidden text-[14px] text-[var(--kimix-panel-text)]" style={{ padding: 8 }}>
               {sessionMenuItems.map((item, index) => (
                 item.type === "separator" ? (
-                  <div key={`session-menu-separator-${index}`} className="my-2 border-t border-[var(--kimix-panel-divider)]" />
+                  <div key={`session-menu-separator-${index}`} className="kimix-menu-separator" style={{ marginTop: 8, marginBottom: 8 }} />
                 ) : (
                   <button
                     key={item.label}
                     type="button"
                     disabled={item.disabled}
                     onClick={() => handleSessionMenuEntry(item)}
-                    className={`flex min-h-10 w-full items-center gap-3 text-left leading-none transition-colors ${
+                    className={`kimix-menu-item gap-3 text-left leading-none ${
                       item.disabled
                         ? "cursor-not-allowed text-[var(--kimix-panel-text-muted)]"
                         : "text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)]"
@@ -473,7 +475,7 @@ export function SessionToolbar({
           <button
             type="button"
             onClick={onOpenLongTaskInspector}
-            className={`flex h-9 min-w-[148px] items-center rounded-xl border bg-surface-elevated text-left transition-colors ${
+            className={`kimix-toolbar-button flex h-9 min-w-[148px] items-center text-left ${
               longTaskMeta.recovery && longTaskMeta.recovery.status !== "none"
                 ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
                 : "border-accent-primary-soft text-accent-primary hover:bg-accent-primary-light"
@@ -502,10 +504,10 @@ export function SessionToolbar({
           </button>
         ) : (
           <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${launchMenuOpen ? "border-accent-primary bg-accent-primary-light text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"}`}>
+            <div className={`kimix-split-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : "text-[var(--kimix-panel-text-secondary)]"}`}>
               <button
                 onClick={() => void launchExecutable()}
-                className="flex h-full flex-1 items-center justify-center"
+                className="kimix-split-control-part flex h-full flex-1 items-center justify-center"
                 style={{ paddingLeft: 9, paddingRight: 4 }}
                 title="启动当前启动文件"
                 aria-label="启动"
@@ -518,22 +520,24 @@ export function SessionToolbar({
                   e.stopPropagation();
                   setLaunchMenuOpen((value) => !value);
                 }}
-                className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--kimix-panel-soft-bg)]"
+                className="kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center"
                 title="启动方式"
                 aria-label="启动方式"
+                aria-haspopup="menu"
+                aria-expanded={launchMenuOpen}
               >
                 <ChevronDown size={13} />
               </button>
             </div>
             {launchMenuOpen && (
-              <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[224px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
+              <div className="kimix-menu-panel absolute right-0 top-full z-40 mt-3 w-[224px] overflow-hidden text-[14px] text-[var(--kimix-panel-text)]" style={{ padding: 8 }}>
                 <button
                   onClick={() => {
                     setLaunchMenuOpen(false);
                     void launchExecutable();
                   }}
                   style={{ paddingLeft: 18, paddingRight: 16 }}
-                  className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                  className="kimix-menu-item text-left"
                 >
                   <Play size={15} className="w-6 shrink-0 text-text-muted" />
                   <span className="min-w-0 flex-1 truncate">启动文件</span>
@@ -541,19 +545,19 @@ export function SessionToolbar({
                 <button
                   onClick={() => void chooseExecutable()}
                   style={{ paddingLeft: 18, paddingRight: 16 }}
-                  className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                  className="kimix-menu-item text-left"
                 >
                   <FolderOpen size={15} className="w-6 shrink-0 text-accent-warning" />
                   <span className="min-w-0 flex-1 truncate">选择启动文件...</span>
                 </button>
-                <div className="my-1.5 border-t border-[var(--kimix-panel-divider)]" />
+                <div className="kimix-menu-separator" style={{ marginTop: 6, marginBottom: 6 }} />
                 <button
                   onClick={() => {
                     setLaunchMenuOpen(false);
                     void launchSavedCommand();
                   }}
                   style={{ paddingLeft: 18, paddingRight: 16 }}
-                  className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                  className="kimix-menu-item text-left"
                 >
                   <SquareTerminal size={15} className="w-6 shrink-0 text-text-muted" />
                   <span className="min-w-0 flex-1 truncate">启动命令</span>
@@ -564,7 +568,7 @@ export function SessionToolbar({
                     onSetLaunchCommand();
                   }}
                   style={{ paddingLeft: 18, paddingRight: 16 }}
-                  className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                  className="kimix-menu-item text-left"
                 >
                   <Pencil size={15} className="w-6 shrink-0 text-text-muted" />
                   <span className="min-w-0 flex-1 truncate">设置启动命令...</span>
@@ -574,11 +578,11 @@ export function SessionToolbar({
           </div>
         )}
         <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <div className={`kimix-toolbar-button flex h-9 w-14 items-center rounded-xl border ${projectMenuOpen ? "border-accent-primary bg-accent-primary-light text-accent-primary" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"} ${!projectPath ? "opacity-45" : ""}`}>
+          <div className={`kimix-split-control flex h-9 w-14 items-center ${projectMenuOpen ? "is-expanded" : "text-[var(--kimix-panel-text-secondary)]"} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
               disabled={!projectPath}
-              className="flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
+              className="kimix-split-control-part flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
               style={{ paddingLeft: 8, paddingRight: 3 }}
               title={currentProject?.path ?? "工作区"}
               aria-label="在文件资源管理器中打开项目"
@@ -592,24 +596,26 @@ export function SessionToolbar({
                 setProjectMenuOpen((value) => !value);
               }}
               disabled={!projectPath}
-              className="mr-0.5 flex h-8 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--kimix-panel-soft-bg)] disabled:cursor-not-allowed"
+              className="kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center disabled:cursor-not-allowed"
               title="打开方式"
               aria-label="打开方式"
+              aria-haspopup="menu"
+              aria-expanded={projectMenuOpen}
             >
               <ChevronDown size={13} />
             </button>
           </div>
           {projectMenuOpen && (
-            <div className="kimix-floating-menu absolute right-0 top-full z-40 mt-3 w-[236px] overflow-hidden rounded-[14px] py-2.5 text-[14px] text-[var(--kimix-panel-text)]">
-              <button onClick={openProjectPath} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+            <div className="kimix-menu-panel absolute right-0 top-full z-40 mt-3 w-[236px] overflow-hidden text-[14px] text-[var(--kimix-panel-text)]" style={{ padding: 8 }}>
+              <button onClick={openProjectPath} style={{ paddingLeft: 18, paddingRight: 16 }} className="kimix-menu-item text-left">
                 <FolderOpen size={15} className="w-6 shrink-0 text-accent-warning" />
                 <span className="min-w-0 flex-1 truncate">在文件资源管理器中打开</span>
               </button>
-              <button onClick={() => void openProjectEditor()} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+              <button onClick={() => void openProjectEditor()} style={{ paddingLeft: 18, paddingRight: 16 }} className="kimix-menu-item text-left">
                 <Code2 size={15} className="w-6 shrink-0 text-accent-primary" />
                 <span className="min-w-0 flex-1 truncate">使用 VS Code 打开</span>
               </button>
-              <button onClick={openProjectTerminal} style={{ paddingLeft: 18, paddingRight: 16 }} className="flex h-10 w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]">
+              <button onClick={openProjectTerminal} style={{ paddingLeft: 18, paddingRight: 16 }} className="kimix-menu-item text-left">
                 <SquareTerminal size={15} className="w-6 shrink-0 text-text-muted" />
                 <span className="min-w-0 flex-1 truncate">打开终端</span>
               </button>
@@ -618,7 +624,7 @@ export function SessionToolbar({
         </div>
         <button
           onClick={() => void openCurrentSessionInKimiWeb()}
-          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center text-[var(--kimix-panel-text-secondary)] disabled:cursor-not-allowed disabled:opacity-45"
           title="在 Kimi Web 打开当前会话"
           aria-label="在 Kimi Web 打开当前会话"
         >
@@ -626,7 +632,7 @@ export function SessionToolbar({
         </button>
         <button
           onClick={reloadKimixWindow}
-          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)] hover:text-[var(--kimix-panel-text)]"
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center text-[var(--kimix-panel-text-secondary)]"
           title="重新载入页面 (Ctrl+R)"
           aria-label="重新载入页面"
         >
@@ -634,25 +640,19 @@ export function SessionToolbar({
         </button>
         <button
           onClick={onToggleDiffPanel}
-          className={`kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border ${
-            diffPanelOpen
-              ? "border-accent-primary bg-accent-primary-light text-accent-primary"
-              : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
-          }`}
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center text-[var(--kimix-panel-text-secondary)]"
           title="文件预览"
           aria-label="文件预览"
+          aria-pressed={diffPanelOpen}
         >
           <FileText size={15} />
         </button>
         <button
           onClick={onToggleLongTaskInspector}
-          className={`kimix-toolbar-button flex h-9 w-9 items-center justify-center rounded-xl border ${
-            longTaskInspectorOpen
-              ? "border-accent-primary bg-accent-primary-light text-accent-primary"
-              : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-soft-bg)]"
-          }`}
+          className="kimix-toolbar-button flex h-9 w-9 items-center justify-center text-[var(--kimix-panel-text-secondary)]"
           title="会话侧栏"
           aria-label="会话侧栏"
+          aria-pressed={longTaskInspectorOpen}
         >
           <PanelRight size={15} />
         </button>
