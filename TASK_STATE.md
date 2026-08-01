@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 优化：现代会话工具栏移除无语义分割线（v2.20.100）
+
+- 根因：`SessionToolbar` 自带 `border-b`，Modern 又将其着色为 `--ui-section-divider-color`；v2.20.99 已让标题栏和对话画布共用同一亮面后，这条整宽横线不再表达独立滚动、尺寸调整或内容归属，只会把连续工作区硬切成两块。
+- 修复：仅在 Modern 下为 `.kimix-app-shell-toolbar` 关闭底边；没有修改全局分隔色 token，因此默认/复古壳层，以及菜单、列表和复合按钮内部真正承担分组作用的局部分隔仍保持原样。
+- 实机验收：Windows 直接操作 v2.20.100 空白对话页，确认标题栏与画布连续、整宽横线消失，外层壳边框和右侧按钮组边界完整。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22100/01-modern-toolbar.png`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-C-QE97_z.css`、JS `assets/index-D_VKKddI.js`）、OKF strict/audit 校验（12 concepts、377 links）通过。
+
 ## 2026-08-01 优化：现代模式亮面工作画布（v2.20.99）
 
 - 根因：Modern 虽已建立 Codex 式圆角和壳层，但主内容、工具栏、Footer、设置与插件工作区仍直接使用颜色主题的 `surface-base`；暖纸等主题在大面积铺开时压平了侧栏与画布的明度差，整体看起来灰蒙。

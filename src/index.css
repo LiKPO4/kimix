@@ -431,6 +431,11 @@
   background-image: none;
 }
 
+/* 会话标题栏与画布属于同一连续表面；只移除这条整宽装饰线，不影响菜单等结构分隔。 */
+[data-ui-style="modern"] .kimix-app-shell-toolbar {
+  border-bottom: 0;
+}
+
 /* 插件、Hooks、设置等整页工作区与对话画布使用同一亮面，外围侧栏继续保留颜色主题底色。 */
 [data-ui-style="modern"] .kimix-workspace-page,
 [data-ui-style="modern"] .kimix-settings-panel.is-workspace {

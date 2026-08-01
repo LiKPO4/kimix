@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern toolbar and canvas form one continuous surface (v2.20.100)**: the chat toolbar no longer draws a decorative full-width bottom rule in Modern. Global divider colors and local menu, list, and compound-control separators remain unchanged, so only the non-semantic shell seam is removed. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Modern redistributes theme surfaces instead of redefining colors (v2.20.99)**: its chat, settings, Plugins, and Hooks canvas now derives a brighter presentation surface from the active theme's elevated/base tokens, while the sidebar remains on the theme ground. Source surface, text, accent, and border tokens remain owned exclusively by the color theme. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Shell borders and nested radii are structural invariants (v2.20.98)**: removing an ornamental divider may not delete one edge of the main shell, and Modern now separates control/card/panel/shell radius roles instead of inflating every utility radius. Adjacent nested surfaces follow `outer radius = inner radius + inset`; the settings theme segment is fixed at 16px/10px/6px. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
