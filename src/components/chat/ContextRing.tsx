@@ -215,7 +215,7 @@ export function ContextRing() {
     >
       <button
         type="button"
-        className="kimix-inline-icon-action is-roomy rounded-xl text-text-muted hover:bg-surface-hover hover:text-text-primary"
+        className="kimix-composer-tool-button kimix-inline-icon-action is-roomy rounded-xl text-text-muted hover:bg-surface-hover hover:text-text-primary"
         aria-label="上下文使用情况"
       >
         <CircularProgress percent={percent} size={18} strokeWidth={2.5} />

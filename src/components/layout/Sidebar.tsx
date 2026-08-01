@@ -889,7 +889,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         <div
                           className={`kimix-sidebar-project-row group/project relative flex h-9 w-full items-center text-[15px] ${
                             isActive
-                              ? "bg-surface-hover text-text-primary"
+                              ? "is-active bg-surface-hover text-text-primary"
                               : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                           }`}
                         >
@@ -1026,11 +1026,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 <div
                                   key={s.id}
                                   style={{ paddingLeft: 16, paddingRight: 10 }}
-                                  className={`group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
+                                  className={`kimix-sidebar-session-row group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
                                     currentSession?.id === s.id
                                       ? isLongTaskSession
-                                        ? "bg-accent-primary-light text-accent-primary-dark"
-                                        : "bg-surface-hover text-text-primary"
+                                        ? "is-active bg-accent-primary-light text-accent-primary-dark"
+                                        : "is-active bg-surface-hover text-text-primary"
                                       : isLongTaskSession
                                         ? "bg-accent-primary-light/60 text-accent-primary hover:bg-accent-primary-light hover:text-accent-primary-dark"
                                         : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"

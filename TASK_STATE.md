@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-01 修复：复古风格组件语言统一（v2.20.93）
+
+- 用户截图确认 v2.20.92 仍有三类割裂：Composer 外壳与内部 textarea 同时描边形成“双框”；复古规则只覆盖 `.kimix-toolbar-button` / `.kimix-icon-text-button`，导致输入区部分按钮风格化、部分仍扁平；侧栏和 ContextBar 仍使用现代平面语言，局部 Platinum 控件像外贴皮肤。
+- 修复改为按组件角色接入：Composer 只有外壳拥有边界和 focus，所有二级工具/模式键统一轻凹面，发送/引导/停止保留圆形主操作；ContextBar 统一为连续控制带；侧栏项目/会话显式 active class 使用同款内框与主题刻度；标题栏增加唯一的极淡 Platinum 横向细纹，其他表面保持克制。
+- 稳定边界写入 `/architecture/interface-style-system.md`：颜色主题拥有颜色，界面风格只拥有形状/质感；禁止全局按钮、textarea 和基础 primitive 铺皮肤。
+- 验证：定向 2 文件 10 项、全量 152 文件 1454 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-DHUUXMwX.js`）、OKF strict/spec/audit 校验（12 concepts、370 links）通过；本机开发窗口已重启为 v2.20.93，视觉验收待用户截图确认。
+
 ## 2026-08-01 重做：复古风格转向 Classic Mac OS Platinum（v2.20.92）
 
 - 用户截图反馈 v2.20.91 的 Win95/98 全局直角与双边框只顾风格化、整体不美观。参考 1997 Mac OS 8 Human Interface Guidelines 与 Classic Mac OS 8/9 Platinum，复古风格改为小圆角、薄边界、轻微顶高光和仅用于交互控件的克制层次，不再让所有内容卡片承担强浮雕。

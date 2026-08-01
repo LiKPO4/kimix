@@ -317,6 +317,9 @@
   --radius-sm: 3px;
   --radius-md: 4px;
   --radius-lg: 6px;
+  --kimix-retro-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 1px 1px rgba(45, 48, 50, 0.10);
+  --kimix-retro-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 1px 3px rgba(40, 43, 45, 0.09);
+  --kimix-retro-inset-shadow: inset 0 1px 2px rgba(40, 43, 45, 0.12), 0 1px 0 rgba(255, 255, 255, 0.58);
   --shadow-hover: 0 1px 2px rgba(40, 43, 45, 0.10);
   --shadow-elevated: 0 1px 0 rgba(255, 255, 255, 0.9), 0 3px 10px rgba(40, 43, 45, 0.10);
   --shadow-floating: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16);
@@ -327,6 +330,9 @@
 
 /* 深色主题只调整阴影可见度，同样不覆盖任何颜色主题 token。 */
 [data-theme="dark"][data-ui-style="retro"] {
+  --kimix-retro-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 1px rgba(0, 0, 0, 0.24);
+  --kimix-retro-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.24);
+  --kimix-retro-inset-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.32), 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-floating: 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.34);
   --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 42px rgba(0, 0, 0, 0.42);
   --kimix-composer-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.28) !important;
@@ -342,37 +348,117 @@
 [data-ui-style="retro"] .kimix-settings-palette-wrap {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 1px 2px rgba(40, 43, 45, 0.06);
+  box-shadow: var(--kimix-retro-panel-shadow);
 }
 
-/* 输入类控件用窄内凹表达可编辑性，聊天内容区不再套凹槽。 */
-[data-ui-style="retro"] .kimix-settings-input,
-[data-ui-style="retro"] textarea {
+/* 设置输入控件可内凹；Composer 由外壳承担边界，内部 textarea 必须保持无框。 */
+[data-ui-style="retro"] .kimix-settings-input {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  box-shadow: inset 0 1px 2px rgba(40, 43, 45, 0.12), 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow: var(--kimix-retro-inset-shadow);
 }
 
-/* Platinum 的交互控件：中性明暗层只使用在按钮，hover 颜色来自当前主题强调色。 */
+/* 相同角色使用相同控件语言：窗口工具键与 Composer 工具/模式键共享轻凹面。 */
 [data-ui-style="retro"] .kimix-toolbar-button,
-[data-ui-style="retro"] .kimix-icon-text-button {
-  border-color: var(--border-default);
+[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button,
+[data-ui-style="retro"] .kimix-composer-tool-button {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.035));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 1px 1px rgba(45, 48, 50, 0.08);
+  box-shadow: var(--kimix-retro-control-shadow);
 }
 
 [data-ui-style="retro"] .kimix-toolbar-button:hover:not(:disabled),
-[data-ui-style="retro"] .kimix-icon-text-button:hover:not(:disabled) {
+[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button:hover:not(:disabled),
+[data-ui-style="retro"] .kimix-composer-tool-button:hover:not(:disabled) {
   background-color: var(--accent-primary-light);
   border-color: var(--accent-primary-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 1px 2px rgba(45, 48, 50, 0.10);
+  box-shadow: var(--kimix-retro-control-shadow);
   transform: none;
 }
 
-[data-ui-style="retro"] .kimix-app-shell-toolbar,
-[data-ui-style="retro"] .kimix-app-shell-footer {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(0, 0, 0, 0.025));
+[data-ui-style="retro"] .kimix-toolbar-button:active:not(:disabled),
+[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button:active:not(:disabled),
+[data-ui-style="retro"] .kimix-composer-tool-button:active:not(:disabled) {
+  scale: 0.96;
+  box-shadow: var(--kimix-retro-inset-shadow);
+}
+
+/* 唯一的强风格记忆点：窗口标题栏使用 Platinum 的极淡水平细纹。 */
+[data-ui-style="retro"] .kimix-app-shell-toolbar {
+  background-image: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0, rgba(255, 255, 255, 0.13) 1px, rgba(0, 0, 0, 0.018) 2px, transparent 3px);
   border-color: var(--border-default);
+}
+
+[data-ui-style="retro"] .kimix-app-shell-main {
+  border-color: var(--border-strong);
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+/* Composer 是一个整体：外壳聚焦，输入文本区不再形成第二个矩形。 */
+[data-ui-style="retro"] .kimix-composer-card {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-composer-card.is-focused {
+  border-color: var(--accent-primary-soft);
+  box-shadow: 0 0 0 2px var(--accent-primary-light), var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-composer-input,
+[data-ui-style="retro"] .kimix-composer-input:focus,
+[data-ui-style="retro"] .kimix-composer-input:focus-visible {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 主操作保留圆形轮廓，与矩形二级工具键形成稳定层级。 */
+[data-ui-style="retro"] .kimix-composer-primary-button {
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="retro"] .kimix-composer-primary-button:active:not(:disabled) {
+  scale: 0.96;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* ContextBar 是一条连续控制带，内部动作只在 hover/展开时显形。 */
+[data-ui-style="retro"] .kimix-context-bar {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+  box-shadow: var(--kimix-retro-inset-shadow);
+}
+
+[data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action,
+[data-ui-style="retro"] .kimix-context-bar > button {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+[data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action:hover,
+[data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action[aria-expanded="true"],
+[data-ui-style="retro"] .kimix-context-bar > button:hover {
+  border-color: var(--border-default);
+  background: var(--surface-hover);
+  box-shadow: var(--kimix-retro-control-shadow);
+}
+
+/* 侧栏维持平面信息密度，选中态用同一套内框和主题刻度建立归属。 */
+[data-ui-style="retro"] .kimix-sidebar {
+  box-shadow: inset -1px 0 0 var(--border-default);
+}
+
+[data-ui-style="retro"] .kimix-sidebar-project-row.is-active,
+[data-ui-style="retro"] .kimix-sidebar-session-row.is-active {
+  box-shadow: inset 2px 0 0 var(--accent-primary), inset 0 0 0 1px var(--border-subtle);
 }
 
 [data-ui-style="retro"] .kimix-sidebar-nav-item:hover,
@@ -394,16 +480,16 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
-[data-theme="dark"][data-ui-style="retro"] .kimix-settings-input,
-[data-theme="dark"][data-ui-style="retro"] textarea {
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-input {
   border-color: var(--border-strong);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: var(--kimix-retro-inset-shadow);
 }
 
 [data-theme="dark"][data-ui-style="retro"] .kimix-toolbar-button,
-[data-theme="dark"][data-ui-style="retro"] .kimix-icon-text-button {
+[data-theme="dark"][data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button,
+[data-theme="dark"][data-ui-style="retro"] .kimix-composer-tool-button {
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.08));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 1px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--kimix-retro-control-shadow);
 }
 
 /* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */

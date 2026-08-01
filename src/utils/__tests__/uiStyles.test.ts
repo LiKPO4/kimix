@@ -38,6 +38,16 @@ describe("UI_STYLES", () => {
 
     expect(styleBlocks).not.toMatch(/--(?:surface|text|accent|border)-/);
   });
+
+  it("复古控件按组件角色接入且 Composer 输入区只有一个边界所有者", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-icon-text-button\s*\{/);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-composer-input[\s\S]*?border:\s*0\s*!important;/);
+    expect(css).toContain('[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-context-bar');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-sidebar-project-row.is-active');
+  });
 });
 
 describe("applyUiStyle", () => {

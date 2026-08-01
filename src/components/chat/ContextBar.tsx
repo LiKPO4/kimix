@@ -788,7 +788,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   }, [usageOpen, workDirsOpen, modelMenuOpen, triggerFocusInput]);
 
   return (
-    <div ref={contextBarRef} className="flex w-full items-center justify-between px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, height: 36, lineHeight: "20px" }}>
+    <div ref={contextBarRef} className="kimix-context-bar flex w-full items-center justify-between px-1 text-[14px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, height: 36, lineHeight: "20px" }}>
       <div className="flex min-w-0 flex-1 items-center" style={{ gap: 8 }}>
         <div ref={workDirsRef} className="relative min-w-0 shrink-0">
           <button

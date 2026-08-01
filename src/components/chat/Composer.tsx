@@ -301,7 +301,7 @@ async function getDefaultKimiModel() {
 }
 
 const iconButtonClass =
-  "kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-sm-token disabled:cursor-not-allowed disabled:opacity-35";
+  "kimix-composer-tool-button kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center rounded-sm-token disabled:cursor-not-allowed disabled:opacity-35";
 
 function roomControlStatusLabel(status: RoomAgentControlTarget["status"]) {
   if (status === "waiting_approval") return "等待审批";
@@ -5106,7 +5106,7 @@ export function Composer() {
                   {canSteerActiveTurn && canSendNow && (
                     <button
                       onClick={() => void handleSteer()}
-                      className="flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"
+                      className="kimix-composer-primary-button flex h-8 shrink-0 items-center rounded-full bg-accent-primary text-white transition-colors hover:bg-accent-primary-dark"
                       style={{ gap: 6, paddingLeft: 12, paddingRight: 14 }}
                       title={roomSteerTargets.length > 1 ? "选择一个运行中的 Agent 并发送引导" : "立即引导当前任务：把输入插入运行中的对话（官方 Ctrl+S steer），不进排队"}
                       aria-label="引导当前任务"
@@ -5117,7 +5117,7 @@ export function Composer() {
                   )}
                   <button
                     onClick={() => void handleStop()}
-                    className="kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors"
+                    className="kimix-composer-primary-button kimix-strong-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors"
                     title={roomStopTargets.length > 1 ? "选择要停止的 Agent" : "停止"}
                     aria-label="停止"
                   >
@@ -5125,7 +5125,7 @@ export function Composer() {
                   </button>
                 </>
               ) : (
-                <button onClick={handleSend} disabled={!canSendNow} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title="发送" aria-label="发送">
+                <button onClick={handleSend} disabled={!canSendNow} className={`kimix-composer-primary-button flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${canSendNow ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "bg-surface-hover text-text-muted"}`} title="发送" aria-label="发送">
                   <ArrowUp size={17} strokeWidth={2.5} />
                 </button>
               )}
