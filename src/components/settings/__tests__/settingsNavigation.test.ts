@@ -14,6 +14,7 @@ describe("settingsNavigation", () => {
     expect(getSettingsPageForSection("model")).toBe("models");
     expect(getSettingsPageForSection("auth")).toBe("account");
     expect(getSettingsPageForSection("freeze")).toBe("diagnostics");
+    expect(getSettingsPageForSection("palette")).toBe("appearance");
   });
 
   it("未知页面安全回退到常规", () => {
@@ -24,6 +25,7 @@ describe("settingsNavigation", () => {
   it("可按标题、说明和中英文关键词搜索", () => {
     expect(searchSettings("API Key").map((item) => item.id)).toContain("models");
     expect(searchSettings("卡顿").map((item) => item.id)).toContain("freeze");
+    expect(searchSettings("调色板").map((item) => item.id)).toEqual(["palette"]);
     expect(searchSettings("上下文").map((item) => item.id)).toEqual(expect.arrayContaining(["new-session", "tool-select"]));
     expect(searchSettings("   ")).toEqual([]);
   });

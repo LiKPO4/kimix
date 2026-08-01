@@ -9,6 +9,7 @@ export type SettingsSectionId =
   | "identity"
   | "model"
   | "theme"
+  | "palette"
   | "permission"
   | "context"
   | "message"
@@ -53,7 +54,7 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     group: "基础设置",
     label: "外观",
     description: "调整界面主题、字号和色彩方案。",
-    sections: ["theme"],
+    sections: ["theme", "palette"],
   },
   {
     id: "conversation",
@@ -134,11 +135,19 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
   },
   {
     id: "theme",
-    label: "主题与色彩",
-    description: "浅色、深色、字号和 Kimi 官方主题",
+    label: "主题与字号",
+    description: "浅色、深色和界面字号",
     pageId: "appearance",
     sectionId: "theme",
-    keywords: ["外观", "字号", "颜色", "调色板"],
+    keywords: ["外观", "字号", "深色", "浅色"],
+  },
+  {
+    id: "palette",
+    label: "色彩方案",
+    description: "选择调色板，或扫描、管理 Kimi 官方主题",
+    pageId: "appearance",
+    sectionId: "palette",
+    keywords: ["颜色", "调色板", "官方主题"],
   },
   {
     id: "permission",

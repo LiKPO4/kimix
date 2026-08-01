@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
+import { X, Sun, Palette, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isWindows } from "@/utils/platform";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
@@ -73,6 +73,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "experiment",
   "model",
   "theme",
+  "palette",
   "permission",
   "context",
   "message",
@@ -1297,17 +1298,26 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     />
                   </div>
                 </div>
-                <div className="kimix-settings-subsection-row">
-                  <div className="kimix-settings-subsection-title">色彩方案</div>
-                  <button
-                    type="button"
-                    onClick={() => void scanOfficialKimiThemes()}
-                    className="kimix-icon-text-button kimix-muted-action is-compact"
-                    disabled={themeScanLoading}
-                  >
-                    {themeScanLoading ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                    <span>扫描官方主题</span>
-                  </button>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("palette", 4)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Palette size={16} className="text-text-muted" />
+                    <span>色彩方案</span>
+                  </div>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => void scanOfficialKimiThemes()}
+                      className="kimix-settings-check-button"
+                      disabled={themeScanLoading}
+                    >
+                      {themeScanLoading ? <RefreshCw size={15} className="kimix-spin" /> : <Download size={15} />}
+                      <span>扫描官方主题</span>
+                    </button>
+                    {settingsDragHandle("palette", "色彩方案")}
+                  </div>
                 </div>
                 <div className="kimix-settings-palette-grid">
                   {paletteOptions.map((palette) => (
