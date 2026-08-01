@@ -12,12 +12,12 @@ export interface UiStylePreset {
 }
 
 /**
- * 界面风格预设：与主题（明暗）、色彩方案（配色）正交，只切换圆角/阴影/边框等形状质感。
+ * 界面风格预设：与主题（明暗）、色彩方案（配色）正交，只切换圆角/阴影/边框、布局壳层等形状质感。
  * 字体不纳入切换，保持 LXGW WenKai 不变。
  */
 export const UI_STYLES: UiStylePreset[] = [
   { id: "default", label: "Kimix 默认", description: "当前视觉，柔和圆角与轻盈阴影。" },
-  { id: "modern", label: "现代化", description: "静谧效率：hairline 细边框、几乎无阴影的安静干净质感。" },
+  { id: "modern", label: "现代化", description: "Codex 式工作台：安静侧栏、大圆角内容壳与轻悬浮层次。" },
   { id: "retro", label: "复古", description: "Platinum：细腻层级、小圆角与克制高光的经典桌面质感。" },
 ];
 

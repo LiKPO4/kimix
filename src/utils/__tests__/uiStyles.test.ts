@@ -39,6 +39,22 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
   });
 
+  it("现代化风格保持颜色主题所有权并建立 Codex 式壳层", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const styleBlocks = [
+      css.match(/\[data-ui-style="modern"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+      css.match(/\[data-theme="dark"\]\[data-ui-style="modern"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+    ].join("\n");
+
+    expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
+    expect(styleBlocks).toMatch(/--ui-selection-shadow:\s*none;/);
+    expect(styleBlocks).toMatch(/--ui-radius-lg:\s*18px;/);
+    expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
+    expect(css).toContain('[data-ui-style="modern"] .kimix-app-shell-main');
+    expect(css).toContain('[data-ui-style="modern"] .kimix-composer-card');
+    expect(css).toContain('[data-ui-style="modern"] .kimix-floating-panel');
+  });
+
   it("复古风格通过语义令牌覆盖控件且 Composer 输入区只有一个边界所有者", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern is a Codex-inspired shell preset, not a flattened Default variant (v2.20.97)**: Modern now uses complete quiet navigation pills, 18–20px content/composer shells, softly elevated floating surfaces, and restrained flat controls while continuing to consume the active color theme. It does not redefine theme color tokens or restructure business layouts. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Navigation selection and button modes use separate state tokens (v2.20.96)**: `--ui-selection-*` is now directional and limited to vertical navigation, while `--ui-toggle-*` gives Swarm, Plan, pressed, and expanded buttons a complete recessed surface without a leading accent stripe. Ordinary navigation and window controls stay flat at rest; only compound launch/open controls retain a persistent shared boundary. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Interface presets now use a semantic style contract (v2.20.95)**: theme tokens remain the color authority, while controls, sidebar actions/lists, selection, popups, fields, menu triggers, and shell separators consume `--ui-*` role tokens. Window controls and launch/open split controls are enrolled, active-plus-hover explicitly preserves the selection accent edge, and the decorative full-height sidebar divider is removed. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

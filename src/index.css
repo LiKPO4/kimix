@@ -327,35 +327,167 @@
 /* ── 界面风格覆盖 ── */
 /* 置于 [data-theme] 之后，保证浅色/深色下都生效；边框等变量会被色彩方案以内联样式写入根元素，需 !important 覆盖。 */
 
-/* 现代化：静谧效率（Linear/Raycast/Vercel 风）。hairline 细边框是唯一分层手段、几乎无阴影、统一中小圆角、零多余装饰 */
+/* 现代化：Codex 式静谧工作台。
+   以完整选中胶囊、大圆角内容壳、轻量悬浮层次建立身份；颜色仍完全来自当前主题。 */
 [data-ui-style="modern"] {
-  /* 统一中小圆角：不大不小求精确 */
-  --ui-radius-sm: 6px;
-  --ui-radius-md: 6px;
-  --ui-radius-lg: 6px;
-  --ui-radius-xl: 8px;
-  --ui-radius-2xl: 10px;
-  --ui-radius-sm-token: 6px;
-  --ui-radius-md-token: 6px;
-  --ui-radius-lg-token: 10px;
-  /* 同步收紧直接引用 var(--radius-*) 的位置 */
-  --radius-sm: 6px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  /* 几乎无阴影：浮层仅用 hairline ring 分离，无模糊投影 */
-  --shadow-hover: none;
-  --shadow-elevated: none;
-  --shadow-floating: 0 0 0 1px rgba(0, 0, 0, 0.05);
-  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.05);
-  /* hairline 细分隔边框：基于配色推导值向面板底色混合（30% 比默认更浅） */
-  --border-subtle: color-mix(in srgb, var(--border-default) 30%, var(--surface-base)) !important;
-  /* 配色方案内联写入的浮层阴影一并扁平化 */
-  --kimix-composer-shadow: none !important;
-  --kimix-float-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  --ui-radius-sm: 10px;
+  --ui-radius-md: 14px;
+  --ui-radius-lg: 18px;
+  --ui-radius-xl: 20px;
+  --ui-radius-2xl: 22px;
+  --ui-radius-sm-token: 10px;
+  --ui-radius-md-token: 14px;
+  --ui-radius-lg-token: 18px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --kimix-modern-surface-shadow: 0 0 0 1px rgba(25, 23, 20, 0.045), 0 1px 2px rgba(25, 23, 20, 0.025);
+  --kimix-modern-elevated-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 8px 24px rgba(25, 23, 20, 0.065), 0 2px 6px rgba(25, 23, 20, 0.035);
+  --kimix-modern-floating-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 18px 46px rgba(25, 23, 20, 0.10), 0 4px 12px rgba(25, 23, 20, 0.045);
+  --shadow-hover: 0 1px 2px rgba(25, 23, 20, 0.045);
+  --shadow-elevated: var(--kimix-modern-elevated-shadow);
+  --shadow-floating: var(--kimix-modern-floating-shadow);
+  --shadow-overlay: var(--kimix-modern-floating-shadow);
+  --kimix-composer-shadow: var(--kimix-modern-elevated-shadow) !important;
+  --kimix-float-shadow: var(--kimix-modern-floating-shadow) !important;
+  --ui-control-border: 1px solid transparent;
+  --ui-control-background: transparent;
+  --ui-control-background-image: none;
+  --ui-control-shadow: none;
+  --ui-control-hover-border-color: transparent;
+  --ui-control-hover-background: var(--surface-hover);
   --ui-control-hover-shadow: none;
+  --ui-control-active-shadow: none;
+  --ui-nav-action-border: 1px solid transparent;
+  --ui-nav-action-background: transparent;
+  --ui-nav-action-background-image: none;
+  --ui-nav-action-shadow: none;
+  --ui-nav-action-hover-border-color: transparent;
+  --ui-nav-action-hover-background: var(--surface-hover);
   --ui-nav-action-hover-shadow: none;
-  --ui-popup-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
-  --ui-popup-backdrop-filter: none;
+  --ui-nav-list-border: 1px solid transparent;
+  --ui-nav-list-background: transparent;
+  --ui-nav-list-shadow: none;
+  --ui-nav-list-hover-border-color: transparent;
+  --ui-nav-list-hover-background: var(--surface-hover);
+  --ui-nav-list-hover-shadow: none;
+  --ui-selection-border-color: transparent;
+  --ui-selection-background: var(--surface-hover);
+  --ui-selection-color: var(--text-primary);
+  --ui-selection-shadow: none;
+  --ui-toggle-border-color: transparent;
+  --ui-toggle-background: var(--surface-active);
+  --ui-toggle-color: var(--text-primary);
+  --ui-toggle-shadow: var(--kimix-modern-surface-shadow);
+  --ui-compound-border: 1px solid var(--border-subtle);
+  --ui-compound-background: var(--surface-elevated);
+  --ui-compound-background-image: none;
+  --ui-compound-shadow: var(--kimix-modern-surface-shadow);
+  --ui-popup-border: 1px solid var(--border-subtle);
+  --ui-popup-background: var(--surface-elevated);
+  --ui-popup-shadow: var(--kimix-modern-floating-shadow);
+  --ui-popup-backdrop-filter: blur(10px);
+  --ui-field-border: 1px solid var(--border-default);
+  --ui-field-shadow: none;
+  --ui-shell-divider: none;
+  --ui-shell-border-color: var(--border-subtle);
+  --ui-section-divider-color: var(--border-subtle);
+  --ui-menu-trigger-border: 1px solid transparent;
+  --ui-menu-trigger-background: transparent;
+  --ui-menu-trigger-shadow: none;
+  --ui-menu-trigger-hover-border-color: transparent;
+  --ui-menu-trigger-hover-background: var(--surface-hover);
+  --ui-menu-trigger-hover-shadow: none;
+}
+
+[data-theme="dark"][data-ui-style="modern"] {
+  --kimix-modern-surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --kimix-modern-elevated-shadow: 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 28px rgba(0, 0, 0, 0.22);
+  --kimix-modern-floating-shadow: 0 0 0 1px rgba(255, 255, 255, 0.085), 0 20px 50px rgba(0, 0, 0, 0.32);
+}
+
+/* 主工作区像一张安静的桌面卡片；侧栏仍使用颜色主题提供的 ground 色。 */
+[data-ui-style="modern"] .kimix-app-shell-main {
+  border: 1px solid var(--ui-shell-border-color);
+  border-radius: 20px;
+  box-shadow: var(--kimix-modern-surface-shadow);
+}
+
+[data-ui-style="modern"] .kimix-app-shell-toolbar {
+  border-color: var(--ui-section-divider-color);
+  background-image: none;
+}
+
+/* Codex 式导航不使用方向性蓝条，选中与悬停都是完整、柔和的胶囊面。 */
+[data-ui-style="modern"] .kimix-sidebar-nav-item,
+[data-ui-style="modern"] .kimix-sidebar-project-row,
+[data-ui-style="modern"] .kimix-sidebar-session-row,
+[data-ui-style="modern"] .kimix-settings-entry,
+[data-ui-style="modern"] .kimix-settings-navigation-item,
+[data-ui-style="modern"] .kimix-settings-search-result {
+  border-radius: var(--radius-sm);
+}
+
+/* 输入区是主界面的轻悬浮锚点，textarea 不再成为第二层边框。 */
+[data-ui-style="modern"] .kimix-composer-card {
+  border-color: transparent;
+  border-radius: 18px;
+  box-shadow: var(--kimix-modern-elevated-shadow);
+}
+
+[data-ui-style="modern"] .kimix-composer-card.is-focused {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--accent-primary-light), var(--kimix-modern-elevated-shadow);
+}
+
+[data-ui-style="modern"] .kimix-composer-input,
+[data-ui-style="modern"] .kimix-composer-input:focus,
+[data-ui-style="modern"] .kimix-composer-input:focus-visible {
+  border: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 浮层、菜单、设置卡统一用同一套大圆角和低扩散阴影。 */
+[data-ui-style="modern"] .kimix-floating-panel,
+[data-ui-style="modern"] .kimix-menu-panel,
+[data-ui-style="modern"] .kimix-modal-card,
+[data-ui-style="modern"] .kimix-onboarding-card,
+[data-ui-style="modern"] .kimix-settings-panel:not(.is-workspace) {
+  border: var(--ui-popup-border);
+  border-radius: 18px !important;
+  background: var(--ui-popup-background);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: var(--ui-popup-backdrop-filter);
+}
+
+[data-ui-style="modern"] .kimix-menu-item {
+  border-radius: 10px;
+}
+
+[data-ui-style="modern"] .kimix-soft-card,
+[data-ui-style="modern"] .kimix-soft-card-strong,
+[data-ui-style="modern"] .kimix-settings-card,
+[data-ui-style="modern"] .kimix-settings-theme,
+[data-ui-style="modern"] .kimix-settings-uistyle,
+[data-ui-style="modern"] .kimix-settings-palette-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-settings-input {
+  border: var(--ui-field-border);
+  border-radius: 10px;
+  box-shadow: var(--ui-field-shadow);
+}
+
+[data-ui-style="modern"] .kimix-context-bar {
+  border-color: transparent;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* 复古：借鉴 Classic Mac OS 8/9 Platinum 的克制层级与控件触感。
