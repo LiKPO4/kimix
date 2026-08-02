@@ -185,8 +185,8 @@ export function TopMenuBar({
         <div className="flex items-center gap-2 text-text-muted">
           <button
             onClick={onToggleSidebar}
-            className="kimix-window-control flex items-center justify-center"
-            style={{ width: 40, height: 40, minWidth: 40, padding: 0, marginLeft: sidebarOpen ? 8 : -2 }}
+            className="kimix-window-control flex h-8 w-8 items-center justify-center"
+            style={{ padding: 0, marginLeft: sidebarOpen ? 8 : -2 }}
             aria-label={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
             title={sidebarOpen ? "收起侧边栏" : "展开侧边栏"}
           >
@@ -194,7 +194,7 @@ export function TopMenuBar({
           </button>
           <button
             onClick={onNavigateBack}
-            className="kimix-window-control ml-2 flex h-8 w-8 items-center justify-center"
+            className="kimix-window-control flex h-8 w-8 items-center justify-center"
             aria-label="后退"
           >
             <ArrowLeft size={17} />
