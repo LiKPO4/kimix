@@ -31,7 +31,7 @@ const PREVIEW_EXIT_DURATION_MS = 140;
 const SCROLL_EDGE_THRESHOLD_PX = 80;
 const RAIL_VERTICAL_INSET_PX = 24;
 /** Chat viewport left inset for the rail hit-box; marks sit on the left of the hit-box. */
-const RAIL_LEFT_OFFSET_PX = 4;
+const RAIL_LEFT_OFFSET_PX = 8;
 
 function markersEqual(previous: ChatNavigationMarker[], next: ChatNavigationMarker[]) {
   return previous.length === next.length && previous.every((marker, index) => {
@@ -267,7 +267,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
           >
             <span
               className="kimix-chat-navigation-mark absolute"
-              style={{ top: "50%", left: 2 }}
+              style={{ top: "50%", left: 4 }}
             />
           </button>
         );
