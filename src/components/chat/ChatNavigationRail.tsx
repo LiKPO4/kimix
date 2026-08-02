@@ -30,7 +30,8 @@ const PREVIEW_CLOSE_DELAY_MS = 90;
 const PREVIEW_EXIT_DURATION_MS = 140;
 const SCROLL_EDGE_THRESHOLD_PX = 80;
 const RAIL_VERTICAL_INSET_PX = 24;
-const RAIL_LEFT_OFFSET_PX = -46;
+/** Distance from the chat viewport left edge (not the centered stream column). */
+const RAIL_LEFT_OFFSET_PX = 10;
 
 function markersEqual(previous: ChatNavigationMarker[], next: ChatNavigationMarker[]) {
   return previous.length === next.length && previous.every((marker, index) => {

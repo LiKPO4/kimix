@@ -1918,8 +1918,8 @@ export const ChatThread = memo(function ChatThread() {
           ))}
         </div>
       </div>
-      <div className="kimix-content-x pointer-events-none absolute inset-0 z-10">
-        <div className="kimix-chat-stream-column relative h-full">
+      {/* Rail is viewport-left fixed: do not nest in centered stream column or it drifts on maximize. */}
+      <div className="pointer-events-none absolute inset-0 z-10">
           <ChatNavigationRail
             items={visibleRenderItems}
             scrollRef={viewport.scrollRef}
@@ -1930,7 +1930,6 @@ export const ChatThread = memo(function ChatThread() {
               "start",
             )}
           />
-        </div>
       </div>
       <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>
         <div className="kimix-chat-stream-column flex justify-end">
