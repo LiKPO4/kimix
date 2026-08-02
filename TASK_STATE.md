@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 排查：发送后约 1 分钟才响应、中途卡顿（无版本变更）
+
+- 方法：解析会话 `336f7ae6` 完整 wire.jsonl（57MB），逐轮计算三段耗时。
+- 数据：turn.prompt→llm.request = 0s（链路零开销）；llm.request→首字 17–123s（中位 ~23s）；tool.result→下一请求 = 0s。每步输入 ~409k tokens、459 条消息、think=high、maxTokens 65536、grok-4.5 第三方 relay；16:09 曾达 ~786k，16:23 手动 compact 后砍半，5 小时又涨回 409k。diag 的 [live] silence 显示卡顿期间 thinking delta 仍在流。
+- 结论：瓶颈 = 超大上下文 × relay × high thinking 的模型往返，非 Kimix 缺陷；不修渲染/事件管线。
+- 处置：runbook 沉淀 `knowledge/maintenance/large-context-latency.md`；建议用户 compact/新会话、降 thinking 与 maxTokens。纯文档，未 bump。
+
 ## 2026-08-02 排查：切换 Swarm 后上一条 assistant 气泡被掏空（无版本变更）
 
 - 现象：20:53 切 Swarm 后，发布轮气泡只剩文件变更卡 + 模型页脚。
