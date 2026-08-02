@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：侧栏 Git 矩阵按钮可辨浅底（v2.20.129）
+
+- 根因：v2.20.128 去掉常驻 accent/surface 工具类后，Git 五键只剩文字，静止态无法辨认为按钮。
+- 修复：新增 `.kimix-inspector-action` 安静芯片角色（`--surface-base` + 细边框），hover 再加深；复古仍仅在 hover/active 加 Platinum 触感，不用 accent-light 常驻底。
+- 验证：uiStyles 定向；OKF strict。实机视觉待 v2.20.129 截图。
+
 ## 2026-08-02 修复：会话侧栏次级按钮静止态过重（v2.20.128）
 
 - 根因：v2.20.123 把侧栏 `.kimix-icon-text-button` 静止态套上 compound 浮雕；Git「详情/拉取/推送/图谱/刷新」又常驻 `bg-accent-primary-light`/`bg-surface-base`，默认就读成 hover。

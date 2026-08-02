@@ -532,6 +532,19 @@
   box-shadow: none;
 }
 
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--kimix-modern-control-radius);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
 [data-ui-style="modern"] .kimix-longtask-inspector .kimix-inspector-field {
   border: var(--ui-field-border);
   border-radius: var(--kimix-modern-control-radius);
@@ -736,6 +749,25 @@
 
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary):active:not(:disabled),
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-inspector-drag-handle:active:not(:disabled) {
+  box-shadow: var(--ui-control-active-shadow);
+}
+
+/* 矩阵芯片保持安静浅底；悬停再给 Platinum 触感，避免静止全透明难辨。 */
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
   box-shadow: var(--ui-control-active-shadow);
 }
 
@@ -1390,6 +1422,20 @@ body::before {
 
 .kimix-icon-text-button:active:not(:disabled) {
   scale: 0.96;
+}
+
+/* 侧栏次级操作矩阵：安静可辨的浅底芯片，不是全透明字，也不是常驻 hover 实底。 */
+.kimix-longtask-inspector .kimix-section-card .kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+.kimix-longtask-inspector .kimix-section-card .kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
 }
 
 /* Shared control contract. Presets customize tokens once; every enrolled control follows. */

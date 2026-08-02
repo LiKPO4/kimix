@@ -272,17 +272,21 @@ describe("UI_STYLES", () => {
   it("会话侧栏内部操作与字段完整接入风格角色", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const longTaskInspector = readFileSync(resolve(process.cwd(), "src/components/layout/LongTaskInspectorPanel.tsx"), "utf8");
-    const gitDetailsButton = longTaskInspector.match(/onClick=\{openGitDetails\}[\s\S]{0,180}?className="([^"]+)"/);
-    const gitPullButton = longTaskInspector.match(/onClick=\{\(\) => void pullGit\(\)\}[\s\S]{0,180}?className="([^"]+)"/);
+    const gitDetailsButton = longTaskInspector.match(/onClick=\{openGitDetails\}[\s\S]{0,220}?className="([^"]+)"/);
+    const gitPullButton = longTaskInspector.match(/onClick=\{\(\) => void pullGit\(\)\}[\s\S]{0,220}?className="([^"]+)"/);
 
     expect(longTaskInspector).toContain("kimix-inspector-drag-handle");
+    expect(longTaskInspector).toContain("kimix-inspector-action");
     expect(longTaskInspector.match(/kimix-inspector-field/g)).toHaveLength(4);
+    expect(css).toMatch(/\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-inspector-action\s*\{[^}]*background-color:\s*var\(--surface-base\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button[\s\S]*?\{[^}]*border:\s*1px solid transparent;[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-inspector-action\s*\{[^}]*background-color:\s*var\(--surface-base\);/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button:not\(\.bg-accent-primary\)[\s\S]*?\{[^}]*border:\s*1px solid transparent;[^}]*border-radius:\s*var\(--radius-sm\);[^}]*background-image:\s*none;[^}]*box-shadow:\s*none;/s);
-    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button:not\(\.bg-accent-primary\):hover:not\(:disabled\)[\s\S]*?\{[^}]*border-color:\s*var\(--ui-control-hover-border-color\);[^}]*background-color:\s*var\(--ui-control-hover-background\);[^}]*box-shadow:\s*var\(--ui-control-hover-shadow\);/s);
-    expect(gitDetailsButton?.[1]).toContain("kimix-icon-text-button is-compact justify-center text-accent-primary hover:bg-accent-primary-light");
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button\.kimix-inspector-action\s*\{[^}]*background-color:\s*var\(--surface-base\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button\.kimix-inspector-action:hover:not\(:disabled\)[\s\S]*?\{[^}]*box-shadow:\s*var\(--ui-control-hover-shadow\);/s);
+    expect(gitDetailsButton?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-icon-text-button", "kimix-inspector-action", "text-accent-primary"]));
     expect(gitDetailsButton?.[1].split(/\s+/)).not.toContain("bg-accent-primary-light");
-    expect(gitPullButton?.[1]).toContain("kimix-icon-text-button is-compact justify-center text-text-muted hover:bg-surface-hover");
+    expect(gitPullButton?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-icon-text-button", "kimix-inspector-action", "text-text-muted"]));
     expect(gitPullButton?.[1].split(/\s+/)).not.toContain("bg-surface-base");
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-inspector-field\s*\{[^}]*border:\s*var\(--ui-field-border\);[^}]*border-radius:\s*var\(--radius-sm\);[^}]*box-shadow:\s*var\(--ui-field-shadow\);/s);
     expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-icon-text-button\s*\{/);
