@@ -8,8 +8,8 @@
 
 | 触发 | 入口 | host 位置 | 行为 |
 | --- | --- | --- | --- |
-| 开启 Swarm（按钮 / `/swarm on`） | Composer | `setSwarmMode` kimiCodeHost.ts:1397 | 空闲会话 `migrateServerSessionToSdk` + `sdkPinnedSessionIds.add`；运行中只记 `swarmModeDesired` 下轮生效 |
-| 发起 Swarm 任务（`/swarm xxx`） | Composer | `swarm` :1415 | 同上，pin |
+| 开启 Swarm（按钮 / `/swarm on`） | Composer | `setSwarmMode` kimiCodeHost.ts:1397 | **v2.20.152 起**：官方 0.31+ profile `agent_config.swarm_mode` 直接切换，不迁移；运行中只记 `swarmModeDesired` 下轮生效。此前：同 id 迁移到 SDK + pin |
+| 发起 Swarm 任务（`/swarm xxx`） | Composer | `swarm` :1415 | **v2.20.152 起**：profile 置 swarm_mode + 请求级 `swarm_mode` 标记，同一条 WS 收子代理事件。此前：同 id 迁移到 SDK + pin |
 | 刷新 Skill 注册表（`/reload`、设置页） | 斜杠/设置 | `reloadSession` :994 | 同 id 迁移，**未 pin**（见风险 1） |
 
 ### B. 故障兜底（保可用性）

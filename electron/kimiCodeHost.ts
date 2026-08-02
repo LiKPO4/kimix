@@ -1398,13 +1398,15 @@ export async function setSwarmMode(sessionId: string, enabled: boolean, trigger:
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    if (!enabled) {
-      serverManaged.swarmMode = false;
-      return;
+    // 官方 0.31+ Server 原生支持 swarm_mode（profile agent_config，已实测），与官方
+    // Web 完全同链路，不再迁移到 SDK。轮次运行中开启仍拒绝（渲染层会先记 desired
+    // 下轮生效）；关闭随时允许。
+    if (enabled && (serverManaged.status === "running" || serverManaged.status === "waiting_approval" || serverManaged.status === "waiting_question")) {
+      throw new Error("当前轮正在运行，不能开启 Swarm。请等本轮结束后重试。");
     }
-    await migrateServerSessionToSdk(sessionId, serverManaged, {
-      runningMessage: "当前轮正在运行，不能开启 Swarm。请等本轮结束后重试。",
-    });
+    await getServerClient().updateSession(sessionId, { swarm_mode: enabled });
+    serverManaged.swarmMode = enabled;
+    return;
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
@@ -1416,9 +1418,24 @@ export async function swarm(sessionId: string, input: string | KimiCodePromptPar
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    await migrateServerSessionToSdk(sessionId, serverManaged, {
-      runningMessage: "当前轮正在运行，不能发起 Swarm。请等本轮结束后重试。",
-    });
+    if (serverManaged.status === "running" || serverManaged.status === "waiting_approval" || serverManaged.status === "waiting_question") {
+      throw new Error("当前轮正在运行，不能发起 Swarm。请等本轮结束后重试。");
+    }
+    // 官方 Server 的 Swarm 任务 = 会话 swarm_mode（profile）+ 请求级 swarm_mode
+    // 标记（0.31+ prompts schema，已实测），子代理事件走同一条 WS，不再需要 SDK
+    // 迁移。
+    if (!serverManaged.swarmMode) {
+      await getServerClient().updateSession(sessionId, { swarm_mode: true });
+      serverManaged.swarmMode = true;
+    }
+    setStatus(sessionId, "running");
+    try {
+      await getServerClient().prompt(sessionId, input, serverControls(serverManaged));
+    } catch (error) {
+      setStatus(sessionId, "error");
+      throw error;
+    }
+    return;
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.swarm) throw new Error("当前兼容链路不支持 Swarm。");
@@ -3100,6 +3117,9 @@ function serverControls(managed: ServerManagedSession, promptModel?: string): Re
     thinking: managed.thinking,
     permission_mode: managed.permission,
     plan_mode: managed.planMode,
+    // 会话 swarm_mode 为真时随请求显式携带（官方 0.31+ prompts schema）；为假时
+    // 不写字段，避免请求级 false 覆盖会话级 true。
+    ...(managed.swarmMode ? { swarm_mode: true } : {}),
   };
 }
 

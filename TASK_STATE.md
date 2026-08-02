@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：Swarm 改走官方 Server 原生接口，不再迁移 SDK（v2.20.152）
+
+- 起因：用户指出官方 Web 的 Swarm 可正常使用。实测官方 0.31.1：profile `agent_config.swarm_mode` 可双向切换（status.swarm_mode 跟随），prompts 请求接受 `swarm_mode` 标记并正常完成；此前「Swarm 只能 SDK」是 ≤0.29 探针的过时结论。
+- 修复：`setSwarmMode`/`swarm` 在 Server 会话上改走 `updateSession({swarm_mode})` + prompt 携带 `swarm_mode`（serverControls 仅在为真时写字段）；不再 `migrateServerSessionToSdk`、不再 pin；运行中开启仍拒绝（渲染层记 desired 下轮生效）。
+- 影响：开 Swarm 不再换引擎/换 id/跳链路，与官方 Web 同链路；迁移窗口竞态类问题（气泡掏空）的该诱因消除。
+- 验证：官方 Server 实测（profile/prompt/schema）+ typecheck + 全量 1483 测试 + build。实机待 v2.20.152 切换 Swarm 确认。
+
 ## 2026-08-02 修复：轮次收尾帧丢失后立即可自愈（v2.20.151）
 
 - 现场：与 Kimi Web 共存时本轮最终总结在 Kimix 缺失（官方 wire 有 1112 字全文，Kimix 本地只到 21:58:32；丢帧窗口与 dev 重启重合）。
