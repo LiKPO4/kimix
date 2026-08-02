@@ -3,11 +3,11 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  Copy,
+  Maximize2,
+  Minimize2,
   Minus,
   PanelLeft,
   PanelLeftOpen,
-  Square,
   X,
 } from "lucide-react";
 
@@ -247,21 +247,21 @@ export function TopMenuBar({
           className="kimix-window-control flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label="最小化"
         >
-          <Minus size={14} />
+          <Minus size={14} strokeWidth={2} />
         </button>
         <button
           onClick={() => window.api.maximizeWindow()}
           className="kimix-window-control flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label={isMaximized ? "还原" : "最大化"}
         >
-          {isMaximized ? <Copy size={12} /> : <Square size={12} />}
+          {isMaximized ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
         </button>
         <button
           onClick={() => window.api.closeWindow()}
           className="kimix-window-control is-danger flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label="关闭"
         >
-          <X size={14} />
+          <X size={14} strokeWidth={2} />
         </button>
       </div>
     </header>
