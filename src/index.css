@@ -545,6 +545,25 @@
   background-color: var(--surface-hover);
 }
 
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
+[data-ui-style="modern"] .kimix-modal-card .kimix-inspector-list-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--kimix-modern-control-radius);
+  background-color: var(--surface-base);
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item:hover:not(:disabled),
+[data-ui-style="modern"] .kimix-modal-card .kimix-inspector-list-item:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
+[data-ui-style="modern"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+  border-radius: var(--kimix-modern-control-radius);
+}
+
 [data-ui-style="modern"] .kimix-longtask-inspector .kimix-inspector-field {
   border: var(--ui-field-border);
   border-radius: var(--kimix-modern-control-radius);
@@ -768,6 +787,39 @@
 }
 
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
+  box-shadow: var(--ui-control-active-shadow);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
+[data-ui-style="retro"] .kimix-modal-card .kimix-inspector-list-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item:hover:not(:disabled),
+[data-ui-style="retro"] .kimix-modal-card .kimix-inspector-list-item:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+  border-radius: var(--radius-sm);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:active:not(:disabled),
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
   box-shadow: var(--ui-control-active-shadow);
 }
 
@@ -1435,6 +1487,41 @@ body::before {
 
 .kimix-longtask-inspector .kimix-section-card .kimix-inspector-action:hover:not(:disabled) {
   border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
+/* 侧栏内可点列表行（会话树子节点、最近变更等）。 */
+.kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
+.kimix-modal-card .kimix-inspector-list-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-hover);
+}
+
+.kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item:hover:not(:disabled),
+.kimix-modal-card .kimix-inspector-list-item:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
+/* 侧栏头部 32px 图标钮：接入 inline-icon + control 触感。 */
+.kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
+.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+.kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
+.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+  border-color: var(--border-subtle);
   background-color: var(--surface-hover);
 }
 

@@ -1178,7 +1178,7 @@ export function LongTaskInspectorPanel({
           <button
             type="button"
             onClick={() => void onCopyBackgroundTaskOutput(task)}
-            className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
+            className="kimix-icon-text-button kimix-inspector-action is-compact text-accent-primary"
           >
             <ClipboardCopy size={13} />
             输出
@@ -1187,7 +1187,7 @@ export function LongTaskInspectorPanel({
             <button
               type="button"
               onClick={() => void onStopBackgroundTask(task)}
-              className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-danger hover:bg-accent-danger-light"
+              className="kimix-icon-text-button kimix-inspector-action is-compact text-accent-danger"
             >
               <Square size={13} />
               停止
@@ -1215,7 +1215,7 @@ export function LongTaskInspectorPanel({
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+          className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary"
           aria-label="关闭会话侧栏"
           title="关闭"
         >
@@ -1251,7 +1251,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       disabled={longTaskControlBusy || Boolean(runningSessionId) || longTaskMeta.stage === "completed"}
                       onClick={() => void onApplyTargetStep(true)}
-                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/60 disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact text-accent-warning disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       <Play size={14} />
                       <span>继续</span>
@@ -1259,7 +1259,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={() => void onCopyNextLongTaskPrompt()}
-                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/60"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact text-accent-warning"
                     >
                       <ClipboardCopy size={13} />
                       <span>复制 prompt</span>
@@ -1268,14 +1268,14 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
               <div className="flex flex-col" style={{ gap: 18, marginTop: 22 }}>
-                <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
                   <div className="text-[13px] font-medium leading-5 text-accent-primary">执行控制</div>
                   <div className="flex items-center" style={{ gap: 14, marginTop: 16 }}>
                     <button
                       type="button"
                       disabled={longTaskControlBusy || longTaskMeta.stage === "paused" || longTaskMeta.stage === "completed"}
                       onClick={() => void onPatchLongTaskMeta({ stage: "paused" }, { stopRunning: true, message: "已暂停长程任务" })}
-                      className="kimix-icon-text-button is-compact flex-1 justify-center bg-surface-elevated text-text-muted hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact flex-1 justify-center text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       <Pause size={14} />
                       暂停
@@ -1284,14 +1284,14 @@ export function LongTaskInspectorPanel({
                       type="button"
                       disabled={longTaskControlBusy || Boolean(runningSessionId) || longTaskMeta.stage === "completed"}
                       onClick={() => void onApplyTargetStep(true)}
-                      className="kimix-icon-text-button is-compact flex-1 justify-center bg-surface-elevated text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact flex-1 justify-center text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       <Play size={14} />
                       继续
                     </button>
                   </div>
                 </div>
-                <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40" style={{ padding: "20px 16px 18px" }}>
                   <div className="flex flex-col" style={{ gap: 14 }}>
                     <label className="text-[13px] font-medium leading-5 text-accent-primary" htmlFor="long-task-target-step">
                       执行到
@@ -1324,7 +1324,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       disabled={targetStepBusy}
                       onClick={() => void onApplyTargetStep(false)}
-                      className="kimix-icon-text-button is-compact flex-1 justify-center bg-surface-elevated text-accent-primary hover:bg-accent-primary-light disabled:cursor-wait disabled:opacity-60"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact flex-1 justify-center text-accent-primary disabled:cursor-wait disabled:opacity-60"
                     >
                       保存目标
                     </button>
@@ -1353,7 +1353,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
                     刷新
@@ -1367,7 +1367,7 @@ export function LongTaskInspectorPanel({
                 </div>
               ) : null}
               {backgroundTasksLoading && backgroundTasks.length === 0 ? (
-                <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   正在读取 Kimi 后台任务...
                 </div>
               ) : backgroundTasks.length > 0 ? (
@@ -1375,7 +1375,7 @@ export function LongTaskInspectorPanel({
                   {backgroundTasks.slice(0, 8).map((task) => renderBackgroundTaskItem(task, `${task.role === "reviewer" ? "审查" : "执行"} agent`, false))}
                 </div>
               ) : (
-                <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   后台 Shell / Agent 任务出现后会显示真实终态、失败原因和输出入口。
                 </div>
               )}
@@ -1390,7 +1390,7 @@ export function LongTaskInspectorPanel({
                   <button
                     type="button"
                     onClick={() => openFile(longTaskMeta.bigPlanPath)}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary"
                   >
                     打开
                   </button>
@@ -1398,7 +1398,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {longTaskDetailLoading ? (
-                <div className="mt-4 rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   正在读取 BIGPLAN...
                 </div>
               ) : longTaskDetailError ? (
@@ -1443,7 +1443,7 @@ export function LongTaskInspectorPanel({
                       );
                     })}
                     {parsedLongTaskDetail.steps.length === 0 && (
-                      <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                      <div className="kimix-inset-section bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                         BIGPLAN 还没有解析到 Step，等待规划完成。
                       </div>
                     )}
@@ -1465,7 +1465,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {longTaskDetailLoading ? (
-                <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   正在读取轮次记录...
                 </div>
               ) : parsedLongTaskDetail && parsedLongTaskDetail.rounds.length > 0 ? (
@@ -1480,7 +1480,7 @@ export function LongTaskInspectorPanel({
                         <button
                           type="button"
                           onClick={() => openFile(round.filePath)}
-                          className="kimix-icon-text-button is-compact shrink-0 bg-surface-elevated text-accent-primary hover:bg-accent-primary-light"
+                          className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary"
                         >
                           打开
                         </button>
@@ -1505,7 +1505,7 @@ export function LongTaskInspectorPanel({
                           </div>
                         ))}
                         {round.entries.length === 0 && (
-                          <div className="rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "11px 11px" }}>
+                          <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "11px 11px" }}>
                             这个 Step 记录暂时为空。
                           </div>
                         )}
@@ -1514,7 +1514,7 @@ export function LongTaskInspectorPanel({
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   暂无 Step 轮次记录。
                 </div>
               )}
@@ -1529,7 +1529,7 @@ export function LongTaskInspectorPanel({
                   <button
                     type="button"
                     onClick={() => openFile(longTaskMeta.reviewQueuePath)}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary"
                   >
                     打开
                   </button>
@@ -1627,7 +1627,7 @@ export function LongTaskInspectorPanel({
                         onSetComposerCardHidden(composerCardSessionId, entry.key, false);
                         showToast(`${entry.title}已恢复到输入框上方`);
                       }}
-                      className="flex w-full items-center rounded-lg border border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-accent-primary-light/40"
+                      className="kimix-inspector-list-item flex w-full items-center text-left"
                       style={{ gap: 10, padding: "12px 12px" }}
                     >
                       <entry.icon size={16} className="shrink-0 text-text-muted" />
@@ -1657,7 +1657,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
                       onClick={() => onRefreshSessionLongTasks()}
-                      className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
                       刷新
@@ -1677,7 +1677,7 @@ export function LongTaskInspectorPanel({
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                  <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                     当前长程任务会话没有其他未归档任务。
                   </div>
                 )}
@@ -1709,7 +1709,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     onClick={() => void loadKimiHealth()}
                     disabled={kimiHealthLoading}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
                     title="刷新 Kimi Code 状态"
                     aria-label="刷新 Kimi Code 状态"
                   >
@@ -1755,7 +1755,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={openKimiAuthSettings}
-                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-text-secondary"
                     >
                       <LogIn size={13} />
                       登录
@@ -1763,7 +1763,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={openKimiModelSettings}
-                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-text-secondary"
                     >
                       <Wrench size={13} />
                       模型
@@ -1772,7 +1772,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       onClick={() => projectPathForKimi && void window.api.openProjectPath({ path: projectPathForKimi })}
                       disabled={!projectPathForKimi}
-                      className="kimix-icon-text-button is-compact justify-center text-text-secondary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <FolderSearch size={13} />
                       项目
@@ -1804,7 +1804,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
                     刷新
@@ -1836,7 +1836,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
                     刷新
@@ -1939,7 +1939,7 @@ export function LongTaskInspectorPanel({
                 {rightCardDragHandle("git", "Git")}
               </div>
               <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
-                <div className="rounded-lg bg-surface-base text-[13px] leading-5" style={{ padding: "12px 12px" }}>
+                <div className="kimix-inset-section bg-surface-base text-[13px] leading-5" style={{ padding: "12px 12px" }}>
                   <div className="flex items-center justify-between" style={{ gap: 10 }}>
                     <span className="min-w-0 truncate text-text-primary">{gitBranch ?? "未检测到分支"}</span>
                     <span className="shrink-0 rounded-full bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 8, paddingRight: 8 }}>
@@ -2021,7 +2021,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={onClearBtw}
-                      className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-text-muted"
                     >
                       <Trash2 size={13} />
                       清空
@@ -2060,7 +2060,7 @@ export function LongTaskInspectorPanel({
                       return (
                         <div
                           key={round.id}
-                          className="rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-secondary"
+                          className="kimix-inset-section bg-surface-base text-[13px] leading-5 text-text-secondary"
                           style={{ padding: "11px 12px" }}
                         >
                           <div className="rounded-lg border border-accent-primary-soft bg-accent-primary-light/40 text-accent-primary" style={{ padding: "9px 10px" }}>
@@ -2115,7 +2115,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!liveCurrentSession || sessionPlanState.loading}
                     onClick={() => onRefreshSessionPlan()}
-                    className="kimix-icon-text-button is-compact shrink-0 bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
                     刷新
@@ -2124,7 +2124,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {sessionPlanState.loading ? (
-                <div className="mt-4 rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   正在读取 Plan 内容...
                 </div>
               ) : sessionPlanState.error ? (
@@ -2132,7 +2132,7 @@ export function LongTaskInspectorPanel({
                   读取失败：{sessionPlanState.error}
                 </div>
               ) : sessionPlanState.content ? (
-                <div className="mt-4 rounded-lg border border border-border-subtle bg-surface-elevated" style={{ padding: "14px 13px" }}>
+                <div className="kimix-inset-section mt-4 bg-surface-elevated" style={{ padding: "14px 13px" }}>
                   <div className="max-h-[460px] min-w-0 overflow-x-hidden overflow-y-auto text-[13px] leading-6 text-text-secondary">
                     <MarkdownRenderer content={sessionPlanState.content} wrapLongLines />
                   </div>
@@ -2143,7 +2143,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={() => void copyToClipboard(sessionPlanState.content, "已复制 Plan 内容")}
-                      className="kimix-icon-text-button is-compact shrink-0 text-accent-primary hover:bg-accent-primary-light"
+                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary"
                     >
                       <Copy size={13} />
                       复制
@@ -2151,7 +2151,7 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   {sessionPlanState.message || "开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。"}
                 </div>
               )}
@@ -2171,7 +2171,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       onClick={() => void refreshServerTree(true)}
                       disabled={serverTreeLoading || Boolean(serverTreeBusy)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                      className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
                       title="刷新会话树"
                       aria-label="刷新会话树"
                     >
@@ -2181,7 +2181,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       onClick={() => void createServerTreeChild()}
                       disabled={serverTreeLoading || Boolean(serverTreeBusy)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
+                      className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-55"
                       title="新建子会话"
                       aria-label="新建子会话"
                     >
@@ -2191,7 +2191,7 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
                 <div className="flex flex-col" style={{ gap: 10, marginTop: 14 }}>
-                  <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-accent-primary-light/40" style={{ padding: "12px 14px" }}>
+                  <div className="kimix-inset-section bg-accent-primary-light/40" style={{ padding: "12px 14px" }}>
                     <div className="grid items-center" style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", gap: 10 }}>
                       <GitBranch size={14} className="text-accent-primary" />
                       <div className="min-w-0">
@@ -2209,7 +2209,7 @@ export function LongTaskInspectorPanel({
                           type="button"
                           onClick={() => void openServerTreeSession(child)}
                           disabled={Boolean(serverTreeBusy)}
-                          className="w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-left transition-colors hover:bg-surface-hover disabled:cursor-wait disabled:opacity-55"
+                          className="kimix-inspector-list-item w-full text-left disabled:cursor-wait disabled:opacity-55"
                           style={{ padding: "11px 12px" }}
                         >
                           <div className="grid items-center" style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", gap: 10 }}>
@@ -2244,20 +2244,20 @@ export function LongTaskInspectorPanel({
               </div>
               <div className="mt-3 flex flex-col text-[13px] leading-5 text-text-muted" style={{ gap: 10 }}>
                 {sessionAgentLabel && (
-                  <div className="rounded-lg bg-surface-elevated" style={{ padding: "11px 12px" }}>
+                  <div className="kimix-inset-section bg-surface-elevated" style={{ padding: "11px 12px" }}>
                     <div className="font-medium text-accent-primary">当前 Agent</div>
                     <div className="mt-1 break-all">{sessionAgentLabel}</div>
                   </div>
                 )}
-                <div className="rounded-lg bg-accent-primary-light/40" style={{ padding: "11px 12px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40" style={{ padding: "11px 12px" }}>
                   <div className="font-medium text-accent-primary">Session</div>
                   <div className="mt-1 break-all">{liveCurrentSession?.id ?? "未选择会话"}</div>
                 </div>
-                <div className="rounded-lg bg-surface-elevated" style={{ padding: "11px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated" style={{ padding: "11px 12px" }}>
                   <div className="font-medium text-accent-primary">工作目录</div>
                   <div className="mt-1 break-all">{liveCurrentSession?.projectPath ?? currentProject?.path ?? "未选择项目"}</div>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-surface-elevated" style={{ gap: 12, padding: "11px 12px" }}>
+                <div className="kimix-inset-section flex items-center justify-between bg-surface-elevated" style={{ gap: 12, padding: "11px 12px" }}>
                   <span className="font-medium text-accent-primary">Plan 模式</span>
                   <span className="rounded-full bg-surface-elevated text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 9, paddingRight: 9 }}>
                     {defaultPlanMode ? "已开启" : "已关闭"}
@@ -2283,7 +2283,7 @@ export function LongTaskInspectorPanel({
                       key={diff.id}
                       type="button"
                       onClick={() => openFile(diff.filePath)}
-                      className="w-full rounded-lg border border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-accent-primary-light/40"
+                      className="kimix-inspector-list-item w-full text-left disabled:cursor-not-allowed disabled:opacity-55"
                       style={{ padding: "12px 12px" }}
                     >
                       <div className="truncate text-[13px] font-medium leading-5 text-text-primary">{diff.filePath}</div>
@@ -2292,7 +2292,7 @@ export function LongTaskInspectorPanel({
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-lg bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
                   当前会话还没有 diff 记录。
                 </div>
               )}
@@ -2320,7 +2320,7 @@ export function LongTaskInspectorPanel({
               type="button"
               disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
               onClick={() => void pushGit()}
-              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+              className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
             >
               {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
               推送
@@ -2329,12 +2329,12 @@ export function LongTaskInspectorPanel({
               type="button"
               disabled={!projectPathForGit || gitDetailsLoading}
               onClick={() => void loadGitDetails()}
-              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+              className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
             >
               {gitDetailsLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               刷新
             </button>
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={closeGitDetails} aria-label="关闭 Git 详情">
+            <button className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={closeGitDetails} aria-label="关闭 Git 详情">
               <X size={16} />
             </button>
           </div>
@@ -2351,7 +2351,7 @@ export function LongTaskInspectorPanel({
                   type="button"
                   disabled={gitFiles.length === 0 || gitDetailsLoading || gitBusy !== null}
                   onClick={() => setSelectedGitFiles(allGitFilesSelected ? new Set() : new Set(gitFiles.map((file) => file.path)))}
-                  className="kimix-icon-text-button is-compact shrink-0 bg-surface-elevated text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                  className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   <ListChecks size={14} />
                   {allGitFilesSelected ? "取消全选" : "全选"}
@@ -2365,7 +2365,7 @@ export function LongTaskInspectorPanel({
                 ) : gitFiles.length > 0 ? gitFiles.map((file) => (
                   <div
                     key={`${file.status}-${file.path}`}
-                    className="grid items-center rounded-lg border border-border-subtle bg-surface-elevated transition-colors hover:bg-surface-hover"
+                    className="kimix-inspector-list-item grid items-center"
                     style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto auto", gap: 12, padding: "11px 12px" }}
                   >
                     <input
@@ -2397,7 +2397,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={() => openFile(file.path, projectPathForGit)}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                      className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary"
                       title="打开文件"
                       aria-label={`打开 ${file.path}`}
                     >
@@ -2439,7 +2439,7 @@ export function LongTaskInspectorPanel({
                       key={diff.id}
                       type="button"
                       onClick={() => openFile(diff.filePath)}
-                      className="grid w-full items-center rounded-lg border border-border-subtle bg-surface-elevated text-left transition-colors hover:bg-surface-hover"
+                      className="kimix-inspector-list-item grid w-full items-center text-left"
                       style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "11px 12px" }}
                     >
                       <span className="min-w-0">
@@ -2467,7 +2467,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={gitBusy !== null}
                     onClick={() => setGitCommitMessage(template)}
-                    className="kimix-icon-text-button is-compact bg-surface-elevated text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {template}
                   </button>
@@ -2486,7 +2486,7 @@ export function LongTaskInspectorPanel({
                 <button
                   type="button"
                   onClick={closeGitDetails}
-                  className="kimix-icon-text-button is-compact bg-surface-elevated text-text-muted hover:bg-surface-hover"
+                  className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted"
                 >
                   关闭
                 </button>
@@ -2523,12 +2523,12 @@ export function LongTaskInspectorPanel({
               type="button"
               disabled={!projectPathForGit || gitGraphLoading || gitGraphLoadingMore}
               onClick={() => void loadGitGraph(gitGraphLimit)}
-              className="kimix-icon-text-button is-compact shrink-0 bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+              className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
             >
               {gitGraphLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               刷新
             </button>
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover" onClick={closeGitGraph} aria-label="关闭 Git 图谱">
+            <button className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary" onClick={closeGitGraph} aria-label="关闭 Git 图谱">
               <X size={16} />
             </button>
           </div>
@@ -2600,7 +2600,7 @@ export function LongTaskInspectorPanel({
                           type="button"
                           disabled={gitGraphLoadingMore}
                           onClick={loadMoreGitGraph}
-                          className="kimix-icon-text-button is-compact w-full justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                          className="kimix-icon-text-button kimix-inspector-action is-compact w-full justify-center text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                         >
                           {gitGraphLoadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
                           <span>{gitGraphLoadingMore ? "正在展开..." : "展开更多 100 条"}</span>

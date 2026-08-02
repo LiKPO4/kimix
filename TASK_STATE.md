@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：会话侧栏剩余交互面接入风格角色（v2.20.130）
+
+- 根因：仅 Git 五键与 section-card 外壳入角色；Plan 刷新、会话树 ±、最近变更行、大量 icon-text 仍用 Tailwind 固定底/圆角，切换 Modern/Retro 几乎不变。
+- 修复：次级按钮统一 `.kimix-inspector-action`（去 accent-light 常驻底）；32px 图标钮 `.kimix-inline-icon-action.is-roomy`；列表行 `.kimix-inspector-list-item`；中性内嵌块 `.kimix-inset-section`。
+- 验证：uiStyles 定向；OKF。实机待 v2.20.130 截图。
+
 ## 2026-08-02 修复：侧栏 Git 矩阵按钮可辨浅底（v2.20.129）
 
 - 根因：v2.20.128 去掉常驻 accent/surface 工具类后，Git 五键只剩文字，静止态无法辨认为按钮。
