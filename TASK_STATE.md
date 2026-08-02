@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：选中行悬停与普通悬停描边对齐（v2.20.132）
+
+- 根因：v2.20.131 的 `--ui-selection-hover-*` 用“加深选中底”另一套语义，和普通 `--ui-nav-list-hover-*`（描边/触感）不一致。
+- 修复：selection-hover 的 border/background 直接复用 nav-list-hover；默认/现代列表悬停补 subtle 描边；复古 hover shadow = 左侧选中条 + list-hover 浮雕。
+- 验证：uiStyles 定向。实机待 v2.20.132 截图。
+
 ## 2026-08-02 修复：侧栏已选中行悬停无反馈（v2.20.131）
 
 - 根因：`.kimix-sidebar-project-row.is-active:hover` 与 `.is-active` 共用 `--ui-selection-*`，悬停被锁死为选中静止底。

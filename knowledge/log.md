@@ -332,6 +332,8 @@
 * **Cache v8 repairs cross-row turn composition and certifies only adopted or turn-equivalent history**: Cross-turn proof aggregates every Assistant row under one user boundary because the renderer presents that partition as one bubble; successful official loads may certify an unchanged local projection while retaining richer tool frames, but rejected non-equivalent candidates keep their stale cache version and remain eligible for repair on the next hydration. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) and [/project/kimix.md](/project/kimix.md).
 ## 2026-08-02
 
+* **Selected sidebar hover reuses ordinary list stroke (v2.20.132)**: `--ui-selection-hover-*` now points at `--ui-nav-list-hover-*` instead of a deepen-only fill; default/modern list hover gains a subtle border stroke, and Retro keeps the leading selection edge composed with list-hover emboss. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Selected sidebar rows keep a hover overlay (v2.20.131)**: `.is-active:hover` no longer reuses the resting selection fill; `--ui-selection-hover-*` deepens the background while preserving the selection mark shadow. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Session inspector enrolls remaining interactive surfaces (v2.20.130)**: header icon buttons use `.kimix-inline-icon-action`, secondary chips and Plan/Git refresh use `.kimix-inspector-action`, clickable rows use `.kimix-inspector-list-item`, and nested neutral blocks move to `.kimix-inset-section` so Modern/Retro own radius and rest/hover depth without accent-light utility fills. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

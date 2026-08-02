@@ -125,15 +125,19 @@ describe("UI_STYLES", () => {
     expect(retroBlock).toMatch(/--ui-selection-shadow:\s*inset 2px 0 0 var\(--accent-primary\)/);
   });
 
-  it("选中项目或会话悬停时加深底色并保留选中标记", () => {
+  it("选中项目或会话悬停时复用普通列表悬停描边", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const rootBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
     const retroBlock = css.match(/\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "";
 
-    expect(rootBlock).toMatch(/--ui-selection-hover-background:\s*var\(--surface-active\);/);
-    expect(retroBlock).toMatch(/--ui-selection-hover-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(rootBlock).toMatch(/--ui-nav-list-hover-border-color:\s*var\(--border-subtle\);/);
+    expect(rootBlock).toMatch(/--ui-selection-hover-border-color:\s*var\(--ui-nav-list-hover-border-color\);/);
+    expect(rootBlock).toMatch(/--ui-selection-hover-background:\s*var\(--ui-nav-list-hover-background\);/);
+    expect(retroBlock).toMatch(/--ui-selection-hover-border-color:\s*var\(--ui-nav-list-hover-border-color\);/);
+    expect(retroBlock).toMatch(/--ui-selection-hover-background:\s*var\(--ui-nav-list-hover-background\);/);
+    expect(retroBlock).toMatch(/--ui-selection-hover-shadow:\s*inset 2px 0 0 var\(--accent-primary\), var\(--ui-nav-list-hover-shadow\);/);
     expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
-    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active:hover,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?background-color:\s*var\(--ui-selection-hover-background\);[\s\S]*?box-shadow:\s*var\(--ui-selection-hover-shadow\);/);
+    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active:hover,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?border-color:\s*var\(--ui-selection-hover-border-color\);[\s\S]*?background-color:\s*var\(--ui-selection-hover-background\);[\s\S]*?box-shadow:\s*var\(--ui-selection-hover-shadow\);/);
     expect(css).not.toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-project-row\.is-active:hover,/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar-project-row:hover/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar\s*\{[\s\S]*?box-shadow:\s*inset\s+-1px/);

@@ -164,15 +164,16 @@
   --ui-nav-list-border: 1px solid transparent;
   --ui-nav-list-background: transparent;
   --ui-nav-list-shadow: none;
-  --ui-nav-list-hover-border-color: transparent;
+  --ui-nav-list-hover-border-color: var(--border-subtle);
   --ui-nav-list-hover-background: var(--surface-hover);
   --ui-nav-list-hover-shadow: none;
   --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-hover);
   --ui-selection-color: var(--text-primary);
   --ui-selection-shadow: none;
-  --ui-selection-hover-border-color: var(--ui-selection-border-color);
-  --ui-selection-hover-background: var(--surface-active);
+  /* Selected+hover reuses ordinary list hover chrome; keep selection mark via shadow. */
+  --ui-selection-hover-border-color: var(--ui-nav-list-hover-border-color);
+  --ui-selection-hover-background: var(--ui-nav-list-hover-background);
   --ui-selection-hover-shadow: var(--ui-selection-shadow);
   --ui-toggle-border-color: var(--accent-primary-soft);
   --ui-toggle-background: var(--accent-primary-light);
@@ -383,15 +384,15 @@
   --ui-nav-list-border: 1px solid transparent;
   --ui-nav-list-background: transparent;
   --ui-nav-list-shadow: none;
-  --ui-nav-list-hover-border-color: transparent;
+  --ui-nav-list-hover-border-color: var(--border-subtle);
   --ui-nav-list-hover-background: var(--surface-hover);
   --ui-nav-list-hover-shadow: none;
   --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-hover);
   --ui-selection-color: var(--text-primary);
   --ui-selection-shadow: none;
-  --ui-selection-hover-border-color: var(--ui-selection-border-color);
-  --ui-selection-hover-background: color-mix(in srgb, var(--surface-active) 72%, var(--surface-hover));
+  --ui-selection-hover-border-color: var(--ui-nav-list-hover-border-color);
+  --ui-selection-hover-background: var(--ui-nav-list-hover-background);
   --ui-selection-hover-shadow: var(--ui-selection-shadow);
   --ui-toggle-border-color: transparent;
   --ui-toggle-background: var(--surface-active);
@@ -697,9 +698,9 @@
   --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-active);
   --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), inset 0 1px 1px rgba(40, 43, 45, 0.08);
-  --ui-selection-hover-border-color: var(--ui-selection-border-color);
-  --ui-selection-hover-background: color-mix(in srgb, var(--surface-active) 78%, var(--border-default));
-  --ui-selection-hover-shadow: var(--ui-selection-shadow);
+  --ui-selection-hover-border-color: var(--ui-nav-list-hover-border-color);
+  --ui-selection-hover-background: var(--ui-nav-list-hover-background);
+  --ui-selection-hover-shadow: inset 2px 0 0 var(--accent-primary), var(--ui-nav-list-hover-shadow);
   --ui-toggle-border-color: var(--border-default);
   --ui-toggle-background: var(--surface-active);
   --ui-toggle-color: var(--text-primary);
@@ -2182,7 +2183,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-selection-shadow);
 }
 
-/* Selected + hover: deepen fill, keep selection mark/shadow. */
+/* Selected + hover: same chrome as ordinary list hover; selection mark stays in shadow. */
 .kimix-sidebar-project-row.is-active:hover,
 .kimix-sidebar-session-row.is-active:hover {
   border-color: var(--ui-selection-hover-border-color);
