@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：复古混合角色按钮移除双层描边（v2.20.115）
+
+- 根因：Composer 的添加、权限、思考强度、上下文用量等按钮同时具有结构控件类与通用按钮类；v2.20.113 的通用复古 hover 白名单使用高权重 `[data-ui-style="retro"]` 作用域，压过后置的结构控件规则，导致真实 1px 边框与额外 1px 阴影环同时显示。
+- 修复：将通用白名单的 preset 作用域降为零权重 `:where([data-ui-style="retro"])`。后置结构控件重新接管其单层边框与浮雕阴影；无真实边框的独立按钮、Agent 折叠标题仍保留兜底环和 v2.20.114 的平滑过渡。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DrvnGm_l.css`、JS `assets/index-Q9XW1yLp.js`）、OKF strict/audit 校验（13 concepts、393 links）通过；构建产物确认保留零权重 `:where([data-ui-style...])` 作用域，实际描边观感等待用户在 v2.20.115 复验。
+
 ## 2026-08-02 优化：复古按钮阴影过渡与 Agent 标题 hover（v2.20.114）
 
 - 根因：顶部菜单触发器会同时过渡背景与浮雕阴影，其他部分独立按钮虽然在 v2.20.112/113 获得相同阴影，但多个语义类没有声明 `box-shadow` 过渡，阴影直接跳变；Agent 内容标题使用 `button.kimix-chat-collapse-row`，此前又未登记到复古按钮角色白名单。

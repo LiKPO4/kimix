@@ -724,8 +724,8 @@
   box-shadow: var(--kimix-retro-button-hover-shadow);
 }
 
-/* 只给独立视觉按钮补充复古 hover 环；嵌套点击热区由外层表面拥有边界。 */
-[data-ui-style="retro"] :where(
+/* 只给独立视觉按钮补充复古 hover 环；低权重确保带真实边框的结构控件接管边界。 */
+:where([data-ui-style="retro"]) :where(
   .kimix-icon-text-button,
   .kimix-muted-action,
   .kimix-inline-icon-action,

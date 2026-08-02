@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Hybrid Retro controls no longer stack a real border with the utility hover ring (v2.20.115)**: Composer buttons such as add, permission, thinking effort, and context usage carry both structural-control and utility classes. The utility allowlist's preset scope now uses `:where(...)`, allowing the later bordered-control contract to win while genuinely borderless utilities retain the fallback ring. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Retro hover motion is consistent across tactile buttons and Agent process headers (v2.20.114)**: the menu bar felt smoother because it interpolated its embossed shadow while several standalone roles snapped directly to the same shadow. All enrolled utility roles now transition the shadow with the shared 150 ms timing, and interactive collapsible headers explicitly join the Retro hover contract without restoring a global native-button fallback. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Nested button hit targets no longer receive duplicate Retro frames (v2.20.113)**: the native `button:hover` fallback introduced in v2.20.112 also framed the title hit target inside an already framed session row. Retro fallback is now an explicit standalone-role allowlist; global native-button hover rings are prohibited. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
