@@ -171,6 +171,9 @@
   --ui-selection-background: var(--surface-hover);
   --ui-selection-color: var(--text-primary);
   --ui-selection-shadow: none;
+  --ui-selection-hover-border-color: var(--ui-selection-border-color);
+  --ui-selection-hover-background: var(--surface-active);
+  --ui-selection-hover-shadow: var(--ui-selection-shadow);
   --ui-toggle-border-color: var(--accent-primary-soft);
   --ui-toggle-background: var(--accent-primary-light);
   --ui-toggle-color: var(--accent-primary-dark);
@@ -387,6 +390,9 @@
   --ui-selection-background: var(--surface-hover);
   --ui-selection-color: var(--text-primary);
   --ui-selection-shadow: none;
+  --ui-selection-hover-border-color: var(--ui-selection-border-color);
+  --ui-selection-hover-background: color-mix(in srgb, var(--surface-active) 72%, var(--surface-hover));
+  --ui-selection-hover-shadow: var(--ui-selection-shadow);
   --ui-toggle-border-color: transparent;
   --ui-toggle-background: var(--surface-active);
   --ui-toggle-color: var(--text-primary);
@@ -691,6 +697,9 @@
   --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-active);
   --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), inset 0 1px 1px rgba(40, 43, 45, 0.08);
+  --ui-selection-hover-border-color: var(--ui-selection-border-color);
+  --ui-selection-hover-background: color-mix(in srgb, var(--surface-active) 78%, var(--border-default));
+  --ui-selection-hover-shadow: var(--ui-selection-shadow);
   --ui-toggle-border-color: var(--border-default);
   --ui-toggle-background: var(--surface-active);
   --ui-toggle-color: var(--text-primary);
@@ -2166,13 +2175,20 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-sidebar-project-row.is-active,
-.kimix-sidebar-project-row.is-active:hover,
-.kimix-sidebar-session-row.is-active,
-.kimix-sidebar-session-row.is-active:hover {
+.kimix-sidebar-session-row.is-active {
   border-color: var(--ui-selection-border-color);
   background-color: var(--ui-selection-background);
   color: var(--ui-selection-color);
   box-shadow: var(--ui-selection-shadow);
+}
+
+/* Selected + hover: deepen fill, keep selection mark/shadow. */
+.kimix-sidebar-project-row.is-active:hover,
+.kimix-sidebar-session-row.is-active:hover {
+  border-color: var(--ui-selection-hover-border-color);
+  background-color: var(--ui-selection-hover-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-hover-shadow);
 }
 
 .kimix-sidebar-project-row-actions {
@@ -2215,13 +2231,19 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-sidebar-nav-item.is-active,
-.kimix-sidebar-nav-item.is-active:hover,
-.kimix-settings-entry.is-active,
-.kimix-settings-entry.is-active:hover {
+.kimix-settings-entry.is-active {
   border-color: var(--ui-selection-border-color);
   background-color: var(--ui-selection-background);
   color: var(--ui-selection-color);
   box-shadow: var(--ui-selection-shadow);
+}
+
+.kimix-sidebar-nav-item.is-active:hover,
+.kimix-settings-entry.is-active:hover {
+  border-color: var(--ui-selection-hover-border-color);
+  background-color: var(--ui-selection-hover-background);
+  color: var(--ui-selection-color);
+  box-shadow: var(--ui-selection-hover-shadow);
 }
 
 /* ── App Shell ── */

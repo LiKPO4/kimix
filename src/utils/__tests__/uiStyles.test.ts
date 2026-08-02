@@ -125,11 +125,16 @@ describe("UI_STYLES", () => {
     expect(retroBlock).toMatch(/--ui-selection-shadow:\s*inset 2px 0 0 var\(--accent-primary\)/);
   });
 
-  it("选中项目或会话悬停时仍由选中态令牌接管左侧标记", () => {
+  it("选中项目或会话悬停时加深底色并保留选中标记", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const rootBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const retroBlock = css.match(/\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "";
 
-    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-project-row\.is-active:hover,/);
-    expect(css).toMatch(/\.kimix-sidebar-session-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(rootBlock).toMatch(/--ui-selection-hover-background:\s*var\(--surface-active\);/);
+    expect(retroBlock).toMatch(/--ui-selection-hover-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-session-row\.is-active\s*\{[\s\S]*?box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).toMatch(/\.kimix-sidebar-project-row\.is-active:hover,\s*\.kimix-sidebar-session-row\.is-active:hover\s*\{[\s\S]*?background-color:\s*var\(--ui-selection-hover-background\);[\s\S]*?box-shadow:\s*var\(--ui-selection-hover-shadow\);/);
+    expect(css).not.toMatch(/\.kimix-sidebar-project-row\.is-active,\s*\.kimix-sidebar-project-row\.is-active:hover,/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar-project-row:hover/);
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-sidebar\s*\{[\s\S]*?box-shadow:\s*inset\s+-1px/);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-app-shell-main\s*\{[^}]*border:\s*1px solid var\(--ui-shell-border-color\);/s);

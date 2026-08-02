@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：侧栏已选中行悬停无反馈（v2.20.131）
+
+- 根因：`.kimix-sidebar-project-row.is-active:hover` 与 `.is-active` 共用 `--ui-selection-*`，悬停被锁死为选中静止底。
+- 修复：拆分选中/选中悬停；新增 `--ui-selection-hover-*`（默认更深 `surface-active`，复古保留左侧 inset 标记）。
+- 验证：uiStyles 定向。实机待 v2.20.131 截图。
+
 ## 2026-08-02 修复：会话侧栏剩余交互面接入风格角色（v2.20.130）
 
 - 根因：仅 Git 五键与 section-card 外壳入角色；Plan 刷新、会话树 ±、最近变更行、大量 icon-text 仍用 Tailwind 固定底/圆角，切换 Modern/Retro 几乎不变。
