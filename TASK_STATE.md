@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：复古按钮 hover 全覆盖并移除底栏外框（v2.20.112）
+
+- 根因一：左上角新对话、搜索等使用 `ui-nav-action`，Retro 将该角色的 hover 边框/阴影设为透明与 `none`；顶部菜单和工具按钮则走另一套 tactile token，造成同为按钮却反馈不一致。
+- 修复一：新增 Retro 共享 hover border/background/shadow token，并让 control、nav action、nav list、menu trigger 与 ContextBar action 统一消费；增加零 specificity 的原生 button hover 兜底，业务主操作、危险、选中和展开态仍可用更具体规则覆盖。
+- 根因二：Retro 把底部 ContextBar 当成连续控制带，额外添加整体边框、底色和内阴影，与上方 Composer 外框叠成双层框。
+- 修复二：ContextBar 恢复透明、无边框、无阴影，仅保留内部按钮在 hover/展开时的复古触感。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-rIXsImFv.css`、JS `assets/index-DXbWuSS5.js`）、OKF strict/audit 校验（13 concepts、390 links）通过；实际观感等待用户在 v2.20.112 检查导航 hover 与无框底栏。
+
 ## 2026-08-02 修复：默认模式移除复古选中左条（v2.20.111）
 
 - 根因：v2.20.95 建立全局界面风格合约时，基础 `:root` 将 `--ui-selection-shadow` 初始化为蓝色 inset 左条；Modern 显式覆盖为 `none`，Retro 单独增强，因此默认模式反而一直继承了本应属于复古的标记。

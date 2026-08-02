@@ -83,6 +83,7 @@ describe("UI_STYLES", () => {
 
   it("复古风格通过语义令牌覆盖控件且 Composer 输入区只有一个边界所有者", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const retroBlock = css.match(/\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "";
 
     expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-icon-text-button\s*\{/);
     expect(css).not.toContain('[data-ui-style="retro"] .kimix-composer-toolbar .kimix-icon-text-button');
@@ -98,6 +99,12 @@ describe("UI_STYLES", () => {
     expect(css).toContain(":where(.kimix-toolbar-button, .kimix-control-button, .kimix-composer-tool-button, .kimix-window-control, .kimix-split-control)");
     expect(css).toContain('[data-ui-style="retro"] .kimix-context-bar');
     expect(css).toContain('[data-ui-style="retro"] .kimix-floating-panel');
+    expect(retroBlock).toMatch(/--ui-control-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
+    expect(retroBlock).toMatch(/--ui-nav-action-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
+    expect(retroBlock).toMatch(/--ui-nav-list-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
+    expect(retroBlock).toMatch(/--ui-menu-trigger-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
+    expect(css).toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\(button:hover:not\(:disabled\)\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-context-bar\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
   });
 
   it("默认选中态不继承复古左侧标记", () => {

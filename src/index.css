@@ -575,6 +575,9 @@
   --kimix-retro-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 1px 1px rgba(45, 48, 50, 0.10);
   --kimix-retro-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 1px 3px rgba(40, 43, 45, 0.09);
   --kimix-retro-inset-shadow: inset 0 1px 2px rgba(40, 43, 45, 0.12), 0 1px 0 rgba(255, 255, 255, 0.58);
+  --kimix-retro-button-hover-border-color: var(--border-default);
+  --kimix-retro-button-hover-background: var(--surface-active);
+  --kimix-retro-button-hover-shadow: var(--kimix-retro-inset-shadow);
   --shadow-hover: 0 1px 2px rgba(40, 43, 45, 0.10);
   --shadow-elevated: 0 1px 0 rgba(255, 255, 255, 0.9), 0 3px 10px rgba(40, 43, 45, 0.10);
   --shadow-floating: 0 1px 0 rgba(255, 255, 255, 0.92), 0 12px 28px rgba(38, 42, 44, 0.16);
@@ -585,20 +588,20 @@
   --ui-control-background: transparent;
   --ui-control-background-image: none;
   --ui-control-shadow: none;
-  --ui-control-hover-border-color: var(--border-default);
-  --ui-control-hover-background: var(--surface-hover);
-  --ui-control-hover-shadow: var(--kimix-retro-control-shadow);
+  --ui-control-hover-border-color: var(--kimix-retro-button-hover-border-color);
+  --ui-control-hover-background: var(--kimix-retro-button-hover-background);
+  --ui-control-hover-shadow: var(--kimix-retro-button-hover-shadow);
   --ui-control-active-shadow: var(--kimix-retro-inset-shadow);
   --ui-nav-action-border: 1px solid transparent;
   --ui-nav-action-background: transparent;
   --ui-nav-action-background-image: none;
   --ui-nav-action-shadow: none;
-  --ui-nav-action-hover-border-color: transparent;
-  --ui-nav-action-hover-background: var(--surface-hover);
-  --ui-nav-action-hover-shadow: none;
-  --ui-nav-list-hover-border-color: transparent;
-  --ui-nav-list-hover-background: var(--surface-hover);
-  --ui-nav-list-hover-shadow: none;
+  --ui-nav-action-hover-border-color: var(--kimix-retro-button-hover-border-color);
+  --ui-nav-action-hover-background: var(--kimix-retro-button-hover-background);
+  --ui-nav-action-hover-shadow: var(--kimix-retro-button-hover-shadow);
+  --ui-nav-list-hover-border-color: var(--kimix-retro-button-hover-border-color);
+  --ui-nav-list-hover-background: var(--kimix-retro-button-hover-background);
+  --ui-nav-list-hover-shadow: var(--kimix-retro-button-hover-shadow);
   --ui-selection-border-color: transparent;
   --ui-selection-background: var(--surface-active);
   --ui-selection-shadow: inset 2px 0 0 var(--accent-primary), inset 0 1px 1px rgba(40, 43, 45, 0.08);
@@ -620,9 +623,9 @@
   --ui-shell-divider: none;
   --ui-shell-border-color: var(--border-default);
   --ui-section-divider-color: var(--border-default);
-  --ui-menu-trigger-hover-border-color: var(--border-default);
-  --ui-menu-trigger-hover-background: var(--surface-active);
-  --ui-menu-trigger-hover-shadow: var(--kimix-retro-inset-shadow);
+  --ui-menu-trigger-hover-border-color: var(--kimix-retro-button-hover-border-color);
+  --ui-menu-trigger-hover-background: var(--kimix-retro-button-hover-background);
+  --ui-menu-trigger-hover-shadow: var(--kimix-retro-button-hover-shadow);
 }
 
 /* 深色主题只调整阴影可见度，同样不覆盖任何颜色主题 token。 */
@@ -700,12 +703,11 @@
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
-/* ContextBar 是一条连续控制带，内部动作只在 hover/展开时显形。 */
+/* ContextBar 只负责排列按钮，不再额外形成一层带框容器。 */
 [data-ui-style="retro"] .kimix-context-bar {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-base);
-  box-shadow: var(--kimix-retro-inset-shadow);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 [data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action,
@@ -717,9 +719,14 @@
 [data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action:hover,
 [data-ui-style="retro"] .kimix-context-bar .kimix-contextbar-action[aria-expanded="true"],
 [data-ui-style="retro"] .kimix-context-bar > button:hover {
-  border-color: var(--border-default);
-  background: var(--surface-hover);
-  box-shadow: var(--kimix-retro-control-shadow);
+  border-color: var(--kimix-retro-button-hover-border-color);
+  background: var(--kimix-retro-button-hover-background);
+  box-shadow: var(--kimix-retro-button-hover-shadow);
+}
+
+/* 未登记到语义按钮类的原生按钮也获得复古 hover 环；更具体的业务态仍可覆盖。 */
+:where([data-ui-style="retro"]) :where(button:hover:not(:disabled)) {
+  box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
 }
 
 /* 深色适配只降低高光，不改变组件层级。 */
