@@ -1398,15 +1398,15 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {longTaskDetailLoading ? (
-                <div className="kimix-inset-section mt-4 bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   正在读取 BIGPLAN...
                 </div>
               ) : longTaskDetailError ? (
-                <div className="mt-4 rounded-lg bg-accent-danger-light text-[13px] leading-6 text-accent-danger" style={{ padding: "13px 12px" }}>
+                <div className="rounded-lg bg-accent-danger-light text-[13px] leading-6 text-accent-danger" style={{ marginTop: 14, padding: "13px 12px" }}>
                   读取失败：{longTaskDetailError}
                 </div>
               ) : parsedLongTaskDetail ? (
-                <div className="mt-4 flex flex-col" style={{ gap: 12 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 12 }}>
                   <div className="rounded-lg bg-accent-primary-light/40 text-[13px] leading-6 text-text-primary" style={{ padding: "13px 12px" }}>
                     <div className="font-medium text-accent-primary">目标</div>
                     <div className="mt-1 line-clamp-3 text-text-muted">{parsedLongTaskDetail.goal}</div>
@@ -1465,11 +1465,11 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {longTaskDetailLoading ? (
-                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   正在读取轮次记录...
                 </div>
               ) : parsedLongTaskDetail && parsedLongTaskDetail.rounds.length > 0 ? (
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                   {parsedLongTaskDetail.rounds.map((round) => (
                     <div key={round.filePath} className="rounded-lg border border border-border-subtle bg-surface-elevated" style={{ padding: "12px 12px" }}>
                       <div className="flex items-center justify-between" style={{ gap: 10 }}>
@@ -1485,7 +1485,7 @@ export function LongTaskInspectorPanel({
                           打开
                         </button>
                       </div>
-                      <div className="mt-3 flex flex-col" style={{ gap: 10 }}>
+                      <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                         {round.entries.map((entry, index) => (
                           <div key={`${round.filePath}-${index}`} className="rounded-lg bg-surface-elevated text-[13px] leading-5 text-text-muted" style={{ padding: "11px 11px" }}>
                             <div className="flex items-center justify-between" style={{ gap: 8 }}>
@@ -1514,7 +1514,7 @@ export function LongTaskInspectorPanel({
                   ))}
                 </div>
               ) : (
-                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   暂无 Step 轮次记录。
                 </div>
               )}
@@ -1537,11 +1537,11 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {longTaskDetailLoading ? (
-                <div className="mt-4 rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ padding: "13px 12px" }}>
+                <div className="rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
                   正在读取用户审查清单...
                 </div>
               ) : parsedLongTaskDetail && parsedLongTaskDetail.reviewItems.length > 0 ? (
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                   {pendingReviewItems.map((item, index) => (
                     <button
                       key={`${index}-${item}`}
@@ -1564,7 +1564,7 @@ export function LongTaskInspectorPanel({
                   )}
                 </div>
               ) : (
-                <div className="mt-4 rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ padding: "13px 12px" }}>
+                <div className="rounded-lg bg-accent-warning-light text-[13px] leading-6 text-accent-warning" style={{ marginTop: 14, padding: "13px 12px" }}>
                   暂无需要用户审查的事项。
                 </div>
               )}
@@ -1583,7 +1583,7 @@ export function LongTaskInspectorPanel({
                     {rightCardDragHandle("confirmed", "已确认")}
                   </div>
                 </div>
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                   {completedReviewItems.map((item, index) => (
                     <button
                       key={`${index}-${item}`}
@@ -1618,7 +1618,7 @@ export function LongTaskInspectorPanel({
                     {rightCardDragHandle("hidden", "已收起卡片")}
                   </div>
                 </div>
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                   {hiddenComposerCardEntries.map((entry) => (
                     <button
                       key={entry.key}
@@ -1666,7 +1666,7 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
                 {visibleSessionLongTasks.length > 0 ? (
-                  <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                  <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                     {visibleSessionLongTasks.slice(0, 3).map((task) => (
                       <div key={task.id} className="rounded-lg border border-border-subtle bg-surface-elevated" style={{ padding: "12px 12px" }}>
                         <div className="truncate text-[13.5px] font-medium leading-5 text-text-primary">{task.title}</div>
@@ -1677,7 +1677,7 @@ export function LongTaskInspectorPanel({
                     ))}
                   </div>
                 ) : (
-                  <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                  <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                     当前长程任务会话没有其他未归档任务。
                   </div>
                 )}
@@ -2124,19 +2124,19 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {sessionPlanState.loading ? (
-                <div className="kimix-inset-section mt-4 bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-accent-primary-light/40 text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   正在读取 Plan 内容...
                 </div>
               ) : sessionPlanState.error ? (
-                <div className="mt-4 rounded-lg bg-accent-danger-light text-[13px] leading-6 text-accent-danger" style={{ padding: "13px 12px" }}>
+                <div className="rounded-lg bg-accent-danger-light text-[13px] leading-6 text-accent-danger" style={{ marginTop: 14, padding: "13px 12px" }}>
                   读取失败：{sessionPlanState.error}
                 </div>
               ) : sessionPlanState.content ? (
-                <div className="kimix-inset-section mt-4 bg-surface-elevated" style={{ padding: "14px 13px" }}>
+                <div className="kimix-inset-section bg-surface-elevated" style={{ marginTop: 14, padding: "14px 13px" }}>
                   <div className="max-h-[460px] min-w-0 overflow-x-hidden overflow-y-auto text-[13px] leading-6 text-text-secondary">
                     <MarkdownRenderer content={sessionPlanState.content} wrapLongLines />
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-[12px] leading-5 text-text-muted" style={{ gap: 10 }}>
+                  <div className="flex items-center justify-between text-[12px] leading-5 text-text-muted" style={{ marginTop: 14, gap: 10 }}>
                     <span className="truncate">
                       {sessionPlanState.updatedAt ? `更新于 ${formatReleaseDate(new Date(sessionPlanState.updatedAt).toISOString())}` : "已读取官方 Plan 文件"}
                     </span>
@@ -2151,7 +2151,7 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
               ) : (
-                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   {sessionPlanState.message || "开启 Plan 模式并让 Kimi 生成计划后，这里会显示官方写入的 markdown 内容。"}
                 </div>
               )}
@@ -2242,7 +2242,7 @@ export function LongTaskInspectorPanel({
                 <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
                 {rightCardDragHandle("session", "会话信息")}
               </div>
-              <div className="mt-3 flex flex-col text-[13px] leading-5 text-text-muted" style={{ gap: 10 }}>
+              <div className="flex flex-col text-[13px] leading-5 text-text-muted" style={{ marginTop: 14, gap: 10 }}>
                 {sessionAgentLabel && (
                   <div className="kimix-inset-section bg-surface-elevated" style={{ padding: "11px 12px" }}>
                     <div className="font-medium text-accent-primary">当前 Agent</div>
@@ -2277,7 +2277,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
               {displaySessionDiffs.length > 0 ? (
-                <div className="mt-4 flex flex-col" style={{ gap: 10 }}>
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 10 }}>
                   {displaySessionDiffs.slice(0, 4).map((diff) => (
                     <button
                       key={diff.id}
@@ -2292,7 +2292,7 @@ export function LongTaskInspectorPanel({
                   ))}
                 </div>
               ) : (
-                <div className="kimix-inset-section mt-4 bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section bg-surface-elevated text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: "13px 12px" }}>
                   当前会话还没有 diff 记录。
                 </div>
               )}
@@ -2481,7 +2481,7 @@ export function LongTaskInspectorPanel({
                 className="h-10 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}
               />
-              {gitError && <div className="mt-3 rounded-lg bg-red-50 text-[12.5px] leading-5 text-accent-danger" style={{ padding: "10px 12px" }}>{gitError}</div>}
+              {gitError && <div className="rounded-lg bg-red-50 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px" }}>{gitError}</div>}
               <div className="flex items-center justify-end" style={{ gap: 10, marginTop: 14 }}>
                 <button
                   type="button"
