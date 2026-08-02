@@ -1043,6 +1043,448 @@
   font-family: var(--font-mono);
 }
 
+
+/* 怀旧：提炼 Windows 95/98 经典控件语言（非像素复刻、不锁配色）。
+   特征：零圆角、硬浮雕斜切（亮上左/暗下右）、静止即立体、按下反转内凹、
+   输入/列表沉入、选中实面无侧栏导条。颜色仍完全由主题提供。 */
+[data-ui-style="nostalgia"] {
+  --ui-radius-sm: 0px;
+  --ui-radius-md: 0px;
+  --ui-radius-lg: 0px;
+  --ui-radius-xl: 0px;
+  --ui-radius-2xl: 0px;
+  --ui-radius-sm-token: 0px;
+  --ui-radius-md-token: 0px;
+  --ui-radius-lg-token: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  /* Classic raised bevel: light TL + dark BR (outer + inner step). */
+  --kimix-nostalgia-raised-shadow:
+    inset 1px 1px 0 color-mix(in srgb, #ffffff 86%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, #000000 42%, transparent),
+    inset 2px 2px 0 color-mix(in srgb, #ffffff 38%, transparent),
+    inset -2px -2px 0 color-mix(in srgb, #000000 22%, transparent);
+  --kimix-nostalgia-sunken-shadow:
+    inset 1px 1px 0 color-mix(in srgb, #000000 40%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, #ffffff 72%, transparent),
+    inset 2px 2px 0 color-mix(in srgb, #000000 18%, transparent),
+    inset -2px -2px 0 color-mix(in srgb, #ffffff 34%, transparent);
+  --kimix-nostalgia-flat-border: 1px solid var(--border-default);
+  --shadow-hover: none;
+  --shadow-elevated: 2px 2px 0 color-mix(in srgb, #000000 28%, transparent);
+  --shadow-floating: 3px 3px 0 color-mix(in srgb, #000000 32%, transparent);
+  --shadow-overlay: 4px 4px 0 color-mix(in srgb, #000000 36%, transparent);
+  --kimix-composer-shadow: var(--kimix-nostalgia-raised-shadow) !important;
+  --kimix-float-shadow: var(--shadow-floating) !important;
+  /* Controls are raised at rest (signature difference from Retro flat-rest). */
+  --ui-control-border: var(--kimix-nostalgia-flat-border);
+  --ui-control-background: var(--surface-elevated);
+  --ui-control-background-image: none;
+  --ui-control-shadow: var(--kimix-nostalgia-raised-shadow);
+  --ui-control-hover-border-color: var(--border-strong);
+  --ui-control-hover-background: var(--surface-hover);
+  --ui-control-hover-shadow: var(--kimix-nostalgia-raised-shadow);
+  --ui-control-active-shadow: var(--kimix-nostalgia-sunken-shadow);
+  --ui-nav-action-border: 1px solid transparent;
+  --ui-nav-action-background: transparent;
+  --ui-nav-action-background-image: none;
+  --ui-nav-action-shadow: none;
+  --ui-nav-action-hover-border-color: var(--border-default);
+  --ui-nav-action-hover-background: var(--surface-hover);
+  --ui-nav-action-hover-shadow: var(--kimix-nostalgia-raised-shadow);
+  --ui-nav-list-hover-border-color: var(--border-default);
+  --ui-nav-list-hover-background: var(--surface-hover);
+  --ui-nav-list-hover-shadow: none;
+  --ui-selection-border-color: var(--border-strong);
+  --ui-selection-background: var(--surface-active);
+  --ui-selection-shadow: none;
+  --ui-selection-hover-border-color: var(--border-strong);
+  --ui-selection-hover-background: var(--surface-hover);
+  --ui-selection-hover-shadow: none;
+  --ui-toggle-border-color: var(--border-strong);
+  --ui-toggle-background: var(--surface-active);
+  --ui-toggle-color: var(--text-primary);
+  --ui-toggle-shadow: var(--kimix-nostalgia-sunken-shadow);
+  --ui-compound-border: var(--kimix-nostalgia-flat-border);
+  --ui-compound-background: var(--surface-elevated);
+  --ui-compound-background-image: none;
+  --ui-compound-shadow: var(--kimix-nostalgia-raised-shadow);
+  --ui-compound-divider-shadow: inset 1px 0 0 color-mix(in srgb, #000000 28%, transparent), inset -1px 0 0 color-mix(in srgb, #ffffff 55%, transparent);
+  --ui-popup-border: var(--kimix-nostalgia-flat-border);
+  --ui-popup-background: var(--surface-elevated);
+  --ui-popup-shadow: var(--shadow-floating);
+  --ui-popup-backdrop-filter: none;
+  --ui-field-border: var(--kimix-nostalgia-flat-border);
+  --ui-field-shadow: var(--kimix-nostalgia-sunken-shadow);
+  --ui-shell-divider: none;
+  --ui-shell-border-color: var(--border-default);
+  --ui-section-divider-color: var(--border-default);
+  --ui-menu-trigger-border: 1px solid transparent;
+  --ui-menu-trigger-background: transparent;
+  --ui-menu-trigger-shadow: none;
+  --ui-menu-trigger-hover-border-color: var(--border-default);
+  --ui-menu-trigger-hover-background: var(--surface-hover);
+  --ui-menu-trigger-hover-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-theme="dark"][data-ui-style="nostalgia"] {
+  --kimix-nostalgia-raised-shadow:
+    inset 1px 1px 0 color-mix(in srgb, #ffffff 22%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, #000000 55%, transparent),
+    inset 2px 2px 0 color-mix(in srgb, #ffffff 10%, transparent),
+    inset -2px -2px 0 color-mix(in srgb, #000000 35%, transparent);
+  --kimix-nostalgia-sunken-shadow:
+    inset 1px 1px 0 color-mix(in srgb, #000000 55%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, #ffffff 18%, transparent),
+    inset 2px 2px 0 color-mix(in srgb, #000000 30%, transparent),
+    inset -2px -2px 0 color-mix(in srgb, #ffffff 8%, transparent);
+  --shadow-elevated: 2px 2px 0 color-mix(in srgb, #000000 55%, transparent);
+  --shadow-floating: 3px 3px 0 color-mix(in srgb, #000000 58%, transparent);
+  --shadow-overlay: 4px 4px 0 color-mix(in srgb, #000000 62%, transparent);
+}
+
+[data-ui-style="nostalgia"] .kimix-soft-card,
+[data-ui-style="nostalgia"] .kimix-soft-card-strong,
+[data-ui-style="nostalgia"] .kimix-settings-card,
+[data-ui-style="nostalgia"] .kimix-settings-theme,
+[data-ui-style="nostalgia"] .kimix-settings-uistyle,
+[data-ui-style="nostalgia"] .kimix-settings-palette-wrap,
+[data-ui-style="nostalgia"] .kimix-section-card {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-event-card {
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-inset-section {
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+/* Inspector matrix: raised chips at rest, sunken on press. */
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-drag-handle {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  background-image: none;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary):hover:not(:disabled),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-drag-handle:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary):active:not(:disabled),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-drag-handle:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-inspector-list-item {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item:hover:not(:disabled),
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-inspector-list-item:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+  border: var(--kimix-nostalgia-flat-border);
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:active:not(:disabled),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-field,
+[data-ui-style="nostalgia"] .kimix-settings-input {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+/* Title bar: dense horizontal pinstripe (Win98 title-bar cue without locking blue). */
+[data-ui-style="nostalgia"] .kimix-app-shell-toolbar {
+  background-image: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, #ffffff 14%, transparent) 0,
+    color-mix(in srgb, #ffffff 14%, transparent) 1px,
+    color-mix(in srgb, #000000 08%, transparent) 2px,
+    transparent 3px
+  );
+  border-color: var(--ui-section-divider-color);
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-app-shell-main {
+  border: 2px solid var(--ui-shell-border-color);
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-composer-card {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-composer-card.is-focused {
+  border-color: var(--border-strong);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-composer-input,
+[data-ui-style="nostalgia"] .kimix-composer-input:focus,
+[data-ui-style="nostalgia"] .kimix-composer-input:focus-visible {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+[data-ui-style="nostalgia"] .kimix-composer-primary-button {
+  border-radius: 0 !important;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-composer-primary-button:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-context-bar {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-ui-style="nostalgia"] .kimix-context-bar .kimix-contextbar-action,
+[data-ui-style="nostalgia"] .kimix-context-bar > button {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-context-bar .kimix-contextbar-action:hover,
+[data-ui-style="nostalgia"] .kimix-context-bar .kimix-contextbar-action[aria-expanded="true"],
+[data-ui-style="nostalgia"] .kimix-context-bar > button:hover {
+  border: var(--kimix-nostalgia-flat-border);
+  background: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+/* Shared raised utility buttons */
+:where([data-ui-style="nostalgia"]) :where(
+  .kimix-icon-text-button,
+  .kimix-muted-action,
+  .kimix-chat-collapse-row,
+  .kimix-chat-banner-button
+):hover:not(:disabled) {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-state-button:not([aria-pressed="true"]):hover:not(:disabled) {
+  border: var(--kimix-nostalgia-flat-border);
+  background: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-state-button[aria-pressed="true"],
+[data-ui-style="nostalgia"] .kimix-state-button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--accent-primary-soft);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary-dark);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-soft-card,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-soft-card-strong,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-settings-card,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-settings-theme,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-settings-uistyle,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-settings-palette-wrap,
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-section-card {
+  border-color: var(--border-default);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-event-card {
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-inset-section {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-theme="dark"][data-ui-style="nostalgia"] .kimix-settings-input {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-floating-panel,
+[data-ui-style="nostalgia"] .kimix-menu-panel,
+[data-ui-style="nostalgia"] .kimix-modal-card,
+[data-ui-style="nostalgia"] .kimix-onboarding-card,
+[data-ui-style="nostalgia"] .kimix-settings-panel:not(.is-workspace) {
+  border: 2px solid var(--border-default);
+  border-radius: 0 !important;
+  background: var(--ui-popup-background);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: none;
+}
+
+[data-ui-style="nostalgia"] .kimix-menu-panel {
+  border-width: 2px;
+}
+
+[data-ui-style="nostalgia"] .kimix-menu-item {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-menu-item[aria-checked="true"],
+[data-ui-style="nostalgia"] .kimix-menu-item[aria-selected="true"] {
+  background: var(--surface-active);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-longtask-inspector,
+[data-ui-style="nostalgia"] .kimix-diff-panel {
+  border-color: var(--border-default) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-skill-card {
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-toast {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  box-shadow: var(--shadow-floating);
+}
+
+[data-ui-style="nostalgia"] .kimix-chat-navigation-preview {
+  border: 2px solid var(--border-default);
+  border-radius: 0;
+  box-shadow: var(--shadow-floating);
+}
+
+[data-ui-style="nostalgia"] .kimix-model-provider-sidebar {
+  border-color: var(--border-default);
+}
+
+[data-ui-style="nostalgia"] .kimix-split-control.is-expanded,
+[data-ui-style="nostalgia"] .kimix-split-control.is-expanded:hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-trigger {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-room-secondary-action {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-choice {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-choice.is-quiet {
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+[data-ui-style="nostalgia"] .kimix-room-choice:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-choice[aria-pressed="true"],
+[data-ui-style="nostalgia"] .kimix-room-choice[data-selected="true"] {
+  border-color: var(--border-strong);
+  background-color: var(--surface-active);
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-primary-action {
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-room-primary-action:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+/* Toolbar / window controls: square raised plates */
+[data-ui-style="nostalgia"] .kimix-toolbar-button,
+[data-ui-style="nostalgia"] .kimix-window-control,
+[data-ui-style="nostalgia"] .kimix-split-control {
+  border-radius: 0 !important;
+}
+
+[data-ui-style="nostalgia"] .kimix-user-bubble {
+  border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-status-surface,
+[data-ui-style="nostalgia"] .markdown-body .kimix-inline-code {
+  border-radius: 0;
+}
+
+[data-ui-style="nostalgia"] .kimix-markdown-code-block,
+[data-ui-style="nostalgia"] .kimix-markdown-table-frame {
+  border-radius: 0;
+}
+
+
 /* ── Base ── */
 
 * {
@@ -3129,7 +3571,7 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-uistyle-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   margin-top: 10px;
 }

@@ -21,7 +21,7 @@ describe("normalizeUiStyleId", () => {
 
 describe("UI_STYLES", () => {
   it("包含 default/modern/retro 三套预设且默认在首位", () => {
-    expect(UI_STYLES.map((item) => item.id)).toEqual(["default", "modern", "retro"]);
+    expect(UI_STYLES.map((item) => item.id)).toEqual(["default", "modern", "retro", "nostalgia"]);
     expect(UI_STYLES[0].id).toBe(DEFAULT_UI_STYLE_ID);
     for (const item of UI_STYLES) {
       expect(item.label).toBeTruthy();
@@ -37,6 +37,30 @@ describe("UI_STYLES", () => {
     ].join("\n");
 
     expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
+  });
+
+
+  it("怀旧风格使用 Win98 式硬浮雕且不覆盖颜色主题 token", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const styleBlocks = [
+      css.match(/\[data-ui-style="nostalgia"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+      css.match(/\[data-theme="dark"\]\[data-ui-style="nostalgia"\]\s*\{([^}]+)\}/)?.[1] ?? "",
+    ].join("\n");
+
+    expect(styleBlocks).not.toMatch(/^\s*--(?:surface|text|accent|border)-/m);
+    expect(styleBlocks).toMatch(/--ui-radius-sm:\s*0px;/);
+    expect(styleBlocks).toMatch(/--radius-sm:\s*0px;/);
+    expect(styleBlocks).toMatch(/--kimix-nostalgia-raised-shadow:/);
+    expect(styleBlocks).toMatch(/--kimix-nostalgia-sunken-shadow:/);
+    // Raised at rest — signature vs Retro flat controls.
+    expect(styleBlocks).toMatch(/--ui-control-shadow:\s*var\(--kimix-nostalgia-raised-shadow\);/);
+    expect(styleBlocks).toMatch(/--ui-control-active-shadow:\s*var\(--kimix-nostalgia-sunken-shadow\);/);
+    // Selection is solid face, not Retro leading edge.
+    expect(styleBlocks).toMatch(/--ui-selection-shadow:\s*none;/);
+    expect(css).toContain('[data-ui-style="nostalgia"] .kimix-app-shell-main');
+    expect(css).toContain('[data-ui-style="nostalgia"] .kimix-composer-card');
+    expect(css).toMatch(/\[data-ui-style="nostalgia"\]\s+\.kimix-section-card[\s\S]*?border-radius:\s*0;/);
+    expect(css).toMatch(/\[data-ui-style="nostalgia"\]\s+\.kimix-settings-input[\s\S]*?box-shadow:\s*var\(--kimix-nostalgia-sunken-shadow\);/);
   });
 
   it("现代化风格保持颜色主题所有权并建立 Codex 式壳层", () => {
@@ -326,6 +350,8 @@ describe("applyUiStyle", () => {
     expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("modern");
     applyUiStyle("retro");
     expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("retro");
+    applyUiStyle("nostalgia");
+    expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("nostalgia");
   });
 
   it("default 移除属性回退 :root", () => {

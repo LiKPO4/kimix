@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light" | "system";
 export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
-export type UiStyleId = "default" | "modern" | "retro";
+export type UiStyleId = "default" | "modern" | "retro" | "nostalgia";
 export interface ThemePaletteColors {
   primary: string;
   surface: string;
