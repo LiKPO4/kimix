@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：会话侧栏内部控件接入界面风格（v2.20.123）
+
+- 根因：v2.20.122 只把会话侧栏 18 张外层分区迁移为 `.kimix-section-card`；Git 操作、长程任务控制等内部按钮仍只使用通用 `.kimix-icon-text-button`，模型选择和 BTW 输入仍由 Tailwind 固定表面拼装。Retro 对普通按钮采用“静止扁平、悬停触感”的全局策略，因此外卡虽已变化，内部密集操作区仍明显扁平。
+- 修复：将 `.kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button` 定义为侧栏专属成组操作角色，Retro 复用 `--ui-compound-*` 获得静止态小圆角、主题边界、轻浮雕与按压内凹，Modern 保持透明边界和扁平表面；目标步数、子 Agent 模型/思考强度和 BTW 输入接入 `.kimix-inspector-field` 字段角色，拖拽柄接入 `.kimix-inspector-drag-handle`。
+- 边界：规则必须同时由 `.kimix-longtask-inspector` 与 `.kimix-section-card` 限定，不给全局 `.kimix-icon-text-button` 永久换肤，也不改变业务按钮的背景色、文字色与主次状态。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-c9sRM_1J.css`、JS `assets/index-C2PCKuH-.js`）、OKF strict/audit（13 concepts、401 links）通过；实机视觉验收等待用户在 v2.20.123 截图确认。
+
 ## 2026-08-02 重构：内容表面确定接入界面风格角色（v2.20.122）
 
 - 根因：界面风格已能通过语义类控制壳层、浮层、菜单和设置卡，但会话侧栏 18 张分区卡、Hooks 顶层分区及多类对话事件卡仍在业务组件中拼装固定圆角、边框和阴影；Retro 因此通常只改变 Tailwind 圆角变量，无法获得完整的 Platinum 小圆角与克制浮雕质感。

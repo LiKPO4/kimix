@@ -918,7 +918,7 @@ export function LongTaskInspectorPanel({
         window.addEventListener("pointerup", finishDrag);
         window.addEventListener("pointercancel", cancelDrag);
       }}
-      className="flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary active:cursor-grabbing"
+      className="kimix-inspector-drag-handle flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary active:cursor-grabbing"
       title="长按拖动调整位置"
       aria-label={`拖动${label}卡片`}
     >
@@ -1303,7 +1303,7 @@ export function LongTaskInspectorPanel({
                       max={totalLongTaskSteps || undefined}
                       value={targetStepDraft}
                       onChange={(event) => onSetTargetStepDraft(event.target.value)}
-                      className="h-9 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none focus:border-accent-primary-soft"
+                      className="kimix-inspector-field h-9 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none focus:border-accent-primary-soft"
                       style={{ paddingLeft: 10, paddingRight: 10 }}
                       placeholder={totalLongTaskSteps ? `1-${totalLongTaskSteps}` : "Step"}
                     />
@@ -1880,7 +1880,7 @@ export function LongTaskInspectorPanel({
                       if (option?.defaultEffort) setSubagentThinkingDraft(option.defaultEffort);
                     }}
                     disabled={subagentCatalogLoading || subagentSaving}
-                    className="h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inspector-field h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                     style={{ paddingLeft: 12, paddingRight: 12 }}
                   >
                     <option value="">跟随主 Agent</option>
@@ -1898,7 +1898,7 @@ export function LongTaskInspectorPanel({
                     value={subagentThinkingDraft}
                     onChange={(event) => setSubagentThinkingDraft(event.target.value)}
                     disabled={subagentSaving}
-                    className="h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inspector-field h-9 w-full rounded-lg border border-border-subtle bg-surface-base text-[13px] text-text-primary outline-none transition-colors focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
                     style={{ paddingLeft: 12, paddingRight: 12 }}
                   >
                     <option value="">跟随主 Agent</option>
@@ -2036,7 +2036,7 @@ export function LongTaskInspectorPanel({
                   onChange={(event) => onSetBtwInput(event.target.value)}
                   onKeyDown={handleBtwKeyDown}
                   placeholder="问一个不影响主轮次的问题"
-                  className="min-h-[72px] w-full resize-none rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent-primary"
+                  className="kimix-inspector-field min-h-[72px] w-full resize-none rounded-lg border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent-primary"
                   style={{ padding: "12px 12px" }}
                 />
                 <div className="flex items-center justify-between" style={{ gap: 10 }}>

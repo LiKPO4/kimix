@@ -265,6 +265,18 @@ describe("UI_STYLES", () => {
 
     expect(semanticSurfaceSources).not.toMatch(/kimix-(?:modal-card|onboarding-card|floating-panel|app-shell-main|media-thumb)[^\n\"`]*(?:rounded-\[[^\]]+\]|shadow-\[[^\]]+\])/);
   });
+
+  it("会话侧栏内部操作与字段完整接入风格角色", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const longTaskInspector = readFileSync(resolve(process.cwd(), "src/components/layout/LongTaskInspectorPanel.tsx"), "utf8");
+
+    expect(longTaskInspector).toContain("kimix-inspector-drag-handle");
+    expect(longTaskInspector.match(/kimix-inspector-field/g)).toHaveLength(4);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button[\s\S]*?\{[^}]*border:\s*1px solid transparent;[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button[\s\S]*?\{[^}]*border:\s*var\(--ui-compound-border\);[^}]*border-radius:\s*var\(--radius-sm\);[^}]*background-image:\s*var\(--ui-compound-background-image\);[^}]*box-shadow:\s*var\(--ui-compound-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-inspector-field\s*\{[^}]*border:\s*var\(--ui-field-border\);[^}]*border-radius:\s*var\(--radius-sm\);[^}]*box-shadow:\s*var\(--ui-field-shadow\);/s);
+    expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-icon-text-button\s*\{/);
+  });
 });
 
 describe("applyUiStyle", () => {
