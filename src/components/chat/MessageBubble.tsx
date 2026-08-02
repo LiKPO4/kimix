@@ -1546,6 +1546,15 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
   const statusText = kimiWebGroupStatusText({ type: "tool", tools });
   const hasError = tools.some((t) => t.status === "error");
   const allDone = !hasError && tools.every((t) => t.status === "success");
+  // A single tool skips the redundant group header: the row itself already
+  // carries target, status, and its own expand/collapse for details.
+  if (tools.length === 1) {
+    return (
+      <div className="kimix-soft-card overflow-hidden rounded-xl">
+        <KimiWebToolRow tool={tools[0]} isLast />
+      </div>
+    );
+  }
   return (
     <div className="kimix-soft-card overflow-hidden rounded-xl">
       <button

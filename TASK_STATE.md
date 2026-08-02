@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：单工具调用直接显示工具行（v2.20.150）
+
+- 根因：工具组只有 1 个调用时仍包一层「1 个工具调用」折叠头，信息冗余。
+- 修复：`KimiWebToolGroupCard` 在 tools.length===1 时直接渲染 `KimiWebToolRow`（保留卡片外壳、状态图标与自身展开详情）；两条渲染路径（KimiWebProcessGroup / TurnBlocksProcessGroup）共用该组件，一并生效。
+- 验证：typecheck + 全量 1483 测试过；pnpm build 过。实机待 v2.20.150 截图。
+
 ## 2026-08-02 修复：设置页按钮接入界面风格体系（v2.20.149）
 
 - 根因：设置侧栏「返回对话」、折叠图标钮、导航项/搜索结果硬编码 `surface-hover`，未消费 `--ui-nav-action-*` / `--ui-nav-list-*` / `--ui-selection-*` token，怀旧（和复古）的浮雕/触感覆盖不到。
