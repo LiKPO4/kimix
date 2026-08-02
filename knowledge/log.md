@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern user-message contrast is calibrated from direct palette weights (v2.20.110)**: screenshot sampling showed that nested mixing reduced the user bubble to an effective 30% hover contribution and only about seven luminance levels of workspace separation. Metadata/code and user surfaces now mix the same palette primitives directly, with an explicit lower user hover weight that stays quieter without disappearing. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Modern message neutrals have a stable two-level hierarchy (v2.20.108)**: neutral usage/model pills and Assistant inline-code shadows now share one lighter theme-derived surface. User prompts derive a second time toward elevated, guaranteeing they remain quieter than both instead of relying on unrelated `surface-active` and `surface-hover` values that can reverse across palettes. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Modern user-prompt contrast is intentionally quiet (v2.20.107)**: the first Modern bubble mix over-weighted `surface-active`, making short prompts read like disabled buttons. Light mode now keeps elevated as the majority surface and dark mode also reduces the active share, preserving authorship separation without a heavy chip appearance. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
