@@ -732,10 +732,25 @@
   .kimix-sidebar-icon-action,
   .kimix-modal-close-button,
   .kimix-settings-entry,
-  .kimix-state-button,
   button.kimix-chat-collapse-row
 ):hover:not(:disabled) {
   box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
+}
+
+/* 二元状态按钮分离“可点击”与“已开启”：hover 保留复古触感，开启态回到 Kimix 蓝色语义。 */
+[data-ui-style="retro"] .kimix-state-button:not([aria-pressed="true"]):hover:not(:disabled) {
+  border-color: var(--kimix-retro-button-hover-border-color);
+  background: var(--kimix-retro-button-hover-background);
+  color: var(--text-primary);
+  box-shadow: var(--kimix-retro-button-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"],
+[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--accent-primary-soft);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary-dark);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent);
 }
 
 /* 深色适配只降低高光，不改变组件层级。 */

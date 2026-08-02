@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Retro binary buttons separate tactile hover from persistent selection (v2.20.116)**: Swarm and Plan no longer use the neutral embossed toggle token for their enabled state. Unpressed hover consumes the Retro border/background/inset-shadow language, while `aria-pressed="true"` restores Kimix's accent border, light accent fill, and accent text. State buttons are removed from the standalone fallback-ring allowlist. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Hybrid Retro controls no longer stack a real border with the utility hover ring (v2.20.115)**: Composer buttons such as add, permission, thinking effort, and context usage carry both structural-control and utility classes. The utility allowlist's preset scope now uses `:where(...)`, allowing the later bordered-control contract to win while genuinely borderless utilities retain the fallback ring. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Retro hover motion is consistent across tactile buttons and Agent process headers (v2.20.114)**: the menu bar felt smoother because it interpolated its embossed shadow while several standalone roles snapped directly to the same shadow. All enrolled utility roles now transition the shadow with the shared 150 ms timing, and interactive collapsible headers explicitly join the Retro hover contract without restoring a global native-button fallback. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

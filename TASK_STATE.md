@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：复古 Swarm/Plan 分离 hover 与选中态（v2.20.116）
+
+- 根因：Retro 将共享 `--ui-toggle-*` 改成中性浮雕值，导致 Swarm/Plan 的持久开启态看起来像 hover；未选中 hover 又由通用按钮兜底环负责，只出现普通阴影，状态层级反转。
+- 修复：把 `.kimix-state-button` 从独立按钮兜底白名单移出。未选中 hover 显式使用 Retro 边框、背景和 inset 阴影；`aria-pressed="true"` 使用 Kimix 默认同源的蓝色边框、浅蓝背景和蓝色文字，且选中后 hover 不退回中性浮雕。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-pLCc4bvR.css`、JS `assets/index-D05m6Ujm.js`）、OKF strict/audit 校验（13 concepts、394 links）通过；构建产物确认包含独立的未选中 hover 与 `aria-pressed="true"` 规则，实际状态观感等待用户在 v2.20.116 复验。
+
 ## 2026-08-02 修复：复古混合角色按钮移除双层描边（v2.20.115）
 
 - 根因：Composer 的添加、权限、思考强度、上下文用量等按钮同时具有结构控件类与通用按钮类；v2.20.113 的通用复古 hover 白名单使用高权重 `[data-ui-style="retro"]` 作用域，压过后置的结构控件规则，导致真实 1px 边框与额外 1px 阴影环同时显示。

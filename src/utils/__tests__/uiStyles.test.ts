@@ -104,7 +104,8 @@ describe("UI_STYLES", () => {
     expect(retroBlock).toMatch(/--ui-nav-list-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(retroBlock).toMatch(/--ui-menu-trigger-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(css).not.toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\(button:hover/);
-    expect(css).toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\([\s\S]*?\.kimix-sidebar-icon-action,[\s\S]*?\.kimix-state-button,[\s\S]*?button\.kimix-chat-collapse-row[\s\S]*?\):hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\([\s\S]*?\.kimix-sidebar-icon-action,[\s\S]*?\.kimix-settings-entry,[\s\S]*?button\.kimix-chat-collapse-row[\s\S]*?\):hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).not.toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\([^)]*\.kimix-state-button/s);
     expect(css).not.toMatch(/\n\[data-ui-style="retro"\]\s+:where\(\s*\.kimix-icon-text-button,/);
     expect(css).toMatch(/\.kimix-chat-collapse-row\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
     expect(css).toMatch(/\.kimix-muted-action\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
@@ -140,6 +141,8 @@ describe("UI_STYLES", () => {
 
     expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
     expect(css).not.toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button:not\(\[aria-pressed="true"\]\):hover:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--kimix-retro-button-hover-border-color\);[^}]*background:\s*var\(--kimix-retro-button-hover-background\);[^}]*box-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button\[aria-pressed="true"\],[\s\S]*?\{[^}]*border-color:\s*var\(--accent-primary-soft\);[^}]*background:\s*var\(--accent-primary-light\);[^}]*color:\s*var\(--accent-primary-dark\);/s);
     expect(css).toMatch(/:where\(\.kimix-toolbar-button, \.kimix-split-control\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
     expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
   });
