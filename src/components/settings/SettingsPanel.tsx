@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Sun, Palette, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isWindows } from "@/utils/platform";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
@@ -1209,6 +1209,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
               <button onClick={() => setSettingsOpen(false)} className="kimix-settings-icon-button" aria-label="关闭设置">
                 <X size={18} />
               </button>
+            </div>
+          </div>
+        )}
+
+        {variant === "workspace" && (
+          <div className="kimix-workspace-header">
+            <div className="kimix-workspace-header-copy">
+              <div className="kimix-workspace-header-title">
+                <Settings size={20} />
+                <span>设置</span>
+                <div className="kimix-workspace-header-subtitle">
+                  管理 Kimix 的外观、对话权限、账户连接与高级选项。
+                </div>
+              </div>
+            </div>
+            <div className="kimix-workspace-header-actions">
+              {onBackToChat && (
+                <button
+                  type="button"
+                  onClick={onBackToChat}
+                  className="kimix-icon-text-button kimix-muted-action is-compact"
+                >
+                  返回对话
+                </button>
+              )}
             </div>
           </div>
         )}

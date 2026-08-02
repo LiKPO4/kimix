@@ -41,7 +41,7 @@ describe("SettingsWorkspaceSidebar", () => {
     useAppStore.setState({ workspaceView: "settings", activeSettingsPageId: "general" });
     const container = await renderSidebar();
 
-    expect(container.textContent).toContain("返回对话");
+    expect(container.textContent).not.toContain("返回对话");
     expect(container.textContent).toContain("模型与供应商");
     expect(container.textContent).not.toContain("新对话");
     expect(container.textContent).not.toContain("项目");

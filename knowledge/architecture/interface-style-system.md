@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-01T21:30:00+08:00"
+timestamp: "2026-08-02T11:59:13+08:00"
 ---
 
 # Interface Style System
@@ -30,6 +30,7 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 * Sidebar projects and sessions use one active-state grammar per preset. Default and Retro use a quiet selected surface plus one accent edge; Modern uses the Codex-style complete quiet pill with no directional marker. Active navigation must not stack a full outline, inset frame, and focus ring to communicate the same state.
 * Compound states have explicit precedence. For project and session rows, `.is-active:hover` consumes the same `--ui-selection-*` tokens as `.is-active`; hover must never replace the complete `box-shadow` and erase the active accent edge. Expanded and pressed toolbar controls keep their own `--ui-toggle-*` state when hovered.
 * Shell separation must communicate real structure. The sidebar does not draw a decorative full-height rule; `--ui-shell-divider` remains `none` unless a preset can justify the divider semantically. Separators inside split controls and menus use their dedicated role tokens and remain local to the grouped content.
+* Full-page workspaces share one identity hierarchy. Plugins, Hooks, and Settings place the workspace icon, title, concise scope description, and return action in `.kimix-workspace-header`; a replacement sidebar owns only local search and section navigation. Page-specific headings such as Appearance remain inside the scrollable body and must not replace or duplicate the workspace identity.
 * The chat toolbar bottom rule is a structural boundary between navigation/actions and conversation content, so every preset keeps it. Split-control dividers are a separate role owned by `--ui-compound-divider-shadow`: Modern may set that local divider to `none` for a seamless Codex-style compound control, while Default and Retro may retain it. A request about one divider must not be implemented by removing another boundary at a different hierarchy.
 * A structural shell border is indivisible. Removing an ornamental sidebar divider must never be implemented by clearing one edge of `.kimix-app-shell-main`; every preset keeps the shell's four structural edges intact and controls ornamental separation through `--ui-shell-divider` or a dedicated spacer.
 * Retro styling uses a restrained signature language: the subtle Platinum title-bar stripe and the inset accent strip on selected vertical navigation rows. Sidebars, window controls, ordinary toolbar actions, and content surfaces stay flat at rest; hover, active state, compound launch/open controls, and floating surfaces carry the tactile treatment. Enrolling a role must not make its boundary permanently visible.

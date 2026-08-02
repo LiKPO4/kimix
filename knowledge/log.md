@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Settings joins the shared full-page workspace hierarchy (v2.20.117)**: Settings now places its identity, scope description, and return action in the same `.kimix-workspace-header` used by Plugins and Hooks. Its replacement sidebar owns only search and category navigation, while the active page heading remains in the scrollable body. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Retro binary buttons separate tactile hover from persistent selection (v2.20.116)**: Swarm and Plan no longer use the neutral embossed toggle token for their enabled state. Unpressed hover consumes the Retro border/background/inset-shadow language, while `aria-pressed="true"` restores Kimix's accent border, light accent fill, and accent text. State buttons are removed from the standalone fallback-ring allowlist. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Hybrid Retro controls no longer stack a real border with the utility hover ring (v2.20.115)**: Composer buttons such as add, permission, thinking effort, and context usage carry both structural-control and utility classes. The utility allowlist's preset scope now uses `:where(...)`, allowing the later bordered-control contract to win while genuinely borderless utilities retain the fallback ring. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

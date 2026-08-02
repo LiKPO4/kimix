@@ -15,7 +15,7 @@ const settingsSidebar = readFileSync(
 describe("settings workspace scroll layout", () => {
   it("keeps one outer workspace scroll container aligned with the chat viewport edge", () => {
     expect(css).toMatch(
-      /\.kimix-settings-panel\.is-workspace \.kimix-settings-body\s*\{[^}]*height:\s*100%;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s,
+      /\.kimix-settings-panel\.is-workspace \.kimix-settings-body\s*\{[^}]*height:\s*auto;[^}]*flex:\s*1;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s,
     );
     expect(css).toMatch(
       /\.kimix-settings-layout\.is-workspace\s*\{[^}]*display:\s*grid;[^}]*min-height:\s*100%;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
@@ -23,6 +23,14 @@ describe("settings workspace scroll layout", () => {
     expect(css).toMatch(
       /\.kimix-settings-layout\.is-workspace \.kimix-settings-page\s*\{[^}]*display:\s*flex;[^}]*min-height:\s*100%;[^}]*flex-direction:\s*column;/s,
     );
+  });
+
+  it("uses the shared workspace header instead of duplicating page identity in the sidebar", () => {
+    expect(settingsPanel).toContain('<div className="kimix-workspace-header">');
+    expect(settingsPanel).toContain("管理 Kimix 的外观、对话权限、账户连接与高级选项。");
+    expect(settingsPanel).toContain("onClick={onBackToChat}");
+    expect(settingsSidebar).not.toContain("kimix-settings-sidebar-header");
+    expect(settingsSidebar).not.toContain("返回对话");
   });
 
   it("pins the footer to the viewport bottom without detaching it from overflowing content", () => {
