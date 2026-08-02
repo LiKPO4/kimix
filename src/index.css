@@ -16,30 +16,30 @@
   --font-sans: "LXGW WenKai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
 
-  /* Surface Colors */
-  --surface-ground: #EDE9E0;
-  --surface-base: #FCFAF5;
+  /* Surface Colors — clearer ladder on pale paper UI */
+  --surface-ground: #E4DDD1;
+  --surface-base: #F7F3EB;
   --surface-elevated: #FFFFFF;
-  --surface-hover: #F5F2EB;
-  --surface-active: #F0ECE4;
+  --surface-hover: #EFE8DC;
+  --surface-active: #E6DFD2;
 
-  /* Text Colors */
-  --text-primary: #1C1917;
-  --text-secondary: #6B6560;
-  --text-muted: #A39E96;
+  /* Text Colors — muted/secondary aim for AA on white cards */
+  --text-primary: #1A1714;
+  --text-secondary: #57534E;
+  --text-muted: #78716C;
   --text-inverse: #FFFFFF;
-  --text-placeholder: #C4BDB3;
+  --text-placeholder: #8A837C;
 
-  /* Border Colors */
-  --border-subtle: #E8E4DC;
-  --border-default: #D9D4CC;
-  --border-strong: #C4BDB3;
+  /* Border Colors — darken toward ink so cards/sections stay scannable */
+  --border-subtle: #D5CEC2;
+  --border-default: #C2B9AB;
+  --border-strong: #A89F90;
 
-  /* Accent — Primary Blue (#1982ff) */
-  --accent-primary: #1982ff;
-  --accent-primary-light: #EBF4FF;
-  --accent-primary-soft: #8EC5FF;
-  --accent-primary-dark: #1466CC;
+  /* Accent — Primary Blue */
+  --accent-primary: #1677F0;
+  --accent-primary-light: #E8F2FF;
+  --accent-primary-soft: #7DB7FF;
+  --accent-primary-dark: #125FCC;
   --kimix-primary-button-hover: #2F74B8;
 
   /* Accent — Secondary (Warm Chestnut) */
@@ -121,11 +121,11 @@
   --kimix-success-bg: var(--accent-success-light);
   --kimix-success-border: #BBE4C8;
   --kimix-success-text: #1A5C33;
-  --kimix-progress-track: #ECE8DF;
+  --kimix-progress-track: #E0D9CD;
   --kimix-progress-fill: var(--text-muted);
   --kimix-user-bubble-bg: var(--surface-elevated);
   --kimix-user-bubble-text: var(--text-primary);
-  --kimix-media-thumb-bg: #F7F5F1;
+  --kimix-media-thumb-bg: #F0EBE3;
   --kimix-media-thumb-border: var(--border-default);
   --kimix-media-thumb-border-hover: var(--border-strong);
   --kimix-strong-button-bg: #171512;
@@ -356,8 +356,8 @@
   --kimix-modern-message-meta-background: color-mix(in srgb, var(--surface-hover) 58%, var(--surface-elevated));
   --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-hover) 46%, var(--surface-elevated));
   /* Tool/process cards: official-like pale wash on white canvas (much lighter than surface-base). */
-  --kimix-modern-process-background: color-mix(in srgb, var(--surface-elevated) 90%, var(--surface-hover));
-  --kimix-modern-process-border: color-mix(in srgb, var(--border-subtle) 72%, var(--surface-elevated));
+  --kimix-modern-process-background: color-mix(in srgb, var(--surface-elevated) 86%, var(--surface-hover));
+  --kimix-modern-process-border: color-mix(in srgb, var(--border-default) 55%, var(--surface-elevated));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;

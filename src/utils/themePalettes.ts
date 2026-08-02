@@ -48,9 +48,9 @@ export const THEME_PALETTES: ThemePaletteDefinition[] = [
     label: "暖纸",
     description: "当前默认色，温和纸面感",
     colors: {
-      primary: "#1982FF",
-      surface: "#EDE9E0",
-      accent: "#B85C38",
+      primary: "#1677F0",
+      surface: "#E6E0D4",
+      accent: "#A8522E",
     },
   },
   {
@@ -58,9 +58,9 @@ export const THEME_PALETTES: ThemePaletteDefinition[] = [
     label: "灰白",
     description: "更纯净、低饱和的工作台",
     colors: {
-      primary: "#2563EB",
-      surface: "#E5E7EB",
-      accent: "#64748B",
+      primary: "#1D4ED8",
+      surface: "#D8DCE3",
+      accent: "#475569",
     },
   },
   {
@@ -68,9 +68,9 @@ export const THEME_PALETTES: ThemePaletteDefinition[] = [
     label: "淡绿",
     description: "轻柔的绿色背景和自然强调",
     colors: {
-      primary: "#168A5B",
-      surface: "#E3EFE4",
-      accent: "#7DA56B",
+      primary: "#0F7A4D",
+      surface: "#D5E6D8",
+      accent: "#5F8F52",
     },
   },
   {
@@ -78,9 +78,9 @@ export const THEME_PALETTES: ThemePaletteDefinition[] = [
     label: "暖橙",
     description: "更明亮、有活力的暖色调",
     colors: {
-      primary: "#E8752A",
-      surface: "#F1E4D5",
-      accent: "#B56A36",
+      primary: "#D9651C",
+      surface: "#E8D5C0",
+      accent: "#9A5A2C",
     },
   },
 ];
@@ -324,26 +324,31 @@ function buildKimiTokens(input: KimiThemePalette, mode: ResolvedThemeMode): Them
 
 function buildLightTokens(colors: ThemePaletteColors, preserveWarmPaperDepth = false): ThemeTokenMap {
   const primary = normalizeHexColor(colors.primary, DEFAULT_CUSTOM_THEME_PALETTE.primary);
-  const surface = normalizeHexColor(colors.surface, DEFAULT_CUSTOM_THEME_PALETTE.surface);
+  // Slightly deepen the canvas seed so ground/base/elevated stay separable on pale palettes.
+  const surfaceSeed = normalizeHexColor(colors.surface, DEFAULT_CUSTOM_THEME_PALETTE.surface);
+  const surface = mix(surfaceSeed, "#1C1917", 0.04);
   const accent = normalizeHexColor(colors.accent, DEFAULT_CUSTOM_THEME_PALETTE.accent);
-  const textBase = mix(surface, "#090909", 0.9);
-  const textSecondary = mix(surface, "#171717", 0.58);
-  const textMuted = mix(surface, "#171717", 0.38);
-  const border = mix(surface, "#5D5D5D", 0.22);
-  const borderStrong = mix(surface, "#404040", 0.32);
+  const textBase = mix(surface, "#090909", 0.92);
+  // Secondary/muted target roughly WCAG AA on white elevated cards.
+  const textSecondary = mix(surface, "#171717", 0.7);
+  const textMuted = mix(surface, "#171717", 0.54);
+  // Borders must darken toward ink, never wash toward white on light UI.
+  const border = mix(surface, "#3F3A34", 0.28);
+  const borderStrong = mix(surface, "#2A2622", 0.38);
+  const borderSubtle = mix(surface, "#3F3A34", 0.16);
 
   return commonTokens({
     surfaceGround: surface,
-    surfaceBase: mix(surface, "#FFFFFF", preserveWarmPaperDepth ? 0.68 : 0.48),
+    surfaceBase: mix(surface, "#FFFFFF", preserveWarmPaperDepth ? 0.58 : 0.42),
     surfaceElevated: "#FFFFFF",
-    surfaceHover: mix(surface, "#FFFFFF", preserveWarmPaperDepth ? 0.42 : 0.24),
-    surfaceActive: mix(surface, "#D8D8D8", preserveWarmPaperDepth ? 0.2 : 0.18),
+    surfaceHover: mix(surface, "#FFFFFF", preserveWarmPaperDepth ? 0.34 : 0.2),
+    surfaceActive: mix(surface, "#D0CBC3", preserveWarmPaperDepth ? 0.22 : 0.2),
     textPrimary: textBase,
     textSecondary,
     textMuted,
     textInverse: "#FFFFFF",
-    textPlaceholder: mix(surface, "#171717", 0.24),
-    borderSubtle: mix(surface, "#FFFFFF", preserveWarmPaperDepth ? 0.36 : 0.18),
+    textPlaceholder: mix(surface, "#171717", 0.4),
+    borderSubtle,
     borderDefault: border,
     borderStrong,
     primary,

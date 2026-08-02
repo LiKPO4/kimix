@@ -55,7 +55,7 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).toMatch(/--kimix-modern-workspace-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 96%, var\(--surface-base\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-message-meta-background:\s*color-mix\(in srgb, var\(--surface-hover\) 58%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-hover\) 46%, var\(--surface-elevated\)\);/);
-    expect(styleBlocks).toMatch(/--kimix-modern-process-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 90%, var\(--surface-hover\)\);/);
+    expect(styleBlocks).toMatch(/--kimix-modern-process-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 86%, var\(--surface-hover\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-hover\) 54%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
     expect(styleBlocks).toMatch(/--ui-compound-divider-shadow:\s*none;/);

@@ -117,3 +117,30 @@ describe("dark mode surface ladder", () => {
     expect(relativeLuminance(borderDefault)).toBeGreaterThan(relativeLuminance(elevated));
   });
 });
+
+describe("light mode surface ladder", () => {
+  it("keeps borders, muted text, and surface steps legible on warm-paper light", () => {
+    const tokens = resolveThemePaletteTokens("warm-paper", { primary: "#1677F0", surface: "#E6E0D4", accent: "#A8522E" }, "light");
+    const ground = tokens["--surface-ground"];
+    const base = tokens["--surface-base"];
+    const elevated = tokens["--surface-elevated"];
+    const hover = tokens["--surface-hover"];
+    const textPrimary = tokens["--text-primary"];
+    const textSecondary = tokens["--text-secondary"];
+    const textMuted = tokens["--text-muted"];
+    const borderSubtle = tokens["--border-subtle"];
+    const borderDefault = tokens["--border-default"];
+
+    expect(contrastRatio(textPrimary, elevated)).toBeGreaterThanOrEqual(12);
+    expect(contrastRatio(textSecondary, elevated)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(textMuted, elevated)).toBeGreaterThanOrEqual(4.4);
+    expect(contrastRatio(borderDefault, elevated)).toBeGreaterThanOrEqual(1.4);
+    expect(contrastRatio(borderSubtle, elevated)).toBeGreaterThanOrEqual(1.2);
+    expect(contrastRatio(base, ground)).toBeGreaterThanOrEqual(1.08);
+    expect(contrastRatio(elevated, base)).toBeGreaterThanOrEqual(1.05);
+    expect(contrastRatio(hover, elevated)).toBeGreaterThanOrEqual(1.08);
+    // Light borders darken relative to white elevated, not wash lighter.
+    expect(relativeLuminance(borderDefault)).toBeLessThan(relativeLuminance(elevated));
+    expect(relativeLuminance(borderSubtle)).toBeLessThan(relativeLuminance(elevated));
+  });
+});

@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：默认浅色主题对比度与辨识度（v2.20.144）
+
+- 根因：浅色 `text-muted`/`border-*` 过浅（muted≈2.5:1，边框≈1.2–1.5）；`borderSubtle` 还向白混合；surface ladder 过近。
+- 修复：加深 muted/secondary/placeholder 与边框；边框改为向墨色混合；拉大 ground/base/hover 阶梯；四套默认 palette seed 略加深；浅色对比度单测。
+- 验证：themePalettes/uiStyles。实机待 v2.20.144 暖纸/灰白等截图。
+
 ## 2026-08-02 优化：现代化工具卡背景改浅（v2.20.143）
 
 - 对照：官方工具行为近白浅灰细边；Kimix modern 工具组用 `kimix-soft-card` + `surface-base`，在近白工作画布上偏深灰实底。
