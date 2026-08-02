@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 排查：切换 Swarm 后上一条 assistant 气泡被掏空（无版本变更）
+
+- 现象：20:53 切 Swarm 后，发布轮气泡只剩文件变更卡 + 模型页脚。
+- 快照结论：wire canonical、IndexedDB 本地、buildRenderItems 三层全部健康；本地事件 id 已重生成，证明之后被一次完整 canonical 水合自愈；渲染管线无 bug。
+- 根因方向：Server→SDK 迁移窗口瞬态（快照回放/水合/wire 重写竞态），精确写入路径不可回溯；唯一无回归守卫的替换入口是非房间水合直换路径 `preserveLocalUserMediaInCanonicalHistory`（App.tsx ~2343）。
+- 快照文档：`docs/issue-swarm-toggle-assistant-bubble-gutted-events-snapshot.md`。纯文档，未 bump。
+
 ## 2026-08-02 优化：单工具调用直接显示工具行（v2.20.150）
 
 - 根因：工具组只有 1 个调用时仍包一层「1 个工具调用」折叠头，信息冗余。
