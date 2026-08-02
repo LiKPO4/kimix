@@ -55,6 +55,7 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).toMatch(/--kimix-modern-workspace-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 96%, var\(--surface-base\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-message-meta-background:\s*color-mix\(in srgb, var\(--surface-hover\) 58%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-hover\) 46%, var\(--surface-elevated\)\);/);
+    expect(styleBlocks).toMatch(/--kimix-modern-process-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 90%, var\(--surface-hover\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-hover\) 54%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
     expect(styleBlocks).toMatch(/--ui-compound-divider-shadow:\s*none;/);
@@ -66,6 +67,7 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-workspace-page,\s*\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-user-bubble\s*\{[^}]*background:\s*var\(--kimix-modern-user-bubble-background\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-soft-card\s*\{[^}]*background:\s*var\(--kimix-modern-process-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-status-surface,\s*\[data-ui-style="modern"\]\s+\.markdown-body\s+\.kimix-inline-code\s*\{[^}]*background:\s*var\(--kimix-modern-message-meta-background\);/s);
     expect(statusCard).toContain("kimix-status-surface bg-surface-hover text-text-muted");
     expect(markdownRenderer).toContain("kimix-inline-code rounded-md bg-surface-hover");

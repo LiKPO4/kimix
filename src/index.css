@@ -355,6 +355,9 @@
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 96%, var(--surface-base));
   --kimix-modern-message-meta-background: color-mix(in srgb, var(--surface-hover) 58%, var(--surface-elevated));
   --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-hover) 46%, var(--surface-elevated));
+  /* Tool/process cards: official-like pale wash on white canvas (much lighter than surface-base). */
+  --kimix-modern-process-background: color-mix(in srgb, var(--surface-elevated) 90%, var(--surface-hover));
+  --kimix-modern-process-border: color-mix(in srgb, var(--border-subtle) 72%, var(--surface-elevated));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
@@ -425,6 +428,8 @@
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 78%, var(--surface-base));
   --kimix-modern-message-meta-background: color-mix(in srgb, var(--surface-hover) 66%, var(--surface-elevated));
   --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-hover) 54%, var(--surface-elevated));
+  --kimix-modern-process-background: color-mix(in srgb, var(--surface-elevated) 62%, var(--surface-hover));
+  --kimix-modern-process-border: color-mix(in srgb, var(--border-subtle) 80%, var(--surface-elevated));
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 28px rgba(0, 0, 0, 0.22);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(255, 255, 255, 0.085), 0 20px 50px rgba(0, 0, 0, 0.32);
@@ -519,6 +524,18 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--kimix-modern-card-radius);
   box-shadow: none;
+}
+
+/* Chat tool/process soft cards: pale official-like wash, not heavy surface-base plate. */
+[data-ui-style="modern"] .kimix-soft-card {
+  border-color: var(--kimix-modern-process-border);
+  background: var(--kimix-modern-process-background);
+  color: var(--text-secondary);
+}
+
+[data-ui-style="modern"] .kimix-soft-card-strong {
+  border-color: var(--kimix-modern-process-border);
+  background: color-mix(in srgb, var(--kimix-modern-process-background) 70%, var(--surface-hover));
 }
 
 [data-ui-style="modern"] .kimix-event-card {

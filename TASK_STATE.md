@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：现代化工具卡背景改浅（v2.20.143）
+
+- 对照：官方工具行为近白浅灰细边；Kimix modern 工具组用 `kimix-soft-card` + `surface-base`，在近白工作画布上偏深灰实底。
+- 修复：新增 `--kimix-modern-process-background/border`（elevated 为主的浅 wash）；modern 下 soft-card 使用该色，贴近官方深度。
+- 验证：uiStyles 定向。实机待 v2.20.143 现代化截图。
+
 ## 2026-08-02 调整：刻度条左距加倍（v2.20.142）
 
 - 反馈：v2.20.141 贴边过近。
