@@ -732,7 +732,8 @@
   .kimix-sidebar-icon-action,
   .kimix-modal-close-button,
   .kimix-settings-entry,
-  .kimix-state-button
+  .kimix-state-button,
+  button.kimix-chat-collapse-row
 ):hover:not(:disabled) {
   box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
 }
@@ -1393,6 +1394,7 @@ body::before {
   border-radius: var(--radius-sm);
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
 }
 
@@ -1501,6 +1503,7 @@ button.bg-accent-primary:disabled:hover,
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
               opacity var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
   transform-origin: center;
 }
@@ -1525,6 +1528,7 @@ button.bg-accent-primary:disabled:hover,
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
               opacity var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
   transform-origin: center;
 }
@@ -1651,6 +1655,7 @@ button.bg-accent-primary:disabled:hover,
   padding-right: 14px;
   line-height: 1;
   transition: background-color var(--duration-base) var(--ease-hover),
+              border-color var(--duration-base) var(--ease-hover),
               box-shadow var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover);
 }
@@ -1761,6 +1766,7 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-sm);
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
 }
 
@@ -3684,6 +3690,7 @@ button.bg-accent-primary:disabled:hover,
   color: var(--text-muted);
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover),
               scale var(--duration-fast) var(--ease-hover);
 }
 

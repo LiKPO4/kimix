@@ -104,7 +104,12 @@ describe("UI_STYLES", () => {
     expect(retroBlock).toMatch(/--ui-nav-list-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(retroBlock).toMatch(/--ui-menu-trigger-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(css).not.toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\(button:hover/);
-    expect(css).toMatch(/\[data-ui-style="retro"\]\s+:where\([\s\S]*?\.kimix-sidebar-icon-action,[\s\S]*?\.kimix-state-button[\s\S]*?\):hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+:where\([\s\S]*?\.kimix-sidebar-icon-action,[\s\S]*?\.kimix-state-button,[\s\S]*?button\.kimix-chat-collapse-row[\s\S]*?\):hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/\.kimix-chat-collapse-row\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
+    expect(css).toMatch(/\.kimix-muted-action\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
+    expect(css).toMatch(/\.kimix-inline-icon-action\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
+    expect(css).toMatch(/\.kimix-sidebar-icon-action\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
+    expect(css).toMatch(/\.kimix-modal-close-button\s*\{[^}]*transition:[^}]*box-shadow var\(--duration-base\) var\(--ease-hover\)/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-context-bar\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
   });
 

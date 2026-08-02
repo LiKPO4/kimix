@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Retro hover motion is consistent across tactile buttons and Agent process headers (v2.20.114)**: the menu bar felt smoother because it interpolated its embossed shadow while several standalone roles snapped directly to the same shadow. All enrolled utility roles now transition the shadow with the shared 150 ms timing, and interactive collapsible headers explicitly join the Retro hover contract without restoring a global native-button fallback. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Nested button hit targets no longer receive duplicate Retro frames (v2.20.113)**: the native `button:hover` fallback introduced in v2.20.112 also framed the title hit target inside an already framed session row. Retro fallback is now an explicit standalone-role allowlist; global native-button hover rings are prohibited. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Retro hover feedback now covers the complete button contract without boxing the context bar (v2.20.112)**: controls, sidebar navigation, project/session rows, menu triggers, and context actions share one tactile hover token set, with a low-specificity fallback for unregistered native buttons. The bottom context bar is once again a borderless layout group. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

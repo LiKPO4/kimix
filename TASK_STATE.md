@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：复古按钮阴影过渡与 Agent 标题 hover（v2.20.114）
+
+- 根因：顶部菜单触发器会同时过渡背景与浮雕阴影，其他部分独立按钮虽然在 v2.20.112/113 获得相同阴影，但多个语义类没有声明 `box-shadow` 过渡，阴影直接跳变；Agent 内容标题使用 `button.kimix-chat-collapse-row`，此前又未登记到复古按钮角色白名单。
+- 修复：为静默按钮、行内图标、侧栏图标、弹窗关闭按钮和折叠标题补齐共享 150ms 阴影过渡；顶部菜单同时平滑过渡边框；只把可交互的 `button.kimix-chat-collapse-row` 加入复古 hover 合约，非按钮标题和嵌套点击热区不受影响。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-k1CvEqEz.css`、JS `assets/index-BMhpkE1x.js`）、OKF strict/audit 校验（13 concepts、392 links）通过；构建产物确认包含 `button.kimix-chat-collapse-row` 复古角色，实际观感等待用户在 v2.20.114 检查动画连贯性。
+
 ## 2026-08-02 修复：复古会话行移除嵌套文字框（v2.20.113）
 
 - 根因：v2.20.112 的全局原生 `button:hover` 兜底同时命中了会话行外层视觉表面内的标题点击按钮，导致一行 hover 时出现“整行外框 + 文字内框”两个边界所有者。
