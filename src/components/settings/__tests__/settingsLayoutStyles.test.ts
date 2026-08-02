@@ -83,8 +83,8 @@ describe("settings workspace scroll layout", () => {
       /\.kimix-settings-search:focus-within\s*\{([^}]*)\}/s,
     )?.[1] ?? "";
 
-    expect(activeNavigationRule).toContain("background: var(--surface-hover)");
-    expect(activeNavigationRule).not.toContain("box-shadow");
+    expect(activeNavigationRule).toContain("background: var(--ui-selection-background)");
+    expect(activeNavigationRule).toContain("box-shadow: var(--ui-selection-shadow)");
     expect(activePermissionRule).not.toContain("box-shadow");
     expect(searchFocusRule).not.toContain("box-shadow");
   });

@@ -1319,6 +1319,24 @@
   border-radius: 0;
 }
 
+/* Workspace header back action: a real raised Win98 button, not a ghost label. */
+[data-ui-style="nostalgia"] .kimix-workspace-header .kimix-icon-text-button {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-workspace-header .kimix-icon-text-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-workspace-header .kimix-icon-text-button:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
 [data-ui-style="nostalgia"] .kimix-state-button:not([aria-pressed="true"]):hover:not(:disabled) {
   border: var(--kimix-nostalgia-flat-border);
   background: var(--surface-hover);
@@ -2968,16 +2986,22 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-sidebar-back {
+  border: var(--ui-nav-action-border);
   border-radius: var(--radius-sm);
+  background-color: var(--ui-nav-action-background);
+  background-image: var(--ui-nav-action-background-image);
+  box-shadow: var(--ui-nav-action-shadow);
   color: var(--text-muted);
   font-size: 13.5px;
-  transition-property: background-color, color, scale;
+  transition-property: background-color, border-color, box-shadow, color, scale;
   transition-duration: var(--duration-fast);
   transition-timing-function: ease-out;
 }
 
 .kimix-settings-sidebar-back:hover {
-  background: var(--surface-hover);
+  border-color: var(--ui-nav-action-hover-border-color);
+  background: var(--ui-nav-action-hover-background);
+  box-shadow: var(--ui-nav-action-hover-shadow);
   color: var(--text-primary);
 }
 
@@ -3031,17 +3055,29 @@ button.bg-accent-primary:disabled:hover,
   min-height: 40px;
   align-items: center;
   justify-content: center;
+  border: var(--ui-nav-action-border);
   border-radius: var(--radius-sm);
+  background-color: var(--ui-nav-action-background);
+  background-image: var(--ui-nav-action-background-image);
+  box-shadow: var(--ui-nav-action-shadow);
   color: var(--text-muted);
-  transition-property: background-color, color, scale;
+  transition-property: background-color, border-color, box-shadow, color, scale;
   transition-duration: var(--duration-fast);
   transition-timing-function: ease-out;
 }
 
-.kimix-settings-sidebar-icon-button:hover,
-.kimix-settings-sidebar-icon-button.is-active {
-  background: var(--surface-hover);
+.kimix-settings-sidebar-icon-button:hover {
+  border-color: var(--ui-nav-action-hover-border-color);
+  background: var(--ui-nav-action-hover-background);
+  box-shadow: var(--ui-nav-action-hover-shadow);
   color: var(--text-primary);
+}
+
+.kimix-settings-sidebar-icon-button.is-active {
+  border-color: var(--ui-selection-border-color);
+  background: var(--ui-selection-background);
+  box-shadow: var(--ui-selection-shadow);
+  color: var(--ui-selection-color);
 }
 
 .kimix-settings-sidebar-icon-button:active {
@@ -3129,10 +3165,13 @@ button.bg-accent-primary:disabled:hover,
   width: 100%;
   min-height: 40px;
   align-items: center;
+  border: var(--ui-nav-list-border);
   border-radius: var(--radius-sm);
+  background-color: var(--ui-nav-list-background);
+  box-shadow: var(--ui-nav-list-shadow);
   color: var(--text-secondary);
   text-align: left;
-  transition-property: background-color, color, scale;
+  transition-property: background-color, border-color, box-shadow, color, scale;
   transition-duration: var(--duration-fast);
   transition-timing-function: ease-out;
 }
@@ -3148,7 +3187,9 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-navigation-item:hover,
 .kimix-settings-search-result:hover {
-  background: var(--surface-hover);
+  border-color: var(--ui-nav-list-hover-border-color);
+  background: var(--ui-nav-list-hover-background);
+  box-shadow: var(--ui-nav-list-hover-shadow);
   color: var(--text-primary);
 }
 
@@ -3158,8 +3199,17 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-navigation-item.is-active {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+  border-color: var(--ui-selection-border-color);
+  background: var(--ui-selection-background);
+  box-shadow: var(--ui-selection-shadow);
+  color: var(--ui-selection-color);
+}
+
+.kimix-settings-navigation-item.is-active:hover {
+  border-color: var(--ui-selection-hover-border-color);
+  background: var(--ui-selection-hover-background);
+  box-shadow: var(--ui-selection-hover-shadow);
+  color: var(--ui-selection-color);
 }
 
 .kimix-settings-search-result {

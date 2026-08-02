@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：设置页按钮接入界面风格体系（v2.20.149）
+
+- 根因：设置侧栏「返回对话」、折叠图标钮、导航项/搜索结果硬编码 `surface-hover`，未消费 `--ui-nav-action-*` / `--ui-nav-list-*` / `--ui-selection-*` token，怀旧（和复古）的浮雕/触感覆盖不到。
+- 修复：全部接入语义 token（active 走 selection，含 `.is-active:hover`）；怀旧下 `.kimix-workspace-header` 的「返回对话」静止即 raised 浮雕、按下 sunken（设置/Hooks/Skills 共用该头部，一并生效）。
+- 注意：默认/现代化风格下导航项 hover 现在会带 `--ui-nav-list-hover-*` 的细边/无阴影，与主侧栏行行为一致，属预期对齐。
+- 验证：settingsLayoutStyles + SettingsWorkspaceSidebar + uiStyles 27 过；pnpm build 过。实机待 v2.20.149 截图。
+
 ## 2026-08-02 修复：怀旧风格可保存 + 风格网格一行三列（v2.20.148）
 
 - 根因：IPC `uiStyle` zod 与 settingsService 白名单仍是 default/modern/retro，选 nostalgia 触发 Invalid settings data。
