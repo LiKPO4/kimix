@@ -86,7 +86,7 @@ export function RoomAgentPicker({
         type="button"
         onClick={() => setOpen((value) => !value)}
         disabled={disabled}
-        className="kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-40"
+        className="kimix-icon-text-button kimix-muted-action kimix-room-trigger is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-40"
         style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, fontSize: 13, lineHeight: "20px" }}
         title={`默认发送给 ${selected.map((agent) => agent.displayName).join("、")}`}
         aria-haspopup="menu"
@@ -138,7 +138,8 @@ export function RoomAgentPicker({
                         : [...selectedAgentIds, agent.id];
                       if (next.length > 0) onSelectionChange(next);
                     }}
-                    className="grid min-w-0 rounded-lg text-left transition-colors hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
+                    className="kimix-room-choice is-quiet grid min-w-0 rounded-lg text-left hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
+                    data-selected={selectedRow ? "true" : "false"}
                     style={{ gridTemplateColumns: "28px minmax(0, 1fr) 18px", gap: 9, minHeight: 48, paddingLeft: 8, paddingRight: 6 }}
                     title={agent.provisioningError || agent.recoveryIssue?.message || agent.lifecycleIssue?.message || `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
                   >

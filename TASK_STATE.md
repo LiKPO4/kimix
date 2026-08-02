@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：恢复默认顶栏并补齐多 Agent 风格角色（v2.20.120）
+
+- 根因：v2.20.95（`e79dd434`）建立全局界面风格合约时，把共享控件的默认边框、背景和阴影设为透明；`SessionToolbar` 又移除了原先的 `rounded-xl border border-[var(--kimix-panel-border-soft)]`，于是新增风格意外改变了 Kimix 默认顶栏。底部 ContextBar 没有被同一提交删除，但默认 hover 仅靠浅背景与低扩散阴影，在当前配色上辨识不足。
+- 修复：仅在没有 `data-ui-style` 的 Kimix 默认作用域恢复顶栏 12px 圆角、细边框、hover 轻上浮与展开/选中完整状态；长程任务状态按钮保留自己的语义边框，不被默认恢复规则覆盖。默认底栏 action 增加主题色派生的浅边界、完整文字色与 1px 上浮反馈。
+- 多 Agent：为接收者/正文范围触发器、模型与权限选项、消息选择项、关闭/取消/管理模型和添加/保存主操作补充 `.kimix-room-*` 语义角色。Modern 继续使用安静大圆角；Retro 使用小圆角、主题派生边界、轻浮雕与内凹选中态，不覆盖任何颜色主题 token。
+- 验证：UI 风格定向 15 项、全量 155 文件 1474 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-Bk3h-5yh.css`、JS `assets/index-BcasY1xp.js`）、OKF strict/audit（13 concepts、399 links）通过；v2.20.120 开发窗口已重启，实际按钮观感等待用户截图验收。
+
 ## 2026-08-02 审计修复：发布门禁与多窗口草稿隔离（v2.20.119）
 
 - 发布说明缺口核验：v2.20.76–118 均未打 tag，按“从上个实际发布版本聚合”的规则不需要 43 份内部 patch 说明；真实风险是 workflow 缺专属文件时静默回退到过期 `RELEASE_NOTES.md`。现改为缺文件直接失败，并新增下一实际发布候选 `v2.20.119.md`，范围从 v2.20.75 起算。

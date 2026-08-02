@@ -1292,6 +1292,35 @@ body::before {
   box-shadow: var(--ui-control-active-shadow);
 }
 
+/* Kimix 默认顶栏保持原有的细边框工具键；新增界面风格只能在各自作用域内覆盖。 */
+:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control) {
+  border: 1px solid var(--kimix-panel-border-soft);
+  border-radius: 12px;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  transition-property: background-color, border-color, color, box-shadow, transform, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-timing-function: var(--ease-hover);
+}
+
+:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control):hover:not(:disabled) {
+  border-color: var(--kimix-panel-border);
+  background-color: var(--kimix-panel-soft-bg);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control):active:not(:disabled),
+:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control).is-expanded,
+:root:not([data-ui-style]) .kimix-app-shell-toolbar .kimix-toolbar-button:not(.kimix-long-task-button)[aria-pressed="true"] {
+  border-color: var(--ui-toggle-border-color);
+  background-color: var(--ui-toggle-background);
+  color: var(--ui-toggle-color);
+  box-shadow: var(--ui-toggle-shadow);
+  transform: translateY(0);
+}
+
 .kimix-window-control.is-danger:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent-danger) 28%, transparent);
   background-color: var(--accent-danger-light);
@@ -1562,13 +1591,115 @@ button.bg-accent-primary:disabled:hover,
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
               opacity var(--duration-base) var(--ease-hover),
-              box-shadow var(--duration-base) var(--ease-hover);
+              box-shadow var(--duration-base) var(--ease-hover),
+              transform var(--duration-base) var(--ease-hover);
 }
 
 .kimix-contextbar-action:hover,
 .kimix-contextbar-action[aria-expanded="true"] {
   background: var(--surface-hover);
   box-shadow: var(--shadow-hover);
+}
+
+/* 默认底栏补回清晰但克制的热区边界，避免浅背景与 hover 面融为一体。 */
+:root:not([data-ui-style]) .kimix-contextbar-action:hover,
+:root:not([data-ui-style]) .kimix-contextbar-action[aria-expanded="true"] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--border-subtle), var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+:root:not([data-ui-style]) .kimix-contextbar-action:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 多 Agent 房间控件使用独立角色；默认外观不变，现代/复古可完整接管。 */
+.kimix-room-trigger,
+.kimix-room-secondary-action {
+  border: var(--ui-control-border);
+  background-color: var(--ui-control-background);
+  background-image: var(--ui-control-background-image);
+  box-shadow: var(--ui-control-shadow);
+  transition-property: background-color, border-color, color, box-shadow, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-timing-function: var(--ease-hover);
+}
+
+.kimix-room-trigger:hover:not(:disabled),
+.kimix-room-trigger[aria-expanded="true"],
+.kimix-room-secondary-action:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+.kimix-room-choice {
+  transition-property: background-color, border-color, color, box-shadow, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-timing-function: var(--ease-hover);
+}
+
+.kimix-room-choice:active:not(:disabled),
+.kimix-room-trigger:active:not(:disabled),
+.kimix-room-secondary-action:active:not(:disabled),
+.kimix-room-primary-action:active:not(:disabled) {
+  scale: 0.96;
+}
+
+[data-ui-style="retro"] .kimix-room-trigger,
+[data-ui-style="retro"] .kimix-room-secondary-action {
+  border: var(--ui-compound-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--ui-compound-background);
+  background-image: var(--ui-compound-background-image);
+  box-shadow: var(--ui-compound-shadow);
+}
+
+[data-ui-style="retro"] .kimix-room-choice {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.025));
+  box-shadow: var(--kimix-retro-control-shadow);
+}
+
+[data-ui-style="retro"] .kimix-room-choice.is-quiet {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="retro"] .kimix-room-choice:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-room-choice[aria-pressed="true"],
+[data-ui-style="retro"] .kimix-room-choice[data-selected="true"] {
+  border-color: var(--ui-toggle-border-color);
+  background-color: var(--ui-toggle-background);
+  background-image: none;
+  color: var(--ui-toggle-color);
+  box-shadow: var(--ui-toggle-shadow);
+}
+
+[data-ui-style="retro"] .kimix-room-primary-action {
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="retro"] .kimix-room-primary-action:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 2px 5px rgba(0, 0, 0, 0.16);
+}
+
+[data-ui-style="modern"] .kimix-room-trigger,
+[data-ui-style="modern"] .kimix-room-secondary-action,
+[data-ui-style="modern"] .kimix-room-choice {
+  border-radius: var(--kimix-modern-control-radius);
 }
 
 .kimix-strong-action {

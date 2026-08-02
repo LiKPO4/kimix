@@ -147,7 +147,7 @@ export function AddRoomAgentDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="kimix-inline-icon-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] disabled:opacity-40"
+            className="kimix-inline-icon-action kimix-room-secondary-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] disabled:opacity-40"
             aria-label="关闭添加 Agent"
           >
             <X size={15} />
@@ -206,7 +206,7 @@ export function AddRoomAgentDialog({
               <button
                 type="button"
                 onClick={onOpenModelSettings}
-                className="kimix-icon-text-button kimix-muted-action is-compact"
+                className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action is-compact"
                 style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}
               >
                 <Settings size={14} />
@@ -243,7 +243,8 @@ export function AddRoomAgentDialog({
                               if (!mentionTouched) setMentionName(mentionFromName(name));
                             }
                           }}
-                          className="grid w-full items-center rounded-xl text-left transition-colors hover:bg-surface-elevated"
+                          aria-pressed={selected}
+                          className="kimix-room-choice is-quiet grid w-full items-center rounded-xl text-left hover:bg-surface-elevated"
                           style={{ gridTemplateColumns: "minmax(0, 1fr) 24px", columnGap: 10, minHeight: 42, paddingLeft: 12, paddingRight: 10 }}
                           title={option.id}
                         >
@@ -273,7 +274,8 @@ export function AddRoomAgentDialog({
                     key={option.value}
                     type="button"
                     onClick={() => setPermissionMode(option.value)}
-                    className={`rounded-xl border text-left transition-colors ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                    aria-pressed={selected}
+                    className={`kimix-room-choice rounded-xl border text-left ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
                     style={{ minHeight: 74, padding: "11px 12px" }}
                   >
                     <span className="block text-[12.5px] font-medium text-[var(--kimix-panel-text)]">{option.label}</span>
@@ -299,13 +301,13 @@ export function AddRoomAgentDialog({
             房间最多 4 个 Agent；当前已有 {session.collaboration?.agents.filter((agent) => !agent.removedAt).length ?? 1} 个。
           </div>
           <div className="flex items-center" style={{ gap: 10 }}>
-            <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
+            <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
               取消
             </button>
             <button
               type="submit"
               disabled={busy || loading || !modelAlias || !displayName.trim() || !mentionName.trim()}
-              className="kimix-icon-text-button bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="kimix-icon-text-button kimix-room-primary-action bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
               style={{ height: 34, minWidth: 98, justifyContent: "center", paddingLeft: 14, paddingRight: 14 }}
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}

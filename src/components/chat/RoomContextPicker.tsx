@@ -67,7 +67,7 @@ export function RoomContextPicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
-        className={`kimix-icon-text-button kimix-muted-action is-compact w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
+        className={`kimix-icon-text-button kimix-muted-action kimix-room-trigger is-compact w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-40 ${invalidSelection ? "text-accent-warning" : ""}`}
         style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12, fontSize: 13, lineHeight: "20px" }}
         title="设置本次发送给 Agent 的房间正文范围；发送后恢复为上一轮"
         aria-haspopup="menu"
@@ -95,7 +95,8 @@ export function RoomContextPicker({
                   type="button"
                   title={mode.title}
                   onClick={() => onChange({ mode: mode.value, selectedEntryIds: mode.value === "selected" ? selection.selectedEntryIds ?? [] : [] })}
-                  className={`rounded-xl border text-[12.5px] transition-colors ${active ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text)]" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                  aria-pressed={active}
+                  className={`kimix-room-choice rounded-xl border text-[12.5px] ${active ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text)]" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
                   style={{ minHeight: 38, paddingLeft: 10, paddingRight: 10 }}
                 >
                   {mode.label}
@@ -122,7 +123,8 @@ export function RoomContextPicker({
                       key={entry.id}
                       type="button"
                       onClick={() => toggleEntry(entry.id)}
-                      className={`grid w-full rounded-xl border text-left transition-colors ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      aria-pressed={selected}
+                      className={`kimix-room-choice grid w-full rounded-xl border text-left ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
                       style={{ gridTemplateColumns: "22px minmax(0, 1fr)", gap: 10, height: 76, minHeight: 76, maxHeight: 76, overflow: "hidden", padding: "10px 12px" }}
                     >
                       <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-md border ${selected ? "border-accent-primary bg-accent-primary text-white" : "border-[var(--kimix-panel-border)] text-transparent"}`}>

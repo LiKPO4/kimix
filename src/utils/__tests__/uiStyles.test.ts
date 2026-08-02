@@ -147,6 +147,37 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
   });
 
+  it("Kimix 默认顶栏保留原有工具键边界且底栏 hover 可辨识", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(css).toMatch(/:root:not\(\[data-ui-style\]\)\s+\.kimix-app-shell-toolbar\s+:where\(\.kimix-toolbar-button:not\(\.kimix-long-task-button\),\s*\.kimix-split-control\)\s*\{[^}]*border:\s*1px solid var\(--kimix-panel-border-soft\);[^}]*border-radius:\s*12px;/s);
+    expect(css).toMatch(/:root:not\(\[data-ui-style\]\)\s+\.kimix-app-shell-toolbar\s+:where\(\.kimix-toolbar-button:not\(\.kimix-long-task-button\),\s*\.kimix-split-control\):hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\);/s);
+    expect(css).toMatch(/:root:not\(\[data-ui-style\]\)\s+\.kimix-contextbar-action:hover,[\s\S]*?box-shadow:\s*0 0 0 1px var\(--border-subtle\), var\(--shadow-hover\);[^}]*transform:\s*translateY\(-1px\);/s);
+  });
+
+  it("多 Agent 房间按钮全部加入可跨风格覆盖的语义角色", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const addDialog = readFileSync(resolve(process.cwd(), "src/components/chat/AddRoomAgentDialog.tsx"), "utf8");
+    const editDialog = readFileSync(resolve(process.cwd(), "src/components/chat/EditRoomAgentDialog.tsx"), "utf8");
+    const agentPicker = readFileSync(resolve(process.cwd(), "src/components/chat/RoomAgentPicker.tsx"), "utf8");
+    const contextPicker = readFileSync(resolve(process.cwd(), "src/components/chat/RoomContextPicker.tsx"), "utf8");
+
+    expect(css).toContain('[data-ui-style="retro"] .kimix-room-trigger');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-room-choice[aria-pressed="true"]');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-room-choice[data-selected="true"]');
+    expect(css).toContain('[data-ui-style="retro"] .kimix-room-primary-action');
+    expect(css).toContain('[data-ui-style="modern"] .kimix-room-trigger');
+    expect(addDialog).toContain("kimix-room-secondary-action");
+    expect(addDialog).toContain("kimix-room-primary-action");
+    expect(addDialog).toContain("kimix-room-choice");
+    expect(editDialog).toContain("kimix-room-secondary-action");
+    expect(editDialog).toContain("kimix-room-primary-action");
+    expect(agentPicker).toContain("kimix-room-trigger");
+    expect(agentPicker).toContain("kimix-room-choice");
+    expect(contextPicker).toContain("kimix-room-trigger");
+    expect(contextPicker).toContain("kimix-room-choice");
+  });
+
   it("初版与其他风格共享导航、控件、菜单和弹窗骨架", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");

@@ -475,7 +475,7 @@ export function SessionToolbar({
           <button
             type="button"
             onClick={onOpenLongTaskInspector}
-            className={`kimix-toolbar-button flex h-9 min-w-[148px] items-center text-left ${
+            className={`kimix-toolbar-button kimix-long-task-button flex h-9 min-w-[148px] items-center text-left ${
               longTaskMeta.recovery && longTaskMeta.recovery.status !== "none"
                 ? "border-accent-warning text-accent-warning hover:bg-accent-warning-light"
                 : "border-accent-primary-soft text-accent-primary hover:bg-accent-primary-light"
