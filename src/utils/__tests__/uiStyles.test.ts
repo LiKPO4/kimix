@@ -100,6 +100,16 @@ describe("UI_STYLES", () => {
     expect(css).toContain('[data-ui-style="retro"] .kimix-floating-panel');
   });
 
+  it("默认选中态不继承复古左侧标记", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const rootBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const retroBlock = css.match(/\[data-ui-style="retro"\]\s*\{([^}]+)\}/)?.[1] ?? "";
+
+    expect(rootBlock).toMatch(/--ui-selection-shadow:\s*none;/);
+    expect(rootBlock).not.toMatch(/--ui-selection-shadow:\s*inset/);
+    expect(retroBlock).toMatch(/--ui-selection-shadow:\s*inset 2px 0 0 var\(--accent-primary\)/);
+  });
+
   it("选中项目或会话悬停时仍由选中态令牌接管左侧标记", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 

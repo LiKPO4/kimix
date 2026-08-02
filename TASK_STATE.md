@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：默认模式移除复古选中左条（v2.20.111）
+
+- 根因：v2.20.95 建立全局界面风格合约时，基础 `:root` 将 `--ui-selection-shadow` 初始化为蓝色 inset 左条；Modern 显式覆盖为 `none`，Retro 单独增强，因此默认模式反而一直继承了本应属于复古的标记。
+- 修复：基础 selection shadow 恢复为 `none`；项目、会话、设置等默认选中态继续保留主题背景，不再显示左条。Retro 仍由自己的 preset token 提供左条，Modern 保持无左条。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CRMnqXlI.css`、JS `assets/index-D22joVgt.js`）、OKF strict/audit 校验（13 concepts、389 links）通过；实际观感等待用户在 v2.20.111 切换默认/复古截图验收。
+
 ## 2026-08-02 修正：现代用户消息改为同源单次混合（v2.20.110）
 
 - 连续两次小幅加权仍未解决用户气泡过浅。v2.20.109 截图取样：工作画布亮度约 254、用户气泡约 247、信息气泡约 242；用户气泡与画布只差约 7 级。

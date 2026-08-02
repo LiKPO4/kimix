@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Retro selection markers no longer leak through the default contract (v2.20.111)**: the global `--ui-selection-shadow` fallback is now neutral. Modern remains neutral and Retro alone owns the inset accent strip for selected vertical navigation rows. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Modern user-message contrast is calibrated from direct palette weights (v2.20.110)**: screenshot sampling showed that nested mixing reduced the user bubble to an effective 30% hover contribution and only about seven luminance levels of workspace separation. Metadata/code and user surfaces now mix the same palette primitives directly, with an explicit lower user hover weight that stays quieter without disappearing. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Modern message neutrals have a stable two-level hierarchy (v2.20.108)**: neutral usage/model pills and Assistant inline-code shadows now share one lighter theme-derived surface. User prompts derive a second time toward elevated, guaranteeing they remain quieter than both instead of relying on unrelated `surface-active` and `surface-hover` values that can reverse across palettes. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
