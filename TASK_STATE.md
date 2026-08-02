@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：会话侧栏次级按钮静止态过重（v2.20.128）
+
+- 根因：v2.20.123 把侧栏 `.kimix-icon-text-button` 静止态套上 compound 浮雕；Git「详情/拉取/推送/图谱/刷新」又常驻 `bg-accent-primary-light`/`bg-surface-base`，默认就读成 hover。
+- 修复：Git 矩阵去掉常驻底色，仅保留文字色与 hover 底；Retro 侧栏次级按钮改为静止透明、hover/active 才给 border+inset；`.bg-accent-primary` 主按钮不套该皮。
+- 验证：uiStyles 17 项通过；OKF strict 通过。实机视觉待用户在 v2.20.128 截图确认。
+
 ## 2026-08-02 功能：子代理模型同步覆盖 Kimi Code Web 与 Swarm（v2.20.127）
 
 - 根因：Kimix 原先只写 `[secondary_model]`，并只给自管 Server 注入 `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1`；外部启动的 `kimi web` 不继承该环境，配置会被忽略。Kimi Code 0.31.1 已支持持久化 `[experimental] secondary-model = true` 和通过 `POST /api/v1/config` 热更新；最新版还通过 `/api/v1/meta.experimental_flags` 暴露有效状态。

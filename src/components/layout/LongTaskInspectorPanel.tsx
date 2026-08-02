@@ -1962,7 +1962,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
                     onClick={openGitDetails}
-                    className="kimix-icon-text-button is-compact justify-center bg-accent-primary-light text-accent-primary hover:bg-accent-primary-light/70 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button is-compact justify-center text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <ListChecks size={14} />
                     <span>详情</span>
@@ -1971,7 +1971,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
                     onClick={() => void pullGit()}
-                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button is-compact justify-center text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {gitBusy === "pull" ? <Loader2 size={14} className="animate-spin" /> : <ArrowDownToLine size={14} />}
                     <span>拉取</span>
@@ -1980,7 +1980,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
                     onClick={() => void pushGit()}
-                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button is-compact justify-center text-text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
                     style={{ gridColumn: width < 340 ? "1 / -1" : undefined }}
                   >
                     {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
@@ -1992,7 +1992,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit}
                     onClick={openGitGraph}
-                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button is-compact justify-center text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <GitCommitHorizontal size={14} />
                     <span>图谱</span>
@@ -2001,7 +2001,7 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
                     onClick={() => void refreshGitInfo()}
-                    className="kimix-icon-text-button is-compact justify-center bg-surface-base text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-icon-text-button is-compact justify-center text-accent-primary hover:bg-accent-primary-light disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     <span>刷新</span>

@@ -717,17 +717,24 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-/* 侧栏里的密集操作矩阵需要静止态可辨识，复用 compound 合约形成 Platinum 小控件。 */
-[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button,
+/* 侧栏密集操作矩阵：静止扁平（与全局 control 一致），悬停/按压才给 Platinum 触感；主色实心按钮不套 compound。 */
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary),
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-inspector-drag-handle {
-  border: var(--ui-compound-border);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background-image: var(--ui-compound-background-image);
-  box-shadow: var(--ui-compound-shadow);
+  background-image: none;
+  box-shadow: none;
   transition-property: background-color, border-color, color, box-shadow, opacity, scale;
 }
 
-[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:active:not(:disabled),
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary):hover:not(:disabled),
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inspector-drag-handle:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button:not(.bg-accent-primary):active:not(:disabled),
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-inspector-drag-handle:active:not(:disabled) {
   box-shadow: var(--ui-control-active-shadow);
 }
