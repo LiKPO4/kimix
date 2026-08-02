@@ -7486,7 +7486,7 @@ const SettingsSchema = z.object({
     ["warm-paper", "neutral-gray", "soft-green", "warm-orange", "custom", "kimi"].includes(value) ||
     /^kimi:[^:]+/.test(value)
   ).optional(),
-  uiStyle: z.enum(["default", "modern", "retro"]).optional(),
+  uiStyle: z.enum(["default", "modern", "retro", "nostalgia"]).optional(),
   customThemePalette: ThemePaletteColorsSchema.optional(),
   kimiThemePalette: KimiThemePaletteSchema.optional(),
   kimiThemePalettes: z.array(z.object({

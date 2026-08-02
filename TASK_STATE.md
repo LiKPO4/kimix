@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：怀旧风格可保存 + 风格网格一行三列（v2.20.148）
+
+- 根因：IPC `uiStyle` zod 与 settingsService 白名单仍是 default/modern/retro，选 nostalgia 触发 Invalid settings data。
+- 修复：主进程/加载校验/ipc 类型放行 nostalgia；外观风格网格恢复 repeat(3)。
+- 验证：结构抽查。实机待 v2.20.148 切换怀旧/复古保存。
+
 ## 2026-08-02 修复：顶栏侧栏按钮与导航键同尺寸（v2.20.147）
 
 - 根因：侧栏折叠键写死 40×40，后退/前进为 h-8 w-8（32）。

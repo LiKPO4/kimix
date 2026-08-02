@@ -131,7 +131,7 @@ export function loadSettings(): AppSettings {
     if ((settings.themePalette as string) === "kimi") {
       settings.themePalette = settings.kimiThemePalettes[0]?.id ? `kimi:${settings.kimiThemePalettes[0].id}` : "warm-paper";
     }
-    if (!["default", "modern", "retro"].includes(settings.uiStyle)) {
+    if (!["default", "modern", "retro", "nostalgia"].includes(settings.uiStyle)) {
       settings.uiStyle = "default";
     }
     if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {

@@ -1489,7 +1489,7 @@ export type AppSettings = {
   defaultPermissionMode: "manual" | "auto" | "yolo";
   theme: "dark" | "light" | "system";
   themePalette: "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
-  uiStyle: "default" | "modern" | "retro";
+  uiStyle: "default" | "modern" | "retro" | "nostalgia";
   customThemePalette: {
     primary: string;
     surface: string;
