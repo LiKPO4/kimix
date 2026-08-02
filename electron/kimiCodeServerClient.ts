@@ -84,6 +84,12 @@ export type ServerSession = {
   usage?: Record<string, unknown>;
 };
 
+export type ServerMeta = {
+  server_id?: string;
+  server_version?: string;
+  experimental_flags?: Record<string, boolean>;
+};
+
 export type ServerWorkspace = {
   id: string;
   root: string;
@@ -470,6 +476,7 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
     defaultProvider: "default_provider",
     defaultModel: "default_model",
     defaultThinking: "default_thinking",
+    secondaryModel: "secondary_model",
   };
   const providerKeys: Record<string, string> = {
     apiKey: "api_key",
@@ -504,6 +511,9 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
           ...(record.overrides === undefined ? {} : { overrides: rename(record.overrides, modelKeys) }),
         }];
       }))];
+    }
+    if (key === "secondaryModel") {
+      return [topLevelKeys[key], rename(value, modelKeys)];
     }
     return [topLevelKeys[key] ?? key, value];
   }));
@@ -1179,6 +1189,10 @@ export class KimiCodeServerClient {
 
   getRedactedConfig(): Promise<Record<string, unknown>> {
     return this.request("/api/v1/config");
+  }
+
+  getMeta(): Promise<ServerMeta> {
+    return this.request("/api/v1/meta");
   }
 
   setConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>> {

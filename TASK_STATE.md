@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 功能：子代理模型同步覆盖 Kimi Code Web 与 Swarm（v2.20.127）
+
+- 根因：Kimix 原先只写 `[secondary_model]`，并只给自管 Server 注入 `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1`；外部启动的 `kimi web` 不继承该环境，配置会被忽略。Kimi Code 0.31.1 已支持持久化 `[experimental] secondary-model = true` 和通过 `POST /api/v1/config` 热更新；最新版还通过 `/api/v1/meta.experimental_flags` 暴露有效状态。
+- 修复：设置子代理模型时同时写入 `secondary_model` 与 `experimental`，活动 Web 走官方 Config API 立即生效并回读确认；支持新版 Meta 字段时再校验有效状态，早期 0.31.1 缺该字段时兼容。TOML 作为旧版回退且保留其他实验项。该配置同时作用于后续 Agent 与 AgentSwarm 新建子代理，恢复中的子代理仍保留原模型。侧栏名称同步调整为“子 Agent / Swarm 模型”。
+- 验证：定向 3 文件 39 项、全量 155 文件 1480 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-G0mJAJkX.js`）、OKF strict（13 concepts、403 links）与 180 天审计通过；对本机 Kimi Web `0.31.1` 的只读探测确认 Config API 已暴露 `experimental`/`secondary_model`，该早期构建尚未暴露最新版 `meta.experimental_flags`，兼容回读路径覆盖此边界。
+
 ## 2026-08-02 优化：精简上传媒体菜单项（v2.20.126）
 
 - 调整：“上传图片或视频”按钮名已能完整表达用途，移除重复的“视频将直接作为多模态内容发送”副标题；文本改为单行截断，按钮最小高度从 52px 收敛到与相邻菜单项一致的 48px。上传逻辑、图标、禁用态和点击热区不变。

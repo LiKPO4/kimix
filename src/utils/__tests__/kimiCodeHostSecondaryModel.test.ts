@@ -51,6 +51,8 @@ describe("secondary_model 保存写前校验", () => {
     expect(next).toContain("[secondary_model]");
     expect(next).toContain(`model = "${ALIAS}"`);
     expect(next).toContain(`default_effort = "high"`);
+    expect(next).toContain("[experimental]");
+    expect(next).toContain("secondary-model = true");
     // 既有 models 段保持不动
     expect(next).toContain(`[models."${ALIAS}"]`);
     expect(next).toContain(`support_efforts = ["low", "medium", "high"]`);
@@ -69,5 +71,38 @@ describe("secondary_model 保存写前校验", () => {
     expect(next).toContain("[secondary_model]");
     expect(next).toContain(`model = "${ALIAS}"`);
     expect(next).not.toContain("default_effort");
+  });
+
+  it("开启 secondary-model 实验时保留其他实验开关", () => {
+    const next = applySecondaryModelConfigToml([
+      CONFIG_WITHOUT_EFFORTS.trimEnd(),
+      "",
+      "[experimental]",
+      "tool-select = true",
+      "secondary-model = false",
+      "",
+    ].join("\n"), ALIAS, "high");
+
+    expect(next).toContain("tool-select = true");
+    expect(next.match(/secondary-model = true/g)).toHaveLength(1);
+    expect(next).not.toContain("secondary-model = false");
+  });
+
+  it("清除模型时不擅自关闭独立配置的实验开关", () => {
+    const next = applySecondaryModelConfigToml([
+      CONFIG_WITHOUT_EFFORTS.trimEnd(),
+      "",
+      "[experimental]",
+      "secondary-model = true",
+      "",
+      "[secondary_model]",
+      `model = "${ALIAS}"`,
+      "default_effort = \"high\"",
+      "",
+    ].join("\n"), null, null);
+
+    expect(next).not.toContain("[secondary_model]");
+    expect(next).toContain("[experimental]");
+    expect(next).toContain("secondary-model = true");
   });
 });

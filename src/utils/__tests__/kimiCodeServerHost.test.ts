@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildManagedKimiServerArgs,
+  detectSecondaryModelExperimentInConfigToml,
   detectSecondaryModelInConfigToml,
   inspectKimiCodeServerContract,
   isKimiCodeServerExperimentEnabled,
@@ -22,7 +23,7 @@ import {
   shouldApplyServerModelRefresh,
 } from "../../../electron/kimiCodeHost";
 import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
-import { isKimiCodeSessionMissingError } from "../../../electron/kimiCodeServerClient";
+import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
@@ -110,13 +111,24 @@ describe("kimiCodeServerHost", () => {
       "/api/v1/workspaces",
     ].map((item) => [item, {}]));
     const result = inspectKimiCodeServerContract(
-      { server_id: "server-1", server_version: "0.0.0" },
+      { server_id: "server-1", server_version: "0.0.0", experimental_flags: { "secondary-model": true } },
       { info: { version: "0.0.0" }, paths },
       { info: { version: "0.0.0" }, channels: { kimiCodeWebSocket: {} } },
     );
     expect(result.serverVersion).toBe("0.0.0");
     expect(result.websocketChannel).toBe(true);
+    expect(result.experimentalFlags?.["secondary-model"]).toBe(true);
     expect(Object.values(result.requiredPaths).every(Boolean)).toBe(true);
+  });
+
+  it("maps secondary-model config to the official Server wire shape", () => {
+    expect(toServerConfigPatch({
+      secondaryModel: { model: "deepseek/model", defaultEffort: "high" },
+      experimental: { "secondary-model": true },
+    })).toEqual({
+      secondary_model: { model: "deepseek/model", default_effort: "high" },
+      experimental: { "secondary-model": true },
+    });
   });
 
   it("marks runtime failures as SDK fallback", () => {
@@ -193,6 +205,17 @@ describe("kimiCodeServerHost", () => {
     expect(detectSecondaryModelInConfigToml('[secondary_model]\ndefault_effort = "low"\n')).toBeUndefined();
     // 下一段的 model 不应被误读进 secondary_model 段。
     expect(detectSecondaryModelInConfigToml('[secondary_model]\n\n[models.kimi]\nmodel = "kimi-for-coding"\n')).toBeUndefined();
+  });
+
+  it("detects a persisted secondary-model experimental flag", () => {
+    expect(detectSecondaryModelExperimentInConfigToml([
+      "[experimental]",
+      "tool-select = true",
+      "secondary-model = true",
+      "",
+    ].join("\n"))).toBe(true);
+    expect(detectSecondaryModelExperimentInConfigToml("[experimental]\nsecondary-model = false\n")).toBe(false);
+    expect(detectSecondaryModelExperimentInConfigToml("[experimental]\ntool-select = true\n")).toBeUndefined();
   });
 
   it("clears the external-server secondary model hint when leaving the attached state", () => {

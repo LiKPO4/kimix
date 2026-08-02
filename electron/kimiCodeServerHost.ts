@@ -27,6 +27,7 @@ export type KimiCodeServerCapabilities = {
   openapiVersion: string;
   asyncapiVersion: string;
   websocketChannel: boolean;
+  experimentalFlags?: Record<string, boolean>;
   requiredPaths: Record<(typeof REQUIRED_PATHS)[number], boolean>;
 };
 
@@ -39,9 +40,8 @@ export type KimiCodeServerHostStatus = {
   capabilities?: KimiCodeServerCapabilities;
   error?: string;
   /**
-   * 仅在 attach 外部 Server（managed=false）且用户 config.toml 配了 [secondary_model]
-   * 时设置：外部进程未注入 KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1，官方 0.29.1 的
-   * secondary_model 实验特性可能未开启，子代理模型配置可能不生效。managed 时不设置。
+   * 仅在 attach 外部 Server（managed=false）、用户配置了 [secondary_model]，且 Server
+   * 明确报告 secondary-model 实验未开启（旧版未报告状态时也保守提示）时设置。
    */
   secondaryModelExternalServer?: { model: string };
 };
@@ -57,7 +57,7 @@ export function isKimiCodeServerExperimentEnabled(
 }
 
 export function inspectKimiCodeServerContract(
-  meta: { server_id?: unknown; server_version?: unknown },
+  meta: { server_id?: unknown; server_version?: unknown; experimental_flags?: unknown },
   openapi: { info?: { version?: unknown }; paths?: Record<string, unknown> },
   asyncapi: { info?: { version?: unknown }; channels?: Record<string, unknown> },
 ): KimiCodeServerCapabilities {
@@ -71,6 +71,9 @@ export function inspectKimiCodeServerContract(
     openapiVersion: typeof openapi.info?.version === "string" ? openapi.info.version : "unknown",
     asyncapiVersion: typeof asyncapi.info?.version === "string" ? asyncapi.info.version : "unknown",
     websocketChannel: Object.hasOwn(asyncapi.channels ?? {}, "kimiCodeWebSocket"),
+    experimentalFlags: meta.experimental_flags && typeof meta.experimental_flags === "object" && !Array.isArray(meta.experimental_flags)
+      ? Object.fromEntries(Object.entries(meta.experimental_flags).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"))
+      : undefined,
     requiredPaths,
   };
 }
@@ -102,10 +105,26 @@ export function detectSecondaryModelInConfigToml(raw: string): { model: string }
   return model ? { model } : undefined;
 }
 
-/** attach 外部 Server 时读取用户 config.toml，判断子代理模型配置是否存在。 */
-function readSecondaryModelExternalServerHint(): { model: string } | undefined {
+export function detectSecondaryModelExperimentInConfigToml(raw: string): boolean | undefined {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  const matches = Array.from(raw.matchAll(sectionPattern));
+  const index = matches.findIndex((match) => match[1].trim() === "experimental");
+  if (index < 0) return undefined;
+  const body = raw.slice((matches[index].index ?? 0) + matches[index][0].length, matches[index + 1]?.index ?? raw.length);
+  const value = body.match(/^\s*secondary-model\s*=\s*(true|false)\s*$/m)?.[1];
+  return value === undefined ? undefined : value === "true";
+}
+
+/** attach 外部 Server 时读取用户 config.toml，判断子代理模型是否缺少实验开关。 */
+function secondaryModelExternalServerHint(capabilities: KimiCodeServerCapabilities): { model: string } | undefined {
   try {
-    return detectSecondaryModelInConfigToml(fs.readFileSync(path.join(os.homedir(), ".kimi-code", "config.toml"), "utf-8"));
+    const raw = fs.readFileSync(path.join(os.homedir(), ".kimi-code", "config.toml"), "utf-8");
+    const model = detectSecondaryModelInConfigToml(raw);
+    if (!model) return undefined;
+    const effectiveFlag = capabilities.experimentalFlags?.["secondary-model"];
+    if (effectiveFlag === true) return undefined;
+    if (effectiveFlag === undefined && detectSecondaryModelExperimentInConfigToml(raw) === true) return undefined;
+    return model;
   } catch {
     return undefined;
   }
@@ -398,7 +417,7 @@ export class KimiCodeServerHost {
         state: "attached",
         managed: false,
         capabilities,
-        secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
+        secondaryModelExternalServer: secondaryModelExternalServerHint(capabilities),
       };
       return this.getStatus();
     } catch {
@@ -419,7 +438,7 @@ export class KimiCodeServerHost {
           endpoint,
           capabilities,
           error: undefined,
-          secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
+          secondaryModelExternalServer: secondaryModelExternalServerHint(capabilities),
         };
         return this.getStatus();
       } catch {
@@ -453,7 +472,7 @@ export class KimiCodeServerHost {
           endpoint,
           capabilities,
           error: undefined,
-          secondaryModelExternalServer: readSecondaryModelExternalServerHint(),
+          secondaryModelExternalServer: secondaryModelExternalServerHint(capabilities),
         };
         return this.getStatus();
       } catch {
@@ -561,10 +580,23 @@ export class KimiCodeServerHost {
     };
   }
 
+  async refreshCapabilities(): Promise<KimiCodeServerCapabilities | undefined> {
+    if (!this.isReady()) return undefined;
+    const capabilities = await this.probe(this.status.endpoint);
+    this.status = {
+      ...this.status,
+      capabilities,
+      secondaryModelExternalServer: this.status.managed
+        ? undefined
+        : secondaryModelExternalServerHint(capabilities),
+    };
+    return capabilities;
+  }
+
   private async probe(endpoint = this.status.endpoint): Promise<KimiCodeServerCapabilities> {
     const [health, meta, openapi, asyncapi] = await Promise.all([
       this.fetchEnvelope<{ ok?: boolean }>("/api/v1/healthz", undefined, endpoint),
-      this.fetchEnvelope<{ server_id?: unknown; server_version?: unknown }>("/api/v1/meta", undefined, endpoint),
+      this.fetchEnvelope<{ server_id?: unknown; server_version?: unknown; experimental_flags?: unknown }>("/api/v1/meta", undefined, endpoint),
       this.fetchJson<{ info?: { version?: unknown }; paths?: Record<string, unknown> }>("/openapi.json", undefined, endpoint),
       this.fetchJson<{ info?: { version?: unknown }; channels?: Record<string, unknown> }>("/asyncapi.json", undefined, endpoint),
     ]);

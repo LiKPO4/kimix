@@ -1107,7 +1107,7 @@ export function LongTaskInspectorPanel({
     const modelAlias = subagentModelDraft.trim() || null;
     const thinkingEffort = subagentThinkingDraft.trim() || null;
     if (modelAlias && !subagentModelOptions.some((option) => option.id === modelAlias)) {
-      showToast("所选子 Agent 模型已不可用，请重新选择。");
+      showToast("所选子 Agent / Swarm 模型已不可用，请重新选择。");
       return;
     }
     setSubagentSaving(true);
@@ -1120,12 +1120,12 @@ export function LongTaskInspectorPanel({
         setSubagentModelConfig(response.data);
         setSubagentModelDraft(response.data.secondaryModel?.model ?? "");
         setSubagentThinkingDraft(response.data.secondaryModel?.defaultEffort ?? "");
-        showToast(modelAlias ? "子 Agent 配置已生效。" : "已清除子 Agent 配置，子代理将跟随主 Agent。");
+        showToast(response.data.message);
       } else {
-        showToast(`保存子 Agent 配置失败：${response.error}`);
+        showToast(`保存子 Agent / Swarm 配置失败：${response.error}`);
       }
     } catch (error) {
-      showToast(`保存子 Agent 配置失败：${error instanceof Error ? error.message : String(error)}`);
+      showToast(`保存子 Agent / Swarm 配置失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSubagentSaving(false);
     }
@@ -1858,7 +1858,7 @@ export function LongTaskInspectorPanel({
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <Bot size={15} className="shrink-0 text-accent-primary" />
-                  <div className="truncate text-[13px] font-medium leading-5 text-text-muted">子 Agent 模型</div>
+                  <div className="truncate text-[13px] font-medium leading-5 text-text-muted">子 Agent / Swarm 模型</div>
                 </div>
                 <span
                   className={`shrink-0 rounded-full text-[11.5px] leading-5 ${subagentModelDraft ? "bg-surface-base text-text-muted" : "bg-surface-base text-text-muted"}`}
@@ -1866,12 +1866,12 @@ export function LongTaskInspectorPanel({
                 >
                   {subagentModelDraft ? "已指定" : "跟随主 Agent"}
                 </span>
-                {rightCardDragHandle("subagent", "子 Agent 模型")}
+                {rightCardDragHandle("subagent", "子 Agent / Swarm 模型")}
               </div>
               <div className="flex flex-col" style={{ gap: 14, marginTop: 14 }}>
 
                 <label className="block">
-                  <span className="block text-[12px] leading-5 text-text-muted" style={{ marginBottom: 8 }}>新子 Agent 模型</span>
+                  <span className="block text-[12px] leading-5 text-text-muted" style={{ marginBottom: 8 }}>新子 Agent / Swarm 模型</span>
                   <select
                     value={subagentModelDraft}
                     onChange={(event) => {

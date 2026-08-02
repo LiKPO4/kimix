@@ -1652,12 +1652,43 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
   const defaultEffort = config.defaultEffort || null;
   // 写前校验：模型声明了非空 support_efforts 而请求档位不在其中时，这里先抛错，
   // backup 与写盘都不会执行，config.toml 保持原样（官方运行时会静默丢弃非法档位）。
+  // Always run the pure writer first: it validates effort declarations and is
+  // also the compatibility fallback for older SDK/Server builds.
   const next = kimiCodeHost.applySecondaryModelConfigToml(raw, model, defaultEffort);
-  backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, next, "utf-8");
-  await reloadIdleKimiCodeSessionsAfterConfigChange();
+  let configResponseVerified = false;
+  if (model) {
+    try {
+      const updated = await kimiCodeHost.setConfig({
+        secondaryModel: {
+          model,
+          ...(defaultEffort ? { defaultEffort } : {}),
+        },
+        experimental: { "secondary-model": true },
+      });
+      configResponseVerified = updated.secondaryModel?.model === model
+        && updated.experimental?.["secondary-model"] === true;
+    } catch (error) {
+      console.warn("[kimi-code] secondary model Config API failed, falling back to TOML writer:", error);
+      backupFileIfExists(configPath);
+      fs.writeFileSync(configPath, next, "utf-8");
+    }
+  } else {
+    backupFileIfExists(configPath);
+    fs.writeFileSync(configPath, next, "utf-8");
+  }
+  const capabilities = await kimiCodeServerHost.refreshCapabilities().catch((error) => {
+    console.warn("[kimi-code] failed to verify secondary-model experimental flag:", error);
+    return undefined;
+  });
+  const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
   const summary = await readKimiModelConfigWithSdk();
-  return { ...summary, message: model ? "已设置子代理默认模型" : "已清除子代理默认模型" };
+  const flagVerified = capabilities?.experimentalFlags?.["secondary-model"] === true || configResponseVerified;
+  return {
+    ...summary,
+    message: model
+      ? `已同步子 Agent 与 Swarm 默认模型到 Kimi Code Web${flagVerified ? "" : "（当前 Web 未提供实验状态确认）"}${buildConfigReloadSuffix(reloadResult)}`
+      : `已清除子 Agent 与 Swarm 默认模型${buildConfigReloadSuffix(reloadResult)}`,
+  };
 }
 
 function saveOpenAiProviderConfig(input: unknown) {

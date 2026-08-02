@@ -169,7 +169,7 @@ describe("LongTaskInspectorPanel 会话级后台任务卡", () => {
     expect(subagentCard?.textContent).toContain("输出");
     expect(subagentCard?.textContent).not.toContain("停止");
     // 模型路由配置卡改名，避免与「子 Agent」任务卡同名
-    expect(cardSection(container, "subagent")?.textContent).toContain("子 Agent 模型");
+    expect(cardSection(container, "subagent")?.textContent).toContain("子 Agent / Swarm 模型");
   });
 
   it("普通会话模式没有任务时自动隐藏两个任务卡", async () => {

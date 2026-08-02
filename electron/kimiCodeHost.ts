@@ -8,6 +8,7 @@ import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, re
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
+import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
 
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
@@ -416,6 +417,11 @@ export type KimiCodeConfig = {
   defaultProvider?: string;
   defaultModel?: string;
   models?: Record<string, KimiCodeModelAlias>;
+  secondaryModel?: {
+    model?: string;
+    defaultEffort?: string;
+  };
+  experimental?: Record<string, boolean>;
   thinking?: {
     mode?: "auto" | "on" | "off";
     enabled?: boolean;
@@ -538,6 +544,12 @@ export function applySecondaryModelConfigToml(raw: string, model: string | null,
     if (defaultEffort) lines.push(`default_effort = "${escapeTomlString(defaultEffort)}"`);
     const base = next.trimEnd();
     next = `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
+  }
+  // Kimi Code 0.31+ allows experimental flags to be persisted. This makes the
+  // same secondary-model recipe effective in an externally launched `kimi web`
+  // process, which does not inherit Kimix's managed-process environment.
+  if (model) {
+    next = setTomlSectionValuePreservingLayout(next, "experimental", "secondary-model", "true");
   }
   return next;
 }
