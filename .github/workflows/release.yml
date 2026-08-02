@@ -15,6 +15,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Validate release notes
+        run: |
+          NOTES_FILE="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "::error::Missing required release notes: $NOTES_FILE"
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -109,7 +117,8 @@ jobs:
         run: |
           NOTES_FILE="docs/release-notes/${GITHUB_REF_NAME}.md"
           if [ ! -f "$NOTES_FILE" ]; then
-            NOTES_FILE="RELEASE_NOTES.md"
+            echo "::error::Missing required release notes: $NOTES_FILE"
+            exit 1
           fi
           echo "Using release notes: $NOTES_FILE"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file "$NOTES_FILE"

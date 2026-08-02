@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-07-23T19:05:00+08:00"
+timestamp: "2026-08-02T12:40:45+08:00"
 ---
 
 # Release Process
@@ -13,7 +13,7 @@ Kimix release artifacts are produced by GitHub Actions, not by manual local pack
 
 # Preconditions
 
-1. Synchronize the application version in `package.json`, `src/components/layout/Sidebar.tsx`, and `src/components/settings/SettingsPanel.tsx` when a product release is being prepared.
+1. Set the application version in `package.json`, the single version source injected into the renderer at build time.
 2. Add `docs/release-notes/vX.Y.Z.md` with content specific to that version, written for end users: user-visible changes and known limitations only, scoped from the last actually published release (a withdrawn version folds into the next one). Omit developer-facing sections such as verification evidence and suggested retest steps.
 3. Run `pnpm typecheck`, tests, production build, `pnpm knowledge:validate`, and `git diff --check`.
 4. Commit and push the reviewed code to `master`.
@@ -26,8 +26,8 @@ After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `p
 
 1. Create tag `vX.Y.Z` on the intended commit.
 2. Push the tag.
-3. Let `.github/workflows/release.yml` build Windows, macOS, and Linux artifacts.
-4. Confirm the release job selected `docs/release-notes/vX.Y.Z.md` instead of the root fallback.
+3. Let `.github/workflows/release.yml` validate the tag-specific notes before building Windows, macOS, and Linux artifacts.
+4. Confirm the release job found `docs/release-notes/vX.Y.Z.md`; the workflow must fail before publishing when the tag-specific file is missing and must never fall back to `RELEASE_NOTES.md`.
 5. Confirm all platform jobs and the final published release succeeded.
 
 # Development Guidelines
@@ -47,6 +47,7 @@ Best-effort cleanup operations (`cancelKimiCodeTurn`, `closeKimiCodeSession`) ma
 * Do not run a local distribution build and upload its artifacts over CI output.
 * Do not tag without version-specific release notes.
 * Do not reuse stale release notes from a previous version.
+* Do not add one release-notes file for every untagged internal patch. The next actual release gets one aggregate file covering changes since the previous published tag.
 
 # Related Knowledge
 

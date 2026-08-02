@@ -60,6 +60,33 @@ describe("composerDraft", () => {
     expect(readComposerDraft(key)).toEqual({ content: "", attachments: [] });
   });
 
+  it("preserves parallel window slots instead of overwriting another window draft", () => {
+    const key = resolveComposerDraftKey("session-parallel", "project-1")!;
+    const encodedKey = encodeURIComponent(key);
+    const otherWindowKey = `kimix_composer_draft_v2:${encodedKey}:other-window`;
+    localStorage.setItem(`kimix_composer_draft_v2:${encodedKey}:broken-window`, "not-json");
+    localStorage.setItem(otherWindowKey, JSON.stringify({
+      content: "另一个窗口尚未发送的内容",
+      updatedAt: Date.now() + 10_000,
+      writerId: "other-window",
+    }));
+
+    expect(readComposerDraft(key).content).toBe("另一个窗口尚未发送的内容");
+
+    writeComposerDraft(key, { content: "当前窗口的草稿", attachments: [] });
+
+    expect(localStorage.getItem(otherWindowKey)).toContain("另一个窗口尚未发送的内容");
+    expect(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((item) => item?.startsWith(`kimix_composer_draft_v2:${encodedKey}:`))).toHaveLength(3);
+
+    clearComposerDraftMemoryCache();
+    expect(readComposerDraft(key).content).toBe("当前窗口的草稿");
+    clearComposerDraft(key);
+    clearComposerDraftMemoryCache();
+    expect(readComposerDraft(key).content).toBe("");
+    expect(localStorage.getItem(otherWindowKey)).toContain("另一个窗口尚未发送的内容");
+  });
+
   it("keeps the draft contract wired across workspace unmounts and conversation switches", () => {
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
     const appShell = readFileSync(resolve(process.cwd(), "src/components/layout/AppShell.tsx"), "utf8");
