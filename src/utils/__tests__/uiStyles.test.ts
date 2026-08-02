@@ -176,6 +176,7 @@ describe("UI_STYLES", () => {
     expect(editDialog).toContain("kimix-room-primary-action");
     expect(agentPicker).toContain("kimix-room-trigger");
     expect(agentPicker).toContain("kimix-room-choice");
+    expect(agentPicker).toMatch(/h-7 w-7 self-center items-center justify-center[\s\S]*?<Bot size=\{14\}/);
     expect(contextPicker).toContain("kimix-room-trigger");
     expect(contextPicker).toContain("kimix-room-choice");
   });

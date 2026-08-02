@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：Agent 选择项机器人图标垂直居中（v2.20.125）
+
+- 根因：接收者弹层的 Agent 选择项使用 48px 最小行高和三列 Grid，文字列与勾选列已有 `self-center`，但 28px 机器人图标容器沿用 Grid 默认拉伸单元格的起始位置，视觉上贴近顶部。
+- 修复：为机器人图标容器补充 `self-center`，只校正垂直位置，不改变图标尺寸、行高、列宽、点击热区或选择逻辑；增加源码回归断言锁定对齐约束。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-EtzmU645.js`）、OKF strict（13 concepts、402 links）通过；实机视觉验收等待用户在 v2.20.125 截图确认。
+
 ## 2026-08-02 修复：Composer 房间触发器恢复同排层级（v2.20.124）
 
 - 根因：Retro 将 `.kimix-room-trigger` 与弹窗 `.kimix-room-secondary-action` 合并使用 `--ui-compound-*`，使 Composer 底栏的 `Agents` 和正文范围触发器在静止态持续带框、浮雕；它们因此比同排的权限、Swarm、Plan 和思考强度更突出，错误表达成主操作层级。

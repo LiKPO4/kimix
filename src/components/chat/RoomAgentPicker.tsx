@@ -143,7 +143,7 @@ export function RoomAgentPicker({
                     style={{ gridTemplateColumns: "28px minmax(0, 1fr) 18px", gap: 9, minHeight: 48, paddingLeft: 8, paddingRight: 6 }}
                     title={agent.provisioningError || agent.recoveryIssue?.message || agent.lifecycleIssue?.message || `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)]">
+                    <span className="flex h-7 w-7 self-center items-center justify-center rounded-lg bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text-secondary)]">
                       <Bot size={14} />
                     </span>
                     <span className="min-w-0 self-center">
