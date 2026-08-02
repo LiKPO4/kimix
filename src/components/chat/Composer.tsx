@@ -4770,15 +4770,12 @@ export function Composer() {
                           mediaFileInputRef.current?.click();
                         }}
                         className="grid w-full items-center rounded-xl text-left transition-[background-color,scale] duration-150 ease-out hover:bg-[var(--kimix-panel-hover)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
-                        style={{ gridTemplateColumns: "32px minmax(0, 1fr)", gap: 10, minHeight: 52, paddingLeft: 8, paddingRight: 12 }}
+                        style={{ gridTemplateColumns: "32px minmax(0, 1fr)", gap: 10, minHeight: 48, paddingLeft: 8, paddingRight: 12 }}
                       >
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text-secondary)]">
                           <Images size={15} />
                         </span>
-                        <span className="min-w-0">
-                          <span className="block text-[13.5px] font-medium text-[var(--kimix-panel-text)]">上传图片或视频</span>
-                          <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">视频将直接作为多模态内容发送</span>
-                        </span>
+                        <span className="min-w-0 truncate text-[13.5px] font-medium text-[var(--kimix-panel-text)]">上传图片或视频</span>
                       </button>
                     </section>
                     {multiAgentRoomUiAvailable && (
