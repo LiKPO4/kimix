@@ -55,12 +55,12 @@ export function getStatusCardToneClass(event: Extract<TimelineEvent, { type: "st
   // Token/context footers are neutral measurements. This display-side guard
   // also repairs persisted legacy rows whose adjacent runtime notification
   // leaked source/tone into a later usage snapshot.
-  if (hasMetricStatus(event)) return "bg-surface-hover text-text-muted";
+  if (hasMetricStatus(event)) return "kimix-status-surface bg-surface-hover text-text-muted";
   if (event.tone === "info" || event.source === "slash") return "bg-accent-primary-light text-accent-primary";
   if (event.tone === "success") return "bg-accent-success-light text-accent-success";
   if (event.tone === "warning") return "bg-accent-warning-light text-accent-warning";
   if (event.tone === "danger") return "bg-accent-danger-light text-accent-danger";
-  return "bg-surface-hover text-text-muted";
+  return "kimix-status-surface bg-surface-hover text-text-muted";
 }
 
 export const StatusCard = memo(function StatusCard({ event, inline = false, allowModelOnly = false }: StatusCardProps) {

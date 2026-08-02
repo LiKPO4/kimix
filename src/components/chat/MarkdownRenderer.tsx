@@ -508,7 +508,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
         if (!isBlock) {
           return (
             <code
-              className="rounded-md bg-surface-hover font-mono text-[0.9em] text-text-primary"
+              className="kimix-inline-code rounded-md bg-surface-hover font-mono text-[0.9em] text-text-primary"
               style={{
                 marginLeft: 2,
                 marginRight: 2,

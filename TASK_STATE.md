@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 调整：现代消息中性色统一为两级层次（v2.20.108）
+
+- 现状核对：消息信息气泡与 Agent 正文行内代码原本同为 `surface-hover`；用户消息另用 `surface-active/elevated` 混合。三者并非全相同，且不同主题下两套来源可能造成层级反转。
+- 修复：消息信息气泡与行内代码统一消费 `--kimix-modern-message-meta-background`，浅色由 58% hover + elevated 混合；用户消息再由该共享表面向 elevated 淡化，浅色只保留 44% 共享表面。深色对应为 66% 与 50%，保证用户消息始终比前两者淡一级。
+- 实机验收：Windows v2.20.108 同屏确认消息信息气泡与 Agent 行内代码保持同色，用户消息为更浅一级的无描边表面；证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22108/01-modern-message-surface-hierarchy.jpg`。
+- 验证：消息表面定向 3 文件 20 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DwKZO88K.css`、JS `assets/index-BiWjGHSx.js`）、OKF strict/audit 校验（13 concepts、387 links）通过。
+
 ## 2026-08-01 调整：现代用户气泡降低表面色权重（v2.20.107）
 
 - 用户实机反馈 v2.20.106 气泡过深，短消息呈现为突出的灰色按钮，而非 Codex 参考中的轻灰输入层。

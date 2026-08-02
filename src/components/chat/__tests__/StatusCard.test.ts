@@ -47,7 +47,7 @@ describe("getStatusCardToneClass", () => {
       tokenCount: 140,
       source: "runtime",
       tone: "info",
-    })).toBe("bg-surface-hover text-text-muted");
+    })).toBe("kimix-status-surface bg-surface-hover text-text-muted");
     expect(getStatusCardToneClass({
       id: "legacy-success-usage",
       type: "status_update",
@@ -57,6 +57,6 @@ describe("getStatusCardToneClass", () => {
       tokenCount: 113,
       source: "runtime",
       tone: "success",
-    })).toBe("bg-surface-hover text-text-muted");
+    })).toBe("kimix-status-surface bg-surface-hover text-text-muted");
   });
 });

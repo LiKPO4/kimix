@@ -348,7 +348,8 @@
   --kimix-modern-segment-radius: calc(var(--kimix-modern-control-radius) + var(--kimix-modern-segment-gap));
   /* 颜色仍由主题提供；Modern 只把 elevated/base 重新分配为更亮的工作画布。 */
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 96%, var(--surface-base));
-  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-active) 48%, var(--surface-elevated));
+  --kimix-modern-message-meta-background: color-mix(in srgb, var(--surface-hover) 58%, var(--surface-elevated));
+  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--kimix-modern-message-meta-background) 44%, var(--surface-elevated));
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
@@ -414,7 +415,8 @@
 
 [data-theme="dark"][data-ui-style="modern"] {
   --kimix-modern-workspace-background: color-mix(in srgb, var(--surface-elevated) 78%, var(--surface-base));
-  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--surface-active) 62%, var(--surface-elevated));
+  --kimix-modern-message-meta-background: color-mix(in srgb, var(--surface-hover) 66%, var(--surface-elevated));
+  --kimix-modern-user-bubble-background: color-mix(in srgb, var(--kimix-modern-message-meta-background) 50%, var(--surface-elevated));
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 28px rgba(0, 0, 0, 0.22);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(255, 255, 255, 0.085), 0 20px 50px rgba(0, 0, 0, 0.32);
@@ -472,7 +474,13 @@
   outline: none !important;
 }
 
-/* Codex 式用户输入层：用主题表面明度区分画布，不额外制造卡片描边。 */
+/* 消息元信息与正文行内代码共享一层轻灰语义表面。 */
+[data-ui-style="modern"] .kimix-status-surface,
+[data-ui-style="modern"] .markdown-body .kimix-inline-code {
+  background: var(--kimix-modern-message-meta-background);
+}
+
+/* 用户输入再淡一级：可辨识作者归属，但不比元信息与代码阴影更抢眼。 */
 [data-ui-style="modern"] .kimix-user-bubble {
   background: var(--kimix-modern-user-bubble-background);
 }

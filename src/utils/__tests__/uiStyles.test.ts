@@ -41,6 +41,8 @@ describe("UI_STYLES", () => {
 
   it("现代化风格保持颜色主题所有权并建立 Codex 式壳层", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const statusCard = readFileSync(resolve(process.cwd(), "src/components/chat/StatusCard.tsx"), "utf8");
+    const markdownRenderer = readFileSync(resolve(process.cwd(), "src/components/chat/MarkdownRenderer.tsx"), "utf8");
     const styleBlocks = [
       css.match(/\[data-ui-style="modern"\]\s*\{([^}]+)\}/)?.[1] ?? "",
       css.match(/\[data-theme="dark"\]\[data-ui-style="modern"\]\s*\{([^}]+)\}/)?.[1] ?? "",
@@ -51,7 +53,8 @@ describe("UI_STYLES", () => {
     expect(styleBlocks).toMatch(/--ui-radius-lg:\s*12px;/);
     expect(styleBlocks).toMatch(/--kimix-modern-segment-radius:\s*calc\(var\(--kimix-modern-control-radius\) \+ var\(--kimix-modern-segment-gap\)\);/);
     expect(styleBlocks).toMatch(/--kimix-modern-workspace-background:\s*color-mix\(in srgb, var\(--surface-elevated\) 96%, var\(--surface-base\)\);/);
-    expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--surface-active\) 48%, var\(--surface-elevated\)\);/);
+    expect(styleBlocks).toMatch(/--kimix-modern-message-meta-background:\s*color-mix\(in srgb, var\(--surface-hover\) 58%, var\(--surface-elevated\)\);/);
+    expect(styleBlocks).toMatch(/--kimix-modern-user-bubble-background:\s*color-mix\(in srgb, var\(--kimix-modern-message-meta-background\) 44%, var\(--surface-elevated\)\);/);
     expect(styleBlocks).toMatch(/--ui-popup-shadow:\s*var\(--kimix-modern-floating-shadow\);/);
     expect(styleBlocks).toMatch(/--ui-compound-divider-shadow:\s*none;/);
     expect(css).toContain('[data-ui-style="modern"] .kimix-app-shell-main');
@@ -62,6 +65,9 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-workspace-page,\s*\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-user-bubble\s*\{[^}]*background:\s*var\(--kimix-modern-user-bubble-background\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-status-surface,\s*\[data-ui-style="modern"\]\s+\.markdown-body\s+\.kimix-inline-code\s*\{[^}]*background:\s*var\(--kimix-modern-message-meta-background\);/s);
+    expect(statusCard).toContain("kimix-status-surface bg-surface-hover text-text-muted");
+    expect(markdownRenderer).toContain("kimix-inline-code rounded-md bg-surface-hover");
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);[^}]*padding:\s*var\(--kimix-modern-segment-gap\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme\s*\{[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-permissions\s*\{[^}]*border-radius:\s*var\(--kimix-modern-segment-radius\);/s);

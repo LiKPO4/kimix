@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Modern message neutrals have a stable two-level hierarchy (v2.20.108)**: neutral usage/model pills and Assistant inline-code shadows now share one lighter theme-derived surface. User prompts derive a second time toward elevated, guaranteeing they remain quieter than both instead of relying on unrelated `surface-active` and `surface-hover` values that can reverse across palettes. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Modern user-prompt contrast is intentionally quiet (v2.20.107)**: the first Modern bubble mix over-weighted `surface-active`, making short prompts read like disabled buttons. Light mode now keeps elevated as the majority surface and dark mode also reduces the active share, preserving authorship separation without a heavy chip appearance. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Modern user prompts use a theme-derived reading surface (v2.20.106)**: the bright Modern workspace and user bubble no longer collapse into the same white plane. User prompts mix the active palette's active/elevated surfaces for Codex-like authorship contrast while remaining borderless and shadowless; Default, Retro, and source color-theme tokens are unchanged. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
