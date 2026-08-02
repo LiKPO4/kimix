@@ -162,7 +162,9 @@ describe("UI_STYLES", () => {
     const agentPicker = readFileSync(resolve(process.cwd(), "src/components/chat/RoomAgentPicker.tsx"), "utf8");
     const contextPicker = readFileSync(resolve(process.cwd(), "src/components/chat/RoomContextPicker.tsx"), "utf8");
 
-    expect(css).toContain('[data-ui-style="retro"] .kimix-room-trigger');
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-room-trigger\s*\{[^}]*border-radius:\s*var\(--radius-sm\);[^}]*\}/s);
+    expect(css).not.toMatch(/\[data-ui-style="retro"\]\s+\.kimix-room-trigger\s*\{[^}]*(?:--ui-compound-border|--ui-compound-background|--ui-compound-shadow)/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-room-secondary-action\s*\{[^}]*border:\s*var\(--ui-compound-border\);[^}]*box-shadow:\s*var\(--ui-compound-shadow\);/s);
     expect(css).toContain('[data-ui-style="retro"] .kimix-room-choice[aria-pressed="true"]');
     expect(css).toContain('[data-ui-style="retro"] .kimix-room-choice[data-selected="true"]');
     expect(css).toContain('[data-ui-style="retro"] .kimix-room-primary-action');

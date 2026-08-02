@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：Composer 房间触发器恢复同排层级（v2.20.124）
+
+- 根因：Retro 将 `.kimix-room-trigger` 与弹窗 `.kimix-room-secondary-action` 合并使用 `--ui-compound-*`，使 Composer 底栏的 `Agents` 和正文范围触发器在静止态持续带框、浮雕；它们因此比同排的权限、Swarm、Plan 和思考强度更突出，错误表达成主操作层级。
+- 修复：拆分房间触发器与弹窗次级按钮材质。`.kimix-room-trigger` 回到 `--ui-control-*` 基线，Retro 静止态透明，仅在 hover、展开和按压时显示触感；`.kimix-room-secondary-action` 继续保留完整 compound 边界。尺寸、弹层逻辑和 Multi-Agent 行为不变。
+- 边界：同为 Multi-Agent 控件不代表共享同一静止材质；Composer 工具行按同排层级统一，弹窗命令按钮按独立操作层级处理。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-YVEx1elZ.js`）、OKF strict/audit（13 concepts、402 links）通过；实机视觉验收等待用户在 v2.20.124 截图确认。
+
 ## 2026-08-02 修复：会话侧栏内部控件接入界面风格（v2.20.123）
 
 - 根因：v2.20.122 只把会话侧栏 18 张外层分区迁移为 `.kimix-section-card`；Git 操作、长程任务控制等内部按钮仍只使用通用 `.kimix-icon-text-button`，模型选择和 BTW 输入仍由 Tailwind 固定表面拼装。Retro 对普通按钮采用“静止扁平、悬停触感”的全局策略，因此外卡虽已变化，内部密集操作区仍明显扁平。

@@ -1784,7 +1784,10 @@ button.bg-accent-primary:disabled:hover,
   scale: 0.96;
 }
 
-[data-ui-style="retro"] .kimix-room-trigger,
+[data-ui-style="retro"] .kimix-room-trigger {
+  border-radius: var(--radius-sm);
+}
+
 [data-ui-style="retro"] .kimix-room-secondary-action {
   border: var(--ui-compound-border);
   border-radius: var(--radius-sm);
