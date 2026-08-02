@@ -101,14 +101,14 @@ export function EditRoomAgentDialog({
           </div>
 
           <div
-            className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
+            className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
             style={{ marginTop: 16, padding: "10px 12px" }}
           >
             只修改房间内显示身份，不会重置上下文、模型、Provider 或官方会话。
           </div>
 
           {error && (
-            <div className="rounded-xl border border-accent-danger/25 bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px" }}>
+            <div className="rounded-xl bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px" }}>
               {error}
             </div>
           )}

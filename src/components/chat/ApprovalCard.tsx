@@ -242,7 +242,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
         </div>
 
         <div
-          className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+          className="rounded-xl bg-[var(--kimix-panel-bg)]"
           style={{ marginTop: 12, padding: "12px 14px" }}
         >
           <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "start" }}>
@@ -273,7 +273,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
                 {summary.paths.map((path) => (
                   <code
                     key={path}
-                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
+                    className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
                     style={{ padding: "7px 10px" }}
                   >
                     {path}
@@ -294,7 +294,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
               {relatedDiffs.map((diff) => (
                 <div
                   key={diff.path}
-                  className="overflow-hidden rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+                  className="overflow-hidden rounded-xl bg-[var(--kimix-panel-bg)]"
                 >
                   <div className="grid items-center border-b border-[var(--kimix-panel-divider)]" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "9px 12px" }}>
                     <code className="min-w-0 truncate text-xs text-text-secondary">{diff.path}</code>
@@ -335,12 +335,12 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
               <span>Plan 审阅</span>
             </div>
             <div
-              className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]"
+              className="rounded-xl bg-[var(--kimix-panel-bg)]"
               style={{ marginTop: 8, padding: "12px 14px" }}
             >
               {planReview.path && (
                 <code
-                  className="block rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
+                  className="block rounded-lg bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
                   style={{ padding: "7px 10px", marginBottom: 12 }}
                 >
                   {planReview.path}
@@ -354,7 +354,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
                   {planOptions.map((option) => (
                     <div
                       key={option.label}
-                      className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]"
+                      className="rounded-lg bg-[var(--kimix-panel-soft-bg)]"
                       style={{ padding: "9px 11px" }}
                     >
                       <div className="text-sm font-medium text-text-primary">{option.label}</div>
@@ -386,7 +386,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
               </button>
             </div>
             <pre
-              className="text-xs text-text-secondary bg-[var(--kimix-panel-bg)] rounded-xl overflow-x-hidden border border-[var(--kimix-panel-border-soft)] font-mono leading-relaxed"
+              className="text-xs text-text-secondary bg-[var(--kimix-panel-bg)] rounded-xl overflow-x-hidden font-mono leading-relaxed"
               style={{ marginTop: 8, maxHeight: 180, padding: "12px 14px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}
@@ -495,7 +495,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
                 {summary.paths.map((path) => (
                   <code
                     key={`modal-${path}`}
-                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
+                    className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-xs text-text-secondary break-all"
                     style={{ padding: "7px 10px" }}
                   >
                     {path}
@@ -505,7 +505,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
             )}
 
             <pre
-              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] font-mono text-xs leading-relaxed text-text-secondary"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl bg-[var(--kimix-panel-soft-bg)] font-mono text-xs leading-relaxed text-text-secondary"
               style={{ marginTop: 14, padding: "14px 16px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}
             >
               {detailPreview}

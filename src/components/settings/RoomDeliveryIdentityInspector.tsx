@@ -141,12 +141,12 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
         </div>
 
         {!inspection ? (
-          <div className="mt-6 rounded-xl border border-border-subtle bg-surface-base text-[14px] leading-6 text-text-secondary" style={{ padding: "18px 16px" }}>
+          <div className="mt-6 rounded-xl bg-surface-base text-[14px] leading-6 text-text-secondary" style={{ padding: "18px 16px" }}>
             当前会话不是房间会话，或未加载 collaboration 状态。
           </div>
         ) : (
           <>
-            <div className="mt-5 grid gap-3 rounded-xl border border-border-subtle bg-surface-base text-[13px] leading-5 text-text-secondary" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", padding: "14px 16px" }}>
+            <div className="mt-5 grid gap-3 rounded-xl bg-surface-base text-[13px] leading-5 text-text-secondary" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", padding: "14px 16px" }}>
               <div>
                 <div className="text-[11.5px] font-medium uppercase tracking-wide text-text-muted">会话</div>
                 <div className="mt-1 truncate text-text-primary">{inspection.summary.title}</div>
@@ -197,7 +197,7 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
                   visibleDeliveries.map((item) => (
                     <div
                       key={`${item.roomMessageId}-${item.roomAgentId}`}
-                      className="rounded-xl border border-border-subtle bg-surface-base"
+                      className="rounded-xl bg-surface-base"
                       style={{ padding: "14px 16px" }}
                     >
                       <div className="flex items-start justify-between" style={{ gap: 12 }}>
@@ -263,7 +263,7 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-xl border border-border-subtle bg-surface-base text-center text-[13.5px] leading-6 text-text-secondary" style={{ padding: "28px 16px" }}>
+                  <div className="rounded-xl bg-surface-base text-center text-[13.5px] leading-6 text-text-secondary" style={{ padding: "28px 16px" }}>
                     没有可显示的 delivery。
                   </div>
                 )}

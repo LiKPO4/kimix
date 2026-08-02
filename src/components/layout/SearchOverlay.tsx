@@ -513,7 +513,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 )}
               </div>
             )) : (
-              <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
+              <div className="rounded-xl bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
                 {scope === "orphan" ? "没有待找回的 Agent 会话" : "没有找到官方会话"}
               </div>
             )
@@ -538,7 +538,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               {index < 9 && <span className="shrink-0 text-[12px] text-text-muted">Ctrl+{index + 1}</span>}
             </button>
           )) : (
-            <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
+            <div className="rounded-xl bg-surface-base text-center text-[14px] text-text-muted" style={{ padding: 28 }}>
               没有找到匹配内容
             </div>
           )}

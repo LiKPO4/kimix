@@ -1108,7 +1108,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
         </div>
 
         <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: "214px minmax(0, 1fr)", gap: 16 }}>
-          <aside className="kimix-settings-card flex w-[214px] shrink-0 flex-col rounded-xl" style={{ padding: "16px 10px 16px 14px", height: "100%", minHeight: 0 }}>
+          <aside className="flex w-[214px] shrink-0 flex-col rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "16px 10px 16px 14px", height: "100%", minHeight: 0 }}>
             <div className="kimix-stable-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ paddingRight: 4, scrollbarGutter: "stable" }}>
               <section>
               <div className="text-[13px] font-medium text-[var(--kimix-panel-text)]">历史</div>
@@ -1252,7 +1252,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
           <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden" style={{ height: "100%" }}>
             <div className="flex h-full w-full min-w-0 items-center justify-center overflow-hidden">
               <div
-                className="relative rounded-lg border border-border-default shadow-elevated-token"
+                className="relative rounded-lg shadow-elevated-token"
                 style={{
                   width: boardDisplaySize.width,
                   height: boardDisplaySize.height,

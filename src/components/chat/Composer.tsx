@@ -4495,7 +4495,7 @@ export function Composer() {
               {themeImportPreview.items.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[12px] border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]"
+                  className="rounded-[12px] bg-[var(--kimix-panel-soft-bg)]"
                   style={{ padding: 14 }}
                 >
                   <div
@@ -4538,7 +4538,7 @@ export function Composer() {
               ))}
             </div>
           ) : (
-            <div className="rounded-[12px] border border-dashed border-[var(--kimix-panel-border)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: 16 }}>
+            <div className="rounded-[12px] bg-[var(--kimix-panel-soft-bg)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: 16 }}>
               未发现可导入的官方自定义主题 JSON。可先在 Kimi Code 中使用官方 /custom-theme 生成主题文件。
             </div>
           )}

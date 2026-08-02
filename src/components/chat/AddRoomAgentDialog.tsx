@@ -193,7 +193,7 @@ export function AddRoomAgentDialog({
           </div>
 
           <section
-            className="rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]"
+            className="rounded-2xl bg-[var(--kimix-panel-soft-bg)]"
             style={{ marginTop: 16, padding: 16 }}
           >
             <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
@@ -220,7 +220,7 @@ export function AddRoomAgentDialog({
                   <span>正在读取模型目录…</span>
                 </div>
               ) : groups.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
+                <div className="rounded-xl text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
                   {catalogError || "尚未配置可用模型"}
                 </div>
               ) : groups.map((group) => (
@@ -287,7 +287,7 @@ export function AddRoomAgentDialog({
           </section>
 
           {(error || catalogError) && (
-            <div className="rounded-xl border border-accent-danger/25 bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 16, padding: "10px 12px" }}>
+            <div className="rounded-xl bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 16, padding: "10px 12px" }}>
               {error || catalogError}
             </div>
           )}

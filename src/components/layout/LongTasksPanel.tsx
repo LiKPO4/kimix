@@ -345,7 +345,7 @@ export function LongTasksPanel() {
         </div>
 
         <div className="min-h-0 overflow-y-auto" style={{ padding: 28 }}>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
             <div className="min-w-0">
               <div className="text-[14.5px] font-medium leading-5 text-text-primary">项目</div>
               <div className="mt-1 truncate text-[13px] leading-5 text-text-secondary">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
@@ -364,7 +364,7 @@ export function LongTasksPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
+          <div className="rounded-xl bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
             <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-text-primary">
               <MessageSquareText size={16} className="text-text-secondary" />
               <span>创建长程任务</span>
@@ -402,13 +402,13 @@ export function LongTasksPanel() {
           </div>
 
           {error && (
-            <div className="mt-4 rounded-xl border border-accent-warning/30 bg-accent-warning-light text-[13.5px] leading-5 text-accent-warning" style={{ padding: "12px 14px" }}>
+            <div className="mt-4 rounded-xl bg-accent-warning-light text-[13.5px] leading-5 text-accent-warning" style={{ padding: "12px 14px" }}>
               {error}
             </div>
           )}
           {recoverableTask && (
             <div
-              className="rounded-xl border border-accent-warning/30 bg-accent-warning-light text-accent-warning"
+              className="rounded-xl bg-accent-warning-light text-accent-warning"
               style={{ marginTop: 16, padding: "16px 16px 15px" }}
             >
               <div className="grid items-start" style={{ gridTemplateColumns: "auto minmax(0, 1fr)", gap: 12 }}>

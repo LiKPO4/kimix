@@ -821,17 +821,17 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                   选择目录
                 </button>
               </div>
-              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "12px 13px" }}>
+              <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "12px 13px" }}>
                 <div className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">主目录</div>
                 <div className="break-all text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>{project?.path ?? "未选择项目"}</div>
               </div>
-              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
+              <div className="rounded-xl bg-[var(--kimix-panel-bg)]" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
                 <div className="grid items-center" style={{ gap: 10, gridTemplateColumns: "minmax(0, 1fr) auto", marginBottom: 10 }}>
                   <span className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">额外工作目录</span>
                   <span className="inline-flex items-center justify-center rounded-full bg-accent-primary-light text-[12px] leading-none text-accent-primary-dark" style={{ height: 20, minWidth: 20, paddingLeft: 8, paddingRight: 8 }}>{additionalWorkDirs.length}</span>
                 </div>
                 {additionalWorkDirs.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
+                  <div className="rounded-xl text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
                     暂无额外目录。点击“选择目录”添加共享库、相邻仓库或资源目录。
                   </div>
                 ) : (
@@ -919,7 +919,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               )}
               {usageData?.extraUsage && <ExtraUsageSection usage={usageData.extraUsage} />}
               {usageData?.message && (
-                <div className="kimix-soft-card mt-5 rounded-lg text-[12.5px] leading-relaxed" style={{ padding: "13px 12px" }}>
+                <div className="mt-5 rounded-lg bg-surface-base text-[12.5px] leading-relaxed text-[var(--kimix-panel-text-secondary)]" style={{ padding: "13px 12px" }}>
                   {usageData.message}
                 </div>
               )}
@@ -999,7 +999,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                     正在读取模型
                   </div>
                 ) : modelGroups.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-[var(--kimix-panel-border-soft)] text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
+                  <div className="rounded-lg text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "13px 14px" }}>
                     {modelCatalogError || (modelSearch ? "没有匹配的模型" : "尚未配置可用模型")}
                   </div>
                 ) : (

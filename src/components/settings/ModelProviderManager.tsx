@@ -116,7 +116,7 @@ function RemovalConfirmDialog({ target, busy, onCancel, onConfirm }: {
         <div className="text-[13.5px] leading-6 text-text-secondary" style={{ marginTop: 12 }}>
           确认删除「{name}」？
         </div>
-        <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 14, padding: "10px 12px" }}>
+        <div className="rounded-xl bg-surface-base text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 14, padding: "10px 12px" }}>
           {target.type === "model"
             ? "供应商连接配置会保留。"
             : `将同时删除其下 ${target.modelCount} 个模型，config.toml 会先自动备份。`}
@@ -652,7 +652,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             </label>
 
             {isCreatingProvider && (
-              <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
+              <div className="rounded-xl bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[12.5px] font-medium text-text-primary">官方 Provider 目录</div>
@@ -779,7 +779,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 </div>
               ))}
               {selectedGroup.models.length === 0 && (
-                <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[12px] leading-5 text-text-muted" style={{ padding: "16px 18px" }}>
+                <div className="rounded-xl bg-surface-base text-[12px] leading-5 text-text-muted" style={{ padding: "16px 18px" }}>
                   此供应商还没有模型。连接配置只需保存一次，之后可以连续添加多个模型。
                 </div>
               )}
@@ -791,7 +791,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
             {!selectedProviderManaged && (
               <div style={{ marginTop: 14 }}>
-                <div className="rounded-sm-token border border-[var(--kimix-panel-border-soft)] bg-surface-base" style={{ padding: "12px 14px" }}>
+                <div className="rounded-sm-token bg-surface-base" style={{ padding: "12px 14px" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-medium text-text-primary">从 Base URL 探测模型</div>
@@ -823,7 +823,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 </div>
 
                 {(selectedModelAlias || addingModel) && (
-                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)" }}>
+                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px", background: "var(--surface-base)", border: "none" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                     <div>
                       <div className="text-[12.5px] font-semibold text-text-primary">{selectedModelAlias ? "编辑模型" : "添加模型"}</div>

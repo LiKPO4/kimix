@@ -108,14 +108,14 @@ function KimiOnboardingDialog({
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl border border-border-subtle bg-surface-base" style={{ padding: "16px 16px 18px" }}>
+        <div className="mt-5 rounded-xl bg-surface-base" style={{ padding: "16px 16px 18px" }}>
           <div className="text-[13px] font-medium leading-5 text-text-secondary">推荐步骤</div>
           <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-text-secondary">
             <div>1. 点击"一键安装"，或使用官方脚本安装 Kimi Code。</div>
             <div>2. 安装完成后，进入设置页的 <span className="font-medium text-text-primary">Kimi 登录</span>，点击"登录"并在浏览器中完成授权。</div>
             <div>3. 登录完成后返回 Kimix，点击"刷新"或重新发送消息。</div>
           </div>
-          <div className="mt-4 rounded-lg border border-border-subtle bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
+          <div className="mt-4 rounded-lg bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
             {isWindows() ? KIMI_CODE_WINDOWS_INSTALL_COMMAND : KIMI_CODE_POSIX_INSTALL_COMMAND}
           </div>
           <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
@@ -292,7 +292,7 @@ function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
         <div className="mt-3 text-[14px] leading-6 text-text-secondary">
           「{visibleDialog.taskTitle}」已执行完成。已按你的设置安排关机。
         </div>
-        <div className="mt-5 rounded-xl border border-border-subtle bg-surface-base text-center" style={{ padding: "18px 16px" }}>
+        <div className="mt-5 rounded-xl bg-surface-base text-center" style={{ padding: "18px 16px" }}>
           <div className="text-[13px] leading-5 text-text-muted">距离关机还有</div>
           <div className="kimix-tabular-nums mt-1 font-mono text-[34px] font-semibold leading-[1.2] text-text-primary">
             {Math.floor(visibleDialog.remainingSeconds / 60)}:{String(visibleDialog.remainingSeconds % 60).padStart(2, "0")}
@@ -414,7 +414,7 @@ function HelpDialogPanel({
                 </div>
               </div>
               <p>Kimix 是一个面向 Kimi Code 的桌面客户端，目标是提供接近 Codex 的项目对话、队列、引导、工具调用和本地开发体验。</p>
-              <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
+              <div className="rounded-xl bg-surface-base" style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}>
                 <div>开发者：{appInfo.author}</div>
                 <button className="kimix-icon-text-button is-compact mt-4 text-accent-primary hover:bg-accent-primary-light" onClick={() => window.api.openExternal(appInfo.repository)}>
                   打开 GitHub 仓库 <ExternalLink size={13} />
@@ -425,7 +425,7 @@ function HelpDialogPanel({
 
           {visibleDialog === "updates" && (
             <div className="flex flex-col text-[14.5px] text-text-secondary" style={{ gap: 16 }}>
-              <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
+              <div className="grid rounded-xl bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                 <div className="min-w-0">
                   <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimix 本体</div>
                   <div className="font-semibold text-text-primary">{updateState.message}</div>
@@ -462,7 +462,7 @@ function HelpDialogPanel({
                   </div>
                 </div>
               </div>
-              <div className="grid rounded-xl border border-border-subtle bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
+              <div className="grid rounded-xl bg-surface-base" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 18, rowGap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 22, paddingTop: 18, paddingBottom: 18 }}>
                 <div className="min-w-0">
                   <div className="mb-1 text-[12px] font-semibold text-text-muted">Kimi Code</div>
                   <div className="font-semibold text-text-primary">{cliUpdateState.message}</div>
@@ -493,7 +493,7 @@ function HelpDialogPanel({
                   )}
                   {cliUpdateState.info?.path && <div className="mt-1 truncate text-[12px] text-text-muted" title={cliUpdateState.info.path}>{cliUpdateState.info.path}</div>}
                   {(cliUpdateState.info?.available === false || cliUpdateState.info?.isLegacy) && (
-                    <div className="mt-3 rounded-lg border border-accent-primary-soft bg-accent-primary-light text-[13px] leading-6 text-accent-primary-dark" style={{ padding: "12px 14px" }}>
+                    <div className="mt-3 rounded-lg bg-accent-primary-light text-[13px] leading-6 text-accent-primary-dark" style={{ padding: "12px 14px" }}>
                       {cliUpdateState.info?.available === false
                         ? "当前没有找到 kimi 命令。请先安装新版 Kimi Code，安装完成后进入设置页的 Kimi 登录完成授权。"
                         : "当前是旧版 Kimi。升级到新版 Kimi Code 后，请在终端运行 kimi migrate，并重新执行 /login 与 MCP 授权。"}
@@ -539,7 +539,7 @@ function HelpDialogPanel({
                 {updateState.releases.map((release) => (
                   <article
                     key={release.tagName}
-                    className="rounded-lg border border-border-subtle bg-surface-elevated text-left"
+                    className="rounded-lg bg-surface-elevated text-left"
                     style={{ paddingTop: 18, paddingRight: 16, paddingBottom: 18, paddingLeft: 16 }}
                   >
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>

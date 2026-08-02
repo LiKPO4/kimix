@@ -52,6 +52,16 @@
 - 如果用户连续两次反馈同一浮层/卡片“没居中、没缝隙、没生效”，先停下找结构根因：检查元素是不是在错误层级、标题是不是漂在两个区块之间、spacing 是否依赖 Tailwind scale 类、是否只修了子元素内部而没有修父级布局。不要继续叠加背景、阴影、标签条来遮盖问题。
 - 图标+文字主按钮在两行说明文字右侧时，不能只按几何中心对齐；要用截图检查文字基线和按钮上下留白，必要时在固定高度基础上做 1px 视觉补偿，并说明这是视觉补偿而不是布局主逻辑。
 
+### 面板/浮层不嵌套边框面板（内层递减）
+
+> 场景：带边框+阴影的容器内部又放一张 `rounded-* border ... bg-...` 完整边框卡片，形成“框套框”。默认/现代下不明显，复古（边框加深/浮雕）下会刺眼，且已反复出现。后续新增或调整浮层/卡片内容时必须按此自查。
+
+- 带边框+阴影的容器（浮层 `.kimix-floating-panel`/`.kimix-modal-card`/`.kimix-onboarding-card`/`.kimix-menu-panel`，卡片 `.kimix-soft-card`/`.kimix-settings-card`/`.kimix-model-provider-manager`）内部，**内容性区块**（提示/说明/警告/错误/空态/分区卡/代码块外壳）**只保留背景+圆角分层，不加边框**：用 `rounded-xl bg-[var(--kimix-panel-soft-bg)]`（或 `bg-surface-base`/`bg-accent-warning-light` 等），不要写 `rounded-xl border border-[soft] bg-[soft-bg]`。
+- **可点击按钮/选择项**（`<button>`、`role="button"`、有 `onClick` 的行）保留控件边框质感（复古下是 Win95 浮雕按钮，合理）；但“外层包装 div + 内层按钮”结构里，**外层包装 div 不加边框**。
+- **输入控件**（`<input>`/`<textarea>`/`.kimix-settings-input`）保留边框（字段样式），不受此限。
+- 共用卡片类（`.kimix-soft-card`/`.kimix-settings-card`/`.kimix-plugin-list-item` 等自带 border+阴影的类）**不要直接用在浮层/卡片内部**；嵌套场景改用内嵌背景分区（移除该类换成 `rounded-* bg-*`，或保留类名补 inline `border: "none"`）。
+- 只有背景无 border、或只有单边分隔线（`border-t`/`border-b`）的内嵌区块是**正常**的，不算违规；顶层单层卡片（父级无边框）不受此限。
+
 ### 高风险区域（每次必查）
 
 - 右侧窄栏：长程任务状态栏、设置侧栏、上下堆叠的状态卡。

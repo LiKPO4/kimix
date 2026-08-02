@@ -2339,7 +2339,7 @@ export function LongTaskInspectorPanel({
             </button>
           </div>
           <div className="max-h-[640px] overflow-y-auto" style={{ padding: 18 }}>
-            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ padding: "14px 16px" }}>
+            <div className="rounded-xl bg-surface-base" style={{ padding: "14px 16px" }}>
               <div className="flex items-center justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-primary">待提交文件</div>
@@ -2359,7 +2359,7 @@ export function LongTaskInspectorPanel({
               </div>
               <div className="flex flex-col" style={{ gap: 9, marginTop: 14 }}>
                 {gitDetailsLoading ? (
-                  <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
+                  <div className="rounded-lg bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
                     正在读取 Git 改动...
                   </div>
                 ) : gitFiles.length > 0 ? gitFiles.map((file) => (
@@ -2405,14 +2405,14 @@ export function LongTaskInspectorPanel({
                     </button>
                   </div>
                 )) : (
-                  <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
+                  <div className="rounded-lg bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ padding: 28 }}>
                     当前没有可提交的文件
                   </div>
                 )}
               </div>
             </div>
             {selectedGitFileRisks.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900" style={{ marginTop: 14, padding: "13px 16px" }}>
+              <div className="rounded-xl bg-amber-50 text-amber-900" style={{ marginTop: 14, padding: "13px 16px" }}>
                 <div className="flex items-center text-[13px] font-medium leading-5" style={{ gap: 8 }}>
                   <ShieldAlert size={15} />
                   提交前提示
@@ -2422,7 +2422,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             )}
-            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
+            <div className="rounded-xl bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
               <div className="flex items-center justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-primary">会话最近变更</div>
@@ -2453,12 +2453,12 @@ export function LongTaskInspectorPanel({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-border-subtle bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: 22 }}>
+                <div className="rounded-lg bg-surface-elevated text-center text-[13px] leading-6 text-text-muted" style={{ marginTop: 14, padding: 22 }}>
                   当前会话还没有结构化 diff 记录
                 </div>
               )}
             </div>
-            <div className="rounded-xl border border-border-subtle bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
+            <div className="rounded-xl bg-surface-base" style={{ marginTop: 14, padding: "14px 16px" }}>
               <div className="text-[13px] font-medium leading-5 text-text-primary">提交说明</div>
               <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
                 {gitCommitTemplates.map((template) => (
@@ -2533,7 +2533,7 @@ export function LongTaskInspectorPanel({
             </button>
           </div>
           <div className="max-h-[640px] overflow-y-auto" style={{ padding: 18 }}>
-            <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-base">
+            <div className="overflow-hidden rounded-xl bg-surface-base">
               <div className="min-w-[820px]">
                 <div
                   className="grid border-b border-border-subtle bg-surface-elevated text-[12.5px] font-medium leading-5 text-text-muted"

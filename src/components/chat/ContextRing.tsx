@@ -273,7 +273,7 @@ export function ContextRing() {
             {contextUsages.map((usage) => (
               <div
                 key={usage.agentId}
-                className="rounded-lg border border-border-subtle bg-surface-secondary"
+                className="rounded-lg bg-surface-secondary"
                 style={{ padding: "10px 16px" }}
               >
                 <div

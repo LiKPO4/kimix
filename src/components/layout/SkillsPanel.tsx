@@ -400,7 +400,7 @@ export function SkillsPanel({
                         <div
                           key={plugin.id}
                           className="kimix-plugin-list-item"
-                          style={{ padding: "12px 14px" }}
+                          style={{ padding: "12px 14px", border: "none" }}
                         >
                           <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                             <div className="min-w-0">
@@ -460,7 +460,7 @@ export function SkillsPanel({
                     <span>{sdkPluginRefreshing ? "刷新中" : "刷新运行时状态"}</span>
                   </button>
                   <div
-                    className={`rounded-lg border ${configWarnings.length > 0 ? "border-accent-warning/35 bg-accent-warning-light/40" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
+                    className={`rounded-lg ${configWarnings.length > 0 ? "bg-accent-warning-light/40" : "bg-surface-elevated"}`}
                     style={{ padding: "10px 12px", marginTop: 12 }}
                   >
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
@@ -492,7 +492,7 @@ export function SkillsPanel({
                     )}
                   </div>
                   <div
-                    className="rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated"
+                    className="rounded-lg bg-surface-elevated"
                     style={{ padding: "10px 12px", marginTop: 12 }}
                   >
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
@@ -534,7 +534,7 @@ export function SkillsPanel({
                         <div
                           key={plugin.id}
                           className="kimix-plugin-list-item"
-                          style={{ padding: "12px 14px" }}
+                          style={{ padding: "12px 14px", border: "none" }}
                         >
                           <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                             <div className="min-w-0">

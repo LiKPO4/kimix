@@ -113,7 +113,7 @@ export function RoomContextPicker({
               </div>
               <div className="flex max-h-[280px] flex-col overflow-y-auto" style={{ gap: 8, marginTop: 10, paddingRight: 2 }}>
                 {entries.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--kimix-panel-border-soft)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
+                  <div className="rounded-xl text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ padding: "12px 14px" }}>
                     房间还没有可补充的已完成正文。
                   </div>
                 ) : entries.map((entry) => {

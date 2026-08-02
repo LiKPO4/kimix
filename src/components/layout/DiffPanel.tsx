@@ -95,11 +95,11 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "14px 18px 18px" }}>
         {error && (
-          <div className="kimix-soft-card text-[13px] leading-6 text-accent-danger" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="rounded-xl bg-surface-base text-[13px] leading-6 text-accent-danger" style={{ padding: "14px 16px", marginBottom: 14 }}>
             {error}
           </div>
         )}
-        <div className="kimix-soft-card" style={{ padding: "14px 14px 16px" }}>
+        <div className="rounded-xl bg-surface-base" style={{ padding: "14px 14px 16px" }}>
           <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 12 }}>
             <div className="min-w-0 text-[13.5px] font-semibold leading-5 text-text-primary">可预览文件</div>
             <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
