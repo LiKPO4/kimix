@@ -30,8 +30,8 @@ const PREVIEW_CLOSE_DELAY_MS = 90;
 const PREVIEW_EXIT_DURATION_MS = 140;
 const SCROLL_EDGE_THRESHOLD_PX = 80;
 const RAIL_VERTICAL_INSET_PX = 24;
-/** Distance from the chat viewport left edge (not the centered stream column). */
-const RAIL_LEFT_OFFSET_PX = 10;
+/** Chat viewport left inset for the rail hit-box; marks sit on the left of the hit-box. */
+const RAIL_LEFT_OFFSET_PX = 4;
 
 function markersEqual(previous: ChatNavigationMarker[], next: ChatNavigationMarker[]) {
   return previous.length === next.length && previous.every((marker, index) => {
@@ -233,7 +233,8 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
       style={{
         left: RAIL_LEFT_OFFSET_PX,
         top: "50%",
-        width: 40,
+        // Wide hit target extends right into the gutter; ticks render on the left edge.
+        width: 28,
         height: groupHeight,
         pointerEvents: "auto",
         transform: "translateY(-50%)",
@@ -244,7 +245,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
           <button
             key={marker.key}
             type="button"
-            className="kimix-chat-navigation-hit absolute right-0"
+            className="kimix-chat-navigation-hit absolute left-0"
             data-active={marker.active ? "true" : "false"}
             data-kind={marker.kind}
             aria-label={`${marker.label}，跳转到第 ${index + 1} 个对话节点`}
@@ -261,12 +262,12 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
             style={{
               top: index * markerGap,
               height: markerGap,
-              width: 40,
+              width: 28,
             }}
           >
             <span
               className="kimix-chat-navigation-mark absolute"
-              style={{ top: "50%", right: 8 }}
+              style={{ top: "50%", left: 2 }}
             />
           </button>
         );

@@ -1379,7 +1379,7 @@ body::before {
   background: var(--text-primary);
   opacity: 0.24;
   transform: translateY(-50%);
-  transform-origin: right center;
+  transform-origin: left center;
   transition-property: opacity, box-shadow;
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
