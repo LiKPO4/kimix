@@ -222,28 +222,29 @@
 }
 
 [data-theme="dark"] {
-  /* Dark Mode: Deep Editorial */
-  --surface-ground: #0E0C0A;
-  --surface-base: #242018;
-  --surface-elevated: #2E2A24;
-  --surface-hover: #38342E;
-  --surface-active: #403C34;
+  /* Dark Mode: elevated ladder (MD3 / VS Code / GitHub Dark).
+     Surfaces must stay distinguishable; borders lift toward white; muted text ≥ ~4.5:1 on elevated. */
+  --surface-ground: #13151C;
+  --surface-base: #1D222C;
+  --surface-elevated: #282F3B;
+  --surface-hover: #353D4C;
+  --surface-active: #414A5B;
 
-  --text-primary: #E8E4DE;
-  --text-secondary: #9E9890;
-  --text-muted: #6B6560;
-  --text-inverse: #12100E;
-  --text-placeholder: #4A4640;
+  --text-primary: #F0F2F5;
+  --text-secondary: #C0C6D0;
+  --text-muted: #A4ACB8;
+  --text-inverse: #0E1116;
+  --text-placeholder: #7B8494;
 
-  --border-subtle: #36322A;
-  --border-default: #484440;
-  --border-strong: #56524A;
+  --border-subtle: #3E4658;
+  --border-default: #556070;
+  --border-strong: #6B768A;
 
-  --accent-primary: #4FA3FF;
+  --accent-primary: #5AABFF;
   --accent-primary-light: #1A2F4A;
   --accent-primary-soft: #2A4A6E;
-  --accent-primary-dark: #6BB8FF;
-  --kimix-primary-button-hover: #3D88D0;
+  --accent-primary-dark: #7BC0FF;
+  --kimix-primary-button-hover: #4796E6;
 
   --accent-secondary: #D4896A;
   --accent-secondary-light: #3A2218;
@@ -254,7 +255,7 @@
   --accent-warning: #FACC15;
   --accent-warning-light: #3A3318;
   --accent-danger: #F87171;
-  --accent-danger-light: #3A1A1A;
+  --accent-danger-light: #3F1D1D;
 
   /* Legacy Aliases */
   --bg-primary: var(--surface-ground);
@@ -289,8 +290,8 @@
   --kimix-panel-badge-bg: var(--surface-hover);
   --kimix-panel-badge-text: var(--text-secondary);
 
-  --kimix-overlay-bg: rgba(18, 16, 14, 0.72);
-  --kimix-modal-overlay-bg: rgba(0, 0, 0, 0.2);
+  --kimix-overlay-bg: rgba(8, 10, 14, 0.72);
+  --kimix-modal-overlay-bg: rgba(6, 8, 12, 0.55);
   --kimix-modal-overlay-blur: none;
   --kimix-selection-idle-bg: var(--surface-base);
   --kimix-selection-idle-border: var(--border-strong);
@@ -305,11 +306,11 @@
   --kimix-process-border: var(--border-default);
   --kimix-process-text: var(--text-secondary);
   --kimix-process-muted: var(--text-muted);
-  --kimix-info-bg: #1A2530;
-  --kimix-info-bg-soft: #1A222C;
-  --kimix-info-border: #2A3A4A;
-  --kimix-info-text: #A8C8E8;
-  --kimix-info-text-secondary: #7A9AB8;
+  --kimix-info-bg: #1E2A38;
+  --kimix-info-bg-soft: #1C2632;
+  --kimix-info-border: #3A4E62;
+  --kimix-info-text: #B4D2F0;
+  --kimix-info-text-secondary: #8EADC8;
   --kimix-warning-bg: #2A2418;
   --kimix-warning-border: #4A4028;
   --kimix-warning-text: #D8C898;
@@ -317,7 +318,7 @@
   --kimix-success-bg: #1A2C22;
   --kimix-success-border: #2A4A38;
   --kimix-success-text: #98D8A8;
-  --kimix-progress-track: #2C2824;
+  --kimix-progress-track: #323A48;
   --kimix-progress-fill: var(--text-muted);
   --kimix-user-bubble-bg: var(--surface-elevated);
   --kimix-user-bubble-text: var(--text-primary);
@@ -326,7 +327,7 @@
   --kimix-media-thumb-border-hover: var(--border-strong);
   --kimix-strong-button-bg: #E7ECF2;
   --kimix-strong-button-text: #18202A;
-  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 24px 64px rgba(0, 0, 0, 0.28);
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 /* ── 界面风格覆盖 ── */

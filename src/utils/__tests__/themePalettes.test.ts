@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KimiThemePreset } from "@/types/ui";
-import { reconcileKimiThemePresetsFromDirectory } from "../themePalettes";
+import { reconcileKimiThemePresetsFromDirectory, resolveThemePaletteTokens } from "../themePalettes";
 
 const palette = {
   primary: "#1565C0",
@@ -66,5 +66,54 @@ describe("reconcileKimiThemePresetsFromDirectory", () => {
 
     expect(result.presets.map((item) => item.id)).toEqual(["external", "manual"]);
     expect(result.removed).toBe(0);
+  });
+});
+
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function relativeLuminance(hex: string) {
+  const [r, g, b] = hexToRgb(hex).map((channel) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a: string, b: string) {
+  const L1 = relativeLuminance(a);
+  const L2 = relativeLuminance(b);
+  const hi = Math.max(L1, L2);
+  const lo = Math.min(L1, L2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe("dark mode surface ladder", () => {
+  it("keeps elevated steps, borders, and muted text legible on warm-paper dark", () => {
+    const tokens = resolveThemePaletteTokens("warm-paper", { primary: "#1982FF", surface: "#EDE9E0", accent: "#B85C38" }, "dark");
+    const ground = tokens["--surface-ground"];
+    const base = tokens["--surface-base"];
+    const elevated = tokens["--surface-elevated"];
+    const hover = tokens["--surface-hover"];
+    const textPrimary = tokens["--text-primary"];
+    const textSecondary = tokens["--text-secondary"];
+    const textMuted = tokens["--text-muted"];
+    const borderSubtle = tokens["--border-subtle"];
+    const borderDefault = tokens["--border-default"];
+
+    expect(contrastRatio(textPrimary, elevated)).toBeGreaterThanOrEqual(9);
+    expect(contrastRatio(textSecondary, elevated)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(textMuted, elevated)).toBeGreaterThanOrEqual(4.4);
+    expect(contrastRatio(borderDefault, elevated)).toBeGreaterThanOrEqual(1.45);
+    expect(contrastRatio(borderSubtle, elevated)).toBeGreaterThanOrEqual(1.2);
+    // Surface steps must not collapse (ΔL via contrast between layers).
+    expect(contrastRatio(base, ground)).toBeGreaterThanOrEqual(1.12);
+    expect(contrastRatio(elevated, base)).toBeGreaterThanOrEqual(1.12);
+    expect(contrastRatio(hover, elevated)).toBeGreaterThanOrEqual(1.12);
+    // Borders are lighter than elevated (higher luminance), not darker mud.
+    expect(relativeLuminance(borderDefault)).toBeGreaterThan(relativeLuminance(elevated));
   });
 });

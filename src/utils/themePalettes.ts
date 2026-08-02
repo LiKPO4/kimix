@@ -263,28 +263,33 @@ function slugThemeName(name: string) {
 function buildKimiTokens(input: KimiThemePalette, mode: ResolvedThemeMode): ThemeTokenMap {
   const colors = normalizeKimiThemePalette(input);
   const dark = mode === "dark";
-  const surfaceSeed = dark ? "#17191D" : "#F1F3F5";
-  const elevatedSeed = dark ? "#202329" : "#FFFFFF";
-  const textPrimary = colors.textStrong || colors.text;
-  const primaryLight = dark ? mix(colors.primary, "#050505", 0.72) : mix(colors.primary, "#FFFFFF", 0.88);
-  const warningBg = dark ? mix(colors.warning, "#050505", 0.76) : mix(colors.warning, "#FFFFFF", 0.9);
-  const successBg = dark ? mix(colors.success, "#050505", 0.76) : mix(colors.success, "#FFFFFF", 0.9);
-  const dangerBg = dark ? mix(colors.error, "#050505", 0.76) : mix(colors.error, "#FFFFFF", 0.9);
+  // Dark ladder matches buildDarkTokens: elevated steps + light borders, not crushed near-black.
+  const surfaceSeed = dark ? "#1C212B" : "#F1F3F5";
+  const elevatedSeed = dark ? "#272E3A" : "#FFFFFF";
+  const textPrimary = dark
+    ? mix(colors.textStrong || colors.text, "#FFFFFF", 0.82)
+    : (colors.textStrong || colors.text);
+  const textSecondary = dark ? mix(colors.textDim || colors.text, "#FFFFFF", 0.55) : colors.textDim;
+  const textMuted = dark ? mix(colors.textMuted || colors.text, "#FFFFFF", 0.42) : colors.textMuted;
+  const primaryLight = dark ? mix(colors.primary, "#0A0C10", 0.72) : mix(colors.primary, "#FFFFFF", 0.88);
+  const warningBg = dark ? mix(colors.warning, "#0A0C10", 0.76) : mix(colors.warning, "#FFFFFF", 0.9);
+  const successBg = dark ? mix(colors.success, "#0A0C10", 0.76) : mix(colors.success, "#FFFFFF", 0.9);
+  const dangerBg = dark ? mix(colors.error, "#0A0C10", 0.76) : mix(colors.error, "#FFFFFF", 0.9);
 
   return commonTokens({
-    surfaceGround: dark ? mix(colors.text, "#050505", 0.86) : mix(colors.text, "#FFFFFF", 0.95),
+    surfaceGround: dark ? "#12141A" : mix(colors.text, "#FFFFFF", 0.95),
     surfaceBase: dark ? surfaceSeed : mix(colors.border, "#FFFFFF", 0.82),
     surfaceElevated: elevatedSeed,
-    surfaceHover: dark ? mix(colors.border, "#050505", 0.64) : mix(colors.border, "#FFFFFF", 0.78),
-    surfaceActive: dark ? mix(colors.border, "#050505", 0.54) : mix(colors.border, "#FFFFFF", 0.68),
+    surfaceHover: dark ? "#343C4B" : mix(colors.border, "#FFFFFF", 0.78),
+    surfaceActive: dark ? "#404959" : mix(colors.border, "#FFFFFF", 0.68),
     textPrimary,
-    textSecondary: colors.textDim,
-    textMuted: colors.textMuted,
-    textInverse: dark ? "#101214" : "#FFFFFF",
-    textPlaceholder: mix(colors.textMuted, dark ? "#050505" : "#FFFFFF", 0.38),
-    borderSubtle: mix(colors.border, dark ? "#050505" : "#FFFFFF", 0.46),
-    borderDefault: colors.border,
-    borderStrong: colors.borderFocus,
+    textSecondary,
+    textMuted,
+    textInverse: dark ? "#0E1116" : "#FFFFFF",
+    textPlaceholder: dark ? mix(textMuted, "#0A0C10", 0.28) : mix(colors.textMuted, "#FFFFFF", 0.38),
+    borderSubtle: dark ? mix(elevatedSeed, "#FFFFFF", 0.12) : mix(colors.border, "#FFFFFF", 0.46),
+    borderDefault: dark ? mix(elevatedSeed, "#FFFFFF", 0.2) : colors.border,
+    borderStrong: dark ? mix(elevatedSeed, "#FFFFFF", 0.3) : colors.borderFocus,
     primary: colors.primary,
     primaryLight,
     primarySoft: dark ? mix(colors.primary, "#050505", 0.55) : mix(colors.primary, "#FFFFFF", 0.62),
@@ -373,18 +378,38 @@ function buildLightTokens(colors: ThemePaletteColors, preserveWarmPaperDepth = f
   });
 }
 
+/**
+ * Dark surfaces follow an elevated ladder (MD3 / VS Code Dark+ / GitHub Dark):
+ * - never collapse ground→base→elevated into near-identical browns
+ * - borders are *lighter* than the fill (hairline separation), not darker mud
+ * - body text stays near white; muted text targets ~4.5:1 on elevated
+ * Palette identity comes from a light tint of the seed surface, not from crushing the seed into #050505.
+ */
 function buildDarkTokens(colors: ThemePaletteColors): ThemeTokenMap {
   const primarySeed = normalizeHexColor(colors.primary, DEFAULT_CUSTOM_THEME_PALETTE.primary);
-  const primary = mix(primarySeed, "#FFFFFF", 0.2);
+  const primary = mix(primarySeed, "#FFFFFF", 0.22);
   const surfaceSeed = normalizeHexColor(colors.surface, DEFAULT_CUSTOM_THEME_PALETTE.surface);
-  const accent = mix(normalizeHexColor(colors.accent, DEFAULT_CUSTOM_THEME_PALETTE.accent), "#FFFFFF", 0.12);
-  const ground = mix(surfaceSeed, "#050505", 0.95);
-  const base = mix(surfaceSeed, "#050505", 0.89);
-  const elevated = mix(surfaceSeed, "#050505", 0.84);
-  const hover = mix(surfaceSeed, "#050505", 0.78);
-  const active = mix(surfaceSeed, "#050505", 0.73);
-  const primaryLight = mix(elevated, primarySeed, 0.2);
-  const primarySoft = mix(elevated, primarySeed, 0.36);
+  const accent = mix(normalizeHexColor(colors.accent, DEFAULT_CUSTOM_THEME_PALETTE.accent), "#FFFFFF", 0.14);
+
+  // Cool-neutral dark ladder (readable steps), then a gentle seed tint for palette flavor.
+  const ground = mix("#12141A", surfaceSeed, 0.07);
+  const base = mix("#1C212B", surfaceSeed, 0.08);
+  const elevated = mix("#272E3A", surfaceSeed, 0.09);
+  const hover = mix("#343C4B", surfaceSeed, 0.08);
+  const active = mix("#404959", surfaceSeed, 0.07);
+
+  const textPrimary = mix("#F0F2F5", surfaceSeed, 0.03);
+  const textSecondary = mix("#C0C6D0", surfaceSeed, 0.04);
+  const textMuted = mix("#A4ACB8", surfaceSeed, 0.03);
+  const textPlaceholder = mix("#7B8494", surfaceSeed, 0.03);
+
+  // Borders: lift toward white so cards/sections stay scannable on dark fills.
+  const borderSubtle = mix(elevated, "#FFFFFF", 0.14);
+  const borderDefault = mix(elevated, "#FFFFFF", 0.22);
+  const borderStrong = mix(elevated, "#FFFFFF", 0.34);
+
+  const primaryLight = mix(elevated, primarySeed, 0.28);
+  const primarySoft = mix(elevated, primarySeed, 0.42);
 
   return commonTokens({
     surfaceGround: ground,
@@ -392,43 +417,43 @@ function buildDarkTokens(colors: ThemePaletteColors): ThemeTokenMap {
     surfaceElevated: elevated,
     surfaceHover: hover,
     surfaceActive: active,
-    textPrimary: mix(surfaceSeed, "#FFFFFF", 0.9),
-    textSecondary: mix(surfaceSeed, "#FFFFFF", 0.62),
-    textMuted: mix(surfaceSeed, "#FFFFFF", 0.4),
-    textInverse: "#12100E",
-    textPlaceholder: mix(surfaceSeed, "#FFFFFF", 0.25),
-    borderSubtle: mix(surfaceSeed, "#050505", 0.48),
-    borderDefault: mix(surfaceSeed, "#FFFFFF", 0.22),
-    borderStrong: mix(surfaceSeed, "#FFFFFF", 0.3),
+    textPrimary,
+    textSecondary,
+    textMuted,
+    textInverse: "#0E1116",
+    textPlaceholder,
+    borderSubtle,
+    borderDefault,
+    borderStrong,
     primary,
     primaryLight,
     primarySoft,
-    primaryDark: mix(primary, "#FFFFFF", 0.16),
-    primaryHover: mix(primary, "#FFFFFF", 0.08),
+    primaryDark: mix(primary, "#FFFFFF", 0.18),
+    primaryHover: mix(primary, "#FFFFFF", 0.1),
     secondary: accent,
-    secondaryLight: mix(accent, "#050505", 0.74),
+    secondaryLight: mix(accent, "#0A0C10", 0.7),
     success: "#4ADE80",
     warning: "#FACC15",
     danger: "#F87171",
-    dangerLight: "#3A1A1A",
-    overlayBg: "rgba(5, 7, 10, 0.78)",
-    infoBgSoft: mix(primary, "#050505", 0.78),
-    infoBorder: mix(primary, "#050505", 0.55),
-    infoText: mix(primary, "#FFFFFF", 0.58),
-    infoTextSecondary: mix(primary, "#FFFFFF", 0.36),
-    warningBg: mix(accent, "#050505", 0.78),
-    warningBorder: mix(accent, "#050505", 0.55),
-    warningText: mix(accent, "#FFFFFF", 0.58),
-    warningTextSecondary: mix(accent, "#FFFFFF", 0.36),
-    successBg: "#1A2C22",
-    successBorder: "#2A4A38",
-    successText: "#98D8A8",
-    progressTrack: mix(surfaceSeed, "#050505", 0.58),
+    dangerLight: "#3F1D1D",
+    overlayBg: "rgba(8, 10, 14, 0.72)",
+    infoBgSoft: mix(primary, "#0A0C10", 0.78),
+    infoBorder: mix(primary, "#0A0C10", 0.48),
+    infoText: mix(primary, "#FFFFFF", 0.62),
+    infoTextSecondary: mix(primary, "#FFFFFF", 0.42),
+    warningBg: mix(accent, "#0A0C10", 0.76),
+    warningBorder: mix(accent, "#0A0C10", 0.48),
+    warningText: mix(accent, "#FFFFFF", 0.62),
+    warningTextSecondary: mix(accent, "#FFFFFF", 0.42),
+    successBg: "#1A2E24",
+    successBorder: "#2F5640",
+    successText: "#A6E3B5",
+    progressTrack: mix(base, "#FFFFFF", 0.08),
     mediaThumbBg: base,
-    strongButtonBg: mix(surfaceSeed, "#FFFFFF", 0.88),
-    strongButtonText: "#18202A",
-    composerShadow: "0 1px 2px rgba(5, 8, 11, 0.28)",
-    floatShadow: "0 16px 42px rgba(3, 5, 8, 0.3)",
+    strongButtonBg: mix("#F2F4F7", surfaceSeed, 0.06),
+    strongButtonText: "#12161E",
+    composerShadow: "0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35)",
+    floatShadow: "0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 48px rgba(0, 0, 0, 0.45)",
   });
 }
 

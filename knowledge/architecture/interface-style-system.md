@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-02T19:35:00+08:00"
+timestamp: "2026-08-02T20:10:00+08:00"
 ---
 
 # Interface Style System
@@ -19,7 +19,7 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 
 # Invariants
 
-* Interface-style root blocks must not assign `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` color tokens. Style rules consume those tokens and may use neutral transparent light/dark overlays only to express depth.
+* Interface-style root blocks must not assign `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` color tokens. Dark theme color ownership still requires an elevated ladder: ground/base/elevated/hover must stay distinguishable, borders lift toward white (not crush into the fill), and muted text should remain near WCAG AA on elevated surfaces. Dark tokens are produced by `buildDarkTokens` / the `[data-theme="dark"]` baseline, not by style presets. Style rules consume those tokens and may use neutral transparent light/dark overlays only to express depth.
 * Visual treatment is assigned by component role, not by global element selectors. Rules such as `[data-ui-style] button`, `[data-ui-style] textarea`, or a global `.kimix-icon-text-button` skin are prohibited because the same primitives serve unrelated roles across navigation, forms, dialogs, and primary actions.
 * A nested control has one visible boundary owner. In the Composer, `.kimix-composer-card` owns border, focus, and elevation; `.kimix-composer-input` remains borderless and transparent. Settings inputs own their own inset boundary because they are standalone fields.
 * Controls with the same role share one state language. `.kimix-control-button` represents a tool that opens more controls, while `.kimix-state-button` represents a binary mode and derives its selected appearance from `aria-pressed="true"`. Business components must not reconstruct selected borders, backgrounds, or shadows through inline styles.

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：深色模式层级与对比度灾难（v2.20.134）
+
+- 根因：`buildDarkTokens` 把 surface 种子与 `#050505` 高比例混合，ground/base/elevated/hover 几乎同色；边框反而更暗；`--text-muted` 在 elevated 上约 2.5:1。
+- 参考：Material Design 3 elevation、VS Code Dark+、GitHub Dark——抬升画布、表面阶梯可辨、边框向白、次要文字接近 AA。
+- 修复：重建暗色 ladder + 亮边框 + 提亮 secondary/muted；同步 CSS `[data-theme=dark]` 与 Kimi dark；对比度单测锁门槛。
+- 验证：themePalettes/uiStyles 定向 + 对比度断言。实机待 v2.20.134 深色截图。
+
 ## 2026-08-02 修复：顶栏启动/打开分体钮默认像选中（v2.20.133）
 
 - 根因：`.kimix-split-control` 静止态强制 `--ui-compound-*` 实心底+边，观感等同 toggle/选中；默认顶栏其它工具键只是 soft border。
