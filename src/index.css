@@ -1572,7 +1572,7 @@ body::before {
 }
 
 :where(.kimix-control-button, .kimix-window-control)[aria-expanded="true"],
-:where(.kimix-toolbar-button, .kimix-split-control).is-expanded,
+:where(.kimix-toolbar-button).is-expanded,
 :where(.kimix-toolbar-button, .kimix-window-control)[aria-pressed="true"] {
   border-color: var(--ui-toggle-border-color);
   background-color: var(--ui-toggle-background);
@@ -1604,13 +1604,23 @@ body::before {
   transform: translateY(-1px);
 }
 
-:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control):active:not(:disabled),
-:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button), .kimix-split-control).is-expanded,
+:root:not([data-ui-style]) .kimix-app-shell-toolbar :where(.kimix-toolbar-button:not(.kimix-long-task-button)):active:not(:disabled),
 :root:not([data-ui-style]) .kimix-app-shell-toolbar .kimix-toolbar-button:not(.kimix-long-task-button)[aria-pressed="true"] {
   border-color: var(--ui-toggle-border-color);
   background-color: var(--ui-toggle-background);
   color: var(--ui-toggle-color);
   box-shadow: var(--ui-toggle-shadow);
+  transform: translateY(0);
+}
+
+/* Split launch/open: menu-open is sticky hover chrome, not mode-toggle blue. */
+:root:not([data-ui-style]) .kimix-app-shell-toolbar .kimix-split-control:active:not(:disabled),
+:root:not([data-ui-style]) .kimix-app-shell-toolbar .kimix-split-control.is-expanded,
+:root:not([data-ui-style]) .kimix-app-shell-toolbar .kimix-split-control.is-expanded:hover {
+  border-color: var(--kimix-panel-border);
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-hover);
   transform: translateY(0);
 }
 
@@ -1632,19 +1642,40 @@ body::before {
   color: var(--accent-danger);
 }
 
-/* Split launch/open: rest matches ordinary toolbar controls; only expanded uses toggle.
-   Part divider still uses --ui-compound-divider-shadow; do not paint a permanent compound plate. */
+/* Split launch/open: rest matches ordinary toolbar controls.
+   Expanded = menu open (sticky hover surface), never mode-toggle blue.
+   Part divider still uses --ui-compound-divider-shadow. */
 .kimix-split-control {
   overflow: hidden;
+  color: var(--text-secondary);
+}
+
+.kimix-split-control:hover:not(:disabled) {
+  color: var(--text-primary);
 }
 
 .kimix-split-control.is-expanded,
 .kimix-split-control.is-expanded:hover {
-  border-color: var(--ui-toggle-border-color);
-  background-color: var(--ui-toggle-background);
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
   background-image: none;
-  color: var(--ui-toggle-color);
-  box-shadow: var(--ui-toggle-shadow);
+  color: var(--text-primary);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+/* When control tokens are transparent (modern), give expanded a real surface. */
+[data-ui-style="modern"] .kimix-split-control.is-expanded,
+[data-ui-style="modern"] .kimix-split-control.is-expanded:hover {
+  border-color: var(--border-subtle);
+  background-color: var(--surface-hover);
+  box-shadow: none;
+}
+
+[data-ui-style="retro"] .kimix-split-control.is-expanded,
+[data-ui-style="retro"] .kimix-split-control.is-expanded:hover {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
 }
 
 .kimix-split-control-part {
@@ -1655,7 +1686,11 @@ body::before {
 }
 
 .kimix-split-control-part:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--ui-control-hover-background) 72%, transparent);
+  background-color: color-mix(in srgb, var(--surface-hover) 88%, transparent);
+}
+
+.kimix-split-control.is-expanded .kimix-split-control-part:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--surface-active) 82%, transparent);
 }
 
 .kimix-split-control-part + .kimix-split-control-part {

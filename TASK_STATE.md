@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：运行/文件分体钮展开态误用 toggle 蓝底（v2.20.145）
+
+- 根因：`kimix-split-control.is-expanded` 走 `--ui-toggle-*`（accent-primary-light），菜单打开像模式选中；展开悬停仍锁蓝底。
+- 修复：展开改为 sticky hover 表面；从共享 toggle 规则移除 split-control；分片 hover 用 surface-hover/active。
+- 验证：uiStyles。实机待 v2.20.145。
+
 ## 2026-08-02 优化：默认浅色主题对比度与辨识度（v2.20.144）
 
 - 根因：浅色 `text-muted`/`border-*` 过浅（muted≈2.5:1，边框≈1.2–1.5）；`borderSubtle` 还向白混合；surface ladder 过近。

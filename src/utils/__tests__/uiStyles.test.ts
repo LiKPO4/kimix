@@ -154,8 +154,10 @@ describe("UI_STYLES", () => {
     expect(css).not.toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-selection-shadow\);/);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button:not\(\[aria-pressed="true"\]\):hover:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--kimix-retro-button-hover-border-color\);[^}]*background:\s*var\(--kimix-retro-button-hover-background\);[^}]*box-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button\[aria-pressed="true"\],[\s\S]*?\{[^}]*border-color:\s*var\(--accent-primary-soft\);[^}]*background:\s*var\(--accent-primary-light\);[^}]*color:\s*var\(--accent-primary-dark\);/s);
-    expect(css).toMatch(/:where\(\.kimix-toolbar-button, \.kimix-split-control\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
-    expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    expect(css).toMatch(/:where\(\.kimix-toolbar-button\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    expect(css).not.toMatch(/:where\([^)]*\.kimix-split-control[^)]*\)\.is-expanded[\s\S]{0,120}--ui-toggle-background/);
+    expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*background-color:\s*var\(--ui-control-hover-background\);/);
+    expect(css).toMatch(/\.kimix-split-control\.is-expanded \.kimix-split-control-part:hover:not\(:disabled\)\s*\{[^}]*--surface-active/);
     // Resting split controls must not paint a permanent compound plate (looks selected-at-rest).
     expect(css).toMatch(/\.kimix-split-control\s*\{[^}]*overflow:\s*hidden;[^}]*\}/s);
     expect(css).not.toMatch(/\.kimix-split-control\s*\{[^}]*(?:--ui-compound-border|--ui-compound-background|--ui-compound-shadow)/s);
