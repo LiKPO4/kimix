@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：顶栏启动/打开分体钮默认像选中（v2.20.133）
+
+- 根因：`.kimix-split-control` 静止态强制 `--ui-compound-*` 实心底+边，观感等同 toggle/选中；默认顶栏其它工具键只是 soft border。
+- 修复：静止态只保留 overflow，走与 toolbar-button 相同的 control 合约；展开时才用 `--ui-toggle-*`；分片分隔线仍用 compound divider。
+- 验证：uiStyles 定向。实机待 v2.20.133 截图。
+
 ## 2026-08-02 修复：选中行悬停与普通悬停描边对齐（v2.20.132）
 
 - 根因：v2.20.131 的 `--ui-selection-hover-*` 用“加深选中底”另一套语义，和普通 `--ui-nav-list-hover-*`（描边/触感）不一致。

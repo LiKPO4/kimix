@@ -154,6 +154,10 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button\[aria-pressed="true"\],[\s\S]*?\{[^}]*border-color:\s*var\(--accent-primary-soft\);[^}]*background:\s*var\(--accent-primary-light\);[^}]*color:\s*var\(--accent-primary-dark\);/s);
     expect(css).toMatch(/:where\(\.kimix-toolbar-button, \.kimix-split-control\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
     expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    // Resting split controls must not paint a permanent compound plate (looks selected-at-rest).
+    expect(css).toMatch(/\.kimix-split-control\s*\{[^}]*overflow:\s*hidden;[^}]*\}/s);
+    expect(css).not.toMatch(/\.kimix-split-control\s*\{[^}]*(?:--ui-compound-border|--ui-compound-background|--ui-compound-shadow)/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
   });
 
   it("Kimix 默认顶栏保留原有工具键边界且底栏 hover 可辨识", () => {

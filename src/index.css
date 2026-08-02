@@ -1614,18 +1614,10 @@ body::before {
   color: var(--accent-danger);
 }
 
+/* Split launch/open: rest matches ordinary toolbar controls; only expanded uses toggle.
+   Part divider still uses --ui-compound-divider-shadow; do not paint a permanent compound plate. */
 .kimix-split-control {
-  border: var(--ui-compound-border);
-  background-color: var(--ui-compound-background);
-  background-image: var(--ui-compound-background-image);
-  box-shadow: var(--ui-compound-shadow);
   overflow: hidden;
-}
-
-.kimix-split-control:hover {
-  border-color: var(--ui-control-hover-border-color);
-  background-color: var(--ui-control-hover-background);
-  box-shadow: var(--ui-control-hover-shadow);
 }
 
 .kimix-split-control.is-expanded,
