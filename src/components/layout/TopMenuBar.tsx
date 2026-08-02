@@ -3,13 +3,30 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  Maximize2,
-  Minimize2,
   Minus,
   PanelLeft,
   PanelLeftOpen,
   X,
 } from "lucide-react";
+
+/** Windows-style maximize: single square outline. */
+function WindowMaximizeIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="2.25" y="2.25" width="9.5" height="9.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/** Windows-style restore: two offset squares. */
+function WindowRestoreIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="4.25" y="1.75" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1.75" y="4.25" width="8" height="8" rx="1" fill="var(--kimix-shell-bg, var(--surface-base))" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
 
 type MenuAction =
   | "close-chat"
@@ -254,7 +271,7 @@ export function TopMenuBar({
           className="kimix-window-control flex h-8 w-8 items-center justify-center text-text-muted"
           aria-label={isMaximized ? "还原" : "最大化"}
         >
-          {isMaximized ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
+          {isMaximized ? <WindowRestoreIcon size={14} /> : <WindowMaximizeIcon size={14} />}
         </button>
         <button
           onClick={() => window.api.closeWindow()}
