@@ -65,14 +65,14 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
 
   return (
     <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden border border-border-subtle">
-      <div className="grid h-14 shrink-0 items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 18, paddingRight: 14, columnGap: 12 }}>
+      <div className="grid h-14 shrink-0 items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 14, paddingRight: 12, columnGap: 10 }}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold leading-5 text-text-primary">文件预览</div>
-          <div className="mt-0.5 truncate text-[12.5px] leading-5 text-text-muted">
+          <div className="truncate text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 2 }}>
             {files.length > 0 ? `${files.length} 个可预览文件 · ${extensionText}` : `根目录与下一级 · ${extensionText}`}
           </div>
         </div>
-        <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+        <div className="flex shrink-0 items-center" style={{ gap: 6 }}>
           <button
             type="button"
             onClick={() => void loadFiles()}
@@ -93,14 +93,15 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "14px 18px 18px" }}>
+      {/* Outer shell stays surface-base; section card + file rows use elevated so the list is not same-color inset. */}
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "10px 12px 12px" }}>
         {error && (
-          <div className="rounded-xl bg-surface-base text-[13px] leading-6 text-accent-danger" style={{ padding: "14px 16px", marginBottom: 14 }}>
+          <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ padding: "12px 12px", marginBottom: 10, backgroundColor: "var(--accent-danger-light)" }}>
             {error}
           </div>
         )}
-        <div className="rounded-xl bg-surface-base" style={{ padding: "14px 14px 16px" }}>
-          <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 12 }}>
+        <div className="kimix-section-card" style={{ padding: "12px 12px 12px" }}>
+          <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
             <div className="min-w-0 text-[13.5px] font-semibold leading-5 text-text-primary">可预览文件</div>
             <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
               <div className="relative">
@@ -147,23 +148,25 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
           {loadingList ? (
             <div className="text-[13px] leading-6 text-text-muted">正在读取文件列表...</div>
           ) : files.length > 0 ? (
-            <div className="flex flex-col" style={{ gap: 8 }}>
+            <div className="flex flex-col" style={{ gap: 6 }}>
               {sortedFiles.map((file) => (
                 <button
                   key={file.path}
                   type="button"
                   onClick={() => onSelectFile(file)}
                   className={`grid min-w-0 items-center rounded-lg border text-left transition-colors ${
-                    selectedPath === file.path ? "border-accent-primary bg-accent-primary-light" : "border-border-subtle bg-surface-base hover:bg-surface-hover"
+                    selectedPath === file.path
+                      ? "border-accent-primary bg-accent-primary-light"
+                      : "border-border-subtle bg-surface-elevated hover:bg-surface-hover"
                   }`}
-                  style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto", gap: 10, padding: "10px 12px" }}
+                  style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto", gap: 10, padding: "9px 11px" }}
                   title={file.path}
                 >
                   <FileText size={15} className="text-text-muted" />
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{file.name}</span>
                     {file.path !== file.name && (
-                      <span className="mt-0.5 block truncate text-[12px] leading-4 text-text-muted">{file.path}</span>
+                      <span className="block truncate text-[12px] leading-4 text-text-muted" style={{ marginTop: 2 }}>{file.path}</span>
                     )}
                   </span>
                   <span className="shrink-0 text-[12px] leading-5 text-text-muted">{formatBytes(file.size)}</span>
@@ -171,7 +174,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
               ))}
             </div>
           ) : (
-            <div className="text-[13px] leading-6 text-text-muted">
+            <div className="kimix-inset-section bg-surface-base text-[13px] leading-6 text-text-muted" style={{ padding: "12px 12px" }}>
               没有找到允许预览的文件。可在设置里调整允许类型。
             </div>
           )}
