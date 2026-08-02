@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：轮次收尾帧丢失后立即可自愈（v2.20.151）
+
+- 现场：与 Kimi Web 共存时本轮最终总结在 Kimix 缺失（官方 wire 有 1112 字全文，Kimix 本地只到 21:58:32；丢帧窗口与 dev 重启重合）。
+- 根因：丢帧只在轮次尾巴发生时无法自愈——启动水合在轮次完成前跑完，而轮询判定 terminal 后只 settle 不再对账；30s running-sample 又要求 running 态。与 Web 共存不互踢（cursor/epoch 可续传订阅），非必现。
+- 修复：抽出共用 `reconcileFromHistorySnapshot`（原 running-sample 内联块）；terminal 分支在流上最后事件 >8s 无更新时触发一次同守卫（熔断器 + shouldReplace 单调性，settled 投影）的 `terminal-tail` 对账；`AgentCanonicalHistoryReason` 加 `"terminal-tail"`。
+- 验证：typecheck + 全量 1483 测试过。实机待 v2.20.151。
+
 ## 2026-08-02 排查：发送后约 1 分钟才响应、中途卡顿（无版本变更）
 
 - 方法：解析会话 `336f7ae6` 完整 wire.jsonl（57MB），逐轮计算三段耗时。

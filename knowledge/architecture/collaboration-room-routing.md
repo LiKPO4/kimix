@@ -23,7 +23,7 @@ Kimix collaboration rooms project multiple independent Kimi Code sessions into o
 
 1. Every runtime event resolves to `{ roomId, roomAgentId }` before it enters renderer state.
 2. Streaming merge, tool/request matching, terminal settlement, usage, approval, question, and Subagent aggregation operate only within the resolved Agent partition.
-3. Official snapshots reconcile only the matching Agent partition. Startup, running-sample, repair, and undo reasons may use different replacement policies, but none may replace another Agent's events.
+3. Official snapshots reconcile only the matching Agent partition. Startup, running-sample, terminal-tail, repair, and undo reasons may use different replacement policies, but none may replace another Agent's events.
 4. A room user message is displayed once. Each recipient delivery records its own official user-event identity and response `agentTurnId`.
 5. Deterministic source identities keep `agentTurnId`, React keys, search anchors, expansion state, and scroll anchors stable across snapshot replay and restart.
 6. Agent output is visible in the room but enters another Agent's official context only when that Agent is explicitly routed and the current visible-body scope includes it. The default scope is the previous completed room turn, not the full room history.

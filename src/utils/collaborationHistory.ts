@@ -18,7 +18,7 @@ import {
   resolveRoomDeliveryUserEvents,
 } from "@/utils/roomDeliveryIdentity";
 
-export type AgentCanonicalHistoryReason = "startup" | "running-sample" | "undo" | "repair";
+export type AgentCanonicalHistoryReason = "startup" | "running-sample" | "terminal-tail" | "undo" | "repair";
 
 export interface ReconcileAgentCanonicalHistoryInput {
   session: Session;

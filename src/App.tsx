@@ -3347,6 +3347,57 @@ function App() {
         }
         runtimeSessionId = resolvedRuntimeSessionId;
         syncSessionSwarmMode(session.id, response.data, roomAgentId);
+        // 轮次收尾帧丢失信号阈值：polling 判定终端时，流上最后事件距现在超过
+        // 该值即视为 turn.ended/usage 等收尾帧没到（重启、订阅被顶替、断线）。
+        const TERMINAL_STREAM_GAP_MS = 8_000;
+        // running-sample 与 terminal-tail 共用：拉取官方全量历史，经 map +
+        // 熔断器 + shouldReplace 单调性守卫后，才允许替换或补丁本地事件。
+        const reconcileFromHistorySnapshot = async (reason: "running-sample" | "terminal-tail") => {
+          const loaded = await timeSync(`${reason}.loadHistory`, () => window.api.loadKimiCodeSession({
+            workDir: session.projectPath,
+            sessionId: runtimeSessionId,
+          })).catch(() => null);
+          if (disposed || !loaded?.success) return;
+          const canonicalSnapshotEvents = timeSync(`${reason}.mapHistory`, () => mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
+          let applied = false;
+          updateSession(session.id, (item) => {
+            const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
+            // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
+            if (isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
+              return item;
+            }
+            const reconciliation = timeSync(`${reason}.reconcile`, () => reconcileAgentCanonicalHistory({
+              session: item,
+              roomAgentId,
+              expectedRuntimeSessionId: runtimeSessionId,
+              canonicalEvents: canonicalSnapshotEvents,
+              reason,
+            }));
+            if (!reconciliation.applied) {
+              return item;
+            }
+            if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalSnapshotEvents })) {
+              const patchedEvents = mergeMissingUsageStatusEvents(
+                mergeMissingLatestCanonicalAssistant(
+                  localAgentEvents,
+                  reconciliation.events,
+                  { sessionId: session.id, roomAgentId, reason },
+                ),
+                reconciliation.events,
+              );
+              if (patchedEvents !== localAgentEvents) {
+                applied = true;
+                return updateRoomAgentEvents(item, roomAgentId, () => patchedEvents);
+              }
+              if (!hasEquivalentKimiHistoryTurnBodies(localAgentEvents, reconciliation.events)) return item;
+              applied = true;
+              return markAgentKimiHistoryCacheCurrent(item, roomAgentId);
+            }
+            applied = true;
+            return markAgentKimiHistoryCacheCurrent(reconciliation.session, roomAgentId);
+          });
+          if (applied) syncCurrentSessionFromStore(session.id);
+        };
         if (isActiveKimiCodeEngineStatus(response.data.engineStatus)) {
           setRoomAgentActivity({
             roomId: session.id,
@@ -3389,49 +3440,7 @@ function App() {
                 histAgeMs: now - lastHistoryRefreshAt,
               },
             });
-            const loaded = await timeSync("runningSample.loadHistory", () => window.api.loadKimiCodeSession({
-              workDir: session.projectPath,
-              sessionId: runtimeSessionId,
-            })).catch(() => null);
-            if (disposed || !loaded?.success) return;
-            const canonicalSnapshotEvents = timeSync("runningSample.mapHistory", () => mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []));
-            let applied = false;
-            updateSession(session.id, (item) => {
-              const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
-              // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-              if (isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
-                return item;
-              }
-              const reconciliation = timeSync("runningSample.reconcile", () => reconcileAgentCanonicalHistory({
-                session: item,
-                roomAgentId,
-                expectedRuntimeSessionId: runtimeSessionId,
-                canonicalEvents: canonicalSnapshotEvents,
-                reason: "running-sample",
-              }));
-              if (!reconciliation.applied) {
-                return item;
-              }
-              if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason: "running-sample", rawCanonicalEvents: canonicalSnapshotEvents })) {
-                const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
-                  localAgentEvents,
-                  reconciliation.events,
-                  { sessionId: session.id, roomAgentId, reason: "running-sample" },
-  ),
-  reconciliation.events,
-);
-                if (patchedEvents !== localAgentEvents) {
-                  applied = true;
-                  return updateRoomAgentEvents(item, roomAgentId, () => patchedEvents);
-                }
-                if (!hasEquivalentKimiHistoryTurnBodies(localAgentEvents, reconciliation.events)) return item;
-                applied = true;
-                return markAgentKimiHistoryCacheCurrent(item, roomAgentId);
-              }
-              applied = true;
-              return markAgentKimiHistoryCacheCurrent(reconciliation.session, roomAgentId);
-            });
-            if (applied) syncCurrentSessionFromStore(session.id);
+            await reconcileFromHistorySnapshot("running-sample");
           }
           return;
         }
@@ -3442,6 +3451,7 @@ function App() {
         const terminalPolls = (runtimeTerminalPollRef.current.get(runtimeSessionId) ?? 0) + 1;
         runtimeTerminalPollRef.current.set(runtimeSessionId, terminalPolls);
         if (terminalPolls < 2) return;
+        const terminalLastStreamEventAt = runtimeLastStreamEventAtRef.current.get(runtimeSessionId) ?? 0;
         runtimeTerminalPollRef.current.delete(runtimeSessionId);
         runtimeLastStreamEventAtRef.current.delete(runtimeSessionId);
         runtimeHistoryRefreshAtRef.current.delete(runtimeSessionId);
@@ -3500,6 +3510,11 @@ function App() {
           roomMessageId: active?.roomMessageId ?? persistedTarget?.roomMessageId,
         }, terminalStatus, settledAt, turnReceivedBody));
         syncCurrentSessionFromStore(session.id);
+        // 收尾帧丢失（重启/订阅被顶替/断线）时立即补一次同守卫对账，让最后一截
+        // 正文马上自愈，而不是挂到下次启动或发消息。
+        if (Date.now() - terminalLastStreamEventAt > TERMINAL_STREAM_GAP_MS) {
+          void reconcileFromHistorySnapshot("terminal-tail").catch(() => undefined);
+        }
         setRoomAgentActivity({
           roomId: session.id,
           roomAgentId,
