@@ -16,9 +16,9 @@ export interface UiStylePreset {
  * 字体不纳入切换，保持 LXGW WenKai 不变。
  */
 export const UI_STYLES: UiStylePreset[] = [
-  { id: "default", label: "Kimix 默认", description: "当前视觉，柔和圆角与轻盈阴影。" },
-  { id: "modern", label: "现代化", description: "Codex 式工作台：安静侧栏、大圆角内容壳与轻悬浮层次。" },
-  { id: "retro", label: "复古", description: "Platinum：细腻层级、小圆角与克制高光的经典桌面质感。" },
+  { id: "default", label: "Kimix 默认", description: "温和圆角、轻阴影，延续现有熟悉界面。" },
+  { id: "modern", label: "现代化", description: "安静侧栏、大圆角内容区与轻薄悬浮层次。" },
+  { id: "retro", label: "复古", description: "小圆角、清晰描边与克制高光的经典桌面感。" },
 ];
 
 export function normalizeUiStyleId(value: unknown): UiStyleId {

@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 优化：界面风格说明去外部产品名（v2.20.135）
+
+- 调整：三套界面风格描述改为自有表述，不再出现 Codex / Platinum 等外部名称。
+- 验证：文案与 uiStyles 单测。
+
 ## 2026-08-02 修复：深色模式层级与对比度灾难（v2.20.134）
 
 - 根因：`buildDarkTokens` 把 surface 种子与 `#050505` 高比例混合，ground/base/elevated/hover 几乎同色；边框反而更暗；`--text-muted` 在 elevated 上约 2.5:1。
