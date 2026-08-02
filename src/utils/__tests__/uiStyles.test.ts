@@ -103,7 +103,8 @@ describe("UI_STYLES", () => {
     expect(retroBlock).toMatch(/--ui-nav-action-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(retroBlock).toMatch(/--ui-nav-list-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
     expect(retroBlock).toMatch(/--ui-menu-trigger-hover-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/);
-    expect(css).toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\(button:hover:not\(:disabled\)\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).not.toMatch(/:where\(\[data-ui-style="retro"\]\)\s+:where\(button:hover/);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+:where\([\s\S]*?\.kimix-sidebar-icon-action,[\s\S]*?\.kimix-state-button[\s\S]*?\):hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--kimix-retro-button-hover-border-color\), var\(--kimix-retro-button-hover-shadow\);/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-context-bar\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
   });
 

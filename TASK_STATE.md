@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 修复：复古会话行移除嵌套文字框（v2.20.113）
+
+- 根因：v2.20.112 的全局原生 `button:hover` 兜底同时命中了会话行外层视觉表面内的标题点击按钮，导致一行 hover 时出现“整行外框 + 文字内框”两个边界所有者。
+- 修复：删除全局原生按钮兜底，改为独立视觉按钮语义类白名单；会话行继续由 `.kimix-sidebar-session-row` 绘制唯一 hover 外框，内部标题按钮只保留点击热区，右侧独立操作按钮仍有自己的 hover 反馈。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BPPwNv4t.css`、JS `assets/index-ML95Vm0Q.js`）、OKF strict/audit 校验（13 concepts、391 links）通过；实际观感等待用户在 v2.20.113 检查会话行 hover。
+
 ## 2026-08-02 优化：复古按钮 hover 全覆盖并移除底栏外框（v2.20.112）
 
 - 根因一：左上角新对话、搜索等使用 `ui-nav-action`，Retro 将该角色的 hover 边框/阴影设为透明与 `none`；顶部菜单和工具按钮则走另一套 tactile token，造成同为按钮却反馈不一致。

@@ -724,8 +724,16 @@
   box-shadow: var(--kimix-retro-button-hover-shadow);
 }
 
-/* 未登记到语义按钮类的原生按钮也获得复古 hover 环；更具体的业务态仍可覆盖。 */
-:where([data-ui-style="retro"]) :where(button:hover:not(:disabled)) {
+/* 只给独立视觉按钮补充复古 hover 环；嵌套点击热区由外层表面拥有边界。 */
+[data-ui-style="retro"] :where(
+  .kimix-icon-text-button,
+  .kimix-muted-action,
+  .kimix-inline-icon-action,
+  .kimix-sidebar-icon-action,
+  .kimix-modal-close-button,
+  .kimix-settings-entry,
+  .kimix-state-button
+):hover:not(:disabled) {
   box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
 }
 
