@@ -35,7 +35,6 @@ import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/r
 import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 import { ModelProviderManager } from "./ModelProviderManager";
-import { SettingsPageIcon } from "./SettingsWorkspaceSidebar";
 import {
   getSettingsPage,
   getSettingsPageForSection,
@@ -1241,43 +1240,34 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         <div className={`kimix-settings-body ${variant === "workspace" ? "kimix-stable-scrollbar" : ""}`}>
           <div className={`kimix-settings-layout ${variant === "workspace" ? "is-workspace" : ""}`}>
             <main className="kimix-settings-page">
-              {variant === "workspace" && (
-                <div className="kimix-settings-page-header">
-                  <div className="kimix-settings-page-heading">
-                    <SettingsPageIcon pageId={activeSettingsPage.id} />
-                    <div className="min-w-0">
-                      <h3>{activeSettingsPage.label}</h3>
-                      <p>{activeSettingsPage.description}</p>
+              {variant === "workspace" && activeSettingsPageId === "models" && (
+                <div className="kimix-settings-page-toolbar">
+                  <div className="kimix-settings-page-actions">
+                    <div className="kimix-settings-model-meta">
+                      <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
+                        {modelConfig?.defaultModel ? `默认模型 ${modelConfig.defaultModel}` : "未设置默认模型"}
+                      </span>
+                      <small>{modelConfig?.providers.length ?? 0} 个 Provider</small>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDoctorModelConfig()}
+                      disabled={modelDoctorLoading}
+                      className="kimix-settings-check-button"
+                    >
+                      <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
+                      <span>诊断</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void refreshModelConfig({ showLoading: true })}
+                      disabled={modelConfigLoading}
+                      className="kimix-settings-check-button"
+                    >
+                      <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
+                      <span>刷新</span>
+                    </button>
                   </div>
-                  {activeSettingsPageId === "models" && (
-                    <div className="kimix-settings-page-actions">
-                      <div className="kimix-settings-model-meta">
-                        <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
-                          {modelConfig?.defaultModel ? `默认模型 ${modelConfig.defaultModel}` : "未设置默认模型"}
-                        </span>
-                        <small>{modelConfig?.providers.length ?? 0} 个 Provider</small>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleDoctorModelConfig()}
-                        disabled={modelDoctorLoading}
-                        className="kimix-settings-check-button"
-                      >
-                        <Terminal size={15} className={modelDoctorLoading ? "kimix-spin" : ""} />
-                        <span>诊断</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void refreshModelConfig({ showLoading: true })}
-                        disabled={modelConfigLoading}
-                        className="kimix-settings-check-button"
-                      >
-                        <RefreshCw size={15} className={modelConfigLoading ? "kimix-spin" : ""} />
-                        <span>刷新</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 

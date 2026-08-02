@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Settings keeps sidebar context but removes repeated active-page headings (v2.20.118)**: the replacement settings sidebar again exposes its local return/title context, while the right body no longer repeats General, Appearance, or other active navigation labels and descriptions. Model diagnosis and refresh survive as a compact action-only toolbar. This supersedes the v2.20.117 rule that reduced the replacement sidebar to search and categories only. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
+
 * **Settings joins the shared full-page workspace hierarchy (v2.20.117)**: Settings now places its identity, scope description, and return action in the same `.kimix-workspace-header` used by Plugins and Hooks. Its replacement sidebar owns only search and category navigation, while the active page heading remains in the scrollable body. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).
 
 * **Retro binary buttons separate tactile hover from persistent selection (v2.20.116)**: Swarm and Plan no longer use the neutral embossed toggle token for their enabled state. Unpressed hover consumes the Retro border/background/inset-shadow language, while `aria-pressed="true"` restores Kimix's accent border, light accent fill, and accent text. State buttons are removed from the standalone fallback-ring allowlist. See [/architecture/interface-style-system.md](/architecture/interface-style-system.md).

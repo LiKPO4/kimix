@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle,
   Archive,
+  ArrowLeft,
   MessageSquare,
   Search,
   Settings,
@@ -40,6 +41,7 @@ export function SettingsPageIcon({ pageId, size = 16 }: { pageId: SettingsPageId
 export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; collapsed: boolean }) {
   const activeSettingsPageId = useAppStore((state) => state.activeSettingsPageId);
   const setActiveSettingsPageId = useAppStore((state) => state.setActiveSettingsPageId);
+  const setWorkspaceView = useAppStore((state) => state.setWorkspaceView);
   const [searchQuery, setSearchQuery] = useState("");
   const searchResults = useMemo(() => searchSettings(searchQuery), [searchQuery]);
   const navigationGroups = useMemo(() => (
@@ -89,6 +91,15 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         }}
         aria-label="设置导航"
       >
+        <button
+          type="button"
+          onClick={() => setWorkspaceView("chat")}
+          className="kimix-settings-sidebar-icon-button"
+          title="返回对话"
+          aria-label="返回对话"
+        >
+          <ArrowLeft size={17} />
+        </button>
         <nav className="kimix-settings-sidebar-collapsed-pages" aria-label="设置分类">
           {SETTINGS_PAGES.map((page) => (
             <button
@@ -116,6 +127,21 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
       style={{ width, minHeight: 0, padding: "0 10px 12px 12px" }}
       aria-label="设置导航"
     >
+      <div className="kimix-settings-sidebar-header">
+        <button
+          type="button"
+          onClick={() => setWorkspaceView("chat")}
+          className="kimix-settings-sidebar-back"
+        >
+          <ArrowLeft size={16} />
+          <span>返回对话</span>
+        </button>
+        <div className="kimix-settings-sidebar-title">
+          <Settings size={18} />
+          <span>设置</span>
+        </div>
+      </div>
+
       <div className="kimix-settings-search is-sidebar">
         <Search size={15} aria-hidden="true" />
         <input

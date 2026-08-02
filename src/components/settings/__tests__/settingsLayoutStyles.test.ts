@@ -25,12 +25,15 @@ describe("settings workspace scroll layout", () => {
     );
   });
 
-  it("uses the shared workspace header instead of duplicating page identity in the sidebar", () => {
+  it("keeps workspace context in the sidebar without repeating the selected page heading", () => {
     expect(settingsPanel).toContain('<div className="kimix-workspace-header">');
     expect(settingsPanel).toContain("管理 Kimix 的外观、对话权限、账户连接与高级选项。");
     expect(settingsPanel).toContain("onClick={onBackToChat}");
-    expect(settingsSidebar).not.toContain("kimix-settings-sidebar-header");
-    expect(settingsSidebar).not.toContain("返回对话");
+    expect(settingsSidebar).toContain("kimix-settings-sidebar-header");
+    expect(settingsSidebar).toContain("返回对话");
+    expect(settingsPanel).not.toContain("kimix-settings-page-header");
+    expect(settingsPanel).not.toContain("kimix-settings-page-heading");
+    expect(settingsPanel).toContain("kimix-settings-page-toolbar");
   });
 
   it("pins the footer to the viewport bottom without detaching it from overflowing content", () => {

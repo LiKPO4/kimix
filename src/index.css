@@ -2030,6 +2030,48 @@ button.bg-accent-primary:disabled:hover,
   color: var(--text-primary);
 }
 
+.kimix-settings-sidebar-header {
+  flex-shrink: 0;
+  padding: 0 8px 14px;
+}
+
+.kimix-settings-sidebar-back,
+.kimix-settings-sidebar-title {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.kimix-settings-sidebar-back {
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  transition-property: background-color, color, scale;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+
+.kimix-settings-sidebar-back:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-settings-sidebar-back:active {
+  scale: 0.96;
+}
+
+.kimix-settings-sidebar-title {
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 24px;
+}
+
 .kimix-settings-search.is-sidebar {
   margin-left: 8px;
   margin-right: 8px;
@@ -2233,43 +2275,13 @@ button.bg-accent-primary:disabled:hover,
   padding-right: 4px;
 }
 
-.kimix-settings-page-header {
-  display: grid;
-  min-height: 72px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  padding: 4px 4px 16px;
-}
-
-.kimix-settings-page-heading {
+.kimix-settings-page-toolbar {
   display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.kimix-settings-page-heading > svg {
+  min-height: 40px;
   flex-shrink: 0;
-  margin-top: 4px;
-  color: var(--text-muted);
-}
-
-.kimix-settings-page-heading h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 650;
-  line-height: 22px;
-  text-wrap: balance;
-}
-
-.kimix-settings-page-heading p {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 12.5px;
-  line-height: 18px;
-  text-wrap: pretty;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 4px 14px;
 }
 
 .kimix-settings-page-actions {
@@ -3275,12 +3287,6 @@ button.bg-accent-primary:disabled:hover,
 }
 
 @media (max-width: 760px) {
-  .kimix-settings-page-header {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 12px;
-  }
-
   .kimix-settings-page-actions {
     flex-wrap: wrap;
     justify-content: flex-start;
