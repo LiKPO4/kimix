@@ -355,7 +355,7 @@ function AttachmentThumb({
         key={image.id ?? `${image.name}-${index}`}
         type="button"
         onClick={() => onPreview({ id: image.id, name: image.name, dataUrl })}
-        className="kimix-media-thumb h-24 w-24 overflow-hidden rounded-[var(--radius-md)] transition-colors"
+        className="kimix-media-thumb h-24 w-24 overflow-hidden"
         title="点击查看图片"
         aria-label={`查看图片 ${image.name}`}
       >
@@ -366,7 +366,7 @@ function AttachmentThumb({
   return (
     <div
       key={image.id ?? `${image.name}-${index}`}
-      className="kimix-media-thumb flex h-24 w-[196px] flex-col justify-center rounded-[14px] text-[var(--kimix-panel-text-muted)]"
+      className="kimix-media-thumb flex h-24 w-[196px] flex-col justify-center text-[var(--kimix-panel-text-muted)]"
       title={image.filePath || image.name}
       style={{ gap: 7, paddingLeft: 14, paddingRight: 14 }}
     >
@@ -421,7 +421,7 @@ function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index
   return (
     <div
       key={image.id ?? `${image.name}-${index}`}
-      className="kimix-media-thumb relative h-[135px] w-[240px] max-w-full overflow-hidden rounded-[14px] bg-black"
+      className="kimix-media-thumb relative h-[135px] w-[240px] max-w-full overflow-hidden bg-black"
       title={error || image.name}
     >
       {source ? (

@@ -83,7 +83,7 @@ function KimiOnboardingDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Kimi Code 配置引导"
-        className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px" }}
       >
         <div className="flex items-start justify-between" style={{ gap: 16 }}>
@@ -219,7 +219,7 @@ function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchC
         role="dialog"
         aria-modal="true"
         aria-label="设置启动命令"
-        className={`kimix-modal-card kimix-presence-content w-full max-w-[520px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[520px] ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px 24px" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -285,7 +285,7 @@ function ShutdownDialog({ dialog, onCancel }: ShutdownDialogProps) {
         role="dialog"
         aria-modal="true"
         aria-label="关机确认"
-        className={`kimix-modal-card kimix-presence-content w-full max-w-[460px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[460px] ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px" }}
       >
         <div className="text-[18px] font-semibold leading-6 text-text-primary">长程任务已完成</div>
@@ -384,7 +384,7 @@ function HelpDialogPanel({
         role="dialog"
         aria-modal="true"
         aria-label={helpDialogTitles[visibleDialog]}
-        className={`kimix-modal-card kimix-presence-content w-full max-w-[560px] rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[560px] ${presence.visible ? "is-visible" : ""}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border-subtle" style={{ padding: "16px 20px" }}>

@@ -109,7 +109,7 @@ function RemovalConfirmDialog({ target, busy, onCancel, onConfirm }: {
         role="dialog"
         aria-modal="true"
         aria-labelledby="model-provider-removal-title"
-        className="kimix-modal-card w-full max-w-[430px] rounded-[18px]"
+        className="kimix-modal-card w-full max-w-[430px]"
         style={{ padding: "20px 22px" }}
       >
         <div id="model-provider-removal-title" className="text-[16px] font-semibold leading-6 text-text-primary">{title}</div>

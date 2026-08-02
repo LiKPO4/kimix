@@ -64,7 +64,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
   const extensionText = normalizedExtensions.length > 0 ? normalizedExtensions.map((item) => `.${item}`).join("、") : "未配置";
 
   return (
-    <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-border-subtle shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+    <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden border border-border-subtle">
       <div className="grid h-14 shrink-0 items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 18, paddingRight: 14, columnGap: 12 }}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold leading-5 text-text-primary">文件预览</div>

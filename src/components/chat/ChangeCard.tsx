@@ -515,7 +515,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-[14px] border border-border-subtle bg-surface-elevated">
+    <div className="kimix-section-card w-full overflow-hidden">
       <div
         className="grid items-center border-b border-border-subtle"
         style={{

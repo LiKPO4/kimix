@@ -203,6 +203,68 @@ describe("UI_STYLES", () => {
     expect(sessionToolbar).toContain("kimix-toolbar-button");
     expect(sessionToolbar).toContain("kimix-menu-panel");
   });
+
+  it("独立内容分区与游离表面全部接入风格语义角色", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const longTaskInspector = readFileSync(resolve(process.cwd(), "src/components/layout/LongTaskInspectorPanel.tsx"), "utf8");
+    const hooksPanel = readFileSync(resolve(process.cwd(), "src/components/layout/HooksPanel.tsx"), "utf8");
+    const changeCard = readFileSync(resolve(process.cwd(), "src/components/chat/ChangeCard.tsx"), "utf8");
+    const fileCard = readFileSync(resolve(process.cwd(), "src/components/chat/FileCard.tsx"), "utf8");
+    const questionCard = readFileSync(resolve(process.cwd(), "src/components/chat/QuestionCard.tsx"), "utf8");
+    const todoPanel = readFileSync(resolve(process.cwd(), "src/components/chat/TodoPanel.tsx"), "utf8");
+    const eventCardSources = [
+      readFileSync(resolve(process.cwd(), "src/components/chat/ApprovalCard.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/chat/ErrorCard.tsx"), "utf8"),
+      questionCard,
+      readFileSync(resolve(process.cwd(), "src/components/chat/SessionRecommendationCard.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/chat/ChatThread.tsx"), "utf8"),
+    ];
+    const semanticSurfaceSources = [
+      readFileSync(resolve(process.cwd(), "src/components/layout/AppShell.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/layout/DialogSystem.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/layout/SessionToolbar.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/settings/ModelProviderManager.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/settings/RoomDeliveryIdentityInspector.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/chat/DrawingBoard.tsx"), "utf8"),
+      readFileSync(resolve(process.cwd(), "src/components/chat/MessageBubble.tsx"), "utf8"),
+    ].join("\n");
+
+    expect(css).toMatch(/\.kimix-section-card\s*\{[^}]*border:\s*1px solid var\(--border-subtle\);[^}]*background:\s*var\(--surface-elevated\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\][\s\S]*?\.kimix-section-card\s*\{[^}]*border-radius:\s*var\(--kimix-modern-card-radius\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\][\s\S]*?\.kimix-section-card\s*\{[^}]*border-radius:\s*var\(--radius-md\);[^}]*box-shadow:\s*var\(--kimix-retro-panel-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-event-card\s*\{[^}]*border-radius:\s*var\(--kimix-modern-card-radius\);[^}]*box-shadow:\s*none;[^}]*\}/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-event-card\s*\{[^}]*border-radius:\s*var\(--radius-md\);[^}]*box-shadow:\s*var\(--kimix-retro-panel-shadow\);[^}]*\}/s);
+    expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-event-card\s*\{[^}]*border(?:-color)?:/s);
+    expect(longTaskInspector.match(/className="kimix-section-card"/g)).toHaveLength(18);
+    expect(hooksPanel.match(/className="kimix-section-card(?:\s[^\"]*)?"/g)).toHaveLength(6);
+    for (const source of [changeCard, fileCard, todoPanel]) {
+      expect(source).toContain("kimix-section-card");
+    }
+    expect(questionCard).toContain("kimix-inset-section");
+    expect(css).toMatch(/\.kimix-inset-section\s*\{[^}]*border:\s*0;[^}]*background:\s*var\(--surface-elevated\);/s);
+    expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-inset-section\s*\{[^}]*border(?:-color)?:/s);
+    for (const source of eventCardSources) {
+      expect(source).toContain("kimix-event-card");
+    }
+    expect(fileCard).toContain("kimix-split-control");
+    expect(fileCard).toContain("kimix-split-control-part");
+    expect(css).toMatch(/:root:not\(\[data-ui-style\]\)\s+\.kimix-file-open-control\s*\{[^}]*border:\s*1px solid var\(--border-subtle\);[^}]*border-radius:\s*12px;/s);
+
+    for (const role of [
+      "kimix-longtask-inspector",
+      "kimix-diff-panel",
+      "kimix-skill-card",
+      "kimix-toast",
+      "kimix-chat-navigation-preview",
+      "kimix-model-provider-sidebar",
+    ]) {
+      expect(css).toContain(`[data-ui-style="modern"] .${role}`);
+      expect(css).toContain(`[data-ui-style="retro"] .${role}`);
+    }
+
+    expect(semanticSurfaceSources).not.toMatch(/kimix-(?:modal-card|onboarding-card|floating-panel|app-shell-main|media-thumb)[^\n\"`]*(?:rounded-\[[^\]]+\]|shadow-\[[^\]]+\])/);
+  });
 });
 
 describe("applyUiStyle", () => {

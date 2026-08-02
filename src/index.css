@@ -506,9 +506,20 @@
 [data-ui-style="modern"] .kimix-soft-card-strong,
 [data-ui-style="modern"] .kimix-settings-card,
 [data-ui-style="modern"] .kimix-settings-uistyle,
-[data-ui-style="modern"] .kimix-settings-palette-wrap {
+[data-ui-style="modern"] .kimix-settings-palette-wrap,
+[data-ui-style="modern"] .kimix-section-card {
   border: 1px solid var(--border-subtle);
   border-radius: var(--kimix-modern-card-radius);
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-event-card {
+  border-radius: var(--kimix-modern-card-radius);
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-inset-section {
+  border-radius: var(--kimix-modern-control-radius);
   box-shadow: none;
 }
 
@@ -556,6 +567,34 @@
   border-radius: 12px;
   background: transparent;
   box-shadow: none;
+}
+
+/* 侧栏外壳、Diff 面板、技能卡、Toast、导航预览、供应商侧栏补风格覆盖：
+   Modern 统一 hairline 边界和角色圆角；阴影沿用对应档位 token。 */
+[data-ui-style="modern"] .kimix-longtask-inspector,
+[data-ui-style="modern"] .kimix-diff-panel {
+  border-color: var(--border-subtle) !important;
+  border-radius: var(--kimix-modern-panel-radius) !important;
+  box-shadow: var(--shadow-hover);
+}
+
+[data-ui-style="modern"] .kimix-skill-card {
+  border-radius: var(--kimix-modern-card-radius);
+}
+
+[data-ui-style="modern"] .kimix-toast {
+  border: var(--ui-popup-border);
+  box-shadow: var(--ui-popup-shadow);
+}
+
+[data-ui-style="modern"] .kimix-chat-navigation-preview {
+  border: var(--ui-popup-border);
+  border-radius: var(--kimix-modern-panel-radius);
+  box-shadow: var(--ui-popup-shadow);
+}
+
+[data-ui-style="modern"] .kimix-model-provider-sidebar {
+  border-color: var(--border-subtle);
 }
 
 /* 复古：借鉴 Classic Mac OS 8/9 Platinum 的克制层级与控件触感。
@@ -646,10 +685,21 @@
 [data-ui-style="retro"] .kimix-settings-card,
 [data-ui-style="retro"] .kimix-settings-theme,
 [data-ui-style="retro"] .kimix-settings-uistyle,
-[data-ui-style="retro"] .kimix-settings-palette-wrap {
+[data-ui-style="retro"] .kimix-settings-palette-wrap,
+[data-ui-style="retro"] .kimix-section-card {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-event-card {
+  border-radius: var(--radius-md);
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-inset-section {
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 /* 设置输入控件可内凹；Composer 由外壳承担边界，内部 textarea 必须保持无框。 */
@@ -759,9 +809,18 @@
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-card,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-theme,
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-uistyle,
-[data-theme="dark"][data-ui-style="retro"] .kimix-settings-palette-wrap {
+[data-theme="dark"][data-ui-style="retro"] .kimix-settings-palette-wrap,
+[data-theme="dark"][data-ui-style="retro"] .kimix-section-card {
   border-color: var(--border-default);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"][data-ui-style="retro"] .kimix-event-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"][data-ui-style="retro"] .kimix-inset-section {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 [data-theme="dark"][data-ui-style="retro"] .kimix-settings-input {
@@ -790,6 +849,36 @@
 [data-ui-style="retro"] .kimix-menu-item[aria-checked="true"],
 [data-ui-style="retro"] .kimix-menu-item[aria-selected="true"] {
   box-shadow: inset 2px 0 0 var(--accent-primary);
+}
+
+/* 与 Modern 对应的游离角色：Retro 统一小圆角和 panel/floating 阴影。
+   技能卡的启用态边框是 accent 语义色，只接管圆角与阴影，不覆盖边框色。 */
+[data-ui-style="retro"] .kimix-longtask-inspector,
+[data-ui-style="retro"] .kimix-diff-panel {
+  border-color: var(--border-default) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-skill-card {
+  border-radius: var(--radius-md);
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+[data-ui-style="retro"] .kimix-toast {
+  border: var(--ui-popup-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ui-popup-shadow);
+}
+
+[data-ui-style="retro"] .kimix-chat-navigation-preview {
+  border: var(--ui-popup-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ui-popup-shadow);
+}
+
+[data-ui-style="retro"] .kimix-model-provider-sidebar {
+  border-color: var(--border-default);
 }
 
 /* 等宽字体点缀：仅标签/徽章/标题/数字，不改全局 --font-sans */
@@ -1319,6 +1408,18 @@ body::before {
   color: var(--ui-toggle-color);
   box-shadow: var(--ui-toggle-shadow);
   transform: translateY(0);
+}
+
+/* 文件卡的打开控件不在顶栏内，默认风格单独保留原有的完整边界。 */
+:root:not([data-ui-style]) .kimix-file-open-control {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-hover);
+}
+
+:root:not([data-ui-style]) .kimix-file-open-control:hover {
+  border-color: var(--border-default);
 }
 
 .kimix-window-control.is-danger:hover:not(:disabled) {
@@ -3589,6 +3690,27 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-sm);
 }
 
+/* 独立内容分区统一接入风格角色；输入、按钮、弹窗内说明块不得复用此类。 */
+.kimix-section-card {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
+  border-radius: var(--ui-radius-xl, 12px);
+}
+
+/* 带业务语义色的对话事件卡只共享形状和质感，不接管其背景与边框色。 */
+.kimix-event-card {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-hover);
+}
+
+/* 完整卡片内部的内容分层只保留背景和圆角，不建立第二个边界。 */
+.kimix-inset-section {
+  border: 0;
+  border-radius: var(--ui-radius-xl, 12px);
+  background: var(--surface-elevated);
+  box-shadow: none;
+}
+
 .kimix-soft-card-strong {
   border: 1px solid var(--border-subtle);
   background: var(--surface-hover);
@@ -3649,7 +3771,9 @@ button.bg-accent-primary:disabled:hover,
   border: 1px solid var(--border-default);
   background: var(--surface-base);
   border-radius: var(--radius-sm);
-  transition: border-color var(--duration-base) var(--ease-hover);
+  box-shadow: var(--shadow-hover);
+  transition: border-color var(--duration-base) var(--ease-hover),
+              box-shadow var(--duration-base) var(--ease-hover);
 }
 
 .kimix-media-thumb:hover {
@@ -3705,6 +3829,7 @@ button.bg-accent-primary:disabled:hover,
   background: var(--kimix-info-bg);
   color: var(--kimix-info-text);
   border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hover);
 }
 
 .kimix-chat-banner.is-reviewer {
@@ -3746,6 +3871,7 @@ button.bg-accent-primary:disabled:hover,
   background: var(--surface-base) !important;
   color: var(--text-primary) !important;
   border-radius: var(--radius-lg) !important;
+  box-shadow: 0 1px 2px rgba(25, 23, 20, 0.04);
 }
 
 /* ── User Bubble ── */
@@ -3763,6 +3889,7 @@ button.bg-accent-primary:disabled:hover,
   background: var(--surface-base) !important;
   color: var(--text-primary) !important;
   border-radius: var(--radius-lg) !important;
+  box-shadow: 0 1px 2px rgba(25, 23, 20, 0.04);
 }
 
 .kimix-longtask-inspector [data-right-sidebar-drop-position]::before {

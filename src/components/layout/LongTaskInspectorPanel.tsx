@@ -1206,7 +1206,7 @@ export function LongTaskInspectorPanel({
   return (
     <>
     {panelOpen && (
-    <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-border-subtle shadow-[0_1px_2px_rgba(25,23,20,0.04)]">
+    <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-longtask-inspector flex h-full shrink-0 flex-col overflow-hidden border border-border-subtle">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle" style={{ paddingLeft: 18, paddingRight: 14 }}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold leading-5 text-text-primary">{title}</div>
@@ -1225,7 +1225,7 @@ export function LongTaskInspectorPanel({
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
         {longTaskMeta ? (
           <div className="flex flex-col" style={{ gap: 16 }}>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("longTaskStatus", 0, { padding: "18px 16px 20px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("longTaskStatus", 0, { padding: "18px 16px 20px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">当前状态</div>
                 {rightCardDragHandle("longTaskStatus", "当前状态")}
@@ -1340,7 +1340,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Kimi 后台任务</div>
@@ -1380,7 +1380,7 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("bigPlan", 3, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("bigPlan", 3, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">BIGPLAN</div>
@@ -1451,7 +1451,7 @@ export function LongTaskInspectorPanel({
                 </div>
               ) : null}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("rounds", 4, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("rounds", 4, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">轮次记录</div>
@@ -1519,7 +1519,7 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("review", 5, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("review", 5, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">用户审查清单</div>
@@ -1570,7 +1570,7 @@ export function LongTaskInspectorPanel({
               )}
             </section>
             {completedReviewItems.length > 0 && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("confirmed", 6, { padding: "16px 16px 18px" })}>
+              <section className="kimix-section-card" {...rightCardSectionProps("confirmed", 6, { padding: "16px 16px 18px" })}>
                 <div className="flex items-center justify-between" style={{ gap: 10 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">已确认</div>
@@ -1605,7 +1605,7 @@ export function LongTaskInspectorPanel({
         ) : (
           <div className="flex flex-col" style={{ gap: 14 }}>
             {hiddenComposerCardEntries.length > 0 && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("hidden", 0, { padding: "16px 16px 18px" })}>
+              <section className="kimix-section-card" {...rightCardSectionProps("hidden", 0, { padding: "16px 16px 18px" })}>
                 <div className="flex items-start justify-between" style={{ gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">已收起卡片</div>
@@ -1644,7 +1644,7 @@ export function LongTaskInspectorPanel({
               </section>
             )}
             {longTaskMeta && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("longTask", 1, { padding: "16px 16px 18px" })}>
+              <section className="kimix-section-card" {...rightCardSectionProps("longTask", 1, { padding: "16px 16px 18px" })}>
                 <div className="flex items-start justify-between" style={{ gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">长程任务</div>
@@ -1683,7 +1683,7 @@ export function LongTaskInspectorPanel({
                 )}
               </section>
             )}
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("kimi", 2, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("kimi", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <button
                   type="button"
@@ -1791,7 +1791,7 @@ export function LongTaskInspectorPanel({
               )}
             </section>
             {bashTasks.length > 0 && (
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">后台 Bash</div>
@@ -1823,7 +1823,7 @@ export function LongTaskInspectorPanel({
             </section>
             )}
             {subagentTasks.length > 0 && (
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagentTasks", 2, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("subagentTasks", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">子 Agent</div>
@@ -1854,7 +1854,7 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
             )}
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("subagent", 3, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("subagent", 3, { padding: "16px 16px 18px" })}>
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <Bot size={15} className="shrink-0 text-accent-primary" />
@@ -1927,7 +1927,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
               <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 96px) auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <GitBranch size={15} className="shrink-0 text-accent-primary" />
@@ -2009,7 +2009,7 @@ export function LongTaskInspectorPanel({
                 </div>
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("btw", 4, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("btw", 4, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <MessageCircleQuestion size={15} className="shrink-0 text-accent-primary" />
@@ -2102,7 +2102,7 @@ export function LongTaskInspectorPanel({
                 )}
               </div>
             </section>
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("plan", 6, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("plan", 6, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Plan</div>
@@ -2158,7 +2158,7 @@ export function LongTaskInspectorPanel({
             </section>
 
             {serverTreeAvailable && (
-              <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("serverTree", 7, { padding: "16px 16px 18px" })}>
+              <section className="kimix-section-card" {...rightCardSectionProps("serverTree", 7, { padding: "16px 16px 18px" })}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium leading-5 text-text-muted">官方会话树</div>
@@ -2237,7 +2237,7 @@ export function LongTaskInspectorPanel({
               </section>
             )}
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("session", 8, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("session", 8, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">会话信息</div>
                 {rightCardDragHandle("session", "会话信息")}
@@ -2266,7 +2266,7 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
 
-            <section className="rounded-xl border border-border-subtle bg-surface-elevated" {...rightCardSectionProps("diffs", 8, { padding: "16px 16px 18px" })}>
+            <section className="kimix-section-card" {...rightCardSectionProps("diffs", 8, { padding: "16px 16px 18px" })}>
               <div className="flex items-center justify-between" style={{ gap: 10 }}>
                 <div className="text-[13px] font-medium leading-5 text-text-muted">最近变更</div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>

@@ -76,7 +76,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
 
   return (
     <div
-      className={`relative w-full rounded-[14px] border border-border-subtle bg-surface-elevated transition-all ${
+      className={`kimix-section-card relative w-full transition-[box-shadow] ${
         isOpen ? "z-[60]" : "z-10"
       }`}
       style={{ padding: "18px 22px" }}
@@ -91,12 +91,12 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
         </div>
 
         <div className="relative shrink-0" ref={menuRef}>
-          <div className="inline-flex items-center rounded-xl border border-border-subtle bg-surface-elevated shadow-sm hover:border-border transition-colors">
+          <div className={`kimix-file-open-control kimix-split-control inline-flex items-center ${isOpen ? "is-expanded" : ""}`}>
             <button
               type="button"
               onClick={handleOpenDefault}
               disabled={!project || !path}
-              className="flex h-9 items-center text-[13.5px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45 rounded-l-xl transition-colors whitespace-nowrap"
+              className="kimix-split-control-part flex h-9 items-center whitespace-nowrap text-[13.5px] font-medium text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45"
               style={{ paddingLeft: 14, paddingRight: 8 }}
             >
               打开
@@ -106,7 +106,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               onClick={() => setIsOpen((prev) => !prev)}
               disabled={!project || !path}
               title="选择打开方式"
-              className="flex h-9 w-8 items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45 rounded-r-xl transition-colors border-l border-border-subtle"
+              className="kimix-split-control-part flex h-9 w-8 items-center justify-center text-text-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45"
             >
               <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? "rotate-180 text-text-primary" : ""}`} />
             </button>

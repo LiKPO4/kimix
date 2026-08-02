@@ -1951,7 +1951,7 @@ ${isFinalStep
           <div className="kimix-layout-spacer" />
         )}
         <main
-          className="kimix-app-shell-main relative grid min-w-0 flex-1 overflow-hidden rounded-[20px] border shadow-[0_1px_2px_rgba(25,23,20,0.04)]"
+          className="kimix-app-shell-main relative grid min-w-0 flex-1 overflow-hidden border shadow-hover-token"
           style={{ gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: mainGridRows, minHeight: 0 }}
         >
           {chatWorkspaceActive && (

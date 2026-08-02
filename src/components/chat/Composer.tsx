@@ -4341,7 +4341,7 @@ export function Composer() {
 
       {pendingMessages.length > 0 && !pendingHidden && (
         <div
-          className="kimix-floating-panel overflow-hidden rounded-[15px] text-[13px]"
+          className="kimix-floating-panel overflow-hidden text-[13px]"
           style={{ marginBottom: 8 }}
         >
           <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 12, paddingLeft: 20, paddingRight: 14 }}>
@@ -4469,7 +4469,7 @@ export function Composer() {
 
       {themeImportPreview && (
         <div
-          className="kimix-floating-panel rounded-[16px] text-[13px]"
+          className="kimix-floating-panel text-[13px]"
           style={{ marginBottom: 10, padding: 16 }}
         >
           <div
@@ -4495,7 +4495,7 @@ export function Composer() {
               {themeImportPreview.items.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[12px] bg-[var(--kimix-panel-soft-bg)]"
+                  className="rounded-xl bg-[var(--kimix-panel-soft-bg)]"
                   style={{ padding: 14 }}
                 >
                   <div
@@ -4538,7 +4538,7 @@ export function Composer() {
               ))}
             </div>
           ) : (
-            <div className="rounded-[12px] bg-[var(--kimix-panel-soft-bg)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: 16 }}>
+            <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ padding: 16 }}>
               未发现可导入的官方自定义主题 JSON。可先在 Kimi Code 中使用官方 /custom-theme 生成主题文件。
             </div>
           )}
@@ -4579,7 +4579,7 @@ export function Composer() {
         {shouldShowCompletionPanel && activeCompletion && (
           <div
             ref={completionListRef}
-            className="kimix-floating-panel mb-3 max-h-[276px] overflow-y-auto rounded-[16px] text-[14px]"
+            className="kimix-floating-panel mb-3 max-h-[276px] overflow-y-auto text-[14px]"
             style={{ padding: 10 }}
             onMouseDown={(event) => event.preventDefault()}
           >
@@ -4681,7 +4681,7 @@ export function Composer() {
               return (
                 <div
                   key={attachment.id}
-                  className={`kimix-media-thumb group relative overflow-hidden rounded-xl text-left shadow-[0_1px_2px_rgba(25,23,20,0.05)] transition-colors ${isImage ? "h-20 w-20" : isVideo ? "h-24 w-[176px]" : "h-20 w-[176px]"}`}
+                  className={`kimix-media-thumb group relative overflow-hidden text-left ${isImage ? "h-20 w-20" : isVideo ? "h-24 w-[176px]" : "h-20 w-[176px]"}`}
                   title={isImage ? undefined : attachment.filePath || attachment.name}
                 >
                   {isVideo && attachment.dataUrl ? (

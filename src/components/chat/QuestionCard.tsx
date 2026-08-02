@@ -169,7 +169,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
   return (
     <div id={`kimix-question-${event.id}`} className="flex justify-center">
       <div
-        className="w-full rounded-2xl border border-accent-primary-soft bg-accent-primary-light text-text-primary"
+        className="kimix-event-card w-full border border-accent-primary-soft bg-accent-primary-light text-text-primary"
         style={{ maxWidth: 832, paddingLeft: 22, paddingRight: 22, paddingTop: 13, paddingBottom: collapsed ? 13 : 12 }}
       >
         <button
@@ -205,7 +205,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
             const customValue = customAnswers[key] ?? "";
             const customActive = Boolean(customSelected[key] && customValue.trim().length > 0);
             return (
-              <div key={`${question.question}-${questionIndex}`} className="rounded-xl border border-border-subtle bg-surface-elevated" style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}>
+              <div key={`${question.question}-${questionIndex}`} className="kimix-inset-section" style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}>
                 <div className="flex items-center" style={{ gap: 12, minHeight: 30 }}>
                   {question.header && (
                     <span className="shrink-0 rounded-md bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>

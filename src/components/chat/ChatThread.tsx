@@ -352,7 +352,7 @@ function PlanPreviewCard({ path, projectPath, sessionId }: { path: string; proje
   }, [path, projectPath, sessionId]);
 
   return (
-    <div className="w-full overflow-hidden rounded-[var(--radius-md)] border border-accent-primary-soft bg-accent-primary-light">
+    <div className="kimix-event-card w-full overflow-hidden border border-accent-primary-soft bg-accent-primary-light">
       <div className="flex min-h-14 items-center border-b border-accent-primary-soft" style={{ paddingLeft: 18, paddingRight: 18, gap: 12 }}>
         <FileText size={16} className="shrink-0 text-accent-primary" />
         <div className="min-w-0 flex-1">
@@ -543,7 +543,7 @@ function ToolGroup({ tools }: { tools: ToolCallEvent[] }) {
 function LongTaskBanner({ meta, projectPath }: { meta: LongTaskSessionMeta; projectPath: string }) {
   return (
     <div
-      className="kimix-chat-banner rounded-2xl shadow-[0_10px_26px_rgba(74,132,190,0.10)]"
+      className="kimix-chat-banner"
       style={{ padding: "16px 18px" }}
     >
       <div className="flex flex-wrap items-center justify-between" style={{ gap: 12 }}>

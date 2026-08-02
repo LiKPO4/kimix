@@ -222,7 +222,7 @@ export const ApprovalCard = memo(function ApprovalCard({ event, diffPreviews = [
   return (
     <div id={`kimix-approval-${event.id}`} className="flex justify-center">
       <div
-        className="max-w-[90%] w-full rounded-2xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
+        className="kimix-event-card max-w-[90%] w-full border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)]"
         style={{ padding: "14px 18px 16px" }}
       >
         <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>

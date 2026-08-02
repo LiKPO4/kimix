@@ -114,7 +114,7 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
         role="dialog"
         aria-modal="true"
         aria-label="房间投递身份诊断"
-        className={`kimix-modal-card kimix-presence-content flex w-full max-w-[720px] flex-col rounded-[18px] ${presence.visible ? "is-visible" : ""}`}
+        className={`kimix-modal-card kimix-presence-content flex w-full max-w-[720px] flex-col ${presence.visible ? "is-visible" : ""}`}
         style={{ padding: "22px 24px 24px", maxHeight: "min(800px, 90vh)" }}
         onMouseDown={(e) => e.stopPropagation()}
       >

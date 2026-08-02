@@ -142,7 +142,7 @@ export const ErrorCard = memo(function ErrorCard({ event, onRetry, onDismiss }: 
   return (
     <div className="flex justify-center">
       <div
-        className="w-full rounded-xl border text-text-primary shadow-[0_1px_0_rgba(25,23,20,0.02)]"
+        className="kimix-event-card w-full border text-text-primary"
         style={{
           borderColor: "rgba(216,59,1,0.18)",
           background: "rgba(216,59,1,0.04)",

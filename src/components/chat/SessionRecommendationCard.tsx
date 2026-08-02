@@ -52,7 +52,7 @@ export const SessionRecommendationCard = memo(function SessionRecommendationCard
   return (
     <div className="flex justify-center">
       <div
-        className="w-full max-w-[860px] rounded-xl border border-accent-primary-soft bg-accent-primary-light text-[14.5px] leading-6 text-text-secondary"
+        className="kimix-event-card w-full max-w-[860px] border border-accent-primary-soft bg-accent-primary-light text-[14.5px] leading-6 text-text-secondary"
         style={{ padding: "16px 20px" }}
       >
         <div className="flex items-start" style={{ gap: 14 }}>

@@ -667,7 +667,7 @@ export function SessionToolbar({
         }}
       >
         <form
-          className="kimix-floating-panel w-full max-w-[420px] rounded-[14px] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text)] shadow-xl"
+          className="kimix-floating-panel w-full max-w-[420px] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text)]"
           style={{ padding: 22 }}
           onMouseDown={(event) => event.stopPropagation()}
           onSubmit={(event) => {

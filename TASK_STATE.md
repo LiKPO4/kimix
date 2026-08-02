@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-02 重构：内容表面确定接入界面风格角色（v2.20.122）
+
+- 根因：界面风格已能通过语义类控制壳层、浮层、菜单和设置卡，但会话侧栏 18 张分区卡、Hooks 顶层分区及多类对话事件卡仍在业务组件中拼装固定圆角、边框和阴影；Retro 因此通常只改变 Tailwind 圆角变量，无法获得完整的 Platinum 小圆角与克制浮雕质感。
+- 修复：新增 `.kimix-section-card` 统一独立中性分区的完整表面，新增 `.kimix-event-card` 只接管审批、澄清、错误、会话建议和恢复卡的形状/质感，`.kimix-inset-section` 为完整卡片内部提供无边框背景分层；业务语义色继续归组件所有。会话侧栏 18 卡、Hooks 6 分区及文件变更、文件、Todo 完成迁移，提问块使用内层递减角色。AppShell、弹窗、浮层、附件缩略图清除覆盖既有语义角色的固定圆角/阴影，文件卡打开控件复用 split-control 合约并保留 Kimix 默认基线。
+- 边界：不重定义 `--border-*` 颜色主题 token；输入框、可点击选择项、分隔线、弹窗内说明块及图片预览等上下文特例不机械迁移为完整卡片，避免角色误判和框套框。
+- 验证：界面风格定向 2 文件 19 项、全量 155 文件 1475 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BJx-m4wp.css`、JS `assets/index-BJ_YD1_r.js`）、OKF strict/audit（13 concepts、400 links）通过；执行策略阻止删除 `out/`/Vite 缓存，因此本轮不是清缓存构建。实机视觉验收等待用户在 v2.20.122 截图确认。
+
 ## 2026-08-02 修复：恢复默认顶栏并补齐多 Agent 风格角色（v2.20.120）
 
 - 根因：v2.20.95（`e79dd434`）建立全局界面风格合约时，把共享控件的默认边框、背景和阴影设为透明；`SessionToolbar` 又移除了原先的 `rounded-xl border border-[var(--kimix-panel-border-soft)]`，于是新增风格意外改变了 Kimix 默认顶栏。底部 ContextBar 没有被同一提交删除，但默认 hover 仅靠浅背景与低扩散阴影，在当前配色上辨识不足。
