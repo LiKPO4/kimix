@@ -1,5 +1,19 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 功能：套餐用量/Goal读取/历史列表/会话导出接入官方 Server 链路（v2.20.153）
+
+- 背景：五路并行审查（docs/feature-web-linkage-audit.md）找出全部未走官方 Web 一致链路的功能点，经在线实测确认 4 项可迁移。
+- B1 套餐用量：`getManagedUsage` server 就绪时先走 `GET /oauth/usage`（新 `getOAuthUsage`），新增 `parseServerUsagePayload`（官方结构无 label，`summary.window`+`limits[].window`）；SDK/官方 HTTP 直连兜底保留。
+- B2 Goal 读取：`getGoal` server 会话接入 `GET /sessions/{id}/goal`（读侧 200，POST 为 unsupported action）；`SERVER_GOAL_UNSUPPORTED_MESSAGE` 文案修正为「仅支持读取」。
+- B3 历史列表：`kimi-code:listHistorySessions` server 就绪时改走双链 `listSessions`（server 权威），title 映射 brief（serverSessionSummary 无 brief 字段）；磁盘扫描兜底保留。
+- B7 会话导出：`exportSession` server 就绪时走 `POST /sessions/{id}/export`（实测 1.3MB application/zip 流），SDK/CLI 兜底保留。
+- 毛边：`resolveMigratedSessionId` 补齐 16 个遗漏函数（askBtw/undo/compact/planMode/thinking/permission/status/usage/MCP/后台任务/skills）；`closeSession` 双向清理 `serverSessionMigrations`；`getMcpStartupMetrics`/`listChildSessions` 文案改能力提示。
+- 实测否决 B6：`/transcript*` 仅是文本帧回放 ops（append text），无 `full_compaction.*`/`usage.record`/`turn.steer` 语义；compact/steer 确认保留 wire.jsonl 读取。
+- 验证：typecheck 过；全量 1486 测试过（新增 3 个 parseServerUsagePayload 用例）；pnpm build 过；在线实测 export/goal/usage 端点 200；knowledge:validate PASS。
+- 知识库：runtime-routing 不变量 97-98 + log 更新。提交 0c6371ad。
+- 实机待验：v2.20.153 下设置页套餐用量显示（Server 数据）、server 会话 Goal 面板不再报错、搜索浮层历史列表、导出 ZIP 可解压。
+
+
 ## 2026-08-02 修复：Swarm 改走官方 Server 原生接口，不再迁移 SDK（v2.20.152）
 
 - 起因：用户指出官方 Web 的 Swarm 可正常使用。实测官方 0.31.1：profile `agent_config.swarm_mode` 可双向切换（status.swarm_mode 跟随），prompts 请求接受 `swarm_mode` 标记并正常完成；此前「Swarm 只能 SDK」是 ≤0.29 探针的过时结论。
