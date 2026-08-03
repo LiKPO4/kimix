@@ -19,6 +19,7 @@ import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError,
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
+import { extractPermissionModeStatus } from "@/utils/kimiCodePermission";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
@@ -1525,6 +1526,19 @@ function App() {
     });
     syncCurrentSessionFromStore(uiSessionId);
   }, [updateSession]);
+  const syncSessionPermissionMode = useCallback((uiSessionId: string, source: unknown, roomAgentId?: string) => {
+    const permissionMode = extractPermissionModeStatus(source);
+    if (permissionMode === undefined) return;
+    updateSession(uiSessionId, (session) => {
+      if (session.collaboration && roomAgentId) {
+        return updateRoomAgent(session, roomAgentId, (agent) => (
+          agent.permissionMode === permissionMode ? agent : { ...agent, permissionMode }
+        ));
+      }
+      return session.permissionMode === permissionMode ? session : { ...session, permissionMode };
+    });
+    syncCurrentSessionFromStore(uiSessionId);
+  }, [updateSession]);
 
   const refreshOfficialGoalState = async (uiSessionId: string, runtimeSessionId: string, roomAgentId?: string) => {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
@@ -2618,6 +2632,7 @@ function App() {
         : null;
       if (rawEvent?.type === "agent.status.updated") {
         syncSessionSwarmMode(uiSessionId, rawEvent, roomAgentId);
+        syncSessionPermissionMode(uiSessionId, rawEvent, roomAgentId);
       }
       const officialTitle = extractOfficialSessionTitle(rawEvent);
       if (

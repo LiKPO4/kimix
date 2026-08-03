@@ -1627,6 +1627,11 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
     if (serverManaged.permission === mode) return;
     await getServerClient().updateSession(sessionId, { permission_mode: mode });
     serverManaged.permission = mode;
+    // 写后回读：校准 managed.permission 并 emit agent.status.updated，让渲染层
+    // 立即收到权威权限值，避免后续切换基于过期缓存 early-return 被吞掉。
+    await refreshServerSessionStatus(sessionId, true).catch((error) => {
+      console.warn(`[KimiCodeServerHost] refresh after permission change failed for ${sessionId}:`, error);
+    });
     return;
   }
   const managed = getManagedSession(sessionId);

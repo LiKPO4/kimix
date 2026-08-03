@@ -6,6 +6,12 @@ import { useAppStore } from "@/stores/appStore";
 import { isWindows } from "@/utils/platform";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
 import { useSessionStore } from "@/stores/sessionStore";
+import { getPrimaryRoomAgent, getRoomAgent, getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
+import { updateRoomMutationOwner } from "@/utils/roomMutationOwner";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
+import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
 import { UI_STYLES } from "@/utils/uiStyles";
@@ -1155,6 +1161,68 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", icon: GitBranch, tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。谨慎使用。" },
     { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
   ];
+  const handleSetPermissionMode = async (mode: PermissionMode) => {
+    // 全局默认总是本地写：这是新会话默认偏好，与当前会话权限解耦
+    setPermissionMode(mode);
+    const appState = useAppStore.getState();
+    const current = appState.currentSession;
+    if (!current) return;
+    const sessionState = useSessionStore.getState();
+    const targetSession = sessionState.sessions.find((session) => session.id === current.id) ?? current;
+    const ownerId = getPrimaryRoomAgent(targetSession).id;
+    const runtimeSessionId = targetSession.collaboration
+      ? getRoomAgentRuntimeId(targetSession, ownerId) ?? getRuntimeSessionId(targetSession)
+      : getRuntimeSessionId(targetSession);
+    const previousMode = getRoomAgent(targetSession, ownerId, appState.permissionMode)?.permissionMode
+      ?? targetSession.permissionMode
+      ?? appState.permissionMode;
+    const writeLocal = () => {
+      useSessionStore.getState().updateSession(targetSession.id, (session) => ({
+        ...updateRoomMutationOwner(session, ownerId, (agent) => ({ ...agent, permissionMode: mode }), previousMode),
+        updatedAt: Date.now(),
+      }));
+      if (useAppStore.getState().currentSession?.id === targetSession.id) {
+        useAppStore.getState().setCurrentSession(
+          useSessionStore.getState().sessions.find((session) => session.id === targetSession.id) ?? null,
+        );
+      }
+    };
+    if (!runtimeSessionId) {
+      // 无 runtime：保持本地（会话级 + 全局），下次发消息创建 runtime 时携带
+      writeLocal();
+      return;
+    }
+    const res = await setKimiCodePermissionWithRecovery({
+      sessionId: runtimeSessionId,
+      mode,
+      projectPath: targetSession.projectPath,
+      additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
+      setPermission: window.api.setKimiCodePermission,
+      resumeSession: window.api.resumeKimiCodeSession,
+    });
+    if (!res.success) {
+      if (isKimiCodeSessionUnavailableError(res.error)) {
+        // 会话不可用：保留本地值，下次发消息时生效（与 Composer 路径一致）
+        writeLocal();
+        const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `权限已设为${modeLabel}，将在下次发消息时生效`,
+        }));
+        return;
+      }
+      setPermissionMode(previousMode);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `权限切换失败：${res.error}`,
+      }));
+      return;
+    }
+    writeLocal();
+    const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
+    window.dispatchEvent(new CustomEvent("kimix:toast", {
+      detail: `权限模式已切换为${modeLabel}`,
+    }));
+  };
+
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [
     { value: "never", label: "永不弹出", desc: "不显示系统通知，也不显示任务栏红点" },
     { value: "unfocused", label: "无焦点时", desc: "仅 Kimix 窗口没有焦点时提醒" },
@@ -1488,7 +1556,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       type="button"
                       aria-pressed={permissionMode === p.value}
                       title={p.tooltip}
-                      onClick={() => setPermissionMode(p.value)}
+                      onClick={() => handleSetPermissionMode(p.value)}
                       className={`kimix-settings-permission ${permissionMode === p.value ? "is-active" : ""}`}
                     >
                       <SelectionIndicator selected={permissionMode === p.value} />

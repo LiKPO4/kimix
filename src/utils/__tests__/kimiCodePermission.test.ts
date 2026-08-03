@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { setKimiCodePermissionWithRecovery } from "../kimiCodePermission";
+import { extractPermissionModeStatus, setKimiCodePermissionWithRecovery } from "../kimiCodePermission";
 
 describe("setKimiCodePermissionWithRecovery", () => {
   it("resumes an inactive session and retries permission on the recovered runtime", async () => {
@@ -45,5 +45,27 @@ describe("setKimiCodePermissionWithRecovery", () => {
       resumeSession: vi.fn().mockResolvedValue({ success: true, data: { sessionId: "session-2", workDir: "D:/work/other" } }),
     })).resolves.toEqual({ success: false, error: "恢复后的会话属于其他项目，已拒绝切换权限" });
     expect(crossProjectSet).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("extractPermissionModeStatus", () => {
+  it("accepts the three official permission modes", () => {
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: "manual" })).toBe("manual");
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: "auto" })).toBe("auto");
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: "yolo" })).toBe("yolo");
+  });
+
+  it("rejects unknown permission values", () => {
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: "ask-everything" })).toBeUndefined();
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: "" })).toBeUndefined();
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: 42 })).toBeUndefined();
+    expect(extractPermissionModeStatus({ type: "agent.status.updated", permission: null })).toBeUndefined();
+  });
+
+  it("returns undefined when permission is missing or payload is not an object", () => {
+    expect(extractPermissionModeStatus({ type: "agent.status.updated" })).toBeUndefined();
+    expect(extractPermissionModeStatus(null)).toBeUndefined();
+    expect(extractPermissionModeStatus("manual")).toBeUndefined();
+    expect(extractPermissionModeStatus(["yolo"])).toBeUndefined();
   });
 });

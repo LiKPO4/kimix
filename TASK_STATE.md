@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 优化：权限模式 Kimix↔官方 Web 双端同步（v2.20.165）
+
+- 现场：用户截图——Kimix 权限「完全自主(auto)」、web 侧「自动通过(yolo)」，Kimix 调整后 web 不同步，怀疑「没走同一条链路」。
+- 调查结论（四路子代理）：写入链路其实已是同一条（Composer → `updateSession(permission_mode)` → POST /profile），真正断点三个：① SettingsPanel 全局权限切换只写本地 appStore，从不推 server；② 回读方向断裂——主进程 `refreshServerSessionStatus` 已把官方 status.permission 经 `agent.status.updated` emit，但渲染层只消费 swarmMode，忽略 permission（web 改权限后 Kimix UI 和 yolo 自动审批 guard 都不跟随）；③ 写后无回读校验，`kimiCodeHost.ts:1627` 的 early-return 可能基于过期缓存吞掉切换。
+- 修复（v2.20.165）：① App.tsx 新增 `syncSessionPermissionMode`（镜像 `syncSessionSwarmMode`，只写 session/room-agent 级，不动全局默认偏好），`agent.status.updated` 分支并列消费；② SettingsPanel 切换改为「全局默认本地写 + 有 runtime 推 server」（复用 `setKimiCodePermissionWithRecovery` 与 Composer 的恢复/失败 toast 模式）；③ `setPermission` server 路径写成功后 `refreshServerSessionStatus(sessionId, true)` 写后回读（校准缓存 + emit 权威值给渲染层）。
+- 验收：全量 1511 测试通过（新增 extractPermissionModeStatus 3 用例）、typecheck 通过、`pnpm build` 通过、`knowledge:validate` PASS；实机双端切换效果待用户验收。
+- 已知边界：SettingsPanel 路径在活跃轮次中不走 Composer 的 turn.ended 延迟门（官方 profile 端点本身支持随时修改，上游 web 也无门控，但比 Kimix 既有不变量 8 的门控宽松）；SDK 路径未加写后回读；回读只更新 UI 不反向写 server，无循环。
+- 知识库：`runtime-routing.md` 不变量 8 扩写双向同步语义，log.md 已记。
+- 关键文件：`src/App.tsx`（syncSessionPermissionMode）、`src/utils/kimiCodePermission.ts`（extractPermissionModeStatus）、`src/components/settings/SettingsPanel.tsx`、`electron/kimiCodeHost.ts:1630-1635`。
+
 ## 2026-08-03 修复：停止/失败后排队消息不再自动派发（v2.20.164）
 
 - 现场：用户截图——上一轮「输出完成 本轮总耗时 45分2秒」，队列里 1 条消息卡住不发，底部「有错误」，停止后也无法发出（v2.20.159）。
