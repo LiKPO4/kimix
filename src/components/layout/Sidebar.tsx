@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
+import { settleHistoricalQuestions } from "@/utils/eventHelpers";
 import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
@@ -750,7 +751,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       toast(`读取会话失败：${loaded.error}`);
       return;
     }
-    const events = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+    const baseEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
+    const events = settleHistoricalQuestions(baseEvents, {
+      isWaitingQuestion: runtimeStatus?.success
+        ? runtimeStatus.data.engineStatus === "waiting_question"
+        : undefined,
+    });
     if (isHiddenInternalSession({ ...session, events })) {
       deleteSession(session.id);
       if (currentSession?.id === session.id) {

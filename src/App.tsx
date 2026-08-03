@@ -34,6 +34,7 @@ import {
   type NotificationClickTarget,
 } from "@/utils/notificationRouting";
 import {
+  settleHistoricalQuestions,
   settleInactiveEvents,
   settleFailedEvents,
   sanitizePersistedEvents,
@@ -2242,7 +2243,12 @@ function App() {
               const runtimeModel = runtimeStatus?.success ? runtimeStatus.data.model : undefined;
               const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
-              const canonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents, Date.now(), false, true);
+              const baseCanonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents, Date.now(), false, true);
+              const canonicalEvents = settleHistoricalQuestions(baseCanonicalEvents, {
+                isWaitingQuestion: runtimeStatus?.success
+                  ? runtimeStatus.data.engineStatus === "waiting_question"
+                  : undefined,
+              });
 
               if (runtimeOwner) {
                 const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;

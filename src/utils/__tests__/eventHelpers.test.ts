@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -532,5 +532,45 @@ describe("repairStableAssistantOrder", () => {
     const result = repairStableAssistantOrder(events);
     const texts = result.filter((e) => e.type === "assistant_message").map((e) => e.content);
     expect(texts).toEqual(["第一轮预告", "第一轮汇总", "第二轮预览", "第二轮总结"]);
+  });
+
+  it("settles pending questions to answered when session is not waiting for a question", () => {
+    const events: TimelineEvent[] = [{
+      id: "q1",
+      type: "question_request",
+      timestamp: 100,
+      requestId: "req-1",
+      rpcRequestId: "req-1",
+      toolCallId: "tool-1",
+      questions: [{ id: "qq-1", question: "继续？", options: [] }],
+      status: "pending",
+    }];
+    const result = settleHistoricalQuestions(events, { isWaitingQuestion: false });
+    expect(result[0]).toMatchObject({ status: "answered" });
+  });
+
+  it("keeps pending questions when the session is currently waiting for a question", () => {
+    const events: TimelineEvent[] = [{
+      id: "q1",
+      type: "question_request",
+      timestamp: 100,
+      requestId: "req-1",
+      rpcRequestId: "req-1",
+      toolCallId: "tool-1",
+      questions: [{ id: "qq-1", question: "继续？", options: [] }],
+      status: "pending",
+    }];
+    const result = settleHistoricalQuestions(events, { isWaitingQuestion: true });
+    expect(result[0]).toMatchObject({ status: "pending" });
+  });
+
+  it("returns the same array reference when nothing changes", () => {
+    const events: TimelineEvent[] = [{
+      id: "u1",
+      type: "user_message",
+      timestamp: 100,
+      content: "hi",
+    }];
+    expect(settleHistoricalQuestions(events)).toBe(events);
   });
 });

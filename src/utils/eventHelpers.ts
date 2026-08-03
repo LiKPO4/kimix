@@ -554,3 +554,25 @@ export function repairStableAssistantOrder(events: TimelineEvent[]): TimelineEve
 
   return result;
 }
+
+/**
+ * 历史重放后对齐「已解决」的澄清提问。
+ *
+ * server 快照只在会话真处于 waiting_question 时重放 pending_questions 帧；
+ * idle 会话（web 端已回答 / 提问已过期）的历史里残留的 question_request 没有
+ * 「已解决」标记可覆盖。当会话当前并不在等待提问时，把历史中的 pending 澄清
+ * 视为已解决（answered），避免显示成未回答的卡片。
+ */
+export function settleHistoricalQuestions(
+  events: TimelineEvent[],
+  options: { isWaitingQuestion?: boolean } = {},
+): TimelineEvent[] {
+  if (options.isWaitingQuestion) return events;
+  let changed = false;
+  const settled = events.map((event) => {
+    if (event.type !== "question_request" || event.status !== "pending") return event;
+    changed = true;
+    return { ...event, status: "answered" as const };
+  });
+  return changed ? settled : events;
+}
