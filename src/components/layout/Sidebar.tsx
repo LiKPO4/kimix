@@ -133,6 +133,25 @@ function hydrateSessionModel(
   }));
 }
 
+/** 从运行时状态同步 Swarm 开关到 store（仅精确显示，不改 desired 目标）。 */
+function hydrateSessionSwarmMode(
+  session: Session,
+  runtimeSwarmMode: boolean | null | undefined,
+): Session {
+  if (runtimeSwarmMode === undefined || runtimeSwarmMode === null) return session;
+  if (!session.collaboration) {
+    if (session.swarmMode === runtimeSwarmMode) return session;
+    return { ...session, swarmMode: runtimeSwarmMode };
+  }
+  const primary = getPrimaryRoomAgent(session);
+  const agent = primary;
+  if (agent.swarmMode === runtimeSwarmMode) return session;
+  return updateRoomAgent(session, primary.id, (current) => ({
+    ...current,
+    swarmMode: runtimeSwarmMode,
+  }));
+}
+
 export function Sidebar({ width = 320 }: SidebarProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -696,10 +715,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     if (hasConversation && session.kimiHistoryCacheVersion === KIMI_HISTORY_CACHE_VERSION) {
       const runtimeStatus = await runtimeStatusPromise;
       if (session.isLoading || (runtimeStatus?.success && runtimeStatus.data.model)) {
-        updateSession(session.id, (current) => ({
-          ...hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined),
-          isLoading: false,
-        }));
+        updateSession(session.id, (current) => {
+          const hydrated = hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined);
+          return hydrateSessionSwarmMode(
+            { ...hydrated, isLoading: false },
+            runtimeStatus?.success ? runtimeStatus.data.swarmMode : undefined,
+          );
+        });
         const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
         if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
       }
@@ -711,10 +733,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       runtimeStatusPromise,
     ]);
     if (!loaded.success) {
-      updateSession(session.id, (current) => ({
-        ...hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined),
-        isLoading: false,
-      }));
+      updateSession(session.id, (current) => hydrateSessionSwarmMode(
+        { ...hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined), isLoading: false },
+        runtimeStatus?.success ? runtimeStatus.data.swarmMode : undefined,
+      ));
       const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
       if (updated && useAppStore.getState().currentSession?.id === session.id) setCurrentSession(updated);
       toast(`读取会话失败：${loaded.error}`);
@@ -747,20 +769,23 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           ),
           events,
         );
-      return {
-        ...hydrateSessionModel(
-          current,
-          runtimeStatus?.success ? runtimeStatus.data.model : undefined,
-          getLastUsedModelFromEvents(hydratedEvents),
-        ),
-        events: hydratedEvents,
-        kimiHistoryCacheVersion: canonicalAdopted ? KIMI_HISTORY_CACHE_VERSION : current.kimiHistoryCacheVersion,
-        title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
-          hydratedEvents,
-          current.title,
-        ),
-        isLoading: false,
-      };
+      return hydrateSessionSwarmMode(
+        {
+          ...hydrateSessionModel(
+            current,
+            runtimeStatus?.success ? runtimeStatus.data.model : undefined,
+            getLastUsedModelFromEvents(hydratedEvents),
+          ),
+          events: hydratedEvents,
+          kimiHistoryCacheVersion: canonicalAdopted ? KIMI_HISTORY_CACHE_VERSION : current.kimiHistoryCacheVersion,
+          title: current.titleLocked || !isDefaultSessionTitle(current.title) ? current.title : deriveSessionTitle(
+            hydratedEvents,
+            current.title,
+          ),
+          isLoading: false,
+        },
+        runtimeStatus?.success ? runtimeStatus.data.swarmMode : undefined,
+      );
     });
     const updated = useSessionStore.getState().sessions.find((item) => item.id === session.id);
     if (updated && useAppStore.getState().currentSession?.id === session.id) {
