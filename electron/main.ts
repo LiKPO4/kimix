@@ -6453,7 +6453,12 @@ ipcMain.handle("kimi-code:getManagedUsage", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const providerName = typeof req.providerName === "string" && req.providerName.trim() ? req.providerName.trim() : undefined;
-    return { success: true, data: await kimiCodeHost.getManagedUsage(providerName) };
+    const usage = await kimiCodeHost.getManagedUsage(providerName);
+    // 解包 source/payload 包装，保持「原始套餐用量数据」语义（渲染层当前无调用者，类型 data: unknown）
+    return {
+      success: true,
+      data: usage && typeof usage === "object" ? (usage as { payload?: unknown }).payload : usage,
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -7136,7 +7141,13 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
       if (usage && typeof usage === "object" && (usage as { source?: string }).source === "server") {
         return { success: true, data: parseServerUsagePayload((usage as { payload: unknown }).payload) };
       }
-      return { success: true, data: parseManagedUsagePayload(usage) };
+      // getManagedUsage SDK 分支返回 { source: "sdk", payload } 包装，解包后再解析
+      return {
+        success: true,
+        data: parseManagedUsagePayload(
+          usage && typeof usage === "object" ? (usage as { payload?: unknown }).payload : usage,
+        ),
+      };
     } catch (sdkError) {
       const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
       if (!/不支持读取套餐用量|unsupported|not support/i.test(sdkMessage)) {
