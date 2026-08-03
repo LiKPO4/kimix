@@ -3557,6 +3557,121 @@ describe("mergeEvents user id dedup and timeline dedup cleanup", () => {
   });
 });
 
+describe("mergeEvents canonical user replay stamping", () => {
+  it("stamps a canonical replay identity onto the matching optimistic echo instead of duplicating it", () => {
+    const optimistic: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: 1000,
+      content: "了解当前项目",
+    };
+    const replay: TimelineEvent = {
+      id: "user:msg_prompt_multi_step",
+      type: "user_message",
+      timestamp: Date.parse("2026-07-20T10:00:00.000Z"),
+      content: "了解当前项目",
+      snapshotMessageId: "msg_prompt_multi_step",
+      snapshotMessageIdStable: true,
+    };
+    const result = mergeEvents([optimistic], replay);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "user_message",
+      id: "local-echo-1",
+      content: "了解当前项目",
+      snapshotMessageId: "msg_prompt_multi_step",
+      snapshotMessageIdStable: true,
+    });
+  });
+
+  it("appends a canonical replay with different content as a new user boundary", () => {
+    const optimistic: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: 1000,
+      content: "第一条消息",
+    };
+    const webMessage: TimelineEvent = {
+      id: "user:msg_web_0002",
+      type: "user_message",
+      timestamp: Date.parse("2026-07-20T10:00:00.000Z"),
+      content: "web 端发起的新一轮",
+      snapshotMessageId: "msg_web_0002",
+      snapshotMessageIdStable: true,
+    };
+    const result = mergeEvents([optimistic], webMessage);
+    expect(result).toHaveLength(2);
+    expect(result[1]).toMatchObject({ type: "user_message", id: "user:msg_web_0002" });
+  });
+
+  it("keeps two intentional identical prompts when the first echo was already stamped", () => {
+    const stamped: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: 1000,
+      content: "继续",
+      snapshotMessageId: "msg_first",
+      snapshotMessageIdStable: true,
+    };
+    const secondEcho: TimelineEvent = {
+      id: "local-echo-2",
+      type: "user_message",
+      timestamp: 2000,
+      content: "继续",
+    };
+    const result = mergeEvents([stamped], secondEcho);
+    expect(result).toHaveLength(2);
+    expect(result[1]).toMatchObject({ type: "user_message", id: "local-echo-2" });
+  });
+
+  it("hard-dedupes a repeated canonical replay after stamping", () => {
+    const optimistic: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: 1000,
+      content: "任务一",
+    };
+    const replay: TimelineEvent = {
+      id: "user:msg_task_1",
+      type: "user_message",
+      timestamp: Date.parse("2026-07-20T10:00:00.000Z"),
+      content: "任务一",
+      snapshotMessageId: "msg_task_1",
+      snapshotMessageIdStable: true,
+    };
+    const once = mergeEvents([optimistic], replay);
+    expect(once).toHaveLength(1);
+    const twice = mergeEvents(once, { ...replay });
+    expect(twice).toHaveLength(1);
+  });
+
+  it("pairs multiple identical optimistic echoes with their own canonical replays one-to-one", () => {
+    const echo1: TimelineEvent = { id: "echo-1", type: "user_message", timestamp: 1000, content: "继续" };
+    const echo2: TimelineEvent = { id: "echo-2", type: "user_message", timestamp: 5000, content: "继续" };
+    const replay1: TimelineEvent = {
+      id: "user:msg_r1",
+      type: "user_message",
+      timestamp: Date.parse("2026-07-20T10:00:00.000Z"),
+      content: "继续",
+      snapshotMessageId: "msg_r1",
+      snapshotMessageIdStable: true,
+    };
+    const after1 = mergeEvents([echo1, echo2], replay1);
+    expect(after1.filter((event) => event.type === "user_message")).toHaveLength(2);
+    expect(after1.find((event) => event.id === "echo-1")).toMatchObject({
+      snapshotMessageId: "msg_r1",
+      snapshotMessageIdStable: true,
+    });
+    const replay2: TimelineEvent = { ...replay1, id: "user:msg_r2", snapshotMessageId: "msg_r2" };
+    const after2 = mergeEvents(after1, replay2);
+    expect(after2.filter((event) => event.type === "user_message")).toHaveLength(2);
+    expect(after2.find((event) => event.id === "echo-2")).toMatchObject({
+      snapshotMessageId: "msg_r2",
+      snapshotMessageIdStable: true,
+    });
+  });
+});
+
 describe("mergeAssistantThinkingText", () => {
   it("returns the fuller text when one side already contains the other", () => {
     expect(mergeAssistantThinkingText("思考全文", "思考")).toBe("思考全文");

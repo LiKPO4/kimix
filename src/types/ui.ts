@@ -388,6 +388,9 @@ export interface UserMessageEvent {
   timestamp: number;
   content: string;
   images?: UserMessageImage[];
+  /** Official snapshot message identity, stamped when a canonical replay matches a local optimistic echo. */
+  snapshotMessageId?: string;
+  snapshotMessageIdStable?: boolean;
 }
 
 export interface UserMessageImage {

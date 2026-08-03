@@ -19,6 +19,93 @@ describe("mapKimiCodeEvent", () => {
   it("ignores turn.started because UI inserts the user message locally", () => {
     expect(mapKimiCodeEvent({ type: "turn.started", turnId: 1 }, testOptions())).toBeNull();
   });
+  it("maps snapshot TurnBegin into a user_message with a stable identity", () => {
+    const createdAt = "2026-07-17T07:10:07.216Z";
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "帮我修复这个 bug",
+      created_at: createdAt,
+      snapshotReplay: "history",
+      snapshotMessageId: "msg_session_user_000123",
+      snapshotMessageIdStable: true,
+      snapshotMessageText: "帮我修复这个 bug",
+      snapshotRole: "user",
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({
+      type: "user_message",
+      id: "user:msg_session_user_000123",
+      timestamp: Date.parse(createdAt),
+      content: "帮我修复这个 bug",
+    });
+  });
+
+  it("maps agent envelope TurnBegin to status_update instead of a user bubble", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: '<notification type="task.completed">\nTitle: 长程任务\n后台长程任务已完成\n</notification>',
+      snapshotMessageId: "msg_notif_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({ type: "status_update", source: "runtime" });
+    if (mapped && mapped.type === "status_update") {
+      expect(mapped.message).toContain("后台任务已完成");
+    }
+  });
+
+  it("maps model-tool skill activation TurnBegin to status_update", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: '<kimi-skill-loaded name="custom-theme" args="做暗色主题" trigger="model-tool">',
+      snapshotMessageId: "msg_skill_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({ type: "status_update", source: "skill" });
+    if (mapped && mapped.type === "status_update") {
+      expect(mapped.message).toContain("已调用 Skill：custom-theme");
+    }
+  });
+
+  it("returns null for empty TurnBegin content", () => {
+    expect(mapKimiCodeEvent({ type: "TurnBegin", user_input: "" }, testOptions())).toBeNull();
+    expect(mapKimiCodeEvent({ type: "TurnBegin" }, testOptions())).toBeNull();
+  });
+
+  it("dedupes repeated TurnBegin replays of the same snapshot message", () => {
+    const frame = {
+      type: "TurnBegin",
+      user_input: "第二轮任务",
+      created_at: "2026-07-17T07:20:00.000Z",
+      snapshotMessageId: "msg_dup_0001",
+      snapshotMessageIdStable: true,
+    };
+    const events = reduceKimiCodeEvents([], [frame, frame]);
+    expect(events.filter((event) => event.type === "user_message")).toHaveLength(1);
+  });
+
+  it("keeps one bubble when a local optimistic echo precedes the TurnBegin replay", () => {
+    const now = 1_000_000;
+    const local: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: now,
+      content: "优化一下这个页面",
+    };
+    const replay = reduceKimiCodeEvents([local], [{
+      type: "TurnBegin",
+      user_input: "优化一下这个页面",
+      created_at: new Date(now + 2000).toISOString(),
+      snapshotMessageId: "msg_echo_0001",
+      snapshotMessageIdStable: true,
+    }]);
+    expect(replay.filter((event) => event.type === "user_message")).toHaveLength(1);
+  });
+
 
   it("maps assistant and thinking deltas to assistant_message chunks", () => {
     const options = testOptions();

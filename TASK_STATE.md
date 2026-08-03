@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：跨客户端同步多轮合并、用户消息只剩最早一条（v2.20.163）
+
+- 现场：kimi code web 和 Kimix 同时运行同一会话时，Kimix 把多轮内容混成一轮渲染，用户消息只显示最早的一条（用户截图，安装版 v2.20.159）。
+- 取证：快照存 `docs/issue-cross-client-turn-merge-events-snapshot.md`——① 实时帧入口 `mapKimiCodeEvent`（`kimiCodeEventMapper.ts`）无 `TurnBegin` case，web 轮次 user 消息的唯一实时载体被 default→null 静默丢弃；② CDP 导出当前会话 IndexedDB：本地发送的 2 条 user_message 都在（乐观回显），丢失只发生在同步映射层；③ `ChatThread.tsx:1310-1334` 只以 user_message 为硬 turn 边界，边界缺失 → 多轮合并。
+- 修复（v2.20.163）：
+  1. `mapKimiCodeEvent` 新增 `TurnBegin → user_message` 映射，对齐历史路径（envelope→status_update、skill 激活→status_update/格式化命令），stable snapshotMessageId 时 id 取 `user:${snapshotMessageId}`；in-flight `turn.started` 帧确认无 user 载荷，保持过滤并注释。
+  2. 全量测试抓到一个真实回归：同客户端乐观回显（无身份）与屏障回放 TurnBegin（稳定身份、>10s 后到达）重复出泡切轮。修复：`mergeEvents` 对带稳定身份的 user_message 先按 snapshotMessageId 硬去重，否则把身份「盖章」到最早的内容等价无身份回显上而非追加；已带稳定身份的最后一条 user 不再吃 10 秒窗口（保护同内容连发）。
+- 验收：全量 1508 测试通过、typecheck 通过、`pnpm build` 通过、`pnpm knowledge:validate` PASS；实机双端显示效果待用户截图验收。
+- 已知边界：内容启发式配对——同会话两端同时发完全相同内容时，身份可能盖到本端回显上（内容相同，边界效果一致）；「继续」类同内容消息若前一条从未被盖章，后一条跨端回放可能配对错（极端边缘）。
+- 知识库：`runtime-routing.md` 新增不变量 19c，log.md 已记。
+- 关键文件：`src/utils/kimiCodeEventMapper.ts`、`src/utils/eventMapper.ts`（mergeEvents 盖章去重）、`src/types/ui.ts`（UserMessageEvent 身份字段）。
+
 ## 2026-08-03 修复：状态胶囊不区分「消息处理中」与「后台 Bash 运行中」（v2.20.162）
 
 - 现场：用户截图反馈，对话区消息底部胶囊在后台 Bash 任务还在跑时也显示「消息处理中」，无法区分两种状态。

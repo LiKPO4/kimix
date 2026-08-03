@@ -1,5 +1,10 @@
 import type { TimelineEvent, UserMessageImage } from "../types/ui";
-import { mergeEvents } from "./eventMapper";
+import { extractUserMessage, mergeEvents } from "./eventMapper";
+import {
+  formatKimiSkillActivationCommand,
+  parseKimiAgentEnvelope,
+  parseKimiSkillActivation,
+} from "./eventHelpers";
 
 export interface KimiCodeEventMapperOptions {
   now?: number;
@@ -396,7 +401,64 @@ export function mapKimiCodeEvent(
 
   switch (type) {
     case "turn.started":
+      // In-flight snapshot frames carry only { type: "turn.started" } — no
+      // user_input and no stable snapshotMessageId to map. The UI keeps its
+      // own optimistic user row, so the turn boundary itself stays filtered.
       return null;
+
+    case "TurnBegin": {
+      const payload = isRecord(event.payload) ? event.payload : {};
+      const userMessage = extractUserMessage(
+        event.user_input ??
+        event.userInput ??
+        event.input ??
+        event.text ??
+        payload.user_input ??
+        payload.userInput ??
+        payload.input ??
+        payload.text,
+      );
+      if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
+      const envelope = parseKimiAgentEnvelope(userMessage.content);
+      if (envelope) {
+        return {
+          id: getId(options),
+          type: "status_update",
+          timestamp,
+          message: envelope.summary,
+          source: "runtime",
+          tone: envelope.tone,
+        };
+      }
+      const skillActivation = parseKimiSkillActivation(userMessage.content);
+      if (skillActivation?.trigger === "model-tool") {
+        return {
+          id: getId(options),
+          type: "status_update",
+          timestamp,
+          message: `已调用 Skill：${skillActivation.name}`,
+          source: "skill",
+          tone: "info",
+        };
+      }
+      const snapshotMessageId = getSnapshotMessageId(event);
+      return {
+        id: snapshotMessageId && getSnapshotMessageIdStable(event) === true
+          ? `user:${snapshotMessageId}`
+          : getId(options),
+        type: "user_message",
+        timestamp,
+        content: skillActivation
+          ? formatKimiSkillActivationCommand(skillActivation.name, skillActivation.args)
+          : userMessage.content,
+        images: userMessage.images,
+        snapshotMessageId: getSnapshotMessageId(event),
+        snapshotMessageIdStable: getSnapshotMessageIdStable(event),
+        roomMessageId: userMessage.deliveryIdentity?.roomMessageId,
+        agentTurnId: userMessage.deliveryIdentity?.agentTurnId,
+        dispatchAttemptId: userMessage.deliveryIdentity?.dispatchAttemptId,
+      };
+    }
 
     case "assistant.delta": {
       const delta = isString(event.delta) ? event.delta : "";

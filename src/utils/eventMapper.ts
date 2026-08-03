@@ -28,7 +28,7 @@ const SUPERPOWERS_BOOTSTRAP_LEGACY_MARKER = "\n\n用户当前消息：\n";
 const HOOK_CONTEXT_MARKER = "\n\n【用户当前消息】\n";
 const OFFICIAL_SYSTEM_REMINDER_PATTERN = /(?:^|\r?\n)[ \t]*<system-reminder\b[^>]*>[\s\S]*?<\/system-reminder>[ \t]*(?=\r?\n|$)/gi;
 
-type ExtractedUserMessage = {
+export type ExtractedUserMessage = {
   content: string;
   images: UserMessageImage[];
   deliveryIdentity?: RoomDeliveryPromptIdentity;
@@ -1171,7 +1171,7 @@ function sanitizeUserMessageText(content: string): string {
   ).content;
 }
 
-function extractUserMessage(input: unknown): ExtractedUserMessage {
+export function extractUserMessage(input: unknown): ExtractedUserMessage {
   if (isString(input)) {
     const parsed = parseRoomDeliveryPrompt(input);
     const extracted = extractFileAttachmentText(
@@ -1979,12 +1979,53 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       ));
       if (alreadyMerged) return existing;
     } else {
+      // 同一条消息的 canonical 回放（带稳定 snapshotMessageId）与本地乐观回显
+      // （无身份、随机 id）可能在时间上相隔整轮（>10s），10 秒窗口拦不住。此时
+      // 把回放身份盖章到最早的等价乐观回显上而不是追加，避免同一消息重复出泡
+      // 并把后续 assistant 切成两个 turn；web 端发起的新消息（内容不同，或最后
+      // 一条 user 已有稳定身份）仍正常追加为新边界。
+      const incomingSnapshotId = incoming.snapshotMessageIdStable === true && incoming.snapshotMessageId
+        ? incoming.snapshotMessageId
+        : undefined;
+      if (incomingSnapshotId) {
+        if (existing.some((event) => (
+          event.type === "user_message" &&
+          event.snapshotMessageIdStable === true &&
+          event.snapshotMessageId === incomingSnapshotId
+        ))) {
+          return existing;
+        }
+        const optimisticIndex = existing.findIndex((event) => {
+          if (event.type !== "user_message" || event.snapshotMessageIdStable === true) return false;
+          const lastContent = normalizeUserContent(event.content);
+          const incomingContent = normalizeUserContent(incoming.content);
+          if (lastContent === incomingContent && incomingContent.length > 0) return true;
+          if (lastContent === incomingContent && incomingContent.length === 0) {
+            return shouldPreserveLocalUserImages(event, incoming) ||
+              getUserImageSignature(event) === getUserImageSignature(incoming) ||
+              hasSameUserMediaShape(event, incoming);
+          }
+          return false;
+        });
+        if (optimisticIndex >= 0) {
+          const result = [...existing];
+          const optimistic = result[optimisticIndex] as Extract<TimelineEvent, { type: "user_message" }>;
+          result[optimisticIndex] = {
+            ...optimistic,
+            snapshotMessageId: incomingSnapshotId,
+            snapshotMessageIdStable: true,
+          };
+          return result;
+        }
+      }
       // Identity-less ordinary and legacy sessions retain the bounded echo
       // fallback. Room deliveries never use text/time guessing.
       const lastUserMessageIndex = existing.findLastIndex((e) => e.type === "user_message");
       if (lastUserMessageIndex >= 0) {
         const lastUser = existing[lastUserMessageIndex] as Extract<TimelineEvent, { type: "user_message" }>;
-        if (Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
+        // 最后一条已带稳定身份（已盖章或来自映射）时它是官方消息；随后到达的无身份
+        // user 是用户新发送（可能同内容），不能用 10 秒窗口误杀。
+        if (lastUser.snapshotMessageIdStable !== true && Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
           const lastContent = normalizeUserContent(lastUser.content);
           const incomingContent = normalizeUserContent(incoming.content);
           if (lastContent === incomingContent && incomingContent.length > 0) {
