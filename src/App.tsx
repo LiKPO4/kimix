@@ -1885,10 +1885,12 @@ function App() {
     try {
       const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (latestSession && hasPendingQuestion(latestSession.events)) {
+        logEvent("app.pendingDispatchDeferred", { uiSessionId, reason: "pendingQuestion" });
         void persistLocalConversationState();
         return false;
       }
       if (await shouldWaitForOfficialPromptQueue(runtimeSessionId)) {
+        logEvent("app.pendingDispatchDeferred", { uiSessionId, reason: "officialQueue" });
         setRunningSessionId(uiSessionId);
         void persistLocalConversationState();
         return false;
@@ -2993,6 +2995,12 @@ function App() {
           ));
           return { ...next, updatedAt: Date.now() };
         });
+        // error/interrupted 终态同样触发下一条排队消息派发：停止/失败路径已清掉 runningSessionId，
+        // reconcile 轮询不再接力，只能在此处接续（守卫与 completed 分支同款）。
+        const failedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        if (!roomAgentId || !failedSession || isPrimaryRoomAgent(failedSession, roomAgentId)) {
+          void dispatchNextPendingKimiMessage(uiSessionId, statusRuntimeSessionId);
+        }
         return;
       }
 

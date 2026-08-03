@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：停止/失败后排队消息不再自动派发（v2.20.164）
+
+- 现场：用户截图——上一轮「输出完成 本轮总耗时 45分2秒」，队列里 1 条消息卡住不发，底部「有错误」，停止后也无法发出（v2.20.159）。
+- 根因（四路调查 + 主代理复核代码确认）：排队消息自动派发全仓只有 3 个事件驱动触发点（completed 状态、长程任务分支、reconcile 轮询），其中 `App.tsx` 的 error/interrupted 分支 settle 后直接 return 不派发；停止路径又先清 runningSessionId → reconcile 轮询停摆 → 队列永久无触发点。后台 bash/子代理/swarm 都经「轮次被停止 → interrupted」汇入这同一链路，非独立 bug。
+- 修复（v2.20.164）：error/interrupted 分支 settle 后镜像 completed 守卫（primary-room）补一次 `dispatchNextPendingKimiMessage`；两个 defer 分支（pendingQuestion / officialQueue）补 `app.pendingDispatchDeferred` 诊断日志。
+- 链路闭合依据：server 路径 cancel 后必发 running|interrupted 状态帧（`kimiCodeHost.ts:1584`）；SDK 路径 cancel 经 `turn.ended(cancelled)` → StatusSequencer → interrupted（`kimiCodeStatusSequencer.ts:50-57`）。官方队列未排空时 defer 会重置 running → reconcile 继续轮询 → 排空后派发，自洽。
+- 验收：全量 1508 测试通过、typecheck 通过、`pnpm build` 通过；实机「停止后队列自动发出」待用户验收。
+- 已知边界：派发失败重排队首后仍无自动重试（等下一次触发点，有意为之防死循环）；App.tsx 状态回调无纯函数测试接缝，未单测。
+- 知识库：无需更新（局部触发点补齐，未变架构不变量）。
+- 关键文件：`src/App.tsx:2998-3003`（派发补点）、`src/App.tsx:1888,1893`（defer 日志）。
+
 ## 2026-08-03 修复：跨客户端同步多轮合并、用户消息只剩最早一条（v2.20.163）
 
 - 现场：kimi code web 和 Kimix 同时运行同一会话时，Kimix 把多轮内容混成一轮渲染，用户消息只显示最早的一条（用户截图，安装版 v2.20.159）。
