@@ -1,5 +1,25 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 现场取证：Swarm 子代理回复「已完成」但内容缺失（v2.20.161 修 isThinking 误标）
+
+- 现场：用户 19:59 发「现在你自己review一下你这两轮做的改动」，UI 显示「已完成」，但回复只有英文思考 + 11 个工具调用 + 57 字符开场白，没有 review 结论正文。
+- 取证链（CDP 读 IndexedDB + diag.log + DOM）：
+  1. 主进程帧完整：delta 帧 1069 个 offset 零缺口（Python 逐帧校验），终止帧（turn.ended + prompt.completed completed/main）12:00:38 全部到达；帧队列 0 次溢出。
+  2. events（IndexedDB）里 19:59 消息（i=1410, turn=agent-turn）的回复只有：i=1412 正文 57 字符（「你好霖江路，我来全面 review 这两轮的所有改动…」）+ i=1414-1435 十一个 Bash 工具调用。**最终 review 结论正文不在 events**（全库搜「Let me review each change for correctness」0 命中）。
+  3. [live] display：子代理 turn（sid=jfdmfies, key=ant:agent-turn:sjfdmfies）19:59:06 init→thinking，20:00:39 thinking→settled_complete，**textChars 全程只有 57**（英文 ~1000 字符是 thinking 不计入正文）。
+  4. 子代理 settled_complete（20:00:39）在主 agent turn.ended + prompt.completed（20:00:38, completed/main）**之后 1 秒**——子代理正文疑似被主 agent 完成信号提前终止或服务端未输出（待验证：对比 web 端同会话，或复现时抓子代理 turn 帧级日志）。
+  5. 渲染层块 11 的英文内容显示为灰色 thinking 样式（rgb(107,118,128) 13.5px muted）——用户看到的「英文 review」是思考不是正文。
+  6. 主 agent 完整 review（4909 字符，i=1384）在 19:44 turn 内生成并渲染为块 9（正文样式完整显示），但**被 draft 提交缺陷标 isThinking=true**（draft 同时累积 thinking.delta + assistant.delta，toAssistantShell 只要 draft.thinking 非空就标 thinking）。
+  7. 子代理英文 thinking（~1000 字符）渲染过但**未落盘**（draft 在 turn 结束时被清理）——刷新后消失。
+  8. 12:02:10 watchdog 92s 静默重连 + 快照恢复（as_of_seq=2871, inFlight=0），之后会话静止无新帧。
+- v2.20.161 已修（P1）：`activeTurnDraftStore.ts` toAssistantShell 的 isThinking 判定——**draft 有 content（正文）时不再标 thinking**（正文与思考混合以正文为准）。
+- 未修（P0，需进一步证据）：
+  a. **子代理 turn final answer 缺失**——是「主 agent 完成信号提前终止子代理」还是「服务端未输出」需验证。验证方法：web 端同会话对比正文是否完整；或复现时开 KIMIX_FRAME_DIAG=1 抓子代理 turn（agent-turn scope）的 delta/turn.ended 帧。
+  b. **子代理 thinking 未落盘**——settled 后 draft 清理导致思考丢失，刷新后消失（视觉抖动/内容减少的另一个来源）。
+  c. i=1382（3223 字符交接摘要）落盘但 UI 无对应渲染块（在折叠区或合并进块 9 未确认）。
+- 关键文件：`src/utils/activeTurnDraftStore.ts`（isThinking 判定）、`src/hooks/useEventStream.ts`（draft 提交/清理）、`src/utils/turnBlocks.ts`（分组不看 isThinking）、`electron/kimiCodeHost.ts:3072-3087`（prompt.completed 屏障）。
+- 类型：功能缺陷，Swarm 子代理长回复的正确性问题。
+
 ## 2026-08-03 待修：Swarm 子代理消息截断 + 状态卡在「执行中」（v2.20.160 已修帧队列保护，卡死链路待快照验证）
 
 - 现场：swarm 子代理回复消息内容不完整（对比 web 端少了一大段），且 UI 永久卡在「执行中 37 秒」「消息处理中」，engineStatus 一直是 running。重启 dev 后仍复现（v2.20.159）。

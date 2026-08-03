@@ -145,7 +145,11 @@ function toAssistantShell(draft: ActiveTurnDraft, key: string): AssistantMessage
     content: draft.content,
     thinking: draft.thinking,
     thinkingParts: draft.thinkingParts,
-    isThinking: Boolean(draft.thinking?.trim() || draft.thinkingParts?.some((part) => part.text.trim())),
+    // 正文与思考混合时以正文为准：draft 同时累积 thinking.delta 与
+    // assistant.delta 时（模型先思考后输出正文的同一段流），有 content 就
+    // 是正式回复，不能再标 thinking——否则消费 isThinking 的路径（如
+    // 复制/导出/统计/状态标签）会把完整正文当思考内容处理。
+    isThinking: !draft.content?.trim() && Boolean(draft.thinking?.trim() || draft.thinkingParts?.some((part) => part.text.trim())),
     isComplete: false,
     roomAgentId: draft.roomAgentId ?? parsed?.roomAgentId,
     roomMessageId: draft.roomMessageId,
