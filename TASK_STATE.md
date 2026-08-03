@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：跨客户端实时同步（web 发消息/已答澄清不同步）（v2.20.157-158）
+
+- 现场：kimix 与 kimi code web 都开着，web 发消息 Kimix 不显示新消息与回复；web 已答的澄清卡片在 Kimix 显示未回答。
+- 根因（同源）：Kimix 打开会话（selectSession）只 load 历史 + getStatus，从不 resume 绑定主进程 serverSessions。dev 重启/冷启动后 store 恢复的会话不在主进程 map，不订阅 WS → web 发消息收不到实时帧；web 答 question 的解决状态也收不到（server 不广播 resolved 帧，仅 /questions?status=pending 可查）。
+- v2.20.157：selectSession 开头先 resumeKimiCodeSession（幂等）确保订阅，再 getStatus + load。
+- v2.20.158：新增 settleHistoricalQuestions——历史重放（App 启动恢复 + Sidebar selectSession）时按 engineStatus 是否为 waiting_question 对齐：非 waiting 时 pending 澄清视为已答。未动 settleInactiveEvents（避免误伤实时状态路径）。
+- 验证：typecheck 过；全量 1489 测试过（新增 3 个）。提交 adde6aee / 6586c16e。
+- 实机待验：v2.20.158 下 web 发消息 Kimix 实时出现；已答澄清不再显示未回答。
+
+
 ## 2026-08-03 修复：侧栏打开会话同步 Swarm 开关状态（v2.20.156）
 
 - 现场：web 端（官方 Server）Swarm 一直开，Kimix 启动后点击侧栏进入对应会话显示「关」。
