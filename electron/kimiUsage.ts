@@ -324,6 +324,49 @@ export function parseManagedUsagePayload(payload: unknown, now = Date.now()): Ki
   };
 }
 
+function findServerWindowLimit(limits: unknown[], duration: number, unit: string) {
+  for (const item of limits) {
+    const row = getRecord(item);
+    if (!row) continue;
+    const window = getRecord(row.window);
+    if (!window) continue;
+    const itemDuration = toNumber(window.duration);
+    const itemUnit = String(window.unit ?? window.timeUnit ?? "").toUpperCase();
+    if (itemDuration === duration && itemUnit.includes(unit)) return row;
+  }
+  return null;
+}
+
+function serverUsageRowToManagedRow(row: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!row) return null;
+  const resetAt = toTimestamp(row.reset_at);
+  return resetAt === undefined ? row : { ...row, refreshAt: resetAt };
+}
+
+/** 官方 Server `/api/v1/oauth/usage` 载荷解析（0.31.1 实测结构：summary.window + limits[].window，无 label 字段）。 */
+export function parseServerUsagePayload(payload: unknown, now = Date.now()): KimiUsageData {
+  const record = getRecord(payload);
+  if (!record) throw new Error("Kimi 用量接口返回格式异常");
+  if (record.kind === "error") {
+    const message = typeof record.message === "string" ? record.message : "Kimi 用量服务暂时不可用";
+    throw new Error(formatKimiUsageError(message));
+  }
+  if (record.kind !== "ok") throw new Error("Kimi 用量接口返回格式异常");
+  const limits = Array.isArray(record.limits) ? record.limits : [];
+  const fiveHourRow = serverUsageRowToManagedRow(findServerWindowLimit(limits, 5, "HOUR"));
+  const weeklyRow = serverUsageRowToManagedRow(getRecord(record.summary));
+  const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000, now);
+  const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now), now);
+  const extraUsage = extraUsageFromPayload(record);
+  return {
+    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
+    updatedAt: now,
+    source: "Kimi Code 官方 Server 用量接口",
+    ...(extraUsage ? { extraUsage } : {}),
+    periods: [fiveHour, weekly],
+  };
+}
+
 export function stripHtmlForError(value: string) {
   return value
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")

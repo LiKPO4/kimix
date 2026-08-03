@@ -1187,6 +1187,10 @@ export class KimiCodeServerClient {
     return this.request("/api/v1/oauth/logout", { method: "POST", body: "{}" });
   }
 
+  getOAuthUsage(): Promise<unknown> {
+    return this.request("/api/v1/oauth/usage");
+  }
+
   getRedactedConfig(): Promise<Record<string, unknown>> {
     return this.request("/api/v1/config");
   }
@@ -1255,10 +1259,26 @@ export class KimiCodeServerClient {
     });
   }
 
+  async exportSession(sessionId: string): Promise<Buffer> {
+    const pathname = `/api/v1/sessions/${encodeURIComponent(sessionId)}/export`;
+    const response = await fetch(`${this.endpoint}${pathname}`, {
+      method: "POST",
+      body: "{}",
+      headers: { accept: "application/zip", "content-type": "application/json", ...serverAuthHeaders() },
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) throw new Error(`${pathname}: HTTP ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
+  }
+
   forkSession(sessionId: string, body: { title?: string; metadata?: Record<string, unknown> } = {}) {
     return this.request<ServerSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}:fork`, {
       method: "POST", body: JSON.stringify(body),
     });
+  }
+
+  getGoal(sessionId: string): Promise<unknown> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/goal`);
   }
 
   async listChildren(sessionId: string): Promise<ServerSession[]> {

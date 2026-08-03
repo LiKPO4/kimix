@@ -18,7 +18,7 @@ import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
-import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, stripHtmlForError } from "./kimiUsage";
+import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -3406,6 +3406,16 @@ async function exportKimiSessionArchive(request: ExportSessionRequest) {
       outputPath: result.filePath,
       includeGlobalLog: true,
     });
+    if (sdkResult.source === "server" && sdkResult.zip) {
+      await fs.promises.writeFile(result.filePath, sdkResult.zip);
+      await shell.showItemInFolder(result.filePath);
+      return {
+        path: result.filePath,
+        output: `Server export completed: ${sdkResult.zip.length} bytes`,
+        selectedAgentId: selectedAgent?.roomAgentId,
+        selectedAgentName: selectedAgent?.displayName,
+      };
+    }
     await shell.showItemInFolder(sdkResult.zipPath || result.filePath);
     return {
       path: sdkResult.zipPath || result.filePath,
@@ -7100,8 +7110,20 @@ ipcMain.handle("kimi:applyThemeImport", async (_, request: unknown) => {
 
 ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: string }) => {
   try {
+    if (kimiCodeHost.isListingSessionsFromServer()) {
+      // 走官方 Server 权威会话列表（与 Web 同链路）；SearchOverlay 消费 brief，
+      // serverSessionSummary 只有 title 无 brief，映射 title 作兜底
+      const sessions = await kimiCodeHost.listSessions(request.workDir);
+      const mapped = sessions.map((session) => ({
+        id: session.id,
+        workDir: session.workDir,
+        brief: session.brief ?? session.title ?? session.lastPrompt ?? "",
+        updatedAt: session.updatedAt,
+      }));
+      return { success: true, data: mapped, source: "server" as const };
+    }
     const sessions = await sessionHistory.getSessions(request.workDir);
-    return { success: true, data: sessions };
+    return { success: true, data: sessions, source: "sdk" as const };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -7110,7 +7132,11 @@ ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: st
 ipcMain.handle("kimi-code:getAccountUsage", async () => {
   try {
     try {
-      return { success: true, data: parseManagedUsagePayload(await kimiCodeHost.getManagedUsage()) };
+      const usage = await kimiCodeHost.getManagedUsage();
+      if (usage && typeof usage === "object" && (usage as { source?: string }).source === "server") {
+        return { success: true, data: parseServerUsagePayload((usage as { payload: unknown }).payload) };
+      }
+      return { success: true, data: parseManagedUsagePayload(usage) };
     } catch (sdkError) {
       const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
       if (!/不支持读取套餐用量|unsupported|not support/i.test(sdkMessage)) {

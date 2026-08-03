@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseKimiUsagePayload, parseManagedUsagePayload } from "../../../electron/kimiUsage";
+import { parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload } from "../../../electron/kimiUsage";
 
 describe("Kimi managed usage parser", () => {
   it("fills refreshAt fallback for SDK managed usage rows", () => {
@@ -125,5 +125,41 @@ describe("Kimi direct usage parser", () => {
       monthlyUsedCents: 1250,
       currency: "CNY",
     });
+  });
+});
+
+describe("Kimi server usage parser (official /api/v1/oauth/usage)", () => {
+  it("parses the server usage payload shape (summary.window + limits[].window, no label)", () => {
+    const usage = parseServerUsagePayload({
+      kind: "ok",
+      summary: {
+        window: { duration: 1, unit: "week" },
+        used: 98,
+        limit: 100,
+        reset_at: "2026-08-05T08:36:42.880059Z",
+      },
+      limits: [
+        { window: { duration: 5, unit: "hour" }, used: 11, limit: 100, reset_at: "2026-08-03T02:36:42.880059Z" },
+      ],
+      extra_usage: null,
+    }, Date.parse("2026-08-03T02:40:00.000Z"));
+
+    expect(usage.available).toBe(true);
+    expect(usage.periods).toHaveLength(2);
+    const fiveHour = usage.periods.find((period) => period.label === "5小时");
+    const weekly = usage.periods.find((period) => period.label === "本周");
+    expect(fiveHour).toMatchObject({ used: 11, limit: 100, percent: 11 });
+    expect(weekly).toMatchObject({ used: 98, limit: 100, percent: 98 });
+    expect(usage.source).toContain("Server");
+  });
+
+  it("parses a server usage payload with no windows as unavailable", () => {
+    const usage = parseServerUsagePayload({ kind: "ok", summary: null, limits: [], extra_usage: null });
+    expect(usage.available).toBe(false);
+  });
+
+  it("throws on kind=error payloads with a friendly message", () => {
+    expect(() => parseServerUsagePayload({ kind: "error", message: "HTTP 502 gateway timeout" }))
+      .toThrow("暂时不可用");
   });
 });

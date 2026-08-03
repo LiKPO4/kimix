@@ -375,6 +375,10 @@ export type KimiCodeExportSessionResult = {
   entries: readonly string[];
   sessionDir: string;
   manifest: unknown;
+  /** 官方 Server 直接导出（POST /sessions/:id/export）返回的 ZIP 字节流。 */
+  zip?: Buffer;
+  /** 导出来源：server = 官方 Server 链路；sdk = 兼容 SDK 链路。 */
+  source?: "server" | "sdk";
 };
 
 export type KimiCodePluginSource = "local-path" | "zip-url" | "github";
@@ -753,6 +757,13 @@ function recordServerSessionMigration(serverSessionId: string, sdkSessionId: str
   serverSessionMigrations.set(serverSessionId, sdkSessionId);
 }
 
+function cleanupSessionMigrationEntries(sessionId: string): void {
+  // 迁移映射键是旧 Server 会话 id；关闭的是迁移后的 SDK 会话 id 或旧 id，双向清理。
+  for (const [serverId, sdkId] of serverSessionMigrations) {
+    if (serverId === sessionId || sdkId === sessionId) serverSessionMigrations.delete(serverId);
+  }
+}
+
 const serverQuestionRequests = new Map<string, Record<string, unknown>>();
 let serverClient: KimiCodeServerClient | null = null;
 let unsubscribeServerFrames: (() => void) | null = null;
@@ -770,7 +781,7 @@ const COMPACTION_WIRE_CONFIRM_TIMEOUT_MS = 10 * 60 * 1000;
 const COMPACTION_WIRE_CONFIRM_INTERVAL_MS = 250;
 const COMPACTION_WIRE_TAIL_BYTES = 256 * 1024;
 const SERVER_RELOAD_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂不支持直接重载配置；如需刷新 Skill、Plugin 或配置，请新建或 fork 会话。";
-const SERVER_GOAL_UNSUPPORTED_MESSAGE = "当前官方 Server 会话暂未公开 Goal API；请使用兼容会话或等待官方 Server 支持。";
+const SERVER_GOAL_UNSUPPORTED_MESSAGE = "官方 Server 仅支持读取 Goal 状态；创建/暂停/恢复请使用兼容会话或等待官方 Server 支持。";
 const sdkPinnedSessionIds = new Set<string>();
 let nextRequestId = 0;
 let activeLoginAbort: AbortController | null = null;
@@ -959,6 +970,7 @@ export async function forkSession(
 }
 
 export async function listChildSessions(sessionId: string): Promise<KimiCodeSessionSummary[]> {
+  if (!kimiCodeServerHost.isReady()) throw new Error("会话子级列表仅由实验性 Kimi Server 提供。");
   const client = getServerClient();
   const [children, sessions] = await Promise.all([client.listChildren(sessionId), client.listSessions()]);
   return mergeServerRelatedSessions(sessionId, children, sessions).map(serverSessionSummary);
@@ -1454,6 +1466,7 @@ export async function askBtw(
   input: string | KimiCodePromptPart[],
   options: { timeoutMs?: number } = {},
 ): Promise<KimiCodeBtwResult> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     if (serverManaged.status !== "idle" && serverManaged.status !== "completed" && serverManaged.status !== "interrupted" && serverManaged.status !== "error") {
@@ -1546,6 +1559,7 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
 }
 
 export async function undoHistory(sessionId: string, count: number): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     await getServerClient().undoSession(sessionId, count);
     return;
@@ -1570,6 +1584,7 @@ export async function cancel(sessionId: string): Promise<void> {
 }
 
 export async function setPlanMode(sessionId: string, enabled: boolean): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     if (serverManaged.planMode === enabled) return;
@@ -1584,6 +1599,7 @@ export async function setPlanMode(sessionId: string, enabled: boolean): Promise<
 }
 
 export async function setThinking(sessionId: string, level: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     if (serverManaged.thinking === level) return;
@@ -1599,6 +1615,7 @@ export async function setThinking(sessionId: string, level: string): Promise<voi
 }
 
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     if (serverManaged.permission === mode) return;
@@ -1613,6 +1630,7 @@ export async function setPermission(sessionId: string, mode: KimiCodePermissionM
 }
 
 export async function compactSession(sessionId: string, instruction?: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     const startedAt = Date.now();
@@ -1773,7 +1791,10 @@ export async function createGoal(sessionId: string, input: KimiCodeCreateGoalInp
 }
 
 export async function getGoal(sessionId: string): Promise<KimiCodeGoalState> {
-  if (serverSessions.has(sessionId)) throw new Error(SERVER_GOAL_UNSUPPORTED_MESSAGE);
+  if (serverSessions.has(sessionId)) {
+    const data = await getServerClient().getGoal(sessionId) as { goal?: KimiCodeGoalSnapshot | null } | null;
+    return { goal: data?.goal ?? null };
+  }
   const managed = getManagedSession(sessionId);
   if (!managed.session.getGoal) throw new Error("当前兼容链路不支持官方 Goal。");
   return managed.session.getGoal();
@@ -1804,6 +1825,7 @@ export async function cancelGoal(sessionId: string, reason?: string): Promise<Ki
 }
 
 export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatus> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     return serverStatusToKimiCodeStatus(await refreshServerSessionStatus(sessionId, false), serverManaged.session.usage);
@@ -1825,6 +1847,7 @@ export function normalizeSdkSessionStatus(
 }
 
 export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     const session = await getServerClient().getSession(sessionId);
@@ -1837,9 +1860,16 @@ export async function getUsage(sessionId: string): Promise<KimiCodeSessionUsage>
 }
 
 export async function getManagedUsage(providerName?: string): Promise<unknown> {
+  if (kimiCodeServerHost.isReady()) {
+    try {
+      return { source: "server", payload: await getServerClient().getOAuthUsage() };
+    } catch (error) {
+      console.warn("[KimiCodeServerHost] server usage failed; falling back to SDK:", error);
+    }
+  }
   const sdkHarness = await getHarness();
   if (!sdkHarness.auth?.getManagedUsage) throw new Error("当前兼容链路不支持读取套餐用量。");
-  return sdkHarness.auth.getManagedUsage(providerName);
+  return { source: "sdk", payload: await sdkHarness.auth.getManagedUsage(providerName) };
 }
 
 export async function login(
@@ -1896,6 +1926,7 @@ export async function login(
 }
 
 export async function listMcpServers(sessionId: string): Promise<KimiCodeMcpServerInfo[]> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     return (await getServerClient().listMcpServers()).map(toKimiCodeMcpServerInfo);
   }
@@ -1905,12 +1936,14 @@ export async function listMcpServers(sessionId: string): Promise<KimiCodeMcpServ
 }
 
 export async function getMcpStartupMetrics(sessionId: string): Promise<KimiCodeMcpStartupMetrics> {
+  if (serverSessions.has(sessionId)) throw new Error("当前官方 Server 会话未提供 MCP 启动指标；该数据仅由兼容链路提供。");
   const managed = getManagedSession(sessionId);
   if (!managed.session.getMcpStartupMetrics) throw new Error("当前兼容链路不支持读取 MCP 启动指标。");
   return managed.session.getMcpStartupMetrics();
 }
 
 export async function reconnectMcpServer(sessionId: string, name: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     const servers = await getServerClient().listMcpServers();
     const server = servers.find((item) => item.id === name || item.name === name);
@@ -2110,6 +2143,7 @@ export async function logoutServerOAuth(): Promise<boolean> {
 }
 
 export async function listBackgroundTasks(sessionId: string, options: { activeOnly?: boolean; limit?: number } = {}): Promise<KimiCodeBackgroundTaskInfo[]> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     const tasks = await getServerClient().listTasks(sessionId, options.activeOnly ? "running" : undefined);
     const mapped = tasks.map((task) => ({
@@ -2139,6 +2173,7 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
 }
 
 export async function getBackgroundTaskOutput(sessionId: string, taskId: string, options: { tail?: number } = {}): Promise<string> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     const task = await getServerClient().getTask(sessionId, taskId, Math.max(1_024, (options.tail ?? 200) * 256));
     return task.output_preview ?? "";
@@ -2149,6 +2184,7 @@ export async function getBackgroundTaskOutput(sessionId: string, taskId: string,
 }
 
 export async function getBackgroundTaskOutputPath(sessionId: string, taskId: string): Promise<string | undefined> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) return undefined;
   const managed = getManagedSession(sessionId);
   if (!managed.session.getBackgroundTaskOutputPath) throw new Error("当前兼容链路不支持读取后台任务输出路径。");
@@ -2156,6 +2192,7 @@ export async function getBackgroundTaskOutputPath(sessionId: string, taskId: str
 }
 
 export async function stopBackgroundTask(sessionId: string, taskId: string, reason?: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     await getServerClient().cancelTask(sessionId, taskId);
     return;
@@ -2279,6 +2316,7 @@ export async function listPlugins(sessionId?: string): Promise<KimiCodePluginSum
 }
 
 export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSummary[]> {
+  if (sessionId) sessionId = resolveMigratedSessionId(sessionId);
   if (sessionId && serverSessions.has(sessionId)) {
     return (await getServerClient().listSkills(sessionId)).map(toKimiCodeSkillSummary);
   }
@@ -2288,6 +2326,7 @@ export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSumma
 }
 
 export async function activateSkill(sessionId: string, name: string, args?: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
     await getServerClient().activateSkill(sessionId, name, args);
     return;
@@ -2492,12 +2531,28 @@ function serverReplayTimestamp(frame: ServerFrame): unknown {
 }
 
 export async function exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult> {
+  if (kimiCodeServerHost.isReady() && input.id) {
+    try {
+      const zip = await getServerClient().exportSession(input.id);
+      return {
+        zipPath: "",
+        entries: [],
+        sessionDir: "",
+        manifest: null,
+        zip,
+        source: "server",
+      };
+    } catch (error) {
+      console.warn("[KimiCodeServerHost] server export failed; falling back to SDK:", error);
+    }
+  }
   const sdkHarness = await getHarness();
-  return sdkHarness.exportSession({
+  const result = await sdkHarness.exportSession({
     ...input,
     version: input.version ?? process.env.npm_package_version ?? "0.0.0",
     installSource: input.installSource ?? "kimix-sdk-host",
   });
+  return { ...result, source: "sdk" };
 }
 
 export async function getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig> {
@@ -2592,11 +2647,15 @@ export async function closeSession(sessionId: string): Promise<void> {
     return;
   }
   const managed = sessions.get(sessionId);
-  if (!managed) return;
+  if (!managed) {
+    cleanupSessionMigrationEntries(sessionId);
+    return;
+  }
   sessions.delete(sessionId);
   settlePendingForSession(sessionId, "cancelled");
   managed.unsubscribe();
   await managed.session.close();
+  cleanupSessionMigrationEntries(sessionId);
 }
 
 export async function closeAllSessions(): Promise<void> {
