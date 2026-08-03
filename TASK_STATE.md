@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：Windows 通知点击不聚焦窗口（v2.20.159）
+
+- 现场：点击 Kimix Windows 通知不跳转聚焦到窗口。
+- 根因两个：(1) Notification 对象在 showTurnCompleteNotification 返回后无模块级引用，可能被 GC 回收导致 click 事件丢失；(2) activateWindow 的 setAlwaysOnTop 脉冲 200ms 在 Windows 后台进程抢焦点场景下太短。
+- 修复：(1) keptNotifications Set 持有 Notification 引用（click/close 后移除）；(2) WINDOWS_TOPMOST_PULSE_MS 从 200→500ms；(3) click 回调增加 app.focus() 作为 Windows 聚焦补充。
+- 验证：typecheck 过；全量 1489 测试过。提交 85d841f4。
+- 实机待验：发通知（等一轮完成或触发后台任务完成通知），点击通知确认窗口聚焦。
+
+
 ## 2026-08-03 修复：跨客户端实时同步（web 发消息/已答澄清不同步）（v2.20.157-158）
 
 - 现场：kimix 与 kimi code web 都开着，web 发消息 Kimix 不显示新消息与回复；web 已答的澄清卡片在 Kimix 显示未回答。
