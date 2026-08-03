@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：通知点击跳转聚焦消息中部而非顶部（v2.20.166）
+
+- 现场：点击 Kimix Windows 通知跳转到对应消息时视口落在消息中部，用户要求与左侧刻度条点击一致（顶部）。
+- 根因：通知链路 `App.tsx` 派发 `kimix:focus-timeline-event` 不带 alignment → `useEventFocus.focusTimelineEvent` 默认 `"center"`；刻度条路径显式传 `"start"`（顶部 + 16px 偏移）。两条路径共享同一滚动实现，只差参数。
+- 修复（v2.20.166）：通知 detail 增加 `alignment: "start"`，`useEventFocus` 的 detail 类型、pending 暂存与重放路径全链路透传；SearchOverlay 搜索跳转不传、保持 center 不变。
+- 验收：全量 1512 测试通过（新增对齐透传用例 1 个）、typecheck 通过、`pnpm build` 通过；实机点击通知效果待用户验收。
+- 知识库：无需更新。
+
 ## 2026-08-03 优化：权限模式 Kimix↔官方 Web 双端同步（v2.20.165）
 
 - 现场：用户截图——Kimix 权限「完全自主(auto)」、web 侧「自动通过(yolo)」，Kimix 调整后 web 不同步，怀疑「没走同一条链路」。

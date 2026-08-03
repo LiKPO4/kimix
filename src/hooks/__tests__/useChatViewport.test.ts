@@ -407,6 +407,32 @@ describe("useChatViewport", () => {
     expect(onHighlight).toHaveBeenCalledWith("target-event");
   });
 
+  it("focuses a notification-targeted event aligned to the top when detail carries alignment start", async () => {
+    const onHighlight = vi.fn();
+    const { scroll } = renderTest({
+      sessionId: "session-focus",
+      renderItems: [eventRenderItem("a")],
+      onHighlightEvent: onHighlight,
+    });
+    scroll.scrollTo = vi.fn();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
+        detail: { sessionId: "session-focus", eventId: "a", alignment: "start" },
+      }));
+    });
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+
+    expect(onHighlight).toHaveBeenCalledWith("a");
+    // "start" alignment must scroll the container to the target's top; the
+    // center fallback would call scrollIntoView instead and leave scrollTo alone.
+    expect(scroll.scrollTo).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth" }),
+    );
+  });
+
   it("reveals a collapsed merged event before selecting its exact search text", async () => {
     const onHighlight = vi.fn();
     const merged = eventRenderItem("assistant:turn-1");

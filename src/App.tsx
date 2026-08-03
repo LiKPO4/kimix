@@ -1414,7 +1414,7 @@ function App() {
     appState.setCurrentSession(focusedSession);
     if (target.eventId) {
       window.dispatchEvent(new CustomEvent("kimix:focus-timeline-event", {
-        detail: { sessionId: focusedSession.id, eventId: target.eventId },
+        detail: { sessionId: focusedSession.id, eventId: target.eventId, alignment: "start" },
       }));
     }
   }), []);

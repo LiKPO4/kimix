@@ -33,7 +33,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     pauseAutoFollowForUser,
   } = options;
 
-  const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string } | null>(null);
+  const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string; alignment?: TimelineFocusAlignment } | null>(null);
   const focusTimelineEventStateRef = useRef<{ eventId: string; attemptCount: number; startTime: number } | null>(null);
   const highlightClearTimerRef = useRef<number | null>(null);
 
@@ -209,13 +209,13 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
 
   useEffect(() => {
     const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ sessionId?: string; eventId?: string; searchText?: string }>).detail;
+      const detail = (event as CustomEvent<{ sessionId?: string; eventId?: string; searchText?: string; alignment?: TimelineFocusAlignment }>).detail;
       if (!detail?.sessionId || !detail.eventId) return;
-      pendingFocusEventRef.current = { sessionId: detail.sessionId, eventId: detail.eventId, searchText: detail.searchText };
+      pendingFocusEventRef.current = { sessionId: detail.sessionId, eventId: detail.eventId, searchText: detail.searchText, alignment: detail.alignment };
       if (sessionId === detail.sessionId) {
         const eventId = detail.eventId;
         window.requestAnimationFrame(() => {
-          if (focusTimelineEvent(eventId, detail.searchText)) {
+          if (focusTimelineEvent(eventId, detail.searchText, detail.alignment)) {
             pendingFocusEventRef.current = null;
           }
         });
@@ -229,7 +229,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     const pending = pendingFocusEventRef.current;
     if (!pending || !sessionId || pending.sessionId !== sessionId) return;
     window.requestAnimationFrame(() => {
-      if (focusTimelineEvent(pending.eventId, pending.searchText)) {
+      if (focusTimelineEvent(pending.eventId, pending.searchText, pending.alignment)) {
         pendingFocusEventRef.current = null;
       }
     });
