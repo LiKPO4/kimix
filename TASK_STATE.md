@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：迁移矩阵剩余毛边收敛（v2.20.154）
+
+- 迁移显式化：`migrateServerSessionToSdk` 迁移成功后发 `emitStatus(sessionId, "idle")`，渲染层据此刷新 runtime 绑定。
+- reload 语义定案：`/reload` 迁移传 `pinToSdk: true`——reload 目的是让 SDK 重载 Skill/Plugin 注册表，钉住避免 Server 恢复后被弹回导致效果丢失与链路横跳（与 Swarm pin 一致）。
+- 僵尸会话自愈：`markServerRuntimeFailure` 后新增 `migrateIdleServerSessionsToSdk`，把已打开的非运行中 Server 会话 best-effort 批量迁到 SDK；运行中/等待中保留（走 createSdkFallbackSession）。
+- 至此 docs/server-sdk-migration-matrix.md 第三节 6 条收敛建议全部落地（2/3/6 在 v2.20.153，1/4/5 在本版）。
+- 验证：typecheck 过；全量 1486 测试过；pnpm build 过；knowledge:validate PASS。
+- 知识库：runtime-routing 不变量 99 + log 更新。
+- 实机待验：v2.20.154 下 reload 后会话不再弹回 Server；Server 降级时已打开会话可继续用（自愈迁移）。
+
+
 ## 2026-08-03 功能：套餐用量/Goal读取/历史列表/会话导出接入官方 Server 链路（v2.20.153）
 
 - 背景：五路并行审查（docs/feature-web-linkage-audit.md）找出全部未走官方 Web 一致链路的功能点，经在线实测确认 4 项可迁移。

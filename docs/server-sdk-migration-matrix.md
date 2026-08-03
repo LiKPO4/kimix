@@ -40,11 +40,13 @@ Goal 五件套（`SERVER_GOAL_UNSUPPORTED_MESSAGE`）、plugin commands、detach
 4. **全局 fallback 后已打开 Server 会话变僵尸**：后续操作必报错「Kimi Server 尚未就绪」，只能手动重开。
 5. **迁移静默**：Swarm/reload 换引擎对用户无任何提示，之后出现的差异（如 Server 专属诊断/终端不可用）无法归因。
 
-## 三、收敛建议（按价值排序，均未实施）
+## 三、收敛建议（实施状态跟踪）
 
-1. **迁移显式化**：Swarm/reload 迁移时写一条 status 事件（「已切到兼容链路继续，官方 Server 恢复后可切回」），消灭静默。
-2. **统一不支持策略**：Goal/plugin commands 等与 Swarm 一致——报错文案里给出「迁移到兼容会话继续」的明确路径，或 UI 禁用并说明。
-3. **补齐 `resolveMigratedSessionId` 覆盖**到全部会话级函数，消除「session is not active」。
-4. **reload 迁移语义定案**：要么 pin（与 Swarm 一致），要么明确「reload 完即升回 Server」是预期并写进注释/知识库。
-5. **僵尸会话自愈**：全局 fallback 期间对已打开 Server 会话的下一次操作自动走单会话迁移，而不是抛错。
-6. `getMcpStartupMetrics` 换成友好不支持文案。
+> 2026-08-03 更新：v2.20.153 完成 2、3、6；v2.20.154 完成 1、4、5。六条全部落地。
+
+1. **迁移显式化** ✅（v2.20.154）：`migrateServerSessionToSdk` 迁移成功后发 `emitStatus(sessionId, "idle")`，渲染层据此刷新 runtime 绑定（mid-turn 失败换 id 场景已有 `migratedTo` 通知，v2.20.152 前已存在）。
+2. **统一不支持策略** ✅（v2.20.153）：Goal 读侧接入 `GET /sessions/{id}/goal`、`SERVER_GOAL_UNSUPPORTED_MESSAGE` 文案改为「仅支持读取」；plugin commands 文案已带「请等待官方 Server API 暴露等价能力，或在 SDK route 会话中使用」。
+3. **补齐 `resolveMigratedSessionId` 覆盖** ✅（v2.20.153）：askBtw/undoHistory/compactSession/setPlanMode/setThinking/setPermission/getStatus/getUsage/listMcpServers/reconnectMcpServer/后台任务组/listSkills/activateSkill 全部补上；`closeSession` 双向清理迁移映射。
+4. **reload 迁移语义定案** ✅（v2.20.154）：**pin 到 SDK**（与 Swarm 一致）——reload 的目的是让 SDK 重载 Skill/Plugin 注册表，钉住避免 Server 恢复后被 `promoteSdkSessionToServer` 弹回导致 reload 效果丢失与链路反复横跳。
+5. **僵尸会话自愈** ✅（v2.20.154）：`markServerRuntimeFailure` 后新增 `migrateIdleServerSessionsToSdk`——把已打开的非运行中 Server 会话批量 best-effort 迁到 SDK（复用 `migrateServerSessionToSdk`，unsubscribe 失败被 catch），运行中/等待中的会话保留（其失败路径走 `createSdkFallbackSession`）。
+6. **`getMcpStartupMetrics` 换成友好不支持文案** ✅（v2.20.153）：改为「当前官方 Server 会话未提供 MCP 启动指标；该数据仅由兼容链路提供。」；另 `listChildSessions` 报错文案改为「会话子级列表仅由实验性 Kimi Server 提供。」

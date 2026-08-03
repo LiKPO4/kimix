@@ -1009,6 +1009,9 @@ export async function reloadSession(sessionId: string): Promise<void> {
     await migrateServerSessionToSdk(sessionId, serverManaged, {
       forcePluginSessionStartReminder: true,
       runningMessage: "当前轮正在运行，不能刷新 Skill 注册表。请等本轮结束后重试。",
+      // reload 的目的是让 SDK 重载 Skill/Plugin 注册表；钉在 SDK，避免 Server 恢复后被
+      // promoteSdkSessionToServer 弹回导致 reload 效果丢失与链路反复横跳（与 Swarm pin 语义一致）。
+      pinToSdk: true,
     });
     return;
   }
@@ -1081,6 +1084,9 @@ async function migrateServerSessionToSdk(
     planMode: status?.planMode ?? serverManaged.planMode,
     metadata: serverManaged.metadata ?? session.summary?.metadata,
   });
+  // 迁移显式化：同 id 迁到兼容链路后发一次 idle 状态，渲染层据此刷新 runtime 绑定；
+  // Server 恢复后未 pin 的会话仍可能被 promoteSdkSessionToServer 弹回，见调用方注释。
+  emitStatus(sessionId, "idle");
   return getManagedSession(sessionId);
 }
 
@@ -2920,7 +2926,30 @@ function markServerRuntimeFailure(error: unknown) {
   unsubscribeServerFrames = null;
   void serverClient?.close().catch(() => undefined);
   serverClient = null;
+  // 僵尸会话自愈：已打开的 Server 会话在 fallback 期间若继续停留在 serverSessions，
+  // 后续操作会抛「Kimi Server 尚未就绪」且无法使用。把 idle 会话批量迁到 SDK（best effort），
+  // 运行中/等待中的会话保留（其失败路径会走 createSdkFallbackSession）。
+  void migrateIdleServerSessionsToSdk();
   scheduleServerRecovery();
+}
+
+async function migrateIdleServerSessionsToSdk() {
+  const idleIds = [...serverSessions.entries()]
+    .filter(([, managed]) => managed.status !== "running"
+      && managed.status !== "waiting_approval" && managed.status !== "waiting_question")
+    .map(([sessionId]) => sessionId);
+  for (const sessionId of idleIds) {
+    const serverManaged = serverSessions.get(sessionId);
+    if (!serverManaged) continue;
+    try {
+      await migrateServerSessionToSdk(sessionId, serverManaged, {
+        runningMessage: "Server 已降级，无法迁移运行中的会话。",
+      });
+      console.info(`[KimiCodeServerHost] migrated idle Server session ${sessionId} to SDK after runtime failure`);
+    } catch (migrationError) {
+      console.warn(`[KimiCodeServerHost] failed to migrate idle session ${sessionId} to SDK:`, migrationError);
+    }
+  }
 }
 
 function getServerClient() {
