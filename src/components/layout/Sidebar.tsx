@@ -710,7 +710,15 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     syncProjectForSession(session);
     setCurrentSession(session);
     const runtimeSessionId = getRuntimeSessionId(session) ?? session.id;
-    const runtimeStatusPromise = window.api.getKimiCodeStatus({ sessionId: runtimeSessionId }).catch(() => null);
+    // 确保主进程已绑定该 runtime（dev 重启/冷启动后 store 恢复的会话不在 serverSessions，
+    // 不绑定则收不到 web 端发来的实时帧；resume 幂等，已绑定则直接返回）
+    // resume 只负责绑定，状态仍以 getStatus 权威结果为准（resume 返回无 swarmMode）。
+    const runtimeResumePromise = window.api.resumeKimiCodeSession({ sessionId: runtimeSessionId })
+      .then((res) => (res.success ? res.data : null))
+      .catch(() => null);
+    const runtimeStatusPromise = runtimeResumePromise.then(() =>
+      window.api.getKimiCodeStatus({ sessionId: runtimeSessionId }).catch(() => null),
+    );
     const hasConversation = session.events.some((event) => event.type === "user_message" || event.type === "assistant_message");
     if (hasConversation && session.kimiHistoryCacheVersion === KIMI_HISTORY_CACHE_VERSION) {
       const runtimeStatus = await runtimeStatusPromise;
