@@ -1,22 +1,19 @@
 # Kimix 长程任务状态
 
-## 2026-08-03 待修：Swarm 子代理消息截断 + 状态卡在「执行中」（根因已定位）
+## 2026-08-03 待修：Swarm 子代理消息截断 + 状态卡在「执行中」（v2.20.160 已修帧队列保护，卡死链路待快照验证）
 
 - 现场：swarm 子代理回复消息内容不完整（对比 web 端少了一大段），且 UI 永久卡在「执行中 37 秒」「消息处理中」，engineStatus 一直是 running。重启 dev 后仍复现（v2.20.159）。
-- 根因链路（三层叠加）：
-  1. **帧队列溢出丢帧**（`kimiCodeServerClient.ts:1925-1931`）：`this.queued.push(frame)` 超 2000 上限时 `splice(0, dropped)` 删最老帧。swarm 子代理高频产出工具调用帧（tool.call.started/result/content.part），队列溢出时把历史 `assistant.delta`（正文截断）和**终止帧**（`prompt.completed`/`turn.ended`）一起丢了。
-  2. **终止帧处理只 log 不清 running**（`App.tsx:2678-2682`）：`prompt.completed`/`turn.ended`/`TurnEnd` 事件到达渲染层后**只调 `noteLiveStreamFrame`（记日志），不调 `setRunningSessionId(null)`**。running 状态仅靠 1.5s 轮询 `reconcileRuntimeStatus` → `getKimiCodeStatus` 从 `engineStatus` 判断（`App.tsx:3537`），但轮询有前提：需要 `runningSessionId` 非空才跑（`App.tsx:3275`）。一旦终止帧被丢、没有新帧触发状态更新，轮询永远跑但 `engineStatus` 若 server 侧仍是 running（swarm 子代理活跃态），就永远不清 running。
-  3. **watchdog 90s 才触发重连**（`kimiCodeServerClient.ts:378`）：`WS_SILENCE_LIMIT_MS = 90_000`，swarm 高帧率场景下 WS 不是沉默而是溢出——watchdog 无法感知帧丢失，90s 后才重连恢复快照，但此时 UI 已经显示了不完整内容且卡住。
-- 影响：swarm 子代理的所有长程回复都会出现内容截断 + 状态卡死；普通非 swarm prompt 受影响较小（帧率低、终止帧紧跟正文）。
-- 修复方向（均未实施）：
-  a. `App.tsx:2678` 终止帧处理补 `setRunningSessionId(null)` 兜底（最低成本止血）
-  b. `kimiCodeServerClient.ts` 帧队列溢出时**保护终止帧**：`prompt.completed`/`turn.ended`/`TurnEnd` 不参与 splice 删最老逻辑（或用优先级标记）
-  c. 渲染层增加**安全超时兜底**：running 状态持续超过阈值（如 5 分钟）且无新流式帧时，自动清 running + 标记 turn 为 interrupted
-  d. 重连恢复（recoverSnapshot）时补全已丢失的 delta 帧（需服务端配合）
-- 关键文件：`electron/kimiCodeServerClient.ts`（帧队列/wdog）、`src/App.tsx`（事件处理/轮询/reconcile）、`src/hooks/useEventStream.ts`
+- 根因复核（v2.20.160 修正交接时的错误结论）：
+  1. 帧队列溢出（`kimiCodeServerClient.ts` deliver）：**不丢 host 事件流帧**——`for (const listener of this.listeners) listener(frame)` 在 waiter 匹配/queued 之前每帧必达（1915/2006 行）；queued 只服务 `waitFor`/`waitForSessionEvent` 事后回放（先查 queued 再注册 waiter）。溢出删最老的真实影响：`waitForSessionEvent`（1399 行，等 `prompt.completed`/`prompt.aborted` 完成确认）匹配不到完成帧 → 挂 180s 空闲超时 → `resolveServerPromptIdleTimeout` 查权威状态，**状态仍 busy 时 `continue` 无限续等** → UI 表现永久「执行中」。正文截断另有来源（渲染合并/快照重放/子代理独立会话），待事件流快照验证。
+  2. 终止帧只 log 不清 running（`App.tsx:2677-2688`）：属实，但这是**有意设计**——`kimiCodeHost.ts:3072-3087` 注释明确「prompt.completed 是交付屏障不是终态，立即 terminalize 会清 runningSessionId、停 poll、UI 把中间正文当最终正文（伪正文+折叠+卡住）」。**交接方案 a（渲染层终止帧无条件 setRunningSessionId(null)）与既有架构冲突，有伪正文回归风险，未实施**。正确语义：终止帧只提示「该 prompt 输出已交付」，会话是否终态由 server /status.busy 权威判定 + 轮询 settle。
+  3. watchdog 90s（`WS_SILENCE_LIMIT_MS=90_000`）：属实；swarm 高帧率下 WS 不沉默，watchdog 无法感知丢帧。
+- v2.20.160 已实施：帧队列溢出**保护终止帧**（`isTerminationFrame`：prompt.completed/prompt.aborted/turn.ended 不参与删最老，优先删普通帧；全终止帧极端场景才兜底截断）。消除「完成帧被挤掉 → 180s 超时 → busy 无限续等」链路的队列侧成因。
+- 未实施（需先抓事件流快照再定）：
+  a2. 渲染层安全超时兜底：running 持续超阈值（如 5 分钟）且无新流式帧时清 running + 标 interrupted——注意长思考轮次实测 616s 无帧（client 1394 行注释），纯时间兜底会误伤，条件需含「无帧且权威状态非 busy」。
+  c. recoverSnapshot 补全 delta 帧（需服务端配合）。
+  d. 卡死复现取证：开主进程调试日志（sdiag）+ 复现 swarm 长回复，抓事件流快照（终止帧是否到达、delta 是否缺、engineStatus 变化序列），区分 SDK/server 行为与 Kimix 逻辑后再修渲染层。
+- 关键文件：`electron/kimiCodeServerClient.ts`（帧队列/wdog/完成确认）、`electron/kimiCodeHost.ts:3072-3114`（prompt.completed 屏障语义）、`src/App.tsx:2677-2688, 3453-3571`（终止帧处理/轮询 reconcile）
 - 类型：功能缺陷，swarm 模式下的性能与正确性问题。
-
-
 ## 2026-08-03 修复：Windows 通知点击不聚焦窗口（v2.20.159）
 
 - 现场：点击 Kimix Windows 通知不跳转聚焦到窗口。

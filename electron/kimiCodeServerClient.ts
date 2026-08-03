@@ -664,6 +664,17 @@ function sniffImageMediaType(base64: string): string | undefined {
   return undefined;
 }
 
+/**
+ * 终止帧：prompt 完成/中止、turn 结束。waitForSessionEvent 依赖这些帧完成
+ * prompt 确认（匹配 prompt_id 后 break），帧队列溢出时若被删最老挤掉，
+ * 会挂到 180s 空闲超时，权威状态仍 busy 时还会无限续等（UI 永久「执行中」）。
+ */
+function isTerminationFrame(frame: ServerFrame): boolean {
+  return frame.type === "prompt.completed"
+    || frame.type === "prompt.aborted"
+    || frame.type === "turn.ended";
+}
+
 export function flattenServerEvent(frame: ServerFrame): Record<string, unknown> {
   const payload = frame.payload && typeof frame.payload === "object"
     ? frame.payload as Record<string, unknown>
@@ -1927,8 +1938,20 @@ export class KimiCodeServerClient {
     this.queued.push(frame);
     if (this.queued.length > 2_000) {
       const dropped = this.queued.length - 2_000;
-      this.queued.splice(0, dropped);
-      console.warn(`[KimiCodeServerClient] frame queue overflow: dropped ${dropped} oldest frames`);
+      // 保护终止帧：溢出时跳过终止帧只删普通帧（swarm 子代理高频 tool 帧会
+      // 把完成帧挤出队列，导致 waitForSessionEvent 匹配不到而挂到 180s 超时）；
+      // 队列里全是终止帧的极端场景才按原逻辑兜底截断，保证上限。
+      let removed = 0;
+      for (let index = 0; removed < dropped && index < this.queued.length; ) {
+        if (isTerminationFrame(this.queued[index])) {
+          index += 1;
+          continue;
+        }
+        this.queued.splice(index, 1);
+        removed += 1;
+      }
+      if (removed < dropped) this.queued.splice(0, dropped - removed);
+      console.warn(`[KimiCodeServerClient] frame queue overflow: dropped ${dropped} oldest frames (protected ${removed} terminal frame(s))`);
     }
   }
 
