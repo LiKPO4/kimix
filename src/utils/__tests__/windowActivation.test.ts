@@ -32,7 +32,7 @@ describe("activateWindow", () => {
     expect(activateWindow(window, "win32")).toBe(true);
     expect(calls).toEqual(["restore", "always:true", "show", "moveTop", "focus"]);
 
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(500);
     expect(calls).toEqual(["restore", "always:true", "show", "moveTop", "focus", "always:false"]);
   });
 

@@ -9,7 +9,7 @@ export interface ActivatableWindow {
   focus(): void;
 }
 
-const WINDOWS_TOPMOST_PULSE_MS = 200;
+const WINDOWS_TOPMOST_PULSE_MS = 500;
 
 export function activateWindow(
   window: ActivatableWindow | null | undefined,

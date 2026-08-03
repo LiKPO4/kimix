@@ -2738,6 +2738,8 @@ let rendererReloadedAfterBlank = false;
 let rendererDocumentGeneration = 0;
 let rendererContentCheckTimer: NodeJS.Timeout | null = null;
 let taskbarAttentionActive = false;
+/** 持有 Notification 引用防止 GC，click/close 后移除。 */
+const keptNotifications = new Set<Notification>();
 let taskbarOverlayIcon: Electron.NativeImage | null = null;
 let lastRendererHeartbeat: { receivedAt: number; payload: RendererHeartbeatPayload | null } | null = null;
 let rendererWatchdogTimer: NodeJS.Timeout | null = null;
@@ -2841,14 +2843,22 @@ function showTurnCompleteNotification(title: string, body: string, fallbackBody:
     body: safeBody || "当前轮次处理已完成，可以回来查看结果。",
     silent: false,
   });
+  keptNotifications.add(notification);
+  const done = () => { keptNotifications.delete(notification); };
   notification.on("click", () => {
+    done();
     const notificationWindow = mainWindow;
     if (!notificationWindow || !activateWindow(notificationWindow)) return;
     clearTaskbarAttention();
+    // Windows 上后台进程抢焦点不够可靠，app.focus() 作为补充
+    if (process.platform === "win32") {
+      app.focus();
+    }
     if (target.sessionId && !notificationWindow.isDestroyed()) {
       notificationWindow.webContents.send("app:notification-clicked", target);
     }
   });
+  notification.on("close", done);
   notification.show();
 }
 
