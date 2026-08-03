@@ -19,7 +19,7 @@ export const UI_STYLES: UiStylePreset[] = [
   { id: "default", label: "Kimix 默认", description: "温和圆角、轻阴影，延续现有熟悉界面。" },
   { id: "modern", label: "现代化", description: "安静侧栏、大圆角内容区与轻薄悬浮层次。" },
   { id: "retro", label: "复古", description: "小圆角、清晰描边与克制高光的经典桌面感。" },
-  { id: "nostalgia", label: "怀旧", description: "直角硬边、立体浮雕与按下内凹的经典桌面控件。" },
+  { id: "nostalgia", label: "怀旧", description: "直角硬边、立体浮雕与按下内凹的经典桌面。" },
 ];
 
 export function normalizeUiStyleId(value: unknown): UiStyleId {
