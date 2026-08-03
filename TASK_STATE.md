@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：侧栏打开会话同步 Swarm 开关状态（v2.20.156）
+
+- 现场：web 端（官方 Server）Swarm 一直开，Kimix 启动后点击侧栏进入对应会话显示「关」。
+- 排查：CDP 实测——Server 权威 `status.swarm_mode=true`；Kimix 主进程 `getKimiCodeStatus` 返回 `swarmMode:true`（数据正确）；问题在渲染层。
+- 根因：Sidebar `selectSession`（点击会话入口）只同步 model（hydrateSessionModel），不同步 swarmMode → store 保持 undefined → `displayedSwarmMode` 显示「关」。startup 自动恢复路径（App.tsx:2290）有同步，手动点击路径缺失。
+- 修复：新增 `hydrateSessionSwarmMode` 辅助，`selectSession` 三处 updateSession（缓存命中/加载失败/主加载）统一从 `runtimeStatus.data.swarmMode` 同步（直接访问字段，未依赖 App.tsx 私有 extractSwarmModeStatus）。
+- 验证：typecheck 过；store 测试 12 个过；dev 重启正常。提交 677b13e3。
+- 已知边界：若 web 端在 Kimix 运行期间（会话 idle 打开中）改 swarm，仍需触发一次状态刷新（切会话/发消息）才同步；无 idle 轮询。实机待验：点击侧栏进入 web 已开 swarm 的会话应显示「开」。
+
+
 ## 2026-08-03 修复：迁移矩阵剩余毛边收敛（v2.20.154）
 
 - 迁移显式化：`migrateServerSessionToSdk` 迁移成功后发 `emitStatus(sessionId, "idle")`，渲染层据此刷新 runtime 绑定。
