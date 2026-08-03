@@ -17,3 +17,16 @@ export function splitBackgroundTasksByKind<T extends { subagentType?: string }>(
   }
   return { subagentTasks, bashTasks };
 }
+
+/** 后台任务终态：completed/failed/killed/cancelled/stopped/exited，其余视为仍在运行。 */
+export function isBackgroundTaskTerminalStatus(status: string) {
+  return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
+}
+
+/** 会话级后台任务中是否存在仍在运行的后台 Bash 任务（子 Agent 组的运行任务不计入）。 */
+export function hasRunningBackgroundBashTask<T extends { subagentType?: string; status: string }>(
+  tasks: readonly T[],
+): boolean {
+  const { bashTasks } = splitBackgroundTasksByKind(tasks);
+  return bashTasks.some((task) => !isBackgroundTaskTerminalStatus(task.status));
+}

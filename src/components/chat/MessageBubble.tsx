@@ -2651,7 +2651,10 @@ function AssistantMessageFooter({
   );
 }
 
-export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean): string {
+export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean, hasRunningBackgroundBash = false): string {
+  // 后台 Bash 任务仍在运行时（turn 已有提交正文或已 settle），用「后台 Bash 运行中」盖住
+  // 「消息处理中」「模型：X」「已完成」，避免把后台任务误读为当前 turn 仍在处理
+  if (hasRunningBackgroundBash && (event.isComplete || !isActiveAssistant)) return "后台 Bash 运行中";
   if (isActiveAssistant) return "消息处理中";
   if (!event.isComplete) return "消息处理中";
   // Prefer model for both room and single-Agent sessions so usage-late turns
@@ -2904,6 +2907,7 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
 function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], attachedSteers = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false, turnBlocks }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean; turnBlocks?: TurnBlock[] }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
+  const sessionHasRunningBackgroundBash = useAppStore((s) => s.sessionHasRunningBackgroundBash);
   // Option C: when the process detail is expanded, the trailing text streams
   // in flow and the body stays empty; when it is collapsed (the flow copy is
   // invisible), the body streams the candidate instead. Never both.
@@ -3004,7 +3008,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
   const footerFallbackLabel = isInterrupted
     ? "输出打断"
-    : assistantFooterFallbackLabel(event, isActiveAssistant);
+    : assistantFooterFallbackLabel(event, isActiveAssistant, sessionHasRunningBackgroundBash);
   const processToBodyGap = processDisplayMode === "kimi-web" && !hideProcessSummary && shouldShowBodyFooter ? 12 : 20;
 
   if (roomDeliveryStatus === "queued" && isWaitingBehindAgentWork && event.roomAgentId && event.roomMessageId) {

@@ -102,6 +102,11 @@ export interface AppState {
   longTasksOpen: boolean;
   longTaskInspectorOpen: boolean;
   diffPanelOpen: boolean;
+  /**
+   * 当前会话是否存在仍在运行的后台 Bash 任务；由 AppShell 后台任务轮询同步，
+   * 供对话区消息状态胶囊区分「消息处理中」与「后台 Bash 运行中」。
+   */
+  sessionHasRunningBackgroundBash: boolean;
   hiddenComposerCards: Record<string, ComposerDockCard[]>;
   rightSidebarCardOrder: RightSidebarCardId[];
   handoffSessionId: string | null;

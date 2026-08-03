@@ -176,6 +176,7 @@ export interface AppStore extends AppState {
   setLongTasksOpen: (open: boolean) => void;
   setLongTaskInspectorOpen: (open: boolean) => void;
   setDiffPanelOpen: (open: boolean) => void;
+  setSessionHasRunningBackgroundBash: (running: boolean) => void;
   setComposerCardHidden: (sessionId: string, card: ComposerDockCard, hidden: boolean) => void;
   setRightSidebarCardOrder: (order: RightSidebarCardId[]) => void;
   setHandoffSessionId: (sessionId: string | null) => void;
@@ -232,6 +233,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   longTasksOpen: false,
   longTaskInspectorOpen: false,
   diffPanelOpen: false,
+  sessionHasRunningBackgroundBash: false,
   hiddenComposerCards: {},
   rightSidebarCardOrder: readRightSidebarCardOrder(),
   handoffSessionId: null,
@@ -311,6 +313,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setLongTasksOpen: (open) => set({ longTasksOpen: open }),
   setLongTaskInspectorOpen: (open) => set({ longTaskInspectorOpen: open }),
   setDiffPanelOpen: (open) => set({ diffPanelOpen: open }),
+  setSessionHasRunningBackgroundBash: (running) => set({ sessionHasRunningBackgroundBash: running }),
   setComposerCardHidden: (sessionId, card, hidden) => set((state) => {
     const current = state.hiddenComposerCards[sessionId] ?? [];
     const next = hidden

@@ -1261,6 +1261,57 @@ describe("assistant footer fallback", () => {
       durationMs: 65_000,
     }, false)).toBe("已完成 · 用时 1分5秒");
   });
+
+  it("shows 后台 Bash 运行中 when the active turn is complete and a background Bash task is still running", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-active",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "正文",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 65_000,
+    }, true, true)).toBe("后台 Bash 运行中");
+  });
+
+  it("shows 后台 Bash 运行中 for a settled turn with a running background Bash task", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-settled",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "正文",
+      model: "openai/gpt-5",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 65_000,
+    }, false, true)).toBe("后台 Bash 运行中");
+  });
+
+  it("keeps 消息处理中 while the assistant turn is still active even with a running background Bash task", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-active",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "",
+      isThinking: true,
+      isComplete: false,
+    }, true, true)).toBe("消息处理中");
+  });
+
+  it("behaves identically when the third argument is omitted or false", () => {
+    const event = {
+      id: "assistant-single",
+      type: "assistant_message" as const,
+      timestamp: 1,
+      content: "完成",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 65_000,
+    };
+    expect(assistantFooterFallbackLabel(event, false)).toBe(assistantFooterFallbackLabel(event, false, false));
+    expect(assistantFooterFallbackLabel(event, false, false)).toBe("已完成 · 用时 1分5秒");
+    expect(assistantFooterFallbackLabel(event, true, false)).toBe("消息处理中");
+  });
 });
 
 describe("message footer memoization", () => {

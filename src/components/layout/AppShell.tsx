@@ -23,7 +23,7 @@ import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
+import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
@@ -54,8 +54,13 @@ import {
 import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
 import { roomHasActiveAgentWork } from "@/utils/sessionArchive";
 
-function isBackgroundTaskTerminalStatus(status: string) {
-  return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
+// 会话级后台 Bash 运行态同步到 appStore，供对话区状态胶囊区分显示；比较后再 set，避免无意义重渲染
+function syncSessionRunningBackgroundBash(tasks: readonly LongTaskBackgroundTaskView[]) {
+  const runningBash = hasRunningBackgroundBashTask(tasks);
+  const store = useAppStore.getState();
+  if (store.sessionHasRunningBackgroundBash !== runningBash) {
+    store.setSessionHasRunningBackgroundBash(runningBash);
+  }
 }
 
 const SIDEBAR_MIN_WIDTH = 240;
@@ -1388,11 +1393,13 @@ ${isFinalStep
 
   // 拉取门槛已从「仅长程任务」放开到普通会话：state 名保留 longTaskBackgroundTasks 不改，
   // 但数据已泛化为会话级（普通会话拉当前 runtime 会话的后台任务）。
+  // 轮询不再要求右侧面板打开：关闭时也要把「后台 Bash 运行中」同步给对话区状态胶囊。
   const refreshLongTaskBackgroundTasks = useCallback((options?: { silent?: boolean }) => {
-    if (!longTaskInspectorOpen || !backgroundTasksRuntimeSessionId) {
+    if (!backgroundTasksRuntimeSessionId) {
       setLongTaskBackgroundTasks([]);
       setLongTaskBackgroundTasksLoading(false);
       setLongTaskBackgroundTasksError(null);
+      syncSessionRunningBackgroundBash([]);
       return;
     }
     const targets = [
@@ -1416,12 +1423,15 @@ ${isFinalStep
         runtimeSessionId: target.runtimeSessionId,
       }));
     })).then((groups) => {
-      setLongTaskBackgroundTasks(groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
+      const tasks = groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+      setLongTaskBackgroundTasks(tasks);
+      syncSessionRunningBackgroundBash(tasks);
     }).catch((err: unknown) => {
       // 会话未激活/不存在是闲置会话的正常状态，静默回落为空态，不作为错误暴露给用户
       if (isKimiCodeSessionUnavailableError(err)) {
         setLongTaskBackgroundTasks([]);
         setLongTaskBackgroundTasksError(null);
+        syncSessionRunningBackgroundBash([]);
         return;
       }
       setLongTaskBackgroundTasksError(err instanceof Error ? err.message : String(err));
@@ -1431,7 +1441,6 @@ ${isFinalStep
   }, [
     backgroundTasksRuntimeSessionId,
     hasLongTaskMeta,
-    longTaskInspectorOpen,
   ]);
 
   // 按官方 tasks 的 kind 分组：subagent 进「子 Agent」卡，其余（bash/tool/未知）进「后台 Bash」卡
@@ -1543,7 +1552,9 @@ ${isFinalStep
 
   useEffect(() => {
     refreshLongTaskBackgroundTasks();
-  }, [refreshLongTaskBackgroundTasks]);
+    // 面板打开/关闭时即时刷新一次：放宽轮询门槛后 callback 不再随面板开关重建，
+    // 打开面板仍保持此前「立刻拉最新数据」的行为
+  }, [longTaskInspectorOpen, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     refreshSessionPlan();
@@ -1565,11 +1576,11 @@ ${isFinalStep
   }, [longTaskInspectorOpen, liveCurrentSession?.id, liveCurrentSession?.longTask?.taskId, liveCurrentSession?.projectPath]);
 
   useEffect(() => {
-    if (!longTaskInspectorOpen || !backgroundTasksRuntimeSessionId) return;
+    if (!backgroundTasksRuntimeSessionId) return;
     const hasRunningTask = longTaskBackgroundTasks.some((task) => !isBackgroundTaskTerminalStatus(task.status));
     const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), hasRunningTask ? 2000 : 5000);
     return () => window.clearInterval(timer);
-  }, [backgroundTasksRuntimeSessionId, longTaskBackgroundTasks, longTaskInspectorOpen, liveCurrentSession?.id, refreshLongTaskBackgroundTasks]);
+  }, [backgroundTasksRuntimeSessionId, longTaskBackgroundTasks, liveCurrentSession?.id, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     if (!liveCurrentSession?.longTask) {

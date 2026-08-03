@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-08-03 修复：状态胶囊不区分「消息处理中」与「后台 Bash 运行中」（v2.20.162）
+
+- 现场：用户截图反馈，对话区消息底部胶囊在后台 Bash 任务还在跑时也显示「消息处理中」，无法区分两种状态。
+- 根因：胶囊文案 `assistantFooterFallbackLabel`（`MessageBubble.tsx`）只看 turn 是否 active，没有后台任务信号；后台任务轮询（AppShell `refreshLongTaskBackgroundTasks`）此前只在右侧长程面板打开时运行且结果存组件局部 state，对话层拿不到。
+- 修复（v2.20.162）：
+  1. `backgroundTasks.ts` 提升 export `isBackgroundTaskTerminalStatus` + 新增 `hasRunningBackgroundBashTask`（只计 bash 组非终态任务，子 Agent 组不计）。
+  2. appStore 新增 `sessionHasRunningBackgroundBash` 字段；AppShell 轮询门槛放宽为「有 runtimeSessionId 即轮询」（不再要求面板打开，2s/5s 节奏不变），成功/清空分支比较后同步 store。
+  3. `assistantFooterFallbackLabel` 加第三参：`hasRunningBackgroundBash && (event.isComplete || !isActiveAssistant)` → 「后台 Bash 运行中」（优先级低于「输出打断」）；模型仍在输出（active 且未提交正文）时仍显示「消息处理中」。
+- 验收：全量 1497 测试通过、typecheck 通过、`pnpm build` 通过；实机显示效果待用户截图验收。
+- 已知边界：胶囊文案受轮询节奏影响最多延迟约 2s；面板关闭时新增每 5s 一次的会话级 IPC 轮询开销（本地 localhost，开销可忽略，如在意可降为 10s）。
+- 关键文件：`src/components/chat/MessageBubble.tsx`、`src/components/layout/AppShell.tsx`、`src/utils/backgroundTasks.ts`、`src/stores/appStore.ts`、`src/types/ui.ts`。
+
 ## 2026-08-03 现场取证：Swarm 子代理回复「已完成」但内容缺失（v2.20.161 修 isThinking 误标）
 
 - 现场：用户 19:59 发「现在你自己review一下你这两轮做的改动」，UI 显示「已完成」，但回复只有英文思考 + 11 个工具调用 + 57 字符开场白，没有 review 结论正文。
