@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：中文供应商名称无法保存（v2.20.170）
+
+- 现场：用户添加第三方供应商「千问」保存失败，报错是不可读的 zod JSON：`[{"validation":"regex","code":"invalid_string",...,"path":["providerName"]}]`。
+- 根因：`electron/main.ts` 4 个 provider schema 自加的 `providerName` 正则 `/^[A-Za-z0-9_.:-]+$/` 排除中文。上游官方 schema（agent-core `z.record(z.string(), ...)`）对 provider key 无格式约束，TOML 写入侧 `toTomlTableKey` 对非 ASCII 键自动加引号，放宽是安全的。
+- 修复（v2.20.170，仅 electron/main.ts）：4 处正则放宽为 `/^[\p{L}\p{N}_.:-]+$/u`（允许中文等 Unicode 字母数字，仍排除空格）并补中文错误消息；新增 `formatProviderConfigError`（zod issues JSON → 「字段: 消息」可读格式），4 个 provider IPC handler（saveOpenAiProvider/saveProvider/saveProviderModel/discoverProviderModels）的 catch 接入。
+- 验收：全量 1512 测试通过、typecheck 通过、`pnpm build` 通过；实机保存中文供应商待用户验收。electron 侧无测试基建（vitest 只含 src/），未加单测。
+- 已知边界：modelAlias 仍限 ASCII slug（`千问/qwen3-max` 中别名部分需英文）；官方 web/CLI 对中文 provider key 的实际兼容性未经实机全链路验证（写入 config.toml 是合法 TOML 引号键）。
+- 知识库：无需更新。
+- 关键文件：`electron/main.ts:1475,1492,1498,1508`（正则）、`1516-1523`（formatProviderConfigError）。
+
 ## 2026-08-04 修复：系统性穷举并补齐所有悬停风格化遗落（v2.20.169）
 
 - 现场：用户连续反馈「还是不全」——Retro 下画板比例按钮、Swarm 关闭、Git 图谱刷新、套餐用量刷新等仍是平面灰块，要求穷举所有有悬停变化的元素。

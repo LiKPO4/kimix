@@ -1472,7 +1472,7 @@ async function readKimiModelConfigWithSdk() {
 }
 
 const OpenAiProviderBaseConfigSchema = z.object({
-  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
   modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
   baseUrl: z.string().trim().url(),
   model: z.string().trim().min(1).max(160),
@@ -1489,13 +1489,13 @@ const TestOpenAiProviderConfigSchema = OpenAiProviderBaseConfigSchema.extend({
 });
 
 const SaveProviderConfigSchema = z.object({
-  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
   baseUrl: z.string().trim().url(),
   apiKey: z.string().trim().max(4096).optional(),
 });
 
 const SaveProviderModelConfigSchema = z.object({
-  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
   modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
   model: z.string().trim().min(1).max(160),
   maxContextSize: z.number().int().min(1).max(1048576).optional(),
@@ -1505,10 +1505,19 @@ const SaveProviderModelConfigSchema = z.object({
 });
 
 const DiscoverProviderModelsSchema = z.object({
-  providerName: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+  providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
   baseUrl: z.string().trim().url(),
   apiKey: z.string().trim().max(4096).optional(),
 });
+
+// zod 校验失败的 err.message 是整个 issues JSON，直接展示不可读；
+// 提取为「字段: 消息」列表，让设置页能看懂是哪个字段不合规。
+function formatProviderConfigError(err: unknown): string {
+  if (err instanceof z.ZodError) {
+    return err.errors.map((issue) => `${issue.path.join(".") || "参数"}: ${issue.message}`).join("；");
+  }
+  return err instanceof Error ? err.message : String(err);
+}
 
 async function saveProviderConfigWithSdk(input: unknown) {
   const config = SaveProviderConfigSchema.parse(input);
@@ -5623,7 +5632,7 @@ ipcMain.handle("kimi:saveOpenAiProvider", async (_, request: unknown) => {
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
     return { success: true, data: { ...config, message: `已保存 OpenAI-compatible Provider${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return { success: false, error: formatProviderConfigError(err) };
   }
 });
 
@@ -5633,7 +5642,7 @@ ipcMain.handle("kimi:saveProvider", async (_, request: unknown) => {
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
     return { success: true, data: { ...config, message: `已保存 Provider 连接配置${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return { success: false, error: formatProviderConfigError(err) };
   }
 });
 
@@ -5643,7 +5652,7 @@ ipcMain.handle("kimi:saveProviderModel", async (_, request: unknown) => {
     const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
     return { success: true, data: { ...config, message: `已保存 Provider 模型${buildConfigReloadSuffix(reloadResult)}` } };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return { success: false, error: formatProviderConfigError(err) };
   }
 });
 
@@ -5707,7 +5716,7 @@ ipcMain.handle("kimi:discoverProviderModels", async (_, request: unknown) => {
   try {
     return { success: true, data: await discoverProviderModels(request) };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return { success: false, error: formatProviderConfigError(err) };
   }
 });
 
