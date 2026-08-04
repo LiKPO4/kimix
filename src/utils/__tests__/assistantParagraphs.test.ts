@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "../assistantParagraphs";
 
 describe("restoreInlineMarkdownHeadings", () => {
+  it("keeps ordinal-plus-issue-hash bold items intact (no false heading split)", () => {
+    const input = "**1. #7 仍有残留不对称（中偏低）**：select 切到**目录无档位**的模型时。";
+    expect(restoreInlineMarkdownHeadings(input)).toBe(input);
+  });
+
+  it("still restores genuine inline headings after sentence endings", () => {
+    expect(restoreInlineMarkdownHeadings("盘点完毕。 ## 本轮目标 内容"))
+      .toBe("盘点完毕。\n\n## 本轮目标 内容");
+  });
   it("moves headings that were appended after a sentence back to line start", () => {
     expect(restoreInlineMarkdownHeadings("你好霖江路。我先扫一遍。 ## 本轮目标 盘点当前工作区\n\n## 计划\n1. 检查状态")).toBe(
       "你好霖江路。我先扫一遍。\n\n## 本轮目标 盘点当前工作区\n\n## 计划\n1. 检查状态",

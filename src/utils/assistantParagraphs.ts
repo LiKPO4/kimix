@@ -385,7 +385,12 @@ export function restoreInlineMarkdownHeadings(content: string) {
   if (!content.includes("#")) return content;
   return mapMarkdownOutsideFences(content, (segment) => segment.replace(
     /([^`\n])([。！？；：.!?:;])\s+(#{1,6})\s*(\S)/g,
-    "$1$2\n\n$3 $4",
+    (match, before: string, punct: string, hashes: string, first: string) =>
+      // 序号句点 + #议题号（如「1. #7」）不是内联标题，误拆会把加粗列表项
+      // 撕成「**1.」残片 + 一级大标题（实机复现）。仅非数字句点才恢复标题。
+      (punct === "." || punct === "。") && /\d/.test(before)
+        ? match
+        : `${before}${punct}\n\n${hashes} ${first}`,
   ));
 }
 
