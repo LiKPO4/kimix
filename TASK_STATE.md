@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：模型保存成功后编辑表单不收起（v2.20.174）
+
+- 现场：用户保存模型（编辑态）后，「编辑模型」表单仍保留内容展开，期望自动关闭。
+- 根因：`handleSaveModel` 成功路径只调 `setAddingModel(false)`（收起添加态表单），编辑态表单由 `selectedModelAlias` 驱动，成功时 `setSelectedModelAlias(effectiveAlias)` 保持选中 → 表单不收起。
+- 修复（v2.20.174）：成功路径改为 `setSelectedModelAlias("")` + `setAddingModel(false)`（编辑/添加两态都收起），成功提示从不可见的表单内 message 移到面板顶部共享 message；测试补「保存成功后表单自动收起」断言。
+- 验收：全量 1523 测试通过、typecheck 通过、`pnpm build` 通过；实机保存后表单收起待用户验收。
+- 知识库：无需更新。
+- 关键文件：`src/components/settings/ModelProviderManager.tsx:420-423`。
+
 ## 2026-08-04 修复：中文供应商别名保存失败 + 模型表单报错位置过远（v2.20.173）
 
 - 现场：用户给中文供应商「千问」添加模型，点「保存模型」无反应——实际失败但报错「模型保存失败：modelAlias: Invalid」显示在面板顶部（保存供应商旁），视线外看不到。

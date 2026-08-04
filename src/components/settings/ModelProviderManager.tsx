@@ -417,9 +417,10 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         setModelFormMessage(`模型保存失败：${res.error}`);
         return;
       }
-      setSelectedModelAlias(effectiveAlias);
+      // 保存成功后收起表单（编辑态与添加态一致），成功提示放到面板顶部可见位置
+      setSelectedModelAlias("");
       setAddingModel(false);
-      await applyConfigResult(res.data, "已保存 Provider 模型", "modelForm");
+      await applyConfigResult(res.data, "已保存 Provider 模型");
     } catch (error) {
       setModelFormMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {

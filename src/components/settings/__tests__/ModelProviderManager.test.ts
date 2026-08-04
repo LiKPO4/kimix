@@ -162,6 +162,9 @@ describe("ModelProviderManager", () => {
     expect(onConfigChange).toHaveBeenCalledWith(discoveredConfig, "已保存 Provider 模型");
     expect(container.textContent).toContain("1 个模型共享当前供应商连接");
     expect(container.textContent).toContain("gateway/model-b");
+    // 保存成功后添加/编辑表单自动收起
+    expect(Array.from(container.querySelectorAll("div"))
+      .find((element) => element.textContent?.trim() === "添加模型")).toBeUndefined();
     await act(async () => root.unmount());
   });
 
