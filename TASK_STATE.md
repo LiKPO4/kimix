@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：新对话点推荐被 deepseek 接管（显示 k3 却以 deepseek 执行）（v2.20.206）
+
+- 现场：归档 → 新对话初始页（模型显示 k3）→ 点第一条推荐 → 发送后选择器变 deepseek、被 deepseek 接管。
+- 根因：初始页模型显示走 ContextBar 全局默认（k3，无 runtime），但 EmptyState 推荐快捷发送创建 runtime 后 prompt 携带 `switchedToModel ?? model`——新会话两者皆空 → undefined → server 用其 deepseek profile 执行；与 v2.20.205 同族（205 权威化防回跳，本条修「根本没携带」）。
+- 修复：EmptyState 创建 runtime 时把 `switchedToModel ?? model ?? pendingNewSessionModel` 写入会话 `switchedToModel`（同步 store + targetSession）；发送处 model 改读最新 store 的 switchedToModel 兜底 pendingNewSessionModel。显示值从此进入发送字段。
+- 验收：typecheck/全量 1559/build 通过；实机待验收（新对话点推荐应：选择器保持 k3、server 以 k3 执行——可对照 dev 控制台 model 字段）。
+- 已知边界：初始页未显式点选模型时 pendingNewSessionModel 可能也为空（ContextBar 局部 defaultModel 不入 store），该罕见组合仍可能回退 server 默认——但那是无显式选择的情形，语义可接受。
+- 知识库：无需更新（显示/发送一致性修复，不变量 8 语义复用）。
+- 关键文件：`src/components/chat/EmptyState.tsx`。
+
 ## 2026-08-04 修复：新会话选 k3 发送被以 deepseek 执行 + 选择器回跳（v2.20.205）
 
 - 现场：204 下「新会话+选 k3+发送」：消息「发送中」久不结束、选择器回跳 deepseek；server REST 实锤 `model=deepseek`、busy=true（deepseek 挂起中），用户 k3 选择没带到 server。

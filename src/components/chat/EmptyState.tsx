@@ -116,6 +116,7 @@ export function EmptyState() {
   const defaultThinkingEffort = useAppStore((s) => s.defaultThinkingEffort);
   const defaultPlanMode = useAppStore((s) => s.defaultPlanMode);
   const permissionMode = useAppStore((s) => s.permissionMode);
+  const pendingNewSessionModel = useAppStore((s) => s.pendingNewSessionModel);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -243,11 +244,16 @@ export function EmptyState() {
         });
         if (!createRes.success) throw new Error(createRes.error);
         runtimeSessionId = createRes.data.sessionId;
+        // 显示的模型（switchedToModel ?? 全局默认）是用户看到并意图使用的模型；新会话
+        // switchedToModel 为空时必须写入会话字段，否则 prompt 携带 undefined → server
+        // 用其 deepseek 默认接管（实机：选择器显示 k3 却以 deepseek 执行并回跳）。
+        const effectiveModel = targetSession.switchedToModel ?? targetSession.model ?? pendingNewSessionModel ?? undefined;
         updateSession(targetSession.id, (session) => ({
           ...session,
           engine: "kimi-code",
           runtimeSessionId,
           officialSessionId: runtimeSessionId,
+          switchedToModel: session.switchedToModel ?? effectiveModel,
           updatedAt: Date.now(),
         }));
         targetSession = {
@@ -255,6 +261,7 @@ export function EmptyState() {
           engine: "kimi-code",
           runtimeSessionId,
           officialSessionId: runtimeSessionId,
+          switchedToModel: targetSession.switchedToModel ?? effectiveModel,
         };
         setCurrentSession(targetSession);
         updateLinkStatus("消息发送中", "info");
@@ -275,7 +282,10 @@ export function EmptyState() {
         sessionId: runtimeSessionId,
         content: text,
         images: [],
-        model: targetSession?.switchedToModel ?? targetSession?.model ?? undefined,
+        model: (() => {
+          const latest = useSessionStore.getState().sessions.find((session) => session.id === targetSession?.id);
+          return latest?.switchedToModel ?? latest?.model ?? targetSession?.switchedToModel ?? targetSession?.model ?? pendingNewSessionModel ?? undefined;
+        })(),
       });
       if (!sendRes.success) throw new Error(sendRes.error);
       updateLinkStatus(kimiCodeRouteStatus(sendRes.data.route), "success");
