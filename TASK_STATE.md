@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 结论：权限双向同步链路 live 实测全部正常（v2.20.178 环境下）
+
+- 用户反馈「两个方向都不行」后做了一系列 live 实测（CDP 直连运行实例 + curl 带 server.token 直写官方 REST）：
+  1. **Kimix→server**：CDP 调 `setKimiCodePermission` 多次写入（含轮次运行中写 yolo/auto 往返），`/status` 回读全部生效且稳定。
+  2. **server 外部变更→Kimix**：curl 直写 profile（auto→manual），6ms 后 Kimix 收到 `agent.status.updated` 广播帧（diag `[live] stream` 实证），`session.permissionMode` 跟随 manual；再写回 auto 再次跟随——广播→`syncSessionPermissionMode` 链路完整。
+  3. 用户 05:52 的两次点击（auto/yolo）从 diag 看 IPC 都成功执行，且事后实测 server 值证实 **写入其实落库了**（yolo 生效）——用户看到的「不行」更可能是：测试时 dev 实例是旧构建（sidebar 显示 v2.20.177），以及 **web 端权限 pill 不随广播实时刷新**（web 读 status，但页面可能需要手动刷新才重新拉取；web 侧行为 Kimix 无法控制）。
+- 结论：v2.20.178 下双向链路协议层全部正常，无新增代码修复。遗留观察项：web pill 实时性（官方 web 侧问题）；用户复验需确保 dev 为最新构建。
+- 知识库：无需更新（不变量 8 已覆盖本轮验证的链路语义）。
+
 ## 2026-08-04 修复：权限模式调整被缓存吞没不同步到 server（v2.20.178）
 
 - 现场：用户反馈权限模式在 Kimix 调整后 kimi code web 不同步（截图：Kimix「完全自主 auto」、web「自动通过 yolo」）。
