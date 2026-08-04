@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 优化：代码块留白/占比对齐官方 Web（v2.20.190）
+
+- 现场：同内容代码块官方 Web 比 Kimix 更易读、留白与占比更合理（三主题对比截图）。
+- 官方实现实测（curl 其 CSS bundle，markstream-vue）：body padding 8/12、字号 12px/行高≈1.65、头部**无灰底**（surface/transparent + 底分隔线）、头部≈36px、复制**纯图标**、外边距 1.5em、圆角 8px、body 用 sunken 底色。
+- Kimix 原状：body 16/18、14px/24px、头部 surface-hover 灰底 ≈46px、复制图标+文字、my-3。
+- 修复（MarkdownRenderer CodeBlock + index.css）：body padding 10/14、字号 13/行高 21（取 Web 与旧值中间保可读性）、头部去灰底+紧凑（6px 上下）、复制按钮图标化（26px）、外边距 14px 0。圆角/边框既有不动。
+- 验收：typecheck/全量 1551/build 通过；视觉待用户三主题截图验收。
+- 知识库：无需更新（纯 UI 微调）。
+- 关键文件：`src/components/chat/MarkdownRenderer.tsx`、`src/index.css`。
+
 ## 2026-08-04 功能：轮中允许预切换权限/plan/思考强度，下一轮生效（v2.20.189）
 
 - 现场：官方 Web 轮中可正常切换权限模式等；Kimix 的权限/plan/思考强度按钮轮中被 `isMutationOwnerRunning` 禁用（swarm 已允许轮中切换、下一轮生效）。

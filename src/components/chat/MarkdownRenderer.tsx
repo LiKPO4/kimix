@@ -287,9 +287,9 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   return (
     <div
       className="kimix-markdown-code-block relative my-3 overflow-hidden rounded-lg border border-border-subtle bg-surface-base"
-      style={{ boxSizing: "border-box" }}
+      style={{ boxSizing: "border-box", margin: "14px 0" }}
     >
-      <div className="flex items-center justify-between border-b border-border-subtle bg-surface-hover" style={{ gap: 12, paddingLeft: 18, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}>
+      <div className="flex items-center justify-between border-b border-border-subtle" style={{ gap: 10, paddingLeft: 14, paddingRight: 8, paddingTop: 6, paddingBottom: 6 }}>
         <span className="min-w-0 truncate font-mono text-xs text-text-muted">
           {className?.replace("language-", "") || "code"}
         </span>
@@ -297,7 +297,7 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
           type="button"
           onClick={() => void copyCode()}
           className="kimix-icon-text-button is-compact shrink-0 text-text-muted hover:bg-surface-active hover:text-text-secondary"
-          style={{ minHeight: 30, paddingLeft: 11, paddingRight: 12 }}
+          style={{ minHeight: 26, minWidth: 26, paddingLeft: 5, paddingRight: 5 }}
           title="复制代码"
           aria-label="复制代码"
         >
@@ -306,7 +306,6 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
             activeIcon={<Check size={13} />}
             inactiveIcon={<Copy size={13} />}
           />
-          <span>{copied ? "已复制" : "复制"}</span>
         </button>
       </div>
       <pre
@@ -317,17 +316,17 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
           width: "100%",
           maxWidth: "100%",
           boxSizing: "border-box",
-          paddingLeft: 18,
-          paddingRight: 18,
-          paddingTop: 16,
-          paddingBottom: 16,
+          paddingLeft: 14,
+          paddingRight: 14,
+          paddingTop: 10,
+          paddingBottom: 10,
           whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
           overflowWrap: wrapLongLines ? "anywhere" : undefined,
           wordBreak: wrapLongLines ? "break-word" : undefined,
         }}
       >
         <code
-          className={`${className ?? ""} block font-mono text-sm leading-6`}
+          className={`${className ?? ""} block font-mono`}
           style={{
             display: "block",
             margin: 0,
@@ -335,7 +334,8 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
             width: "max-content",
             minWidth: "100%",
             background: "transparent",
-            lineHeight: "24px",
+            fontSize: 13,
+            lineHeight: "21px",
             whiteSpace: wrapLongLines ? "pre-wrap" : undefined,
             overflowWrap: wrapLongLines ? "anywhere" : undefined,
             wordBreak: wrapLongLines ? "break-word" : undefined,

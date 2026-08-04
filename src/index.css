@@ -5228,7 +5228,7 @@ button.bg-accent-primary:disabled:hover,
 
 .markdown-body .kimix-markdown-code-block pre {
   margin: 0;
-  padding: 16px 18px;
+  padding: 10px 14px;
 }
 
 .markdown-body .kimix-markdown-code-block pre code.hljs,
