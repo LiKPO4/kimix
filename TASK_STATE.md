@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：Context 显示格式轮间不一致（绝对值/百分比随数据切换）（v2.20.202）
+
+- 现场：相邻两轮 footer 一个 `Context: 329.52k`、一个 `Context: 33.05%`。
+- 根因：`formatContext` 按 contextLimit 是否存在切换「绝对值/百分比」两种格式；不同轮帧结构不同（usage.record 无 limit / status 帧有 limit）→ 显示不一致。
+- 修复：格式只依赖 detailed 开关——非 detailed 一律绝对 token 数（ratio×limit 换算）；detailed 显示 used/limit；纯 ratio 无 limit 的罕见情形才 %。2 新用例。
+- 顺带说明：用户该会话输入已达 985k，无首字长等待属百万级上下文 provider TTFT（knowledge large-context-latency runbook，remedy 是 compaction），非链路 bug。
+- 验收：typecheck/全量 1559/build 通过；视觉待用户确认两轮格式一致。
+- 知识库：无需更新（显示格式修复）。
+- 关键文件：`src/components/chat/StatusCard.tsx`、`src/components/chat/__tests__/StatusCard.test.ts`。
+
 ## 2026-08-04 修复：折叠提示 pill 图标方向（折叠态应箭头朝右）（v2.20.201）
 
 - 现场：「已折叠较早对话 N 条，点击展开」pill 用 ChevronDown（朝下），与轮次折叠行朝右语义不一致。

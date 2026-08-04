@@ -87,3 +87,26 @@ describe("getStatusCardToneClass", () => {
     })).toBe("kimix-status-surface bg-surface-hover text-text-muted");
   });
 });
+
+describe("Context format consistency", () => {
+  it("shows absolute tokens in non-detailed mode regardless of limit presence", () => {
+    const withLimit = getStatusCardDetailTexts({
+      id: "a", type: "status_update", timestamp: 1,
+      contextSize: 329520, contextLimit: 997000,
+    }, false);
+    expect(withLimit).toEqual(["Context: 329.52k"]);
+    const withoutLimit = getStatusCardDetailTexts({
+      id: "b", type: "status_update", timestamp: 2,
+      contextSize: 329520,
+    }, false);
+    expect(withoutLimit).toEqual(["Context: 329.52k"]);
+  });
+
+  it("shows used/limit in detailed mode and converts ratio sizes", () => {
+    const detailed = getStatusCardDetailTexts({
+      id: "c", type: "status_update", timestamp: 1,
+      contextSize: 0.3305, contextLimit: 997000,
+    }, true);
+    expect(detailed).toEqual(["Context: 329.51k/997.00k"]);
+  });
+});

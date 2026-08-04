@@ -25,17 +25,14 @@ function formatK(tokens: number): string {
 }
 
 function formatContext(event: Extract<TimelineEvent, { type: "status_update" }>, detailed: boolean): string {
-  const ratio = event.contextSize ?? 0;
+  const size = event.contextSize ?? 0;
   const limit = event.contextLimit;
-  if (limit === undefined || limit <= 0) {
-    return ratio <= 1 ? `${(ratio * 100).toFixed(2)}%` : formatK(ratio);
-  }
-  if (detailed) {
-    const used = ratio <= 1 ? ratio * limit : ratio;
-    return `${formatK(used)}/${formatK(limit)}`;
-  }
-  const percent = ratio <= 1 ? ratio * 100 : (ratio / limit) * 100;
-  return `${percent.toFixed(2)}%`;
+  // 格式只依赖 detailed 开关：非 detailed 一律绝对 token 数。原先按 limit 是否存在
+  // 在「绝对值/百分比」间切换，相邻两轮帧结构不同就会显示不一致（实机复现）。
+  const absolute = size <= 1 && limit !== undefined && limit > 0 ? size * limit : size;
+  if (detailed && limit !== undefined && limit > 0) return `${formatK(absolute)}/${formatK(limit)}`;
+  if (absolute > 0 && absolute <= 1) return `${(absolute * 100).toFixed(2)}%`;
+  return formatK(absolute);
 }
 
 export function getStatusCardDetailTexts(
