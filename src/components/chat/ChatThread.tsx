@@ -251,7 +251,8 @@ function rememberRenderDiagnosticKey(keys: Set<string>, key: string): boolean {
   }
   return true;
 }
-const CHAT_BOTTOM_SPACER_HEIGHT = 60;
+// 底部呼吸间距：v2.9.46 从 120 收敛到 60，用户反馈仍偏大（遮挡感），再收敛到 28
+const CHAT_BOTTOM_SPACER_HEIGHT = 28;
 const longTaskStageLabels: Record<LongTaskSessionMeta["stage"], string> = {
   drafting: "需求澄清",
   planning: "计划设计",

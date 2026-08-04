@@ -4811,6 +4811,20 @@ ipcMain.handle("project:getGitDetails", async (_, projectPath: string) => {
   }
 });
 
+ipcMain.handle("project:gitNumstat", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({
+      projectPath: z.string().min(1).max(4096),
+    }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git numstat request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    const data = await projectService.getGitNumstat(parsed.data.projectPath);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:getGitGraph", async (_, request: unknown) => {
   try {
     const parsed = z.object({

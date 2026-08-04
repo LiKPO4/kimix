@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：变更卡统计不到 Bash/python 改动 + 输入区上方空白过大（v2.20.175）
+
+- 现场 1：用户反馈 v2.20.174 轮实际改 4 个文件，变更卡只显示「文件变更 1 个 +9 -0」（TASK_STATE.md）。
+- 根因 1：变更卡数据源是纯工具调用拦截（官方只对 Write/Edit 附 display.diff，Kimix fallback 只认 write/edit/multiedit 工具名），Bash 执行 python 脚本改的文件三条路径都统计不到（官方 web 同款边界）。
+- 修复 1：轮次 completed 时 git numstat 兜底——新增 `project:gitNumstat` IPC（工作区+暂存区相对 HEAD 行数，untracked 按行数，失败静默返回空），App.tsx completed 分支对照本轮已记录路径去重后追加 change_summary 事件（`gitFallbackChanges.ts` 纯函数 + 8 用例）。
+- 现场 2：输入框上方和 TodoList 上方有一大块空白遮挡内容。
+- 根因 2：不是遮罩元素（全仓 0 处 mask/fade），是滚动区内 `CHAT_BOTTOM_SPACER_HEIGHT = 60` 的呼吸间距（v2.9.46 从 120 收敛到 60）+ footer padding（≈78px 同色空白），卡片滚到底边时被裁切读作「被空白盖住」。另有动态补偿变量 `--kimix-detached-tail-compensation`（折叠防跳动用，不能删）。
+- 修复 2：常量 60→28（保留呼吸感，总间距 ≈46px），TodoPanel 上方同步变窄。
+- 验收：全量 1531 测试通过（新增 8 用例）、typecheck 通过、`pnpm build` 通过；实机变更卡计数与底部间距待用户验收。
+- 已知边界：git 兜底会把用户手改的未提交文件并入轮次卡；上轮未提交的变更可能在下一轮卡片重复出现（按轮次区间去重）；非 git 仓库无兜底；空白若远超 46px 则是 detached 补偿卡住，需另抓 tailCompensation 诊断。
+- 知识库：无需更新。
+- 关键文件：`electron/projectService.ts:470-533`、`electron/main.ts:4814`、`src/App.tsx:741-792,3104-3116`、`src/utils/gitFallbackChanges.ts`、`src/components/chat/ChatThread.tsx:254`。
+
 ## 2026-08-04 修复：模型保存成功后编辑表单不收起（v2.20.174）
 
 - 现场：用户保存模型（编辑态）后，「编辑模型」表单仍保留内容展开，期望自动关闭。

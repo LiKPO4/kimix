@@ -461,6 +461,76 @@ export async function getGitLineStats(projectPath: string, files: string[]): Pro
   return stats;
 }
 
+export type GitNumstatEntry = {
+  path: string;
+  added: number;
+  removed: number;
+};
+
+
+/** 解析 `git diff --numstat` 输出；二进制文件的 `-\t-` 占位解析为 0。 */
+export function parseGitNumstat(stdout: string): GitNumstatEntry[] {
+  const entries: GitNumstatEntry[] = [];
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+    const parts = line.split("\t");
+    const file = parts.slice(2).join("\t");
+    if (!file) continue;
+    const added = Number.parseInt(parts[0] ?? "", 10);
+    const removed = Number.parseInt(parts[1] ?? "", 10);
+    entries.push({
+      path: file,
+      added: Number.isFinite(added) ? added : 0,
+      removed: Number.isFinite(removed) ? removed : 0,
+    });
+  }
+  return entries;
+}
+
+/**
+ * 工作区+暂存区相对 HEAD 的每文件行数变更（untracked 文件按行数记 added、removed 0）。
+ * 非 git 仓库或 git 命令失败时返回空数组，调用方静默处理。
+ */
+export async function getGitNumstat(projectPath: string): Promise<GitNumstatEntry[]> {
+  const entries: GitNumstatEntry[] = [];
+  try {
+    const { stdout } = await execFileAsync("git", ["diff", "--numstat"], {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    entries.push(...parseGitNumstat(stdout));
+    const { stdout: cachedStdout } = await execFileAsync("git", ["diff", "--cached", "--numstat"], {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    entries.push(...parseGitNumstat(cachedStdout));
+  } catch {
+    // 非 git 仓库或命令失败：返回空数组。
+  }
+  try {
+    for (const item of await getGitStatusFiles(projectPath)) {
+      if (!item.status.includes("?")) continue;
+      let added = 0;
+      try {
+        const content = fs.readFileSync(path.join(projectPath, item.path), "utf-8");
+        if (content !== "") {
+          const newlineCount = (content.match(/\r\n|\r|\n/g) ?? []).length;
+          added = newlineCount + (content.endsWith("\n") || content.endsWith("\r") ? 0 : 1);
+        }
+      } catch {
+        // 目录项或不可读文件按 0 行处理。
+      }
+      entries.push({ path: item.path, added, removed: 0 });
+    }
+  } catch {
+    // 状态获取失败时忽略 untracked 补充。
+  }
+  return entries;
+}
+
 const MAX_CHANGE_PREVIEW_CHARS = 64 * 1024;
 const HISTORICAL_CHANGE_WINDOW_MS = 15 * 60 * 1000;
 

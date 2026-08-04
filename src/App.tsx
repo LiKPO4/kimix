@@ -91,6 +91,7 @@ import {
   updateRoomAgent,
   updateRoomAgentEvents,
 } from "@/utils/collaborationRooms";
+import { planGitFallbackChanges, type GitNumstatEntryLike } from "@/utils/gitFallbackChanges";
 import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   bindRecoveredRoomAgentRuntime,
@@ -734,6 +735,55 @@ function notifyTurnComplete(
     pageVisible: document.visibilityState === "visible",
   }).catch((err) => {
     console.warn("Notify turn complete failed:", err, { uiSessionId, runtimeSessionId });
+  });
+}
+
+/**
+ * Git 兜底统计：轮次内通过 Bash/python 等非 Write/Edit 工具改动的文件不会被工具拦截
+ * 统计到，轮次完成时用 git numstat 对照本轮已记录的变更路径，把缺失的文件补齐为
+ * change_summary 事件（未记录的才追加；非 git 仓库或命令失败静默跳过）。
+ */
+async function reconcileGitFallbackChanges(options: {
+  uiSessionId: string;
+  runtimeSessionId: string;
+  roomAgentId?: string;
+  projectPath?: string;
+  eventStartIndex: number;
+}) {
+  const { uiSessionId, runtimeSessionId, roomAgentId, eventStartIndex } = options;
+  const projectPath = options.projectPath || useAppStore.getState().currentSession?.projectPath;
+  if (!projectPath) return;
+  let numstat: GitNumstatEntryLike[];
+  try {
+    const response = await window.api.getGitNumstat({ projectPath });
+    if (!response.success) return;
+    numstat = response.data;
+  } catch (error) {
+    console.warn("Git numstat fallback failed:", error);
+    return;
+  }
+  const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+  if (!session) return;
+  const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
+  const plan = planGitFallbackChanges(
+    getRoomAgentEvents(session, ownerAgentId),
+    eventStartIndex,
+    numstat,
+  );
+  if (!plan) return;
+  const fallbackEvent: TimelineEvent = {
+    id: `git-numstat-fallback-${runtimeSessionId}-${eventStartIndex}`,
+    type: "change_summary",
+    timestamp: Date.now(),
+    projectPath,
+    files: plan.files,
+    additions: plan.additions,
+    deletions: plan.deletions,
+    roomAgentId: ownerAgentId,
+  };
+  useSessionStore.getState().updateSession(uiSessionId, (session) => {
+    const next = updateRoomAgentEvents(session, ownerAgentId, (events) => [...events, fallbackEvent]);
+    return { ...next, updatedAt: Date.now() };
   });
 }
 
@@ -3052,6 +3102,18 @@ function App() {
         eventId: assistant?.id,
       });
       runtimeTurnStartRef.current.delete(statusRuntimeSessionId);
+
+      // Git 兜底：Bash/python 等非 Write/Edit 工具改动的文件不会被工具拦截统计到，
+      // 轮次完成时用 git numstat 对照本轮已记录的变更路径补齐 change_summary。
+      if (turnStart) {
+        void reconcileGitFallbackChanges({
+          uiSessionId,
+          runtimeSessionId: statusRuntimeSessionId,
+          roomAgentId,
+          projectPath: completedSession?.projectPath,
+          eventStartIndex: turnStart.eventStartIndex,
+        });
+      }
 
       if (!roomAgentId || !completedSession || isPrimaryRoomAgent(completedSession, roomAgentId)) {
         void dispatchNextPendingKimiMessage(uiSessionId, statusRuntimeSessionId);

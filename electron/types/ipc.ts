@@ -981,6 +981,24 @@ export type GitDetailsResponse = {
   error: string;
 };
 
+export type GitNumstatEntry = {
+  path: string;
+  added: number;
+  removed: number;
+};
+
+export type GitNumstatRequest = {
+  projectPath: string;
+};
+
+export type GitNumstatResponse = {
+  success: true;
+  data: GitNumstatEntry[];
+} | {
+  success: false;
+  error: string;
+};
+
 export type GitGraphEntry = {
   graph: string;
   shortHash: string;
