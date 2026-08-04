@@ -1473,7 +1473,7 @@ async function readKimiModelConfigWithSdk() {
 
 const OpenAiProviderBaseConfigSchema = z.object({
   providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
-  modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
+  modelAlias: z.string().trim().min(2).max(120).regex(/^[\p{L}\p{N}_./:-]+$/u, "模型别名只能包含中英文、数字以及 _ . / : -"),
   baseUrl: z.string().trim().url(),
   model: z.string().trim().min(1).max(160),
   maxContextSize: z.number().int().min(1).max(1048576).optional(),
@@ -1496,7 +1496,7 @@ const SaveProviderConfigSchema = z.object({
 
 const SaveProviderModelConfigSchema = z.object({
   providerName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}_.:-]+$/u, "供应商名称只能包含中英文、数字以及 _ . : -"),
-  modelAlias: z.string().trim().min(2).max(120).regex(/^[A-Za-z0-9_./:-]+$/),
+  modelAlias: z.string().trim().min(2).max(120).regex(/^[\p{L}\p{N}_./:-]+$/u, "模型别名只能包含中英文、数字以及 _ . / : -"),
   model: z.string().trim().min(1).max(160),
   maxContextSize: z.number().int().min(1).max(1048576).optional(),
   makeDefault: z.boolean().optional(),

@@ -609,3 +609,37 @@ it("prefills Context and efforts from the catalog when typing a model id into an
   expect(pressedEfforts).toEqual(["中"]);
   await act(async () => root.unmount());
 });
+
+it("shows a model save error inside the model form instead of the panel top message", async () => {
+  const saveKimiProviderModel = vi.fn().mockResolvedValue({
+    success: false,
+    error: "modelAlias: Invalid",
+  });
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: { saveKimiProviderModel },
+  });
+  const { container, root } = await renderManager(emptyProviderConfig);
+
+  await act(async () => buttonByText(container, "添加模型")?.click());
+  const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "qwen3.8-max");
+    modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => buttonByText(container, "保存模型")?.click());
+
+  expect(saveKimiProviderModel).toHaveBeenCalledWith(expect.objectContaining({
+    providerName: "gateway",
+    modelAlias: "qwen3.8-max",
+    model: "qwen3.8-max",
+  }));
+  // 失败消息渲染在添加模型卡片内（保存模型按钮附近），而非面板顶部的供应商操作区
+  const formCard = Array.from(container.querySelectorAll(".kimix-settings-card"))
+    .find((element) => element.textContent?.includes("添加模型")) as HTMLElement;
+  expect(formCard).toBeDefined();
+  expect(formCard.textContent).toContain("模型保存失败：modelAlias: Invalid");
+  const topMessage = container.querySelector(".kimix-model-provider-actions .text-text-muted");
+  expect(topMessage?.textContent ?? "").not.toContain("模型保存失败");
+  await act(async () => root.unmount());
+});

@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：中文供应商别名保存失败 + 模型表单报错位置过远（v2.20.173）
+
+- 现场：用户给中文供应商「千问」添加模型，点「保存模型」无反应——实际失败但报错「模型保存失败：modelAlias: Invalid」显示在面板顶部（保存供应商旁），视线外看不到。
+- 根因两个：① 别名自动生成为 `千问/qwen3.8-max`，被 electron/main.ts 的 modelAlias ASCII 正则拦截（与 v2.20.170 providerName 同族；上游官方 models 键 `z.record(z.string(), ...)` 无约束，放宽安全）；② ModelProviderManager 用单一共享 message state 渲染在面板顶部，模型表单操作反馈离触发按钮太远。
+- 修复（v2.20.173）：① 2 处 modelAlias 正则放宽为 `/^[\p{L}\p{N}_./:-]+$/u`（保留 `/`，附中文消息）；② 模型表单反馈拆出独立 `modelFormMessage` state，渲染在添加模型卡片内「保存模型」按钮正下方（含进行中/失败/前置校验全部 5 处），供应商级操作仍走顶部 message；切换供应商/打开表单等时机清空。
+- 验收：全量 1523 测试通过（新增「错误显示在表单卡片内而非顶部」用例）、typecheck 通过、`pnpm build` 通过；实机保存中文别名模型待用户验收。
+- 知识库：无需更新。
+- 关键文件：`electron/main.ts:1476,1499`、`src/components/settings/ModelProviderManager.tsx:153,189-218,394-424,964-966`。
+
 ## 2026-08-04 修复：重启后 in-flight 轮次失去订阅、尾部事件丢失（v2.20.172）
 
 - 现场：用户双端对比截图——web 端显示完整尾部（grep/编辑 TASK_STATE/git 提交 3 个工具调用 + 最终答复），Kimix 侧只剩 1 个工具调用，最终答复是旧内容。用户反馈「还是会有这种不同步」。

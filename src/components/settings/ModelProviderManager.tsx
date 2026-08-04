@@ -150,6 +150,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [discoveredEndpoint, setDiscoveredEndpoint] = useState("");
   const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
   const [message, setMessage] = useState("");
+  const [modelFormMessage, setModelFormMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
   const catalogModels = useMemo(() => catalog.flatMap((provider) => provider.models), [catalog]);
@@ -185,12 +186,20 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     });
   }, [isCreatingProvider, selectedGroup]);
 
-  const applyConfigResult = async (next: KimiModelConfigSummary & { message?: string }, fallbackMessage: string) => {
+  const applyConfigResult = async (
+    next: KimiModelConfigSummary & { message?: string },
+    fallbackMessage: string,
+    messageTarget: "top" | "modelForm" = "top",
+  ) => {
     const savedMessage = next.message || fallbackMessage;
     const { message: _message, ...writtenConfig } = next;
     // 写入响应来自刚完成的持久化操作，必须先显示；SDK/Server 的 reload 可能短暂返回旧缓存。
     onConfigChange(writtenConfig, savedMessage);
-    setMessage(savedMessage);
+    if (messageTarget === "modelForm") {
+      setModelFormMessage(savedMessage);
+    } else {
+      setMessage(savedMessage);
+    }
     const refreshed = await window.api.getKimiModelConfig().catch((error) => ({
       success: false as const,
       error: error instanceof Error ? error.message : String(error),
@@ -200,7 +209,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     const nextMessage = refreshed.success
       ? (refreshMatchesWrite ? savedMessage : `${savedMessage}；后台配置仍在同步`)
       : `${savedMessage}；即时刷新失败：${refreshed.error}`;
-    setMessage(nextMessage);
+    if (messageTarget === "modelForm") {
+      setModelFormMessage(nextMessage);
+    } else {
+      setMessage(nextMessage);
+    }
     window.dispatchEvent(new CustomEvent("kimix:kimi-model-config-changed"));
   };
 
@@ -211,6 +224,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
+    setModelFormMessage("");
     setMessage("");
   };
 
@@ -222,6 +236,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
+    setModelFormMessage("");
     setMessage("先保存供应商连接配置，再在下方添加一个或多个模型。");
   };
 
@@ -314,6 +329,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     if (!modelId) return;
     const item = discoveredModels.find((m) => m.id === modelId);
     setSelectedModelAlias("");
+    setModelFormMessage("");
     setAddingModel(true);
     setModelDraft((current) => {
       const prefill = prefillFromCatalog({
@@ -375,7 +391,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleSaveModel = async () => {
     const contextSize = readContextSize();
     if (!selectedGroup || selectedProviderManaged) {
-      setMessage("请先选择一个第三方 Provider。");
+      setModelFormMessage("请先选择一个第三方 Provider。");
       return;
     }
     const trimmedModel = modelDraft.model.trim();
@@ -383,11 +399,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     const effectiveAlias = trimmedAlias || trimmedModel;
 
     if (!trimmedModel || contextSize === null) {
-      setMessage("请填写有效的模型 ID 和 Context。");
+      setModelFormMessage("请填写有效的模型 ID 和 Context。");
       return;
     }
     setBusyAction("model");
-    setMessage("正在保存模型...");
+    setModelFormMessage("正在保存模型...");
     try {
       const res = await window.api.saveKimiProviderModel({
         providerName: selectedGroup.provider.name,
@@ -398,14 +414,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         defaultEffort: modelDraft.supportEfforts.includes(modelDraft.defaultEffort) ? modelDraft.defaultEffort : null,
       });
       if (!res.success) {
-        setMessage(`模型保存失败：${res.error}`);
+        setModelFormMessage(`模型保存失败：${res.error}`);
         return;
       }
       setSelectedModelAlias(effectiveAlias);
       setAddingModel(false);
-      await applyConfigResult(res.data, "已保存 Provider 模型");
+      await applyConfigResult(res.data, "已保存 Provider 模型", "modelForm");
     } catch (error) {
-      setMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
+      setModelFormMessage(`模型保存失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setBusyAction(null);
     }
@@ -496,6 +512,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
           return;
         }
         setRemovalTarget(null);
+        setModelFormMessage("");
         setSelectedModelAlias("");
         setAddingModel(false);
         await applyConfigResult(res.data, "已删除模型，Provider 连接配置已保留");
@@ -529,6 +546,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleSelectModel = (model: KimiModelAliasSummary) => {
     setSelectedModelAlias(model.alias);
     setAddingModel(false);
+    setModelFormMessage("");
     setModelDraft(createModelDraft(model));
   };
 
@@ -536,6 +554,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setSelectedModelAlias("");
     setAddingModel(true);
     setModelDraft(createModelDraft());
+    setModelFormMessage("");
     setMessage("填写模型 ID、别名和 Context 后保存；Provider 的连接信息会自动复用。");
     ensureCatalogLoaded();
   };
@@ -942,6 +961,9 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       保存模型
                     </button>
                   </div>
+                  {modelFormMessage && (
+                    <div className="min-w-0 text-[12px] leading-5 text-text-muted" style={{ marginTop: 10, paddingLeft: 2, paddingRight: 2 }}>{modelFormMessage}</div>
+                  )}
                 </div>
                 )}
               </div>
