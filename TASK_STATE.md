@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：折叠提示 pill 图标方向（折叠态应箭头朝右）（v2.20.201）
+
+- 现场：「已折叠较早对话 N 条，点击展开」pill 用 ChevronDown（朝下），与轮次折叠行朝右语义不一致。
+- 修复：FoldedHistoryNotice 只在折叠态渲染，图标改 ChevronRight。
+- 验收：typecheck/全量 1557/build 通过；视觉待用户确认。
+- 知识库：无需更新。
+- 关键文件：`src/components/chat/ChatThread.tsx`。
+
 ## 2026-08-04 优化：搜索浮层大屏不居中（顶挂 86px）（v2.20.200）
 
 - 现场：搜索窗只在小屏看似居中；大屏顶挂 paddingTop 86 + items-start，垂直不居中。

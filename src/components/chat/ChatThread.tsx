@@ -591,7 +591,7 @@ function FoldedHistoryNotice({ count, onExpand }: { count: number; onExpand: () 
         className="kimix-icon-text-button kimix-muted-action"
         style={{ minHeight: 34, paddingLeft: 16, paddingRight: 16 }}
       >
-        <ChevronDown size={15} />
+        <ChevronRight size={15} />
         <span>已折叠较早对话 {count} 条，点击展开</span>
       </button>
     </div>
