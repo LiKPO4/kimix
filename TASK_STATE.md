@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：轮末观察窗永不触发 + 重启丢失，外部新轮仍两轮合并（v2.20.181）
+
+- 现场：v2.20.180 实机，Web 侧发第二轮后 Kimix 仍不显示用户消息、两轮回复合并（与 179 同场景）。
+- 根因（两层叠加）：① 179 探针 `[...items].reverse().find(user)` 在 newest-first 的 items（items[0] 即最新，进度标记依赖此序）上取到的是**最老**用户消息，`userAt <= terminalAt` 恒成立，探针永不触发——179 出生即无效；② 观察窗只挂在当前进程的 live 主 agent 轮末帧上，进程重启后 idle 会话 resume 拿到的是 snapshot 重放帧（被 `recovered_from_snapshot` 排除），窗口永不挂载。
+- 修复：① `latestUser` 改 `items.find(...)` 取最新用户；② 新挂载点：`recoverSnapshot` 后无 `in_flight_turn` 时以 `terminalAt = snapshot 最新消息时间戳` 挂载（与官方用户消息同源时钟），覆盖重启/重连对账；③ 去掉 180s 过期，仅 unsubscribe/pending 清除，覆盖长 idle 后发消息；④ 抽 `armPostTerminalExternalWatch` 共用挂载点。探测命中后强制重连拿 snapshot 补边界，179 的 mergeEvents 乱序插入保证归属。
+- 验收：typecheck/全量测试/build 结果待出；实机待用户验收（重启后已合并的旧会话有望经启动对账 canonical 历史自愈；新外部新轮应 ≤4s 出边界）。
+- 已知边界：每挂载会话 idle 时 4s 一次 HTTP GET /messages（与既有 8s idle 进度探针同量级，可接受）；误报代价仍为一次重连 + snapshot 补全。
+- 知识库：runtime-routing.md 不变量 90(a) 段重写，log.md 已记。
+- 关键文件：`electron/kimiCodeServerClient.ts`（探针取序/挂载点/去过期/公共方法）。
+
 ## 2026-08-04 修复：Web 侧新建对话不同步到 Kimix 侧栏（v2.20.180）
 
 - 现场：用户在官方 Web 新建对话并发送消息后，Kimix 侧栏（v2.20.179）不出现该新会话，需折叠重展开或重启才可见。

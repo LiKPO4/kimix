@@ -379,8 +379,9 @@ const WS_SILENCE_LIMIT_MS = 90_000;
 const WS_WATCHDOG_INTERVAL_MS = 2_000;
 // 轮末观察窗：live WS 不广播新轮用户消息（TurnBegin 仅 snapshot 重放合成），既有进度探针只在静默期触发，
 // 抓不到与前轮衔接的新轮（前轮尾帧/新轮头帧使静默低于阈值），用户消息会永久缺失、两轮回复合并。
-// 窗口内主动轮询官方历史，发现晚于轮末的用户消息即主动重连拿 snapshot 补用户边界。
-const POST_TERMINAL_EXTERNAL_PROMPT_WATCH_MS = 180_000;
+// 主动轮询官方历史，发现晚于轮末的用户消息即主动重连拿 snapshot 补用户边界。挂载点二：live 主 agent 轮末帧、
+// snapshot 恢复后（含进程重启/重连对账，无 in_flight_turn 时）；观察不设过期，仅在 unsubscribe/pending 时清除，
+// 覆盖重启后未观测到轮末帧的场景。terminalAt 取 snapshot 最新消息时间戳（与官方用户消息同源时钟，避免跨钟偏斜）。
 const POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS = 4_000;
 
 export function serverMessageProgressMarker(
@@ -1045,15 +1046,17 @@ export class KimiCodeServerClient {
     }
   }
 
+  // snapshot 恢复即本地时间线对齐到官方快照此刻，晚于它的用户消息必为其他客户端的新轮；
+  // 与 live 轮末帧路径共用挂载点。terminalAt 由调用方提供（snapshot 用最新消息时间戳，live 轮末用当前时间）。
+  private armPostTerminalExternalWatch(sessionId: string, terminalAt: number): void {
+    this.postTerminalExternalWatch.set(sessionId, { terminalAt, lastProbeAt: 0 });
+  }
+
   private pollPostTerminalExternalPrompts(): void {
     if (this.postTerminalExternalWatch.size === 0) return;
     const now = Date.now();
     for (const [sessionId, watch] of [...this.postTerminalExternalWatch]) {
       if (!this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId)) {
-        this.postTerminalExternalWatch.delete(sessionId);
-        continue;
-      }
-      if (now - watch.terminalAt > POST_TERMINAL_EXTERNAL_PROMPT_WATCH_MS) {
         this.postTerminalExternalWatch.delete(sessionId);
         continue;
       }
@@ -1066,7 +1069,8 @@ export class KimiCodeServerClient {
   private async probeExternalUserPromptAfterTerminal(sessionId: string, terminalAt: number): Promise<void> {
     try {
       const response = await this.listMessages(sessionId, 10);
-      const latestUser = [...response.items].reverse().find((item) => (
+      // items 为 newest-first（items[0] 即最新，进度标记依赖此序）；直接取第一个 user 即最新用户边界。
+      const latestUser = response.items.find((item) => (
         isRecord(item) && (item as Record<string, unknown>).role === "user"
       ));
       if (!latestUser) return;
@@ -1973,7 +1977,7 @@ export class KimiCodeServerClient {
       if (terminalPayload.recovered_from_snapshot !== true) {
         const terminalAgentId = typeof terminalPayload.agentId === "string" ? terminalPayload.agentId : "";
         if (terminalAgentId === "" || terminalAgentId === "main") {
-          this.postTerminalExternalWatch.set(frame.session_id, { terminalAt: Date.now(), lastProbeAt: 0 });
+          this.armPostTerminalExternalWatch(frame.session_id, Date.now());
         }
       }
     }
@@ -2080,6 +2084,15 @@ export class KimiCodeServerClient {
       );
       this.cursors.set(sessionId, { seq: snapshot.as_of_seq, epoch: snapshot.epoch });
       sdiag(`[wssnap] done ${sessionId.slice(-8)} as_of_seq=${snapshot.as_of_seq} epoch=${snapshot.epoch} msgs=${snapshot.messages?.items?.length ?? "?"} inFlight=${snapshot.in_flight_turn ? 1 : 0}`);
+      if (!snapshot.in_flight_turn) {
+        const latestSnapshotMessageAt = (snapshot.messages?.items ?? [])
+          .map((item) => snapshotTimestampToEpochMs(snapshotMessageTimestamp(item as Record<string, unknown>)))
+          .reduce<number | undefined>(
+            (max, at) => (at === undefined ? max : max === undefined ? at : Math.max(max, at)),
+            undefined,
+          );
+        this.armPostTerminalExternalWatch(sessionId, latestSnapshotMessageAt ?? Date.now());
+      }
       const frame: ServerFrame = {
         type: "kimix.server.snapshot",
         session_id: sessionId,
