@@ -1820,7 +1820,7 @@ async function reloadIdleKimiCodeSessionsAfterConfigChange() {
 
 function buildConfigReloadSuffix(result: Awaited<ReturnType<typeof reloadIdleKimiCodeSessionsAfterConfigChange>>) {
   if (result.reloaded.length > 0) return `，已重载 ${result.reloaded.length} 个空闲会话`;
-  if (result.skipped.length > 0) return "，当前运行中的会话会在下一轮或新会话中使用新配置";
+  if (result.skipped.length > 0) return "，运行中的会话下次发送如遇旧配置错误会自动重载/切换恢复";
   return "";
 }
 

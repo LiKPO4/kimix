@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：配置新模型后老会话必须重启才能用（v2.20.187）
+
+- 现场（用户 145 复现）：设置里配置新模型后不重启，老会话继续对话报 `Model "…" is not configured in config.toml`；重启后正常。
+- 分析：报错来自官方运行时用内存配置校验；配置写盘从一开始就对，缺的是通知运行中的运行时。现状缺口：① idle SDK 会话保存后有 `reloadIdleSessions` 覆盖；② **server 路由会话不在重载范围**（`reloadIdleSessions` 只遍历 SDK sessions map，官方 server 无公开 reload 路由），是否热生效 POST /api/v1/config 的 models 无证据；③ 保存时运行中的 SDK 会话被 skip，旧 toast 承诺「下一轮生效」未验证。
+- 修复：`sendPrompt` 两处 catch 增加陈旧配置恢复——匹配 `not configured in config.toml` 且模型在本地 config（reload 读）存在时：server 会话 `migrateServerSessionToSdk`(pinToSdk) 后重试一次；SDK 会话 `reloadSession` 后重试一次；恢复失败落回原错误路径（真缺模型不循环）。toast 措辞改为如实描述恢复机制。
+- 探针决策：server 热生效探针需改用户全局 config.toml（探针 server 共享全局配置），收益仅知识存档、不改变修复覆盖面，**不跑**；改由用户重跑 145 复现做端到端验收（server 热生效则直接成功，不热生效则恢复机制迁移+重试成功，两种结果都不需要重启）。
+- 验收：typecheck/全量 1549/build 通过；实机待用户按 145 步骤复验。
+- 已知边界：server 会话恢复后 pin 到 SDK（与 reload 语义一致，server 恢复后不弹回）；恢复重试仅一次且仅在特定错误后。
+- 知识库：runtime-routing.md 新增不变量 92，log.md 已记。
+- 关键文件：`electron/kimiCodeHost.ts`（isModelNotConfiguredError/isModelConfiguredLocally + 两处 catch 恢复）、`electron/main.ts`（toast 措辞）。
+
 ## 2026-08-04 修复：08-03~08-04 改动复查清单（8 项修复 + 2 项澄清）（v2.20.186）
 
 - 背景：6 子代理并行 review 08-03 起 30 提交；经逐条复核修正严重级（无高危，多数低概率/展示层）；用户先修 select 档位粘住（v2.20.185），本轮修复其余项。

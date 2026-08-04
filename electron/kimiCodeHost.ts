@@ -1313,6 +1313,22 @@ export function resolveServerModelRefresh(
   return managedModel?.trim() || undefined;
 }
 
+const MODEL_NOT_CONFIGURED_PATTERN = /not configured in config\.toml/i;
+
+function isModelNotConfiguredError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return MODEL_NOT_CONFIGURED_PATTERN.test(message);
+}
+
+async function isModelConfiguredLocally(model: string): Promise<boolean> {
+  try {
+    const config = await getConfig({ reload: true });
+    return Boolean(config.models?.[model]);
+  } catch {
+    return false;
+  }
+}
+
 export async function sendPrompt(
   sessionId: string,
   input: string | KimiCodePromptPart[],
@@ -1337,6 +1353,28 @@ export async function sendPrompt(
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged, promptModel));
       return { route: "server" };
     } catch (error) {
+      // 保存新模型后运行中的 Server 可能仍用旧内存配置，prompt 校验报 not configured；
+      // 模型已在本地配置时迁到兼容链路（读最新 TOML）重试一次，避免用户必须重启。
+      if (isModelNotConfiguredError(error) && promptModel && (await isModelConfiguredLocally(promptModel))) {
+        let migrated: ManagedSession | null = null;
+        try {
+          setStatus(sessionId, "interrupted");
+          migrated = await migrateServerSessionToSdk(sessionId, serverManaged, {
+            pinToSdk: true,
+            runningMessage: "当前轮正在运行，不能切换运行时。请等本轮结束后重试。",
+          });
+          setStatus(sessionId, "running");
+          const migratedFiles = await materializeSdkFileReferences(sessionId, input);
+          await migrated.session.prompt(await materializeVideoFileReferences(migratedFiles));
+          return { route: "sdk-fallback", fallbackReason: "server model config stale, migrated to SDK" };
+        } catch (retryError) {
+          if (migrated) {
+            setStatus(sessionId, "error");
+            throw retryError;
+          }
+          console.warn("[KimiCodeServerHost] stale model config migration failed; original error path:", retryError);
+        }
+      }
       console.warn("[KimiCodeServerHost] prompt failed mid-turn; error will propagate to caller without fallback:", error);
       // Don't fallback mid-turn: create a fresh SDK session for the next turn,
       // notify the renderer of the migration, then propagate the error.
@@ -1363,6 +1401,24 @@ export async function sendPrompt(
         : {}),
     };
   } catch (error) {
+    // SDK 链路同样可能内存配置陈旧（保存模型时运行中的会话不在 idle 重载覆盖内）；重载重试一次。
+    if (
+      isModelNotConfiguredError(error) &&
+      promptModel &&
+      managed.session.reloadSession &&
+      (await isModelConfiguredLocally(promptModel))
+    ) {
+      try {
+        setStatus(sessionId, "interrupted");
+        await managed.session.reloadSession();
+        setStatus(sessionId, "running");
+        const retryFiles = await materializeSdkFileReferences(sessionId, input);
+        await managed.session.prompt(await materializeVideoFileReferences(retryFiles));
+        return { route: "sdk" };
+      } catch (retryError) {
+        console.warn("[KimiCodeServerHost] stale model config SDK reload recovery failed:", retryError);
+      }
+    }
     setStatus(sessionId, "error");
     throw error;
   }
