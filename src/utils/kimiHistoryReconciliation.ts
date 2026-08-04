@@ -943,4 +943,26 @@ export function backfillTurnModelsFromUsageStatuses(events: TimelineEvent[]): Ti
   flushTurn();
   return dirty ? result : events;
 }
+/**
+ * Live 路径的 backfillTurnModelsFromUsageStatuses 孪生：host 的权威当轮模型信号
+ *（kimix.turn.model：dispatch 时为本地注入的本轮模型，settle 时为 server 实际模型）
+ * 盖到最后一条用户边界之后、尚无模型的 assistant 上，让消息头徽标与底部信息
+ * 立即显示模型，不必等切会话触发的历史对账。只填空，不覆盖官方 per-turn 模型。
+ */
+export function stampCurrentTurnModel(events: TimelineEvent[], model: string | undefined): TimelineEvent[] {
+  const trimmed = typeof model === "string" ? model.trim() : "";
+  if (!trimmed) return events;
+  const result = [...events];
+  let dirty = false;
+  for (let index = result.length - 1; index >= 0; index -= 1) {
+    const event = result[index];
+    if (event.type === "user_message") break;
+    if (event.type === "assistant_message" && !(typeof event.model === "string" && event.model.trim())) {
+      result[index] = { ...event, model: trimmed };
+      dirty = true;
+    }
+  }
+  return dirty ? result : events;
+}
+
 

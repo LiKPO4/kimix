@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：当轮消息头/底部信息缺模型，切会话来回才正常（v2.20.208）
+
+- 现场：207 实机验收主链路已通过（k3 执行、选择器不回跳），但当轮「（输出完成）本轮总耗时」行无模型徽标、底部 pill 显示裸「已完成 · 用时 26秒」；切其他会话再回来即正常。
+- 根因：消息头徽标（resolveTurnHeaderModelName←processEvent.model）与底部 pill（assistantFooterFallbackLabel←event.model）都依赖 assistant 事件的 model 字段；live 路径从不写它——server 路由 WS 不广播 usage.record（只写 wire.jsonl），agent.status.updated 状态刷新携带的 model 被映射层丢弃（无 usage.currentTurn 时不进 message）。只有切会话触发的历史对账 backfillTurnModelsFromUsageStatuses 从 wire usage.record 回填 model，故「切回来就好了」。
+- 修复：host 新增轻量信号 `kimix.turn.model`——sendPrompt 注入模型后立即 emit（dispatch 意图，不变量 65；server/SDK 两路由统一），settle 后以 server 实际模型补 emit（覆盖 Web 发起的外部轮次）；渲染层 App.tsx 预映射分支接收，用新 helper `stampCurrentTurnModel`（backfill 的 live 孪生：扫到最后用户边界、只填空不覆盖）盖到当轮 assistant。合并安全：eventMapper 2162 `incoming.model ?? target.model` 保留已盖章值，不打断流式合并。
+- 验收：新增 stampCurrentTurnModel 单元测试 3 例（多段盖章/只填空/同引用短路）；typecheck/全量 1564/build 通过；实机待验收（当轮完成即显示模型徽标+「模型：k3」pill，不必切会话）。
+- 已知边界：live 仍无 token/Context 用量卡（server /status 无 usage，需 wire 才有）——用量数字仍在重载后出现，本轮只解决模型信息；dispatch 盖章为意图模型，server 实际分叉的罕见情形以重载对账为准。
+- 知识库：runtime-routing invariant 65 扩展（kimix.turn.model 信号），log 已记。
+- 关键文件：`electron/kimiCodeHost.ts`、`src/App.tsx`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
+
 ## 2026-08-04 修复：新对话点推荐被 deepseek 接管根因——EmptyState 不消费 pendingNewSessionModel（v2.20.207）
 
 - 现场：同 206——归档 → 新对话初始页（显示 k3）→ 点推荐 → 选择器变 deepseek、被 deepseek 接管；205/206 两轮未根治。

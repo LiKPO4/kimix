@@ -7,6 +7,7 @@ import {
   mergeMissingUsageStatusEvents,
   removeIdentityCoveredDuplicateToolCalls,
   shouldReplaceWithCanonicalKimiHistory,
+  stampCurrentTurnModel,
 } from "../kimiHistoryReconciliation";
 
 const userMessage: TimelineEvent = {
@@ -1116,5 +1117,50 @@ describe("backfillTurnModelsFromUsageStatuses (via mergeMissingUsageStatusEvents
     // Context fields other than rawCanonicalEvents must still be present.
     expect(logArg.sessionId).toBe("s-1");
     expect(logArg.roomAgentId).toBe("agent-a");
+  });
+});
+
+describe("stampCurrentTurnModel", () => {
+  it("把模型盖到最后一条用户边界之后所有无模型的 assistant（含多段正文）", () => {
+    const events: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "第一轮" },
+      assistant("旧轮正文"),
+      { id: "u2", type: "user_message", timestamp: 20, content: "第二轮" },
+      assistant("工具前段", { id: "a-pre", isComplete: true }),
+      assistant("最终段", { id: "a-final", isComplete: false }),
+    ];
+
+    const stamped = stampCurrentTurnModel(events, "kimi/k3");
+
+    const byId = (id: string) => stamped.find((event) => event.id === id);
+    expect(byId("a-pre")).toMatchObject({ model: "kimi/k3" });
+    expect(byId("a-final")).toMatchObject({ model: "kimi/k3" });
+    // 用户边界之前的上一轮不受影响
+    const oldTurn = byId("assistant-旧轮正文");
+    expect(oldTurn && "model" in oldTurn ? oldTurn.model : undefined).toBeUndefined();
+  });
+
+  it("只填空：已有官方 per-turn 模型的 assistant 不被覆盖", () => {
+    const events: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "x" },
+      assistant("带模型", { id: "a1", model: "deepseek-chat" }),
+      assistant("不带模型", { id: "a2" }),
+    ];
+
+    const stamped = stampCurrentTurnModel(events, "kimi/k3");
+
+    expect(stamped.find((event) => event.id === "a1")).toMatchObject({ model: "deepseek-chat" });
+    expect(stamped.find((event) => event.id === "a2")).toMatchObject({ model: "kimi/k3" });
+  });
+
+  it("无模型信号或无待盖章 assistant 时原样返回（同引用）", () => {
+    const events: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "x" },
+      assistant("已盖章", { model: "kimi/k3" }),
+    ];
+
+    expect(stampCurrentTurnModel(events, undefined)).toBe(events);
+    expect(stampCurrentTurnModel(events, "  ")).toBe(events);
+    expect(stampCurrentTurnModel(events, "kimi/k3")).toBe(events);
   });
 });

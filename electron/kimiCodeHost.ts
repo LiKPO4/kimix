@@ -1358,6 +1358,11 @@ export async function sendPrompt(
     serverManaged = serverSessions.get(sessionId);
   }
   await ensureModelOutputLimitBeforePrompt(promptModel);
+
+  // 本轮权威模型（不变量 65：dispatch 起不可变）立即通知渲染层盖到当轮 assistant——
+  // server 路由 live 不产出 usage 状态卡，否则消息头徽标/底部模型信息要等切会话
+  // 触发的历史对账 backfill 才显示。
+  if (promptModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: promptModel } });
   serverManaged ??= sdkPinnedSessionIds.has(sessionId) ? undefined : await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
@@ -3285,6 +3290,10 @@ async function settleServerSessionAfterPromptCompleted(sessionId: string): Promi
       mainTurnActive = undefined; // 无法确认时保守按 busy
     }
     setStatus(sessionId, resolveEngineStatusAfterPromptCompleted(status, mainTurnActive));
+    // settle 后以 server 实际模型补一次当轮盖章：覆盖外部（Web 发起）轮次——它们没有
+    // sendPrompt 的意图信号；渲染层只填空，不覆盖 dispatch 时已盖章的值。
+    const settledTurnModel = status.model?.trim();
+    if (settledTurnModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: settledTurnModel } });
   } catch (error) {
     console.warn(`[KimiCodeServerHost] refresh after prompt.completed failed for ${sessionId}:`, error);
     const current = serverSessions.get(sessionId)?.status;

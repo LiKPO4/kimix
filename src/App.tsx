@@ -72,6 +72,7 @@ import {
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
   shouldReplaceWithCanonicalKimiHistory,
+  stampCurrentTurnModel,
 } from "@/utils/kimiHistoryReconciliation";
 import { isCanonicalReconciliationCircuitOpen } from "@/utils/reconcileCircuitBreaker";
 import { logError, logEvent } from "@/utils/reportError";
@@ -2720,6 +2721,23 @@ function App() {
             }
           }
           updateSession(uiSessionId, () => ({ ...settledSession, updatedAt: Date.now() }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
+        return;
+      }
+      if (rawEvent?.type === "kimix.turn.model") {
+        // Host 权威当轮模型信号（dispatch=本地注入的本轮模型，不变量 65；settle=server
+        // 实际模型）。server 路由 live 不产出 usage 状态卡，当轮 assistant 的 model
+        // 一直为空，消息头徽标/底部信息要等切会话重载（历史对账 backfill）才显示。
+        const turnModel = typeof rawEvent.model === "string" ? rawEvent.model.trim() : "";
+        if (turnModel && targetSession) {
+          const stampAgentId = roomAgentId ?? getPrimaryRoomAgent(targetSession).id;
+          updateSession(uiSessionId, (session) => {
+            const view = getRoomAgentEvents(session, stampAgentId);
+            const stamped = stampCurrentTurnModel(view, turnModel);
+            if (stamped === view) return session;
+            return { ...updateRoomAgentEvents(session, stampAgentId, () => stamped), updatedAt: Date.now() };
+          });
           syncCurrentSessionFromStore(uiSessionId);
         }
         return;
