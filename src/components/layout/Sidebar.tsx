@@ -34,6 +34,10 @@ const collapsedNavItemClass = "kimix-sidebar-nav-item flex items-center justify-
 const collapsedSettingsItemClass = "kimix-settings-entry flex items-center justify-center rounded-lg text-text-secondary";
 const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight: 40, padding: 0 } as const;
 const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
+// 官方 Server 不广播「其他客户端新建会话」，侧栏目录原本只在展开集合/最近项目变化时
+// 刷新，Web 侧新对话永远不被发现。周期 + 焦点/可见性回归刷新让双端目录收敛
+// （reconcileOfficialSessionCatalog 幂等，无变化不写状态）。
+const SIDEBAR_CATALOG_REFRESH_INTERVAL_MS = 30_000;
 
 function normalizeProjectPath(path: string | undefined) {
   return normalizePathForComparison(path);
@@ -214,6 +218,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const lastAutoExpandedProjectPath = useRef<string | null>(null);
   const handledInitialProjectExpansionRef = useRef(false);
   const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
+  const [catalogRefreshTick, setCatalogRefreshTick] = useState(0);
   const pluginWorkspaceActive = workspaceView === "plugins" || workspaceView === "mcp";
 
   const toast = (message: string) => {
@@ -267,6 +272,21 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   }, [currentProject?.path, restoredProjectExpansion.hasSavedState]);
 
   useEffect(() => {
+    const bumpCatalogRefresh = () => setCatalogRefreshTick((tick) => tick + 1);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") bumpCatalogRefresh();
+    };
+    const timer = window.setInterval(bumpCatalogRefresh, SIDEBAR_CATALOG_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", bumpCatalogRefresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", bumpCatalogRefresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
     for (const project of recentProjects) {
       const projectKey = normalizeProjectPath(project.path);
       if (!expandedProjectPaths.has(projectKey)) continue;
@@ -289,7 +309,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         projectCatalogRefreshInFlightRef.current.delete(projectKey);
       });
     }
-  }, [expandedProjectPaths, recentProjects]);
+  }, [expandedProjectPaths, recentProjects, catalogRefreshTick]);
 
   const currentSessionId = currentSession?.id;
   const currentSessionUpdatedAt = currentSession?.updatedAt;

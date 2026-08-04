@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：Web 侧新建对话不同步到 Kimix 侧栏（v2.20.180）
+
+- 现场：用户在官方 Web 新建对话并发送消息后，Kimix 侧栏（v2.20.179）不出现该新会话，需折叠重展开或重启才可见。
+- 根因：官方 Server 不广播「其他客户端新建会话」（WS 订阅是会话级）；侧栏 `refreshExpandedProjectSessions` effect 只依赖 `expandedProjectPaths`/`recentProjects` 变化触发，无周期/焦点刷新，外部新建会话永不被发现。
+- 修复：Sidebar 新增 30s 周期 tick + 窗口 focus/可见性回归触发，复用既有 `listKimiCodeSessions` + `reconcileOfficialSessionCatalog` 链路（合并幂等、无变化不写状态；缺失官方会话以懒加载镜像进入侧栏；归档清扫仍只认显式证据，周期刷新不会误归档）。
+- 验收：typecheck/全量测试/build 结果待出；实机「Web 新对话 ≤30s 或焦点回归后出现在 Kimix 侧栏」待用户验收。
+- 已知边界：只刷新已展开项目的目录（现场目标项目为展开态）；每 tick 每展开项目一次 HTTP GET /sessions；窗口未聚焦时最慢 30s 发现。
+- 知识库：runtime-routing.md 新增不变量 91，log.md 已记。
+- 关键文件：`src/components/layout/Sidebar.tsx`（常量 + tick/focus effect + deps）。
+
 ## 2026-08-04 修复：Web 侧新轮用户消息 Kimix 缺失 + 两轮回复合并 + 外部已回应审批永久待审批（v2.20.179）
 
 - 现场：用户全程在官方 Web 侧交互（session_c0197cc1-13ad-430e-b4db-d303e8d14aa0），Kimix 侧（截图 v2.20.178）：① Web 第二次发的用户消息不显示，两轮 agent 回复糅合到一轮；② Web 已回应的权限申请在 Kimix 仍待回复，底部常驻「待审批」。
