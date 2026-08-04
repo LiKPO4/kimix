@@ -144,7 +144,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
                 <FolderOpen size={15} className="shrink-0 text-text-muted" />
                 <span className="whitespace-nowrap">在文件管理器中定位</span>
               </button>
-              <div className="my-1.5 border-t border-border-subtle" />
+              <div className="kimix-menu-separator" style={{ marginTop: 6, marginBottom: 6 }} />
               <button
                 type="button"
                 onClick={handleCopyFullPath}

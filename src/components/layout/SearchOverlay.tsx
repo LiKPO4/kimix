@@ -438,24 +438,27 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
         <div ref={listRef} className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
           <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, flexWrap: "wrap" }}>
             <button
-              className={`kimix-icon-text-button ${scope === "project" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              className="kimix-icon-text-button kimix-state-button"
               style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              aria-pressed={scope === "project"}
               onClick={() => setScope("project")}
             >
               <MessageSquare size={14} />
               当前项目
             </button>
             <button
-              className={`kimix-icon-text-button ${scope === "all" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              className="kimix-icon-text-button kimix-state-button"
               style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              aria-pressed={scope === "all"}
               onClick={() => setScope("all")}
             >
               <Globe2 size={14} />
               全部工作目录
             </button>
             <button
-              className={`kimix-icon-text-button ${scope === "orphan" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:bg-surface-hover"}`}
+              className="kimix-icon-text-button kimix-state-button"
               style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+              aria-pressed={scope === "orphan"}
               onClick={() => setScope("orphan")}
             >
               <Unlink size={14} />
@@ -479,8 +482,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 data-search-index={index}
                 role="button"
                 tabIndex={0}
-                className={`grid min-h-14 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
+                className="kimix-menu-item grid min-h-14 w-full items-center text-left"
                 style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, padding: "10px 14px" }}
+                aria-selected={selectedIndex === index}
                 onClick={() => void openGlobalSession(match.session)}
                 onMouseMove={() => setSelectedIndex(index)}
               >
@@ -525,7 +529,8 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
                 openSession(match);
               }}
               onMouseMove={() => setSelectedIndex(index)}
-              className={`flex min-h-12 w-full items-center rounded-xl text-left transition-colors ${selectedIndex === index ? "bg-surface-hover" : "hover:bg-surface-hover"}`}
+              aria-selected={selectedIndex === index}
+              className="kimix-menu-item min-h-12 w-full items-center text-left"
               style={{ gap: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 9, paddingBottom: 9 }}
             >
               {match.kind === "最近对话" || match.kind === "标题" ? <MessageSquare size={16} className="shrink-0 text-text-muted" /> : <FileText size={16} className="shrink-0 text-text-muted" />}

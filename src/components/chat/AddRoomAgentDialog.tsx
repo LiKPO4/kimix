@@ -102,7 +102,7 @@ export function AddRoomAgentDialog({
   if (!open) return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
       style={{ padding: 20 }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
@@ -112,7 +112,7 @@ export function AddRoomAgentDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-room-agent-title"
-        className="kimix-floating-panel flex max-h-[min(720px,calc(100dvh-40px))] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl"
+        className="kimix-modal-card flex max-h-[min(720px,calc(100dvh-40px))] w-full max-w-[560px] flex-col overflow-hidden"
         style={{ padding: 0 }}
         onSubmit={(event) => {
           event.preventDefault();
@@ -147,7 +147,7 @@ export function AddRoomAgentDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="kimix-inline-icon-action kimix-room-secondary-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] disabled:opacity-40"
+            className="kimix-inline-icon-action is-roomy kimix-room-secondary-action text-[var(--kimix-panel-text-secondary)] disabled:opacity-40"
             aria-label="关闭添加 Agent"
           >
             <X size={15} />
@@ -193,7 +193,7 @@ export function AddRoomAgentDialog({
           </div>
 
           <section
-            className="rounded-2xl bg-[var(--kimix-panel-soft-bg)]"
+            className="kimix-inset-section"
             style={{ marginTop: 16, padding: 16 }}
           >
             <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
@@ -275,7 +275,7 @@ export function AddRoomAgentDialog({
                     type="button"
                     onClick={() => setPermissionMode(option.value)}
                     aria-pressed={selected}
-                    className={`kimix-room-choice rounded-xl border text-left ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                    className="kimix-room-choice rounded-xl border text-left border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)] aria-pressed:border-[var(--kimix-panel-border)] aria-pressed:bg-[var(--kimix-panel-soft-bg)]"
                     style={{ minHeight: 74, padding: "11px 12px" }}
                   >
                     <span className="block text-[12.5px] font-medium text-[var(--kimix-panel-text)]">{option.label}</span>
@@ -287,7 +287,7 @@ export function AddRoomAgentDialog({
           </section>
 
           {(error || catalogError) && (
-            <div className="rounded-xl bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 16, padding: "10px 12px" }}>
+            <div className="kimix-inset-section text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 16, padding: "10px 12px", backgroundColor: "var(--accent-danger-light)" }}>
               {error || catalogError}
             </div>
           )}

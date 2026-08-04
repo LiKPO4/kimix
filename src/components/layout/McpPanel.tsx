@@ -133,7 +133,7 @@ function KeyValueListEditor({
               value={item.key}
               onChange={(event) => patchItem(item.id, { key: event.target.value })}
               placeholder={placeholderKey}
-              className="h-10 min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+              className="kimix-settings-input h-10 min-w-0 rounded-xl text-[14px] outline-none"
               style={{ paddingLeft: 18, paddingRight: 18 }}
             />
             <div className="text-[13px] text-[var(--kimix-panel-text-muted)]">{separator}</div>
@@ -141,7 +141,7 @@ function KeyValueListEditor({
               value={item.value}
               onChange={(event) => patchItem(item.id, { value: event.target.value })}
               placeholder={placeholderValue}
-              className="h-10 min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+              className="kimix-settings-input h-10 min-w-0 rounded-xl text-[14px] outline-none"
               style={{ paddingLeft: 18, paddingRight: 18 }}
             />
             <button
@@ -552,7 +552,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     <input
                       value={form.name}
                       onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                      className="mt-2 h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+                      className="kimix-settings-input mt-2 h-10 w-full rounded-xl text-[14px] outline-none"
                       style={{ paddingLeft: 18, paddingRight: 18 }}
                     />
                   </label>
@@ -561,7 +561,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     <select
                       value={form.transport}
                       onChange={(event) => setForm((current) => ({ ...current, transport: event.target.value as "http" | "sse" | "stdio" }))}
-                      className="mt-2 h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+                      className="kimix-settings-input mt-2 h-10 w-full rounded-xl text-[14px] outline-none"
                       style={{ paddingLeft: 12, paddingRight: 18 }}
                     >
                       <option value="http">HTTP</option>
@@ -575,7 +575,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                       <input
                         value={form.url}
                         onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
-                        className="mt-2 h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+                        className="kimix-settings-input mt-2 h-10 w-full rounded-xl text-[14px] outline-none"
                         style={{ paddingLeft: 18, paddingRight: 18 }}
                       />
                     </label>
@@ -585,7 +585,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                       <input
                         value={form.command}
                         onChange={(event) => setForm((current) => ({ ...current, command: event.target.value }))}
-                        className="mt-2 h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+                        className="kimix-settings-input mt-2 h-10 w-full rounded-xl text-[14px] outline-none"
                         style={{ paddingLeft: 18, paddingRight: 18 }}
                       />
                     </label>
@@ -619,7 +619,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                                 args: current.args.map((item, itemIndex) => (itemIndex === index ? event.target.value : item)),
                               }))}
                               placeholder={`参数 ${index + 1}`}
-                              className="h-10 min-w-0 rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[14px] text-[var(--kimix-panel-text)] outline-none"
+                              className="kimix-settings-input h-10 min-w-0 rounded-xl text-[14px] outline-none"
                               style={{ paddingLeft: 18, paddingRight: 18 }}
                             />
                             <button

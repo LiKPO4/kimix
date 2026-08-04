@@ -128,7 +128,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
                             role="menuitemradio"
                             aria-checked={mode === sortMode}
                             onClick={() => { setSortMode(mode); setSortMenuOpen(false); }}
-                            className={`kimix-menu-item text-left text-[13px] ${mode === sortMode ? "bg-accent-primary-light text-accent-primary" : "text-text-secondary"}`}
+                            className={`kimix-menu-item text-left text-[13px] ${mode === sortMode ? "" : "text-text-secondary"}`}
                             style={{ height: 32, paddingLeft: 10, paddingRight: 12, gap: 6 }}
                           >
                             <span className="flex w-4 shrink-0 items-center justify-center">{mode === sortMode ? <Check size={13} /> : null}</span>

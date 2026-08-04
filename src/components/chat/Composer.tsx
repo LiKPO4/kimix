@@ -4408,7 +4408,7 @@ export function Composer() {
                   <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
                     <Edit2 size={13} />
                   </button>
-                  <button onClick={() => removePendingMessage(msg.id)} className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-accent-red/10 hover:text-accent-red" title="删除" aria-label="删除">
+                  <button onClick={() => removePendingMessage(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg text-accent-red" title="删除" aria-label="删除">
                     <Trash2 size={13} />
                   </button>
                   <div className="relative" ref={(el) => { pendingMoreRefs.current[msg.id] = el; }}>
@@ -4596,7 +4596,8 @@ export function Composer() {
                           key={item.id}
                           type="button"
                           onClick={() => applyCompletion(item)}
-                          className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                          className="kimix-menu-item gap-2.5 text-left"
+                          aria-selected={activeCompletionIndex === index}
                           style={{ paddingLeft: 10, paddingRight: 12 }}
                         >
                           <Bot size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
@@ -4616,7 +4617,8 @@ export function Composer() {
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className="kimix-menu-item gap-2.5 text-left"
+                      aria-selected={activeCompletionIndex === index}
                       style={{ paddingLeft: 10, paddingRight: 12 }}
                     >
                       <Puzzle size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
@@ -4634,7 +4636,8 @@ export function Composer() {
                       key={item.id}
                       type="button"
                       onClick={() => applyCompletion(item)}
-                      className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className="kimix-menu-item gap-2.5 text-left"
+                      aria-selected={activeCompletionIndex === index}
                       style={{ paddingLeft: 10, paddingRight: 12 }}
                     >
                       <FileText size={15} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
@@ -4654,7 +4657,8 @@ export function Composer() {
                     key={item.id}
                     type="button"
                     onClick={() => applyCompletion(item)}
-                    className={`flex h-9 w-full items-center gap-2.5 rounded-xl text-left transition-colors ${activeCompletionIndex === index ? "bg-[var(--kimix-panel-hover)] text-[var(--kimix-panel-text)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                    className="kimix-menu-item gap-2.5 text-left"
+                    aria-selected={activeCompletionIndex === index}
                     style={{ paddingLeft: 10, paddingRight: 12 }}
                   >
                     {item.kind === "skill"
@@ -4769,7 +4773,7 @@ export function Composer() {
                           setShowAddMenu(false);
                           mediaFileInputRef.current?.click();
                         }}
-                        className="grid w-full items-center rounded-xl text-left transition-[background-color,scale] duration-150 ease-out hover:bg-[var(--kimix-panel-hover)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
+                        className="kimix-menu-item grid text-left disabled:cursor-not-allowed disabled:opacity-45"
                         style={{ gridTemplateColumns: "32px minmax(0, 1fr)", gap: 10, minHeight: 48, paddingLeft: 8, paddingRight: 12 }}
                       >
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text-secondary)]">
@@ -4779,12 +4783,12 @@ export function Composer() {
                       </button>
                     </section>
                     {multiAgentRoomUiAvailable && (
-                      <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
+                      <section className="kimix-menu-separator" style={{ paddingTop: 14 }}>
                         <button
                           type="button"
                           disabled={!canUseComposer || activeRoomBusy || activeRoomAgents.length >= 4}
                           onClick={() => void handleOpenAddRoomAgent()}
-                          className="grid w-full items-center rounded-xl text-left transition-colors hover:bg-[var(--kimix-panel-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                          className="kimix-menu-item grid text-left disabled:cursor-not-allowed disabled:opacity-45"
                           style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto", gap: 10, minHeight: 48, paddingLeft: 8, paddingRight: 8 }}
                           title={activeRoomAgents.length >= 4 ? "一个房间最多 4 个 Agent" : "添加使用独立上下文的 Agent"}
                         >
@@ -4802,7 +4806,7 @@ export function Composer() {
                       </section>
                     )}
 
-                    <section className={multiAgentRoomUiAvailable ? "border-t border-[var(--kimix-panel-divider)]" : undefined} style={multiAgentRoomUiAvailable ? { paddingTop: 14 } : undefined}>
+                    <section className={multiAgentRoomUiAvailable ? "kimix-menu-separator" : undefined} style={multiAgentRoomUiAvailable ? { paddingTop: 14 } : undefined}>
                       <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
                         <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
                           <Palette size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
@@ -4816,7 +4820,7 @@ export function Composer() {
                             key={ratio}
                             type="button"
                             onClick={() => openBlankDrawingBoard(ratio)}
-                            className="kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] text-text-secondary hover:bg-[var(--kimix-panel-hover)]"
+                            className="kimix-icon-text-button is-compact justify-center text-[13px] text-text-secondary"
                             style={{ width: 38, paddingLeft: 0, paddingRight: 0 }}
                           >
                             {ratio}
@@ -4825,7 +4829,7 @@ export function Composer() {
                       </div>
                     </section>
 
-                    <section className="border-t border-[var(--kimix-panel-divider)]" style={{ paddingTop: 14 }}>
+                    <section className="kimix-menu-separator" style={{ paddingTop: 14 }}>
                       <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
@@ -4843,7 +4847,8 @@ export function Composer() {
                             setShowAddMenu(false);
                             void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" });
                           }}
-                          className={`kimix-icon-text-button is-compact justify-center rounded-lg text-[13px] disabled:cursor-not-allowed disabled:opacity-55 ${swarmModeEnabled ? "text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                          className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-55"
+                          aria-pressed={swarmModeEnabled}
                           style={{ minWidth: 72, height: 32, paddingLeft: 12, paddingRight: 12 }}
                           title={swarmModeEnabled
                             ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm；运行中切换会在下一轮生效`
@@ -5065,7 +5070,7 @@ export function Composer() {
                     <button
                       type="button"
                       onClick={() => setRoomControlRequest(null)}
-                      className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg"
+                      className="kimix-room-secondary-action flex h-7 w-7 items-center justify-center"
                       title="关闭"
                       aria-label="关闭 Agent 控制菜单"
                     >
@@ -5078,7 +5083,7 @@ export function Composer() {
                         key={target.roomAgentId}
                         type="button"
                         onClick={() => void handleRoomControlSelection(target.roomAgentId)}
-                        className="grid w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+                        className="kimix-room-choice grid w-full text-left"
                         style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, minHeight: 42, paddingLeft: 13, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
                         title={`${roomControlRequest.action === "stop" ? "停止" : "引导"} ${target.displayName}`}
                       >

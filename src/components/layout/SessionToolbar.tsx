@@ -454,8 +454,8 @@ export function SessionToolbar({
                     onClick={() => handleSessionMenuEntry(item)}
                     className={`kimix-menu-item gap-3 text-left leading-none ${
                       item.disabled
-                        ? "cursor-not-allowed text-[var(--kimix-panel-text-muted)]"
-                        : "text-[var(--kimix-panel-text)] hover:bg-[var(--kimix-panel-hover)]"
+                        ? "cursor-not-allowed"
+                        : ""
                     }`}
                     style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 9, paddingBottom: 9 }}
                   >
@@ -504,7 +504,7 @@ export function SessionToolbar({
           </button>
         ) : (
           <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={`kimix-split-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+            <div className={`kimix-split-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : ""}`}>
               <button
                 onClick={() => void launchExecutable()}
                 className="kimix-split-control-part flex h-full flex-1 items-center justify-center"
@@ -578,7 +578,7 @@ export function SessionToolbar({
           </div>
         )}
         <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <div className={`kimix-split-control flex h-9 w-14 items-center ${projectMenuOpen ? "is-expanded" : "text-[var(--kimix-panel-text-secondary)]"} ${!projectPath ? "opacity-45" : ""}`}>
+          <div className={`kimix-split-control flex h-9 w-14 items-center ${projectMenuOpen ? "is-expanded" : ""} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
               disabled={!projectPath}
@@ -667,7 +667,7 @@ export function SessionToolbar({
         }}
       >
         <form
-          className="kimix-floating-panel w-full max-w-[420px] bg-[var(--kimix-panel-bg)] text-[var(--kimix-panel-text)]"
+          className="kimix-modal-card w-full max-w-[420px]"
           style={{ padding: 22 }}
           onMouseDown={(event) => event.stopPropagation()}
           onSubmit={(event) => {
@@ -695,12 +695,12 @@ export function SessionToolbar({
               setRenameError(null);
             }}
             autoFocus
-            className="h-10 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)] text-[14px] outline-none focus:border-[var(--accent-blue)]"
+            className="kimix-settings-input h-10 w-full text-[14px]"
             style={{ marginTop: 16, paddingLeft: 14, paddingRight: 14 }}
             placeholder="输入新的对话标题"
           />
           {renameError && (
-            <div className="rounded-lg bg-accent-danger-light text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px" }}>
+            <div className="kimix-inset-section text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px" }}>
               {renameError}
             </div>
           )}

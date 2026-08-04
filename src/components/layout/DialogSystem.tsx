@@ -101,7 +101,7 @@ function KimiOnboardingDialog({
           <button
             type="button"
             onClick={onDismiss}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover"
+            className="kimix-modal-close-button shrink-0"
             aria-label="稍后配置"
           >
             <X size={16} />

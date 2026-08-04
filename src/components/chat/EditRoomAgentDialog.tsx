@@ -34,7 +34,7 @@ export function EditRoomAgentDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[125] flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[125] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
       style={{ padding: 20 }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
@@ -44,7 +44,7 @@ export function EditRoomAgentDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-room-agent-title"
-        className="kimix-floating-panel w-full max-w-[440px] overflow-hidden rounded-2xl"
+        className="kimix-modal-card w-full max-w-[440px] overflow-hidden"
         onSubmit={(event) => {
           event.preventDefault();
           if (!busy) onSubmit({ displayName, mentionName });
@@ -64,7 +64,7 @@ export function EditRoomAgentDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="kimix-inline-icon-action kimix-room-secondary-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] disabled:opacity-40"
+            className="kimix-inline-icon-action is-roomy kimix-room-secondary-action text-[var(--kimix-panel-text-secondary)] disabled:opacity-40"
             title="关闭"
             aria-label="关闭编辑 Agent"
           >
@@ -101,14 +101,14 @@ export function EditRoomAgentDialog({
           </div>
 
           <div
-            className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
+            className="kimix-inset-section text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
             style={{ marginTop: 16, padding: "10px 12px" }}
           >
             只修改房间内显示身份，不会重置上下文、模型、Provider 或官方会话。
           </div>
 
           {error && (
-            <div className="rounded-xl bg-accent-danger/5 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px" }}>
+            <div className="kimix-inset-section text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px", backgroundColor: "var(--accent-danger-light)" }}>
               {error}
             </div>
           )}

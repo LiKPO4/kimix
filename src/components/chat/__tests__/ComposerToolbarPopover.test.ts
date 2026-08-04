@@ -30,7 +30,9 @@ describe("ComposerToolbarPopover", () => {
     expect(panel.style.right).toBe("auto");
     expect(panel.style.marginBottom).toBe("8px");
     expect(panel.style.padding).toBe("16px");
-    expect(panel.style.borderRadius).toBe("var(--radius-lg)");
+    // 圆角由 .kimix-floating-panel 角色类独占（!important），外壳不再叠 inline borderRadius
+    expect(panel.className).toContain("kimix-floating-panel");
+    expect(panel.style.borderRadius).toBe("");
   });
 
   it("统一工具栏右侧弹窗的向上和向左展开规则", () => {

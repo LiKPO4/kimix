@@ -228,10 +228,9 @@ export function TopMenuBar({
                       <button
                         key={item.label}
                         onClick={() => handleMenuClick(item)}
+                        aria-disabled={item.disabled || undefined}
                         style={{ paddingLeft: 24, paddingRight: 22, paddingTop: 10, paddingBottom: 10 }}
-                        className={`kimix-menu-item justify-between gap-5 text-left leading-none ${
-                          item.disabled ? "text-text-muted" : "text-text-primary"
-                        }`}
+                        className="kimix-menu-item justify-between gap-5 text-left leading-none"
                       >
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
                         {item.hint && <span className="shrink-0 text-[13px] text-text-muted">{item.hint}</span>}

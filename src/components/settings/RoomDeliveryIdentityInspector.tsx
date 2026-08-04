@@ -219,12 +219,12 @@ export function RoomDeliveryIdentityInspector({ open, onClose }: { open: boolean
                             ) : (
                               <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 text-text-muted">official: —</span>
                             )}
-                            <span className={`rounded-md px-1.5 py-0.5 ${item.officialIdIsUnique ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                            <span className={`rounded-md px-1.5 py-0.5 ${item.officialIdIsUnique ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`}>
                               official unique: {item.officialIdIsUnique ? "yes" : "no"}
                             </span>
                           </div>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${item.resolution.hasTransactionConflict ? "bg-accent-danger-light text-accent-danger" : "bg-green-50 text-green-700"}`}>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11.5px] leading-4 ${item.resolution.hasTransactionConflict ? "bg-accent-danger-light text-accent-danger" : "bg-accent-success-light text-accent-success"}`}>
                           {item.resolution.hasTransactionConflict ? "冲突" : "干净"}
                         </span>
                       </div>

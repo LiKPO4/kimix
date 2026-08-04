@@ -345,7 +345,7 @@ export function LongTasksPanel() {
         </div>
 
         <div className="min-h-0 overflow-y-auto" style={{ padding: 28 }}>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
+          <div className="kimix-inset-section grid grid-cols-[minmax(0,1fr)_auto] items-center bg-surface-base" style={{ gap: 16, padding: "18px 18px" }}>
             <div className="min-w-0">
               <div className="text-[14.5px] font-medium leading-5 text-text-primary">项目</div>
               <div className="mt-1 truncate text-[13px] leading-5 text-text-secondary">{selectedProject?.path ?? "选择一个项目来创建长程任务"}</div>
@@ -364,7 +364,7 @@ export function LongTasksPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
+          <div className="kimix-inset-section bg-surface-elevated" style={{ marginTop: 24, padding: "24px 20px 22px" }}>
             <div className="flex items-center gap-2 text-[15px] font-medium leading-6 text-text-primary">
               <MessageSquareText size={16} className="text-text-secondary" />
               <span>创建长程任务</span>
@@ -373,14 +373,14 @@ export function LongTasksPanel() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="任务标题（可选）"
-              className="h-10 w-full rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[14px] outline-none placeholder:text-text-muted focus:border-accent-primary focus:bg-surface-elevated"
+              className="kimix-settings-input h-10 w-full rounded-xl text-[14px] outline-none"
               style={{ marginTop: 20, paddingLeft: 16, paddingRight: 16 }}
             />
             <textarea
               value={initialRequest}
               onChange={(event) => setInitialRequest(event.target.value)}
               placeholder="输入长程任务的初始需求，后续会进入多轮澄清和计划设计"
-              className="min-h-[120px] w-full resize-none rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[14px] leading-6 outline-none placeholder:text-text-muted focus:border-accent-primary focus:bg-surface-elevated"
+              className="kimix-settings-input min-h-[120px] w-full resize-none rounded-xl text-[14px] leading-6 outline-none"
               style={{ marginTop: 16, padding: "14px 16px" }}
             />
             <div className="flex flex-wrap items-center justify-between" style={{ marginTop: 20, gap: 14 }}>
@@ -424,7 +424,7 @@ export function LongTasksPanel() {
                       type="button"
                       disabled={isRetryingKickoff || isCreating}
                       onClick={() => void retryKickoff()}
-                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       {isRetryingKickoff ? <Loader2 size={13} className="kimix-spin" /> : <RefreshCw size={13} />}
                       <span>{isRetryingKickoff ? "重试中" : "重试启动"}</span>
@@ -435,7 +435,7 @@ export function LongTasksPanel() {
                         activateTask(recoverableTask);
                         setOpen(false);
                       }}
-                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-white/70"
+                      className="kimix-icon-text-button is-compact bg-surface-elevated text-accent-warning hover:bg-surface-hover"
                     >
                       <ArrowRight size={13} />
                       <span>打开任务</span>

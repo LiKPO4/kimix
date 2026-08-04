@@ -202,7 +202,7 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         >
           <div
             className="h-full"
-            style={{ width: `${timePercent}%`, borderRadius: 0, background: "#2ddd19" }}
+            style={{ width: `${timePercent}%`, borderRadius: 0, background: "var(--accent-success)" }}
           />
         </div>
       )}
@@ -228,7 +228,7 @@ function ExtraUsageSection({ usage }: { usage: ExtraUsageInfo }) {
   ];
   return (
     <section
-      className="border-t border-[var(--kimix-panel-border-soft)]"
+      className="kimix-menu-separator"
       style={{ marginTop: 16, padding: "14px 2px 0" }}
       aria-label="额外用量"
     >
@@ -805,7 +805,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
             {!iconOnly && <span style={{ lineHeight: "20px", paddingBottom: 1 }}>工作空间</span>}
           </button>
           {workDirsOpen && (
-            <ContextBarPopover anchorRef={workDirsRef} panelRef={workDirsPanelRef} width={360} align="left" className="kimix-floating-panel z-40 rounded-xl" style={{ padding: "16px 18px 18px" }}>
+            <ContextBarPopover anchorRef={workDirsRef} panelRef={workDirsPanelRef} width={360} align="left" className="kimix-floating-panel z-40" style={{ padding: "16px 18px 18px" }}>
               <div className="grid items-center" style={{ columnGap: 16, gridTemplateColumns: "minmax(0, 1fr) auto" }}>
                 <div className="min-w-0 self-center">
                   <div className="text-[14px] font-semibold leading-5 text-[var(--kimix-panel-text)]">工作目录</div>
@@ -821,11 +821,11 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                   选择目录
                 </button>
               </div>
-              <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "12px 13px" }}>
+              <div className="kimix-inset-section" style={{ marginTop: 16, padding: "12px 13px" }}>
                 <div className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">主目录</div>
                 <div className="break-all text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>{project?.path ?? "未选择项目"}</div>
               </div>
-              <div className="rounded-xl bg-[var(--kimix-panel-bg)]" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
+              <div className="kimix-inset-section" style={{ marginTop: 14, padding: "12px 12px 12px" }}>
                 <div className="grid items-center" style={{ gap: 10, gridTemplateColumns: "minmax(0, 1fr) auto", marginBottom: 10 }}>
                   <span className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]">额外工作目录</span>
                   <span className="inline-flex items-center justify-center rounded-full bg-accent-primary-light text-[12px] leading-none text-accent-primary-dark" style={{ height: 20, minWidth: 20, paddingLeft: 8, paddingRight: 8 }}>{additionalWorkDirs.length}</span>
@@ -837,12 +837,12 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                 ) : (
                   <div className="flex flex-col" style={{ gap: 8 }}>
                     {additionalWorkDirs.map((dir, index) => (
-                      <div key={`${index}-${dir}`} className="grid items-center rounded-xl border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-bg)]" style={{ columnGap: 10, gridTemplateColumns: "minmax(0, 1fr) 32px", padding: "10px 10px 10px 12px" }}>
+                      <div key={`${index}-${dir}`} className="kimix-inset-section grid items-center" style={{ columnGap: 10, gridTemplateColumns: "minmax(0, 1fr) 32px", padding: "10px 10px 10px 12px" }}>
                         <div className="min-w-0 flex-1 break-all text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">{dir}</div>
                         <button
                           type="button"
                           onClick={() => removeAdditionalWorkDir(index)}
-                          className="kimix-muted-action flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg text-accent-danger"
+                          className="kimix-inline-icon-action is-roomy shrink-0 self-center text-accent-danger"
                           title="移除目录"
                           aria-label="移除目录"
                         >
@@ -876,7 +876,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               panelRef={usagePanelRef}
               width={330}
               align="left"
-              className="kimix-floating-panel z-40 rounded-xl"
+              className="kimix-floating-panel z-40"
               style={{
                 paddingLeft: 22,
                 paddingRight: 22,
@@ -910,7 +910,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               </div>
               {usageData?.totalQuota !== undefined && (
                 <div
-                  className="flex items-center justify-between border-t border-[var(--kimix-panel-border-soft)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]"
+                  className="kimix-menu-separator flex items-center justify-between text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]"
                   style={{ marginTop: 16, padding: "12px 2px 0" }}
                 >
                   <span>Kimi Code 总额度</span>
@@ -919,7 +919,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               )}
               {usageData?.extraUsage && <ExtraUsageSection usage={usageData.extraUsage} />}
               {usageData?.message && (
-                <div className="mt-5 rounded-lg bg-surface-base text-[12.5px] leading-relaxed text-[var(--kimix-panel-text-secondary)]" style={{ padding: "13px 12px" }}>
+                <div className="kimix-inset-section mt-5 text-[12.5px] leading-relaxed text-[var(--kimix-panel-text-secondary)]" style={{ padding: "13px 12px" }}>
                   {usageData.message}
                 </div>
               )}
@@ -963,7 +963,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
               align="right"
               role="menu"
               ariaLabel="选择会话模型"
-              className="kimix-floating-panel z-50 overflow-hidden rounded-xl"
+              className="kimix-floating-panel z-50 overflow-hidden"
               style={{ padding: 12 }}
             >
               <div className="grid items-center" style={{ columnGap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 4, paddingRight: 4 }}>
@@ -985,7 +985,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                     value={modelSearch}
                     onChange={(event) => setModelSearch(event.target.value)}
                     placeholder="搜索模型"
-                    className="h-9 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-[var(--kimix-panel-soft-bg)] text-[13px] text-[var(--kimix-panel-text)] outline-none transition-colors focus:border-[var(--border-strong)]"
+                    className="kimix-settings-input h-9 w-full text-[13px] outline-none"
                     style={{ paddingLeft: 34, paddingRight: 12 }}
                     autoFocus
                   />
@@ -1023,7 +1023,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                                 aria-checked={selected}
                                 disabled={isActiveRuntimeSessionRunning || Boolean(switchingModel) || activeSession?.isLoading}
                                 onClick={() => void handleSelectModel(option.id)}
-                                className="grid w-full items-center rounded-lg text-left text-[13px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                className="kimix-menu-item grid text-left text-[13px] text-[var(--kimix-panel-text-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{
                                   gridTemplateColumns: "minmax(0, 1fr) 22px",
                                   columnGap: 8,
@@ -1047,7 +1047,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                 )}
               </div>
 
-              <div className="border-t border-[var(--kimix-panel-border-soft)]" style={{ marginTop: 12, paddingTop: 10 }}>
+              <div className="kimix-menu-separator" style={{ marginTop: 12, paddingTop: 10 }}>
                 <button
                   type="button"
                   onClick={() => {

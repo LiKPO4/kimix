@@ -124,7 +124,7 @@ export function RoomAgentPicker({
               return (
                 <div
                   key={agent.id}
-                  className={`grid rounded-xl ${selectedRow ? "bg-[var(--kimix-panel-soft-bg)]" : "bg-transparent"}`}
+                  className="grid"
                   style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, padding: 8 }}
                 >
                   <button
@@ -138,7 +138,7 @@ export function RoomAgentPicker({
                         : [...selectedAgentIds, agent.id];
                       if (next.length > 0) onSelectionChange(next);
                     }}
-                    className="kimix-room-choice is-quiet grid min-w-0 rounded-lg text-left hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60"
+                    className="kimix-room-choice is-quiet grid min-w-0 rounded-lg text-left hover:bg-surface-elevated data-[selected=true]:bg-[var(--kimix-panel-soft-bg)] disabled:cursor-not-allowed disabled:opacity-60"
                     data-selected={selectedRow ? "true" : "false"}
                     style={{ gridTemplateColumns: "28px minmax(0, 1fr) 18px", gap: 9, minHeight: 48, paddingLeft: 8, paddingRight: 6 }}
                     title={agent.provisioningError || agent.recoveryIssue?.message || agent.lifecycleIssue?.message || `${selectedRow ? "取消" : "选择"} ${agent.displayName}`}
@@ -165,7 +165,7 @@ export function RoomAgentPicker({
                       type="button"
                       onClick={() => onEdit(agent.id)}
                       disabled={roomBusy || Boolean(busyAgentId)}
-                      className="kimix-inline-icon-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)] disabled:opacity-35"
+                      className="kimix-inline-icon-action kimix-room-secondary-action text-[var(--kimix-panel-text-muted)] disabled:opacity-35"
                       title="编辑名称和 @名称"
                       aria-label={`编辑 ${agent.displayName}`}
                     >
@@ -176,7 +176,7 @@ export function RoomAgentPicker({
                         type="button"
                         onClick={() => onRetry(agent.id)}
                         disabled={roomBusy || Boolean(busyAgentId)}
-                        className="kimix-inline-icon-action flex h-8 w-8 items-center justify-center rounded-lg text-accent-danger hover:bg-accent-danger/8 disabled:opacity-40"
+                        className="kimix-inline-icon-action kimix-room-secondary-action text-accent-danger disabled:opacity-40"
                         title={actionBusy ? "正在重试" : "重试创建 Agent"}
                         aria-label={`重试创建 ${agent.displayName}`}
                       >
@@ -188,7 +188,7 @@ export function RoomAgentPicker({
                         type="button"
                         onClick={() => onRemove(agent.id)}
                         disabled={roomBusy || Boolean(busyAgentId)}
-                        className="kimix-inline-icon-action flex h-8 w-8 items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] hover:bg-accent-danger/8 hover:text-accent-danger disabled:opacity-35"
+                        className="kimix-inline-icon-action kimix-room-secondary-action text-[var(--kimix-panel-text-muted)] disabled:opacity-35"
                         title="移出房间并保留为独立会话"
                         aria-label={`将 ${agent.displayName} 移出房间`}
                       >
@@ -202,7 +202,7 @@ export function RoomAgentPicker({
           </div>
 
           <div
-            className="grid rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
+            className="kimix-inset-section grid text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]"
             style={{ gridTemplateColumns: "16px minmax(0, 1fr)", gap: 10, marginTop: 14, padding: "10px 12px" }}
           >
             <AlertTriangle size={15} className="text-accent-warning" style={{ marginTop: 2 }} />

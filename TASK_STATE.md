@@ -1,5 +1,22 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 优化：二级菜单/浮层风格化覆盖补齐（v2.20.167）
+
+- 现场：用户截图反馈多个二级菜单/浮层（权限菜单 tooltip、套餐用量浮层、思考强度菜单、会话「…」菜单、顶部「文件」下拉、工作目录浮层）未跟随界面风格体系，要求全面排查所有二级菜单位置。
+- 方式：四路并行审计（对照 `knowledge/architecture/interface-style-system.md` 契约与 index.css 角色类）→ 六路并行修复（严格按文件归属分区）。审计确认：浮层外壳大多已 enroll，缺口集中在**浮层内部元素**。
+- 修复内容（19 个文件，+120/−95）：
+  1. 菜单项/选择项角色化：模型选择行、@/slash 补全条目、「+」附件菜单行、搜索结果行 → `kimix-menu-item`（选中态走 aria-checked/aria-selected）；停止/引导目标行 → `kimix-room-choice`；DiffPanel 排序项删硬编码选中色。
+  2. 选中/开关态通道统一：Swarm 切换、SearchOverlay scope 按钮 → `kimix-state-button` + aria-pressed；room 系列选中态改 data-selected/aria-pressed 通道（删 class 三元拼装）。
+  3. 字段控件统一：模型搜索框、重命名输入框、HooksPanel/McpPanel/LongTasksPanel 全部手写字段 → `kimix-settings-input`。
+  4. 对话框角色修正：重命名对话框、添加/编辑房间 Agent 对话框 `kimix-floating-panel` → `kimix-modal-card`；遮罩 `bg-black/30` → `--kimix-modal-overlay-bg`。
+  5. inset 分区与分隔线：目录分区卡、说明/错误块 → `kimix-inset-section`（额外目录行去边框，修「浮层内框套框」违规）；菜单分隔线统一 `kimix-menu-separator`。
+  6. CSS 契约补强（index.css）：`.kimix-menu-item` 新增 `:disabled`/`[aria-disabled]` 规则（此前 disabled 菜单项不变灰）；`.kimix-room-choice` 基类补默认 hover 底与 radius（修角色化后默认风格失去可点外观的回归）。
+  7. 杂项：`#2ddd19` 硬编码绿 → accent-success token；`bg-green-50/amber-50` Tailwind 色板 → accent token；`hover:bg-white/70` → surface-hover；外壳冗余 rounded/inline borderRadius 清理。
+- 验收：全量 1512 测试通过（ComposerToolbarPopover 测试断言随契约更新：radius 由角色类独占）、typecheck 通过、`pnpm build` 通过；四风格实机效果待用户截图验收。
+- 已知边界：子代理首次引入 Tailwind v4 `data-[selected=true]:`/`aria-pressed:` variant 作默认/Modern 选中态兜底（Retro/Nostalgia 由层外角色类压制接管），若截图发现默认风格选中态未生效需清缓存重验；「选择目录」实底主按钮保持不动（契约允许的主操作例外）；原生 select 弹出列表与系统 tooltip 是平台限制无法风格化。
+- 知识库：无需更新（契约文档已覆盖所有用到的角色类，未新增角色语义）。
+- 关键文件：`src/index.css`（disabled 规则 + room-choice 基类）、Composer/ContextBar/SessionToolbar/SearchOverlay 等 17 个组件文件。
+
 ## 2026-08-04 修复：通知点击跳转聚焦消息中部而非顶部（v2.20.166）
 
 - 现场：点击 Kimix Windows 通知跳转到对应消息时视口落在消息中部，用户要求与左侧刻度条点击一致（顶部）。

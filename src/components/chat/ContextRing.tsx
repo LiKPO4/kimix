@@ -235,7 +235,7 @@ export function ContextRing() {
               type="button"
               onClick={handleCompact}
               disabled={!canCompact}
-              className="shrink-0 rounded-md text-[13px] transition-colors disabled:cursor-not-allowed"
+              className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 text-[13px] disabled:cursor-not-allowed"
               style={{
                 padding: "2px 8px",
                 color: isCompacting || compactRequestPending ? "var(--accent-warning)" : compactStatus === "failed" ? "var(--accent-danger)" : canCompact || compactStatus === "success" ? "var(--accent-primary)" : "var(--text-muted)",
@@ -273,7 +273,7 @@ export function ContextRing() {
             {contextUsages.map((usage) => (
               <div
                 key={usage.agentId}
-                className="rounded-lg bg-surface-secondary"
+                className="kimix-inset-section"
                 style={{ padding: "10px 16px" }}
               >
                 <div
@@ -318,7 +318,7 @@ export function ContextRing() {
             )}
           </div>
           {sessionRecommendationEnabled && (
-            <div className="border-t border-border-subtle" style={{ marginTop: 16, paddingTop: 14 }}>
+            <div className="kimix-menu-separator" style={{ marginTop: 16, paddingTop: 14 }}>
               <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 7 }}>
                 <span className="text-[13px] text-text-muted">推荐会话长度：</span>
                 <span className={`kimix-tabular-nums shrink-0 text-[13px] ${recommendation.remainingTurns === 0 ? "text-accent-warning" : "text-text-secondary"}`}>

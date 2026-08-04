@@ -96,7 +96,7 @@ export function RoomContextPicker({
                   title={mode.title}
                   onClick={() => onChange({ mode: mode.value, selectedEntryIds: mode.value === "selected" ? selection.selectedEntryIds ?? [] : [] })}
                   aria-pressed={active}
-                  className={`kimix-room-choice rounded-xl border text-[12.5px] ${active ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)] text-[var(--kimix-panel-text)]" : "border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                  className="kimix-room-choice rounded-xl border text-[12.5px] border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] aria-pressed:border-[var(--kimix-panel-border)] aria-pressed:bg-[var(--kimix-panel-soft-bg)] aria-pressed:text-[var(--kimix-panel-text)]"
                   style={{ minHeight: 38, paddingLeft: 10, paddingRight: 10 }}
                 >
                   {mode.label}
@@ -124,7 +124,7 @@ export function RoomContextPicker({
                       type="button"
                       onClick={() => toggleEntry(entry.id)}
                       aria-pressed={selected}
-                      className={`kimix-room-choice grid w-full rounded-xl border text-left ${selected ? "border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]" : "border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className="kimix-room-choice grid w-full rounded-xl border text-left border-[var(--kimix-panel-border-soft)] hover:bg-[var(--kimix-panel-hover)] aria-pressed:border-[var(--kimix-panel-border)] aria-pressed:bg-[var(--kimix-panel-soft-bg)]"
                       style={{ gridTemplateColumns: "22px minmax(0, 1fr)", gap: 10, height: 76, minHeight: 76, maxHeight: 76, overflow: "hidden", padding: "10px 12px" }}
                     >
                       <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-md border ${selected ? "border-accent-primary bg-accent-primary text-white" : "border-[var(--kimix-panel-border)] text-transparent"}`}>
@@ -158,8 +158,8 @@ export function RoomContextPicker({
           )}
 
           <div
-            className={`rounded-xl text-[12px] leading-5 ${estimate.overLimitAgentNames.length > 0 || invalidSelection ? "text-accent-warning" : "text-[var(--kimix-panel-text-muted)]"}`}
-            style={{ marginTop: 14, padding: "10px 12px", background: "var(--kimix-panel-soft-bg)" }}
+            className={`kimix-inset-section text-[12px] leading-5 ${estimate.overLimitAgentNames.length > 0 || invalidSelection ? "text-accent-warning" : "text-[var(--kimix-panel-text-muted)]"}`}
+            style={{ marginTop: 14, padding: "10px 12px" }}
           >
             {invalidSelection
               ? "请选择至少一条正文；未选择时不会发送。"

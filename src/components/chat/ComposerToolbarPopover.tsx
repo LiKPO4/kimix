@@ -36,7 +36,6 @@ export function ComposerToolbarPopover({
         maxWidth: "calc(100vw - 40px)",
         marginBottom: COMPOSER_TOOLBAR_POPOVER_GAP,
         padding,
-        borderRadius: "var(--radius-lg)",
       }}
     >
       {children}

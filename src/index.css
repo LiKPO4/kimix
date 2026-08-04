@@ -2427,9 +2427,14 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-room-choice {
+  border-radius: var(--radius-lg);
   transition-property: background-color, border-color, color, box-shadow, scale;
   transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
   transition-timing-function: var(--ease-hover);
+}
+
+.kimix-room-choice:hover:not(:disabled) {
+  background-color: var(--surface-hover);
 }
 
 .kimix-room-choice:active:not(:disabled),
@@ -2576,6 +2581,18 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-menu-item:active:not(:disabled) {
   scale: 0.96;
+}
+
+.kimix-menu-item:disabled,
+.kimix-menu-item[aria-disabled="true"] {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.kimix-menu-item:disabled:hover,
+.kimix-menu-item[aria-disabled="true"]:hover {
+  background: transparent;
 }
 
 .kimix-menu-separator {

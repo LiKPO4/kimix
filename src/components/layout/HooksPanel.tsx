@@ -334,7 +334,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
     <div className="flex flex-col" style={{ gap: 14 }}>
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
         规则名称
-        <input value={rule.name} onChange={(event) => onPatch({ name: event.target.value })} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 11, paddingRight: 11 }} />
+        <input value={rule.name} onChange={(event) => onPatch({ name: event.target.value })} className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none" style={{ paddingLeft: 11, paddingRight: 11 }} />
       </label>
 
       <div className="grid grid-cols-2" style={{ gap: 12 }}>
@@ -347,13 +347,13 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
             } else {
               onPatch({ event: nextEvent });
             }
-          }} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
+          }} className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none" style={{ paddingLeft: 10, paddingRight: 10 }}>
             {hookEvents.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
         <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
           动作
-          <select value={rule.action} onChange={(event) => onPatch({ action: event.target.value as HookRule["action"] })} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
+          <select value={rule.action} onChange={(event) => onPatch({ action: event.target.value as HookRule["action"] })} className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none" style={{ paddingLeft: 10, paddingRight: 10 }}>
             {hookActions.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
@@ -361,12 +361,12 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
 
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
         匹配器
-        <textarea value={rule.matcher} onChange={(event) => onPatch({ matcher: event.target.value })} className="min-h-[82px] rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] leading-5 outline-none focus:border-[var(--accent-blue)]" style={{ padding: "10px 11px" }} />
+        <textarea value={rule.matcher} onChange={(event) => onPatch({ matcher: event.target.value })} className="kimix-settings-input min-h-[82px] rounded-lg text-[13px] leading-5 outline-none" style={{ padding: "10px 11px" }} />
       </label>
 
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
         命令 / Hook 脚本
-        <input value={rule.command ?? ""} onChange={(event) => onPatch({ command: event.target.value })} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 11, paddingRight: 11 }} placeholder="run_command 时执行，如 rtk pnpm build" />
+        <input value={rule.command ?? ""} onChange={(event) => onPatch({ command: event.target.value })} className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none" style={{ paddingLeft: 11, paddingRight: 11 }} placeholder="run_command 时执行，如 rtk pnpm build" />
       </label>
 
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
@@ -377,14 +377,14 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
           max={600}
           value={rule.timeout ?? 30}
           onChange={(event) => onPatch({ timeout: Math.max(1, Math.min(600, Number(event.target.value) || 30)) })}
-          className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary"
+          className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none"
           style={{ paddingLeft: 11, paddingRight: 11 }}
         />
       </label>
 
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
         阻断/通知说明
-        <textarea value={rule.reason ?? ""} onChange={(event) => onPatch({ reason: event.target.value })} className="min-h-[66px] rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] leading-5 outline-none focus:border-[var(--accent-blue)]" style={{ padding: "10px 11px" }} />
+        <textarea value={rule.reason ?? ""} onChange={(event) => onPatch({ reason: event.target.value })} className="kimix-settings-input min-h-[66px] rounded-lg text-[13px] leading-5 outline-none" style={{ padding: "10px 11px" }} />
       </label>
 
       <div className="grid grid-cols-2" style={{ gap: 12 }}>
@@ -394,7 +394,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
         </label>
         <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
           范围
-          <select value={rule.scope} onChange={scopeHandler} className="h-9 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] outline-none focus:border-accent-primary" style={{ paddingLeft: 10, paddingRight: 10 }}>
+          <select value={rule.scope} onChange={scopeHandler} className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none" style={{ paddingLeft: 10, paddingRight: 10 }}>
             <option value="global">全局</option>
             <option value="project" disabled={rule.event !== "UserPromptSubmit"}>当前项目</option>
           </select>
@@ -467,7 +467,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                   value={naturalLanguage}
                   onChange={(event) => setNaturalLanguage(event.target.value)}
                   disabled={generating}
-                  className="min-h-[126px] rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] leading-6 outline-none focus:border-[var(--accent-blue)]"
+                  className="kimix-settings-input min-h-[126px] rounded-lg text-[13px] leading-6 outline-none"
                   style={{ padding: "11px 12px" }}
                   placeholder="例如：如果 agent 要执行 git reset --hard 或删除目录，先拦截并说明风险。"
                 />
