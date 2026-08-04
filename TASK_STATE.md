@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：Web 侧新轮用户消息 Kimix 缺失 + 两轮回复合并 + 外部已回应审批永久待审批（v2.20.179）
+
+- 现场：用户全程在官方 Web 侧交互（session_c0197cc1-13ad-430e-b4db-d303e8d14aa0），Kimix 侧（截图 v2.20.178）：① Web 第二次发的用户消息不显示，两轮 agent 回复糅合到一轮；② Web 已回应的权限申请在 Kimix 仍待回复，底部常驻「待审批」。
+- 根因 1：官方 Server live WS 不广播其他客户端发起的新轮用户消息（TurnBegin 仅 snapshot 重放合成）；前轮尾帧 + 新轮头帧使静默低于 watchdog 阈值，既有静默探针抓不到 → 用户消息永久缺失、两轮合并。
+- 修复 1：`kimiCodeServerClient.ts` 轮末观察窗（live 主 agent `prompt.completed/aborted` 后 180s，每 4s 轮询官方历史），发现晚于轮末的用户消息即强制重连拿 snapshot 补用户边界；`eventMapper.mergeEvents` 对迟到的稳定用户边界（`user:*` id）按时间序插入而非追加尾部（id 去重；本地非稳定消息仍走追加路径，3 新用例）。
+- 根因 2：其他客户端回应审批后 Server 不广播 resolved 帧，只把条目从 `pending_approvals` 移除 → Kimix 审批卡永远「待审批」。
+- 修复 2：`kimiCodeHost.setStatus` 从 `waiting_approval` 迁出时回读 snapshot，对本地跟踪且已不在 pending 列表的审批发 `kimix.approval.resolved`（去向 running/completed 视为 approved，其余 rejected）；`App.tsx` 把会话与房间 agent 分区里对应 pending `approval_request` settle 掉。本地 respondApproval 先删 id 再改状态，不会自触发。
+- 验收：全量 1542 测试通过、typecheck 通过、`pnpm build` 通过；实机双端同步待用户验收（复验需确保 dev 为 v2.20.179 构建）。
+- 已知边界：观察窗仅在 live 主 agent 轮末帧后开启（启动时 idle 会话由既有启动对账覆盖）；探测误报代价为一次重连 + snapshot 补全（无害）；审批 settle 依赖状态迁出 waiting_approval 的帧，状态帧丢失时仍靠 snapshot 对账兜底。
+- 知识库：runtime-routing.md 新增不变量 90（跨客户端广播双缺口与本地补偿），log.md 已记。
+- 关键文件：`electron/kimiCodeServerClient.ts`（观察窗/探针/重连）、`electron/kimiCodeHost.ts:3626-3668`（审批 settle）、`src/App.tsx:2708-2727`（resolved settle）、`src/utils/eventMapper.ts:2585-2603`（乱序插入）。
+
 ## 2026-08-04 结论：权限双向同步链路 live 实测全部正常（v2.20.178 环境下）
 
 - 用户反馈「两个方向都不行」后做了一系列 live 实测（CDP 直连运行实例 + curl 带 server.token 直写官方 REST）：

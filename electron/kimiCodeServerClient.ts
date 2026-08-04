@@ -377,6 +377,11 @@ const WS_PROGRESS_PROBE_INTERVAL_MS = 3_000;
 // 90s 覆盖 llm 长考期间 thinking.delta 的正常推送间隔；误判代价仅为一次重连+快照补全（无害）。
 const WS_SILENCE_LIMIT_MS = 90_000;
 const WS_WATCHDOG_INTERVAL_MS = 2_000;
+// 轮末观察窗：live WS 不广播新轮用户消息（TurnBegin 仅 snapshot 重放合成），既有进度探针只在静默期触发，
+// 抓不到与前轮衔接的新轮（前轮尾帧/新轮头帧使静默低于阈值），用户消息会永久缺失、两轮回复合并。
+// 窗口内主动轮询官方历史，发现晚于轮末的用户消息即主动重连拿 snapshot 补用户边界。
+const POST_TERMINAL_EXTERNAL_PROMPT_WATCH_MS = 180_000;
+const POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS = 4_000;
 
 export function serverMessageProgressMarker(
   message: ServerMessageSummary | null | undefined,
@@ -924,6 +929,7 @@ export class KimiCodeServerClient {
   private readonly serverProgressMarkers = new Map<string, string | null>();
   private readonly lastSessionProgressAt = new Map<string, number>();
   private readonly pendingPrompts = new Map<string, { completionId: string; messageId: string }>();
+  private readonly postTerminalExternalWatch = new Map<string, { terminalAt: number; lastProbeAt: number }>();
 
   private armWsWatchdog() {
     if (this.watchdogTimer) return;
@@ -935,6 +941,7 @@ export class KimiCodeServerClient {
         this.forceWatchdogReconnect(`固定静默上限 silence=${Math.round(silenceMs / 1000)}s`);
         return;
       }
+      this.pollPostTerminalExternalPrompts();
       const silentSessions = [...this.subscribed].flatMap((sessionId) => {
         const sessionSilenceMs = Date.now() - (this.lastSessionProgressAt.get(sessionId) ?? this.lastMessageAt);
         const minimumSilenceMs = this.pendingPrompts.has(sessionId)
@@ -1035,6 +1042,46 @@ export class KimiCodeServerClient {
       sdiag(`[wsc] progress probe failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.watchdogProgressProbeInFlight = false;
+    }
+  }
+
+  private pollPostTerminalExternalPrompts(): void {
+    if (this.postTerminalExternalWatch.size === 0) return;
+    const now = Date.now();
+    for (const [sessionId, watch] of [...this.postTerminalExternalWatch]) {
+      if (!this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId)) {
+        this.postTerminalExternalWatch.delete(sessionId);
+        continue;
+      }
+      if (now - watch.terminalAt > POST_TERMINAL_EXTERNAL_PROMPT_WATCH_MS) {
+        this.postTerminalExternalWatch.delete(sessionId);
+        continue;
+      }
+      if (now - watch.lastProbeAt < POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS) continue;
+      watch.lastProbeAt = now;
+      void this.probeExternalUserPromptAfterTerminal(sessionId, watch.terminalAt);
+    }
+  }
+
+  private async probeExternalUserPromptAfterTerminal(sessionId: string, terminalAt: number): Promise<void> {
+    try {
+      const response = await this.listMessages(sessionId, 10);
+      const latestUser = [...response.items].reverse().find((item) => (
+        isRecord(item) && (item as Record<string, unknown>).role === "user"
+      ));
+      if (!latestUser) return;
+      const userAt = snapshotTimestampToEpochMs(snapshotMessageTimestamp(latestUser as Record<string, unknown>));
+      if (userAt === undefined || userAt <= terminalAt) return;
+      if (!this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId)) {
+        this.postTerminalExternalWatch.delete(sessionId);
+        return;
+      }
+      this.postTerminalExternalWatch.delete(sessionId);
+      this.forceWatchdogReconnect(
+        `官方新轮用户消息 sid=${sessionId.slice(-8)} silence=${Math.round((Date.now() - this.lastMessageAt) / 1000)}s`,
+      );
+    } catch {
+      // 探测失败不影响主链路；静默探针与渲染层对账仍兜底。
     }
   }
 
@@ -1336,6 +1383,7 @@ export class KimiCodeServerClient {
     this.serverProgressMarkers.delete(sessionId);
     this.lastSessionProgressAt.delete(sessionId);
     this.pendingPrompts.delete(sessionId);
+    this.postTerminalExternalWatch.delete(sessionId);
     if (!this.socket) return;
     await this.sendControl("unsubscribe", { session_ids: [sessionId] }).catch(() => undefined);
   }
@@ -1614,6 +1662,7 @@ export class KimiCodeServerClient {
     this.serverProgressMarkers.clear();
     this.lastSessionProgressAt.clear();
     this.pendingPrompts.clear();
+    this.postTerminalExternalWatch.clear();
     this.recoveringSnapshots.clear();
     for (const waiter of this.waiters) {
       clearTimeout(waiter.timer);
@@ -1918,6 +1967,18 @@ export class KimiCodeServerClient {
       if (!previous || frame.seq >= previous.seq) {
         this.cursors.set(frame.session_id, { seq: frame.seq, epoch: frame.epoch ?? previous?.epoch });
       }
+    }
+    if (frame.session_id && (frame.type === "prompt.completed" || frame.type === "prompt.aborted")) {
+      const terminalPayload = isRecord(frame.payload) ? frame.payload : {};
+      if (terminalPayload.recovered_from_snapshot !== true) {
+        const terminalAgentId = typeof terminalPayload.agentId === "string" ? terminalPayload.agentId : "";
+        if (terminalAgentId === "" || terminalAgentId === "main") {
+          this.postTerminalExternalWatch.set(frame.session_id, { terminalAt: Date.now(), lastProbeAt: 0 });
+        }
+      }
+    }
+    if (frame.type === "kimix.server.snapshot" && frame.session_id) {
+      this.postTerminalExternalWatch.delete(frame.session_id);
     }
     if (frame.type === "resync_required") {
       const sessionId = (frame.payload as { session_id?: unknown } | undefined)?.session_id;
@@ -2317,6 +2378,19 @@ function snapshotMessageIdentity(message: Record<string, unknown>, role: string)
 
 function snapshotMessageTimestamp(message: Record<string, unknown>): unknown {
   return message.created_at ?? message.createdAt ?? message.timestamp ?? message.time;
+}
+
+function snapshotTimestampToEpochMs(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value >= 1e12 ? Math.round(value) : Math.round(value * 1000);
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return parsed;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric >= 1e12 ? Math.round(numeric) : Math.round(numeric * 1000);
+  }
+  return undefined;
 }
 
 function snapshotReplayPayload(

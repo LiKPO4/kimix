@@ -2705,6 +2705,26 @@ function App() {
         syncCurrentSessionFromStore(uiSessionId);
       }
       if (shouldSkipKimiCodeSnapshotReplay(rawEvent, targetAgentSession?.events, runtimeActive)) return;
+      if (rawEvent?.type === "kimix.approval.resolved") {
+        const resolvedRequestId = typeof rawEvent.requestId === "string" ? rawEvent.requestId : "";
+        const resolvedStatus: "approved" | "rejected" = rawEvent.status === "rejected" ? "rejected" : "approved";
+        if (resolvedRequestId && targetSession) {
+          const settleApproval = (events: TimelineEvent[]) => events.map((event) => (
+            event.type === "approval_request" && event.requestId === resolvedRequestId && event.status === "pending"
+              ? { ...event, status: resolvedStatus }
+              : event
+          ));
+          let settledSession: Session = { ...targetSession, events: settleApproval(targetSession.events) };
+          if (settledSession.collaboration) {
+            for (const roomAgent of settledSession.collaboration.agents) {
+              settledSession = updateRoomAgentEvents(settledSession, roomAgent.id, settleApproval);
+            }
+          }
+          updateSession(uiSessionId, () => ({ ...settledSession, updatedAt: Date.now() }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
+        return;
+      }
       const mapped = rawEvent?.type === "kimix.approval.request"
         ? mapKimiCodeApprovalRequest({
             ...(rawEvent.request && typeof rawEvent.request === "object" && !Array.isArray(rawEvent.request) ? rawEvent.request as Record<string, unknown> : {}),

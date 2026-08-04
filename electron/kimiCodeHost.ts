@@ -3623,11 +3623,51 @@ function updateStatusFromEvent(sessionId: string, event: unknown, terminalScope:
   statusSequencer.handle(sessionId, event, terminalScope);
 }
 
+// 其他客户端（如官方 Web）回应审批后 Server 不广播 resolved 帧：只把条目从 pending_approvals
+// 移除并让会话状态离开 waiting_approval。不补这条链路，Kimix 的审批卡会永远「待审批」。
+// 状态迁移时回读 snapshot，对已不在 pending 列表的审批按去向发 settle 事件
+// （running/completed 视为 approved，其余视为 rejected）。本地 respondApproval 路径先删 id
+// 再改状态，不会误触发。
+async function settleExternallyResolvedServerApprovals(
+  sessionId: string,
+  nextStatus: KimiCodeEngineStatus,
+): Promise<void> {
+  const keys = [...serverApprovalIds].filter((key) => key.startsWith(`${sessionId}:`));
+  if (keys.length === 0) return;
+  let stillPending: Set<string> | null = null;
+  try {
+    const snapshot = await getServerClient().getSnapshot(sessionId);
+    stillPending = new Set(
+      (Array.isArray(snapshot.pending_approvals) ? snapshot.pending_approvals : [])
+        .map((approval) => (approval && typeof approval === "object"
+          ? (approval as Record<string, unknown>).approval_id
+          : undefined))
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    );
+  } catch {
+    stillPending = null;
+  }
+  const approvedLike = nextStatus === "running" || nextStatus === "completed";
+  for (const key of keys) {
+    const requestId = key.slice(sessionId.length + 1);
+    if (stillPending?.has(requestId)) continue;
+    serverApprovalIds.delete(key);
+    eventSink?.({
+      sessionId,
+      event: { type: "kimix.approval.resolved", requestId, status: approvedLike ? "approved" : "rejected" },
+    });
+  }
+}
+
 function setStatus(sessionId: string, status: KimiCodeEngineStatus) {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     if (serverManaged.status === status) return;
+    const previousStatus = serverManaged.status;
     serverManaged.status = status;
+    if (previousStatus === "waiting_approval") {
+      void settleExternallyResolvedServerApprovals(sessionId, status);
+    }
     emitStatus(sessionId, status);
     return;
   }

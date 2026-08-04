@@ -3896,3 +3896,39 @@ describe("tool_result wire failure flag", () => {
     expect(toolCall.result).toBe("Failed to grep: rg: no such file (os error 2)");
   });
 });
+
+describe("mergeEvents late stable user boundary", () => {
+  it("inserts a late stable user boundary before newer events", () => {
+    let events: TimelineEvent[] = [];
+    events = mergeEvents(events, { id: "user:m1", type: "user_message", timestamp: 1_000, content: "第一轮" });
+    events = mergeEvents(events, { id: "a1", type: "assistant_message", timestamp: 2_000, content: "第一轮回复", isThinking: false, isComplete: true });
+    events = mergeEvents(events, { id: "a2", type: "assistant_message", timestamp: 4_000, content: "第二轮草稿", isThinking: false, isComplete: false });
+    events = mergeEvents(events, { id: "user:m2", type: "user_message", timestamp: 3_000, content: "第二轮" });
+
+    expect(events.map((event) => event.id)).toEqual(["user:m1", "a1", "user:m2", "a2"]);
+  });
+
+  it("does not remount a duplicate stable user boundary", () => {
+    let events: TimelineEvent[] = [];
+    events = mergeEvents(events, { id: "user:m1", type: "user_message", timestamp: 1_000, content: "第一轮" });
+    events = mergeEvents(events, { id: "a1", type: "assistant_message", timestamp: 2_000, content: "第一轮回复", isThinking: false, isComplete: true });
+    events = mergeEvents(events, { id: "a2", type: "assistant_message", timestamp: 4_000, content: "第二轮草稿", isThinking: false, isComplete: false });
+    const withBoundary = mergeEvents(events, { id: "user:m2", type: "user_message", timestamp: 3_000, content: "第二轮" });
+    const again = mergeEvents(withBoundary, { id: "user:m2", type: "user_message", timestamp: 3_000, content: "第二轮" });
+
+    expect(again).toHaveLength(withBoundary.length);
+    expect(again.map((event) => event.id)).toEqual(withBoundary.map((event) => event.id));
+  });
+
+  it("leaves local non-stable user messages on the original append path", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user:m1", type: "user_message", timestamp: 1_000, content: "第一轮" },
+      { id: "a1", type: "assistant_message", timestamp: 2_000, content: "第一轮回复", isThinking: false, isComplete: true },
+    ];
+    const incoming: TimelineEvent = { id: "kimi-code-event-x", type: "user_message", timestamp: 1_500, content: "本地消息" };
+
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(3);
+    expect(result[result.length - 1].id).toBe("kimi-code-event-x");
+  });
+});

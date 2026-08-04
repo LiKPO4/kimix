@@ -2582,6 +2582,25 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
     return appendAroundTrailingSteer(result, [ownedIncoming]);
   }
 
+  // 迟到的外部用户边界（稳定 snapshot id）必须按官方时间序插入：重连 snapshot 补用户消息
+  // 若晚于新轮流式帧到达，直接追加尾部会让新轮回复归属到上一轮。
+  if (
+    incoming.type === "user_message" &&
+    typeof incoming.id === "string" &&
+    incoming.id.startsWith("user:")
+  ) {
+    if (existing.some((event) => event.id === incoming.id)) return existing;
+    const lastEvent = existing[existing.length - 1];
+    if (lastEvent && lastEvent.timestamp > incoming.timestamp) {
+      const insertionIndex = existing.findIndex((event) => event.timestamp > incoming.timestamp);
+      if (insertionIndex !== -1) {
+        const result = [...existing];
+        result.splice(insertionIndex, 0, incoming);
+        return result;
+      }
+    }
+  }
+
   return appendAroundTrailingSteer(existing, [incoming]);
 }
 
