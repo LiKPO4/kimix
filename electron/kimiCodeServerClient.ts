@@ -909,6 +909,7 @@ export class KimiCodeServerClient {
   private readonly recoveringSnapshots = new Map<string, Promise<void>>();
   private readonly promptCompletionBarriers = new Map<string, Promise<void>>();
   private readonly queued: ServerFrame[] = [];
+  private lastOverflowLogAt = 0;
   private readonly waiters = new Set<{
     match: (frame: ServerFrame) => boolean;
     resolve: (frame: ServerFrame) => void;
@@ -2030,7 +2031,9 @@ export class KimiCodeServerClient {
     }
     this.queued.push(frame);
     if (this.queued.length > 2_000) {
-      const dropped = this.queued.length - 2_000;
+      // 滞回：一次修剪到 1200，避免每帧溢出各做 O(n) 扫描；无 waiter 长轮期间
+      // 队列纯为竞态兜底，高频修剪 + 每帧同步 console.warn 是主进程 CPU 黑洞。
+      const dropped = this.queued.length - 1_200;
       // 保护终止帧：溢出时跳过终止帧只删普通帧（swarm 子代理高频 tool 帧会
       // 把完成帧挤出队列，导致 waitForSessionEvent 匹配不到而挂到 180s 超时）；
       // 队列里全是终止帧的极端场景才按原逻辑兜底截断，保证上限。
@@ -2044,7 +2047,11 @@ export class KimiCodeServerClient {
         removed += 1;
       }
       if (removed < dropped) this.queued.splice(0, dropped - removed);
-      console.warn(`[KimiCodeServerClient] frame queue overflow: dropped ${dropped} oldest frames (protected ${removed} terminal frame(s))`);
+      const now = Date.now();
+      if (now - this.lastOverflowLogAt > 5_000) {
+        this.lastOverflowLogAt = now;
+        console.warn(`[KimiCodeServerClient] frame queue overflow: trimmed ${removed} oldest frames (protected terminal frames)`);
+      }
     }
   }
 
