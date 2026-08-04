@@ -767,7 +767,6 @@ async function reconcileGitFallbackChanges(options: {
   const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
   const plan = planGitFallbackChanges(
     getRoomAgentEvents(session, ownerAgentId),
-    eventStartIndex,
     numstat,
   );
   if (!plan) return;

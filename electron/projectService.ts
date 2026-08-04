@@ -468,15 +468,22 @@ export type GitNumstatEntry = {
 };
 
 
-/** 解析 `git diff --numstat` 输出；二进制文件的 `-\t-` 占位解析为 0。 */
+/**
+ * 解析 `git diff --numstat` 输出（配合 -c core.quotePath=false 调用，路径不转义）。
+ * 二进制文件的 `-\t-` 占位无行数可统计，直接跳过（避免产生 0/0 空变更卡条目）；
+ * rename 行的 `old => new` 只取新路径（防御性，--no-renames 下已不出现）。
+ */
 export function parseGitNumstat(stdout: string): GitNumstatEntry[] {
   const entries: GitNumstatEntry[] = [];
   for (const rawLine of stdout.split(/\r?\n/)) {
     const line = rawLine.trimEnd();
     if (!line) continue;
     const parts = line.split("\t");
-    const file = parts.slice(2).join("\t");
-    if (!file) continue;
+    if (parts.length < 3) continue;
+    if (parts[0] === "-" || parts[1] === "-") continue;
+    let file = parts.slice(2).join("\t");
+    const renameArrow = file.lastIndexOf(" => ");
+    if (renameArrow >= 0) file = file.slice(renameArrow + 4);
     const added = Number.parseInt(parts[0] ?? "", 10);
     const removed = Number.parseInt(parts[1] ?? "", 10);
     entries.push({
@@ -495,18 +502,30 @@ export function parseGitNumstat(stdout: string): GitNumstatEntry[] {
 export async function getGitNumstat(projectPath: string): Promise<GitNumstatEntry[]> {
   const entries: GitNumstatEntry[] = [];
   try {
-    const { stdout } = await execFileAsync("git", ["diff", "--numstat"], {
+    // -c core.quotePath=false：中文/非 ASCII 路径直接输出不转义；--no-renames：重命名
+    // 拆为删除+新增两行；staged/unstaged 同路径按行数合并，避免部分暂存双计。
+    const numstatArgs = ["-c", "core.quotePath=false", "diff", "--no-renames", "--numstat"];
+    const { stdout } = await execFileAsync("git", numstatArgs, {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
     });
-    entries.push(...parseGitNumstat(stdout));
-    const { stdout: cachedStdout } = await execFileAsync("git", ["diff", "--cached", "--numstat"], {
+    const { stdout: cachedStdout } = await execFileAsync("git", [...numstatArgs, "--cached"], {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
     });
-    entries.push(...parseGitNumstat(cachedStdout));
+    const merged = new Map<string, GitNumstatEntry>();
+    for (const entry of [...parseGitNumstat(stdout), ...parseGitNumstat(cachedStdout)]) {
+      const existing = merged.get(entry.path);
+      if (existing) {
+        existing.added += entry.added;
+        existing.removed += entry.removed;
+      } else {
+        merged.set(entry.path, { ...entry });
+      }
+    }
+    entries.push(...merged.values());
   } catch {
     // 非 git 仓库或命令失败：返回空数组。
   }

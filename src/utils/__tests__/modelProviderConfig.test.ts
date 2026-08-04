@@ -24,6 +24,31 @@ describe("matchCatalogModel", () => {
     expect(matchCatalogModel(catalog, "")).toBeUndefined();
     expect(matchCatalogModel(catalog, "   ")).toBeUndefined();
   });
+
+  it("falls back to bare-id match after stripping the provider prefix", () => {
+    const prefixed = [
+      { id: "openai/gpt-5.1", maxContextSize: 400_000, supportEfforts: ["high"] },
+      { id: "anthropic/claude-sonnet-4-6", maxContextSize: 200_000, supportEfforts: ["max"] },
+    ];
+    expect(matchCatalogModel(prefixed, "gpt-5.1")?.id).toBe("openai/gpt-5.1");
+    expect(matchCatalogModel(prefixed, "claude-sonnet-4-6")?.id).toBe("anthropic/claude-sonnet-4-6");
+  });
+
+  it("does not fall back when multiple providers share the same bare id", () => {
+    const prefixed = [
+      { id: "openai/gpt-5.1", maxContextSize: 400_000 },
+      { id: "fireworks/gpt-5.1", maxContextSize: 128_000 },
+    ];
+    expect(matchCatalogModel(prefixed, "gpt-5.1")).toBeUndefined();
+  });
+
+  it("exact match still wins over prefix fallback", () => {
+    const catalogWithBoth = [
+      { id: "gpt-5.1", maxContextSize: 100_000 },
+      { id: "openai/gpt-5.1", maxContextSize: 400_000 },
+    ];
+    expect(matchCatalogModel(catalogWithBoth, "gpt-5.1")?.id).toBe("gpt-5.1");
+  });
 });
 
 describe("prefillFromCatalog", () => {

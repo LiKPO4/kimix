@@ -1052,6 +1052,26 @@ export class KimiCodeServerClient {
     this.postTerminalExternalWatch.set(sessionId, { terminalAt, lastProbeAt: 0 });
   }
 
+  // live 轮末帧路径的基线校准：探针把官方时间戳的 userAt 与本地时间的 terminalAt 直接比较，
+  // 两端时钟偏差会漏检（本地钟偏快时轮末后的新消息被误判为旧消息）。取「时间戳最大的一条」
+  // 作为官方基线（与列表顺序无关），校准后探针为纯顺序比较；失败保持本地时间基线（等效旧行为）。
+  private async calibrateLivePostTerminalWatchToOfficialTime(sessionId: string): Promise<void> {
+    try {
+      const response = await this.listMessages(sessionId, 10);
+      let latestAt: number | undefined;
+      for (const item of response.items) {
+        if (!isRecord(item)) continue;
+        const at = snapshotTimestampToEpochMs(snapshotMessageTimestamp(item));
+        if (at !== undefined && (latestAt === undefined || at > latestAt)) latestAt = at;
+      }
+      if (latestAt === undefined) return;
+      const watch = this.postTerminalExternalWatch.get(sessionId);
+      if (watch) watch.terminalAt = latestAt;
+    } catch {
+      // 保持本地时间基线（等效旧行为）。
+    }
+  }
+
   private pollPostTerminalExternalPrompts(): void {
     if (this.postTerminalExternalWatch.size === 0) return;
     const now = Date.now();
@@ -1977,6 +1997,7 @@ export class KimiCodeServerClient {
         const terminalAgentId = typeof terminalPayload.agentId === "string" ? terminalPayload.agentId : "";
         if (terminalAgentId === "" || terminalAgentId === "main") {
           this.armPostTerminalExternalWatch(frame.session_id, Date.now());
+          void this.calibrateLivePostTerminalWatchToOfficialTime(frame.session_id);
         }
       }
     }

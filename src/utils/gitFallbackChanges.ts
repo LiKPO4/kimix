@@ -21,12 +21,14 @@ export function normalizeGitPath(filePath: string): string {
 }
 
 /**
- * 收集 eventStartIndex 之后已由 change_summary / diff 事件记录过的文件路径。
- * 用于轮次完成时把 git 变更里「未出现过的」文件补齐到文件变更卡。
+ * 收集事件里所有已由 change_summary / diff 事件记录过的文件路径（全量历史，跨轮去重）。
+ * git numstat 是相对 HEAD 的累计快照：同一未提交文件在后续轮次会继续出现在 numstat，
+ * 若去重窗口只切本轮，该文件会跨轮重复进变更卡。按路径做全量去重后，一个文件在
+ * 未提交窗口内只出现一次变更卡（代价：连续两轮 Bash 改同一未提交文件时第二轮不重复显示）。
  */
-export function collectRecordedChangePaths(events: TimelineEvent[], eventStartIndex: number): Set<string> {
+export function collectRecordedChangePaths(events: TimelineEvent[]): Set<string> {
   const paths = new Set<string>();
-  for (const event of events.slice(eventStartIndex)) {
+  for (const event of events) {
     if (event.type === "change_summary") {
       for (const file of event.files) paths.add(normalizeGitPath(file.path));
     } else if (event.type === "diff") {
@@ -42,10 +44,9 @@ export function collectRecordedChangePaths(events: TimelineEvent[], eventStartIn
  */
 export function planGitFallbackChanges(
   events: TimelineEvent[],
-  eventStartIndex: number,
   numstat: GitNumstatEntryLike[],
 ): GitFallbackPlan | null {
-  const recorded = collectRecordedChangePaths(events, eventStartIndex);
+  const recorded = collectRecordedChangePaths(events);
   const files: GitFallbackPlan["files"] = [];
   let additions = 0;
   let deletions = 0;

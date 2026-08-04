@@ -2634,6 +2634,7 @@ const CATALOG_EFFORT_TO_KIMIX: Readonly<Record<string, string>> = {
   medium: "medium",
   high: "high",
   xhigh: "max",
+  max: "max",
   minimal: "minimal",
 };
 
@@ -3645,7 +3646,10 @@ async function settleExternallyResolvedServerApprovals(
         .filter((id): id is string => typeof id === "string" && id.length > 0),
     );
   } catch {
-    stillPending = null;
+    // 快照读取失败时保守跳过 settle：无法确认哪些审批已从 pending 移除，
+    // 误 settle（把仍在等待的审批报成已批准）比多留一会儿更糟；
+    // 后续 snapshot 恢复/重连会对 pending_approvals 重新对账。
+    return;
   }
   const approvedLike = nextStatus === "running" || nextStatus === "completed";
   for (const key of keys) {

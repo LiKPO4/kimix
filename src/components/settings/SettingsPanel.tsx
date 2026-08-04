@@ -1161,8 +1161,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", icon: GitBranch, tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。谨慎使用。" },
     { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
   ];
+  // 设置面板路径：有 runtime 时权限调整「立即写 server」（写后回读校准），
+  // 不同于 Composer 路径轮中 toast 拒绝 + pending 等 turn.ended 的绑定语义——
+  // 面板是显式全局配置意图，即时生效是设计选择，不视为对不变量 8 的违背。
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     // 全局默认总是本地写：这是新会话默认偏好，与当前会话权限解耦
+    const globalBefore = useAppStore.getState().permissionMode;
     setPermissionMode(mode);
     const appState = useAppStore.getState();
     const current = appState.currentSession;
@@ -1210,7 +1214,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         }));
         return;
       }
-      setPermissionMode(previousMode);
+      setPermissionMode(globalBefore);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `权限切换失败：${res.error}`,
       }));

@@ -605,9 +605,13 @@ describe("KimiCodeServerClient protocol adapters", () => {
     });
     await expect(dispatched).resolves.toEqual({ prompt_id: promptId });
     expect(subscribe).toHaveBeenCalledWith("session-1");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/v1/sessions/session-1/prompts");
-    expect(fetchMock.mock.calls[1]?.[0]).toContain("/messages?page_size=20");
+    // prompt 前静默探针 /messages + 轮末观察窗基线校准 /messages + /prompts，共 3 次 REST；
+    // 校准请求与 prompt 流程并发，按内容统计而非调用顺序。
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const callUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(callUrls.filter((url) => url.includes("/prompts")).length).toBe(1);
+    expect(callUrls.filter((url) => url.includes("/messages?page_size=20")).length).toBe(1);
+    expect(callUrls.filter((url) => url.includes("/messages?page_size=10")).length).toBe(1);
     expect(warn).toHaveBeenCalledWith("[KimiCodeServerClient] prompt 前建立会话订阅失败，继续发送（首波增量可经快照兜底）:", failure);
     warn.mockRestore();
   });
@@ -911,7 +915,8 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
     const assistantIndex = observed.findIndex((current) => current.type === "content.part");
     const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
-    expect(requestCount).toBe(2);
+    // Baseline calibration (/messages) races with the barrier read: 2 or 3 both valid.
+    expect(requestCount).toBeGreaterThanOrEqual(2);
     expect(assistantIndex).toBeGreaterThanOrEqual(0);
     expect(assistantIndex).toBeLessThan(completionIndex);
     await client.close();
@@ -948,6 +953,13 @@ describe("KimiCodeServerClient protocol adapters", () => {
 
   it("recovers a stable failure assistant before delivering a failed prompt completion", async () => {
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/messages?")) {
+        // Baseline calibration request for the post-terminal watch; empty items.
+        return new Response(JSON.stringify({ code: 0, data: { items: [], has_more: false } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       expect(url).toBe("http://127.0.0.1:58627/api/v1/sessions/session-1/snapshot");
       return new Response(JSON.stringify({
         code: 0,
@@ -986,8 +998,9 @@ describe("KimiCodeServerClient protocol adapters", () => {
     await vi.waitFor(() => expect(observed.some((current) => current.type === "prompt.completed")).toBe(true));
     const snapshotIndex = observed.findIndex((current) => current.type === "kimix.server.snapshot");
     const completionIndex = observed.findIndex((current) => current.type === "prompt.completed");
-    // recoverSnapshot + getSnapshot both hit the snapshot endpoint.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // recoverSnapshot + getSnapshot hit the snapshot endpoint; the /messages
+    // baseline calibration adds one more call.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(snapshotIndex).toBeGreaterThanOrEqual(0);
     expect(snapshotIndex).toBeLessThan(completionIndex);
     await client.close();

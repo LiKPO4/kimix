@@ -700,7 +700,7 @@ export function SessionToolbar({
             placeholder="输入新的对话标题"
           />
           {renameError && (
-            <div className="kimix-inset-section text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px" }}>
+            <div className="kimix-inset-section text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px", backgroundColor: "var(--accent-danger-light)" }}>
               {renameError}
             </div>
           )}

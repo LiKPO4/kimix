@@ -72,14 +72,25 @@ export type CatalogModelLike = {
   supportEfforts?: string[];
 };
 
-/** 大小写不敏感精确匹配目录模型条目；不命中不猜（不做模糊匹配）。 */
+/**
+ * 目录模型条目匹配：先大小写不敏感精确匹配；不中时回退「剥离 catalog id 的 provider
+ * 前缀后裸 id 精确匹配」（models.dev 部分条目带前缀如 openai/gpt-5.1，探测接口返回裸
+ * id 如 gpt-5.1）。前缀回退仅在唯一命中时采用，避免多个 provider 同裸 id 时误取。
+ */
 export function matchCatalogModel(
   catalog: readonly CatalogModelLike[],
   modelId: string,
 ): CatalogModelLike | undefined {
   const normalized = modelId.trim().toLowerCase();
   if (!normalized) return undefined;
-  return catalog.find((model) => model.id.trim().toLowerCase() === normalized);
+  const exact = catalog.find((model) => model.id.trim().toLowerCase() === normalized);
+  if (exact) return exact;
+  const bareMatches = catalog.filter((model) => {
+    const id = model.id.trim().toLowerCase();
+    const slash = id.indexOf("/");
+    return slash > 0 && id.slice(slash + 1) === normalized;
+  });
+  return bareMatches.length === 1 ? bareMatches[0] : undefined;
 }
 
 export type CatalogPrefillMode = "select" | "type";

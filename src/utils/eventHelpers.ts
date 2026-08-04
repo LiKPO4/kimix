@@ -562,12 +562,16 @@ export function repairStableAssistantOrder(events: TimelineEvent[]): TimelineEve
  * idle 会话（web 端已回答 / 提问已过期）的历史里残留的 question_request 没有
  * 「已解决」标记可覆盖。当会话当前并不在等待提问时，把历史中的 pending 澄清
  * 视为已解决（answered），避免显示成未回答的卡片。
+ *
+ * 仅当明确不在等待提问（isWaitingQuestion === false）时才 settle；状态未知
+ * （undefined，如 getStatus 失败）时保守保留 pending，避免把真实等待中的
+ * 提问误标成已解决导致用户无法回答。
  */
 export function settleHistoricalQuestions(
   events: TimelineEvent[],
   options: { isWaitingQuestion?: boolean } = {},
 ): TimelineEvent[] {
-  if (options.isWaitingQuestion) return events;
+  if (options.isWaitingQuestion !== false) return events;
   let changed = false;
   const settled = events.map((event) => {
     if (event.type !== "question_request" || event.status !== "pending") return event;

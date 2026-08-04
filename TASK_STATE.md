@@ -1,4 +1,22 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：08-03~08-04 改动复查清单（8 项修复 + 2 项澄清）（v2.20.186）
+
+- 背景：6 子代理并行 review 08-03 起 30 提交；经逐条复核修正严重级（无高危，多数低概率/展示层）；用户先修 select 档位粘住（v2.20.185），本轮修复其余项。
+- 修复：
+  1. #5 CATALOG_EFFORT_TO_KIMIX 补 `max: "max"`——实测 models.dev 588 条带 max、253 条 max-without-xhigh（kimi-k3/glm-5.2）预填丢 max 档；
+  2. #11 SessionToolbar renameError 补 `backgroundColor: var(--accent-danger-light)`（与 AddRoomAgentDialog 对齐）；
+  3. #3 settleExternallyResolvedServerApprovals 快照读取失败时保守跳过 settle（原仍全部按去向误报 approved/rejected）；
+  4. #4 settleHistoricalQuestions 仅明确 `isWaitingQuestion === false` 才 settle——getStatus 失败（undefined）时保守保留 pending，避免真实等待中的提问被误标已解决；
+  5. #1 live 轮末观察窗 arm 后异步校准 terminalAt 到官方最新消息时间戳（取时间戳最大一条，与顺序无关）——消除探针跨时钟域比较（本地钟偏快时漏检两轮合并）；
+  6. #6 matchCatalogModel 加「剥离 provider 前缀后裸 id」回退匹配（仅唯一命中），修复 models.dev 带前缀 id（48%）对 OpenAI/Anthropic/Google 探测预填静默失效；
+  7. #2 git numstat：`-c core.quotePath=false`（中文路径不转义）+ `--no-renames`（rename 拆删除/新增）+ 二进制 `-` 行过滤 + staged/unstaged 同路径合并（原 4 缺陷：乱码/重复/空卡/双计）；
+  8. #8 SettingsPanel 权限写失败回滚改回点击前全局默认（`globalBefore`），不再用会话值污染全局默认。
+- 变更：
+  9. #12 变更卡跨轮重复：collectRecordedChangePaths 改全量历史去重（git numstat 是相对 HEAD 累计快照，同一未提交文件跨轮不重复显示）；取舍：连续两轮 Bash 改同一未提交文件时第二轮不重复显示；
+  10. #9 设置面板轮中即时写 vs Composer pending 属设计差异，加注释澄清不改逻辑。
+- 验收：全量测试通过（新增 #4 1 用例、#6 3 用例、#12 1 用例，共 5 新用例；#2/#5 经一次性实测脚本验证 5+5 场景后删除）；typecheck 通过；`pnpm build` 通过。
+- 已知边界：#2 中文路径反转义依赖 core.quotePath=false（git 版本均支持）；#12 全量去重对「连续两轮 Bash 改同一未提交文件」第二轮不显示；#1 校准失败回落本地时间基线（等效旧行为）。
+- 关键文件：`electron/kimiCodeHost.ts:2634,3646`、`electron/kimiCodeServerClient.ts:1055-1074,1999`、`electron/projectService.ts:471-530`、`src/components/settings/SettingsPanel.tsx:1166,1214`、`src/components/layout/SessionToolbar.tsx:703`、`src/utils/eventHelpers.ts:566-578`、`src/utils/modelProviderConfig.ts:76-95`、`src/utils/gitFallbackChanges.ts`、`src/App.tsx:768-772`。
 
 ## 2026-08-04 修复：select 切换模型档位不跟随（Context 跟、档位留旧）（v2.20.185）
 

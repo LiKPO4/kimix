@@ -573,4 +573,19 @@ describe("repairStableAssistantOrder", () => {
     }];
     expect(settleHistoricalQuestions(events)).toBe(events);
   });
+
+  it("keeps pending questions when the waiting status is unknown (getStatus failed)", () => {
+    const events: TimelineEvent[] = [{
+      id: "q1",
+      type: "question_request",
+      timestamp: 100,
+      requestId: "req-1",
+      rpcRequestId: "req-1",
+      toolCallId: "tool-1",
+      questions: [{ id: "qq-1", question: "继续？", options: [] }],
+      status: "pending",
+    }];
+    const result = settleHistoricalQuestions(events, { isWaitingQuestion: undefined });
+    expect(result[0]).toMatchObject({ status: "pending" });
+  });
 });
