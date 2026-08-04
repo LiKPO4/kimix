@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：外部新轮首段丢失（等待首事件 30+s 后同步仍缺思考/首段正文）（v2.20.183）
+
+- 现场：v2.20.182 实机双端对比。Web 侧发新轮后 Kimix 长时间「等待首个模型事件 33秒」，开始同步后直接是工具调用，缺 Web 可见的思考与首段正文（「读代码先。你好霖江路！合理质疑…」）。
+- 取证（diag [wsc]/[wssnap]/[live] 闭环）：① 07:52:41 外部轮开始，旧订阅只收到 status 帧，**无任何 thinking/body 帧**（server 不向轮前建立的订阅推送新轮早期帧）；② 07:52:45 181 探针命中后 forceWatchdogReconnect，snapshot inFlight=1 但**首段尚未提交**，as_of_seq=1284 续订把 1280-1284 的早期帧永久丢掉（重连后 thinking.delta 从 offset=34 恢复）；③ 轮中 canonical 对账被单调性闸门拒绝（本地 live thinking 更富），首段只能等轮末对账——用户看到的就是「首段不对」。
+- 修复：探针命中不再断连接，改 `recoverSnapshot(sessionId, { backdateResubCursor: true })`——同连接以**轮前 cursor** 重订阅，server 回放新轮早到的 thinking/body 帧；snapshot 同时补用户边界。早到帧在边界挂载后按 live 流挂载到新轮，首段如始终在线般流式出现。
+- 验收：typecheck/全量测试/build/knowledge 结果待出；实机待用户验收（Web 发新轮后 Kimix 应数秒内出用户边界+思考+首段正文，与 Web 同步）。
+- 已知边界：回溯重订阅会重放少量已处理帧（渲染层按 id/offset 去重，幂等）；server 若不认回溯 cursor 会 resync_required，既有 recoverSnapshot 兜底。
+- 知识库：runtime-routing.md 不变量 90(a) 探针语义重写，log.md 已记。
+- 关键文件：`electron/kimiCodeServerClient.ts`（recoverSnapshot backdate 参数 + 探针改同连接重订阅）。
+
 ## 2026-08-04 修复：轮末信息卡混入后台任务通知文案（v2.20.182）
 
 - 现场：v2.20.181 实机，轮末用法信息卡显示「后台任务已完成: 后台跑全量测试确认基线 输入: 100.67k 输出: 2.37k Context: 100.67k」——通知文案不该出现在度量卡里。

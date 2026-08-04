@@ -379,7 +379,7 @@ const WS_SILENCE_LIMIT_MS = 90_000;
 const WS_WATCHDOG_INTERVAL_MS = 2_000;
 // 轮末观察窗：live WS 不广播新轮用户消息（TurnBegin 仅 snapshot 重放合成），既有进度探针只在静默期触发，
 // 抓不到与前轮衔接的新轮（前轮尾帧/新轮头帧使静默低于阈值），用户消息会永久缺失、两轮回复合并。
-// 主动轮询官方历史，发现晚于轮末的用户消息即主动重连拿 snapshot 补用户边界。挂载点二：live 主 agent 轮末帧、
+// 主动轮询官方历史，发现晚于轮末的用户消息即以轮前 cursor 同连接重订阅（server 回放新轮早到帧）+ snapshot 补用户边界，
 // snapshot 恢复后（含进程重启/重连对账，无 in_flight_turn 时）；观察不设过期，仅在 unsubscribe/pending 时清除，
 // 覆盖重启后未观测到轮末帧的场景。terminalAt 取 snapshot 最新消息时间戳（与官方用户消息同源时钟，避免跨钟偏斜）。
 const POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS = 4_000;
@@ -1081,9 +1081,8 @@ export class KimiCodeServerClient {
         return;
       }
       this.postTerminalExternalWatch.delete(sessionId);
-      this.forceWatchdogReconnect(
-        `官方新轮用户消息 sid=${sessionId.slice(-8)} silence=${Math.round((Date.now() - this.lastMessageAt) / 1000)}s`,
-      );
+      sdiag(`[wsc] 外部新轮用户消息 sid=${sessionId.slice(-8)} → 同连接轮前 cursor 重订阅补首段`);
+      void this.recoverSnapshot(sessionId, { backdateResubCursor: true }).catch(() => undefined);
     } catch {
       // 探测失败不影响主链路；静默探针与渲染层对账仍兜底。
     }
@@ -2071,12 +2070,13 @@ export class KimiCodeServerClient {
     for (const sessionId of payload?.resync_required ?? []) await this.recoverSnapshot(sessionId);
   }
 
-  private async recoverSnapshot(sessionId: string) {
+  private async recoverSnapshot(sessionId: string, options?: { backdateResubCursor?: boolean }) {
     if (!this.subscribed.has(sessionId)) {
       throw new Error(`Kimi Server snapshot 恢复失败：会话 ${sessionId} 未订阅。`);
     }
     const inFlight = this.recoveringSnapshots.get(sessionId);
     if (inFlight) return inFlight;
+    const priorCursor = this.cursors.get(sessionId);
     const recovery = (async () => {
       sdiag(`[wssnap] start ${sessionId.slice(-8)}`);
       const snapshot = await this.request<ServerSnapshot>(
@@ -2102,9 +2102,13 @@ export class KimiCodeServerClient {
       };
       for (const listener of this.listeners) listener(frame);
       if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+      // 外部新轮探测场景：用轮前 cursor 重订阅，让 server 回放新轮早到的 thinking/body 帧；
+      // snapshot 只含已提交内容，as_of_seq 续订会把首段永久丢掉。
       const ack = await this.sendControl("subscribe", {
         session_ids: [sessionId],
-        cursors: this.cursorPayload([sessionId]),
+        cursors: options?.backdateResubCursor && priorCursor
+          ? { [sessionId]: priorCursor }
+          : this.cursorPayload([sessionId]),
       });
       sdiag(`[wssnap] resub ${sessionId.slice(-8)} ack=${ack.code}`);
       if (ack.code !== 0) throw new Error(`Kimi Server snapshot 重订阅失败：${ack.msg ?? ack.code}`);
