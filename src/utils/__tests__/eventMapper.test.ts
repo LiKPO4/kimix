@@ -1882,18 +1882,25 @@ describe("mergeEvents", () => {
     };
 
     const result = mergeEvents(existing, incoming);
-    expect(result).toHaveLength(1);
-    const merged = result[0] as Extract<TimelineEvent, { type: "status_update" }>;
-    expect(merged).toMatchObject({
+    // 跨类不折叠（v2.20.182）：通知行与用量行各自独立成行，语义天然互不泄漏。
+    expect(result).toHaveLength(2);
+    const [notification, usage] = result as Array<Extract<TimelineEvent, { type: "status_update" }>>;
+    expect(notification).toMatchObject({
+      id: "notification",
+      message: "定时任务触发：检查构建状态",
+      source: "runtime",
+      tone: "info",
+    });
+    expect(usage).toMatchObject({
       id: "usage",
       message: "模型：kimi-code/k3",
       inputTokenCount: 622_188,
       tokenCount: 140,
       usageScope: "turn",
     });
-    expect(merged.source).toBeUndefined();
-    expect(merged.tone).toBeUndefined();
-    expect(merged.parentEventId).toBeUndefined();
+    expect(usage.source).toBeUndefined();
+    expect(usage.tone).toBeUndefined();
+    expect(usage.parentEventId).toBeUndefined();
   });
 
   it("drops a subagent-scoped assistant event when no matching card exists", () => {
