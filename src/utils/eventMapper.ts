@@ -1960,6 +1960,13 @@ function officialSnapshotSequence(snapshotMessageId?: string): { prefix: string;
   return { prefix: match[1], value: Number(match[2]) };
 }
 
+// 通知类状态行（后台任务信封/技能激活等，带 tone 或 runtime/skill/slash source）与度量类
+// （usage 快照/模型信息）是两种状态行，跨类不折叠，避免轮末信息卡出现不该出现的内容。
+function isNotificationStatusUpdate(event: Extract<TimelineEvent, { type: "status_update" }>): boolean {
+  return event.tone !== undefined ||
+    event.source === "runtime" || event.source === "skill" || event.source === "slash";
+}
+
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
@@ -2547,6 +2554,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
       return appendAfterConfirmedSteer(existing, [incoming], { closeOpenAssistant: false });
     }
     if (last?.type === "status_update") {
+      // 跨类不折叠：度量快照继承通知文案、或通知卡继承度量数字，都会让信息卡混入无关内容。
+      if (isNotificationStatusUpdate(last) !== isNotificationStatusUpdate(incoming)) {
+        return appendAroundTrailingSteer(existing, [incoming]);
+      }
       const merged: typeof last = {
         ...last,
         ...incoming,

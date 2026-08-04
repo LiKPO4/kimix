@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：轮末信息卡混入后台任务通知文案（v2.20.182）
+
+- 现场：v2.20.181 实机，轮末用法信息卡显示「后台任务已完成: 后台跑全量测试确认基线 输入: 100.67k 输出: 2.37k Context: 100.67k」——通知文案不该出现在度量卡里。
+- 根因：`mergeEvents` 的 status_update 合并分支里 `message` 仍是「incoming 没有就继承 last」旧规则（v2.20.176 只修了 source/tone/parentEventId 继承）。后台任务信封（role=user 的 `<notification>`，映射为 source=runtime/tone=success 的 status_update）先到，usage 快照（无 message 或仅模型文本）后到，合并行 = 通知文案 + 度量数字 + 中性色调。反向同样：通知卡会继承先到的度量数字。
+- 修复：新增 `isNotificationStatusUpdate`（带 tone 或 source 为 runtime/skill/slash），合并分支跨类不折叠（双向各自成行）；同类度量行保持折叠与模型文本继承。3 新用例（跨类双向不折叠、同类折叠保留模型文本）。
+- 验收：typecheck/全量测试/build/knowledge 结果待出；已持久化的污染行经切会话 canonical 重放自愈（重放走修复后的 mergeEvents）。
+- 已知边界：无标记的反馈行（如「输出打断」、ui/ipc 源）仍按旧合并语义（非本次报告场景，不扩大范围）。
+- 知识库：runtime-routing.md 不变量 14f 扩写 message 族规则，log.md 已记。
+- 关键文件：`src/utils/eventMapper.ts`（isNotificationStatusUpdate + 跨类守卫）、`src/utils/__tests__/eventMapper.test.ts`。
+
 ## 2026-08-04 修复：轮末观察窗永不触发 + 重启丢失，外部新轮仍两轮合并（v2.20.181）
 
 - 现场：v2.20.180 实机，Web 侧发第二轮后 Kimix 仍不显示用户消息、两轮回复合并（与 179 同场景）。

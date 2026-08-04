@@ -3932,3 +3932,50 @@ describe("mergeEvents late stable user boundary", () => {
     expect(result[result.length - 1].id).toBe("kimi-code-event-x");
   });
 });
+
+describe("status_update family-aware merge", () => {
+  it("does not collapse a runtime notification into a following usage snapshot", () => {
+    const existing: TimelineEvent[] = [
+      { id: "n1", type: "status_update", timestamp: 1_000, message: "后台任务已完成：跑测试", source: "runtime", tone: "success" },
+    ];
+    const incoming: TimelineEvent = { id: "u1", type: "status_update", timestamp: 2_000, tokenCount: 10, inputTokenCount: 20 };
+
+    const events = mergeEvents(existing, incoming);
+
+    expect(events).toHaveLength(2);
+    const [notification, usage] = events as Array<Extract<TimelineEvent, { type: "status_update" }>>;
+    expect(notification.message).toBe("后台任务已完成：跑测试");
+    expect(notification.tokenCount).toBeUndefined();
+    expect(usage.message).toBeUndefined();
+    expect(usage.tokenCount).toBe(10);
+    expect(usage.inputTokenCount).toBe(20);
+  });
+
+  it("does not let a notification inherit prior usage metrics", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "status_update", timestamp: 1_000, message: "模型：x", tokenCount: 10, inputTokenCount: 20 },
+    ];
+    const incoming: TimelineEvent = { id: "n1", type: "status_update", timestamp: 2_000, message: "后台任务已完成：跑测试", source: "runtime", tone: "success" };
+
+    const events = mergeEvents(existing, incoming);
+
+    expect(events).toHaveLength(2);
+    const [usage, notification] = events as Array<Extract<TimelineEvent, { type: "status_update" }>>;
+    expect(usage.tokenCount).toBe(10);
+    expect(notification.message).toBe("后台任务已完成：跑测试");
+    expect(notification.tokenCount).toBeUndefined();
+    expect(notification.inputTokenCount).toBeUndefined();
+  });
+
+  it("still collapses same-family metric rows and preserves the model message", () => {
+    const existing: TimelineEvent[] = [
+      { id: "u1", type: "status_update", timestamp: 1_000, message: "模型：x", tokenCount: 10 },
+    ];
+    const incoming: TimelineEvent = { id: "u2", type: "status_update", timestamp: 2_000, inputTokenCount: 20 };
+
+    const events = mergeEvents(existing, incoming);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ message: "模型：x", tokenCount: 10, inputTokenCount: 20 });
+  });
+});
