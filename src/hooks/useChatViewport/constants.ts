@@ -7,3 +7,11 @@ export const SCROLL_ANCHOR_IDLE_CAPTURE_MS = 140;
 export const USER_SCROLL_RESIZE_RESTORE_SUPPRESS_MS = 260;
 export const USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS = 700;
 export const MAX_RESIZE_ANCHOR_RESTORE_PX = 300;
+/**
+ * Sub-threshold manual anchor drift that is NOT compensated by a scrollTop
+ * write. The Plain→Rich settle swap after user-scroll stop produces a ~13px
+ * layout-height drift; the 700ms suppress window cannot cover its 0.5~1.6s
+ * timing, so a restore would misread it as real content movement. Deltas at or
+ * below this threshold are instead re-captured as the new baseline.
+ */
+export const MIN_MANUAL_ANCHOR_RESTORE_PX = 32;

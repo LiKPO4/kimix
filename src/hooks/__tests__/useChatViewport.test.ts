@@ -333,6 +333,71 @@ describe("useChatViewport", () => {
     });
   });
 
+  it("suppresses a sub-threshold anchor drift without a scrollTop write and recaptures the new baseline", () => {
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"],
+    });
+    const writeDiag = (window as any).api.writeDiag as ReturnType<typeof vi.fn>;
+    const { viewport, scroll } = renderTest({
+      sessionId: "session-1",
+      contentVersion: "v1",
+      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
+    });
+    const anchorEl = scroll.querySelector<HTMLElement>("[data-kimix-event-id='b']")!;
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, writable: true, value: 1000 },
+      scrollTop: { configurable: true, writable: true, value: 800 },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+    const bRectMock = vi.fn(() => ({ top: 700 - scroll.scrollTop, bottom: 800 - scroll.scrollTop } as DOMRect));
+    vi.spyOn(anchorEl, "getBoundingClientRect").mockImplementation(bRectMock as unknown as () => DOMRect);
+
+    // Flush the mount-time priming rAFs (scroll-to-bottom) so they cannot clobber
+    // scrollTop mid-test, then place the viewport at the detached working offset.
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    Object.defineProperty(scroll, "scrollTop", { configurable: true, writable: true, value: 700 });
+
+    // User scrolls up (detached) and the viewport captures an anchor at offset 0.
+    act(() => {
+      viewport().handlers.onWheel({ deltaY: -10 } as React.WheelEvent<HTMLDivElement>);
+      viewport().captureResizeAnchor();
+    });
+    expect(viewport().getScrollDiagSnapshot()).toMatchObject({ userScroll: true });
+
+    // Plain→Rich settle swap drifts the anchored item down 13px (≤ 32px threshold).
+    bRectMock.mockImplementation(() => ({ top: 713 - scroll.scrollTop, bottom: 813 - scroll.scrollTop } as DOMRect));
+    writeDiag.mockClear();
+
+    let restored = false;
+    act(() => {
+      restored = viewport().restoreResizeAnchor("contentVersion:user-scroll");
+    });
+    expect(restored).toBe(true);
+    expect(scroll.scrollTop).toBe(700); // self-drift must not write scrollTop
+    expect(writeDiag).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ suppressedByMinDelta: true }) }),
+    );
+
+    // The drifted position is re-captured as the new baseline via the rAF pass.
+    const rectCallsAfterRestore = bRectMock.mock.calls.length;
+    act(() => {
+      vi.advanceTimersByTime(32);
+    });
+    expect(bRectMock.mock.calls.length).toBeGreaterThan(rectCallsAfterRestore);
+
+    // Real content displacement above the threshold still compensates as before.
+    bRectMock.mockImplementation(() => ({ top: 753 - scroll.scrollTop, bottom: 853 - scroll.scrollTop } as DOMRect));
+    let restoredLarge = false;
+    act(() => {
+      restoredLarge = viewport().restoreResizeAnchor("contentVersion:user-scroll");
+    });
+    expect(restoredLarge).toBe(true);
+    expect(scroll.scrollTop).toBe(740);
+  });
+
   it("pins to the bottom when content grows after the session settle window expired", () => {
     vi.useFakeTimers({
       toFake: [

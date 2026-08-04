@@ -6,6 +6,7 @@ import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import { noteUserScrollActivity, isUserScrollActive, clearUserScrollActivity } from "@/utils/userScrollActivity";
 import {
   MAX_RESIZE_ANCHOR_RESTORE_PX,
+  MIN_MANUAL_ANCHOR_RESTORE_PX,
   SCROLL_ANCHOR_IDLE_CAPTURE_MS,
   USER_SCROLL_ANCHOR_RESTORE_SUPPRESS_MS,
 } from "./constants";
@@ -135,20 +136,27 @@ export function useScrollAnchor(options: UseScrollAnchorOptions): UseScrollAncho
     const containerRect = node.getBoundingClientRect();
     const targetOffsetTop = target ? target.getBoundingClientRect().top - containerRect.top : undefined;
     const delta = target && anchor ? targetOffsetTop! - anchor.offsetTop : undefined;
-    const restored = restoreResizeScrollAnchor(Number.POSITIVE_INFINITY);
+    // Plain→Rich settle drift after user-scroll stop is a sub-threshold self-shift
+    // (≈13px), not incoming content: suppress the scrollTop write, re-capture the
+    // drifted position as the new baseline, and treat the restore as handled.
+    const suppressedByMinDelta = typeof delta === "number" && Math.abs(delta) <= MIN_MANUAL_ANCHOR_RESTORE_PX;
+    const restored = suppressedByMinDelta ? true : restoreResizeScrollAnchor(Number.POSITIVE_INFINITY);
     const afterScrollTop = node.scrollTop;
     const afterDistance = node.scrollHeight - node.scrollTop - node.clientHeight;
     if (restored) {
-      noteScrollTopWrite("anchor-restore");
+      if (!suppressedByMinDelta) {
+        noteScrollTopWrite("anchor-restore");
+      }
       updateShowScrollToBottom(afterDistance > 80);
       scheduleAnchorCapture();
     }
-    if (beforeScrollTop <= 8 || Math.abs(afterScrollTop - beforeScrollTop) > 0.5 || (!restored && anchor?.key)) {
+    if (beforeScrollTop <= 8 || Math.abs(afterScrollTop - beforeScrollTop) > 0.5 || suppressedByMinDelta || (!restored && anchor?.key)) {
       window.api?.writeDiag?.({
         message: "[useScrollAnchor] restoreManualScrollAnchor",
         data: {
           reason,
           restored,
+          suppressedByMinDelta,
           beforeScrollTop,
           afterScrollTop,
           beforeDistance,

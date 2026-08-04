@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：滚动停止约 1s 后视口自动下跳（v2.20.177）
+
+- 现场：用户反馈消息区滚动结束后约 1s 视口莫名自动往下跳一下，向上滚动后尤其明显。
+- 取证（diag.log 实锤）：用户最后一次滚动（04:58:28.5）后 1.6s，`[useScrollAnchor] restoreManualScrollAnchor reason=contentVersion:user-scroll` 把 scrollTop 6073→6086（delta +13）。
+- 根因（三层叠加）：① MarkdownRenderer 的 Plain→Rich settle 机制在用户停止滚动 350ms+120ms 后切回富渲染，产生约 13px 布局净增高；② 上滚后 detached 状态原生 overflow-anchor 被禁用；③ `restoreManualScrollAnchor` 把「渲染形态切换的自身漂移」误判为「新内容到达」做补偿写入（700ms 亲和期盖不住 0.5~1.6s 的 settle 漂移）。下滚到底时 auto-follow 贴底吸收不可见，上滚停在中间时补偿完全可见——所以「向上滚动后尤其明显」。
+- 修复（v2.20.177）：restore 计算出 delta 后加最小阈值 `MIN_MANUAL_ANCHOR_RESTORE_PX = 32`——|delta| ≤ 32px 时不写 scrollTop，仅 scheduleAnchorCapture 把漂移后位置重捕获为新基准；真实内容插入（通常 >32px）补偿行为不变。diag 补 `suppressedByMinDelta` 字段便于生产验证。
+- 验收：全量 1536 测试通过（新增「小 delta 不写 scrollTop 且重捕获、40px 仍补偿」用例）、typecheck 通过、`pnpm build` 通过；实机滚动体验待用户验收。
+- 已知边界：≤32px 的真实内容位移也会被抑制（只重捕获不补偿，视觉几乎无感）；日志中另观察到一次 99px 回退来源未完全定位（同一漂移家族，保留 diag 观察）。
+- 知识库：无需更新（视口补偿参数调整，未变 chat-viewport-state 既有不变量）。
+- 关键文件：`src/hooks/useChatViewport/constants.ts:11-18`、`src/hooks/useChatViewport/useScrollAnchor.ts:139-159`。
+
 ## 2026-08-04 修复：轮末用法信息卡缺失（显示「已完成 · 用时」而非模型/输入/输出/Context）（v2.20.176）
 
 - 现场：用户截图对比——一轮结束时 footer 有时显示「已完成 · 用时 22秒」，切会话再切回就变成正常的「模型: k3 输入 输出 Context」卡。
