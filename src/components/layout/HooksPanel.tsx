@@ -493,7 +493,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 {hookTemplates.map((template) => {
                   const Icon = template.icon;
                   return (
-                    <button key={template.title} type="button" onClick={() => startCreate(template)} disabled={generating} className="kimix-muted-action w-full rounded-lg text-left disabled:cursor-wait disabled:opacity-60" style={{ padding: "11px 12px" }}>
+                    <button key={template.title} type="button" onClick={() => startCreate(template)} disabled={generating} className="kimix-muted-action kimix-row-action w-full rounded-lg text-left disabled:cursor-wait disabled:opacity-60" style={{ padding: "11px 12px" }}>
                       <div className="flex items-center" style={{ gap: 9 }}>
                         <Icon size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--kimix-panel-text)]">{template.title}</span>
@@ -573,7 +573,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                   {hookTemplates.map((template) => {
                     const Icon = template.icon;
                     return (
-                      <button key={template.title} type="button" onClick={() => startCreate(template)} className="kimix-muted-action w-full rounded-lg text-left" style={{ padding: "12px 12px" }}>
+                      <button key={template.title} type="button" onClick={() => startCreate(template)} className="kimix-muted-action kimix-row-action w-full rounded-lg text-left" style={{ padding: "12px 12px" }}>
                         <div className="flex items-center" style={{ gap: 9 }}>
                           <Icon size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--kimix-panel-text)]">{template.title}</span>

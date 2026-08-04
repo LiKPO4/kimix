@@ -1054,7 +1054,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                     setModelMenuOpen(false);
                     void openModelSettings();
                   }}
-                  className="kimix-icon-text-button kimix-muted-action w-full justify-start rounded-lg"
+                  className="kimix-icon-text-button kimix-muted-action kimix-row-action w-full justify-start rounded-lg"
                   style={{ minHeight: 36, paddingLeft: 12, paddingRight: 12 }}
                 >
                   <Settings2 size={15} />

@@ -2553,6 +2553,13 @@ button.bg-accent-primary:disabled:hover,
   scale: 0.96;
 }
 
+/* 全宽行式按钮（变更卡展开/收起、Hooks 模板行、ContextBar 入口行等）：
+   全局 muted-action 的 :active scale 0.96 会让整行横向收缩，露出两侧卡片
+   底色，阴影/灰底左右覆盖不全；行式按钮按压只变色不缩放。 */
+.kimix-muted-action.kimix-row-action:active:not(:disabled) {
+  scale: 1;
+}
+
 .kimix-inline-icon-action {
   display: inline-flex;
   width: 28px;

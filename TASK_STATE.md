@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：全宽行式按钮按压时阴影/灰底左右覆盖不全（v2.20.188）
+
+- 现场：变更卡「再显示 N 个文件/收起」展开收起按钮点击时灰底+阴影左右收缩、露出卡片底色，表现奇怪。
+- 根因：`.kimix-muted-action:active:not(:disabled) { scale: 0.96 }` 全局按压缩放对小按钮合适，对 w-full 行式按钮会让整行横向缩 4%，两侧露底。
+- 修复：新增角色类 `.kimix-row-action`（`:active` scale 保持 1，按压只变色不缩放），挂载 5 处全宽行按钮：ChangeCard 展开/收起 ×2、HooksPanel 模板行 ×2、ContextBar 入口行 ×1。紧凑小按钮（Composer/RoomPicker 等）保留原按压反馈。
+- 验收：typecheck/全量 1549/build 通过；视觉待用户截图验收（默认/retro/nostalgia 三风格下按压行按钮不再横向收缩）。
+- 知识库：无需更新（纯 UI 微调）。
+- 关键文件：`src/index.css`（kimix-row-action 规则）、`ChangeCard.tsx`/`HooksPanel.tsx`/`ContextBar.tsx`。
+
 ## 2026-08-04 修复：配置新模型后老会话必须重启才能用（v2.20.187）
 
 - 现场（用户 145 复现）：设置里配置新模型后不重启，老会话继续对话报 `Model "…" is not configured in config.toml`；重启后正常。
