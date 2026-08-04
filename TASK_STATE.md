@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：192 静态 import highlight.js 致 dev 启动崩溃（v2.20.193）
+
+- 现场：192 后打开 dev 直接「界面遇到错误」：`Cannot read properties of null (reading 'useState')`（vite deps chunk）——新增静态依赖触发 vite 重新预打包，旧 `node_modules/.vite` 缓存使 React 双副本。
+- 修复：hljs 改**动态 import**（`import("highlight.js/lib/common")` 在 idle 回调里，主 chunk 彻底无 hljs 静态依赖，首包 -340kB）；清 `node_modules/.vite`/`.cache` 后重启。cleanup 置 cancelled 防卸载后着色。
+- 验收：typecheck/全量 1551/build 通过；实机待用户确认打开不再崩溃、首滚顺滑、代码异步着色。
+- 教训：渲染层新增静态重依赖要走动态 import（dev 预打包 churn + 首包体积）。
+- 关键文件：`src/components/chat/MarkdownRenderer.tsx`。
+
 ## 2026-08-04 优化：首次滚动 1-3s 卡顿——hljs 高亮移出渲染通道（v2.20.192）
 
 - 现场：191 后周期性 bursts 消失，但首次滚动最初 1-3s 仍卡。

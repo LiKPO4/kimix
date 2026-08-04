@@ -3,7 +3,6 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import { Lexer } from "marked";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import hljs from "highlight.js/lib/common";
 import rehypeKatex from "rehype-katex";
 import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -277,12 +276,14 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   useEffect(() => {
     const node = codeRef.current;
     if (!node || !node.className.includes("language-") || node.classList.contains("hljs")) return;
-    const run = () => hljs.highlightElement(node);
+    let cancelled = false;
+    const run = () => { void import("highlight.js/lib/common").then((m) => { if (!cancelled) m.default.highlightElement(node); }).catch(() => undefined); };
     let idleId: number | undefined;
     let timerId: number | undefined;
     if (typeof window.requestIdleCallback === "function") idleId = window.requestIdleCallback(run, { timeout: 600 });
     else timerId = window.setTimeout(run, 120);
     return () => {
+      cancelled = true;
       if (idleId !== undefined && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idleId);
       if (timerId !== undefined) window.clearTimeout(timerId);
     };
