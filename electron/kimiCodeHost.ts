@@ -3366,7 +3366,8 @@ function emitServerError(sessionId: string, error: unknown) {
 function serverControls(managed: ServerManagedSession, promptModel?: string): Record<string, unknown> {
   return {
     model: resolvePromptModel(promptModel, managed.model) ?? "kimi-code/kimi-for-coding",
-    thinking: managed.thinking,
+    // 空串不发送（server zod 要求 >=1 字符，实机新会话 managed.thinking="" 致 POST 被拒）；缺省时 server 用会话默认。
+    thinking: typeof managed.thinking === "string" && managed.thinking.length > 0 ? managed.thinking : undefined,
     permission_mode: managed.permission,
     plan_mode: managed.planMode,
     // 会话 swarm_mode 为真时随请求显式携带（官方 0.31+ prompts schema）；为假时

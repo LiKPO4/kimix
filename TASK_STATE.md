@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：新会话 prompt 被 server 拒（thinking 空串）→ 闪一下无内容+模型回跳（v2.20.204）
+
+- 现场：203 下复现「新会话+切 k3+发送」：闪一下无内容、选择器回跳 deepseek。203 的秒定守卫已生效（无 settled_complete），但 POST 根本没到 server（server messages:0）。
+- 取证（dev 控制台）：POST 报错 `thinking: Too small: expected string to have >=1 characters`——`serverControls` 直发 `managed.thinking`，新会话为 ""，server zod 拒收 → sendPrompt 抛错 → 空轮 + 错误回落（模型回跳是回落副作用）。前两次新会话复现同因。
+- 修复：`serverControls` 空串不发送 thinking（缺省时 server 用会话默认）。
+- 验收：typecheck/全量 1559/build 通过；实机待验收（新会话切 k3 发送应正常流式、选择器保持 k3）。
+- 知识库：无需更新（请求体卫生修复）。
+- 关键文件：`electron/kimiCodeHost.ts`。
+
 ## 2026-08-04 修复：新轮被 pre-POST snapshot 秒定「输出完成 1s」+ 模型选择被 status 刷回（v2.20.203）
 
 - 现场：deepseek 挂后新会话切 k3 发消息，闪一下「输出完成·1s」无内容；底部模型选择器变回 deepseek。
