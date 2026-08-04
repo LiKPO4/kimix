@@ -287,6 +287,10 @@ describe("resolveEngineStatusAfterPromptCompleted", () => {
     // recoverSnapshot still delivers tool.call.started (tool counts keep rising).
     expect(resolveEngineStatusAfterPromptCompleted({ busy: true })).toBe("running");
     expect(resolveEngineStatusAfterPromptCompleted({ busy: true, status: "idle" })).toBe("running");
+    // 仅后台任务挂着（主轮已结束）：busy=true 也不钉住轮次
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: true }, false)).toBe("completed");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: true }, true)).toBe("running");
+    expect(resolveEngineStatusAfterPromptCompleted({ busy: true }, undefined)).toBe("running");
   });
 
   it("maps true terminal busy=false to completed for renderer settle", () => {

@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：主轮结束仅后台任务挂着时 Kimix 仍「消息处理中」+ 后台工具帧重开 running（v2.20.199）
+
+- 现场：Web 显示主轮已结束（后台 bash 挂着），Kimix 仍「消息处理中」；live 流工具调用混乱，重启后正常。
+- 根因（双通道）：① `settleServerSessionAfterPromptCompleted` 按 busy 权威——后台任务使 busy=true → settle 保持 running；② 3198 重开逻辑：后台 bash 的 tool.call.delta 在 status completed 后把状态重开 running。两者都把「会话 busy」误当「轮次 running」。
+- 修复：引入主轮信号 `mainTurnActive`（thinking/assistant.delta 或自身 prompt 或 snapshot in_flight → true；主 prompt.completed / snapshot 无 in_flight → false）。① settle 后读 snapshot：`in_flight_turn`/`main_turn_active` 判主轮，busy=true 且主轮已结束 → completed（后台任务自有面板）；② 重开逻辑加 `mainTurnActive !== false` 守卫。无法确认时保守按 busy（不假完成）。3 新断言。
+- 验收：typecheck/全量 1557/build 通过；实机待验收（主轮结束+后台 bash 挂着时 Kimix 应 settle，后台任务面板独立显示）。
+- 已知边界：status 帧通道（agent.status.updated busy=true）未加降级——若 server 在后台期持续广播 status 仍可能翻回 running，观察实机后必要时补。
+- 知识库：无需更新（状态裁决实现细节；不变量 8/7 语义未变）。
+- 关键文件：`electron/kimiCodeHost.ts`、`src/utils/__tests__/kimiCodeServerHost.test.ts`。
+
 ## 2026-08-04 性能：帧队列溢出每帧 O(n) 扫描+同步 warn 的主进程 CPU 黑洞（v2.20.198）
 
 - 现场：196 dev 日志 8651 条 `frame queue overflow`，启动即开始、持续整轮。

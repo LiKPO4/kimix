@@ -708,6 +708,7 @@ type ServerManagedSession = {
   session: ServerSession;
   workDir: string;
   status: KimiCodeEngineStatus;
+  mainTurnActive?: boolean;
   model?: string;
   modelRevision: number;
   modelMutation?: Promise<void>;
@@ -1356,6 +1357,7 @@ export async function sendPrompt(
   serverManaged ??= sdkPinnedSessionIds.has(sessionId) ? undefined : await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
+    serverManaged.mainTurnActive = true;
     try {
       await getServerClient().prompt(sessionId, input, serverControls(serverManaged, promptModel));
       return { route: "server" };
@@ -3124,6 +3126,7 @@ function handleServerFrame(frame: ServerFrame) {
     if (session && managed) {
       managed.session = session;
       setStatus(sessionId, resolveServerEngineStatus(session));
+      managed.mainTurnActive = snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? true : session?.main_turn_active === true;
     }
     const replayFingerprint = `${snapshot.as_of_seq}|${snapshot.epoch ?? ""}|${snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? 1 : 0}|${Array.isArray(snapshot.messages?.items) ? snapshot.messages.items.length : 0}`;
     const previousFingerprint = snapshotReplayFingerprints.get(sessionId);
@@ -3195,9 +3198,12 @@ function handleServerFrame(frame: ServerFrame) {
   // barrier). Re-open running so the renderer does not stay on 已连接 / 输出完成
   // while tools continue (diag: settled_complete then tool.call.started via
   // watchdog recoverSnapshot, tool counts still climbing).
+  const turnTrack = serverSessions.get(sessionId);
+  if (turnTrack && (frame.type === "thinking.delta" || frame.type === "assistant.delta")) turnTrack.mainTurnActive = true;
   if (
     (frame.type === "tool.call.started" || frame.type === "tool.call.delta" || frame.type === "thinking.delta" || frame.type === "assistant.delta")
     && serverSessions.get(sessionId)?.status === "completed"
+    && serverSessions.get(sessionId)?.mainTurnActive !== false
   ) {
     setStatus(sessionId, "running");
   }
@@ -3212,6 +3218,8 @@ function handleServerFrame(frame: ServerFrame) {
     // 必须以 refresh 后的 busy 再落 engine 状态。
     const completedAgentId = typeof payload.agentId === "string" && payload.agentId ? payload.agentId : "main";
     if (completedAgentId === "main") {
+      const completedManaged = serverSessions.get(sessionId);
+      if (completedManaged) completedManaged.mainTurnActive = false;
       void settleServerSessionAfterPromptCompleted(sessionId).catch((error) => {
         console.warn(`[KimiCodeServerHost] settle after prompt.completed failed for ${sessionId}:`, error);
       });
@@ -3227,8 +3235,11 @@ function handleServerFrame(frame: ServerFrame) {
  */
 export function resolveEngineStatusAfterPromptCompleted(
   source: { status?: unknown; busy?: unknown },
+  mainTurnActive?: boolean,
 ): KimiCodeEngineStatus {
   const engine = resolveServerEngineStatus(source);
+  // busy=true 但主轮已结束（仅后台任务挂着）：后台任务不钉住轮次 running。
+  if (engine === "running" && mainTurnActive === false) return "completed";
   if (engine === "running" || engine === "waiting_approval" || engine === "waiting_question") return engine;
   if (engine === "error" || engine === "interrupted") return engine;
   if (engine === "unknown") return "running";
@@ -3250,7 +3261,18 @@ async function settleServerSessionAfterPromptCompleted(sessionId: string): Promi
     // re-read: concurrent cancel/error may have landed during refresh
     const current = serverSessions.get(sessionId)?.status;
     if (current === "interrupted" || current === "error") return;
-    setStatus(sessionId, resolveEngineStatusAfterPromptCompleted(status));
+    let mainTurnActive: boolean | undefined;
+    try {
+      const snap = await getServerClient().getSnapshot(sessionId);
+      mainTurnActive = snap.in_flight_turn && typeof snap.in_flight_turn === "object"
+        ? true
+        : snap.session?.main_turn_active === true;
+      const managedNow = serverSessions.get(sessionId);
+      if (managedNow) managedNow.mainTurnActive = mainTurnActive;
+    } catch {
+      mainTurnActive = undefined; // 无法确认时保守按 busy
+    }
+    setStatus(sessionId, resolveEngineStatusAfterPromptCompleted(status, mainTurnActive));
   } catch (error) {
     console.warn(`[KimiCodeServerHost] refresh after prompt.completed failed for ${sessionId}:`, error);
     const current = serverSessions.get(sessionId)?.status;
