@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-04 优化：搜索浮层大屏不居中（顶挂 86px）（v2.20.200）
+
+- 现场：搜索窗只在小屏看似居中；大屏顶挂 paddingTop 86 + items-start，垂直不居中。
+- 修复：overlay 改 `items-center` + 上下 24px 留白；面板 `maxHeight: calc(100vh - 48px)` + flex column，列表 `minHeight: 0, flex: 0 1 auto`（矮屏内部滚动、大屏整体垂直居中）；头部/scope 行 flexShrink 0。
+- 验收：typecheck/全量 1557/build 通过；视觉待用户大小屏各截图验收。
+- 知识库：无需更新（纯 UI 微调）。
+- 关键文件：`src/components/layout/SearchOverlay.tsx`。
+
 ## 2026-08-04 修复：主轮结束仅后台任务挂着时 Kimix 仍「消息处理中」+ 后台工具帧重开 running（v2.20.199）
 
 - 现场：Web 显示主轮已结束（后台 bash 挂着），Kimix 仍「消息处理中」；live 流工具调用混乱，重启后正常。

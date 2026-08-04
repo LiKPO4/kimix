@@ -396,16 +396,17 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   if (!open) return null;
 
   return (
-    <div className="kimix-modal-overlay fixed inset-0 z-[85] flex items-start justify-center px-5" style={{ paddingTop: 86 }} onMouseDown={onClose}>
+    <div className="kimix-modal-overlay fixed inset-0 z-[85] flex items-center justify-center px-5" style={{ paddingTop: 24, paddingBottom: 24 }} onMouseDown={onClose}>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="搜索会话"
         className="kimix-modal-card w-full max-w-[720px] overflow-hidden"
+        style={{ maxHeight: "calc(100vh - 48px)", display: "flex", flexDirection: "column" }}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16 }}>
+        <div className="flex h-14 items-center border-b border-border-subtle" style={{ gap: 12, paddingLeft: 20, paddingRight: 16, flexShrink: 0 }}>
           <Search size={18} className="shrink-0 text-text-muted" />
           <input
             ref={inputRef}
@@ -435,8 +436,8 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
             <X size={16} />
           </button>
         </div>
-        <div ref={listRef} className="max-h-[560px] overflow-y-auto" style={{ padding: 12 }}>
-          <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, flexWrap: "wrap" }}>
+        <div ref={listRef} className="max-h-[560px] overflow-y-auto" style={{ padding: 12, minHeight: 0, flex: "0 1 auto" }}>
+          <div className="flex items-center" style={{ gap: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
             <button
               className="kimix-icon-text-button kimix-state-button"
               style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
