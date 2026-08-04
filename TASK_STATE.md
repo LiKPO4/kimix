@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：select 无目录档位残留不对称清空 + 195 探针三段序补测试（v2.20.197）
+
+- 背景：review 195/196 后确认 #7 残留不对称仍在（select 切到目录未声明档位的模型时档位保留旧模型值），且 195 探针三段序无测试覆盖。
+- 修复：`prefillFromCatalog` select 模式档位改为 `catalogEfforts ?? []`——目录带档位时覆盖、无档位时清空（不再返回 null 保留旧模型档位）；type 模式保持「为空才填」不变。更新 4 处既有断言 + 语义注释。
+- 补测试：`kimiCodeServerClient.test.ts` 新增「post-terminal external prompt watch probe」describe 4 用例——命中（snapshot 边界晚于轮末 → 删 watch + 两次 recoverSnapshot 共 3 次 /snapshot 请求）、未命中保留 watch、无 user 保留 watch、本地 pendingPrompts 存在时删 watch 不 recover。
+- 验收：全量 1557 测试通过（+4）、typecheck 通过；build 未跑（逻辑改动，dev 重启时验证）。
+- 关键文件：`src/utils/modelProviderConfig.ts:132-146`、`src/utils/__tests__/modelProviderConfig.test.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts:1929-2012`。
 ## 2026-08-04 修复：富文本误拆加粗列表项（「**1. #7」→ 残片+一级大标题）（v2.20.196）
 
 - 现场：Kimix 渲染另一方 review 消息时字超大、`**1.` 字面残留、加粗/列表不解析；Web 正常。

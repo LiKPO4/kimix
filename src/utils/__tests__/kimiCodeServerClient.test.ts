@@ -1923,3 +1923,84 @@ describe("snapshot tool replay failure flag", () => {
     expect(toolFrame?.payload).toMatchObject({ toolCallId: "call-err", is_error: true });
   });
 });
+
+describe("post-terminal external prompt watch probe (v2.20.195 three-step sequence)", () => {
+  const terminalAt = Date.parse("2026-08-04T10:03:00Z");
+
+  function snapshotBody(items: unknown[]) {
+    return {
+      as_of_seq: 20,
+      epoch: "epoch-1",
+      session: { id: "session-1", status: "idle", busy: false, main_turn_active: false, last_turn_reason: "completed" },
+      messages: { items },
+      in_flight_turn: null,
+    };
+  }
+
+  async function setup(snapshot: unknown) {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0, data: snapshot }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = client as unknown as {
+      subscribed: Set<string>;
+      pendingPrompts: Map<string, { completionId: string; messageId: string }>;
+      postTerminalExternalWatch: Map<string, { terminalAt: number; lastProbeAt: number }>;
+      cursors: Map<string, { seq: number; epoch?: string }>;
+      probeExternalUserPromptAfterTerminal: (sessionId: string, terminalAt: number) => Promise<void>;
+    };
+    internals.subscribed.add("session-1");
+    internals.postTerminalExternalWatch.set("session-1", { terminalAt, lastProbeAt: 0 });
+    return { client, fetchMock, internals };
+  }
+
+  it("hit: boundary after the turn end -> deletes watch and recovers twice (boundary first, then resubCursor)", async () => {
+    const items = [
+      { id: "m1", role: "assistant", content: [], created_at: "2026-08-04T10:02:00Z" },
+      { id: "m2", role: "user", content: [{ type: "text", text: "old" }], created_at: "2026-08-04T10:01:00Z" },
+      { id: "m3", role: "user", content: [{ type: "text", text: "external new turn" }], created_at: "2026-08-04T10:05:00Z" },
+    ];
+    const { client, fetchMock, internals } = await setup(snapshotBody(items));
+    internals.cursors.set("session-1", { seq: 19, epoch: "epoch-1" });
+    await internals.probeExternalUserPromptAfterTerminal("session-1", terminalAt);
+    // probe getSnapshot 1 + two recoverSnapshot calls = 3 /snapshot requests.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await client.close();
+  });
+
+  it("miss: newest user not after the turn end -> keeps the watch, no recovery", async () => {
+    const items = [
+      { id: "m1", role: "user", content: [{ type: "text", text: "old" }], created_at: "2026-08-04T10:02:00Z" },
+    ];
+    const { client, fetchMock, internals } = await setup(snapshotBody(items));
+    await internals.probeExternalUserPromptAfterTerminal("session-1", terminalAt);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(internals.postTerminalExternalWatch.has("session-1")).toBe(true);
+    await client.close();
+  });
+
+  it("no user message in snapshot -> keeps the watch for the next probe", async () => {
+    const items = [
+      { id: "m1", role: "assistant", content: [], created_at: "2026-08-04T10:02:00Z" },
+    ];
+    const { client, fetchMock, internals } = await setup(snapshotBody(items));
+    await internals.probeExternalUserPromptAfterTerminal("session-1", terminalAt);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(internals.postTerminalExternalWatch.has("session-1")).toBe(true);
+    await client.close();
+  });
+
+  it("local pending prompt exists -> deletes the watch without recovering", async () => {
+    const items = [
+      { id: "m3", role: "user", content: [{ type: "text", text: "external new turn" }], created_at: "2026-08-04T10:05:00Z" },
+    ];
+    const { client, fetchMock, internals } = await setup(snapshotBody(items));
+    internals.pendingPrompts.set("session-1", { completionId: "c-1", messageId: "m-1" });
+    await internals.probeExternalUserPromptAfterTerminal("session-1", terminalAt);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(internals.postTerminalExternalWatch.has("session-1")).toBe(false);
+    await client.close();
+  });
+});

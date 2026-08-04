@@ -106,9 +106,9 @@ export type CatalogPrefill = {
  * 按目录命中条目计算「添加模型」表单的预填值。
  * - Context 优先级：探测接口 contextLength > 目录 maxContextSize > 模型名推断；
  *   select（探测下拉选中）全部缺失时保留现值；type（手输模型 ID）沿用「为空才填」，仅当当前为空时填。
- * - 思考档位：select（探测下拉选中）视为新意图，目录带档位时覆盖（与 Context 对称，
- *   避免「Context 跟新模型、档位留旧模型」的不对称）；type（手输）仅在当前未勾选任何
- *   档位时填入，已手改的档位不被覆盖。
+ * - 思考档位：select（探测下拉选中）视为新意图，目录带档位时覆盖、无档位时清空（与
+ *   Context 对称，避免「Context 跟新模型、档位留旧模型」的不对称，含目录未声明档位时
+ *   不残留上一模型的档位）；type（手输）仅在当前未勾选任何档位时填入，已手改不被覆盖。
  * - defaultEffort 不在此处预填（留空由 SDK 自动取中间档）。
  */
 export function prefillFromCatalog(params: {
@@ -142,9 +142,9 @@ export function prefillFromCatalog(params: {
     catalogModel?.supportEfforts != null && catalogModel.supportEfforts.length > 0
       ? catalogModel.supportEfforts
       : null;
-  const supportEfforts = catalogEfforts
-    ? (mode === "select" || currentSupportEfforts.length === 0 ? catalogEfforts : null)
-    : null;
+  const supportEfforts = mode === "select"
+    ? (catalogEfforts ?? [])
+    : (catalogEfforts && currentSupportEfforts.length === 0 ? catalogEfforts : null);
 
   return { maxContextSize, supportEfforts };
 }

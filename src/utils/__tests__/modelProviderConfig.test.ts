@@ -82,7 +82,7 @@ describe("prefillFromCatalog", () => {
       currentSupportEfforts: [],
       catalogModel: null,
       probeContextLength: null,
-    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: [] });
   });
 
   it("select mode: keeps current context when model id is blank", () => {
@@ -137,15 +137,15 @@ describe("prefillFromCatalog", () => {
     })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
   });
 
-  it("passes through catalog efforts unchanged; empty effort lists count as no value", () => {
+  it("select mode: empty catalog efforts clear the field (no stale efforts kept)", () => {
     expect(prefillFromCatalog({
       mode: "select",
       modelId: "gpt-5.1",
       currentContextSize: "262144",
-      currentSupportEfforts: [],
+      currentSupportEfforts: ["low"],
       catalogModel: catalog[1],
       probeContextLength: null,
-    })).toEqual({ maxContextSize: 400_000, supportEfforts: null });
+    })).toEqual({ maxContextSize: 400_000, supportEfforts: [] });
   });
 
   it("ignores out-of-range catalog limits and probe values", () => {
@@ -156,7 +156,7 @@ describe("prefillFromCatalog", () => {
       currentSupportEfforts: [],
       catalogModel: { id: "qwen3.8-max", maxContextSize: 999, supportEfforts: undefined },
       probeContextLength: 12,
-    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: [] });
   });
 
   it("select mode: catalog efforts follow the new model even when current efforts are non-empty", () => {
@@ -171,7 +171,7 @@ describe("prefillFromCatalog", () => {
     expect(prefill.supportEfforts).toEqual(["medium"]);
   });
 
-  it("select mode: keeps current efforts when the new catalog model declares none", () => {
+  it("select mode: clears efforts when the new catalog model declares none (no stale old-model efforts)", () => {
     const prefill = prefillFromCatalog({
       mode: "select",
       modelId: "gpt-5.1",
@@ -180,6 +180,6 @@ describe("prefillFromCatalog", () => {
       catalogModel: catalog[1],
       probeContextLength: null,
     });
-    expect(prefill.supportEfforts).toBeNull();
+    expect(prefill.supportEfforts).toEqual([]);
   });
 });
