@@ -1088,21 +1088,29 @@ export class KimiCodeServerClient {
 
   private async probeExternalUserPromptAfterTerminal(sessionId: string, terminalAt: number): Promise<void> {
     try {
-      const response = await this.listMessages(sessionId, 10);
-      // items 为 newest-first（items[0] 即最新，进度标记依赖此序）；直接取第一个 user 即最新用户边界。
-      const latestUser = response.items.find((item) => (
-        isRecord(item) && (item as Record<string, unknown>).role === "user"
-      ));
-      if (!latestUser) return;
-      const userAt = snapshotTimestampToEpochMs(snapshotMessageTimestamp(latestUser as Record<string, unknown>));
-      if (userAt === undefined || userAt <= terminalAt) return;
+      // 边界以 snapshot 为准（REST /messages 可能先于 snapshot 提交可见）；未提交则保留 watch 下轮重试，
+      // 避免早到工具帧在边界之前挂载粘到上一轮。
+      const snapshot = await this.getSnapshot(sessionId);
+      const items = Array.isArray(snapshot.messages?.items) ? snapshot.messages.items : [];
+      let latestUserAt: number | undefined;
+      for (let idx = items.length - 1; idx >= 0; idx--) {
+        const item = items[idx];
+        if (!isRecord(item) || (item as Record<string, unknown>).role !== "user") continue;
+        latestUserAt = snapshotTimestampToEpochMs(snapshotMessageTimestamp(item as Record<string, unknown>));
+        break;
+      }
+      if (latestUserAt === undefined || latestUserAt <= terminalAt) return;
       if (!this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId)) {
         this.postTerminalExternalWatch.delete(sessionId);
         return;
       }
       this.postTerminalExternalWatch.delete(sessionId);
-      sdiag(`[wsc] 外部新轮用户消息 sid=${sessionId.slice(-8)} → 同连接轮前 cursor 重订阅补首段`);
-      void this.recoverSnapshot(sessionId, { backdateResubCursor: true }).catch(() => undefined);
+      const preRecoveryCursor = this.cursors.get(sessionId);
+      sdiag(`[wsc] 外部新轮用户消息 sid=${sessionId.slice(-8)} → 先挂边界再轮前 cursor 重订阅补早到帧`);
+      await this.recoverSnapshot(sessionId);
+      if (preRecoveryCursor) {
+        await this.recoverSnapshot(sessionId, { resubCursor: preRecoveryCursor });
+      }
     } catch {
       // 探测失败不影响主链路；静默探针与渲染层对账仍兜底。
     }
@@ -2091,13 +2099,12 @@ export class KimiCodeServerClient {
     for (const sessionId of payload?.resync_required ?? []) await this.recoverSnapshot(sessionId);
   }
 
-  private async recoverSnapshot(sessionId: string, options?: { backdateResubCursor?: boolean }) {
+  private async recoverSnapshot(sessionId: string, options?: { resubCursor?: { seq: number; epoch?: string } }) {
     if (!this.subscribed.has(sessionId)) {
       throw new Error(`Kimi Server snapshot 恢复失败：会话 ${sessionId} 未订阅。`);
     }
     const inFlight = this.recoveringSnapshots.get(sessionId);
     if (inFlight) return inFlight;
-    const priorCursor = this.cursors.get(sessionId);
     const recovery = (async () => {
       sdiag(`[wssnap] start ${sessionId.slice(-8)}`);
       const snapshot = await this.request<ServerSnapshot>(
@@ -2123,12 +2130,12 @@ export class KimiCodeServerClient {
       };
       for (const listener of this.listeners) listener(frame);
       if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-      // 外部新轮探测场景：用轮前 cursor 重订阅，让 server 回放新轮早到的 thinking/body 帧；
-      // snapshot 只含已提交内容，as_of_seq 续订会把首段永久丢掉。
+// resubCursor 显式传入轮前 cursor：server 回放新轮早到帧；调用方须保证边界已先挂载。
+// 无显式 cursor 时按 snapshot as_of_seq 续订。
       const ack = await this.sendControl("subscribe", {
         session_ids: [sessionId],
-        cursors: options?.backdateResubCursor && priorCursor
-          ? { [sessionId]: priorCursor }
+        cursors: options?.resubCursor
+          ? { [sessionId]: options.resubCursor }
           : this.cursorPayload([sessionId]),
       });
       sdiag(`[wssnap] resub ${sessionId.slice(-8)} ack=${ack.code}`);
