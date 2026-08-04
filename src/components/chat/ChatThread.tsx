@@ -474,8 +474,8 @@ function CompactionNotice({
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
-            className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-            style={{ gridTemplateColumns: "minmax(0, 1fr) 18px", gap: 10, minHeight: 40, paddingLeft: 16, paddingRight: 14 }}
+            className="kimix-chat-collapse-row grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
+            style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px", gap: 10, minHeight: 40, paddingLeft: 16, paddingRight: 14 }}
             aria-expanded={expanded}
           >
             <span className="truncate" style={{ fontSize: 13, lineHeight: "18px" }}>

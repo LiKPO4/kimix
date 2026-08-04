@@ -493,7 +493,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                 {hookTemplates.map((template) => {
                   const Icon = template.icon;
                   return (
-                    <button key={template.title} type="button" onClick={() => startCreate(template)} disabled={generating} className="w-full rounded-lg border border-[var(--kimix-panel-border-soft)] text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)] disabled:cursor-wait disabled:opacity-60" style={{ padding: "11px 12px" }}>
+                    <button key={template.title} type="button" onClick={() => startCreate(template)} disabled={generating} className="kimix-muted-action w-full rounded-lg text-left disabled:cursor-wait disabled:opacity-60" style={{ padding: "11px 12px" }}>
                       <div className="flex items-center" style={{ gap: 9 }}>
                         <Icon size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--kimix-panel-text)]">{template.title}</span>
@@ -548,7 +548,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                       暂无规则。点击模板或“新建规则”开始配置。
                     </div>
                   ) : rules.map((rule) => (
-                    <button key={rule.id} type="button" onClick={() => setSelectedRuleId(rule.id)} className={`w-full rounded-lg border text-left transition-colors ${selectedRule?.id === rule.id ? "border-accent-primary bg-accent-primary-light" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated hover:bg-[var(--kimix-panel-soft-bg)]"}`} style={{ padding: "12px 12px" }}>
+                    <button key={rule.id} type="button" onClick={() => setSelectedRuleId(rule.id)} className="kimix-menu-item grid bg-surface-elevated text-left" aria-selected={selectedRule?.id === rule.id} style={{ padding: "12px 12px" }}>
                       <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                         <div className="min-w-0">
                           <div className="truncate text-[13.5px] font-semibold leading-5 text-[var(--kimix-panel-text)]">{rule.name}</div>
@@ -573,7 +573,7 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
                   {hookTemplates.map((template) => {
                     const Icon = template.icon;
                     return (
-                      <button key={template.title} type="button" onClick={() => startCreate(template)} className="w-full rounded-lg border border-[var(--kimix-panel-border-soft)] text-left transition-colors hover:bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 12px" }}>
+                      <button key={template.title} type="button" onClick={() => startCreate(template)} className="kimix-muted-action w-full rounded-lg text-left" style={{ padding: "12px 12px" }}>
                         <div className="flex items-center" style={{ gap: 9 }}>
                           <Icon size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--kimix-panel-text)]">{template.title}</span>

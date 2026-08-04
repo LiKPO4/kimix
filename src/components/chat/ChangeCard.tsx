@@ -432,7 +432,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
-            className="flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors hover:bg-surface-hover"
+            className="kimix-muted-action flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors"
             style={{ gap: 8, padding: "6px 8px" }}
             title={`预览 ${file.path} 的本轮变更`}
           >
@@ -455,7 +455,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
             disabled={loading}
-            className="justify-self-end rounded-md text-[12.5px] leading-5 text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:opacity-50"
+            className="kimix-muted-action justify-self-end rounded-md text-[12.5px] leading-5 text-text-muted transition-colors disabled:opacity-50"
             style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
           >
             {loading ? "加载中" : diffExpanded ? "收起" : "预览"}
@@ -464,7 +464,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             type="button"
             onClick={() => void handleRevert([file])}
             disabled={!projectPath || reverting}
-            className="flex h-8 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
+            className="kimix-muted-action flex h-8 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors disabled:cursor-not-allowed disabled:opacity-45"
             style={{ gap: 6, paddingLeft: 10, paddingRight: 10, minWidth: 68 }}
             title="撤销此文件"
           >
@@ -554,7 +554,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           type="button"
           onClick={() => void handleRevert(files)}
           disabled={!projectPath || reverting || files.length === 0}
-          className="flex shrink-0 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-45"
+          className="kimix-muted-action flex shrink-0 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors disabled:cursor-not-allowed disabled:opacity-45"
           style={{ gap: 6, height: 30, paddingLeft: 12, paddingRight: 12, minWidth: 92 }}
           title="撤销全部文件"
         >
@@ -568,7 +568,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="flex min-h-10 w-full items-center border-b border-border-subtle text-left text-[13.5px] text-text-secondary transition-colors hover:bg-surface-hover"
+            className="kimix-muted-action flex min-h-10 w-full items-center border-b border-border-subtle text-left text-[13.5px] text-text-secondary transition-colors hover:border-b-transparent"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronDown size={14} />
@@ -579,7 +579,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="flex min-h-10 w-full items-center text-left text-[13.5px] text-text-secondary transition-colors hover:bg-surface-hover"
+            className="kimix-muted-action flex min-h-10 w-full items-center text-left text-[13.5px] text-text-secondary transition-colors"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronUp size={14} />

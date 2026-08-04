@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：系统性穷举并补齐所有悬停风格化遗落（v2.20.169）
+
+- 现场：用户连续反馈「还是不全」——Retro 下画板比例按钮、Swarm 关闭、Git 图谱刷新、套餐用量刷新等仍是平面灰块，要求穷举所有有悬停变化的元素。
+- 根因（三路穷举审计）：① retro/nostalgia 的 `:where` 悬停环只给 box-shadow 不给 border/background，hover 底色仍是基类平涂 `--surface-hover`；② 悬停环成员不全（settings-icon-button、settings-check-button、chat-process-row 等未纳入，nostalgia 环比 retro 少更多）；③ `.kimix-inspector-action` 只在 inspector 作用域有规则，modal 内（Git 图谱刷新）完全失效；④ 一批组件仍是裸 Tailwind hover 未挂角色类（KimiWeb 折叠行、ChangeCard 按钮、DrawingBoard 控件、Hooks/Diff/Mcp/Sidebar/ModelProviderManager 等）；⑤ nostalgia 的 nav-list/selection hover shadow 是 none。
+- 修复（v2.20.169，四路并行 + 主代理收尾）：
+  1. CSS（index.css）：两个 allowlist 补全三件套（border-color+background+color+ring/raised）并扩 9 个成员；补 `.kimix-modal-card .kimix-inspector-action` 作用域；7 类带边框选择卡补无 ring 的边框 hover；menu-item danger 项补两风格 hover；实底 success/error/primary 按钮 hover 保浮雕（提特异性压过基类 shadow-hover）；nostalgia token `--ui-nav-list/selection-hover-shadow` none→raised；skill-card hover 保浮雕。
+  2. 组件（12 个 tsx）：MessageBubble 7 处折叠行、ChatThread 压缩行、QuestionCard 折叠行+选项 → kimix-chat-collapse-row/room-choice；ChangeCard 6 钮、SessionRecommendationCard 2 钮、EmptyState 建议行、DrawingBoard 2 组控件、HooksPanel 3 处、DiffPanel 文件行、McpPanel OAuth 开关、Sidebar 展开行、ModelProviderManager 3 处全部挂角色类。
+  3. 主代理收尾补丁：`.kimix-chat-collapse-row` 基类补 hover 底（挂类后 default 无 hover 的回归）、`.kimix-menu-item` transition 补 box-shadow（retro 环 150ms 过渡而非 snap，符合不变量 45）。
+- 验收：全量 1512 测试通过（uiStyles 回归门禁断言同步更新）、typecheck 通过、`pnpm build` 通过、`knowledge:validate` PASS；实机两风格悬停效果待用户截图验收。
+- 已知边界：Composer 排队拖拽行（4378）与 TodoPanel 标题行（105）经判断不适合挂角色类保持现状（有报告理由）；nostalgia  hover 新增 1px border 有约 0.5px 位移（Win98 语言既有模式）；nostalgia 选中侧栏行 hover 从平面变凸起（token 修正的预期变化）。
+- 知识库：log.md 已记（allowlist 补全与组件角色化），契约不变量无需新增。
+- 关键文件：`src/index.css`（两个 allowlist + modal 作用域 + 边框卡 hover + token）、12 个组件 tsx、`src/utils/__tests__/uiStyles.test.ts`。
+
 ## 2026-08-04 修复：Retro/Nostalgia 下菜单项悬停与实底主按钮无风格质感（v2.20.168）
 
 - 现场：用户截图（Retro 风格）——顶部「编辑」下拉菜单项悬停是平涂灰底、工作目录浮层「选择目录」深色按钮、套餐用量「刷新」按钮，悬停效果与当前风格不一致。

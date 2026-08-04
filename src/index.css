@@ -570,6 +570,19 @@
   background-color: var(--surface-hover);
 }
 
+[data-ui-style="modern"] .kimix-modal-card .kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--kimix-modern-control-radius);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="modern"] .kimix-modal-card .kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
 [data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
 [data-ui-style="modern"] .kimix-modal-card .kimix-inspector-list-item {
   border: 1px solid var(--border-subtle);
@@ -818,6 +831,25 @@
   box-shadow: var(--ui-control-active-shadow);
 }
 
+/* 弹窗（如 Git 图谱）内的刷新芯片与侧栏矩阵同一角色语言。 */
+[data-ui-style="retro"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-ui-style="retro"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--ui-control-hover-border-color);
+  background-color: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
+  box-shadow: var(--ui-control-active-shadow);
+}
+
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inspector-list-item,
 [data-ui-style="retro"] .kimix-modal-card .kimix-inspector-list-item {
   border: 1px solid var(--border-subtle);
@@ -941,6 +973,19 @@
   box-shadow: var(--kimix-retro-button-hover-shadow);
 }
 
+/* 带真实边框的选择卡/列表行：hover 用同一套描边+内阴影语言，不叠加 ring，避免粗双边。 */
+[data-ui-style="retro"] .kimix-settings-theme:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-settings-uistyle:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-settings-palette-wrap:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-settings-permission:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-model-provider-item:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-model-row:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="retro"] .kimix-plugin-list-item:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]) {
+  border-color: var(--kimix-retro-button-hover-border-color);
+  background: var(--kimix-retro-button-hover-background);
+  box-shadow: var(--kimix-retro-button-hover-shadow);
+}
+
 /* 只给独立视觉按钮补充复古 hover 环；低权重确保带真实边框的结构控件接管边界。 */
 :where([data-ui-style="retro"]) :where(
   .kimix-icon-text-button,
@@ -949,8 +994,19 @@
   .kimix-sidebar-icon-action,
   .kimix-modal-close-button,
   .kimix-settings-entry,
-  button.kimix-chat-collapse-row
-):hover:not(:disabled) {
+  button.kimix-chat-collapse-row,
+  .kimix-chat-banner-button,
+  .kimix-settings-icon-button,
+  .kimix-settings-palette-action,
+  .kimix-preview-close,
+  .kimix-preview-nav,
+  .kimix-runtime-error-close,
+  .kimix-chat-process-row,
+  .kimix-settings-check-button
+):hover:not(:disabled):not(.bg-accent-primary) {
+  border-color: var(--kimix-retro-button-hover-border-color);
+  background: var(--kimix-retro-button-hover-background);
+  color: var(--text-primary);
   box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
 }
 
@@ -1025,6 +1081,11 @@
   box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
+/* 危险菜单项保留语义色，hover 仅补充描边+内阴影，不改变底色。 */
+[data-ui-style="retro"] .kimix-menu-item.is-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 35%, transparent), var(--kimix-retro-button-hover-shadow);
+}
+
 /* 与 Modern 对应的游离角色：Retro 统一小圆角和 panel/floating 阴影。
    技能卡的启用态边框是 accent 语义色，只接管圆角与阴影，不覆盖边框色。 */
 [data-ui-style="retro"] .kimix-longtask-inspector,
@@ -1036,6 +1097,11 @@
 
 [data-ui-style="retro"] .kimix-skill-card {
   border-radius: var(--radius-md);
+  box-shadow: var(--kimix-retro-panel-shadow);
+}
+
+/* 基础 hover 的同特异性阴影会洗掉静止浮雕，这里恢复 Platinum 面板浮雕。 */
+[data-ui-style="retro"] .kimix-skill-card:hover {
   box-shadow: var(--kimix-retro-panel-shadow);
 }
 
@@ -1114,13 +1180,13 @@
   --ui-nav-action-hover-shadow: var(--kimix-nostalgia-raised-shadow);
   --ui-nav-list-hover-border-color: var(--border-default);
   --ui-nav-list-hover-background: var(--surface-hover);
-  --ui-nav-list-hover-shadow: none;
+  --ui-nav-list-hover-shadow: var(--kimix-nostalgia-raised-shadow);
   --ui-selection-border-color: var(--border-strong);
   --ui-selection-background: var(--surface-active);
   --ui-selection-shadow: none;
   --ui-selection-hover-border-color: var(--border-strong);
   --ui-selection-hover-background: var(--surface-hover);
-  --ui-selection-hover-shadow: none;
+  --ui-selection-hover-shadow: var(--kimix-nostalgia-raised-shadow);
   --ui-toggle-border-color: var(--border-strong);
   --ui-toggle-background: var(--surface-active);
   --ui-toggle-color: var(--text-primary);
@@ -1220,6 +1286,23 @@
 }
 
 [data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
+/* 弹窗（如 Git 图谱）内的刷新芯片与侧栏矩阵同一角色语言。 */
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action {
+  border: var(--kimix-nostalgia-flat-border);
+  border-radius: 0;
+  background-color: var(--surface-elevated);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-icon-text-button.kimix-inspector-action:active:not(:disabled) {
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 
@@ -1345,9 +1428,22 @@
   .kimix-icon-text-button,
   .kimix-muted-action,
   .kimix-chat-collapse-row,
-  .kimix-chat-banner-button
+  .kimix-chat-banner-button,
+  .kimix-inline-icon-action,
+  .kimix-sidebar-icon-action,
+  .kimix-modal-close-button,
+  .kimix-settings-entry,
+  .kimix-settings-icon-button,
+  .kimix-settings-palette-action,
+  .kimix-preview-close,
+  .kimix-preview-nav,
+  .kimix-runtime-error-close,
+  .kimix-chat-process-row,
+  .kimix-settings-check-button
 ):hover:not(:disabled) {
   border-radius: 0;
+  border: var(--kimix-nostalgia-flat-border);
+  background: var(--surface-hover);
   /* 悬停浮现 Win98 凸起浮雕，与 nostalgia「控件静止即凸起」的语言一致。 */
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
@@ -1439,6 +1535,24 @@
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 
+/* 危险菜单项保留语义色，hover 仅补充凸起浮雕，不改变底色。 */
+[data-ui-style="nostalgia"] .kimix-menu-item.is-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+/* 带真实边框的选择卡/列表行：hover 凸起浮雕 + 浅底，不叠加第二个边界。 */
+[data-ui-style="nostalgia"] .kimix-settings-theme:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-settings-uistyle:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-settings-palette-wrap:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-settings-permission:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-model-provider-item:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-model-row:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]),
+[data-ui-style="nostalgia"] .kimix-plugin-list-item:hover:not(:disabled):not(.is-active):not([aria-pressed="true"]) {
+  border: var(--kimix-nostalgia-flat-border);
+  background: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
 [data-ui-style="nostalgia"] .kimix-longtask-inspector,
 [data-ui-style="nostalgia"] .kimix-diff-panel {
   border-color: var(--border-default) !important;
@@ -1448,6 +1562,11 @@
 
 [data-ui-style="nostalgia"] .kimix-skill-card {
   border-radius: 0;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+/* 基础 hover 会把浮雕洗成 none，这里恢复 Win98 凸起浮雕。 */
+[data-ui-style="nostalgia"] .kimix-skill-card:hover {
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
@@ -1843,6 +1962,19 @@ body::before {
   background: #B91C1C;
 }
 
+/* 实底彩色按钮保留预设浮雕，不被基础 hover 阴影覆盖（只加形状，不改背景色）。 */
+[data-ui-style="retro"] .kimix-runtime-error-button:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="nostalgia"] .kimix-runtime-error-button:hover:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-runtime-error-button:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
 /* ── Composer Focus Override ── */
 
 .kimix-composer-surface:focus,
@@ -2013,6 +2145,20 @@ body::before {
 }
 
 .kimix-longtask-inspector .kimix-section-card .kimix-inspector-action:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background-color: var(--surface-hover);
+}
+
+/* 弹窗（如 Git 图谱）内的刷新芯片与侧栏矩阵同一角色语言。 */
+.kimix-modal-card .kimix-inspector-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-base);
+  background-image: none;
+  box-shadow: none;
+}
+
+.kimix-modal-card .kimix-inspector-action:hover:not(:disabled) {
   border-color: var(--border-default);
   background-color: var(--surface-hover);
 }
@@ -2273,6 +2419,10 @@ body::before {
               scale var(--duration-fast) var(--ease-hover);
 }
 
+.kimix-chat-collapse-row:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
 .kimix-chat-collapse-row:active:not(:disabled) {
   scale: 0.96;
 }
@@ -2346,6 +2496,17 @@ button.bg-accent-primary:hover:not(:disabled),
   background: var(--kimix-primary-button-hover) !important;
   color: var(--text-inverse) !important;
   box-shadow: var(--shadow-hover);
+}
+
+/* 属性选择器提特异性：hover 保持预设浮雕（retro 顶高光 / nostalgia 凸起），active 下沉由各预设块覆盖。 */
+[data-ui-style="retro"] button.bg-accent-primary:hover:not(:disabled),
+[data-ui-style="retro"] [role="button"].bg-accent-primary:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="nostalgia"] button.bg-accent-primary:hover:not(:disabled),
+[data-ui-style="nostalgia"] [role="button"].bg-accent-primary:hover:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
 .bg-accent-primary:focus-visible:not(:disabled),
@@ -2571,6 +2732,19 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--shadow-hover);
 }
 
+/* 实底彩色按钮保留预设浮雕（只加形状，不改背景色）。 */
+[data-ui-style="retro"] .kimix-success-action:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="nostalgia"] .kimix-success-action:hover:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] .kimix-success-action:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
 /* ── Menus ── */
 
 .kimix-top-menu,
@@ -2591,8 +2765,8 @@ button.bg-accent-primary:disabled:hover,
   align-items: center;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  transition-property: background-color, color, scale;
-  transition-duration: var(--duration-base), var(--duration-base), var(--duration-fast);
+  transition-property: background-color, color, box-shadow, scale;
+  transition-duration: var(--duration-base), var(--duration-base), var(--duration-base), var(--duration-fast);
   transition-timing-function: var(--ease-hover);
 }
 

@@ -71,7 +71,7 @@ export const SessionRecommendationCard = memo(function SessionRecommendationCard
                 type="button"
                 disabled={disabled}
                 onClick={startFreshSession}
-                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary transition-colors hover:bg-accent-primary/10 disabled:cursor-wait disabled:text-text-muted"
+                className="kimix-icon-text-button is-compact h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary disabled:cursor-wait disabled:text-text-muted"
                 style={{ gap: 6, paddingLeft: 10, paddingRight: 12 }}
               >
                 <span>{creating ? "正在开启" : "开启新对话"}</span>
@@ -81,7 +81,7 @@ export const SessionRecommendationCard = memo(function SessionRecommendationCard
                 type="button"
                 disabled={disabled}
                 onClick={startHandoff}
-                className="inline-flex h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary transition-colors hover:bg-accent-primary/10 disabled:cursor-wait disabled:text-text-muted"
+                className="kimix-icon-text-button is-compact h-8 items-center rounded-lg text-[14px] font-medium text-accent-primary disabled:cursor-wait disabled:text-text-muted"
                 style={{ gap: 6, paddingLeft: 10, paddingRight: 12 }}
               >
                 <span>{isHandoffRunning ? `交接中${dots}` : "携带交接内容开启新对话"}</span>

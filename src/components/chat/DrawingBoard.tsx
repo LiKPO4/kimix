@@ -1136,7 +1136,8 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       key={item.value}
                       type="button"
                       onClick={() => setColorPanelMode(item.value)}
-                      className={`h-8 flex-1 rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)] hover:bg-surface-elevated/70"}`}
+                      className={`kimix-settings-check-button h-8 flex-1 justify-center rounded-lg text-[13px] transition-colors ${active ? "bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]" : "text-[var(--kimix-panel-text-secondary)]"}`}
+                      style={{ minHeight: 32, ...(active ? { background: "var(--surface-elevated)", color: "var(--accent-primary)" } : undefined) }}
                     >
                       {item.label}
                     </button>
@@ -1177,7 +1178,8 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       key={item.value}
                       type="button"
                       onClick={() => setStrokeWidth(item.value)}
-                      className={`h-8 rounded-lg text-[13px] transition-colors ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)]"}`}
+                      className={`kimix-settings-check-button h-8 justify-center rounded-lg text-[13px] transition-colors ${active ? "bg-accent-primary-light text-accent-primary" : "text-[var(--kimix-panel-text-secondary)]"}`}
+                      style={{ minHeight: 32, ...(active ? { background: "var(--accent-primary-light)", color: "var(--accent-primary)" } : undefined) }}
                     >
                       {item.label}
                     </button>

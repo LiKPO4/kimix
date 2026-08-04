@@ -175,7 +175,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="flex w-full items-center rounded-xl text-left transition-colors hover:bg-surface-elevated/60"
+          className="kimix-chat-collapse-row flex w-full items-center rounded-xl text-left transition-colors hover:bg-surface-elevated/60"
           style={{ gap: 14, minHeight: 48, paddingLeft: 10, paddingRight: 10 }}
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]">
@@ -223,8 +223,9 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
                         type="button"
                         disabled={!isPending || isSubmitting}
                         onClick={() => setQuestionAnswer(key, option.label, question.multiSelect)}
-                        className={`flex w-full items-center rounded-xl border text-left text-[13.5px] transition-colors disabled:cursor-not-allowed ${active ? "border-accent-primary bg-accent-primary-light text-accent-primary-dark" : "border-border-subtle bg-surface-elevated text-text-primary hover:bg-surface-hover"}`}
+                        className={`kimix-room-choice flex w-full items-center rounded-xl border text-left text-[13.5px] disabled:cursor-not-allowed border-border-subtle bg-surface-elevated text-text-primary hover:bg-surface-hover data-[selected=true]:border-accent-primary data-[selected=true]:bg-accent-primary-light data-[selected=true]:text-accent-primary-dark`}
                         style={{ gap: 10, minHeight: 62, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10 }}
+                        data-selected={active}
                         title={option.description}
                       >
                         <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${active ? "border-accent-primary bg-accent-primary text-white" : "border-border-default text-transparent"}`}>

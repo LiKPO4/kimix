@@ -154,11 +154,8 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
                   key={file.path}
                   type="button"
                   onClick={() => onSelectFile(file)}
-                  className={`grid min-w-0 items-center rounded-lg border text-left transition-colors ${
-                    selectedPath === file.path
-                      ? "border-accent-primary bg-accent-primary-light"
-                      : "border-border-subtle bg-surface-elevated hover:bg-surface-hover"
-                  }`}
+                  className="kimix-menu-item grid min-w-0 items-center bg-surface-elevated text-left"
+                  aria-selected={selectedPath === file.path}
                   style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto", gap: 10, padding: "9px 11px" }}
                   title={file.path}
                 >

@@ -595,7 +595,8 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                     <button
                       type="button"
                       onClick={() => setForm((current) => ({ ...current, authOauth: !current.authOauth }))}
-                      className={`mt-2 flex h-10 w-full items-center justify-between rounded-xl border text-[14px] transition-colors ${form.authOauth ? "border-accent-primary-soft bg-accent-primary-light text-accent-primary-dark hover:bg-accent-primary-light/80" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[var(--kimix-panel-text-secondary)] hover:bg-surface-hover"}`}
+                      aria-pressed={form.authOauth}
+                      className="kimix-state-button mt-2 flex h-10 w-full items-center justify-between rounded-xl text-[14px] transition-colors"
                       style={{ paddingLeft: 16, paddingRight: 16 }}
                     >
                       <span>{form.authOauth ? "已启用" : "未启用"}</span>

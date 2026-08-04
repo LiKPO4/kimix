@@ -643,7 +643,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowApiKey((value) => !value)}
-                  className="absolute right-1 top-1 flex h-7 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover"
+                  className="kimix-inline-icon-action absolute right-1 top-1 text-text-muted hover:bg-surface-hover"
+                  style={{ width: 32, height: 28 }}
                   aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
                 >
                   {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -770,7 +771,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       默认
                     </button>
                     {!selectedProviderManaged && (
-                      <button type="button" onClick={(event) => { event.stopPropagation(); void handleRemoveModel(model); }} disabled={Boolean(busyAction)} className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-accent-danger-light hover:text-accent-danger" aria-label={`删除 ${model.displayName || model.alias}`}>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); void handleRemoveModel(model); }} disabled={Boolean(busyAction)} className="kimix-inline-icon-action text-text-muted hover:bg-accent-danger-light hover:text-accent-danger" style={{ width: 32, height: 32, flexBasis: 32 }} aria-label={`删除 ${model.displayName || model.alias}`}>
                         <Trash2 size={13} />
                       </button>
                     )}
@@ -873,7 +874,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                             type="button"
                             aria-pressed={selected}
                             onClick={() => handleToggleEffort(effort)}
-                            className={`flex items-center justify-center rounded-lg border border-[var(--kimix-panel-border-soft)] text-[12px] leading-none ${selected ? "bg-surface-hover text-accent-primary" : "text-text-muted hover:bg-surface-hover"}`}
+                            className="kimix-state-button flex items-center justify-center rounded-lg text-[12px] leading-none"
                             style={{ height: 28, paddingLeft: 11, paddingRight: 11 }}
                           >
                             {thinkingEffortLabel(effort)}

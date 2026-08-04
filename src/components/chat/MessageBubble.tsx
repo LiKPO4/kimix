@@ -1504,8 +1504,8 @@ function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) 
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           data-kimix-search-expand="true"
-          className="grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
+          className="kimix-chat-collapse-row grid w-full items-center text-left text-[14.5px] text-[var(--kimix-panel-text-secondary)] transition-colors"
+          style={{ display: "grid", gridTemplateColumns: "18px 1fr auto 18px", gap: 8, minHeight: 34, paddingLeft: 12, paddingRight: 12 }}
         >
           {rowContent}
         </button>
@@ -1562,7 +1562,7 @@ function KimiWebToolGroupCard({ tools }: { tools: ToolEvent[] }) {
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
         data-kimix-search-expand="true"
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="kimix-chat-collapse-row flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -1891,8 +1891,8 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="grid w-full items-center text-left transition-colors hover:bg-[var(--kimix-panel-hover)]"
-          style={{ gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42, paddingLeft: 16, paddingRight: 16 }}
+          className="kimix-chat-collapse-row grid w-full items-center text-left transition-colors"
+          style={{ display: "grid", gridTemplateColumns: "18px minmax(0, 1fr) auto 18px", gap: 8, minHeight: 42, paddingLeft: 16, paddingRight: 16 }}
           title={expanded ? "收起子事件" : "展开子事件"}
         >
           {rowContent}
@@ -1937,7 +1937,7 @@ function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; tool?: T
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="kimix-chat-collapse-row flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -1995,7 +1995,7 @@ function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] })
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="kimix-chat-collapse-row flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors"
         style={{ gap: 9, minHeight: 42, padding: "9px 16px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -2074,7 +2074,7 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="kimix-chat-collapse-row flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -2117,7 +2117,7 @@ function KimiWebQuestionGroupCard({ question }: { question: QuestionEvent }) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors hover:bg-[var(--kimix-panel-hover)]"
+        className="kimix-chat-collapse-row flex w-full items-center text-left text-[13.5px] leading-none text-[var(--kimix-panel-text-secondary)] transition-colors"
         style={{ gap: 9, padding: "8px 12px" }}
       >
         <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">

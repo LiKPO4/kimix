@@ -1163,8 +1163,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               <button
                                 type="button"
                                 onClick={toggleSessionListExpanded}
-                                className="flex h-8 items-center rounded-lg text-[13px] text-text-muted transition-colors hover:bg-surface-hover"
-                                style={{ paddingLeft: 16, paddingRight: 10, gap: 6 }}
+                                className="kimix-menu-item text-[13px]"
+                                style={{ height: 32, minHeight: 32, paddingLeft: 16, paddingRight: 10, gap: 6, color: "var(--text-muted)" }}
                               >
                                 {sessionListWindow.collapsed ? `展开剩余 ${sessionListWindow.hiddenCount} 个对话` : `收起 ${sessionListWindow.hiddenCount} 个对话`}
                               </button>
