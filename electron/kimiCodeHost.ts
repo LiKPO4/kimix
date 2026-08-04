@@ -3186,7 +3186,7 @@ async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean)
   }
   managed.planMode = status.plan_mode;
   managed.swarmMode = status.swarm_mode;
-  if (emitEvent) eventSink?.({ sessionId, event: serverStatusToAgentEvent(effectiveStatus) });
+  if (emitEvent) eventSink?.({ sessionId, event: { ...serverStatusToAgentEvent(effectiveStatus), kimixStatusRefresh: true } });
   return effectiveStatus;
 }
 

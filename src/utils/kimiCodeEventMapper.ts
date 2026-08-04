@@ -703,6 +703,7 @@ export function mapKimiCodeEvent(
         contextLimit: isNumber(event.maxContextTokens) ? event.maxContextTokens : undefined,
         planMode: typeof event.planMode === "boolean" ? event.planMode : undefined,
         swarmMode: typeof event.swarmMode === "boolean" ? event.swarmMode : undefined,
+        source: event.kimixStatusRefresh === true ? "status_refresh" : undefined,
         message: currentTurnUsage && isString(event.model) ? `模型：${event.model}` : undefined,
       };
     }

@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：轮末用法信息卡缺失（显示「已完成 · 用时」而非模型/输入/输出/Context）（v2.20.176）
+
+- 现场：用户截图对比——一轮结束时 footer 有时显示「已完成 · 用时 22秒」，切会话再切回就变成正常的「模型: k3 输入 输出 Context」卡。
+- 根因（代码证据闭环）：时序为 turn.ended/prompt.completed → renderer settle（清 runningSessionId + settleInactiveEvents + 渲染冻结）→ 最终 usage.record / agent.status.updated **迟到**；迟到帧在入口被 `shouldAppendRuntimeStatusToTimeline`（`runtimeStatusTimeline.ts:30` 要求 active/open work）丢弃；切会话走 canonical 历史（不经闸门）所以自愈。
+- 关键约束：闸门本来是为了拦「快照帧」（`refreshServerSessionStatus(emitEvent=true)` 发射，resume/切会话/权限变更/compaction 回读，带 contextTokens，不变量 8/14f 要求闲置时不得重写 footer），不能简单放宽。
+- 修复（v2.20.176）：refresh 路径 emit 点给事件打标 `kimixStatusRefresh: true` → 映射为 `source: "status_refresh"`（维持旧闸门语义）；未打标的实时帧携带指标数据（tokenCount/inputTokenCount/contextSize/contextLimit 任一）且会话最新事件在 2 分钟新鲜窗口（STALE_TIMELINE_WORK_MS）内时放行。sessionMetrics 无需改动（status_refresh 无 token/message 不自成卡）。
+- 验收：全量 1535 测试通过（新增 4 闸门用例）、typecheck 通过、`pnpm build` 通过、`knowledge:validate` PASS；实机轮末卡片完整性待用户验收。
+- 已知边界：settle 到迟到帧超过 2 分钟仍可能缺卡（切会话自愈兜底）；空事件新会话的极端场景实时帧被丢弃。
+- 知识库：`runtime-routing.md` 不变量 14f 扩写（settle 竞态 + 打标语义），log.md 已记。
+- 关键文件：`electron/kimiCodeHost.ts:3189`（打标）、`src/utils/kimiCodeEventMapper.ts:706`、`src/utils/runtimeStatusTimeline.ts`（闸门）。
+
 ## 2026-08-04 修复：变更卡统计不到 Bash/python 改动 + 输入区上方空白过大（v2.20.175）
 
 - 现场 1：用户反馈 v2.20.174 轮实际改 4 个文件，变更卡只显示「文件变更 1 个 +9 -0」（TASK_STATE.md）。

@@ -580,7 +580,7 @@ export interface StatusUpdateEvent {
   swarmMode?: boolean;
   message?: string;
   level?: string;
-  source?: "runtime" | "slash" | "skill" | "ui" | "ipc";
+  source?: "runtime" | "slash" | "skill" | "ui" | "ipc" | "status_refresh";
   tone?: "default" | "info" | "success" | "warning" | "danger";
   parentEventId?: string;
 }
