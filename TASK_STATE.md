@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：Retro/Nostalgia 下菜单项悬停与实底主按钮无风格质感（v2.20.168）
+
+- 现场：用户截图（Retro 风格）——顶部「编辑」下拉菜单项悬停是平涂灰底、工作目录浮层「选择目录」深色按钮、套餐用量「刷新」按钮，悬停效果与当前风格不一致。
+- 根因：上一轮（v2.20.167）把元素都挂上了角色类，但 CSS 契约层本身没给这些角色定义 preset 悬停质感——`.kimix-menu-item:hover` 在所有预设下都是平涂 `--surface-hover`；`button.bg-accent-primary` 实底主按钮无任何 preset 浮雕；Nostalgia 的 icon-text/muted 按钮 hover 只有 radius 归零没有凸起。问题不在组件层而在预设规则缺失。
+- 修复（v2.20.168，只改 index.css + 文档）：
+  1. Retro `.kimix-menu-item:hover` → 共享悬停背景 + 描边内阴影（与按钮 hover 同一语言）；选中/危险/disabled 项排除，保留各自语义。
+  2. Nostalgia `.kimix-menu-item:hover` → 凸起浮雕；选中项保持下沉。
+  3. Nostalgia icon-text/muted 等按钮 hover 补 `raised-shadow`（此前只有 radius 0）。
+  4. Retro/Nostalgia `button.bg-accent-primary` 实底主按钮补形状级浮雕（retro 顶高光+投影 / nostalgia 凸起静止+下沉按压），accent 填充仍归色彩主题所有（未违反 token 所有权）。
+- 验收：全量 1512 测试通过、typecheck 通过、`pnpm build` 通过（Tailwind v4 校验 CSS 语法）、`knowledge:validate` PASS；实机两风格悬停效果待用户截图验收。
+- 知识库：`interface-style-system.md` 新增一条不变量（菜单项悬停语言 + 实底主按钮 preset 浮雕例外），log.md 已记。
+- 关键文件：`src/index.css`（retro 菜单项 hover、nostalgia 菜单项 hover、nostalgia 按钮 hover、两风格 bg-accent-primary 规则）。
+
 ## 2026-08-04 优化：二级菜单/浮层风格化覆盖补齐（v2.20.167）
 
 - 现场：用户截图反馈多个二级菜单/浮层（权限菜单 tooltip、套餐用量浮层、思考强度菜单、会话「…」菜单、顶部「文件」下拉、工作目录浮层）未跟随界面风格体系，要求全面排查所有二级菜单位置。

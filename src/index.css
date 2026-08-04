@@ -908,6 +908,18 @@
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
+/* 实底主操作按钮同样要有复古浮雕：沿用 composer-primary 的顶高光+投影语言。 */
+[data-ui-style="retro"] button.bg-accent-primary,
+[data-ui-style="retro"] [role="button"].bg-accent-primary {
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="retro"] button.bg-accent-primary:active:not(:disabled),
+[data-ui-style="retro"] [role="button"].bg-accent-primary:active:not(:disabled) {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
 /* ContextBar 只负责排列按钮，不再额外形成一层带框容器。 */
 [data-ui-style="retro"] .kimix-context-bar {
   border: 0;
@@ -999,6 +1011,13 @@
 [data-ui-style="retro"] .kimix-menu-panel {
   padding-top: 6px;
   padding-bottom: 6px;
+}
+
+/* 菜单项悬停接入复古语言：与按钮 hover 同款的描边+内阴影，避免平涂灰底。
+   选中/危险项保留各自语义处理，不被 hover 规则覆盖。 */
+[data-ui-style="retro"] .kimix-menu-item:hover:not(:disabled):not([aria-disabled="true"]):not([aria-checked="true"]):not([aria-selected="true"]):not(.is-danger) {
+  background: var(--kimix-retro-button-hover-background);
+  box-shadow: 0 0 0 1px var(--kimix-retro-button-hover-border-color), var(--kimix-retro-button-hover-shadow);
 }
 
 [data-ui-style="retro"] .kimix-menu-item[aria-checked="true"],
@@ -1290,6 +1309,18 @@
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 
+/* 实底主操作按钮：静止凸起、按压下沉，与 composer-primary 同一语言。 */
+[data-ui-style="nostalgia"] button.bg-accent-primary,
+[data-ui-style="nostalgia"] [role="button"].bg-accent-primary {
+  border-radius: 0 !important;
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
+}
+
+[data-ui-style="nostalgia"] button.bg-accent-primary:active:not(:disabled),
+[data-ui-style="nostalgia"] [role="button"].bg-accent-primary:active:not(:disabled) {
+  box-shadow: var(--kimix-nostalgia-sunken-shadow);
+}
+
 [data-ui-style="nostalgia"] .kimix-context-bar {
   border: 0;
   background: transparent;
@@ -1317,6 +1348,8 @@
   .kimix-chat-banner-button
 ):hover:not(:disabled) {
   border-radius: 0;
+  /* 悬停浮现 Win98 凸起浮雕，与 nostalgia「控件静止即凸起」的语言一致。 */
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
 /* Workspace header back action: a real raised Win98 button, not a ghost label. */
@@ -1392,6 +1425,12 @@
 
 [data-ui-style="nostalgia"] .kimix-menu-item {
   border-radius: 0;
+}
+
+/* 菜单项悬停用凸起浮雕而非平涂底色；选中项保持下沉、危险项保持语义色。 */
+[data-ui-style="nostalgia"] .kimix-menu-item:hover:not(:disabled):not([aria-disabled="true"]):not([aria-checked="true"]):not([aria-selected="true"]):not(.is-danger) {
+  background: var(--surface-hover);
+  box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
 [data-ui-style="nostalgia"] .kimix-menu-item[aria-checked="true"],
