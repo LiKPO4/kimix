@@ -480,7 +480,10 @@ async function loadStartupRoomAgentHistory(
         loaded = fallbackLoaded;
       }
     }
-    const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId }).catch(() => null);
+    const resumedRuntime = await window.api.resumeKimiCodeSession({ sessionId })
+      .then((res) => (res.success ? res.data : null))
+      .catch(() => null);
+    const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: resumedRuntime?.sessionId ?? sessionId }).catch(() => null);
     const runtimeIsActive = Boolean(
       runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
     );
@@ -2252,7 +2255,11 @@ function App() {
                 }
                 return;
               }
-              const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: historySessionId }).catch(() => null);
+              const resumedRuntime = await window.api.resumeKimiCodeSession({ sessionId: historySessionId })
+                .then((res) => (res.success ? res.data : null))
+                .catch(() => null);
+              const runtimeStatusSessionId = resumedRuntime?.sessionId ?? historySessionId;
+              const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: runtimeStatusSessionId }).catch(() => null);
               const runtimeIsActive = Boolean(
                 runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
               );

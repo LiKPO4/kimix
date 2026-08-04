@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：重启后 in-flight 轮次失去订阅、尾部事件丢失（v2.20.172）
+
+- 现场：用户双端对比截图——web 端显示完整尾部（grep/编辑 TASK_STATE/git 提交 3 个工具调用 + 最终答复），Kimix 侧只剩 1 个工具调用，最终答复是旧内容。用户反馈「还是会有这种不同步」。
+- 取证链（diag.log + IndexedDB 导出 + persist 计数）：
+  1. 本地时间线在启动对账前**恰好缺 8 个事件**（02:11:12 `kimiHistoryReconciliation.accepted` reason=startup，persist 21669→21677 = 缺失的 status×3 + Edit + change_summary + diff + Bash + 最终答复 assistant）。
+  2. 02:08:42 renderer boot（electron-vite 因主进程代码改动重启了整个应用）后 **diag.log 再无任何 [wsframe]/[poll] 帧日志**——WS 订阅随主进程死亡，agent 在外部 server 继续跑了 2 分钟（web 全程可见），新主进程无人重新订阅。
+  3. 渲染层 `runningSessionId` 是内存态（重启后 null）→ 1.5s reconcile 轮询短路；启动链路直接 `getKimiCodeStatus`，而主进程 getStatus 对未注册会话必抛错 → 一律按 idle → 无任何机制发现 server 上会话还在忙。
+- 修复（v2.20.172）：启动主链路（App.tsx:2258）与房间恢复路径（:483）在 getStatus 前补幂等 `resumeKimiCodeSession`（镜像 Sidebar.tsx:717-722 已验证模式；resume = 绑定 WS 订阅 + 回读状态，不是复活），后续 getStatus 用 resume 返回的权威 sessionId；runningSessionId 仍只由官方 status 的 active 判定置位，terminal/unknown 维持 settleInactiveEvents（与不变量 7 兼容——复活门是 status 裁决本身）。
+- 验收：全量 1522 测试通过、typecheck 通过、`pnpm build` 通过、`knowledge:validate` PASS；实机「重启后续传」待用户验收。
+- 已知边界：主进程每次启动多一次 resume IPC（失败静默）；生产环境 quit/reopen 中途轮次同样受益；不变量 7 已扩写「resume 是绑定不是复活」。
+- 知识库：`runtime-routing.md` 不变量 7 扩写，log.md 已记。
+- 关键文件：`src/App.tsx:2258-2262`（主启动链路）、`src/App.tsx:483-486`（房间恢复路径）。
+
 ## 2026-08-04 功能：添加模型时 Context 与思考档位自动预填（v2.20.171）
 
 - 现场：用户添加第三方供应商模型（阿里百炼 qwen3.8-max），问思考档位和上下文大小能否自动探测、不能的话怎么快捷设置。
