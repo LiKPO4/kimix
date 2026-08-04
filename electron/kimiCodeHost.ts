@@ -1351,6 +1351,10 @@ export async function sendPrompt(
   const promptModel = resolvePromptModel(expectedModel, serverManaged?.model ?? sessions.get(sessionId)?.model);
   if (promptModel && promptModel !== (serverManaged?.model ?? sessions.get(sessionId)?.model)) {
     await setModel(sessionId, promptModel);
+    // 本地期望值是用户对本轮的权威意图：setModel 之外直接注入，防止
+    // server 状态刷新（busy 期间仍可能回写）把选择器刷回旧值。
+    const managedNow = serverSessions.get(sessionId) ?? sessions.get(sessionId);
+    if (managedNow) managedNow.model = promptModel;
     serverManaged = serverSessions.get(sessionId);
   }
   await ensureModelOutputLimitBeforePrompt(promptModel);

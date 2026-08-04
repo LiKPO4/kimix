@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：新会话选 k3 发送被以 deepseek 执行 + 选择器回跳（v2.20.205）
+
+- 现场：204 下「新会话+选 k3+发送」：消息「发送中」久不结束、选择器回跳 deepseek；server REST 实锤 `model=deepseek`、busy=true（deepseek 挂起中），用户 k3 选择没带到 server。
+- 根因（两层）：① sendPrompt 的 setModel 以旧 deepseek 配置/连接发 /profile，「卡住的 deepseek」上 updateSession 可能挂起/失败致本轮以旧模型执行；② 挂起/失败后 server 状态刷新（busy 期间 managed.model 未更新时仍回写）把选择器刷回 deepseek。图1「未连接」是前一实例（204 前）的日志。
+- 修复：sendPrompt 在 setModel 后把本地期望值直接注入 managed（`managedNow.model = promptModel`）——用户选择是本轮权威意图，server 状态刷新不能再回写；prompt 携带源同步即为此值。k3 选择可生效时以 k3 执行，server 卡住无法 updateSession 时仍以 deepseek 执行但选择器不再回跳。
+- 验收：typecheck/全量 1559/build 通过；实机待验收（新会话选 k3 发送：选择器应保持在 k3 或至少不回跳；若仍被以 deepseek 执行，回传——下一步查 setModel 在卡住会话上的具体失败）。
+- 已知边界：setModel 对「卡住会话」的失败未单独重试；需诊断时抓 dev 控制台 `[KimiCodeServerHost] prompt failed`/`updateSession` 日志。
+- 知识库：无需更新（权限/模型不变量 8 的语义复用）。
+- 关键文件：`electron/kimiCodeHost.ts`。
+
 ## 2026-08-04 修复：新会话 prompt 被 server 拒（thinking 空串）→ 闪一下无内容+模型回跳（v2.20.204）
 
 - 现场：203 下复现「新会话+切 k3+发送」：闪一下无内容、选择器回跳 deepseek。203 的秒定守卫已生效（无 settled_complete），但 POST 根本没到 server（server messages:0）。
