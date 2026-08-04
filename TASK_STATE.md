@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：上下滚动卡顿（snapshot 同指纹重放风暴）+ 大会话结构性问题登记（v2.20.191）
+
+- 现场：用户反馈页面上下滚动卡顿异常。diag 取证（session da02b357）：
+  1. 该会话累计 **18k events**（含 630+ 工具调用的轮），`buildRenderItems` 单次 **max 448ms**、persist.strip **1039ms**（longTask max 1053ms）——任何触发重建的更新都百毫秒级卡主线程，滚动尤甚（根因，结构性）；
+  2. 放大器：每次 `recoverSnapshot`（idle 90s 重连/探针恢复）把**同一快照**（as_of_seq=1804 两小时不变）重放，单次 50+ `turn.ended` 帧 2ms 内灌入渲染管线，累计 **4700 次重复投递**——纯浪费 storms，叠加大会话成周期性卡顿。
+- 修复（191）：host 的 `kimix.server.snapshot` 处理加同指纹跳过守卫（as_of_seq|epoch|inFlight|条数 不变 → 直接 return，不重放历史帧/不重发 pending 合成；首帧与内容前进仍正常重放）。
+- 验收：typecheck/全量 1551/build 通过；实机待用户验收（滚动应无周期性 bursts；idle 重连不再灌帧）。
+- 未完成/后续登记（结构性，另开轮次）：① 大会话渲染窗口化（buildRenderItems 对全量 events 重建 448ms）；② persist.strip 18k events 1s 主线程（knowledge 243 已记预算项，需增量 strip 或分片）。
+- 知识库：无需更新（性能修复未变不变量；结构性问题已在 streaming-render-pipeline 243 段覆盖 persist 语义）。
+- 关键文件：`electron/kimiCodeHost.ts`（snapshotReplayFingerprints 守卫）。
+
 ## 2026-08-04 优化：代码块留白/占比对齐官方 Web（v2.20.190）
 
 - 现场：同内容代码块官方 Web 比 Kimix 更易读、留白与占比更合理（三主题对比截图）。

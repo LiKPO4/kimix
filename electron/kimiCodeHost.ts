@@ -749,6 +749,10 @@ const serverSessions = new Map<string, ServerManagedSession>();
 /** Server 会话 mid-turn 失败后迁移到 SDK 会话的映射（old server id -> new sdk id）。 */
 const serverSessionMigrations = new Map<string, string>();
 const serverApprovalIds = new Set<string>();
+// 同指纹 snapshot（as_of_seq/epoch/inFlight/条数均不变）不重放历史帧：idle 90s 重连与探针
+// 恢复会反复拿到同一快照，每次重放数十个 turn.ended 进渲染管线（diag 实测 4700 次
+// 重复投递、单批 2ms 内数十帧），对大会话是周期性卡顿 bursts，纯浪费。
+const snapshotReplayFingerprints = new Map<string, string>();
 const serverQuestionIds = new Set<string>();
 
 function resolveMigratedSessionId(sessionId: string): string {
@@ -3118,6 +3122,10 @@ function handleServerFrame(frame: ServerFrame) {
       managed.session = session;
       setStatus(sessionId, resolveServerEngineStatus(session));
     }
+    const replayFingerprint = `${snapshot.as_of_seq}|${snapshot.epoch ?? ""}|${snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? 1 : 0}|${Array.isArray(snapshot.messages?.items) ? snapshot.messages.items.length : 0}`;
+    const previousFingerprint = snapshotReplayFingerprints.get(sessionId);
+    snapshotReplayFingerprints.set(sessionId, replayFingerprint);
+    if (previousFingerprint === replayFingerprint) return;
     for (const replayFrame of snapshotMessagesToServerFrames(snapshot, sessionId)) {
       handleServerFrame(replayFrame);
     }
