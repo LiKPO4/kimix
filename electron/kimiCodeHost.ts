@@ -753,6 +753,9 @@ const serverApprovalIds = new Set<string>();
 // 恢复会反复拿到同一快照，每次重放数十个 turn.ended 进渲染管线（diag 实测 4700 次
 // 重复投递、单批 2ms 内数十帧），对大会话是周期性卡顿 bursts，纯浪费。
 const snapshotReplayFingerprints = new Map<string, string>();
+// 增量重放：按上一次 snapshot 最新消息 id 切片，只重放新增历史消息 + in_flight，
+// 全量 100 条历史合成帧（50+ turn.ended）灌入渲染管线造成大会话卡死与状态错位。
+const lastSnapshotLatestMessageIds = new Map<string, string>();
 const serverQuestionIds = new Set<string>();
 
 function resolveMigratedSessionId(sessionId: string): string {
@@ -3126,7 +3129,25 @@ function handleServerFrame(frame: ServerFrame) {
     const previousFingerprint = snapshotReplayFingerprints.get(sessionId);
     snapshotReplayFingerprints.set(sessionId, replayFingerprint);
     if (previousFingerprint === replayFingerprint) return;
-    for (const replayFrame of snapshotMessagesToServerFrames(snapshot, sessionId)) {
+    const snapshotItems = Array.isArray(snapshot.messages?.items) ? snapshot.messages.items : [];
+    const latestItem = snapshotItems.length > 0 ? snapshotItems[snapshotItems.length - 1] : undefined;
+    const latestItemId = latestItem && typeof latestItem === "object" && typeof (latestItem as Record<string, unknown>).id === "string"
+      ? (latestItem as Record<string, unknown>).id as string
+      : undefined;
+    const previousLatestId = lastSnapshotLatestMessageIds.get(sessionId);
+    if (latestItemId) lastSnapshotLatestMessageIds.set(sessionId, latestItemId);
+    let replayStartIndex = 0;
+    if (previousLatestId !== undefined) {
+      const previousIndex = snapshotItems.findIndex((item) => (
+        typeof item === "object" && item !== null && (item as Record<string, unknown>).id === previousLatestId
+      ));
+      // 找不到（窗口滑动）才全量重放；找到则只重放其后新增消息。
+      replayStartIndex = previousIndex >= 0 ? previousIndex + 1 : 0;
+    }
+    const replaySnapshot: ServerSnapshot = replayStartIndex > 0
+      ? { ...snapshot, messages: { ...snapshot.messages, items: snapshotItems.slice(replayStartIndex) } }
+      : snapshot;
+    for (const replayFrame of snapshotMessagesToServerFrames(replaySnapshot, sessionId)) {
       handleServerFrame(replayFrame);
     }
     for (const approval of Array.isArray(payload.pending_approvals) ? payload.pending_approvals : []) {

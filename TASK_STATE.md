@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：外部新轮启动时全量 snapshot 重放风暴致卡死+旧气泡误显「消息处理中」（v2.20.194）
+
+- 现场：Web+Kimix 同开，Web 发消息后 Kimix 把上一条消息气泡映射为「消息处理中」，且整 UI 卡死（滚动/点击无响应），Web 已继续走消息。
+- 取证（diag 12:06:16）：外部轮启动触发 recoverSnapshot，指纹 legitimately 变化（in_flight 出现）→ **全量 100 条历史合成帧（46+ turn.ended，1ms 内）灌入渲染管线**；18k events 会话每帧触发重渲染 → 卡死；风暴期间新轮用户边界未挂上，running 状态挂到旧气泡 → 错位。191 指纹守卫只挡「不变」，挡不住「合法变化」的全量重放。
+- 修复：host snapshot 重放改**增量尾部**——按上一次 snapshot 最新消息 id 切片（`lastSnapshotLatestMessageIds`），只重放其后新增历史消息 + in_flight；id 找不到（窗口滑动）才全量。注意 msgs=100 是分页上限，count 切片无效，必须用 id。
+- 验收：typecheck/全量 1551/build 通过；实机待用户验收（Web 发新轮后 Kimix 不再卡死、不再错位显示「消息处理中」、边界数秒内挂上）。
+- 已知边界：窗口滑动超 100 条时回落全量（罕见）；历史消息被外部编辑不重放（轮末对账兜底）。
+- 知识库：无需更新（191 守卫的性能补强，不变量语义未变）。
+- 关键文件：`electron/kimiCodeHost.ts`。
+
 ## 2026-08-04 修复：192 静态 import highlight.js 致 dev 启动崩溃（v2.20.193）
 
 - 现场：192 后打开 dev 直接「界面遇到错误」：`Cannot read properties of null (reading 'useState')`（vite deps chunk）——新增静态依赖触发 vite 重新预打包，旧 `node_modules/.vite` 缓存使 React 双副本。
