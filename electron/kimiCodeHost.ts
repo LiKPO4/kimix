@@ -3125,7 +3125,15 @@ function handleServerFrame(frame: ServerFrame) {
     const managed = serverSessions.get(sessionId);
     if (session && managed) {
       managed.session = session;
-      setStatus(sessionId, resolveServerEngineStatus(session));
+      const resolvedStatus = resolveServerEngineStatus(session);
+      const terminalish = resolvedStatus !== "running" && resolvedStatus !== "waiting_approval" && resolvedStatus !== "waiting_question";
+      const snapshotInFlight = snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object";
+      // pre-POST snapshot 必然「prompt 到达前」(busy=false/inFlight=0)，不得把刚乐观
+      // 置 running 的轮降级成 completed（实机：新轮 121ms 被定成「输出完成 1s」）。
+      // mainTurnActive 期间终态判定交给 prompt.completed/settle 路径。
+      if (!(terminalish && managed.mainTurnActive === true && !snapshotInFlight)) {
+        setStatus(sessionId, resolvedStatus);
+      }
       managed.mainTurnActive = snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? true : session?.main_turn_active === true;
     }
     const replayFingerprint = `${snapshot.as_of_seq}|${snapshot.epoch ?? ""}|${snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? 1 : 0}|${Array.isArray(snapshot.messages?.items) ? snapshot.messages.items.length : 0}`;
@@ -3288,7 +3296,9 @@ async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean)
   if (!managed) throw new Error(`Kimi Server session is not active: ${sessionId}`);
   const modelRevision = managed.modelRevision;
   const status = await getServerClient().getSessionStatus(sessionId);
-  const modelMutationPending = Boolean(managed.modelMutation);
+  // 轮中（mainTurnActive）本地模型选择是用户对本轮的意图，server 状态刷新不得回写覆盖
+  // （实机：新会话切 k3 发送后被 status 刷回 deepseek）。
+  const modelMutationPending = Boolean(managed.modelMutation) || managed.mainTurnActive === true;
   const applyStatusModel = shouldApplyServerModelRefresh(
     modelRevision,
     managed.modelRevision,

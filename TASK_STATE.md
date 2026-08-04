@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：新轮被 pre-POST snapshot 秒定「输出完成 1s」+ 模型选择被 status 刷回（v2.20.203）
+
+- 现场：deepseek 挂后新会话切 k3 发消息，闪一下「输出完成·1s」无内容；底部模型选择器变回 deepseek。
+- 取证（diag 14:29:39）：sendPrompt 前「refresh live subscription before POST」的 snapshot（必然 inFlight=0/busy=false）经 snapshot handler `setStatus` 把刚乐观置 running 的轮降级 completed——display 121ms 即 settled_complete；同窗口 status 刷新把 server 模型（deepseek）回写覆盖本地 k3。
+- 修复：① snapshot handler 终态降级守卫——`mainTurnActive===true` 且 snapshot 无 in_flight 时不 setStatus（终态判定交给 prompt.completed/settle）；② `refreshServerSessionStatus` 的 modelMutationPending 扩展 `|| mainTurnActive===true`，轮中 server 模型刷新不回写本地选择。
+- 验收：typecheck/全量 1559/build 通过；实机待验收（新会话切模型发送应正常流式、选择器不回跳）。
+- 已知边界：轮中 Web 侧改模型 Kimix 不实时镜像（轮后收敛），可接受。
+- 知识库：无需更新（199 mainTurnActive 信号的复用，语义一致）。
+- 关键文件：`electron/kimiCodeHost.ts`。
+
 ## 2026-08-04 修复：Context 显示格式轮间不一致（绝对值/百分比随数据切换）（v2.20.202）
 
 - 现场：相邻两轮 footer 一个 `Context: 329.52k`、一个 `Context: 33.05%`。
