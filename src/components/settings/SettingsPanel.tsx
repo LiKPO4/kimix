@@ -1162,8 +1162,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
   ];
   // 设置面板路径：有 runtime 时权限调整「立即写 server」（写后回读校准），
-  // 不同于 Composer 路径轮中 toast 拒绝 + pending 等 turn.ended 的绑定语义——
-  // 面板是显式全局配置意图，即时生效是设计选择，不视为对不变量 8 的违背。
+  // 与 Composer 路径统一「立即写 server」（与官方 Web 轮中可切换同语义）；
+  // 轮中切换对当前轮剩余部分可能仍用旧值，下一轮起生效。
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     // 全局默认总是本地写：这是新会话默认偏好，与当前会话权限解耦
     const globalBefore = useAppStore.getState().permissionMode;

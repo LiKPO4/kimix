@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-04 功能：轮中允许预切换权限/plan/思考强度，下一轮生效（v2.20.189）
+
+- 现场：官方 Web 轮中可正常切换权限模式等；Kimix 的权限/plan/思考强度按钮轮中被 `isMutationOwnerRunning` 禁用（swarm 已允许轮中切换、下一轮生效）。
+- 修复：三者解锁（disabled 去掉 running 门禁，canTogglePlanMode 同步），轮中切换走即时写 server profile（与官方 Web/设置面板同语义，下一轮起生效）；权限处理器删除轮中 toast 拒绝 + pending 分支，直接 applyPermissionMode；移除 `pendingPermissionChange` 工具与测试（机制被即时写取代）；title 文案改「运行中切换将从下一轮生效」。
+- 保留门禁：撤销/房间变更等真实 mutation 控件仍轮中禁用；hasUniqueMutationOwner/canUseComposer 不变。
+- 验收：typecheck/全量 1551（-2 pending 用例）/build 通过；实机待用户验收（轮中点权限/plan/思考强度应可切换且 toast/标题语义正确，下一轮生效）。
+- 知识库：不变量 8 扩写轮中可切换语义，log.md 已记。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/components/settings/SettingsPanel.tsx`（注释）、删除 `src/utils/pendingPermissionChange.ts`+测试。
+
 ## 2026-08-04 修复：全宽行式按钮按压时阴影/灰底左右覆盖不全（v2.20.188）
 
 - 现场：变更卡「再显示 N 个文件/收起」展开收起按钮点击时灰底+阴影左右收缩、露出卡片底色，表现奇怪。

@@ -28,7 +28,6 @@ import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
 import { hasRecentDuplicatePendingMessage } from "@/utils/promptQueue";
-import { isPendingPermissionTurnEnded, type PendingPermissionChange } from "@/utils/pendingPermissionChange";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
@@ -574,7 +573,6 @@ export function Composer() {
   const addBtnRef = useRef<HTMLDivElement>(null);
   const roomControlMenuRef = useRef<HTMLDivElement>(null);
   const pendingMoreRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const pendingPermissionChangeRef = useRef<PendingPermissionChange | null>(null);
   const activeSession = liveSession ?? currentSession;
   const activeSessionRef = useRef(activeSession);
   activeSessionRef.current = activeSession;
@@ -683,7 +681,7 @@ export function Composer() {
   );
   const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
-  const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner && !isMutationOwnerRunning;
+  const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner;
 
   useEffect(() => () => {
     writeComposerDraft(composerDraftKey, {
@@ -3860,7 +3858,6 @@ export function Composer() {
       currentSessionId: currentSession?.id,
       runningSessionId,
       isCurrentSessionRunning,
-      hasPendingPermissionChange: Boolean(pendingPermissionChangeRef.current),
       showPermissionMenu,
     });
     setShowPermissionMenu(false);
@@ -3877,76 +3874,15 @@ export function Composer() {
     if (previousMode === mode) {
       // 同模式点击不再吞掉：UI 显示值可能已与 server 不一致（web 端经 prompt
       // 改写后 Kimix 缓存过期），仍向 server 重申一次，由 host 先回读再决定是否
-      // 写入（幂等）。轮次中继续走下方 pending 流程，不在轮中直接写。
+      // 写入（幂等）。轮次中同样即时写（与官方 Web 同语义：当前轮剩余部分可能仍用旧值，下一轮起生效）。
       emitPermissionModeDiag("click:reassert-same-mode", {
         traceId,
         requestedMode: mode,
         previousMode,
       });
     }
-    if (activeSession?.collaboration && isMutationOwnerRunning) {
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: `${owner.displayName} 正在运行，请在本轮结束后切换权限。`,
-      }));
-      return;
-    }
-    if (activeSession && isMutationOwnerRunning) {
-      if (!activeRuntimeSessionId) {
-        emitPermissionModeDiag("pending:error-no-runtime", {
-          traceId,
-          requestedMode: mode,
-          previousMode,
-          activeSessionId: activeSession.id,
-          runningSessionId,
-        });
-        window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: "当前轮 runtime 尚未就绪，无法记录权限切换",
-        }));
-        return;
-      }
-      pendingPermissionChangeRef.current = {
-        sessionId: activeSession.id,
-        runtimeSessionId: activeRuntimeSessionId,
-        roomAgentId: owner.roomAgentId,
-        mode,
-      };
-      emitPermissionModeDiag("pending:stored", {
-        traceId,
-        requestedMode: mode,
-        previousMode,
-        activeSessionId: activeSession.id,
-        activeRuntimeSessionId,
-        currentSessionId: currentSession?.id,
-        runningSessionId,
-      });
-      window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "已记录，将在当前轮结束后安全切换权限",
-      }));
-      return;
-    }
     await applyPermissionMode(mode, activeRuntimeSessionId ?? undefined, owner.roomAgentId, traceId);
   };
-
-  useEffect(() => window.api.onKimiCodeEvent((payload) => {
-    const pending = pendingPermissionChangeRef.current;
-    if (!isPendingPermissionTurnEnded(pending, payload)) return;
-    pendingPermissionChangeRef.current = null;
-    const traceId = genId();
-    emitPermissionModeDiag("pending:turn-ended", {
-      traceId,
-      requestedMode: pending.mode,
-      pendingSessionId: pending.sessionId,
-      pendingRuntimeSessionId: pending.runtimeSessionId,
-      eventType: payload.event && typeof payload.event === "object" && "type" in payload.event
-        ? String(payload.event.type)
-        : undefined,
-      eventSessionId: payload.sessionId,
-      eventRuntimeSessionId: payload.sessionId,
-      currentSessionId: useAppStore.getState().currentSession?.id,
-      runningSessionId: useAppStore.getState().runningSessionId,
-    });
-    void applyPermissionMode(pending.mode, pending.runtimeSessionId, pending.roomAgentId, traceId);
-  }), [applyPermissionMode]);
 
   const loadThinkingMenu = async () => {
     setThinkingMenuLoading(true);
@@ -4873,14 +4809,14 @@ export function Composer() {
               style={{ flex: "0 0 116px", width: 116 }}
             >
               <button
-                disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
+                disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={() => setShowPermissionMenu((v) => !v)}
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12 }}
                 title={!hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
-                    ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可切换权限`
+                    ? `${activeMutationOwner?.displayName ?? "Agent"} 运行中切换将从下一轮生效`
                     : activeMutationOwner ? `修改 ${activeMutationOwner.displayName} 的权限` : undefined}
                 aria-haspopup="menu"
                 aria-expanded={showPermissionMenu}
@@ -4982,7 +4918,7 @@ export function Composer() {
             </button>
             <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
               <button
-                disabled={!canUseComposer || !hasUniqueMutationOwner || isMutationOwnerRunning}
+                disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={toggleThinkingMenu}
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -4996,7 +4932,7 @@ export function Composer() {
                   paddingRight: 12,
                 }}
                 title={isMutationOwnerRunning
-                  ? `${activeMutationOwner?.displayName ?? "Agent"} 正在运行，本轮结束后可调整思考强度`
+                  ? `思考强度：${thinkingEffortLabel(activeThinkingEffort)}（运行中切换将从下一轮生效）`
                   : `思考强度：${thinkingEffortLabel(activeThinkingEffort)}`}
                 aria-haspopup="menu"
                 aria-expanded={showThinkingMenu}
