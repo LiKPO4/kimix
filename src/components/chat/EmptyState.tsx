@@ -153,10 +153,14 @@ export function EmptyState() {
     if (currentSession) return currentSession;
     if (!project) return null;
 
+    // 待使用模型（欢迎屏切换，只影响下一个新会话）优先于官方默认模型；一次性消费：
+    // 创建会话后立即清除。与 Composer.ensureSession 语义一致——否则显示走
+    // pendingNewSessionModel、发送走 config 默认，出现「显示 k3 却以默认模型执行」。
+    const pendingModel = useAppStore.getState().pendingNewSessionModel;
     const session: Session = {
       id: crypto.randomUUID(),
       engine: "kimi-code",
-      model: await getDefaultKimiModel(),
+      model: pendingModel ?? await getDefaultKimiModel(),
       title: "新会话",
       projectPath: project.path,
       createdAt: Date.now(),
@@ -166,6 +170,7 @@ export function EmptyState() {
     };
     addSession(session);
     setCurrentSession(session);
+    if (pendingModel) useAppStore.getState().setPendingNewSessionModel(null);
     return session;
   };
 

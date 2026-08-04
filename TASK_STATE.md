@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-04 修复：新对话点推荐被 deepseek 接管根因——EmptyState 不消费 pendingNewSessionModel（v2.20.207）
+
+- 现场：同 206——归档 → 新对话初始页（显示 k3）→ 点推荐 → 选择器变 deepseek、被 deepseek 接管；205/206 两轮未根治。
+- 根因（静态锁定，无需运行时诊断）：欢迎屏选模型只写 `pendingNewSessionModel`（ContextBar 无会话分支），显示链路 `pendingNewSessionModel ?? defaultModel` 显示 k3；但 `EmptyState.ensureSession` 建会话只用 `getDefaultKimiModel()`（config 默认），206 的 `effectiveModel = switchedToModel ?? model ?? pendingNewSessionModel` 中 `targetSession.model` 恒非空 → pending 是死代码 → 发送携带 config 默认（本机 deepseek）→ server 执行 deepseek 并状态回写。Composer.ensureSession 才是正确参照（pending 优先 + 一次性消费）。
+- 修复：EmptyState.ensureSession 对齐 Composer——`model: pendingModel ?? await getDefaultKimiModel()`，创建后 `setPendingNewSessionModel(null)` 一次性消费。
+- 验收：新增 EmptyStateSend 组件回归测试 2 例（k3 优先+消费 / 无 pending 回落 config 默认）；旧代码下 k3 用例失败、修复后通过（负向验证已做）；typecheck/全量 1561/build 通过；实机待验收（归档→新对话点推荐应保持 k3 执行、选择器不回跳）。
+- 知识库：runtime-routing 新增 invariant 100（pending 模型是渲染层一次性契约，所有建会话入口必须优先消费），log 已记。
+- 关键文件：`src/components/chat/EmptyState.tsx`、`src/components/chat/__tests__/EmptyStateSend.test.ts`、`knowledge/architecture/runtime-routing.md`。
+
 ## 2026-08-04 修复：新对话点推荐被 deepseek 接管（显示 k3 却以 deepseek 执行）（v2.20.206）
 
 - 现场：归档 → 新对话初始页（模型显示 k3）→ 点第一条推荐 → 发送后选择器变 deepseek、被 deepseek 接管。

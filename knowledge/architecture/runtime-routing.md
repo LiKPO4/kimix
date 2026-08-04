@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-08-04T12:40:00+08:00"
+timestamp: "2026-08-04T23:59:00+08:00"
 ---
 
 # Runtime Routing
@@ -151,6 +151,7 @@ Running-sample history reconciliation is a correction mechanism, never a stream 
 98. Every session-level host function that can run against a migrated session resolves the migration map first (v2.20.153): `askBtw`, `undoHistory`, `compactSession`, `setPlanMode`, `setThinking`, `setPermission`, `getStatus`, `getUsage`, `listMcpServers`, `reconnectMcpServer`, the background-task group, `listSkills`, and `activateSkill` now call `resolveMigratedSessionId` before branching, and `closeSession` cleans the migration map so it cannot grow unbounded. Server-only features that officially do not exist (`getMcpStartupMetrics`, child-session listing on non-Server routes) now report capability-oriented errors instead of misleading "session is not active" / "Server not ready" text.
 
 99. Server→SDK migration is explicit and pinned where the SDK reload is the point (v2.20.154). `migrateServerSessionToSdk` emits an `idle` status after registering the SDK session so the renderer refreshes runtime bindings, and `/reload` passes `pinToSdk` so the session stays on the SDK route instead of being promoted back the moment the Server recovers (reload exists to refresh the Skill/Plugin registry, which only the SDK can do; pinning matches the Swarm pin semantics). On global runtime failure, `markServerRuntimeFailure` also runs `migrateIdleServerSessionsToSdk`: already-open non-running Server sessions are best-effort migrated to the SDK so their next operation does not hit a dead "Server not ready" path; running/waiting sessions stay on the Server route because their failure path already creates a fresh SDK fallback session.
+100. The welcome-screen pending model (`pendingNewSessionModel`) is a renderer-wide one-shot contract, not a Composer-local detail. With no active session the model selector writes only this pending value, and every entry point that materializes a local session object (Composer input, EmptyState project suggestions, and any future new-session creator) must prefer it over the configured default model, store it as the new session's `model`, and clear it immediately after creation (consume-once). A creator that falls back to the configured default while the selector displays the pending choice reintroduces the "shows k3 but executes the provider default (e.g. deepseek)" bug: the fresh session's `model` then outranks the pending value in every downstream `switchedToModel ?? model` prompt chain (v2.20.207).
 
 # Main Components
 
