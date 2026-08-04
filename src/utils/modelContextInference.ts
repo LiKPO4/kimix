@@ -6,7 +6,7 @@
  * - Anthropic API Docs: Claude Fable 5 / Sonnet 5 / Opus 4.6~4.8 / Sonnet 4.6 (1,000,000 = 1M, GA default), Claude Haiku 4.5 / 3.7 Sonnet / 3.5 Sonnet / 3 Opus / 3 Haiku (200,000)
  * - Google Gemini Docs: Gemini 3.x incl. Pro (1,048,576 = 1M), Gemini 1.5 Pro / 2.0 Pro / Exp (2,097,152 = 2M), Gemini 1.5 Flash / 2.0 Flash / Flash-Lite / 8B (1,048,576 = 1M)
  * - DeepSeek API Docs: DeepSeek V4 Flash/Pro (1,000,000 = 1M), DeepSeek V3 / R1 / V2.5 / Chat / Coder (128,000 = 128k)
- * - Aliyun Qwen Docs: Qwen3.7 / Qwen3.6 Plus / Flash (1,000,000 = 1M), Qwen3.6 Max / Qwen3-Max (256,000), Qwen-Long (10,000,000 = 10M), Qwen 2.5-1M / Turbo (1,000,000 = 1M), Qwen 2.5 / QwQ-32B (131,072 = 128k)
+ * - Aliyun Qwen Docs: Qwen3.8-Max / Qwen3.7 / Qwen3.6 Plus / Flash (1,000,000 = 1M), Qwen3.6 Max / Qwen3-Max (256,000), Qwen-Long (10,000,000 = 10M), Qwen 2.5-1M / Turbo (1,000,000 = 1M), Qwen 2.5 / QwQ-32B (131,072 = 128k)
  * - xAI Grok Docs: Grok 4.3 / Grok 4.20 / Grok 3 (1,000,000 = 1M), Grok 4.5 (500,000), Grok 2 / Grok 2 Vision / Grok Beta (131,072 = 128k)
  * - Meta Llama Docs: Llama 3.3 / 3.2 / 3.1 (131,072 = 128k), Llama 3 (8,192), Llama 2 (4,096)
  * - Mistral AI Docs: Codestral 2501 / Mistral Large 2411 / Pixtral Large / Mistral NeMo / Ministral (128,000), Codestral 2405 / Mistral 7B (32,768), Mixtral 8x22B (65,536)
@@ -125,8 +125,11 @@ export function inferModelContextSize(
     return 131_072;
   }
 
-  // Qwen family: Qwen3.7 全系 / Qwen3.6 Plus / Flash = 1,000,000; Qwen3.6 Max / Qwen3-Max = 256,000; Qwen-Long = 10,000,000; Turbo / 1M = 1,000,000; 其他 = 131,072
+  // Qwen family: Qwen3.8-Max / Qwen3.7 全系 / Qwen3.6 Plus / Flash = 1,000,000; Qwen3.6 Max / Qwen3-Max = 256,000; Qwen-Long = 10,000,000; Turbo / 1M = 1,000,000; 其他 = 131,072
   if (name.includes("qwen") || name.includes("qwq")) {
+    if (name.includes("qwen3.8-max")) {
+      return 1_000_000;
+    }
     if (name.includes("qwen3.7")) {
       return 1_000_000;
     }

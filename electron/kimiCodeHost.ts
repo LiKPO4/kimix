@@ -563,6 +563,7 @@ export type KimiCodeCatalogModel = {
   name?: string;
   maxOutputSize?: number;
   reasoningKey?: string;
+  supportEfforts?: string[];
   capability?: {
     image_in?: boolean;
     video_in?: boolean;
@@ -584,6 +585,7 @@ export type KimiCodeProviderCatalogEntry = {
     maxContextSize: number | null;
     thinking: boolean;
     toolUse: boolean;
+    supportEfforts?: string[];
   }[];
 };
 
@@ -2605,6 +2607,26 @@ function normalizeCatalogMaxContextSize(value: number | null) {
   return Math.max(1, input);
 }
 
+// models.dev 思考档位 → Kimix 词表（off/minimal/low/medium/high/max）：
+// none→off、low→low、medium→medium、high→high、xhigh→max、minimal→minimal。
+// 未认识的值一律丢弃（不猜测）；无档位信息时返回 undefined，不编造档位。
+const CATALOG_EFFORT_TO_KIMIX: Readonly<Record<string, string>> = {
+  none: "off",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "max",
+  minimal: "minimal",
+};
+
+function mapCatalogEffortValues(values: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(values) || values.length === 0) return undefined;
+  const mapped = values
+    .map((value) => CATALOG_EFFORT_TO_KIMIX[value.toLowerCase()])
+    .filter((value): value is string => value !== undefined);
+  return mapped.length > 0 ? mapped : undefined;
+}
+
 export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntry[]> {
   const sdk = await loadSdk();
   if (!sdk.fetchCatalog || !sdk.inferWireType || !sdk.catalogProviderModels || !sdk.catalogBaseUrl) {
@@ -2627,6 +2649,7 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
             maxContextSize: normalizeCatalogMaxContextSize(rawMaxContextSize),
             thinking: Boolean(model.capability?.thinking),
             toolUse: model.capability?.tool_use !== false,
+            supportEfforts: mapCatalogEffortValues(model.supportEfforts),
           };
         })
         .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));

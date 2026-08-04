@@ -153,7 +153,8 @@ describe("ModelProviderManager", () => {
       providerName: "gateway",
       modelAlias: "gateway/model-b",
       model: "model-b",
-      maxContextSize: 262144,
+      // 目录未命中且无探测值时按推断规则兜底（model-b 未知 → 128k），不再保留默认 262144
+      maxContextSize: 128000,
       supportEfforts: [],
       defaultEffort: null,
     });
@@ -475,5 +476,136 @@ it("shows a friendly manual-add hint when the Base URL has no models endpoint", 
   expect(container.textContent).toContain("可手动添加模型");
   expect(container.textContent).not.toContain("模型探测失败");
   expect((buttonByText(container, "探测模型") as HTMLButtonElement).disabled).toBe(false);
+  await act(async () => root.unmount());
+});
+
+it("prefills Context and thinking efforts from the official catalog when a discovered model matches", async () => {
+  let resolveCatalog!: (value: unknown) => void;
+  const listKimiProviderCatalog = vi.fn(() => new Promise((resolve) => { resolveCatalog = resolve; }));
+  const discoverKimiProviderModels = vi.fn().mockResolvedValue({
+    success: true,
+    data: {
+      endpoint: "https://gateway.example/v1/models",
+      models: [{ id: "model-b", ownedBy: "catalog" }],
+    },
+  });
+  const saveKimiProviderModel = vi.fn().mockResolvedValue({
+    success: true,
+    data: { ...emptyProviderConfig, message: "已保存 Provider 模型" },
+  });
+  const getKimiModelConfig = vi.fn().mockResolvedValue({ success: true, data: emptyProviderConfig });
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: { discoverKimiProviderModels, listKimiProviderCatalog, saveKimiProviderModel, getKimiModelConfig },
+  });
+  const { container, root } = await renderManager(emptyProviderConfig);
+
+  await act(async () => buttonByText(container, "探测模型")?.click());
+  // 探测成功后惰性触发目录载入；手动 resolve 保证选中前目录已就绪
+  await act(async () => {
+    resolveCatalog({
+      success: true,
+      data: {
+        providers: [{
+          providerId: "catalog-prod",
+          type: "openai",
+          baseUrl: "https://catalog.example/v1",
+          modelCount: 1,
+          models: [{
+            id: "model-b",
+            name: "Model B",
+            maxContextSize: 1_000_000,
+            thinking: true,
+            toolUse: true,
+            supportEfforts: ["low", "high"],
+          }],
+        }],
+      },
+    });
+  });
+
+  const discoveredSelect = Array.from(container.querySelectorAll("select"))
+    .find((select) => select.textContent?.includes("model-b"));
+  expect(discoveredSelect).toBeDefined();
+  await act(async () => {
+    if (!discoveredSelect) return;
+    discoveredSelect.value = "model-b";
+    discoveredSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  expect((container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement).value).toBe("model-b");
+  const contextInput = Array.from(container.querySelectorAll("input"))
+    .find((input) => (input as HTMLInputElement).type === "number") as HTMLInputElement;
+  expect(contextInput.value).toBe("1000000");
+  const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
+    .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
+  const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
+    .map((button) => button.textContent?.trim());
+  expect(pressedEfforts).toEqual(["低", "高"]);
+
+  await act(async () => buttonByText(container, "保存模型")?.click());
+  expect(saveKimiProviderModel).toHaveBeenCalledWith({
+    providerName: "gateway",
+    modelAlias: "gateway/model-b",
+    model: "model-b",
+    maxContextSize: 1_000_000,
+    supportEfforts: ["low", "high"],
+    defaultEffort: null,
+  });
+  await act(async () => root.unmount());
+});
+
+it("prefills Context and efforts from the catalog when typing a model id into an empty Context field", async () => {
+  let resolveCatalog!: (value: unknown) => void;
+  const listKimiProviderCatalog = vi.fn(() => new Promise((resolve) => { resolveCatalog = resolve; }));
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: { listKimiProviderCatalog },
+  });
+  const { container, root } = await renderManager(emptyProviderConfig);
+
+  // 打开添加模型表单会惰性触发目录载入
+  await act(async () => buttonByText(container, "添加模型")?.click());
+  await act(async () => {
+    resolveCatalog({
+      success: true,
+      data: {
+        providers: [{
+          providerId: "catalog-prod",
+          type: "openai",
+          baseUrl: null,
+          modelCount: 1,
+          models: [{
+            id: "catalog-only-model",
+            name: null,
+            maxContextSize: 777_000,
+            thinking: true,
+            toolUse: true,
+            supportEfforts: ["medium"],
+          }],
+        }],
+      },
+    });
+  });
+
+  // 沿用「为空才填」纪律：先清空 Context，再输入模型 ID
+  const contextInput = Array.from(container.querySelectorAll("input"))
+    .find((input) => (input as HTMLInputElement).type === "number") as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(contextInput, "");
+    contextInput.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "catalog-only-model");
+    modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  expect(contextInput.value).toBe("777000");
+  const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
+    .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
+  const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
+    .map((button) => button.textContent?.trim());
+  expect(pressedEfforts).toEqual(["中"]);
   await act(async () => root.unmount());
 });

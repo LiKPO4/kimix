@@ -89,7 +89,8 @@ describe("inferModelContextSize (grounded in official provider docs for latest &
     expect(inferModelContextSize("llama-3-70b")).toBe(8_192);
   });
 
-  it("infers official context size for Qwen latest two generations (3.7 = 1M / 3.6-Max & 3-Max = 256k)", () => {
+  it("infers official context size for Qwen latest two generations (3.8-Max = 1M / 3.7 = 1M / 3.6-Max & 3-Max = 256k)", () => {
+    expect(inferModelContextSize("qwen3.8-max")).toBe(1_000_000);
     expect(inferModelContextSize("qwen3.7-max")).toBe(1_000_000);
     expect(inferModelContextSize("qwen3.6-plus")).toBe(1_000_000);
     expect(inferModelContextSize("qwen3.6-flash")).toBe(1_000_000);

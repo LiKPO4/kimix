@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
@@ -22,8 +22,9 @@ import {
   chooseInitialModelProvider,
   defaultModelAliasForProvider,
   groupModelsByProvider,
+  matchCatalogModel,
+  prefillFromCatalog,
 } from "@/utils/modelProviderConfig";
-import { inferModelContextSize } from "@/utils/modelContextInference";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 
@@ -151,6 +152,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [message, setMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
+  const catalogModels = useMemo(() => catalog.flatMap((provider) => provider.models), [catalog]);
+  const catalogLoadTriggeredRef = useRef(false);
 
   const selectedGroup = groups.find((group) => group.provider.name === selectedProviderName) ?? null;
   const isCreatingProvider = selectedProviderName === NEW_PROVIDER_ID || !selectedGroup;
@@ -222,22 +225,33 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setMessage("先保存供应商连接配置，再在下方添加一个或多个模型。");
   };
 
-  const handleLoadCatalog = async () => {
+  const handleLoadCatalog = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     setCatalogLoading(true);
-    setMessage("正在载入官方 Provider 目录...");
+    if (!silent) setMessage("正在载入官方 Provider 目录...");
     try {
       const res = await window.api.listKimiProviderCatalog();
       if (!res.success) {
-        setMessage(`目录载入失败：${res.error}`);
+        if (!silent) setMessage(`目录载入失败：${res.error}`);
+        catalogLoadTriggeredRef.current = false;
         return;
       }
       setCatalog(res.data.providers);
-      setMessage(`已载入 ${res.data.providers.length} 个 OpenAI-compatible Provider。`);
+      if (!silent) setMessage(`已载入 ${res.data.providers.length} 个 OpenAI-compatible Provider。`);
     } catch (error) {
-      setMessage(`目录载入失败：${error instanceof Error ? error.message : String(error)}`);
+      if (!silent) setMessage(`目录载入失败：${error instanceof Error ? error.message : String(error)}`);
+      catalogLoadTriggeredRef.current = false;
     } finally {
       setCatalogLoading(false);
     }
+  };
+
+  // 惰性目录载入：打开添加模型表单或探测成功时，若目录尚未载入则静默触发一次（失败允许下次重试），
+  // 仅用于目录匹配预填，不阻塞表单、不覆盖提示文案
+  const ensureCatalogLoaded = () => {
+    if (catalog.length > 0 || catalogLoading || catalogLoadTriggeredRef.current) return;
+    catalogLoadTriggeredRef.current = true;
+    void handleLoadCatalog({ silent: true });
   };
 
   const handleCatalogProvider = (providerId: string) => {
@@ -285,7 +299,8 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       }
       setDiscoveredModels(res.data.models);
       setDiscoveredEndpoint(res.data.endpoint);
-      setMessage(`已从接口发现 ${res.data.models.length} 个模型，选择后将自动解析填入 Context 上下文大小。`);
+      setMessage(`已从接口发现 ${res.data.models.length} 个模型，选择后将自动解析填入 Context 与思考档位。`);
+      ensureCatalogLoaded();
     } catch (error) {
       setDiscoveredModels([]);
       setDiscoveredEndpoint("");
@@ -298,16 +313,25 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const handleDiscoveredModel = (modelId: string) => {
     if (!modelId) return;
     const item = discoveredModels.find((m) => m.id === modelId);
-    const inferredContext = inferModelContextSize(modelId, item?.contextLength);
     setSelectedModelAlias("");
     setAddingModel(true);
-    setModelDraft((current) => ({
-      modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
-      model: modelId,
-      maxContextSize: item?.contextLength ? String(item.contextLength) : (current.maxContextSize.trim() || String(inferredContext)),
-      supportEfforts: current.supportEfforts,
-      defaultEffort: current.defaultEffort,
-    }));
+    setModelDraft((current) => {
+      const prefill = prefillFromCatalog({
+        mode: "select",
+        modelId,
+        currentContextSize: current.maxContextSize,
+        currentSupportEfforts: current.supportEfforts,
+        catalogModel: matchCatalogModel(catalogModels, modelId),
+        probeContextLength: item?.contextLength,
+      });
+      return {
+        modelAlias: defaultModelAliasForProvider(providerDraft.providerName, modelId),
+        model: modelId,
+        maxContextSize: prefill.maxContextSize != null ? String(prefill.maxContextSize) : current.maxContextSize,
+        supportEfforts: prefill.supportEfforts ?? current.supportEfforts,
+        defaultEffort: current.defaultEffort,
+      };
+    });
   };
 
   const handleSaveProvider = async () => {
@@ -513,6 +537,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setAddingModel(true);
     setModelDraft(createModelDraft());
     setMessage("填写模型 ID、别名和 Context 后保存；Provider 的连接信息会自动复用。");
+    ensureCatalogLoaded();
   };
 
   const managedGroups = groups.filter((group) => group.managed);
@@ -840,13 +865,20 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                         onChange={(event) => {
                           const val = event.target.value;
                           setModelDraft((current) => {
-                            const shouldAutoFillContext = !current.maxContextSize.trim();
                             const item = discoveredModels.find((m) => m.id === val.trim());
-                            const inferredContext = shouldAutoFillContext ? inferModelContextSize(val.trim(), item?.contextLength) : null;
+                            const prefill = prefillFromCatalog({
+                              mode: "type",
+                              modelId: val,
+                              currentContextSize: current.maxContextSize,
+                              currentSupportEfforts: current.supportEfforts,
+                              catalogModel: matchCatalogModel(catalogModels, val),
+                              probeContextLength: item?.contextLength,
+                            });
                             return {
                               ...current,
                               model: val,
-                              maxContextSize: inferredContext ? String(inferredContext) : current.maxContextSize,
+                              maxContextSize: prefill.maxContextSize != null ? String(prefill.maxContextSize) : current.maxContextSize,
+                              supportEfforts: prefill.supportEfforts ?? current.supportEfforts,
                             };
                           });
                         }}

@@ -1,5 +1,19 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 功能：添加模型时 Context 与思考档位自动预填（v2.20.171）
+
+- 现场：用户添加第三方供应商模型（阿里百炼 qwen3.8-max），问思考档位和上下文大小能否自动探测、不能的话怎么快捷设置。
+- 调查结论（三路）：① 思考档位**确凿不可探测**——标准 OpenAI /models 只有 id/owned_by，连最全的 OpenRouter 也只有布尔 reasoning，无 effort 枚举接口；② Context 部分可探测（仅 OpenRouter/Moonshot 等少数端点带扩展字段），百炼/DeepSeek/OpenAI 官方不可探测；③ 但官方 models.dev 目录（设置页「官方 Provider 目录」本来就在拉）每个模型都有 `limit.context` 和 `reasoning_options`，上游 kimi-code CLI 正是用它实现免手填——**卡点在 Kimix 两层丢数据**：kimiCodeHost 丢弃 SDK 已算好的 supportEfforts，渲染层表单完全没用目录模型条目；④ 推断表缺 qwen3.8-max（错误兜底 131k，实际 1M）。
+- 修复（v2.20.171）：
+  1. electron：`KimiProviderCatalogModelSummary` 透传 `supportEfforts`（models.dev 值映射到 Kimix 词表：none→off、xhigh→max、minimal 保留、未认识别丢弃不编造）。
+  2. 渲染层：`matchCatalogModel`（大小写不敏感精确匹配，不模糊猜）+ `prefillFromCatalog`（Context 优先级：探测 contextLength > 目录 > 名称推断 > 保留现值；档位仅在未勾选时填；defaultEffort 不预填——SDK 自动取中间档）；探测下拉选中和手输模型 ID 两条管线都接入；目录未载入时惰性静默拉取，失败降级为原行为。
+  3. 推断表补 qwen3.8-max → 1,000,000。
+- 覆盖纪律：手输模式「为空才填」；探测选中视为新意图可覆盖 Context（沿用原探测值覆盖语义），档位永不覆盖手改。
+- 验收：全量 1522 测试通过（新增 13 用例：qwen3.8-max、目录匹配/预填优先级/覆盖纪律、目录命中预填端到端）、typecheck 通过、`pnpm build` 通过；实机添加模型预填效果待用户验收。
+- 已知边界：qwen 系模型在目录里只有 toggle+budget_tokens（无 effort 档位列表），档位预填对它们不会生效（符合语义——百炼是 enable_thinking+budget 不是 reasoning_effort）；目录异步载入完成前的选择会降级为无目录值（下次触发点生效）。
+- 知识库：无需更新（局部功能增强，未变架构不变量）。
+- 关键文件：`electron/kimiCodeHost.ts:2613-2652`、`electron/types/ipc.ts:495`、`src/utils/modelProviderConfig.ts:67-137`、`src/components/settings/ModelProviderManager.tsx`、`src/utils/modelContextInference.ts:130`。
+
 ## 2026-08-04 修复：中文供应商名称无法保存（v2.20.170）
 
 - 现场：用户添加第三方供应商「千问」保存失败，报错是不可读的 zod JSON：`[{"validation":"regex","code":"invalid_string",...,"path":["providerName"]}]`。

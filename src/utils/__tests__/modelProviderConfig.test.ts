@@ -1,49 +1,136 @@
 import { describe, expect, it } from "vitest";
-import type { KimiModelConfigSummary } from "@electron/types/ipc";
-import {
-  chooseInitialModelProvider,
-  defaultModelAliasForProvider,
-  groupModelsByProvider,
-} from "../modelProviderConfig";
+import { matchCatalogModel, prefillFromCatalog } from "../modelProviderConfig";
 
-const config: KimiModelConfigSummary = {
-  configPath: "config.toml",
-  exists: true,
-  defaultModel: "openai/gpt-5.1",
-  providers: [
-    { name: "managed:kimi-code", type: "kimi", baseUrl: null, hasApiKey: true, hasEnv: false, hasOauth: true },
-    { name: "openai", type: "openai", baseUrl: "https://api.openai.com/v1", hasApiKey: true, hasEnv: false, hasOauth: false },
-  ],
-  models: [
-    { alias: "kimi-for-coding", provider: "managed:kimi-code", model: "kimi-for-coding", displayName: "Kimi", maxContextSize: 262144, adaptiveThinking: true, supportEfforts: null, defaultEffort: null, isDefault: false },
-    { alias: "openai/gpt-5.1", provider: "openai", model: "gpt-5.1", displayName: "GPT-5.1", maxContextSize: 400000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: true },
-    { alias: "openai/gpt-4.1", provider: "openai", model: "gpt-4.1", displayName: "GPT-4.1", maxContextSize: 1000000, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false },
-  ],
-  secondaryModel: null,
-};
+const catalog = [
+  { id: "qwen3.8-max", maxContextSize: 1_000_000, supportEfforts: ["low", "high"] },
+  { id: "gpt-5.1", maxContextSize: 400_000, supportEfforts: [] },
+  { id: "Unknown-Case-Model", maxContextSize: 128_000 },
+];
 
-describe("model provider config", () => {
-  it("groups existing models under one provider without duplicating credentials", () => {
-    const groups = groupModelsByProvider(config);
-    expect(groups.map((group) => group.provider.name)).toEqual(["managed:kimi-code", "openai"]);
-    expect(groups[1].models.map((model) => model.alias)).toEqual(["openai/gpt-5.1", "openai/gpt-4.1"]);
+describe("matchCatalogModel", () => {
+  it("matches exactly with case-insensitive ids", () => {
+    expect(matchCatalogModel(catalog, "qwen3.8-max")?.id).toBe("qwen3.8-max");
+    expect(matchCatalogModel(catalog, "QWEN3.8-MAX")?.id).toBe("qwen3.8-max");
+    expect(matchCatalogModel(catalog, " unknown-case-model ")).toBeDefined();
   });
 
-  it("selects the provider used by the default model during migration", () => {
-    expect(chooseInitialModelProvider(config)).toBe("openai");
-    expect(chooseInitialModelProvider(config, "managed:kimi-code")).toBe("managed:kimi-code");
+  it("returns undefined when nothing matches (no fuzzy matching)", () => {
+    expect(matchCatalogModel(catalog, "qwen3.8-max-v2")).toBeUndefined();
+    expect(matchCatalogModel(catalog, "qwen3")).toBeUndefined();
+    expect(matchCatalogModel(catalog, "max")).toBeUndefined();
   });
 
-  it("keeps orphaned legacy models visible instead of dropping them", () => {
-    const groups = groupModelsByProvider({
-      ...config,
-      models: [...config.models, { alias: "legacy", provider: null, model: "legacy", displayName: null, maxContextSize: null, adaptiveThinking: null, supportEfforts: null, defaultEffort: null, isDefault: false }],
-    });
-    const unbound = groups.find((group) => group.provider.name === "__unbound__");
-    expect(unbound?.models[0].alias).toBe("legacy");
+  it("returns undefined for empty or blank model ids", () => {
+    expect(matchCatalogModel(catalog, "")).toBeUndefined();
+    expect(matchCatalogModel(catalog, "   ")).toBeUndefined();
+  });
+});
+
+describe("prefillFromCatalog", () => {
+  it("select mode: probe contextLength wins over catalog limit and inference", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "qwen3.8-max",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: catalog[0],
+      probeContextLength: 500_000,
+    })).toEqual({ maxContextSize: 500_000, supportEfforts: ["low", "high"] });
   });
 
-  it("derives a stable alias for newly added provider models", () => {
-    expect(defaultModelAliasForProvider("moonshot", "kimi-k2")).toBe("moonshot/kimi-k2");
+  it("select mode: catalog limit wins over inference", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "qwen3.8-max",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: catalog[0],
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: ["low", "high"] });
+  });
+
+  it("select mode: inference wins over keeping the current value (qwen3.8-max → 1M even without catalog)", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "qwen3.8-max",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: null,
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
+  });
+
+  it("select mode: keeps current context when model id is blank", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "  ",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: catalog[0],
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: null, supportEfforts: ["low", "high"] });
+  });
+
+  it("type mode: fills only empty Context, never overrides a hand-edited value", () => {
+    expect(prefillFromCatalog({
+      mode: "type",
+      modelId: "qwen3.8-max",
+      currentContextSize: "",
+      currentSupportEfforts: [],
+      catalogModel: catalog[0],
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: ["low", "high"] });
+    expect(prefillFromCatalog({
+      mode: "type",
+      modelId: "qwen3.8-max",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: catalog[0],
+      probeContextLength: 500_000,
+    })).toEqual({ maxContextSize: null, supportEfforts: ["low", "high"] });
+  });
+
+  it("type mode: never overrides hand-toggled efforts, even when catalog has values", () => {
+    expect(prefillFromCatalog({
+      mode: "type",
+      modelId: "qwen3.8-max",
+      currentContextSize: "",
+      currentSupportEfforts: ["off"],
+      catalogModel: catalog[0],
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
+  });
+
+  it("falls back to inference when catalog misses", () => {
+    expect(prefillFromCatalog({
+      mode: "type",
+      modelId: "qwen3.8-max",
+      currentContextSize: "",
+      currentSupportEfforts: [],
+      catalogModel: null,
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
+  });
+
+  it("passes through catalog efforts unchanged; empty effort lists count as no value", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "gpt-5.1",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: catalog[1],
+      probeContextLength: null,
+    })).toEqual({ maxContextSize: 400_000, supportEfforts: null });
+  });
+
+  it("ignores out-of-range catalog limits and probe values", () => {
+    expect(prefillFromCatalog({
+      mode: "select",
+      modelId: "qwen3.8-max",
+      currentContextSize: "262144",
+      currentSupportEfforts: [],
+      catalogModel: { id: "qwen3.8-max", maxContextSize: 999, supportEfforts: undefined },
+      probeContextLength: 12,
+    })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
   });
 });
