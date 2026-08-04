@@ -2,7 +2,7 @@ import { memo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import type { TimelineEvent } from "@/types/ui";
 import { compactModelText } from "@/utils/modelDisplay";
-import { hasMetricStatus, isEmptyStatusUpdate, shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
+import { hasMetricStatus, isEmptyStatusUpdate, isNotificationSummaryMessage, shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 
 interface StatusCardProps {
   event: Extract<TimelineEvent, { type: "status_update" }>;
@@ -42,9 +42,12 @@ export function getStatusCardDetailTexts(
   event: Extract<TimelineEvent, { type: "status_update" }>,
   detailedContext: boolean,
 ): string[] {
+  // 182 前的遗留持久化行可能把通知摘要混进度量行 message；与上方 tone/source
+  // 兜底同类的显示层修复，度量行不显示通知文案。
+  const leakedNotificationMessage = hasMetricStatus(event) && isNotificationSummaryMessage(event.message);
   return [
     event.planMode === true ? "Plan" : "",
-    event.message ? compactModelText(event.message) : "",
+    event.message && !leakedNotificationMessage ? compactModelText(event.message) : "",
     event.inputTokenCount !== undefined ? `输入: ${formatK(event.inputTokenCount)}` : "",
     event.tokenCount !== undefined ? `输出: ${formatK(event.tokenCount)}` : "",
     shouldDisplayStatusContext(event) ? `Context: ${formatContext(event, detailedContext)}` : "",

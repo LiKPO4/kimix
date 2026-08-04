@@ -23,6 +23,33 @@ describe("getStatusCardDetailTexts", () => {
     expect(details).toEqual(["模型：kimi-for-coding-highspeed", "输入: 128", "输出: 72"]);
     expect(details.join(" ")).not.toContain("2026-07-13");
   });
+
+  it("drops legacy leaked notification text from metric rows", () => {
+    const details = getStatusCardDetailTexts({
+      id: "legacy-leak",
+      type: "status_update",
+      timestamp: 1,
+      message: "后台任务已完成：后台跑全量测试确认基线",
+      inputTokenCount: 100_670,
+      tokenCount: 2_370,
+      contextSize: 100_670,
+    }, false);
+
+    expect(details).toEqual(["输入: 100.67k", "输出: 2.37k", "Context: 100.67k"]);
+  });
+
+  it("keeps notification text on non-metric notification rows", () => {
+    const details = getStatusCardDetailTexts({
+      id: "notice",
+      type: "status_update",
+      timestamp: 1,
+      message: "后台任务已完成：后台跑全量测试确认基线",
+      source: "runtime",
+      tone: "success",
+    }, false);
+
+    expect(details).toEqual(["后台任务已完成：后台跑全量测试确认基线"]);
+  });
 });
 
 describe("getStatusCardToneClass", () => {

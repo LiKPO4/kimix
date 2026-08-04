@@ -16,6 +16,15 @@ export interface SessionRecommendationMetrics {
   latestContextLimit?: number;
 }
 
+// 运行时通知信封映射成 status_update 的摘要前缀（与 eventHelpers 的摘要构造同源）。
+// v2.20.182 前的遗留持久化行可能把通知文案混进度量行 message；度量行的展示/合并
+// 路径按前缀剔除，避免轮末信息卡出现不该出现的内容。
+const NOTIFICATION_SUMMARY_PREFIXES = ["后台任务已完成：", "后台任务已丢失：", "后台任务通知：", "定时任务触发：", "已调用 Skill："];
+export function isNotificationSummaryMessage(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return NOTIFICATION_SUMMARY_PREFIXES.some((prefix) => message.startsWith(prefix));
+}
+
 export function countUserTurns(events: TimelineEvent[]): number {
   return events.filter((event) => event.type === "user_message").length;
 }
@@ -96,7 +105,9 @@ export function mergeMetricStatusUpdates(
       ? {
           ...acc,
           ...incoming,
-          message: incoming.message?.trim() ? incoming.message : acc.message,
+          message: incoming.message?.trim() && !isNotificationSummaryMessage(incoming.message)
+            ? incoming.message
+            : isNotificationSummaryMessage(acc.message) ? undefined : acc.message,
           inputTokenCount: preferPositiveMetric(incoming.inputTokenCount, acc.inputTokenCount),
           tokenCount: preferPositiveMetric(incoming.tokenCount, acc.tokenCount),
           // Interim agent.status frames often carry contextSize:0 + a limit only;

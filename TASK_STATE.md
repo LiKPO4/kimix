@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：182 前遗留污染行仍在信息卡显示通知文案（v2.20.184）
+
+- 现场：v2.20.183 实机，轮末信息卡仍显示「后台任务已完成：后台跑… 输入 输出 Context」。
+- 复查结论：182 的跨类不折叠对新合并生效（用例+代码确认），但截图行是 **182 之前持久化的遗留合并行**（该轮 15:5x 结束于 181 环境，合并行已落 IndexedDB）；且 `sessionMetrics.mergeMetricStatusUpdates` 的 reduce 也有 `message: incoming ?: acc` 继承，遗留行（带度量）会把通知文案再传进页脚。
+- 修复：`sessionMetrics` 新增 `isNotificationSummaryMessage`（通知摘要前缀，与 eventHelpers 摘要构造同源）；① `getStatusCardDetailTexts` 度量行剔除通知文案（显示层兜底，与既有 tone/source 遗留修复同先例）；② `mergeMetricStatusUpdates` message 继承双侧剔除。2 新用例（度量行剔除、纯通知行保留）。
+- 验收：typecheck/全量 1547/build 通过；实机待用户验收（遗留行无需切会话，渲染即修复）。
+- 已知边界：前缀列表与 eventHelpers 摘要构造需保持同源（硬编码两处，注释互指）。
+- 知识库：runtime-routing.md 14f 补显示层兜底句，log.md 已记。
+- 关键文件：`src/utils/sessionMetrics.ts`、`src/components/chat/StatusCard.tsx`、`src/components/chat/__tests__/StatusCard.test.ts`。
+
 ## 2026-08-04 修复：外部新轮首段丢失（等待首事件 30+s 后同步仍缺思考/首段正文）（v2.20.183）
 
 - 现场：v2.20.182 实机双端对比。Web 侧发新轮后 Kimix 长时间「等待首个模型事件 33秒」，开始同步后直接是工具调用，缺 Web 可见的思考与首段正文（「读代码先。你好霖江路！合理质疑…」）。
