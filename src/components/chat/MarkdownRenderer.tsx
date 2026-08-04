@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import { Lexer } from "marked";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import rehypeHighlight from "rehype-highlight";
+import hljs from "highlight.js/lib/common";
 import rehypeKatex from "rehype-katex";
 import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -272,6 +272,21 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
   const codeText = nodeText(children).replace(/\n$/, "");
+  const codeRef = useRef<HTMLElement | null>(null);
+  // 高亮移出渲染通道：挂载先出纯文本，idle 时再着色，首滚/扩展挂载不再被 hljs 同步高亮阻塞。
+  useEffect(() => {
+    const node = codeRef.current;
+    if (!node || !node.className.includes("language-") || node.classList.contains("hljs")) return;
+    const run = () => hljs.highlightElement(node);
+    let idleId: number | undefined;
+    let timerId: number | undefined;
+    if (typeof window.requestIdleCallback === "function") idleId = window.requestIdleCallback(run, { timeout: 600 });
+    else timerId = window.setTimeout(run, 120);
+    return () => {
+      if (idleId !== undefined && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idleId);
+      if (timerId !== undefined) window.clearTimeout(timerId);
+    };
+  }, [children]);
 
   useEffect(() => () => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
@@ -326,6 +341,7 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
         }}
       >
         <code
+          ref={codeRef}
           className={`${className ?? ""} block font-mono`}
           style={{
             display: "block",
@@ -615,7 +631,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   );
 
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);
-  const rehypePlugins = useMemo(() => [rehypeKatex, rehypeHighlight], []);
+  const rehypePlugins = useMemo(() => [rehypeKatex], []);
   const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(displayContent);
 
   useLayoutEffect(() => {

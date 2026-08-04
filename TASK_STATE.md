@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-04 优化：首次滚动 1-3s 卡顿——hljs 高亮移出渲染通道（v2.20.192）
+
+- 现场：191 后周期性 bursts 消失，但首次滚动最初 1-3s 仍卡。
+- 根因：首次上滚触发历史扩展/挂载，代码块经 rehype-highlight 在 **react-markdown 渲染通道内同步高亮**，大批代码块挂载时 hljs 解析占主线程 1-3s。
+- 修复：rehypePlugins 去掉 rehypeHighlight；CodeBlock 挂载先出纯文本，`requestIdleCallback`（600ms timeout，回退 setTimeout 120ms）里 `hljs.highlightElement`（highlight.js/lib/common，与低亮语言集一致）异步着色；卸载取消。着色略延迟出现，换取首滚/扩展不被阻塞。
+- 验收：typecheck/全量 1551/build 通过；实机待用户验收（首次上滚应明显顺滑，代码着色稍后出现）。
+- 已知边界：idle 被持续滚动推迟时着色延后；流式 Plain→Rich settle 路径同样受益。
+- 知识库：无需更新（渲染性能微调，streaming-render-pipeline 既有预算语义不变）。
+- 关键文件：`src/components/chat/MarkdownRenderer.tsx`。
+
 ## 2026-08-04 修复：上下滚动卡顿（snapshot 同指纹重放风暴）+ 大会话结构性问题登记（v2.20.191）
 
 - 现场：用户反馈页面上下滚动卡顿异常。diag 取证（session da02b357）：
