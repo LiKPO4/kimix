@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：权限模式调整被缓存吞没不同步到 server（v2.20.178）
+
+- 现场：用户反馈权限模式在 Kimix 调整后 kimi code web 不同步（截图：Kimix「完全自主 auto」、web「自动通过 yolo」）。
+- 取证（live）：官方 server `/status` 实测 `permission: "yolo"`，Kimix 本地 `session.permissionMode = "auto"`——调整没落库。web bundle 分析：当前版本 web 的权限 pill 显示**读 server status**（不是旧版 localStorage 显示），但每个 prompt 携带 `permissionMode: e.permission`（本地持久化状态），与 Kimix 的 prompt 携带 `permission_mode: managed.permission` 形成「最后写入者胜」。
+- 根因两个：① `kimiCodeHost.ts:1627` 的 early-return 拿**缓存** `serverManaged.permission` 对比目标值——web 经 prompt 改写 profile 后缓存过期，缓存==目标时显式调整被静默吞掉，且连 v2.20.165 的写后回读也被跳过（UI 保持乐观值、server 保持旧值）；② `Composer.tsx:3877` 同模式点击纯 noop 不发 IPC，已不一致时用户点当前模式无法重新对齐。
+- 修复（v2.20.178）：① setPermission 改「先回读再决定」——先 `refreshServerSessionStatus` 拿 server 真值（校准缓存 + emit 同步 UI，失败不阻塞写入），新鲜值==目标才跳过写入，否则写入 + 写后回读；② 同模式点击改为重申语义（`click:reassert-same-mode`），仍走 applyPermissionMode 向 server 重申（轮次中保持 pending 流程不轮中直写）。
+- 验收：全量 1539 测试通过（新增 `shouldWritePermissionToServer` 3 用例）、typecheck 通过、`pnpm build` 通过、`knowledge:validate` PASS；实机双端权限同步待用户验收。
+- 已知边界（范围外）：resume 重放与 prompt 携带仍以本地值覆盖 server（最后写入者胜的协议本质），后续可单独评估 resume 时 adopt server 值；回读失败时按缓存判断仍有小吞没窗口（保守取舍）。
+- 知识库：`runtime-routing.md` 不变量 8 权限段扩写（先回读再决定 + 最后写入者胜说明），log.md 已记。
+- 关键文件：`electron/kimiCodeHost.ts:1625-1661`、`src/components/chat/Composer.tsx:3877-3886`。
+
 ## 2026-08-04 修复：滚动停止约 1s 后视口自动下跳（v2.20.177）
 
 - 现场：用户反馈消息区滚动结束后约 1s 视口莫名自动往下跳一下，向上滚动后尤其明显。

@@ -1622,11 +1622,29 @@ export async function setThinking(sessionId: string, level: string): Promise<voi
   managed.thinking = level;
 }
 
+/**
+ * 权限写盘决策：以 refresh 回来的 server 真值（而非本地缓存）对比目标模式，
+ * 一致则不写。幂等重申也必须先回读再决定，避免缓存==目标值时吞掉显式调整。
+ */
+export function shouldWritePermissionToServer(
+  current: KimiCodePermissionMode | undefined,
+  target: KimiCodePermissionMode,
+): boolean {
+  return current !== target;
+}
+
 export async function setPermission(sessionId: string, mode: KimiCodePermissionMode): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    if (serverManaged.permission === mode) return;
+    // 先回读再决定：managed.permission 只是缓存，web 端可经 prompt 改写 server
+    // profile 使缓存过期；必须用 server 真值做 early-return 判断，否则缓存==目标
+    // 值时显式调整被静默吞掉（连写后回读也被跳过）。回读失败不阻塞写入，catch
+    // 记录后继续按当前缓存值判断。
+    await refreshServerSessionStatus(sessionId, true).catch((error) => {
+      console.warn(`[KimiCodeServerHost] refresh before permission change failed for ${sessionId}:`, error);
+    });
+    if (!shouldWritePermissionToServer(serverManaged.permission, mode)) return;
     await getServerClient().updateSession(sessionId, { permission_mode: mode });
     serverManaged.permission = mode;
     // 写后回读：校准 managed.permission 并 emit agent.status.updated，让渲染层

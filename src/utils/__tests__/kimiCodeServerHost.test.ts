@@ -21,6 +21,7 @@ import {
   resolveServerEngineStatus,
   resolveServerModelRefresh,
   shouldApplyServerModelRefresh,
+  shouldWritePermissionToServer,
 } from "../../../electron/kimiCodeHost";
 import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
@@ -361,5 +362,23 @@ describe("server prompt model ownership", () => {
       false,
       false,
     )).toBe("opencode-go/deepseek-v4-pro");
+  });
+});
+
+describe("shouldWritePermissionToServer", () => {
+  it("skips the write when the fresh server value already matches the target", () => {
+    expect(shouldWritePermissionToServer("auto", "auto")).toBe(false);
+    expect(shouldWritePermissionToServer("yolo", "yolo")).toBe(false);
+    expect(shouldWritePermissionToServer("manual", "manual")).toBe(false);
+  });
+
+  it("writes when the fresh server value differs from the target", () => {
+    expect(shouldWritePermissionToServer("yolo", "auto")).toBe(true);
+    expect(shouldWritePermissionToServer("auto", "manual")).toBe(true);
+    expect(shouldWritePermissionToServer("manual", "yolo")).toBe(true);
+  });
+
+  it("writes when the server value is unknown", () => {
+    expect(shouldWritePermissionToServer(undefined, "auto")).toBe(true);
   });
 });

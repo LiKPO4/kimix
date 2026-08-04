@@ -3875,12 +3875,14 @@ export function Composer() {
       isCurrentSessionRunning,
     });
     if (previousMode === mode) {
-      emitPermissionModeDiag("click:noop-same-mode", {
+      // 同模式点击不再吞掉：UI 显示值可能已与 server 不一致（web 端经 prompt
+      // 改写后 Kimix 缓存过期），仍向 server 重申一次，由 host 先回读再决定是否
+      // 写入（幂等）。轮次中继续走下方 pending 流程，不在轮中直接写。
+      emitPermissionModeDiag("click:reassert-same-mode", {
         traceId,
         requestedMode: mode,
         previousMode,
       });
-      return;
     }
     if (activeSession?.collaboration && isMutationOwnerRunning) {
       window.dispatchEvent(new CustomEvent("kimix:toast", {
