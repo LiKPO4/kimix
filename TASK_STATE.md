@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-04 修复：select 切换模型档位不跟随（Context 跟、档位留旧）（v2.20.185）
+
+- 现场：复查清单 #7 我原判「静态未能证实」，用户读码纠正：机制在两条路径交汇处，成立。
+- 根因：`handleDiscoveredModel`（select 路径）里 Context 每次 select 强制刷新（select 模式 `probe ?? catalogLimit ?? infer` 恒有值），而 `prefillFromCatalog` 的档位仅在当前为空数组时预填、否则 null → `?? current.supportEfforts` 留旧值。复现：选 A（预填 [low,high]）→ 选 B（目录 [medium]）→ draft = B 的 Context + A 的档位，保存带旧档位入库。
+- 修复：select 视为新意图——目录带非空档位时覆盖（与 Context 对称）；type（手输）保持「为空才填」不覆盖手改。2 新用例（select 跟随 / 新模型无档位保留现值）。
+- 验收：typecheck/全量 1549/build 通过；实机待用户验收（探测下拉 A→B 切换后档位应跟随 B）。
+- 已知边界：新模型目录无档位时保留现值（无权威来源可跟随，合理不对称）。
+- 知识库：无需更新（局部表单行为调整，v2.20.171 本身未入知识库）。
+- 关键文件：`src/utils/modelProviderConfig.ts`（prefill 语义）、`src/utils/__tests__/modelProviderConfig.test.ts`。
+
 ## 2026-08-04 修复：182 前遗留污染行仍在信息卡显示通知文案（v2.20.184）
 
 - 现场：v2.20.183 实机，轮末信息卡仍显示「后台任务已完成：后台跑… 输入 输出 Context」。

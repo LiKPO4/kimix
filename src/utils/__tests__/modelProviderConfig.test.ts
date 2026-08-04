@@ -133,4 +133,28 @@ describe("prefillFromCatalog", () => {
       probeContextLength: 12,
     })).toEqual({ maxContextSize: 1_000_000, supportEfforts: null });
   });
+
+  it("select mode: catalog efforts follow the new model even when current efforts are non-empty", () => {
+    const prefill = prefillFromCatalog({
+      mode: "select",
+      modelId: "other-model",
+      currentContextSize: "1000000",
+      currentSupportEfforts: ["low", "high"],
+      catalogModel: { id: "other-model", supportEfforts: ["medium"] },
+      probeContextLength: null,
+    });
+    expect(prefill.supportEfforts).toEqual(["medium"]);
+  });
+
+  it("select mode: keeps current efforts when the new catalog model declares none", () => {
+    const prefill = prefillFromCatalog({
+      mode: "select",
+      modelId: "gpt-5.1",
+      currentContextSize: "400000",
+      currentSupportEfforts: ["low"],
+      catalogModel: catalog[1],
+      probeContextLength: null,
+    });
+    expect(prefill.supportEfforts).toBeNull();
+  });
 });
