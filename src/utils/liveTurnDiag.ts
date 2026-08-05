@@ -164,6 +164,8 @@ export function resetLiveTurnDiagStateForTests() {
   lastSilenceLogAtBySid.clear();
   lastStreamSampleAtBySid.clear();
   streamCountsBySid.clear();
+  anchorDiagRowsByKey.clear();
+  anchorDiagLastOffsetByKey.clear();
 }
 
 function writeLive(message: string, data?: Record<string, unknown>) {
@@ -253,6 +255,60 @@ export function noteLiveStreamFrame(input: {
     },
     sinceFirstMs: now - counts.firstAt,
     sinceBodyMs: counts.lastBodyAt ? now - counts.lastBodyAt : null,
+  });
+}
+
+/**
+ * offset 锚定判定的逐帧留痕（不抽样）。`[live] stream` 每 2s 抽样一次，无法
+ * 区分「offset 归 0 重启」与「offset 按 step 重置」——两者在抽样日志下观测
+ * 等价，却指向完全不同的修法。这里记录每次判定的 offset/anchor/accepted，
+ * 只记长度不记正文；按 key 设上限防刷屏，超限后仍保留被拒帧与回退帧（正是
+ * 诊断要看的信号）。
+ */
+const ANCHOR_DIAG_FULL_ROWS_PER_KEY = 1200;
+const ANCHOR_DIAG_HARD_ROWS_PER_KEY = 2000;
+const anchorDiagRowsByKey = new Map<string, number>();
+const anchorDiagLastOffsetByKey = new Map<string, number>();
+
+export function shouldLogStreamAnchorDecision(input: {
+  rows: number;
+  accepted: boolean;
+  isOffsetRegression: boolean;
+}): boolean {
+  if (input.rows >= ANCHOR_DIAG_HARD_ROWS_PER_KEY) return false;
+  if (input.rows < ANCHOR_DIAG_FULL_ROWS_PER_KEY) return true;
+  return !input.accepted || input.isOffsetRegression;
+}
+
+export function noteStreamAnchorDecision(input: {
+  key: string;
+  kind: "body" | "think";
+  offset: number;
+  deltaLen: number;
+  accLen: number;
+  anchorBefore: number | null;
+  anchorAfter: number | null;
+  accepted: boolean;
+}) {
+  const trackKey = `${input.key}:${input.kind}`;
+  const rows = anchorDiagRowsByKey.get(trackKey) ?? 0;
+  const lastOffset = anchorDiagLastOffsetByKey.get(trackKey);
+  const isOffsetRegression = lastOffset !== undefined && input.offset < lastOffset;
+  anchorDiagLastOffsetByKey.set(trackKey, input.offset);
+  if (!shouldLogStreamAnchorDecision({ rows, accepted: input.accepted, isOffsetRegression })) return;
+  anchorDiagRowsByKey.set(trackKey, rows + 1);
+  writeLive("[live] anchor", {
+    key: input.key.slice(-24),
+    kind: input.kind,
+    offset: input.offset,
+    deltaChars: input.deltaLen,
+    accChars: input.accLen,
+    anchorBefore: input.anchorBefore,
+    anchorAfter: input.anchorAfter,
+    accepted: input.accepted,
+    regression: isOffsetRegression,
+    prevOffset: lastOffset ?? null,
+    row: rows + 1,
   });
 }
 

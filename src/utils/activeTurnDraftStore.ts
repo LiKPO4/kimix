@@ -3,6 +3,7 @@ import type { TimelineEvent } from "@/types/ui";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText, mergeEvents } from "@/utils/eventMapper";
 import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
+import { noteStreamAnchorDecision } from "@/utils/liveTurnDiag";
 
 type AssistantMessage = Extract<TimelineEvent, { type: "assistant_message" }>;
 
@@ -332,9 +333,22 @@ export function applyActiveTurnDraftDelta(
   let thinkAnchor: StreamAnchor = persistedAnchors?.think ?? previous?.streamThinkAnchor ?? null;
   let merged: TimelineEvent[];
   if (isAppendOnlyDelta && typeof event.streamOffset === "number") {
+    const isThinkDelta = Boolean(event.thinking) && !event.content;
+    const anchorBefore = isThinkDelta ? thinkAnchor : contentAnchor;
+    const accBefore = (isThinkDelta ? base.thinking ?? "" : base.content).length;
     const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor });
     contentAnchor = applied.contentAnchor;
     thinkAnchor = applied.thinkAnchor;
+    noteStreamAnchorDecision({
+      key,
+      kind: isThinkDelta ? "think" : "body",
+      offset: event.streamOffset,
+      deltaLen: (isThinkDelta ? event.thinking ?? "" : event.content ?? "").length,
+      accLen: accBefore,
+      anchorBefore,
+      anchorAfter: isThinkDelta ? thinkAnchor : contentAnchor,
+      accepted: applied.accepted,
+    });
     streamAnchors.set(key, { content: contentAnchor, think: thinkAnchor });
     if (!applied.accepted) {
       if (previous) {

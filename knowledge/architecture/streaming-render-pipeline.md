@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-07-31T11:20:13+08:00"
+timestamp: "2026-08-05T19:45:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -198,6 +198,8 @@ cannot reconstruct the whole-turn length; the next live frame may seed a fresh
 cursor from a non-zero offset, with the snapshot already carrying the prefix.
 An offset gap against a known cursor is never fuzzy-appended: showing a shorter
 authoritative/live prefix is preferable to persisting invented prose.
+
+Diagnosing this anchor model requires an unsampled log. `[live] stream` (`noteLiveStreamFrame`) samples at most one row per session every 2s, which makes "offset resets to 0 at a stream restart" and "offset is scoped per step" **observationally equivalent**: in both cases the first sampled row after a reset carries a small non-zero offset (a few hundred chars accumulated inside the sampling window). Those two hypotheses imply opposite fixes, so the turn-global claim above must never be revised from sampled rows. `noteStreamAnchorDecision` emits unsampled `[live] anchor` rows at the decision point (offset, delta/accumulator lengths, anchor before/after, accepted, offset-regression flag), capped per `key:kind` at 1200 full rows then key signals only (rejections and offset regressions) to a hard stop at 2000.
 
 The offset is threaded `ServerFrame → flattenServerEvent →
 mapKimiCodeEvent → AssistantMessageEvent.streamOffset`. Order-based

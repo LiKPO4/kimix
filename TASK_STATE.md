@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-08-05 加强：offset 锚定不抽样诊断（产生侧定性前置）（v2.20.227）
+
+- 背景：226 已让两个残片轮实机闭环（用户验收：正文均显示）。转追产生侧。
+- 自我更正（重要）：先前从 diag 读出「13 次 offset 从 8389 回退到 247-320、无一落 0」，据此判定「协议按 step 计 offset、注释承诺的 offset 0 自愈永不发生」——该结论作废。`[live] stream` 每 sid 每 2s 只抽样一条（`noteLiveStreamFrame`），「offset 真归 0」与「offset 按 step 计」在抽样日志下观测等价：归零后头几百字符的 delta 全落在采样窗内，首条被采样到的必然是小非零值。回退值挤在 247-320 这条窄带恰是「2s 内累积字符数」的特征。
+- 影响：A（锚定改 per-step）的前提无证据支撑，不能选；B（大幅回退视同重起点）同样缺依据。知识库 streaming-render-pipeline 的 turn-global 模型无证据前不改。
+- 本轮改动：新增 `noteStreamAnchorDecision`（不抽样，输出 `[live] anchor`：offset/deltaChars/accChars/anchorBefore/anchorAfter/accepted/regression/prevOffset/row，不含正文），挂在 `applyActiveTurnDraftDelta` 的 `applyStreamOffsetDelta` 决策点；上限每 `key:kind` 前 1200 行全记、超出只记 accepted=false 与 offset 回退、硬上限 2000。纯函数 `shouldLogStreamAnchorDecision` 可单测。
+- 验收：新增单测 3 例（软上限内全记 / 超软上限只留关键信号 / 硬上限即使关键信号也停）；全量 157 文件 1597 例、typecheck、build 通过。待用户复现一轮后回传 `[live] anchor` 序列，再判定 turn-global 还是 per-step，然后定修法。
+- 已知边界：先前取证的 offset 回退帧全是 `kind=think`，body 通道的回退尚未直接抓到；那段 diag（08:21-08:41Z）不覆盖两个残片轮（06:52-07:31Z）。
+- 未完成：watchdog 固定静默上限空转收窄（证据链已完整：`WS_SILENCE_LIMIT_MS=90_000` + `WS_WATCHDOG_INTERVAL_MS=2_000` 对应实测 90/92 秒；daemon 从不主动 ping，diag 里 ping 0 次；8s 粒度 REST 探测走 `listMessages`，僵尸 socket 下仍能发现官方历史增长并重连，故固定上限在完全空闲时多余）。
+- 关键文件：`src/utils/liveTurnDiag.ts`、`src/utils/activeTurnDraftStore.ts`。
+
+
 ## 2026-08-05 修复：跳轮错位残片（下一轮首段落到上一轮边界下）（v2.20.226）
 
 - 现场：225 修好了 T4 那轮（用户已确认），但截图下面那轮（显示「backoff。」）仍不修。
