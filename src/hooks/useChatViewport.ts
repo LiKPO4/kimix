@@ -248,6 +248,8 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     onExpandOlderItemsToEnd,
     onHighlightEvent,
     pauseAutoFollowForUser,
+    captureResizeAnchor,
+    cancelPendingAnchorCapture,
   });
 
   useResizeObserver({

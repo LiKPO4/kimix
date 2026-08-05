@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：运行中点左侧刻度跳转约 1 秒后跳回旧位置（v2.20.220）
+
+- 现场：流式运行中点击 ChatNavigationRail 刻度跳转，约 1 秒后视口自动回到跳转前位置（跟随态的底部）。
+- 根因：focusTimelineEvent 经 pauseAutoFollowForUser → recordExplicitUserScrollIntent 调度 140ms 闲时锚点捕获；smooth 滚动落定需数百毫秒，捕获落在出发时的旧位置。700ms 抑制窗过后，下一次内容刷新的 restoreManualScrollAnchor 按过期锚点（无上限 delta）把视口拖回旧位置。wheel/触摸滚动是瞬时的所以没暴露，smooth 导航才触发。
+- 修复：useEventFocus 导航成功后取消待定闲时捕获，改用 rAF 落定检测（先观察到 scrollTop 移动、再连续 3 帧稳定，1.5s 兜底）捕获新锚点；会话切换/卸载取消该循环。
+- 验收：新增回归 1 例（fake timers+Date，smooth 300ms 落定模型；无修复时断言失败 800≠84，修复后通过）；useChatViewport 21 例、全量 1585 例、typecheck、build 通过；实机刻度跳转待用户验收。
+- 知识库：无需更新（视口锚点时序修正，不变量未变）。
+- 关键文件：`src/hooks/useChatViewport/useEventFocus.ts`、`src/hooks/useChatViewport.ts`、`src/hooks/__tests__/useChatViewport.test.ts`。
+
 ## 2026-08-05 修复：流式期间思考/正文段跳到工具帧前——多步工具粘成一张「N 个工具调用」卡（v2.20.219）
 
 - 现场：运行中 kimi-web 展开过程流里几十步工具合并成「69 个工具调用」一张卡、中间思考段只剩末段 teaser、部分正文不可见；Ctrl+R 后 kimiHistoryReconciliation 回放 canonical 恢复正常（diag.log 有 repair 记录）。kimi Web 端任何时候都正常。

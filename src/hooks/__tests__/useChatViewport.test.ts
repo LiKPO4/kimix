@@ -333,6 +333,69 @@ describe("useChatViewport", () => {
     });
   });
 
+  it("does not let a mid-smooth-scroll anchor capture pull the viewport back after rail navigation", () => {
+    // 现场：跟随态点左侧刻度跳转，smooth 滚动落定前 140ms 闲时捕获落在旧位置，
+    // 700ms 抑制窗过后下一次内容刷新按过期锚点把视口拖回跳转前位置（约 1 秒跳回）。
+    // Date 必须一起 fake，否则抑制窗按真实时钟永远判定"刚滚动过"。
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame", "Date"],
+    });
+    const { viewport, scroll, rerender } = renderTest({
+      contentVersion: "v1",
+      renderItems: [eventRenderItem("a"), eventRenderItem("b")],
+    });
+    const first = scroll.querySelector<HTMLElement>("[data-kimix-event-id='a']")!;
+    const target = scroll.querySelector<HTMLElement>("[data-kimix-event-id='b']")!;
+    Object.defineProperties(scroll, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, writable: true, value: 1000 },
+      scrollTop: { configurable: true, writable: true, value: 800 },
+      scrollTo: {
+        configurable: true,
+        value: vi.fn(({ top }: ScrollToOptions) => {
+          // smooth 滚动约 300ms 后落定（jsdom 无真实动画，用定时器模拟）。
+          window.setTimeout(() => {
+            scroll.scrollTop = Number(top ?? 0);
+          }, 300);
+        }),
+      },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockImplementation(() => ({ top: 0 } as DOMRect));
+    vi.spyOn(first, "getBoundingClientRect").mockImplementation(() => ({
+      top: 100 - scroll.scrollTop,
+      bottom: 200 - scroll.scrollTop,
+    } as DOMRect));
+    vi.spyOn(target, "getBoundingClientRect").mockImplementation(() => ({
+      top: 700 - scroll.scrollTop,
+      bottom: 800 - scroll.scrollTop,
+    } as DOMRect));
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    scroll.scrollTop = 800;
+
+    act(() => {
+      viewport().focusTimelineEvent("a", undefined, "start");
+    });
+    // 140ms 闲时捕获窗口过去时 smooth 尚未落定；修复后该捕获必须被取消。
+    act(() => {
+      vi.advanceTimersByTime(140);
+    });
+    // smooth 落定 + 锚点落定捕获（连续稳定帧）。
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(scroll.scrollTop).toBe(84);
+
+    // 抑制窗（700ms）过后的内容刷新不得把视口拖回旧位置。
+    act(() => {
+      vi.advanceTimersByTime(500);
+      rerender({ contentVersion: "v2" });
+    });
+    expect(scroll.scrollTop).toBe(84);
+  });
+
   it("suppresses a sub-threshold anchor drift without a scrollTop write and recaptures the new baseline", () => {
     vi.useFakeTimers({
       toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"],

@@ -10,6 +10,8 @@ export interface UseEventFocusOptions {
   onExpandOlderItemsToEnd: () => void;
   onHighlightEvent?: (eventId: string | null) => void;
   pauseAutoFollowForUser: () => void;
+  captureResizeAnchor: () => void;
+  cancelPendingAnchorCapture: () => void;
 }
 
 export type UseEventFocusResult = {
@@ -31,11 +33,60 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
     onExpandOlderItemsToEnd,
     onHighlightEvent,
     pauseAutoFollowForUser,
+    captureResizeAnchor,
+    cancelPendingAnchorCapture,
   } = options;
 
   const pendingFocusEventRef = useRef<{ sessionId: string; eventId: string; searchText?: string; alignment?: TimelineFocusAlignment } | null>(null);
   const focusTimelineEventStateRef = useRef<{ eventId: string; attemptCount: number; startTime: number } | null>(null);
   const highlightClearTimerRef = useRef<number | null>(null);
+  const postFocusAnchorCaptureFrameRef = useRef<number | null>(null);
+
+  const cancelPostFocusAnchorCapture = useCallback(() => {
+    if (postFocusAnchorCaptureFrameRef.current !== null) {
+      window.cancelAnimationFrame(postFocusAnchorCaptureFrameRef.current);
+      postFocusAnchorCaptureFrameRef.current = null;
+    }
+  }, []);
+
+  // 刻度/通知跳转用 smooth 滚动，落定需要数百毫秒；而
+  // recordExplicitUserScrollIntent 的 140ms 闲时捕获会在滚动刚出发时落在
+  // 旧位置（跟随态的底部）。700ms 抑制窗过后，restoreManualScrollAnchor
+  // 按这个过期锚点把视口拖回跳转前位置（现场：点刻度约 1 秒后跳回）。
+  // 导航后取消待定捕获，等 scrollTop 落定（连续 3 帧不变，1.5s 兜底）再捕新锚点。
+  const armPostFocusAnchorCapture = useCallback(() => {
+    cancelPendingAnchorCapture();
+    cancelPostFocusAnchorCapture();
+    const startedAt = Date.now();
+    let lastTop = scrollRef.current?.scrollTop ?? 0;
+    let stableFrames = 0;
+    let moved = false;
+    const tick = () => {
+      const node = scrollRef.current;
+      if (!node) {
+        postFocusAnchorCaptureFrameRef.current = null;
+        return;
+      }
+      if (Math.abs(node.scrollTop - lastTop) < 0.5) {
+        stableFrames += 1;
+      } else {
+        // smooth 启动前 scrollTop 同样"稳定"，必须先观察到移动，
+        // 否则会在旧位置误捕（和 140ms 闲时捕获同一个坑）。
+        moved = true;
+        stableFrames = 0;
+        lastTop = node.scrollTop;
+      }
+      if ((moved && stableFrames >= 3) || Date.now() - startedAt > 1500) {
+        postFocusAnchorCaptureFrameRef.current = null;
+        captureResizeAnchor();
+        return;
+      }
+      postFocusAnchorCaptureFrameRef.current = window.requestAnimationFrame(tick);
+    };
+    postFocusAnchorCaptureFrameRef.current = window.requestAnimationFrame(tick);
+  }, [cancelPendingAnchorCapture, cancelPostFocusAnchorCapture, captureResizeAnchor, scrollRef]);
+
+  useEffect(() => cancelPostFocusAnchorCapture, [cancelPostFocusAnchorCapture]);
 
   const findRenderedEventNode = useCallback((eventId: string, searchText?: string): HTMLElement | null => {
     const node = scrollRef.current;
@@ -196,6 +247,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
         target.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
+    armPostFocusAnchorCapture();
     if (highlightClearTimerRef.current !== null) {
       window.clearTimeout(highlightClearTimerRef.current);
     }
@@ -205,7 +257,7 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       onHighlightEvent?.(null);
     }, 2200);
     return true;
-  }, [findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, pauseAutoFollowForUser, selectTextInNode, scrollRef]);
+  }, [findRenderedEventNode, hasMoreOlderItems, onExpandOlderItemsToEnd, onHighlightEvent, pauseAutoFollowForUser, selectTextInNode, scrollRef, armPostFocusAnchorCapture]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -240,12 +292,13 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       pendingFocusEventRef.current = null;
     }
     focusTimelineEventStateRef.current = null;
+    cancelPostFocusAnchorCapture();
     if (highlightClearTimerRef.current !== null) {
       window.clearTimeout(highlightClearTimerRef.current);
       highlightClearTimerRef.current = null;
     }
     onHighlightEvent?.(null);
-  }, [onHighlightEvent]);
+  }, [onHighlightEvent, cancelPostFocusAnchorCapture]);
 
   useEffect(() => () => {
     if (highlightClearTimerRef.current !== null) {
