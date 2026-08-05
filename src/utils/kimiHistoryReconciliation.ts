@@ -728,20 +728,35 @@ export function mergeCanonicalFragmentTurnBodies(
   meta: FragmentTurnMeta,
 ): TimelineEvent[] {
   type TurnSlice = {
-    user: string;
+    user: Extract<TimelineEvent, { type: "user_message" | "steer_message" }>;
     assistants: Array<Extract<TimelineEvent, { type: "assistant_message" }>>;
   };
   const sliceTurns = (events: TimelineEvent[]): TurnSlice[] => {
     const turns: TurnSlice[] = [];
     for (const event of events) {
       if (event.type === "user_message" || event.type === "steer_message") {
-        turns.push({ user: normalizedUserTurnContent(event.content), assistants: [] });
+        turns.push({ user: event, assistants: [] });
         continue;
       }
       if (event.type !== "assistant_message" || turns.length === 0) continue;
       turns[turns.length - 1].assistants.push(event);
     }
     return turns;
+  };
+  // canonical 的 user 正文常被客户端注入的 <system-reminder> 等包装裹住，
+  // 与本地裸文本纯比较必失配；优先轮次身份，退化为包含关系+时间窗。
+  const turnUsersMatch = (
+    local: TurnSlice["user"],
+    canonical: TurnSlice["user"],
+  ): boolean => {
+    if (local.agentTurnId && canonical.agentTurnId && local.agentTurnId === canonical.agentTurnId) return true;
+    if (local.roomMessageId && canonical.roomMessageId && local.roomMessageId === canonical.roomMessageId) return true;
+    if (local.id === canonical.id) return true;
+    const localText = normalizedUserTurnContent(local.content);
+    const canonicalText = normalizedUserTurnContent(canonical.content);
+    if (!localText || !canonicalText) return false;
+    return (canonicalText.includes(localText) || localText.includes(canonicalText)) &&
+      Math.abs(local.timestamp - canonical.timestamp) <= 30_000;
   };
   const localTurns = sliceTurns(localEvents);
   const canonicalTurns = sliceTurns(canonicalEvents);
@@ -752,7 +767,7 @@ export function mergeCanonicalFragmentTurnBodies(
   for (let index = 0; index < limit; index += 1) {
     const local = localTurns[index];
     const canonical = canonicalTurns[index];
-    if (local.user !== canonical.user) break;
+    if (!turnUsersMatch(local.user, canonical.user)) break;
     const canonicalWithBody = canonical.assistants.filter((event) => event.content.trim());
     const localWithBody = local.assistants.filter((event) => event.content.trim());
     if (canonicalWithBody.length === 0 || localWithBody.length === 0) continue;
@@ -761,7 +776,12 @@ export function mergeCanonicalFragmentTurnBodies(
     const localFinal = localWithBody[localWithBody.length - 1];
     const localFinalBody = localFinal.content.trim();
     if (localFinalBody === canonicalFinal) continue;
-    const isFragment = localFinalBody.length === 0 || canonicalFinal.endsWith(localFinalBody);
+    // 残片既可能是尾后缀，也可能是 offset 重置点截出的中间子串
+    // （如「backoff。」）；用「子串且显著更短」兜底，长度门槛防误伤正常短回复。
+    const isFragment = localFinalBody.length === 0 ||
+      canonicalFinal.endsWith(localFinalBody) ||
+      (canonicalFinal.includes(localFinalBody) && localFinalBody.length <= 32) ||
+      (canonicalFinal.includes(localFinalBody) && localFinalBody.length * 2 <= canonicalFinal.length);
     if (!isFragment || canonicalFinal.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
     replacements.set(localFinal.id, canonicalFinalEvent.content);
     for (const segment of localWithBody.slice(0, -1)) {

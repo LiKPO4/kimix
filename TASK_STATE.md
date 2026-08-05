@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：残片补丁对齐与残片判定两处失配（223 实测不生效根因）（v2.20.224）
+
+- 现场：223 的 repair 触发但 fragmentTurnBodiesPatched 零日志。
+- 根因 1（对齐）：canonical user 正文带客户端注入的 <system-reminder> 包装，本地是裸文本，223 用纯文本相等对齐轮次，第一轮就 break，永远到不了残片轮。改轮次身份优先（agentTurnId/roomMessageId/id），退化包含关系+30s 时间窗。
+- 根因 2（判定）：offset 重置截出的残片是 canonical 全量的中间子串（「backoff。」）而非尾后缀，223 的 endsWith 判不中。放宽为「子串且显著更短」（≤32 字符或 ≤一半长度），门槛防误伤。
+- 验收：新增单测 1 例（中间残片+reminder 包装对齐）；定向 63 例、全量、typecheck、build 通过；实机待用户验收（加载 224 重启或下一轮 settle 后两残片轮应完整）。
+- 知识库：无需更新（223 条目已覆盖机制，本次为判定修正）。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
+
 ## 2026-08-05 修复：残片正文按轮补丁（222 自愈实测不生效的补刀）（v2.20.223）
 
 - 现场：222 的 settle 自愈实测不修残片。diag 取证：整轮替换被 process-history-regression 门拒绝（local 进程帧 559 vs canonical 205，门在保护 live 过程细节），旧补丁 mergeMissingLatestCanonicalAssistant 只补最新一轮，老残片轮无人修。

@@ -94,6 +94,29 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
   });
 
+  it("patches a mid-substring fragment (offset-reset signature) and aligns reminder-wrapped canonical user turns", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage, timestamp: 10 },
+      assistant("你好霖江路。我来查机制，先读代码确认边界，然后修复并提交，最后说明", { id: "seg-1" }),
+      assistant("backoff。", { id: "seg-2" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      {
+        ...userMessage,
+        timestamp: 12,
+        content: `<system-reminder>包装文案</system-reminder> ${userMessage.content}`,
+      },
+      assistant(fullBody, { id: "canonical-1" }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    expect(merged.map((event) => (event.type === "assistant_message" ? event.content : event.type))).toEqual([
+      "user_message",
+      "",
+      fullBody,
+    ]);
+  });
+
   it("keeps intermediate texts of multi-message turns (not prefixes of the final body)", () => {
     const local: TimelineEvent[] = [
       { ...userMessage },
