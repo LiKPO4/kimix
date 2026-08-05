@@ -75,7 +75,7 @@ import type {
 } from "../electron/types/ipc";
 import App from "./App";
 import "./index.css";
-import { applyCachedThemeSnapshot } from "@/utils/themeSnapshot";
+import { applyCachedThemeSnapshot, applyThemeSnapshot, writeCachedThemeSnapshot, type ThemeSnapshot } from "@/utils/themeSnapshot";
 import { ensureLongTaskObserver, getPerfDiagSnapshot, resetPerfDiagCounters } from "@/utils/perfDiag";
 import { isPerfDiagEnabled } from "@/utils/perfFlags";
 import { installStartupLongTaskObserver, getStartupProfile } from "@/utils/startupProfiler";
@@ -713,6 +713,25 @@ window.addEventListener("load", () => reportStartup("window load"));
 reportStartup("renderer entry");
 applyCachedThemeSnapshot();
 reportStartup("after theme snapshot");
+// localStorage 快照按 origin 隔离（dev 与安装版不同源），崩溃页可能停在默认色。
+// 启动即用主进程权威设置补一次主题应用并回写快照，卡死页也跟随用户主题。
+void (async () => {
+  try {
+    const res = await window.api.getSettings();
+    if (!res?.success || !res.data) return;
+    const snapshot: ThemeSnapshot = {
+      theme: res.data.theme,
+      themePalette: res.data.themePalette,
+      customThemePalette: res.data.customThemePalette,
+      kimiThemePalettes: res.data.kimiThemePalettes,
+      uiStyle: res.data.uiStyle,
+    };
+    applyThemeSnapshot(snapshot);
+    writeCachedThemeSnapshot(snapshot);
+  } catch {
+    // 权威设置不可达时保留 localStorage 快照主题。
+  }
+})();
 installBrowserPreviewApi();
 reportStartup("after browser preview api");
 installStartupLongTaskObserver();

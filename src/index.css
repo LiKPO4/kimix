@@ -1863,7 +1863,8 @@ body::before {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgba(245, 242, 235, 0.88);
+  /* 崩溃页也要吃主题：遮罩用主题变量，硬编码浅色在 dark 下会闪白 */
+  background: var(--kimix-overlay-bg, rgba(245, 242, 235, 0.88));
   backdrop-filter: blur(6px);
 }
 

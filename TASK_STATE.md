@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：崩溃/卡死页不吃主题（v2.20.229）
+
+- 现场：dev 实例 React 双副本崩溃（vite 旧 .vite 缓存，清缓存重启可解）时，错误页停在默认浅色，不跟用户主题。
+- 根因：首帧主题只读 localStorage `kimix_theme_snapshot`，按 origin 隔离（dev localhost:5173 与安装版不同源，dev 侧可能无快照）；且 `#kimix-runtime-error` 遮罩背景硬编码浅色 rgba。
+- 修复：main.tsx 启动时在缓存快照之后用 `window.api.getSettings()` 权威设置补一次 applyThemeSnapshot 并回写快照；遮罩背景改 `var(--kimix-overlay-bg)`（light/dark 各有值）。
+- 验收：typecheck/全量 1599/build 通过；实机待用户验收（dark/复古主题下触发崩溃页应跟随主题；dev 卡死实例需先杀进程清 node_modules/.vite、.cache、out 再重启）。
+- 知识库：无需更新（首帧主题快照机制补强，不变量未变）。
+- 关键文件：`src/main.tsx`、`src/index.css`。
+
 
 ## 2026-08-05 修复：空闲会话每 90 秒无谓断连重连（v2.20.228）
 
