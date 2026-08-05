@@ -29,11 +29,24 @@ type DraftListener = () => void;
 
 const drafts = new Map<string, ActiveTurnDraft>();
 type StreamAnchors = { content: StreamAnchor; think: StreamAnchor };
-// Server offsets are cumulative for the whole Agent turn, while `drafts`
-// contains only the currently visible segment and is committed at tool/status
-// boundaries. Keep the protocol cursor independent from that transient draft
-// so replayed tails after a boundary are still recognized as duplicates.
+// Server offsets restart at 0 for EACH step and accumulate only within that
+// step. Verified on 0.32 with 1240 unsampled `[live] anchor` rows: splitting
+// at offset 0 yields per-step blocks that are each strictly monotonic
+// (think 0..2339, then 0..259, then 0..3493 ...). The older note here claimed
+// one cumulative cursor for the whole Agent turn; that was wrong and made
+// `takeActiveTurnDraft` keep a stale anchor across step boundaries, which in
+// turn made every new step's opening offset-0 delta look exactly like a
+// reconnect replay. The anchor then froze and rejected the rest of the step
+// (measured: 814/932 thinking and 146/308 body deltas dropped).
 const streamAnchors = new Map<string, StreamAnchors>();
+// Text of the segment most recently committed for a key. A reconnect/resync
+// replay re-sends an already-committed prefix at offset 0, which is otherwise
+// byte-identical to a new step opening; comparing against this text is the
+// only way to tell them apart. Rejecting a suspected replay deliberately
+// leaves the anchor null, so a genuine new step whose first delta happens to
+// match the committed prefix (replies here often open with the same words)
+// loses just that delta and resumes on the next one, instead of freezing.
+const committedSegments = new Map<string, { content: string; think: string }>();
 const listeners = new Map<string, Set<DraftListener>>();
 const globalListeners = new Set<DraftListener>();
 
@@ -181,30 +194,44 @@ export function appendStreamingText(existing: string, incoming: string): string 
 type StreamAnchor = number | null;
 
 /**
- * 0.29 Server 的 volatile delta 携带累计 offset（协议：offset < 本地长度=重复，
- * 跳过；offset > 本地长度=中间缺帧）。对齐官方 web 的 turnLen 锚定模型：
- * offset===0 在当前视觉段仍挂载时视为流（重）起点，以新流替换；
- * 视觉段已提交但 turn anchor 仍存在时则是旧前缀回放，必须跳过；
- * offset===锚点 顺序追加；offset<锚点 跳过重复尾部；
- * offset>锚点 说明缺帧；残片不能安全拼接，等待权威快照/offset 0 自愈。
- * 无锚点且本地段为空时允许从非零 offset 接续：权威快照可能已经承载前文。
+ * 0.29+ Server volatile delta carries a character `offset` that restarts at 0
+ * for each step and accumulates within that step (see the streamAnchors note).
+ * offset === 0 therefore opens a new stream for the current visual segment and
+ * replaces whatever that segment holds; offset === anchor appends in order;
+ * offset < anchor skips an already-seen tail; offset > anchor means a gap, and a
+ * fragment cannot be spliced safely, so it waits for an authoritative snapshot
+ * or the next offset 0. With no anchor and an empty segment we may resume from a
+ * non-zero offset, because a snapshot may already carry the prefix.
+ *
+ * The retired `!acc && anchor !== null -> reject` rule tried to spot a
+ * reconnect/resync replay of an already-committed prefix. It cannot: after a
+ * boundary commit the state is byte-identical to a new step opening, so it
+ * rejected real output instead. Anchors are now dropped at commit, so a
+ * committed segment leaves no anchor for offset 0 to trip over.
  */
 function anchorStreamText(
   acc: string,
   delta: string,
   offset: number,
   anchor: StreamAnchor,
+  committedText?: string,
 ): { text: string; anchor: StreamAnchor; accepted: boolean } {
   if (offset === 0) {
-    // While a visual segment is mounted, offset 0 means the Server restarted
-    // that live stream and the replacement must win. After the segment has
-    // already been committed, however, the turn-global anchor remains while
-    // `acc` is empty: offset 0 is then a reconnect/resync replay of the old
-    // turn prefix. Accepting it would create a fresh materialization at every
-    // tool boundary (the same status/thought rendered many times).
-    return !acc && anchor !== null
-      ? { text: acc, anchor, accepted: false }
-      : { text: delta, anchor: delta.length, accepted: true };
+    // Offsets are per-step: 0 opens this step's stream, so the delta becomes
+    // the segment's new text. A boundary commit drops the anchor
+    // (takeActiveTurnDraft), and a rejected delta can also leave an anchor
+    // behind with no draft; in both states an empty accumulator plus a live
+    // anchor is a genuine step opening, not a replay, so it must be accepted.
+    // The previous `!acc && anchor !== null -> reject` rule aimed at a
+    // reconnect replay of an already-committed prefix but could not tell the
+    // two apart, and rejected real output instead: the anchor then froze and
+    // the whole step was dropped (measured 814/932 thinking, 146/308 body).
+    if (!acc && delta && committedText && committedText.startsWith(delta)) {
+      // Replay of the prefix we already committed. Keep the anchor null so a
+      // false positive costs one delta and self-heals on the next frame.
+      return { text: acc, anchor: null, accepted: false };
+    }
+    return { text: delta, anchor: delta.length, accepted: true };
   }
   if (anchor === null) {
     return acc
@@ -220,6 +247,7 @@ function applyStreamOffsetDelta(
   base: AssistantMessage,
   event: AssistantMessage,
   anchors: { content: StreamAnchor; think: StreamAnchor },
+  committed?: { content: string; think: string },
 ): { event: AssistantMessage; contentAnchor: StreamAnchor; thinkAnchor: StreamAnchor; accepted: boolean } {
   const offset = event.streamOffset as number;
   if (event.thinking && !event.content) {
@@ -228,6 +256,7 @@ function applyStreamOffsetDelta(
       event.thinking,
       offset,
       anchors.think,
+      committed?.think,
     );
     const anchored = merged.anchor !== null;
     const basePart = base.thinkingParts?.[0];
@@ -254,7 +283,7 @@ function applyStreamOffsetDelta(
       accepted: merged.accepted,
     };
   }
-  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content);
+  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, committed?.content);
   return {
     event: {
       ...base,
@@ -336,7 +365,7 @@ export function applyActiveTurnDraftDelta(
     const isThinkDelta = Boolean(event.thinking) && !event.content;
     const anchorBefore = isThinkDelta ? thinkAnchor : contentAnchor;
     const accBefore = (isThinkDelta ? base.thinking ?? "" : base.content).length;
-    const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor });
+    const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor }, committedSegments.get(key));
     contentAnchor = applied.contentAnchor;
     thinkAnchor = applied.thinkAnchor;
     noteStreamAnchorDecision({
@@ -405,8 +434,12 @@ export function takeActiveTurnDraft(key: string): ActiveTurnDraft | null {
   pendingNotifyKeys.delete(key);
   flushPendingNotifications();
   drafts.delete(key);
-  // Do not clear streamAnchors: `take` commits only the current visual segment.
-  // The Server offset remains turn-global across later tool/model steps.
+  // A committed visual segment ends this anchoring scope: the next step's
+  // first delta arrives at offset 0 (offsets are per-step, not turn-global).
+  // Keeping the anchor here made that opening delta indistinguishable from a
+  // reconnect replay, so it was rejected and the anchor never advanced again.
+  streamAnchors.delete(key);
+  committedSegments.set(key, { content: draft.content, think: draft.thinking ?? "" });
   notify(key);
   return draft;
 }
@@ -416,6 +449,7 @@ export function clearActiveTurnDraft(key: string): void {
   // per-message body cannot reconstruct the Server's whole-turn offset, so let
   // the next live frame seed a fresh cursor (including a non-zero resume).
   streamAnchors.delete(key);
+  committedSegments.delete(key);
   if (!drafts.has(key)) return;
   pendingNotifyKeys.delete(key);
   flushPendingNotifications();
@@ -435,6 +469,9 @@ export function clearActiveTurnDraftsForSession(sessionId: string): void {
   }
   for (const key of [...streamAnchors.keys()]) {
     if (key.startsWith(prefix)) streamAnchors.delete(key);
+  }
+  for (const key of [...committedSegments.keys()]) {
+    if (key.startsWith(prefix)) committedSegments.delete(key);
   }
   if (changed) {
     for (const listener of globalListeners) listener();
@@ -493,6 +530,7 @@ export function useActiveTurnDraft(key: string | null): ActiveTurnDraft | null {
 export function resetActiveTurnDraftStoreForTests(): void {
   drafts.clear();
   streamAnchors.clear();
+  committedSegments.clear();
   listeners.clear();
   globalListeners.clear();
   pendingNotifyKeys.clear();

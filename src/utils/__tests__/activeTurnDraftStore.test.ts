@@ -226,16 +226,38 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(key)?.content).toBe("你好霖江路");
   });
 
-  it("keeps the turn-global offset cursor after a tool boundary commits the visual draft", () => {
+  it("restarts the offset cursor for each step after a boundary commit", () => {
+    // Offsets are per-step (verified with unsampled `[live] anchor` rows),
+    // so a committed segment must not leave an anchor behind: the next
+    // step's opening delta arrives at offset 0 and has to be accepted.
+    // The previous version of this test asserted a turn-global cursor and
+    // encoded the very assumption that froze the anchor and dropped whole
+    // steps (814/932 thinking, 146/308 body deltas measured as rejected).
     const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
     applyActiveTurnDraftDelta(key, delta("先读 DamageService。", { streamOffset: 0 }));
-    const first = takeActiveTurnDraft(key);
-    expect(first?.content).toBe("先读 DamageService。");
+    expect(takeActiveTurnDraft(key)?.content).toBe("先读 DamageService。");
 
-    // Reconnect/tool-boundary replay of an old tail must not seed the new
-    // segment. The next legitimate delta continues from the whole-turn offset.
-    applyActiveTurnDraftDelta(key, delta("DamageService。", { streamOffset: 2 }));
-    applyActiveTurnDraftDelta(key, delta("再看调用方。", { streamOffset: "先读 DamageService。".length }));
+    applyActiveTurnDraftDelta(key, delta("再看调用方。", { streamOffset: 0 }));
+    expect(getActiveTurnDraft(key)?.content).toBe("再看调用方。");
+    applyActiveTurnDraftDelta(key, delta("继续。", { streamOffset: "再看调用方。".length }));
+    expect(getActiveTurnDraft(key)?.content).toBe("再看调用方。继续。");
+  });
+
+  it("resumes on the next delta when a step opening looks like a replay", () => {
+    // Replies here often open with the same words, so a committed-prefix
+    // match can be a false positive. Rejecting one keeps the anchor null,
+    // so only that delta is lost and the step resumes immediately instead
+    // of freezing for the rest of the step.
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    applyActiveTurnDraftDelta(key, delta("你好霖江路。先看现有实现。", { streamOffset: 0 }));
+    expect(takeActiveTurnDraft(key)?.content).toBe("你好霖江路。先看现有实现。");
+
+    // Same opening words as the committed segment: treated as a replay.
+    applyActiveTurnDraftDelta(key, delta("你好霖江路。", { streamOffset: 0 }));
+    expect(getActiveTurnDraft(key)).toBeNull();
+
+    // The very next delta resumes from its non-zero offset.
+    applyActiveTurnDraftDelta(key, delta("再看调用方。", { streamOffset: "你好霖江路。".length }));
     expect(getActiveTurnDraft(key)?.content).toBe("再看调用方。");
   });
 
@@ -245,8 +267,8 @@ describe("activeTurnDraftStore", () => {
     applyActiveTurnDraftDelta(key, delta(firstText, { streamOffset: 0 }));
     expect(takeActiveTurnDraft(key)?.content).toBe(firstText);
 
-    // 0.29 的 offset 是 turn-global。工具边界后从 0 重放的是旧前缀，
-    // 不能生成一个新 materialization；真正的新片段从旧锚点继续。
+    // A reconnect replay re-sends the already-committed prefix at offset 0.
+    // It must not create a second materialization of that same segment.
     applyActiveTurnDraftDelta(key, delta(firstText, { streamOffset: 0 }));
     expect(getActiveTurnDraft(key)).toBeNull();
 

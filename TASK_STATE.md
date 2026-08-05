@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：流式 offset 是 per-step，回放守卫吞掉整个 step（v2.20.230）
+
+- 现场：用户报「工具又全粘成一张卡、中间思考段不显示」，同时 225/226 一直在事后打捞正文残片。
+- 取证：227 的不抽样 `[live] anchor` 首次产出 1240 行——accepted False 960 / True 280；think 拒 814/932、body 拒 146/308；17 次 offset 回退全部精确落在 0；按 offset 0 切块后每块严格单调（think 0..2339 / 0..259 / 0..3493）。
+- 根因：offset **每 step 从 0 重启**，而代码与知识库自 v2.20.12 起记的是 turn-global，`takeActiveTurnDraft` 因此故意保留 anchor。提交后「acc 空 + anchor 在场」与新 step 首帧完全同构，`!acc && anchor !== null → reject` 把真实输出当回放拒掉，anchor 从此冻结，该 step 余下 delta 连锁全拒。一条根因同时解释三个症状（思考段缺失、工具粘连、正文残片）。
+- 修复：提交时清 anchor（per-step 作用域随段结束）；移除该 reject 规则；改用「delta 是刚提交段前缀」判定真回放，且**拒绝时保持 anchor 为 null**，误判只损失一个 delta 并在下一帧自愈，不退化成冻结级联。
+- 验收：改写 1 例（原用例断言 turn-global，编码的正是被证伪的假设）、新增 2 例（边界提交后 offset 0 必须接受并累计；疑似回放后自愈）；保留原「重连回放不得重复材料化」用例原样通过。全量 1600、typecheck、build 通过。临时探针证实旧实现下新 step 首帧根本不产生草稿。实机待用户验收。
+- 已知边界：真回放判定依赖内容前缀，非前缀形态的尾部回放不在覆盖内；`[live] anchor` 可抓到（offset 0 且 accChars>0 被接受）。
+- 注意：本轮期间另一会话提交了 `0badd6e9`（v2.20.229，崩溃页主题），占用 229，故本轮用 230；两会话并行时 `package.json`/`TASK_STATE.md` 是冲突热点。
+- 关键文件：`src/utils/activeTurnDraftStore.ts`、`src/utils/__tests__/activeTurnDraftStore.test.ts`。
+
 ## 2026-08-05 修复：崩溃/卡死页不吃主题（v2.20.229）
 
 - 现场：dev 实例 React 双副本崩溃（vite 旧 .vite 缓存，清缓存重启可解）时，错误页停在默认浅色，不跟用户主题。

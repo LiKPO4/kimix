@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-05T19:45:00+08:00"
+timestamp: "2026-08-05T20:40:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -176,26 +176,40 @@ already persisted final body.
 
 ## Offset-anchored volatile deltas take precedence over order-based merging
 
-Kimi Code 0.29 Server tags volatile `assistant.delta` / `thinking.delta` WS
-frames with a cumulative character `offset` across the **whole Agent turn**;
-text and thinking lengths are tracked separately, and neither cursor resets at
-a `turn.step` or tool boundary. The official web client assembles strictly by
-this anchor. While the current visual segment is still mounted, `offset === 0`
-restarts and replaces that live stream. Once a tool boundary has committed the
-segment, however, an empty accumulator plus a retained non-zero turn anchor
-means `offset === 0` is a reconnect/resync replay of the old turn prefix and
-must not create a new materialization. `offset === anchor` appends,
-`offset < anchor` skips a duplicated tail, and `offset > anchor` means frames
-were missed and requires an authoritative snapshot.
+Kimi Code Server tags volatile `assistant.delta` / `thinking.delta` WS frames
+with a character `offset` that **restarts at 0 for every step** and accumulates
+only within that step; text and thinking cursors are tracked separately. This
+was measured on 0.32 with 1240 unsampled `[live] anchor` rows: splitting the
+sequence at `offset === 0` yields per-step blocks that are each strictly
+monotonic (thinking 0..2339, then 0..259, then 0..3493, and so on).
 
-Kimix therefore keeps protocol cursors in `activeTurnDraftStore` independently
-from the transient visible draft. `commitActiveTurnDraftsToBatch` may delete a
-draft at every formal/tool boundary, but it must retain the whole-turn content
-and thinking cursors; otherwise a reconnect replay tail seeds the next visual
-segment and creates sentences with old prefixes spliced into new text. An
-authoritative body/snapshot clears the cursor because its per-message text
-cannot reconstruct the whole-turn length; the next live frame may seed a fresh
-cursor from a non-zero offset, with the snapshot already carrying the prefix.
+The earlier text here claimed one cumulative cursor across the whole Agent turn
+that never resets at a `turn.step` or tool boundary, and required
+`takeActiveTurnDraft` to retain it. That was wrong, and it caused the worst
+live-output defect of this family: a retained anchor made every new step's
+opening `offset === 0` delta byte-identical to a reconnect replay, so the
+`!acc && anchor !== null -> reject` rule dropped it, the anchor never advanced,
+and the rest of that step was rejected as well (measured 814/932 thinking and
+146/308 body deltas discarded in a single turn). That one cause produced three
+long-standing symptoms at once: intermediate thinking segments missing, many
+steps' tools clumping into one "N 个工具调用" card (only tool frames survived
+the batch), and final bodies surviving only as fragments — the per-turn
+fragment patch in `kimiHistoryReconciliation` had been salvaging that damage
+after the fact.
+
+So a committed visual segment now ends its anchoring scope:
+`takeActiveTurnDraft` drops the cursors, and `offset === 0` always opens the
+segment's new stream. `offset === anchor` appends, `offset < anchor` skips an
+already-seen tail, and `offset > anchor` means frames were missed and requires
+an authoritative snapshot. A genuine reconnect/resync replay is instead
+detected by content: it re-sends the prefix just committed, so the store keeps
+that text and rejects an `offset === 0` delta that is a prefix of it. Such a
+rejection deliberately leaves the anchor `null`, because replies routinely open
+with identical words and a false positive must cost one delta and resume on the
+next frame rather than freeze the step. An authoritative body/snapshot clears
+the cursor because its per-message text cannot reconstruct the step length; the
+next live frame may seed a fresh cursor from a non-zero offset, with the
+snapshot already carrying the prefix.
 An offset gap against a known cursor is never fuzzy-appended: showing a shorter
 authoritative/live prefix is preferable to persisting invented prose.
 
