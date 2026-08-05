@@ -47,6 +47,42 @@ describe("MarkdownRenderer streaming blocks", () => {
     expect(updatedStreamRoot?.textContent).toContain("第二段继续增长");
   });
 
+  it("re-highlights a streaming code block when its text changes on the reused DOM node", async () => {
+    // 流式增量场景：首次 idle 着色后 <code> 带 hljs 类；React 复用同一节点更新
+    // 文本时，旧守卫会因 hljs 类直接 return，增量代码永远保持旧高亮。
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: ["```js", "const alphaToken = 1;", "```"].join("\n"),
+        streaming: true,
+      }));
+    });
+    // idle/timeout 着色（jsdom 无 requestIdleCallback 时走 120ms 兜底）
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    });
+    const code = container.querySelector<HTMLElement>("code.language-js");
+    expect(code).not.toBeNull();
+    expect(code?.classList.contains("hljs")).toBe(true);
+    expect(code?.textContent).toContain("alphaToken");
+
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: ["```js", "const betaToken = 2;", "```"].join("\n"),
+        streaming: true,
+      }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    });
+    const updated = container.querySelector<HTMLElement>("code.language-js");
+    expect(updated?.textContent).toContain("betaToken");
+    expect(updated?.textContent).not.toContain("alphaToken");
+    // 重新着色发生：hljs 类保留且高亮 span 基于新文本（不再含旧标识符的 span）
+    expect(updated?.classList.contains("hljs")).toBe(true);
+    expect(updated?.innerHTML).not.toContain("alphaToken");
+    expect(updated?.querySelector(".hljs-keyword, .hljs-title, .hljs-literal, span")).not.toBeNull();
+  });
+
   it("applies assistant progress restoration inside the renderer", () => {
     const content = `先${"检查状态".repeat(12)}。现在${"继续构建".repeat(12)}。然后${"运行验证".repeat(12)}。下一步整理结果。`;
     expect(normalizeMarkdownContent(content, true)).toContain("。\n\n现在");

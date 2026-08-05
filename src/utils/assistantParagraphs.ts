@@ -387,8 +387,8 @@ export function restoreInlineMarkdownHeadings(content: string) {
     /([^`\n])([。！？；：.!?:;])\s+(#{1,6})\s*(\S)/g,
     (match, before: string, punct: string, hashes: string, first: string) =>
       // 序号句点 + #议题号（如「1. #7」）不是内联标题，误拆会把加粗列表项
-      // 撕成「**1.」残片 + 一级大标题（实机复现）。仅非数字句点才恢复标题。
-      (punct === "." || punct === "。") && /\d/.test(before)
+      // 撕成「**1.」残片 + 一级大标题（实机复现）。仅当 # 后紧跟数字（议题号）才跳过；「1. ## 本章小结」这类数字句点+真标题仍恢复。
+      (punct === "." || punct === "。") && /\d/.test(before) && /\d/.test(first)
         ? match
         : `${before}${punct}\n\n${hashes} ${first}`,
   ));

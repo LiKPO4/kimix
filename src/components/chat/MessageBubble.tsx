@@ -2653,8 +2653,12 @@ function AssistantMessageFooter({
 
 export function assistantFooterFallbackLabel(event: Extract<TimelineEvent, { type: "assistant_message" }>, isActiveAssistant: boolean, hasRunningBackgroundBash = false): string {
   // 后台 Bash 任务仍在运行时（turn 已有提交正文或已 settle），用「后台 Bash 运行中」盖住
-  // 「消息处理中」「模型：X」「已完成」，避免把后台任务误读为当前 turn 仍在处理
-  if (hasRunningBackgroundBash && (event.isComplete || !isActiveAssistant)) return "后台 Bash 运行中";
+  // 「消息处理中」「模型：X」「已完成」，避免把后台任务误读为当前 turn 仍在处理；
+  // 已知模型时并列展示，不把当轮模型信息整个吞掉。
+  if (hasRunningBackgroundBash && (event.isComplete || !isActiveAssistant)) {
+    const backgroundModel = compactModelDisplayName(event.model);
+    return backgroundModel ? `模型：${backgroundModel} · 后台 Bash 运行中` : "后台 Bash 运行中";
+  }
   if (isActiveAssistant) return "消息处理中";
   if (!event.isComplete) return "消息处理中";
   // Prefer model for both room and single-Agent sessions so usage-late turns

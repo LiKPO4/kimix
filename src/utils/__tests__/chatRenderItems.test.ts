@@ -1299,13 +1299,26 @@ describe("assistant footer fallback", () => {
     }, true, true)).toBe("后台 Bash 运行中");
   });
 
-  it("shows 后台 Bash 运行中 for a settled turn with a running background Bash task", () => {
+  it("shows 模型与后台 Bash 运行中并列 for a settled turn with a known model", () => {
+    // 后台运行中只盖状态不吞模型：当轮模型仍可读（review 中 9）。
     expect(assistantFooterFallbackLabel({
       id: "assistant-settled",
       type: "assistant_message",
       timestamp: 1,
       content: "正文",
       model: "openai/gpt-5",
+      isThinking: false,
+      isComplete: true,
+      durationMs: 65_000,
+    }, false, true)).toBe("模型：gpt-5 · 后台 Bash 运行中");
+  });
+
+  it("shows bare 后台 Bash 运行中 for a settled turn without a model", () => {
+    expect(assistantFooterFallbackLabel({
+      id: "assistant-settled-nomodel",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "正文",
       isThinking: false,
       isComplete: true,
       durationMs: 65_000,

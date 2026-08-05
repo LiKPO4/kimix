@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：渲染类四项（review 中 9 批次）（v2.20.215）
+
+- hljs 增量不重着色（MarkdownRenderer）：首次 idle 着色后 `<code>` 带 hljs 类+`data-highlighted`，React 复用节点更新文本时旧守卫直接 return。改为按「文本与上次着色是否一致」判断，重着色前清 hljs 类与 `data-highlighted`（highlight.js v11 对带标记节点直接跳过——调试实证只清类会导致着色静默失败）。新 jsdom 用例（先 alpha 后 beta，断言重新着色）调试期负向验证通过。
+- 后台 Bash 与模型并列（MessageBubble）：settled/非活跃轮 `assistantFooterFallbackLabel` 原以「后台 Bash 运行中」整盖模型信息，现「模型：X · 后台 Bash 运行中」；无模型保持原文案。更新 1 旧断言 + 新增 2 例。
+- assistantParagraphs 假阴性收窄：196 的「数字句点不拆」误伤「1. ## 本章小结」类真标题，收窄为「# 后紧跟数字（议题号）才跳过」。新增 1 例。
+- Sidebar 缓存快速路径补 `settleHistoricalQuestions`：Web 端答完澄清后，缓存命中路径此前不对齐，pending 提问长期残留；外层条件放宽为 `session.isLoading || runtimeStatus?.success`（hydrate 对 undefined model 本就可空转，与同文件慢路径一致）。
+- 验收：typecheck/定向 66 例通过；Sidebar 改动无组件级测试（harness 成本），由 typecheck+实机覆盖。
+- 知识库：无需更新（渲染修复，不变量未变）。
+- 关键文件：`src/components/chat/MarkdownRenderer.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/assistantParagraphs.ts`、`src/components/layout/Sidebar.tsx` 及对应测试。
+
 ## 2026-08-05 修复：审批 settle 幂等与模型盖章错轮守卫（review 中 6）（v2.20.214）
 
 - 复核证伪一条：review 称「kimix.approval.resolved / kimix.turn.model 排在 snapshot skip 之后会被吞」——两事件均无 `snapshotReplay: "history"` 标记，skip 首行即 return false，永不误吞，无需改动。

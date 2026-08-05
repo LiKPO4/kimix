@@ -7,6 +7,11 @@ describe("restoreInlineMarkdownHeadings", () => {
     expect(restoreInlineMarkdownHeadings(input)).toBe(input);
   });
 
+  it("数字句点 + 真标题（# 后非数字）仍恢复为标题", () => {
+    // 「1. ## 本章小结」是合法「序号 + 标题」，196 的收窄不应误伤（review 中 9）。
+    expect(restoreInlineMarkdownHeadings("1. ## 本章小结 内容")).toBe("1.\n\n## 本章小结 内容");
+  });
+
   it("still restores genuine inline headings after sentence endings", () => {
     expect(restoreInlineMarkdownHeadings("盘点完毕。 ## 本轮目标 内容"))
       .toBe("盘点完毕。\n\n## 本轮目标 内容");

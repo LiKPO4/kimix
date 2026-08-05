@@ -272,12 +272,25 @@ function CodeBlock({ className, children, wrapLongLines }: { className?: string;
   const timerRef = useRef<number | null>(null);
   const codeText = nodeText(children).replace(/\n$/, "");
   const codeRef = useRef<HTMLElement | null>(null);
+  const highlightedTextRef = useRef<string | null>(null);
   // 高亮移出渲染通道：挂载先出纯文本，idle 时再着色，首滚/扩展挂载不再被 hljs 同步高亮阻塞。
+  // 流式增量：React 复用同一 <code> 节点更新文本时 hljs 标记仍在——文本与上次着色
+  // 不一致时重新着色（highlight.js v11 对 data-highlighted 节点直接跳过，需先清标记），
+  // 否则增量代码永远保持旧高亮/无高亮。
   useEffect(() => {
     const node = codeRef.current;
-    if (!node || !node.className.includes("language-") || node.classList.contains("hljs")) return;
+    if (!node || !node.className.includes("language-")) return;
+    if (node.dataset.highlighted === "yes" && highlightedTextRef.current === node.textContent) return;
     let cancelled = false;
-    const run = () => { void import("highlight.js/lib/common").then((m) => { if (!cancelled) m.default.highlightElement(node); }).catch(() => undefined); };
+    const run = () => {
+      void import("highlight.js/lib/common").then((m) => {
+        if (cancelled) return;
+        node.classList.remove("hljs");
+        delete node.dataset.highlighted;
+        m.default.highlightElement(node);
+        highlightedTextRef.current = node.textContent;
+      }).catch(() => undefined);
+    };
     let idleId: number | undefined;
     let timerId: number | undefined;
     if (typeof window.requestIdleCallback === "function") idleId = window.requestIdleCallback(run, { timeout: 600 });

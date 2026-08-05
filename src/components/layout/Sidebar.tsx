@@ -743,9 +743,16 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     const hasConversation = session.events.some((event) => event.type === "user_message" || event.type === "assistant_message");
     if (hasConversation && session.kimiHistoryCacheVersion === KIMI_HISTORY_CACHE_VERSION) {
       const runtimeStatus = await runtimeStatusPromise;
-      if (session.isLoading || (runtimeStatus?.success && runtimeStatus.data.model)) {
+      if (session.isLoading || runtimeStatus?.success) {
         updateSession(session.id, (current) => {
-          const hydrated = hydrateSessionModel(current, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined);
+          // 缓存快速路径同样对齐已解决的澄清提问：Web 端答完后 engineStatus 已离开
+          // waiting_question，缓存中的 pending question_request 不应继续显示待提问。
+          const settledEvents = runtimeStatus?.success
+            ? settleHistoricalQuestions(current.events, {
+              isWaitingQuestion: runtimeStatus.data.engineStatus === "waiting_question",
+            })
+            : current.events;
+          const hydrated = hydrateSessionModel({ ...current, events: settledEvents }, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined);
           return hydrateSessionSwarmMode(
             { ...hydrated, isLoading: false },
             runtimeStatus?.success ? runtimeStatus.data.swarmMode : undefined,
