@@ -765,6 +765,7 @@ export function mergeCanonicalFragmentTurnBodies(
   let patchedTurns = 0;
   let alignedTurns = 0;
   let mismatchedTurns = 0;
+  let crossTurnRemnants = 0;
   // 两侧轮数天然可以不等：本地可能缺官方边界（跨轮错位/相邻轮合并），官方
   // 也可能多出「被打断后原文重发」的重复轮。因此对齐用单调游标向前搜索，
   // 匹配不到的本地轮跳过。旧实现按下标配对且首个不匹配就 break，任意一处
@@ -803,8 +804,24 @@ export function mergeCanonicalFragmentTurnBodies(
       (canonicalBody.includes(localFinalBody) && localFinalBody.length <= 32) ||
       (canonicalBody.includes(localFinalBody) && localFinalBody.length * 2 <= canonicalBody.length)
     );
-    const isFragment = localFinalBody.length === 0 ||
+    const isOwnTurnFragment = localFinalBody.length === 0 ||
       canonicalWithBody.some((event) => isFragmentOf(event.content.trim()));
+    // 跨轮错位：live 流式下，下一轮的首段残片可能落在上一轮的
+    // user 边界下（官方边界帧比首段正文晚到）。此时展示正文不属于
+    // 本轮任何官方段，旧判定恒为否；但它是【下一轮】某段的残片，这就是
+    // 错位的证据。下一轮自己也已对齐到本地轮（否则不进此分支），所以把
+    // 本轮展示正文换回本轮官方终段不会丢它的内容。必须先排除本轮命中：
+    // 短残片（如【。】）会同时命中多轮，本轮优先才不会误改正常短回复。
+    const nextCanonical = canonicalTurns[matchIndex + 1];
+    const isCrossTurnRemnant = !isOwnTurnFragment &&
+      localFinalBody.length > 0 &&
+      nextCanonical !== undefined &&
+      nextCanonical.assistants.some((event) => {
+        const body = event.content.trim();
+        return body.length >= MIN_CANONICAL_REPLY_MATCH_LENGTH && isFragmentOf(body);
+      });
+    if (isCrossTurnRemnant) crossTurnRemnants += 1;
+    const isFragment = isOwnTurnFragment || isCrossTurnRemnant;
     if (!isFragment || canonicalFinal.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
     replacements.set(localFinal.id, canonicalFinalEvent.content);
     for (const segment of localWithBody.slice(0, -1)) {
@@ -825,6 +842,7 @@ export function mergeCanonicalFragmentTurnBodies(
         canonicalTurns: canonicalTurns.length,
         alignedTurns,
         mismatchedTurns,
+        crossTurnRemnants,
       });
     }
     return localEvents;
@@ -838,6 +856,7 @@ export function mergeCanonicalFragmentTurnBodies(
     canonicalTurns: canonicalTurns.length,
     alignedTurns,
     mismatchedTurns,
+    crossTurnRemnants,
   });
   return localEvents.map((event) => {
     if (event.type !== "assistant_message") return event;

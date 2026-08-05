@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-05 修复：跳轮错位残片（下一轮首段落到上一轮边界下）（v2.20.226）
+
+- 现场：225 修好了 T4 那轮（用户已确认），但截图下面那轮（显示「backoff。」）仍不修。
+- 取证：225 新增的轮数计数直接定案——diag `fragmentTurnBodiesPatched {patchedTurns:1, localTurns:16, canonicalTurns:12, alignedTurns:12, mismatchedTurns:3}`，随后 `fragmentTurnBodiesSkipped {mismatchedTurns:2}`。本地是多 4 条边界（不是缺），上一轮「缺 T6 边界」的推断被推翻；12 条官方轮已全部对齐，剩下 2 轮是对齐了但残片判定拒绝。
+- 根因：该轮展示正文不属于本轮任何官方段，而是【下一轮】首段的残片（live 下官方 user 边界帧比下一轮首段正文晚到，首段落到上一轮边界下）。真实 wire 形状已验证：「backoff。」在 T5 任何段里都不存在，却是 T6 首段（66 字）的子串。
+- 修复：新增跳轮残片判定——本轮不命中但命中相邻下一轮某段时，认为是错位残片，把展示正文换回本轮官方终段。护栏：必须先排除本轮命中（短残片如「。」会同时命中多轮，实测 T6/T7/T9/T10/T11 均为本轮命中）；下一轮段长度需达阀值。下一轮自己也已对齐到本地轮，所以不会丢它的内容。
+- 验收：新增单测 2 例（跳轮恢复 + 短正当回复不误改），均经确认在 225 下失败；真实 wire 形状前后对照（225 原样返回，本版补成 1149 字且 T6 本轮不动）；全量 1594、typecheck、build 通过。实机待用户验收。
+- 已知边界：本地多出的 4 条边界（痑疑 steer / 中断重发）未查清；产生侧（offset 锚定把末段正文缩成残片、首段跳轮）的帧级机制仍未定位，目前靠 222-226 自愈网兜底。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
+
 ## 2026-08-05 修复：残片补丁零命中的两处结构性根因（223/224 未生效的真因）（v2.20.225）
 
 - 现场：用户实测 224 仍缺正文（两轮显示「。」/「backoff。」）。diag 取证：`fragmentTurnBodiesPatched` 全天 0 次，而同刻 `latestCanonicalAssistantPatched`/`latestCanonicalTurnPatched` 有——补丁链在跑，函数每次都 patchedTurns=0。

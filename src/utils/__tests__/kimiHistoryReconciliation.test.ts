@@ -163,6 +163,55 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     expect(bodies).toEqual([fullBody]);
   });
 
+  it("restores a turn whose displayed body is the NEXT turn's opening fragment", () => {
+    // Live streaming can land the next turn's opening fragment under the
+    // previous user boundary (the official boundary frame arrives after the
+    // first body deltas). The remnant belongs to no segment of its own turn,
+    // so the own-turn rule can never match it.
+    const nextOpening = "你好霖江路。先看现有 recovery 机制的触发点与退避 backoff。";
+    const ownFinal = "你好霖江路。结论：确实走了 SDK 兼容链路，不是显示误标，已定位到 daemon 启动窗口。";
+    const remnant = nextOpening.slice(nextOpening.length - 9);
+    const local: TimelineEvent[] = [
+      { ...userMessage, id: "u-a", timestamp: 100 },
+      assistant(remnant, { id: "remnant", timestamp: 110 }),
+      { ...userMessage, id: "u-b", timestamp: 200, content: "next turn prompt" },
+      assistant(nextOpening, { id: "next-body", timestamp: 210 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, id: "c-u-a", timestamp: 100 },
+      assistant(ownFinal, { id: "c-own", timestamp: 110 }),
+      { ...userMessage, id: "c-u-b", timestamp: 200, content: "next turn prompt" },
+      assistant(nextOpening, { id: "c-next", timestamp: 210 }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    const bodies = merged
+      .filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message")
+      .map((e) => e.content);
+    // own turn restored; the next turn keeps its own body untouched
+    expect(bodies).toEqual([ownFinal, nextOpening]);
+  });
+
+  it("does not rewrite a short legitimate reply that also occurs in the next turn", () => {
+    // Guard against the cross-turn rule firing on a real short answer: it is a
+    // fragment of its OWN turn, so the own-turn branch wins and nothing moves.
+    const shortReply = "好的，已经按你说的改完并提交，请验收。";
+    const nextBody = `${shortReply} 另外还需要说明一下后续的计划与边界。`;
+    const local: TimelineEvent[] = [
+      { ...userMessage, id: "u-a", timestamp: 100 },
+      assistant(shortReply, { id: "own", timestamp: 110 }),
+      { ...userMessage, id: "u-b", timestamp: 200, content: "next turn prompt" },
+      assistant(nextBody, { id: "next", timestamp: 210 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, id: "c-u-a", timestamp: 100 },
+      assistant(shortReply, { id: "c-own", timestamp: 110 }),
+      { ...userMessage, id: "c-u-b", timestamp: 200, content: "next turn prompt" },
+      assistant(nextBody, { id: "c-next", timestamp: 210 }),
+    ];
+    expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
+  });
+
   it("keeps intermediate texts of multi-message turns (not prefixes of the final body)", () => {
     const local: TimelineEvent[] = [
       { ...userMessage },
