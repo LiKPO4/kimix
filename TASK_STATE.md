@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：getGitNumstat 主进程同步 IO 改异步分批（v2.20.211）
+
+- 背景：自 review 高 3——untracked 文件行数统计逐文件 `fs.readFileSync`，大量/大型 untracked 文件阻塞主进程事件循环，全应用 IPC 卡死。
+- 修复：改 `fs.promises.stat`+`readFile`，8 个一批并发；>8MB 文件放弃行数统计按 0 行（原实现会整个读进内存，更危险）；目录/不可读仍按 0 行。
+- 验收：typecheck 通过；electron 侧无 vitest harness（`electron/__tests__` 为空，electron 模块不可入 jsdom），行为等价性靠人工复核：同一路径集合、同一行数规则、同一异常兜底。已知行为变化：>8MB untracked 文件 added 从实计变 0，属有意的安全收窄。
+- 知识库：无需更新（实现细节）。
+- 关键文件：`electron/projectService.ts`。
+
 ## 2026-08-05 测试：帧队列溢出保护补回归 + 修剪日志计数修正（v2.20.210）
 
 - 背景：自 review 高 2——复核后**证伪**审查的「混合队列会误删终止帧」：第一遍全队列扫描后剩余必然全是终止帧，兜底 splice 只在全终止帧极端场景删最老终止帧，语义正确；真实缺口是该保护（160/198 两轮修复核心）无单元测试。

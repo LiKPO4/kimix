@@ -530,19 +530,30 @@ export async function getGitNumstat(projectPath: string): Promise<GitNumstatEntr
     // 非 git 仓库或命令失败：返回空数组。
   }
   try {
-    for (const item of await getGitStatusFiles(projectPath)) {
-      if (!item.status.includes("?")) continue;
-      let added = 0;
-      try {
-        const content = fs.readFileSync(path.join(projectPath, item.path), "utf-8");
-        if (content !== "") {
-          const newlineCount = (content.match(/\r\n|\r|\n/g) ?? []).length;
-          added = newlineCount + (content.endsWith("\n") || content.endsWith("\r") ? 0 : 1);
+    const untracked = (await getGitStatusFiles(projectPath)).filter((item) => item.status.includes("?"));
+    // 异步分批读取：同步 readFileSync 在主进程事件循环上逐文件阻塞，大量/大型
+    // untracked 文件会卡死整个应用 IPC；超过 8MB 的文件放弃行数统计（按 0 行），
+    // 避免为计数把整个大文件读进内存。
+    const UNTRACKED_NUMSTAT_BATCH = 8;
+    const UNTRACKED_NUMSTAT_MAX_BYTES = 8 * 1024 * 1024;
+    for (let offset = 0; offset < untracked.length; offset += UNTRACKED_NUMSTAT_BATCH) {
+      const batch = untracked.slice(offset, offset + UNTRACKED_NUMSTAT_BATCH);
+      const counted = await Promise.all(batch.map(async (item): Promise<GitNumstatEntry> => {
+        let added = 0;
+        try {
+          const filePath = path.join(projectPath, item.path);
+          const stat = await fs.promises.stat(filePath);
+          if (stat.isFile() && stat.size > 0 && stat.size <= UNTRACKED_NUMSTAT_MAX_BYTES) {
+            const content = await fs.promises.readFile(filePath, "utf-8");
+            const newlineCount = (content.match(/\r\n|\r|\n/g) ?? []).length;
+            added = newlineCount + (content.endsWith("\n") || content.endsWith("\r") ? 0 : 1);
+          }
+        } catch {
+          // 目录项或不可读文件按 0 行处理。
         }
-      } catch {
-        // 目录项或不可读文件按 0 行处理。
-      }
-      entries.push({ path: item.path, added, removed: 0 });
+        return { path: item.path, added, removed: 0 };
+      }));
+      entries.push(...counted);
     }
   } catch {
     // 状态获取失败时忽略 untracked 补充。
