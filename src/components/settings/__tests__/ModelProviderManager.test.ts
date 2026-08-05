@@ -591,7 +591,57 @@ it("prefills Context and efforts from the catalog when typing a model id into an
     });
   });
 
-  // 沿用「为空才填」纪律：先清空 Context，再输入模型 ID
+  // 新语义：未手动编辑的字段即视为可预填（默认值不是用户意图），无需先清空。
+  const contextInput = Array.from(container.querySelectorAll("input"))
+    .find((input) => (input as HTMLInputElement).type === "number") as HTMLInputElement;
+  const modelInput = container.querySelector('input[placeholder="例如 gpt-5.1"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(modelInput, "catalog-only-model");
+    modelInput.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  expect(contextInput.value).toBe("777000");
+  const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
+    .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
+  const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
+    .map((button) => button.textContent?.trim());
+  expect(pressedEfforts).toEqual(["中"]);
+  await act(async () => root.unmount());
+});
+
+it("does not refill Context after the user manually cleared it (touched wins)", async () => {
+  let resolveCatalog!: (value: unknown) => void;
+  const listKimiProviderCatalog = vi.fn(() => new Promise((resolve) => { resolveCatalog = resolve; }));
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: { listKimiProviderCatalog },
+  });
+  const { container, root } = await renderManager(emptyProviderConfig);
+
+  await act(async () => buttonByText(container, "添加模型")?.click());
+  await act(async () => {
+    resolveCatalog({
+      success: true,
+      data: {
+        providers: [{
+          providerId: "catalog-prod",
+          type: "openai",
+          baseUrl: null,
+          modelCount: 1,
+          models: [{
+            id: "catalog-only-model",
+            name: null,
+            maxContextSize: 777_000,
+            thinking: true,
+            toolUse: true,
+            supportEfforts: ["medium"],
+          }],
+        }],
+      },
+    });
+  });
+
+  // 用户手动清空 Context = 明确意图；之后输入模型 ID 不得回填（review 中 8）。
   const contextInput = Array.from(container.querySelectorAll("input"))
     .find((input) => (input as HTMLInputElement).type === "number") as HTMLInputElement;
   await act(async () => {
@@ -604,7 +654,8 @@ it("prefills Context and efforts from the catalog when typing a model id into an
     modelInput.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
-  expect(contextInput.value).toBe("777000");
+  expect(contextInput.value).toBe("");
+  // 未触碰的档位字段仍正常预填
   const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
     .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
   const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))

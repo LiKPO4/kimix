@@ -155,6 +155,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
   const catalogModels = useMemo(() => catalog.flatMap((provider) => provider.models), [catalog]);
   const catalogLoadTriggeredRef = useRef(false);
+  // 「用户已手动编辑」跟踪：type 模式预填只填未触碰字段——用户清空 Context/档位后
+  // 不得被下一次按键的预填重新填回（review 中 8）；目录迟到补预填同样只碰未触碰字段。
+  const modelContextTouchedRef = useRef(false);
+  const modelEffortsTouchedRef = useRef(false);
+  const resetModelDraftTracking = () => {
+    modelContextTouchedRef.current = false;
+    modelEffortsTouchedRef.current = false;
+  };
 
   const selectedGroup = groups.find((group) => group.provider.name === selectedProviderName) ?? null;
   const isCreatingProvider = selectedProviderName === NEW_PROVIDER_ID || !selectedGroup;
@@ -221,6 +229,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setSelectedProviderName(providerName);
     setSelectedModelAlias("");
     setAddingModel(false);
+    resetModelDraftTracking();
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
@@ -233,6 +242,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setSelectedModelAlias("");
     setAddingModel(false);
     setProviderDraft({ providerName: "", baseUrl: "", apiKey: "" });
+    resetModelDraftTracking();
     setModelDraft(createModelDraft());
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
@@ -269,6 +279,33 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     void handleLoadCatalog({ silent: true });
   };
 
+  // 目录惰性加载与预填的竞态（review 中 8）：目录返回前用户已选中/手输模型时，
+  // 首次预填只能看到空目录；目录到达后对「未手动编辑」的字段补跑一次预填。
+  useEffect(() => {
+    if (catalogModels.length === 0) return;
+    setModelDraft((current) => {
+      if (!current.model.trim()) return current;
+      if (modelContextTouchedRef.current && modelEffortsTouchedRef.current) return current;
+      const item = discoveredModels.find((m) => m.id === current.model.trim());
+      const prefill = prefillFromCatalog({
+        mode: "type",
+        modelId: current.model,
+        currentContextSize: "",
+        currentSupportEfforts: [],
+        catalogModel: matchCatalogModel(catalogModels, current.model),
+        probeContextLength: item?.contextLength,
+      });
+      const nextContext = modelContextTouchedRef.current
+        ? current.maxContextSize
+        : (prefill.maxContextSize != null ? String(prefill.maxContextSize) : current.maxContextSize);
+      const nextEfforts = modelEffortsTouchedRef.current
+        ? current.supportEfforts
+        : (prefill.supportEfforts ?? current.supportEfforts);
+      if (nextContext === current.maxContextSize && nextEfforts === current.supportEfforts) return current;
+      return { ...current, maxContextSize: nextContext, supportEfforts: nextEfforts };
+    });
+  }, [catalogModels, discoveredModels]);
+
   const handleCatalogProvider = (providerId: string) => {
     const provider = catalog.find((item) => item.providerId === providerId);
     if (!provider) return;
@@ -279,6 +316,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     }));
     setDiscoveredModels([]);
     setDiscoveredEndpoint("");
+    resetModelDraftTracking();
     setModelDraft(createModelDraft());
   };
 
@@ -330,6 +368,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     const item = discoveredModels.find((m) => m.id === modelId);
     setSelectedModelAlias("");
     setModelFormMessage("");
+    resetModelDraftTracking();
     setAddingModel(true);
     setModelDraft((current) => {
       const prefill = prefillFromCatalog({
@@ -378,6 +417,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   };
 
   const handleToggleEffort = (effort: string) => {
+    modelEffortsTouchedRef.current = true;
     setModelDraft((current) => {
       const next = current.supportEfforts.includes(effort)
         ? current.supportEfforts.filter((item) => item !== effort)
@@ -548,12 +588,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     setSelectedModelAlias(model.alias);
     setAddingModel(false);
     setModelFormMessage("");
+    resetModelDraftTracking();
     setModelDraft(createModelDraft(model));
   };
 
   const handleAddModel = () => {
     setSelectedModelAlias("");
     setAddingModel(true);
+    resetModelDraftTracking();
     setModelDraft(createModelDraft());
     setModelFormMessage("");
     setMessage("填写模型 ID、别名和 Context 后保存；Provider 的连接信息会自动复用。");
@@ -889,16 +931,22 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                             const prefill = prefillFromCatalog({
                               mode: "type",
                               modelId: val,
-                              currentContextSize: current.maxContextSize,
-                              currentSupportEfforts: current.supportEfforts,
+                              currentContextSize: "",
+                              currentSupportEfforts: [],
                               catalogModel: matchCatalogModel(catalogModels, val),
                               probeContextLength: item?.contextLength,
                             });
+                            // 手动编辑过的字段不参与自动预填——「用户清空」同样是明确意图，
+                            // 不得被下一次按键重新填回。
                             return {
                               ...current,
                               model: val,
-                              maxContextSize: prefill.maxContextSize != null ? String(prefill.maxContextSize) : current.maxContextSize,
-                              supportEfforts: prefill.supportEfforts ?? current.supportEfforts,
+                              maxContextSize: modelContextTouchedRef.current
+                                ? current.maxContextSize
+                                : (prefill.maxContextSize != null ? String(prefill.maxContextSize) : current.maxContextSize),
+                              supportEfforts: modelEffortsTouchedRef.current
+                                ? current.supportEfforts
+                                : (prefill.supportEfforts ?? current.supportEfforts),
                             };
                           });
                         }}
@@ -954,7 +1002,10 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                   <div className="kimix-model-editor-footer" style={{ gap: 12, marginTop: 12 }}>
                     <label className="min-w-0">
                       <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>Context</span>
-                      <input type="number" min={1} max={1048576} value={modelDraft.maxContextSize} onChange={(event) => setModelDraft((current) => ({ ...current, maxContextSize: event.target.value }))} className="kimix-settings-input kimix-number-input h-9 w-full text-center text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} />
+                      <input type="number" min={1} max={10000000} value={modelDraft.maxContextSize} onChange={(event) => {
+                        modelContextTouchedRef.current = true;
+                        setModelDraft((current) => ({ ...current, maxContextSize: event.target.value }));
+                      }} className="kimix-settings-input kimix-number-input h-9 w-full text-center text-[13px] outline-none" style={{ marginTop: 6, paddingLeft: 12, paddingRight: 12 }} />
                     </label>
                     <div className="text-[11.5px] leading-5 text-text-muted">同一供应商可添加任意数量模型；更新 Base URL 或 Key 后会统一生效。</div>
                     <button type="button" onClick={() => void handleSaveModel()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:opacity-55">
