@@ -22,8 +22,8 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 18 to force re-hydration of pre-offset-anchored thinking", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(18);
+  it("uses cache version 19 to force re-hydration of thinking-inflated certified caches", () => {
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(19);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {

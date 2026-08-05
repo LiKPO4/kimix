@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：body-only 等价认证冻结思考虚高缓存（认证防线 + 缓存升版）（v2.20.232）
+
+- 现场：旧会话 06b4c056 的 repair 循环 13:03 后消失，非收敛——被拒后残片补丁补齐正文，`hasEquivalentKimiHistoryTurnBodies` 只比正文判等价 → 打 cache-current → 永久移出 repair 候选，损伤固化。
+- 取证（IndexedDB blob + wire 镜像逐段对齐，227 本地 vs 258 canonical 思考段）：本地前 209 段与 canonical 逐字符一致；损伤全在尾部——9 段盲拼（两相邻官方段无分隔拼合，跨形态，三层折叠都管不到）+ 1 段 7548 字正式事件精确重复（非 active-draft id，231 collapse 不覆盖）+ ~491 字可去重重复。门禁曾见的「5 字符」是这些形态经去重与连接符增减后的净值，非真实内容差。canonical 后期反超本地（619175 vs 581128），升版重跑 repair 可整体替换洗净。
+- 修复 A（认证防线）：新增 `hasInflatedLocalKimiThinkingHistory`（本地思考先过比较侧去重再比总量），接入 App.tsx 全部四个 cache-current 认证点（repair/runtime-recovery/startup/running-sample）。
+- 修复 B（一次性清创）：`KIMI_HISTORY_CACHE_VERSION` 18→19，全部会话下次启动重跑 repair；版本钉住测试同步更新。
+- 附带：230 的知识库收尾漏改 Invariant G（仍写 turn-global 旧语义，与 per-step 小节自相矛盾），本轮已重写对齐；缓存版本引用 17→19。
+- 验收：新增敏感性用例 4 例（虚高阻断认证/思考一致放行/本地更薄放行/可证重复先去重；首例对旧实现证伪——旧谓词在同场景放行）；定向 75 例、全量 1608、typecheck 通过；build 见本条目收尾。实机待用户验收：重启后 06b4c056 应被整体替换（重复思考段消失）、不再出现 repair 空转。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/kimiHistoryCache.ts`、`src/App.tsx`、`knowledge/architecture/streaming-render-pipeline.md`。
+
 ## 2026-08-05 收敛：材料化重复事件持久化折叠（思考/正文虚高修复面）（v2.20.231）
 
 - 背景：230 已修产生侧（offset per-step 锚定冻结级联），本轮按 handoff 收敛剩留点。交接文档问题 2（commit 切碎正文）已被 230 的 per-step 根修覆盖，无需单独处理。

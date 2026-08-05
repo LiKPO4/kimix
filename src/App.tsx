@@ -68,6 +68,7 @@ import { useBootstrap } from "@/hooks/useBootstrap";
 import { hasLegacyKimiClarificationWrapper, KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import {
   hasEquivalentKimiHistoryTurnBodies,
+  hasInflatedLocalKimiThinkingHistory,
   hasPossiblyLostUserImages,
   collapseDuplicateMaterializations,
   mergeCanonicalFragmentTurnBodies,
@@ -343,7 +344,8 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
             );
             if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair", rawCanonicalEvents: canonicalEvents })) {
               const fragmentPatchedEvents = mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localEvents), reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" });
-              const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(fragmentPatchedEvents, reconciliation.events);
+              const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(fragmentPatchedEvents, reconciliation.events) &&
+                !hasInflatedLocalKimiThinkingHistory(fragmentPatchedEvents, reconciliation.events);
               const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                 fragmentPatchedEvents,
                 reconciliation.events,
@@ -606,7 +608,10 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           missingSince: undefined,
           recoveryIssue: undefined,
         }));
-        if (canonicalAdopted || hasEquivalentKimiHistoryTurnBodies(localEvents, reconciliation.events)) {
+        if (canonicalAdopted || (
+          hasEquivalentKimiHistoryTurnBodies(localEvents, reconciliation.events) &&
+          !hasInflatedLocalKimiThinkingHistory(localEvents, reconciliation.events)
+        )) {
           next = markAgentKimiHistoryCacheCurrent(next, result.target.roomAgentId);
         }
         if (isPrimaryRoomAgent(next, result.target.roomAgentId) && !next.titleLocked) {
@@ -2414,7 +2419,8 @@ function App() {
                 }
                 if (canonicalAdopted || (
                   reconciliation.applied &&
-                  hasEquivalentKimiHistoryTurnBodies(localAgentEvents, reconciliation.events)
+                  hasEquivalentKimiHistoryTurnBodies(localAgentEvents, reconciliation.events) &&
+                  !hasInflatedLocalKimiThinkingHistory(localAgentEvents, reconciliation.events)
                 )) {
                   hydrated = markAgentKimiHistoryCacheCurrent(hydrated, ownerAgentId);
                 }
@@ -3558,6 +3564,7 @@ function App() {
                 return updateRoomAgentEvents(item, roomAgentId, () => patchedEvents);
               }
               if (!hasEquivalentKimiHistoryTurnBodies(localAgentEvents, reconciliation.events)) return item;
+              if (hasInflatedLocalKimiThinkingHistory(localAgentEvents, reconciliation.events)) return item;
               applied = true;
               return markAgentKimiHistoryCacheCurrent(item, roomAgentId);
             }

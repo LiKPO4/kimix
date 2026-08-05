@@ -4,6 +4,7 @@ import * as reportError from "@/utils/reportError";
 import {
   collapseDuplicateMaterializations,
   hasEquivalentKimiHistoryTurnBodies,
+  hasInflatedLocalKimiThinkingHistory,
   mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
@@ -277,6 +278,59 @@ describe("collapseDuplicateMaterializations", () => {
       assistant("短回复。", { id: "active-draft:s:t:m2" }),
     ];
     expect(collapseDuplicateMaterializations(local)).toBe(local);
+  });
+});
+
+describe("hasInflatedLocalKimiThinkingHistory", () => {
+  const think = (text: string) => [{ id: `tp-${text.slice(0, 8)}`, timestamp: 2, text }];
+
+  it("blocks certifying a body-equivalent cache whose local thinking is inflated by a duplicated segment", () => {
+    // 实机形态：正文逐轮等价（旧认证谓词放行），但本地思考多一段完整重复。
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { thinkingParts: think("第一段完整思考内容。") }),
+      assistant("正文回答续", { thinkingParts: think("第二段完整思考内容。") }),
+    ];
+    const cached: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { id: "local-a1", thinkingParts: think("第一段完整思考内容。") }),
+      assistant("正文回答续", { id: "local-a2", thinkingParts: think("第二段完整思考内容。") }),
+      assistant("", { id: "local-a2-dup", thinkingParts: think("第二段完整思考内容。") }),
+    ];
+
+    expect(hasEquivalentKimiHistoryTurnBodies(cached, canonical)).toBe(true);
+    expect(hasInflatedLocalKimiThinkingHistory(cached, canonical)).toBe(true);
+  });
+
+  it("returns false when local and canonical thinking are identical", () => {
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { thinkingParts: think("同一段思考。") }),
+    ];
+    const cached: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { id: "local-a1", thinkingParts: think("同一段思考。") }),
+    ];
+    expect(hasInflatedLocalKimiThinkingHistory(cached, canonical)).toBe(false);
+  });
+
+  it("returns false when local thinking is thinner than canonical", () => {
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { thinkingParts: think("一段比较长的规范思考内容。") }),
+    ];
+    const cached: TimelineEvent[] = [
+      userMessage,
+      assistant("正文回答", { id: "local-a1", thinkingParts: think("短思考。") }),
+    ];
+    expect(hasInflatedLocalKimiThinkingHistory(cached, canonical)).toBe(false);
+  });
+
+  it("dedupes provable local duplicates before comparing (re-mounted identical event ids)", () => {
+    const shared = assistant("正文回答", { id: "shared-a1", thinkingParts: think("同一段思考内容。") });
+    const canonical: TimelineEvent[] = [userMessage, shared];
+    const cached: TimelineEvent[] = [userMessage, shared, shared];
+    expect(hasInflatedLocalKimiThinkingHistory(cached, canonical)).toBe(false);
   });
 });
 

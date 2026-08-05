@@ -154,6 +154,20 @@ export function collapseDuplicateMaterializations(events: TimelineEvent[]): Time
   return changed ? result : events;
 }
 
+/**
+ * 认证防线：hasEquivalentKimiHistoryTurnBodies 只比对用户边界与正文，思考虚高
+ * （盲拼残片、正式事件精确重复）的缓存会被误判「等价」并打上 cache-current，
+ * 此后不再是 repair 候选，损伤永久固化（实机实据：某会话尾部 9 段盲拼 +
+ * 一段 7548 字正式事件重复被认证后冻结）。认证前必须确认本地思考总量
+ * （先做比较侧去重）不超过 canonical。
+ */
+export function hasInflatedLocalKimiThinkingHistory(
+  cachedEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): boolean {
+  return thinkingHistorySize(dedupeLocalHistoryForComparison(cachedEvents)) > thinkingHistorySize(canonicalEvents);
+}
+
 function displayableUserImageCount(events: TimelineEvent[]): number {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (
