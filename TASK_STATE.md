@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：活跃会话轮末正文残片不自愈（v2.20.222）
+
+- 现场：过去两轮 settle 后正文只剩尾部残片（「。」/「backoff。」），盯着的会话一直看不到完整正文。
+- 取证：wire.jsonl 官方帧完整（流式 delta 可拼全）；IndexedDB 最新表含完整正文（另一实例启动修复写入）；diag [live] display 显示 live settle 时 textChars=22/24，而 15:31 重启后同两轮 init 即 1125/1937 全量——修复管线本身有效。
+- 根因：`repairKimiCodeHistoryBodies` 显式排除启动活跃会话（防打扰 live 水合），而用户盯着的会话正是启动活跃会话；SDK 轮又无完成屏障回放，server 轮屏障在该现场未补全 → 残片永久停留，只有重启/切走才修。
+- 修复：轮次终态（completed/interrupted/error/idle）后 2.5s 去抖，对单个非运行会话以 includeActive 复用同一条修复管线（repair 门控/熔断/限流原样生效）。
+- 验收：typecheck/全量 1585/build 通过；触发器为 App 层接线，实机待用户验收（settle 后 ≤3s 残片轮应被 canonical 全量替换）。
+- 知识库：无需更新（修复触发面扩展，reconciliation 不变量未变）。
+- 关键文件：`src/App.tsx`。
+
 ## 2026-08-05 加强：Server daemon 静默故障自愈，压缩 SDK 兜底窗口（v2.20.221）
 
 - 现场：13:20 发送显示「经 SDK 发送」——非显示误标，daemon 实例 13:37:39 才启动，发送时 Server 不可用真实走了 SDK 兜底；daemon 恢复后会话已 promote 回 Server（当前轮 journal 连续写入）。

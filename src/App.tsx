@@ -248,6 +248,23 @@ function getKimiHistoryTargets(session: Session) {
   ));
 }
 
+// 活跃会话在启动修复里被排除（避免打扰 live 水合），但「当轮 settle 时正文已是
+// 残片」的现场因此永远等不到修复（用户盯着的会话正是启动活跃会话）。轮次终态后
+// 会话不再运行，canonical 历史已落盘，此时对单个会话复用同一条修复管线是安全的。
+const settledHistoryRepairTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleSettledActiveSessionHistoryRepair(uiSessionId: string) {
+  const existing = settledHistoryRepairTimers.get(uiSessionId);
+  if (existing) clearTimeout(existing);
+  settledHistoryRepairTimers.set(uiSessionId, setTimeout(() => {
+    settledHistoryRepairTimers.delete(uiSessionId);
+    const session = useSessionStore.getState().sessions.find((item) => item.id === uiSessionId);
+    if (!session || session.engine !== "kimi-code" || session.archivedAt) return;
+    if (isSessionRuntimeRunning(session, useAppStore.getState().runningSessionId)) return;
+    void repairKimiCodeHistoryBodies([session], { includeActive: true });
+  }, 2_500));
+}
+
 function extractOfficialSessionTitle(event: unknown): string | null {
   if (!event || typeof event !== "object" || Array.isArray(event)) return null;
   const record = event as Record<string, unknown>;
@@ -256,10 +273,10 @@ function extractOfficialSessionTitle(event: unknown): string | null {
   return title && !isDefaultSessionTitle(title) ? title : null;
 }
 
-async function repairKimiCodeHistoryBodies(sessions: Session[]) {
+async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { includeActive?: boolean }) {
   const activeSessionId = STARTUP_ACTIVE_CONTEXT?.sessionId;
   const candidates = sessions
-    .filter((session) => session.id !== activeSessionId && needsKimiCodeHistoryRepair(session))
+    .filter((session) => (options?.includeActive || session.id !== activeSessionId) && needsKimiCodeHistoryRepair(session))
     .slice(0, 12);
   for (const session of candidates) {
     if (!session.projectPath) continue;
@@ -2927,6 +2944,9 @@ function App() {
           return session ? getPrimaryRoomAgent(session).id : undefined;
         })();
       const statusRuntimeSessionId = payload.migratedTo ?? payload.sessionId;
+      if (["completed", "interrupted", "error", "idle"].includes(payload.status)) {
+        scheduleSettledActiveSessionHistoryRepair(uiSessionId);
+      }
 
       // Server 会话 mid-turn 失败后已迁移到新的 SDK 会话：更新本地 runtime id。
       if (payload.migratedTo) {
