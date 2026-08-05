@@ -128,6 +128,31 @@ export function mergeMetricStatusUpdates(
     : { ...merged, contextSize };
 }
 
+/**
+ * Server 链路 live 状态帧只携带 context（无 usage.currentTurn/token 计数）：
+ * 轮末没有 token 级用量时，把本轮的 context 帧合成一张信息卡，避免 footer
+ * 回落到只剩模型名（实机：pill 只剩「模型：k3」，切会话走 canonical 才补齐）。
+ * 只认 host 主动状态读取发射的 status_refresh 帧：快照恢复/回放产生的无标
+ * context 帧不得自成轮次信息卡（既有守卫：context-only recovery snapshot 不渲染
+ * 为 footer；mergeMetricStatusUpdates 严格口径同样不变）。
+ */
+export function mergeContextOnlyStatusUpdates(
+  statuses: Extract<TimelineEvent, { type: "status_update" }>[],
+) {
+  const withContext = statuses.filter((status) => (
+    status.source === "status_refresh" && hasMetricStatus(status) &&
+    typeof status.contextSize === "number" && status.contextSize > 0
+  ));
+  if (withContext.length === 0) return undefined;
+  return withContext.slice(1).reduce<Extract<TimelineEvent, { type: "status_update" }>>((acc, incoming) => ({
+    ...acc,
+    ...incoming,
+    message: incoming.message?.trim() ? incoming.message : acc.message,
+    contextSize: preferPositiveMetric(incoming.contextSize, acc.contextSize),
+    contextLimit: preferPositiveMetric(incoming.contextLimit, acc.contextLimit),
+  }), withContext[0]!);
+}
+
 export function getLatestMeaningfulStatus(events: TimelineEvent[]) {
   const statuses = events.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
   for (let index = statuses.length - 1; index >= 0; index -= 1) {

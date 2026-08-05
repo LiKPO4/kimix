@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：Server 链路轮末信息卡只剩「模型：k3」（切会话自愈）（v2.20.213）
+
+- 现场：用户实机——长轮结束后 footer pill 只剩「模型：k3」，无输入/输出/Context；切换一次会话即正常。
+- 取证（diag.log 事件流）：该轮（27 分钟 swarm 轮，think 14028/tool 29344 帧）全程无 prompt.completed/turn.ended 主终帧；settle 走 snapshot 路径。链式根因：① Server live 流不发 usage.record（208 已确证）；② `refreshServerSessionStatus` 发射的 agent.status.updated 只带 contextTokens/maxContextTokens，**无 usage.currentTurn**（`serverStatusToAgentEvent` 证据）→ 映射出的 status_update 无 tokenCount/inputTokenCount/模型文案；③ `mergeMetricStatusUpdates` 的 hasTurnUsage 只认 token 计数/「模型：」文案 → finalUsageStatus 恒 undefined → 回落 modelOnlyFallbackStatus（只剩模型名）；④ 切会话走 canonical 历史（含 usage.record）才补齐——与用户自愈路径吻合。
+- 修复：新增 `mergeContextOnlyStatusUpdates`（专用 context 合成；只认 host 主动状态读取发射的 `status_refresh` 帧 + 正数 contextSize 才出卡，快照恢复/回放的无标 context 帧不算）；ChatThread 轮末卡链改 `mergeMetricStatusUpdates ?? mergeContextOnlyStatusUpdates`，缺模型文案时用当轮助手已盖章模型补齐 message。两道既有守卫均不动——mergeMetricStatusUpdates 严格口径（会话级 context 快照不得自成轮次用量）、ChatThread「context-only recovery snapshot 不渲染为 footer」与入口闸门（status_refresh 闲置不入时间线）全部保持原语义并有测试锁定。
+- 验收：新增 4 例（sessionMetrics 合成×2+无标帧拒绝×1、chatRenderItems 端到端×1）；旧代码下端到端用例必失败（旧逻辑回落 footer-model 兜底而非 context 卡，负向成立）；typecheck/定向 99 例通过；实机待验收（下一轮结束 footer 应显示「模型：k3 + Context: …」，token 计数仍待 canonical 补齐）。
+- 已知边界：live 卡无输入/输出 token（Server 不提供），canonical 对账后补齐；主终帧未到达的根因（27 分钟轮无 prompt.completed）未单独追查，如复发抓 [wsframe] 取证。
+- 知识库：runtime-routing 不变量 14f 补记 Server live 无 token 级用量的显示路径，log 已记。
+- 关键文件：`src/utils/sessionMetrics.ts`、`src/components/chat/ChatThread.tsx`、`src/utils/__tests__/sessionMetrics.test.ts`、`src/utils/__tests__/chatRenderItems.test.ts`。
+
 ## 2026-08-05 修复：listHistorySessions Server 分支窄映射丢必填字段（v2.20.212）
 
 - 背景：自 review 高 4——host 已映射完整 `KimiCodeSessionSummary`，`main.ts` 二次窄映射只留 id/workDir/brief/updatedAt，`sessionDir`/`createdAt` 在类型上必填却变 undefined（IPC handler 返回无类型约束，typecheck 拦不住）。当前唯一消费方 SearchOverlay 只用 id/brief/workDir/updatedAt，未爆雷，但契约漂移已存在。

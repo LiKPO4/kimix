@@ -5,6 +5,7 @@ import {
   isEmptyStatusUpdate,
   getLatestMetricStatus,
   getLatestMeaningfulStatus,
+  mergeContextOnlyStatusUpdates,
   mergeMetricStatusUpdates,
   preferPositiveMetric,
   statusesAfterLatestContextBoundary,
@@ -152,6 +153,54 @@ describe("mergeMetricStatusUpdates", () => {
       id: "context-only",
       type: "status_update",
       timestamp: 2,
+      contextSize: 101_116,
+      contextLimit: 500_000,
+    }])).toBeUndefined();
+  });
+
+  it("merges context-only statuses into a card via the dedicated context merge (Server live route)", () => {
+    // Server 链路 live 状态帧只携带 context（无 usage.currentTurn/token 计数）：
+    // 严格 merge 仍拒绝（上方守卫），但轮末 footer 可用专用合成得到信息卡。
+    const merged = mergeContextOnlyStatusUpdates([{
+      id: "context-1",
+      type: "status_update",
+      timestamp: 1,
+      contextSize: 48_000,
+      contextLimit: 262_144,
+      source: "status_refresh",
+    }, {
+      id: "context-2",
+      type: "status_update",
+      timestamp: 2,
+      contextSize: 101_116,
+      contextLimit: 262_144,
+      source: "status_refresh",
+    }]);
+    expect(merged).toMatchObject({
+      id: "context-2",
+      contextSize: 101_116,
+      contextLimit: 262_144,
+    });
+  });
+
+  it("context merge requires a positive contextSize (limit-only shells stay empty)", () => {
+    expect(mergeContextOnlyStatusUpdates([{
+      id: "shell",
+      type: "status_update",
+      timestamp: 1,
+      contextSize: 0,
+      contextLimit: 262_144,
+    }])).toBeUndefined();
+    expect(mergeContextOnlyStatusUpdates([])).toBeUndefined();
+  });
+
+  it("context merge ignores unmarked (snapshot/replay) context-only statuses", () => {
+    // 守卫对齐：context-only recovery snapshot 不得自成轮次信息卡；
+    // 只认 host 主动状态读取发射的 status_refresh 帧。
+    expect(mergeContextOnlyStatusUpdates([{
+      id: "context",
+      type: "status_update",
+      timestamp: 3,
       contextSize: 101_116,
       contextLimit: 500_000,
     }])).toBeUndefined();

@@ -25,7 +25,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
-import { hasMetricStatus, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
@@ -989,7 +989,18 @@ export function buildRenderItems(
           : baseAssistant
       : projectedFailureAssistant;
     const settledStatusEvents = statusEvents.filter((status) => !(status.source === "ipc" && status.parentEventId));
-    const finalUsageStatus = mergeMetricStatusUpdates(settledStatusEvents);
+    const turnModelMessage = renderAssistantEvent?.model?.trim()
+      ? `模型：${renderAssistantEvent.model.trim()}`
+      : settledStatusEvents.map((status) => status.message?.trim()).find((message) => message?.startsWith("模型："));
+    // Server 链路 live 状态帧只携带 context（无 usage.currentTurn/token 计数）：
+    // token 级用量缺失时用本轮 context 帧合成信息卡，否则轮末 pill 只剩模型名
+    //（实机：Server 路由 settle 后 footer 只剩「模型：k3」，切会话走 canonical 才补齐）。
+    // 闲置/会话级 context 快照的污染仍由入口闸门与 mergeMetricStatusUpdates 严格口径把守。
+    const rawFinalUsageStatus = mergeMetricStatusUpdates(settledStatusEvents)
+      ?? mergeContextOnlyStatusUpdates(settledStatusEvents);
+    const finalUsageStatus = rawFinalUsageStatus && !rawFinalUsageStatus.message?.trim() && turnModelMessage
+      ? { ...rawFinalUsageStatus, message: turnModelMessage }
+      : rawFinalUsageStatus;
     const interruptedStatus = settledStatusEvents.findLast(isInterruptedStatusEvent);
     // Prefer real turn usage. If usage.record is late, still surface a model-only
     // footer from the assistant (or a model message status) so the bubble never

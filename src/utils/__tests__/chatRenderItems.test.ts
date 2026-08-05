@@ -794,6 +794,31 @@ describe("buildRenderItems usage footer", () => {
     if (assistant?.type !== "event") return;
     expect(assistant.trailingStatuses?.map((status) => status.id)).toEqual(["usage-2"]);
   });
+
+  it("synthesizes a context card with the turn model when only Server live context frames exist", () => {
+    // 实机根因：Server 链路 live 状态帧只携带 context（无 usage.currentTurn/token 计数），
+    // settle 后 finalUsageStatus 曾恒为 undefined，footer 回落到只剩「模型：k3」；
+    // 切会话走 canonical（含 usage.record）才补齐。现在用本轮 context 帧合成信息卡并补模型文案。
+    const items = buildRenderItems([{
+      id: "user-server", type: "user_message", timestamp: 1, content: "继续处理",
+    }, {
+      id: "assistant-server", type: "assistant_message", timestamp: 2, content: "阶段性回复",
+      isThinking: false, isComplete: true, model: "k3",
+    }, {
+      id: "context-live", type: "status_update", timestamp: 3,
+      contextSize: 101_116, contextLimit: 262_144, source: "status_refresh",
+    }], "kimi-code", undefined, false);
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event") return;
+    expect(assistant.trailingStatuses).toHaveLength(1);
+    expect(assistant.trailingStatuses?.[0]).toMatchObject({
+      id: "context-live",
+      message: "模型：k3",
+      contextSize: 101_116,
+      contextLimit: 262_144,
+    });
+  });
 });
 
 describe("buildRenderItems completed turn cache", () => {
