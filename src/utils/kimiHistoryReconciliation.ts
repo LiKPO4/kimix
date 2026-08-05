@@ -123,6 +123,37 @@ function dedupeLocalHistoryForComparison(events: TimelineEvent[]): TimelineEvent
   return visit(events);
 }
 
+/**
+ * 持久化修复版去重：dedupeLocalHistoryForComparison 只作用于比较侧，本地
+ * 时间线自身的重复仍会原样落盘。同轮内 `active-draft:` id 事件若（正文+
+ * 思考）文本完全相同，是同一段官方内容的重复材料化（旧快照有实据：同一
+ * 51 字进度被材料化为 16 个不同事件）；保留首个、清空其余。只认材料化 id
+ * 前缀与非空长文本，formal 事件与合法短回复不受影响；思考总量回落后单调
+ * 门禁不再把干净 canonical 判「更薄」。
+ */
+export function collapseDuplicateMaterializations(events: TimelineEvent[]): TimelineEvent[] {
+  const seenSignatures = new Set<string>();
+  let changed = false;
+  const result = events.map((event) => {
+    if (event.type === "user_message" || event.type === "steer_message") {
+      seenSignatures.clear();
+      return event;
+    }
+    if (event.type !== "assistant_message" || !event.id.startsWith("active-draft:")) return event;
+    const body = event.content.trim();
+    const thinking = (event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "").trim();
+    const signature = body + "\n" + thinking;
+    if (signature.length < 16) return event;
+    if (seenSignatures.has(signature)) {
+      changed = true;
+      return { ...event, content: "", thinking: undefined, thinkingParts: undefined, isThinking: false };
+    }
+    seenSignatures.add(signature);
+    return event;
+  });
+  return changed ? result : events;
+}
+
 function displayableUserImageCount(events: TimelineEvent[]): number {
   return events
     .filter((event): event is Extract<TimelineEvent, { type: "user_message" | "steer_message" }> => (

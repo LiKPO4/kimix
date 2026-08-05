@@ -69,6 +69,7 @@ import { hasLegacyKimiClarificationWrapper, KIMI_HISTORY_CACHE_VERSION } from "@
 import {
   hasEquivalentKimiHistoryTurnBodies,
   hasPossiblyLostUserImages,
+  collapseDuplicateMaterializations,
   mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
@@ -341,7 +342,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
               new Set([target.roomAgentId]),
             );
             if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair", rawCanonicalEvents: canonicalEvents })) {
-              const fragmentPatchedEvents = mergeCanonicalFragmentTurnBodies(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" });
+              const fragmentPatchedEvents = mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localEvents), reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" });
               const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(fragmentPatchedEvents, reconciliation.events);
               const patchedEvents = mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
                 fragmentPatchedEvents,
@@ -577,7 +578,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
         const canonicalAdopted = localEvents.length === 0 || shouldUseCanonicalHistory;
         const rejectedBaseEvents = canonicalAdopted
           ? localEvents
-          : mergeCanonicalFragmentTurnBodies(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" });
+          : mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localEvents), reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery" });
         const rejectedPatchedEvents = canonicalAdopted
           ? rejectedBaseEvents
           : mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
@@ -2369,7 +2370,7 @@ function App() {
                 const canonicalAdopted = reconciliation.applied && (localAgentEvents.length === 0 || shouldUseCanonicalHistory);
                 const rejectedBaseEvents = !reconciliation.applied || canonicalAdopted
                   ? localAgentEvents
-                  : mergeCanonicalFragmentTurnBodies(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" });
+                  : mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localAgentEvents), reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup" });
                 const rejectedPatchedEvents = !reconciliation.applied || canonicalAdopted
                   ? rejectedBaseEvents
                   : mergeMissingUsageStatusEvents(mergeMissingLatestCanonicalAssistant(
@@ -3546,7 +3547,7 @@ function App() {
             if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalSnapshotEvents })) {
               const patchedEvents = mergeMissingUsageStatusEvents(
                 mergeMissingLatestCanonicalAssistant(
-                  mergeCanonicalFragmentTurnBodies(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason }),
+                  mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localAgentEvents), reconciliation.events, { sessionId: session.id, roomAgentId, reason }),
                   reconciliation.events,
                   { sessionId: session.id, roomAgentId, reason },
                 ),

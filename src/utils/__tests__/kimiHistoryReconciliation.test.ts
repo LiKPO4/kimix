@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
 import {
+  collapseDuplicateMaterializations,
   hasEquivalentKimiHistoryTurnBodies,
   mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
@@ -228,6 +229,54 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
     const bodies = merged.filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message").map((e) => e.content);
     expect(bodies).toEqual(["中间进度：先看一下代码。", fullBody]);
+  });
+});
+
+describe("collapseDuplicateMaterializations", () => {
+  const longText = "完整的正文回复，包含足够长度的文本内容，超过折叠门槛。";
+
+  it("blanks later identical active-draft materializations within one turn", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "active-draft:s:t:mat-1" }),
+      toolCall(),
+      assistant(longText, { id: "active-draft:s:t:mat-2" }),
+    ];
+    const merged = collapseDuplicateMaterializations(local);
+    expect(merged.map((event) => (event.type === "assistant_message" ? event.content : event.type))).toEqual([
+      "user_message",
+      longText,
+      "tool_call",
+      "",
+    ]);
+  });
+
+  it("keeps formal events with identical text (not materializations)", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "formal-1" }),
+      assistant(longText, { id: "formal-2" }),
+    ];
+    expect(collapseDuplicateMaterializations(local)).toBe(local);
+  });
+
+  it("resets the duplicate window at user boundaries", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "active-draft:s:t1:mat-1" }),
+      { ...userMessage, id: "user-2", timestamp: 9 },
+      assistant(longText, { id: "active-draft:s:t2:mat-1" }),
+    ];
+    expect(collapseDuplicateMaterializations(local)).toBe(local);
+  });
+
+  it("does not fold short texts (legitimate short replies may repeat)", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant("短回复。", { id: "active-draft:s:t:m1" }),
+      assistant("短回复。", { id: "active-draft:s:t:m2" }),
+    ];
+    expect(collapseDuplicateMaterializations(local)).toBe(local);
   });
 });
 

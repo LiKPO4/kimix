@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 收敛：材料化重复事件持久化折叠（思考/正文虚高修复面）（v2.20.231）
+
+- 背景：230 已修产生侧（offset per-step 锚定冻结级联），本轮按 handoff 收敛剩留点。交接文档问题 2（commit 切碎正文）已被 230 的 per-step 根修覆盖，无需单独处理。
+- 收敛点（问题 1）：`dedupeLocalHistoryForComparison` 的去重只作用于比较侧，本地时间线的重复材料化仍原样落盘——同一段文本被材料化为多个 `active-draft:` 事件（旧快照实据：51 字进度×16），思考/正文总量虚高，单调门禁把干净 canonical 判「更薄」拒绝替换，重复永久固化。
+- 修复：新增 `collapseDuplicateMaterializations`——同轮内 `active-draft:` id 事件（正文+思考）签名完全相同且 ≥16 字符时保留首个、清空其余；只认材料化 id 前缀，formal 事件与合法短回复不动。接入 repair/runtime-recovery/startup/room-snapshot 四个非替换分支（包在 fragment 补丁输入侧）。
+- 验收：新增单测 4 例（折叠/不碰 formal/跨轮窗口重置/短文本不折叠）；定向 71 例、全量 1604、typecheck、build 通过。实机待用户验收：旧会话重复思考段应不再堆积、门禁更易放行 canonical 替换。
+- 知识库：无需更新（invariant 14 已含 identity-aware merge 与 dedupe 语义，本次是把比较侧语义落到持久化侧）。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/App.tsx`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
+
 ## 2026-08-05 修复：流式 offset 是 per-step，回放守卫吞掉整个 step（v2.20.230）
 
 - 现场：用户报「工具又全粘成一张卡、中间思考段不显示」，同时 225/226 一直在事后打捞正文残片。
