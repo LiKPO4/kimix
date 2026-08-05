@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：新会话入口遗漏消费 pendingNewSessionModel（/new 与推荐卡）（v2.20.209）
+
+- 背景：自 review（v2.20.145..HEAD 全面审查）高 1——207 只修了 EmptyState，`Composer /new|/clear` 与 `useCreateProjectSession`（推荐卡「开启新对话」）仍直接 `getDefaultKimiModel()`，违反不变量 100「所有建会话入口必须优先消费 pending 模型」。
+- 修复：两入口对齐 EmptyState.ensureSession——`pendingModel ?? await getDefaultKimiModel()`，创建成功后 `setPendingNewSessionModel(null)` 一次性消费。
+- 验收：新增 `useCreateProjectSession.test.ts` 2 例（k3 优先+消费 / 无 pending 回落 config 默认）；typecheck 通过；定向 8 例通过；旧代码下 k3 用例必失败（旧逻辑恒取 config 默认，负向成立）。Composer /new 路径无组件级测试（Composer 渲染 harness 成本高），由 typecheck+实机覆盖。
+- 知识库：无需更新（不变量 100 已于 207 入库，本条是收口执行）。
+- 关键文件：`src/components/chat/Composer.tsx`、`src/hooks/useCreateProjectSession.ts`、`src/hooks/__tests__/useCreateProjectSession.test.ts`。
+
 ## 2026-08-05 修复：当轮消息头/底部信息缺模型，切会话来回才正常（v2.20.208）
 
 - 现场：207 实机验收主链路已通过（k3 执行、选择器不回跳），但当轮「（输出完成）本轮总耗时」行无模型徽标、底部 pill 显示裸「已完成 · 用时 26秒」；切其他会话再回来即正常。

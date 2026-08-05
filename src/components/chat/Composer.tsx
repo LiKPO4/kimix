@@ -2550,7 +2550,10 @@ export function Composer() {
         await appendStatusMessage("请先选择项目，再创建新会话。", roomAgentId);
         return true;
       }
-      const model = await getDefaultKimiModel();
+      // 待使用模型（欢迎屏切换）优先于 config 默认并一次性消费，
+      // 与 EmptyState/Composer.ensureSession 语义一致（不变量 100）。
+      const pendingModel = useAppStore.getState().pendingNewSessionModel;
+      const model = pendingModel ?? await getDefaultKimiModel();
       const fresh: Session = {
         id: genId(),
         engine: "kimi-code" as const,
@@ -2566,6 +2569,7 @@ export function Composer() {
       };
       addSession(fresh);
       setCurrentSession(fresh);
+      if (pendingModel) useAppStore.getState().setPendingNewSessionModel(null);
       await appendStatusMessage("已开启全新会话，官方上下文已丢弃。", roomAgentId);
       return true;
     }

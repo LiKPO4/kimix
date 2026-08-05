@@ -39,10 +39,12 @@ export function useCreateProjectSession() {
     };
     setCreatingSessionProjectPath(project.path);
     try {
+      // 待使用模型（欢迎屏切换）优先于 config 默认并一次性消费（不变量 100）。
+      const pendingModel = useAppStore.getState().pendingNewSessionModel;
       const session: Session = {
         id: crypto.randomUUID(),
         engine: "kimi-code",
-        model: await getDefaultKimiModel(),
+        model: pendingModel ?? await getDefaultKimiModel(),
         title: "新会话",
         projectPath: project.path,
         createdAt: Date.now(),
@@ -53,6 +55,7 @@ export function useCreateProjectSession() {
       addSession(session);
       setCurrentProject(project);
       setCurrentSession(session);
+      if (pendingModel) useAppStore.getState().setPendingNewSessionModel(null);
     } finally {
       setCreatingSessionProjectPath(null);
     }
