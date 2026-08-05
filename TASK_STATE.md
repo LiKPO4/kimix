@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+
+## 2026-08-05 修复：残片补丁零命中的两处结构性根因（223/224 未生效的真因）（v2.20.225）
+
+- 现场：用户实测 224 仍缺正文（两轮显示「。」/「backoff。」）。diag 取证：`fragmentTurnBodiesPatched` 全天 0 次，而同刻 `latestCanonicalAssistantPatched`/`latestCanonicalTurnPatched` 有——补丁链在跑，函数每次都 patchedTurns=0。
+- 取证方式：用真实 wire 镜像（session_94f414ec，7629 行）跑真实 `parseKimiCodeRecord` + `mapHistoryEvents` + `settleInactiveEvents`，得 canonical 12 条 user 边界、tool_call 243（与 diag 的 canonicalProcessEvents=243 完全一致，证明探针复现了应用所见）。
+- 根因 1（对齐）：按数组下标配对轮次且首个不匹配就 `break`。本地缺任一官方边界（T3 是中断后原文重发、与 T4 正文完全相同）即整体错位，后面所有残片轮永远修不到。改单调游标向前搜索、匹配不到的本地轮跳过、绝不 break。
+- 根因 2（判定粒度）：canonical 一轮有**多段正文（每 step 一段）**，旧判定只拿「整轮最后一段」比残片。实测残片属于**首段**（T6 step1 尾 delta「backoff。」不是 step17 那 1101 字终段的子串），恒判否。改为逐段判定，命中后仍补成官方终段（折叠轮显示的就是终段），本地已持有终段则跳过。
+- 补取证钩子：新增 `fragmentTurnBodiesSkipped`（只在确有正文不一致的轮次时打，只打计数不打正文）。前两轮「触发了但零命中」无从判断，就是缺这条。
+- 验收：真实数据前后对照——本地缺 T3 边界时 HEAD 原样返回（残片仍 1 字符），新版补成 833 字；缺 T6 边界时两者都能补（证明失效条件是 T4 之前的早期分歧）。新增永久回归 2 例（早期边界缺失后仍补later残片轮 / 残片来自非终段），已验证两例在 HEAD 版函数上均失败。typecheck、全量 1592、build 通过。
+- 已知未闭合（下一增量）：T5/T6 那轮是**跨轮错位+边界合并**，本地该轮展示正文是 T6 首段残片，在 T5 的 canonical 任何段里都不存在 → 同轮补丁按设计不动它。需要「缺失 user 边界回填」增量，而整轮替换正被 process-history-regression 门保护（local 596 进程帧 vs canonical 243），属独立机制，不并入本轮。
+- 知识库：invariant 14 扩展（对齐单调游标、canonical 每 step 一段），log.md 记一条。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
 ## 2026-08-05 修复：残片补丁对齐与残片判定两处失配（223 实测不生效根因）（v2.20.224）
 
 - 现场：223 的 repair 触发但 fragmentTurnBodiesPatched 零日志。

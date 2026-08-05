@@ -763,11 +763,25 @@ export function mergeCanonicalFragmentTurnBodies(
   const replacements = new Map<string, string>();
   const clearedSegmentIds = new Set<string>();
   let patchedTurns = 0;
-  const limit = Math.min(localTurns.length, canonicalTurns.length);
-  for (let index = 0; index < limit; index += 1) {
-    const local = localTurns[index];
-    const canonical = canonicalTurns[index];
-    if (!turnUsersMatch(local.user, canonical.user)) break;
+  let alignedTurns = 0;
+  let mismatchedTurns = 0;
+  // 两侧轮数天然可以不等：本地可能缺官方边界（跨轮错位/相邻轮合并），官方
+  // 也可能多出「被打断后原文重发」的重复轮。因此对齐用单调游标向前搜索，
+  // 匹配不到的本地轮跳过。旧实现按下标配对且首个不匹配就 break，任意一处
+  // 边界错位都会让后面所有残片轮永远修不到（实测零命中的根因）。
+  let cursor = 0;
+  for (const local of localTurns) {
+    let matchIndex = -1;
+    for (let probe = cursor; probe < canonicalTurns.length; probe += 1) {
+      if (turnUsersMatch(local.user, canonicalTurns[probe].user)) {
+        matchIndex = probe;
+        break;
+      }
+    }
+    if (matchIndex < 0) continue;
+    cursor = matchIndex + 1;
+    alignedTurns += 1;
+    const canonical = canonicalTurns[matchIndex];
     const canonicalWithBody = canonical.assistants.filter((event) => event.content.trim());
     const localWithBody = local.assistants.filter((event) => event.content.trim());
     if (canonicalWithBody.length === 0 || localWithBody.length === 0) continue;
@@ -776,12 +790,21 @@ export function mergeCanonicalFragmentTurnBodies(
     const localFinal = localWithBody[localWithBody.length - 1];
     const localFinalBody = localFinal.content.trim();
     if (localFinalBody === canonicalFinal) continue;
+    mismatchedTurns += 1;
+    // 官方一轮有多段正文（每个 step 一段）。残片是 offset 锚定从某一段截出
+    // 的尾/中间子串，不一定属于最后一段——实测残片属于首段时，只比最后一段
+    // 的旧判定恒为否。逐段判定；命中后仍把展示正文补成官方终段（折叠轮显示
+    // 的就是终段）。本地已持有终段时不动，避免重复。
+    if (localWithBody.some((event) => event.content.trim() === canonicalFinal)) continue;
     // 残片既可能是尾后缀，也可能是 offset 重置点截出的中间子串
     // （如「backoff。」）；用「子串且显著更短」兜底，长度门槛防误伤正常短回复。
+    const isFragmentOf = (canonicalBody: string): boolean => (
+      canonicalBody.endsWith(localFinalBody) ||
+      (canonicalBody.includes(localFinalBody) && localFinalBody.length <= 32) ||
+      (canonicalBody.includes(localFinalBody) && localFinalBody.length * 2 <= canonicalBody.length)
+    );
     const isFragment = localFinalBody.length === 0 ||
-      canonicalFinal.endsWith(localFinalBody) ||
-      (canonicalFinal.includes(localFinalBody) && localFinalBody.length <= 32) ||
-      (canonicalFinal.includes(localFinalBody) && localFinalBody.length * 2 <= canonicalFinal.length);
+      canonicalWithBody.some((event) => isFragmentOf(event.content.trim()));
     if (!isFragment || canonicalFinal.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
     replacements.set(localFinal.id, canonicalFinalEvent.content);
     for (const segment of localWithBody.slice(0, -1)) {
@@ -790,12 +813,31 @@ export function mergeCanonicalFragmentTurnBodies(
     }
     patchedTurns += 1;
   }
-  if (patchedTurns === 0) return localEvents;
+  if (patchedTurns === 0) {
+    // 对齐上了却一条没补时留痕：没有这条日志，「触发了但零命中」只能靠猜。
+    // 只在确有正文不一致的轮次时打，避免稳态刷屏；不打正文，只打计数。
+    if (mismatchedTurns > 0) {
+      logEvent("kimiHistoryReconciliation.fragmentTurnBodiesSkipped", {
+        sessionId: meta.sessionId,
+        roomAgentId: meta.roomAgentId,
+        reason: meta.reason,
+        localTurns: localTurns.length,
+        canonicalTurns: canonicalTurns.length,
+        alignedTurns,
+        mismatchedTurns,
+      });
+    }
+    return localEvents;
+  }
   logEvent("kimiHistoryReconciliation.fragmentTurnBodiesPatched", {
     sessionId: meta.sessionId,
     roomAgentId: meta.roomAgentId,
     reason: meta.reason,
     patchedTurns,
+    localTurns: localTurns.length,
+    canonicalTurns: canonicalTurns.length,
+    alignedTurns,
+    mismatchedTurns,
   });
   return localEvents.map((event) => {
     if (event.type !== "assistant_message") return event;

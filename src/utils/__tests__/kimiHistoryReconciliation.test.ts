@@ -117,6 +117,52 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     ]);
   });
 
+  it("still patches a later fragment turn when local lost an earlier canonical boundary", () => {
+    // Real shape (session 94f414ec): the official history keeps both the
+    // interrupted turn and its verbatim resend, while the local timeline holds
+    // only one of them. Index-paired alignment broke on that duplicate and
+    // never reached the fragment turn behind it (observed zero-hit).
+    const resent = "运行过程中点击左侧刻度跳转后，过1秒左右又自动跳回去了";
+    const local: TimelineEvent[] = [
+      { ...userMessage, id: "local-resend", timestamp: 102_000, content: resent },
+      assistant("backoff。", { id: "frag", timestamp: 103_000 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, id: "c-interrupted", timestamp: 0, content: resent },
+      { ...userMessage, id: "c-resend", timestamp: 102_000, content: resent },
+      assistant(fullBody, { id: "c-final", timestamp: 103_000 }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    const bodies = merged
+      .filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message")
+      .map((e) => e.content);
+    expect(bodies).toEqual([fullBody]);
+  });
+
+  it("patches a fragment cut from a non-final canonical segment", () => {
+    // One official turn carries one body per step; the offset-anchored merge can
+    // reduce the displayed body to a fragment of the FIRST segment, which the
+    // final-segment-only test could never match.
+    const firstSegment = "你好霹江路。先看现有 recovery 机制的触发点与 backoff。";
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant("backoff。", { id: "frag" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(firstSegment, { id: "c-seg-1" }),
+      toolCall(),
+      assistant(fullBody, { id: "c-final" }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    const bodies = merged
+      .filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message")
+      .map((e) => e.content);
+    expect(bodies).toEqual([fullBody]);
+  });
+
   it("keeps intermediate texts of multi-message turns (not prefixes of the final body)", () => {
     const local: TimelineEvent[] = [
       { ...userMessage },
