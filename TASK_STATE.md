@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：残片正文按轮补丁（222 自愈实测不生效的补刀）（v2.20.223）
+
+- 现场：222 的 settle 自愈实测不修残片。diag 取证：整轮替换被 process-history-regression 门拒绝（local 进程帧 559 vs canonical 205，门在保护 live 过程细节），旧补丁 mergeMissingLatestCanonicalAssistant 只补最新一轮，老残片轮无人修。
+- 修复：新增 mergeCanonicalFragmentTurnBodies——按 user 边界对齐轮次，local 展示正文是 canonical 最终正文真后缀（或空）时，替换该轮最后带正文 assistant 为 canonical 全量，并清空同轮作为其前缀的流式残段；多消息轮中间正文、工具/进程帧一律不动。接入 repair/runtime-recovery/startup/room-snapshot 四个非替换分支。
+- 验收：新增单测 4 例（残片替换+前缀清空/等价不动/无关不改/多消息轮中间正文保留）；全量 1589、typecheck、build 通过。实机待用户验收：加载 223 后重启或下一轮 settle，两个残片轮应显示完整正文。
+- 知识库：无需更新（reconciliation 补丁面扩展，门控不变量未变）。
+- 关键文件：`src/utils/kimiHistoryReconciliation.ts`、`src/App.tsx`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`。
+
 ## 2026-08-05 修复：活跃会话轮末正文残片不自愈（v2.20.222）
 
 - 现场：过去两轮 settle 后正文只剩尾部残片（「。」/「backoff。」），盯着的会话一直看不到完整正文。

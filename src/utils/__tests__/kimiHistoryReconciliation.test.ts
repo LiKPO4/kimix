@@ -3,6 +3,7 @@ import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
 import {
   hasEquivalentKimiHistoryTurnBodies,
+  mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
   removeIdentityCoveredDuplicateToolCalls,
@@ -55,6 +56,61 @@ function toolCall(name = "ReadFile"): TimelineEvent {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("mergeCanonicalFragmentTurnBodies", () => {
+  const fullBody = "你好霖江路。我来查机制，先读代码确认边界，然后修复并提交，最后说明 backoff。";
+
+  it("replaces a suffix-fragment final body with the canonical full body and clears prefix segments", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant("你好霖江路。我来查机制，先读代码确认边界，然后修复并提交，最后说明", { id: "seg-1" }),
+      toolCall(),
+      assistant("backoff。", { id: "seg-2" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(fullBody, { id: "canonical-1" }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    expect(merged.map((event) => (event.type === "assistant_message" ? event.content : event.type))).toEqual([
+      "user_message",
+      "",
+      "tool_call",
+      fullBody,
+    ]);
+  });
+
+  it("keeps events untouched when bodies already match", () => {
+    const local: TimelineEvent[] = [{ ...userMessage }, assistant(fullBody, { id: "a-1" })];
+    const canonical: TimelineEvent[] = [{ ...userMessage }, assistant(fullBody, { id: "c-1" })];
+    expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
+  });
+
+  it("does not rewrite a genuinely different final body", () => {
+    const local: TimelineEvent[] = [{ ...userMessage }, assistant("另一个完整回答，与官方版本无关的内容。", { id: "a-1" })];
+    const canonical: TimelineEvent[] = [{ ...userMessage }, assistant(fullBody, { id: "c-1" })];
+    expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
+  });
+
+  it("keeps intermediate texts of multi-message turns (not prefixes of the final body)", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant("中间进度：先看一下代码。", { id: "mid-1" }),
+      toolCall(),
+      assistant("backoff。", { id: "seg-2" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage },
+      assistant("中间进度：先看一下代码。", { id: "c-mid" }),
+      { ...toolCall(), id: "tool-2" },
+      assistant(fullBody, { id: "c-final" }),
+    ];
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    const bodies = merged.filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message").map((e) => e.content);
+    expect(bodies).toEqual(["中间进度：先看一下代码。", fullBody]);
+  });
 });
 
 describe("shouldReplaceWithCanonicalKimiHistory", () => {

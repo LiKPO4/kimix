@@ -710,6 +710,82 @@ export function mergeMissingLatestCanonicalAssistant(
  * is shorter or has fewer process events than what we already have locally, we
  * keep the local timeline to avoid destructive regressions.
  */
+type FragmentTurnMeta = { sessionId?: string; roomAgentId?: string; reason: string };
+
+/**
+ * 按轮补丁「正文残片」：live 流式合并偶尔把最终正文缩成尾部残片（offset
+ * 锚定跳过大部分 delta），整轮替换又被 process-history-regression 门挡住
+ * （local 进程帧比 canonical 丰富），旧补丁只补最新一轮。这里按 user 边界
+ * 对齐轮次，仅当 local 展示正文是 canonical 最终正文的真后缀（或空）时，把
+ * 该轮最后一个带正文 assistant 事件替换为 canonical 全量，并清空同轮里作为
+ * 其前缀的早到分段（它们是同一条官方消息的流式残段，canonical 视角不存在
+ * 独立中间正文）。多消息轮的中间正文不是最终正文前缀，不受影响；进程/工具
+ * 帧一律不动。
+ */
+export function mergeCanonicalFragmentTurnBodies(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+  meta: FragmentTurnMeta,
+): TimelineEvent[] {
+  type TurnSlice = {
+    user: string;
+    assistants: Array<Extract<TimelineEvent, { type: "assistant_message" }>>;
+  };
+  const sliceTurns = (events: TimelineEvent[]): TurnSlice[] => {
+    const turns: TurnSlice[] = [];
+    for (const event of events) {
+      if (event.type === "user_message" || event.type === "steer_message") {
+        turns.push({ user: normalizedUserTurnContent(event.content), assistants: [] });
+        continue;
+      }
+      if (event.type !== "assistant_message" || turns.length === 0) continue;
+      turns[turns.length - 1].assistants.push(event);
+    }
+    return turns;
+  };
+  const localTurns = sliceTurns(localEvents);
+  const canonicalTurns = sliceTurns(canonicalEvents);
+  const replacements = new Map<string, string>();
+  const clearedSegmentIds = new Set<string>();
+  let patchedTurns = 0;
+  const limit = Math.min(localTurns.length, canonicalTurns.length);
+  for (let index = 0; index < limit; index += 1) {
+    const local = localTurns[index];
+    const canonical = canonicalTurns[index];
+    if (local.user !== canonical.user) break;
+    const canonicalWithBody = canonical.assistants.filter((event) => event.content.trim());
+    const localWithBody = local.assistants.filter((event) => event.content.trim());
+    if (canonicalWithBody.length === 0 || localWithBody.length === 0) continue;
+    const canonicalFinalEvent = canonicalWithBody[canonicalWithBody.length - 1];
+    const canonicalFinal = canonicalFinalEvent.content.trim();
+    const localFinal = localWithBody[localWithBody.length - 1];
+    const localFinalBody = localFinal.content.trim();
+    if (localFinalBody === canonicalFinal) continue;
+    const isFragment = localFinalBody.length === 0 || canonicalFinal.endsWith(localFinalBody);
+    if (!isFragment || canonicalFinal.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
+    replacements.set(localFinal.id, canonicalFinalEvent.content);
+    for (const segment of localWithBody.slice(0, -1)) {
+      const body = segment.content.trim();
+      if (body && canonicalFinal.startsWith(body)) clearedSegmentIds.add(segment.id);
+    }
+    patchedTurns += 1;
+  }
+  if (patchedTurns === 0) return localEvents;
+  logEvent("kimiHistoryReconciliation.fragmentTurnBodiesPatched", {
+    sessionId: meta.sessionId,
+    roomAgentId: meta.roomAgentId,
+    reason: meta.reason,
+    patchedTurns,
+  });
+  return localEvents.map((event) => {
+    if (event.type !== "assistant_message") return event;
+    const replacement = replacements.get(event.id);
+    if (replacement !== undefined) return { ...event, content: replacement };
+    if (clearedSegmentIds.has(event.id)) return { ...event, content: "" };
+    return event;
+  });
+}
+
 export function shouldReplaceWithCanonicalKimiHistory(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
