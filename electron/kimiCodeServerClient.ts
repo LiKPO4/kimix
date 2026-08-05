@@ -428,6 +428,23 @@ export function shouldReconnectForMissedServerProgress(input: {
     input.latestMarker !== input.baselineMarker;
 }
 
+/**
+ * 固定静默上限是「该有帧却没帧」的假死兜底（v2.20.20 引入）。官方 daemon 从不
+ * 主动 ping（实测 diag 里 ping 帧 0 次），而 lastMessageAt 只被真实收到的帧刷新，
+ * 所以空闲订阅会话的静默必然线性撞上限：每 90s 断连一次并重拉 100 条快照，而
+ * as_of_seq 一动不动（实测连续 12 轮空转）。因此上限只在确有在飞任务时生效；
+ * 完全空闲时交给 8s 粒度的 REST 进度探测——它走 listMessages 而非 WS，僵尸
+ * socket 下仍能发现官方历史增长并触发重连，正确性不依赖这条上限。
+ */
+export function shouldReconnectForFixedSilenceLimit(input: {
+  silenceMs: number;
+  hasPendingPrompts: boolean;
+  limitMs?: number;
+}): boolean {
+  if (!input.hasPendingPrompts) return false;
+  return input.silenceMs >= (input.limitMs ?? WS_SILENCE_LIMIT_MS);
+}
+
 class ServerSessionIdleTimeoutError extends Error {
   constructor(readonly idleTimeoutMs: number) {
     super(`Kimi Server WebSocket 等待超时（会话空闲 ${idleTimeoutMs}ms）`);
@@ -939,7 +956,10 @@ export class KimiCodeServerClient {
       if (this.closing || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
       if (this.subscribed.size === 0) return;
       const silenceMs = Date.now() - this.lastMessageAt;
-      if (silenceMs >= WS_SILENCE_LIMIT_MS) {
+      if (shouldReconnectForFixedSilenceLimit({
+        silenceMs,
+        hasPendingPrompts: this.pendingPrompts.size > 0,
+      })) {
         this.forceWatchdogReconnect(`固定静默上限 silence=${Math.round(silenceMs / 1000)}s`);
         return;
       }

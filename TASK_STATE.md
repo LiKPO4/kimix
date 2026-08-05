@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-05 修复：空闲会话每 90 秒无谓断连重连（v2.20.228）
+
+- 现场：diag 里 `[wsc] watchdog 假死判定 固定静默上限` 连续 12 轮，周期 90/92 秒，每轮重连后重拉 100 条快照而 `as_of_seq` 恒为 798（无任何新数据）。
+- 根因：`WS_SILENCE_LIMIT_MS=90_000` + `WS_WATCHDOG_INTERVAL_MS=2_000`（相位差解释 90/92 秒）。`lastMessageAt` 只被收到的帧刷新（`receive()`，socket message 监听器把每条消息都送进去），而官方 0.32 daemon 从不主动 ping（diag 里 ping 帧 0 次；代码只有被动 pong）。早退条件只有 closing / socket 非 OPEN / 无订阅，缺「无在飞任务」，于是空闲订阅会话静默必然线性撞上限。
+- 该上限是 v2.20.20 为「有轮次在跑却收不到帧」引入的假死兜底，空闲期周期空转这一面未被覆盖。
+- 修复：新增纯函数 `shouldReconnectForFixedSilenceLimit`，上限只在 `pendingPrompts` 非空（确有在飞任务）时生效；完全空闲交给 8s 粒度的 REST 进度探测（`WS_PROGRESS_PROBE_SILENCE_MS=8_000` / `INTERVAL=3_000`，走 `listMessages` 而非 WS，僵尸 socket 下仍能发现官方历史增长并 `forceWatchdogReconnect`）。正确性不依赖固定上限。
+- 净效果：空闲每 90s 少一次断连 + 少一次 100 条快照；REST 探测频率不变（原本 8s~90s 之间也在每 3s 探测）。
+- 验收：新增单测 2 例（空闲 90s/1h 均不重连；在飞时 90_000 重连、89_999 不重连、自定义 limitMs 生效）；全量 1599、typecheck、build 通过。实机待验收：空闲不再出现周期性 `固定静默上限` 行。
+- 已知边界（未处理，记为后续）：空闲期 REST 进度探测仍每 3s 跑一次（本轮之前既有行为，非本次引入）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+
 ## 2026-08-05 加强：offset 锚定不抽样诊断（产生侧定性前置）（v2.20.227）
 
 - 背景：226 已让两个残片轮实机闭环（用户验收：正文均显示）。转追产生侧。

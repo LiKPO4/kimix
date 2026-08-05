@@ -18,6 +18,7 @@ import {
   serverMessageProgressMarker,
   type ServerMessageSummary,
   shouldReconnectForMissedServerProgress,
+  shouldReconnectForFixedSilenceLimit,
   snapshotMessagesToServerFrames,
   snapshotToHistoryFrames,
   toServerConfigPatch,
@@ -358,6 +359,36 @@ describe("KimiCodeServerClient protocol adapters", () => {
       baselineMarker: undefined,
       latestMarker: advanced,
     })).toBe(false);
+  });
+
+  it("does not reconnect on the fixed silence limit while nothing is in flight", () => {
+    // 空闲订阅会话：daemon 从不主动 ping，静默必然线性撞上限。旧逻辑因此每
+    // 90s 断连+重拉快照一次而毫无新数据（实测连续 12 轮、as_of_seq 恒定）。
+    expect(shouldReconnectForFixedSilenceLimit({
+      silenceMs: 90_000,
+      hasPendingPrompts: false,
+    })).toBe(false);
+    expect(shouldReconnectForFixedSilenceLimit({
+      silenceMs: 3_600_000,
+      hasPendingPrompts: false,
+    })).toBe(false);
+  });
+
+  it("keeps the fixed silence limit as the stall backstop for in-flight prompts", () => {
+    // v2.20.20 引入该上限要解决的正是「轮次在跑却收不到帧」，必须原样保留。
+    expect(shouldReconnectForFixedSilenceLimit({
+      silenceMs: 90_000,
+      hasPendingPrompts: true,
+    })).toBe(true);
+    expect(shouldReconnectForFixedSilenceLimit({
+      silenceMs: 89_999,
+      hasPendingPrompts: true,
+    })).toBe(false);
+    expect(shouldReconnectForFixedSilenceLimit({
+      silenceMs: 5_000,
+      hasPendingPrompts: true,
+      limitMs: 5_000,
+    })).toBe(true);
   });
 
   it("keeps a pre-prompt baseline when the first Assistant persisted before the post-accept read", () => {
