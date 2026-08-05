@@ -7152,11 +7152,11 @@ ipcMain.handle("kimi-code:listHistorySessions", async (_, request: { workDir: st
       // 走官方 Server 权威会话列表（与 Web 同链路）；SearchOverlay 消费 brief，
       // serverSessionSummary 只有 title 无 brief，映射 title 作兜底
       const sessions = await kimiCodeHost.listSessions(request.workDir);
+      // 透传 host 已映射的完整 KimiCodeSessionSummary（sessionDir/createdAt 等必填字段），
+      // 仅补 brief 兜底；窄映射会让 IPC 返回在类型上缺字段（typecheck 拦不住 IPC handler）。
       const mapped = sessions.map((session) => ({
-        id: session.id,
-        workDir: session.workDir,
+        ...session,
         brief: session.brief ?? session.title ?? session.lastPrompt ?? "",
-        updatedAt: session.updatedAt,
       }));
       return { success: true, data: mapped, source: "server" as const };
     }

@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：listHistorySessions Server 分支窄映射丢必填字段（v2.20.212）
+
+- 背景：自 review 高 4——host 已映射完整 `KimiCodeSessionSummary`，`main.ts` 二次窄映射只留 id/workDir/brief/updatedAt，`sessionDir`/`createdAt` 在类型上必填却变 undefined（IPC handler 返回无类型约束，typecheck 拦不住）。当前唯一消费方 SearchOverlay 只用 id/brief/workDir/updatedAt，未爆雷，但契约漂移已存在。
+- 修复：改 `{ ...session, brief: 兜底 }` 透传。
+- 验收：typecheck 通过；消费方行为不变（所读字段原样保留）。
+- 知识库：无需更新（实现细节）。
+- 关键文件：`electron/main.ts`。
+
 ## 2026-08-05 修复：getGitNumstat 主进程同步 IO 改异步分批（v2.20.211）
 
 - 背景：自 review 高 3——untracked 文件行数统计逐文件 `fs.readFileSync`，大量/大型 untracked 文件阻塞主进程事件循环，全应用 IPC 卡死。
