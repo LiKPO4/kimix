@@ -2004,3 +2004,78 @@ describe("post-terminal external prompt watch probe (v2.20.195 three-step sequen
     await client.close();
   });
 });
+
+describe("frame queue overflow protection", () => {
+  type FrameInternals = {
+    deliver(frame: unknown): void;
+    queued: Array<{ type?: string; payload?: Record<string, unknown> }>;
+    waitForSessionEvent(
+      sessionId: string,
+      match: (frame: { type?: string }) => boolean,
+      idleTimeoutMs: number,
+    ): Promise<{ payload?: Record<string, unknown> }>;
+  };
+
+  const internalsOf = (client: KimiCodeServerClient) => client as unknown as FrameInternals;
+  const normalFrame = (seq: number) => ({
+    type: "assistant.delta",
+    session_id: "s1",
+    seq,
+    payload: { text: `chunk-${seq}` },
+  });
+  // recovered_from_snapshot: true 避免触发 post-terminal 外部探针副作用
+  const terminalFrame = (seq: number, promptId: string) => ({
+    type: "prompt.completed",
+    session_id: "s1",
+    seq,
+    payload: { prompt_id: promptId, recovered_from_snapshot: true },
+  });
+
+  it("滞回修剪：超过 2000 一次剪到 1200，之后不再每帧扫描", () => {
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = internalsOf(client);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let seq = 1; seq <= 2001; seq += 1) internals.deliver(normalFrame(seq));
+    expect(internals.queued).toHaveLength(1200);
+
+    internals.deliver(normalFrame(2002));
+    expect(internals.queued).toHaveLength(1201);
+    warn.mockRestore();
+  });
+
+  it("混合队列溢出只删最老普通帧，最老终止帧保留且可被 waitForSessionEvent 匹配", async () => {
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = internalsOf(client);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // 终止帧放在最老位置——正是 160/198 修复要保护的场景
+    internals.deliver(terminalFrame(1, "p-oldest"));
+    for (let seq = 2; seq <= 2001; seq += 1) internals.deliver(normalFrame(seq));
+
+    expect(internals.queued).toHaveLength(1200);
+    const survivors = internals.queued.filter((frame) => frame.type === "prompt.completed");
+    expect(survivors).toHaveLength(1);
+    expect(survivors[0]?.payload?.prompt_id).toBe("p-oldest");
+    // 最老的 801 条普通帧被剪掉，队列首帧是终止帧
+    expect(internals.queued[0]?.type).toBe("prompt.completed");
+
+    await expect(
+      internals.waitForSessionEvent("s1", (frame) => frame.type === "prompt.completed", 1_000),
+    ).resolves.toMatchObject({ payload: { prompt_id: "p-oldest" } });
+    warn.mockRestore();
+  });
+
+  it("队列几乎全为终止帧的极端场景：兜底截断最老终止帧，较近终止帧保留", () => {
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    const internals = internalsOf(client);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let seq = 1; seq <= 2001; seq += 1) internals.deliver(terminalFrame(seq, `p-${seq}`));
+
+    expect(internals.queued).toHaveLength(1200);
+    expect(internals.queued[0]?.payload?.prompt_id).toBe("p-802");
+    expect(internals.queued.at(-1)?.payload?.prompt_id).toBe("p-2001");
+    warn.mockRestore();
+  });
+});

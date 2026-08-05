@@ -2050,7 +2050,7 @@ export class KimiCodeServerClient {
       const now = Date.now();
       if (now - this.lastOverflowLogAt > 5_000) {
         this.lastOverflowLogAt = now;
-        console.warn(`[KimiCodeServerClient] frame queue overflow: trimmed ${removed} oldest frames (protected terminal frames)`);
+        console.warn(`[KimiCodeServerClient] frame queue overflow: trimmed ${dropped} oldest frames (protected terminal frames)`);
       }
     }
   }

@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-05 测试：帧队列溢出保护补回归 + 修剪日志计数修正（v2.20.210）
+
+- 背景：自 review 高 2——复核后**证伪**审查的「混合队列会误删终止帧」：第一遍全队列扫描后剩余必然全是终止帧，兜底 splice 只在全终止帧极端场景删最老终止帧，语义正确；真实缺口是该保护（160/198 两轮修复核心）无单元测试。
+- 变更：kimiCodeServerClient.test.ts 新增「frame queue overflow protection」3 例——滞回修剪（2001→1200、之后不每帧扫描）、混合队列最老终止帧保留且 waitForSessionEvent 可匹配、全终止帧极端兜底截断最老保留较近。顺带修正溢出 warn 日志计数（trimmed removed → dropped，实际删除量恒为 dropped）。
+- 验收：typecheck 通过；该文件 66 例通过（63+3）。
+- 知识库：无需更新（队列实现细节，不变量未变）。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`。
+
 ## 2026-08-05 修复：新会话入口遗漏消费 pendingNewSessionModel（/new 与推荐卡）（v2.20.209）
 
 - 背景：自 review（v2.20.145..HEAD 全面审查）高 1——207 只修了 EmptyState，`Composer /new|/clear` 与 `useCreateProjectSession`（推荐卡「开启新对话」）仍直接 `getDefaultKimiModel()`，违反不变量 100「所有建会话入口必须优先消费 pending 模型」。
