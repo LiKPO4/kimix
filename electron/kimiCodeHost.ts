@@ -1362,7 +1362,7 @@ export async function sendPrompt(
   // 本轮权威模型（不变量 65：dispatch 起不可变）立即通知渲染层盖到当轮 assistant——
   // server 路由 live 不产出 usage 状态卡，否则消息头徽标/底部模型信息要等切会话
   // 触发的历史对账 backfill 才显示。
-  if (promptModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: promptModel } });
+  if (promptModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: promptModel, phase: "dispatch" } });
   serverManaged ??= sdkPinnedSessionIds.has(sessionId) ? undefined : await promoteSdkSessionToServer(sessionId);
   if (serverManaged) {
     setStatus(sessionId, "running");
@@ -3293,7 +3293,7 @@ async function settleServerSessionAfterPromptCompleted(sessionId: string): Promi
     // settle 后以 server 实际模型补一次当轮盖章：覆盖外部（Web 发起）轮次——它们没有
     // sendPrompt 的意图信号；渲染层只填空，不覆盖 dispatch 时已盖章的值。
     const settledTurnModel = status.model?.trim();
-    if (settledTurnModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: settledTurnModel } });
+    if (settledTurnModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: settledTurnModel, phase: "settle" } });
   } catch (error) {
     console.warn(`[KimiCodeServerHost] refresh after prompt.completed failed for ${sessionId}:`, error);
     const current = serverSessions.get(sessionId)?.status;
@@ -3760,9 +3760,16 @@ function updateStatusFromEvent(sessionId: string, event: unknown, terminalScope:
 // 状态迁移时回读 snapshot，对已不在 pending 列表的审批按去向发 settle 事件
 // （running/completed 视为 approved，其余视为 rejected）。本地 respondApproval 路径先删 id
 // 再改状态，不会误触发。
+// 审批通过后 Server 可能直接进入 waiting_question（继续追问澄清），与
+// running/completed 一样视为 approved；只有其余去向（error/interrupted 等）才是 rejected。
+export function resolveExternalApprovalSettleStatus(status: KimiCodeEngineStatus): "approved" | "rejected" {
+  return status === "running" || status === "completed" || status === "waiting_question" ? "approved" : "rejected";
+}
+
 async function settleExternallyResolvedServerApprovals(
   sessionId: string,
   nextStatus: KimiCodeEngineStatus,
+  attempt = 0,
 ): Promise<void> {
   const keys = [...serverApprovalIds].filter((key) => key.startsWith(`${sessionId}:`));
   if (keys.length === 0) return;
@@ -3778,18 +3785,23 @@ async function settleExternallyResolvedServerApprovals(
     );
   } catch {
     // 快照读取失败时保守跳过 settle：无法确认哪些审批已从 pending 移除，
-    // 误 settle（把仍在等待的审批报成已批准）比多留一会儿更糟；
-    // 后续 snapshot 恢复/重连会对 pending_approvals 重新对账。
+    // 误 settle（把仍在等待的审批报成已批准）比多留一会儿更糟。但本函数是唯一
+    // 对账入口，直接放弃会让外部已回应的审批永久「待审批」——做有上限的退避重试。
+    if (attempt < 3) {
+      setTimeout(() => {
+        void settleExternallyResolvedServerApprovals(sessionId, nextStatus, attempt + 1);
+      }, 2_000 * (attempt + 1));
+    }
     return;
   }
-  const approvedLike = nextStatus === "running" || nextStatus === "completed";
+  const settleStatus = resolveExternalApprovalSettleStatus(nextStatus);
   for (const key of keys) {
     const requestId = key.slice(sessionId.length + 1);
     if (stillPending?.has(requestId)) continue;
     serverApprovalIds.delete(key);
     eventSink?.({
       sessionId,
-      event: { type: "kimix.approval.resolved", requestId, status: approvedLike ? "approved" : "rejected" },
+      event: { type: "kimix.approval.resolved", requestId, status: settleStatus },
     });
   }
 }

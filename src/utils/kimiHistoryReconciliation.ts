@@ -949,9 +949,24 @@ export function backfillTurnModelsFromUsageStatuses(events: TimelineEvent[]): Ti
  * 盖到最后一条用户边界之后、尚无模型的 assistant 上，让消息头徽标与底部信息
  * 立即显示模型，不必等切会话触发的历史对账。只填空，不覆盖官方 per-turn 模型。
  */
-export function stampCurrentTurnModel(events: TimelineEvent[], model: string | undefined): TimelineEvent[] {
+export function stampCurrentTurnModel(events: TimelineEvent[], model: string | undefined, options?: { requireTurnContent?: boolean }): TimelineEvent[] {
   const trimmed = typeof model === "string" ? model.trim() : "";
   if (!trimmed) return events;
+  if (options?.requireTurnContent) {
+    // settle 信号迟到且用户已发下一轮时，扫描目标是新一轮的占位 assistant（无正文、
+    // 未完成）——把旧轮模型盖上去是错误的，且 fill-empty 会挡住新一轮自己的 dispatch
+    // 盖章。settle 路径要求目标轮已有正文或完成态证据；dispatch 路径不需要。
+    let hasTurnEvidence = false;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      const event = events[index];
+      if (event.type === "user_message") break;
+      if (event.type === "assistant_message" && (event.isComplete || event.content.trim())) {
+        hasTurnEvidence = true;
+        break;
+      }
+    }
+    if (!hasTurnEvidence) return events;
+  }
   const result = [...events];
   let dirty = false;
   for (let index = result.length - 1; index >= 0; index -= 1) {

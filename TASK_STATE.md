@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：审批 settle 幂等与模型盖章错轮守卫（review 中 6）（v2.20.214）
+
+- 复核证伪一条：review 称「kimix.approval.resolved / kimix.turn.model 排在 snapshot skip 之后会被吞」——两事件均无 `snapshotReplay: "history"` 标记，skip 首行即 return false，永不误吞，无需改动。
+- 修复 1（审批 settle）：`settleExternallyResolvedServerApprovals` 是唯一外部审批对账入口，此前快照读取失败直接 return 且无后续触发 → 外部已回应审批永久「待审批」；现加有上限退避重试（2s/4s/6s 共 3 次）。另 `waiting_question` 此前被误归 rejected——审批通过后 server 可能继续追问澄清，现计入 approved（新纯函数 `resolveExternalApprovalSettleStatus` + 6 断言）。
+- 修复 2（模型盖章错轮）：`kimix.turn.model` 两发射点加 `phase`（dispatch/settle）；settle 相位 `stampCurrentTurnModel` 新增 `requireTurnContent`——目标轮只有空占位 assistant（无正文未完成，即迟到 settle 撞上新一轮）时拒绝盖章，避免旧轮模型 fill-empty 挡住新一轮自己的 dispatch 盖章；dispatch 相位行为不变。
+- 验收：新增 3 例（settle 错轮拒绝/dispatch 不受影响/settle 有证据正常盖章）+ 6 断言；typecheck/定向 92 例通过。
+- 知识库：无需更新（实现对齐性修复，不变量 65 语义未变）。
+- 关键文件：`electron/kimiCodeHost.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/App.tsx`、`src/utils/__tests__/kimiHistoryReconciliation.test.ts`、`src/utils/__tests__/kimiCodeServerHost.test.ts`。
+
 ## 2026-08-05 修复：Server 链路轮末信息卡只剩「模型：k3」（切会话自愈）（v2.20.213）
 
 - 现场：用户实机——长轮结束后 footer pill 只剩「模型：k3」，无输入/输出/Context；切换一次会话即正常。

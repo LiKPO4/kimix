@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   resolveEngineStatusAfterPromptCompleted,
+  resolveExternalApprovalSettleStatus,
   resolvePromptModel,
   resolveServerEngineStatus,
   resolveServerModelRefresh,
@@ -278,6 +279,17 @@ describe("resolveServerEngineStatus", () => {
     expect(resolveServerEngineStatus({ busy: false, status: "running" })).toBe("idle");
     expect(resolveServerEngineStatus({ busy: false, status: "completed" })).toBe("completed");
     expect(resolveServerEngineStatus({ busy: false, status: "failed" })).toBe("error");
+  });
+});
+
+describe("resolveExternalApprovalSettleStatus", () => {
+  it("treats waiting_question as approved (server may ask a follow-up question after approval)", () => {
+    expect(resolveExternalApprovalSettleStatus("waiting_question")).toBe("approved");
+    expect(resolveExternalApprovalSettleStatus("running")).toBe("approved");
+    expect(resolveExternalApprovalSettleStatus("completed")).toBe("approved");
+    expect(resolveExternalApprovalSettleStatus("error")).toBe("rejected");
+    expect(resolveExternalApprovalSettleStatus("interrupted")).toBe("rejected");
+    expect(resolveExternalApprovalSettleStatus("idle")).toBe("rejected");
   });
 });
 

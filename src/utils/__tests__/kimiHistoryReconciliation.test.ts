@@ -1153,6 +1153,32 @@ describe("stampCurrentTurnModel", () => {
     expect(stamped.find((event) => event.id === "a2")).toMatchObject({ model: "kimi/k3" });
   });
 
+  it("settle 相位跳过只有占位 assistant 的新一轮（迟到信号不盖错轮）", () => {
+    const events: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "旧轮" },
+      assistant("旧轮正文", { id: "a-old", isComplete: true }),
+      { id: "u2", type: "user_message", timestamp: 20, content: "新轮" },
+      assistant("", { id: "a-new", isComplete: false }),
+    ];
+
+    // settle 相位：新轮只有空占位，拒绝盖章（旧轮模型不得盖到新轮）
+    expect(stampCurrentTurnModel(events, "kimi/k3", { requireTurnContent: true })).toBe(events);
+    // dispatch 相位（默认）：新轮发送时的意图盖章不受影响
+    const stamped = stampCurrentTurnModel(events, "kimi/k3");
+    expect(stamped.find((event) => event.id === "a-new")).toMatchObject({ model: "kimi/k3" });
+    expect(stamped.find((event) => event.id === "a-old") && "model" in (stamped.find((event) => event.id === "a-old") ?? {})).toBe(false);
+  });
+
+  it("settle 相位在目标轮已有正文/完成态时正常盖章", () => {
+    const events: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 10, content: "旧轮" },
+      assistant("外部轮正文", { id: "a-ext", isComplete: true }),
+    ];
+
+    const stamped = stampCurrentTurnModel(events, "kimi/k3", { requireTurnContent: true });
+    expect(stamped.find((event) => event.id === "a-ext")).toMatchObject({ model: "kimi/k3" });
+  });
+
   it("无模型信号或无待盖章 assistant 时原样返回（同引用）", () => {
     const events: TimelineEvent[] = [
       { id: "u1", type: "user_message", timestamp: 10, content: "x" },

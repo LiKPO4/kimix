@@ -2734,7 +2734,7 @@ function App() {
           const stampAgentId = roomAgentId ?? getPrimaryRoomAgent(targetSession).id;
           updateSession(uiSessionId, (session) => {
             const view = getRoomAgentEvents(session, stampAgentId);
-            const stamped = stampCurrentTurnModel(view, turnModel);
+            const stamped = stampCurrentTurnModel(view, turnModel, { requireTurnContent: rawEvent.phase === "settle" });
             if (stamped === view) return session;
             return { ...updateRoomAgentEvents(session, stampAgentId, () => stamped), updatedAt: Date.now() };
           });
