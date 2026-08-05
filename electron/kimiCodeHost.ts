@@ -1475,13 +1475,47 @@ async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManag
   }
 }
 
+const SERVER_RECOVERY_TICK_MS = 10_000;
+let serverRecoveryTicker: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * daemon 静默退出或启动失败时，没有发送、也没有显式失败会触发 recovery，
+ * 故障后第一次发送只能落 SDK（现场「经 SDK 发送」持续了 17 分钟）。
+ * 周期自检把 SDK 窗口压缩到一个 tick；恢复后再把空闲兼容会话批量
+ * promote 回 Server，不等下次发送逐条 promote。SDK 只作最后兜底。
+ */
+export function startServerRecoveryTicker() {
+  if (serverRecoveryTicker) return;
+  serverRecoveryTicker = setInterval(() => {
+    if (!isKimiCodeServerSessionRoutingEnabled(process.env)) return;
+    if (kimiCodeServerHost.isReady()) void promoteIdleSdkSessionsToServer();
+    else scheduleServerRecovery();
+  }, SERVER_RECOVERY_TICK_MS);
+  (serverRecoveryTicker as { unref?: () => void }).unref?.();
+}
+
+async function promoteIdleSdkSessionsToServer() {
+  for (const sessionId of [...sessions.keys()]) {
+    if (sdkPinnedSessionIds.has(sessionId)) continue;
+    try {
+      const promoted = await promoteSdkSessionToServer(sessionId);
+      if (promoted) console.info(`[KimiCodeServerHost] promoted idle SDK session ${sessionId} back to Server`);
+    } catch (error) {
+      console.warn(`[KimiCodeServerHost] idle SDK promotion sweep failed for ${sessionId}:`, error);
+    }
+  }
+}
+
 function scheduleServerRecovery() {
+  startServerRecoveryTicker();
   const status = kimiCodeServerHost.getStatus();
   if (!status.enabled || kimiCodeServerHost.isReady() || serverRecoveryPromise || Date.now() < nextServerRecoveryAt) return;
   if (!isKimiCodeServerSessionRoutingEnabled(process.env)) return;
-  nextServerRecoveryAt = Date.now() + 30_000;
+  nextServerRecoveryAt = Date.now() + SERVER_RECOVERY_TICK_MS;
   serverRecoveryPromise = kimiCodeServerHost.start()
-    .then(() => undefined)
+    .then(() => {
+      void promoteIdleSdkSessionsToServer();
+    })
     .catch((error) => console.warn("[KimiCodeServerHost] background recovery failed:", error))
     .finally(() => {
       serverRecoveryPromise = null;

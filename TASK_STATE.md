@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-05 加强：Server daemon 静默故障自愈，压缩 SDK 兜底窗口（v2.20.221）
+
+- 现场：13:20 发送显示「经 SDK 发送」——非显示误标，daemon 实例 13:37:39 才启动，发送时 Server 不可用真实走了 SDK 兜底；daemon 恢复后会话已 promote 回 Server（当前轮 journal 连续写入）。
+- 根因：recovery 只被「发送落 SDK」与「显式 server 调用失败」触发；daemon 静默不在时 `shouldRouteNewSessionToServer()` 直接 false，不发 server 调用、不产生失败，无人触发 recovery，故障窗口无限长。
+- 修复：① 新增 10s 周期自检 ticker（unref，不阻挡退出）：routing 启用且 daemon 不在 → scheduleServerRecovery；daemon 在 → 空闲 SDK 会话批量 promote 回 Server。② backoff 30s→10s。③ recovery 成功后立即跑 promote 扫描。④ 启动首绘后 arm ticker。pinned/运行中/等待中会话不动，SDK 仍作最后兜底。
+- 验收：typecheck/全量 1585/build 通过；electron 主进程无测试基建，ticker 行为实机待用户验收（杀 daemon 后 ≤10s 应自愈拉起，空闲 SDK 会话自动回 Server）。
+- 知识库：无需更新（恢复触发面增强，路由不变量未变）。
+- 关键文件：`electron/kimiCodeHost.ts`、`electron/main.ts`。
+
 ## 2026-08-05 修复：运行中点左侧刻度跳转约 1 秒后跳回旧位置（v2.20.220）
 
 - 现场：流式运行中点击 ChatNavigationRail 刻度跳转，约 1 秒后视口自动回到跳转前位置（跟随态的底部）。

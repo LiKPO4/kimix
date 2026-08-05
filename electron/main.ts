@@ -4526,6 +4526,7 @@ function scheduleKimiServerStartupAfterFirstPaint() {
   if (kimiServerStartupScheduled) return;
   kimiServerStartupScheduled = true;
   setTimeout(() => {
+    kimiCodeHost.startServerRecoveryTicker();
     void requestKimiServerStartup().catch(() => undefined);
   }, 2_000);
 }
