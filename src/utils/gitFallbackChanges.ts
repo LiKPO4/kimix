@@ -17,6 +17,7 @@ export interface GitFallbackPlan {
 export function normalizeGitPath(filePath: string): string {
   let normalized = filePath.replace(/\\/g, "/");
   while (normalized.startsWith("./")) normalized = normalized.slice(2);
+  normalized = normalized.replace(/\/{2,}/g, "/");
   return normalized;
 }
 

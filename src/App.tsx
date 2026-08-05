@@ -782,7 +782,11 @@ async function reconcileGitFallbackChanges(options: {
     roomAgentId: ownerAgentId,
   };
   useSessionStore.getState().updateSession(uiSessionId, (session) => {
-    const next = updateRoomAgentEvents(session, ownerAgentId, (events) => [...events, fallbackEvent]);
+    // 幂等：completed 事件与轮询对账可能近同时触发两次本函数，第一次的 numstat
+    // 尚未落库时第二次已开始——按事件 ID 去重，不产生重复 change_summary。
+    const next = updateRoomAgentEvents(session, ownerAgentId, (events) => (
+      events.some((event) => event.id === fallbackEvent.id) ? events : [...events, fallbackEvent]
+    ));
     return { ...next, updatedAt: Date.now() };
   });
 }

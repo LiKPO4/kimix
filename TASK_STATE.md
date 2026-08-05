@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：竞态类三项（review 中 8 批次）（v2.20.216）
+
+- SettingsPanel 权限切换并发竞态：原无锁，A→B 快速连点时 A 的失败回滚可晚于 B 成功写入。加 in-flight ref 守卫（写 server 期间忽略新点击）+ 条件回滚（仅当全局值仍是本次目标才回滚）。
+- AppShell 后台任务轮询漂移：原 setInterval 依赖任务 state，每次结果回来重建定时器（实际间隔 = 请求耗时 + 2s/5s）。改 setTimeout 链式调度 + ref 镜像读最新任务态；refresh 函数返回内部 promise 供链式等待（其余调用方不受影响）。
+- Git fallback 幂等：`reconcileGitFallbackChanges` 追加前按事件 ID 去重（completed 与轮询对账近同时触发时不再产生重复 change_summary）；`normalizeGitPath` 补多余斜杠归一（新增 1 例）。
+- 有意不改：全量历史去重窗口（v2.20.175/186 的文档化权衡——numstat 相对 HEAD 累计，窗口切本轮会重新引入同文件跨轮重复进卡；代价是连续两轮 Bash 改同一未提交文件不重复显示）。跨轮归属根治需按轮 git 快照，超出最小修复范围，记为已知边界。
+- 验收：typecheck/全量 1580 通过；SettingsPanel/AppShell 无组件级测试（harness 成本），实机覆盖。
+- 知识库：无需更新（竞态修复，不变量未变）。
+- 关键文件：`src/components/settings/SettingsPanel.tsx`、`src/components/layout/AppShell.tsx`、`src/App.tsx`、`src/utils/gitFallbackChanges.ts`。
+
 ## 2026-08-05 修复：渲染类四项（review 中 9 批次）（v2.20.215）
 
 - hljs 增量不重着色（MarkdownRenderer）：首次 idle 着色后 `<code>` 带 hljs 类+`data-highlighted`，React 复用节点更新文本时旧守卫直接 return。改为按「文本与上次着色是否一致」判断，重着色前清 hljs 类与 `data-highlighted`（highlight.js v11 对带标记节点直接跳过——调试实证只清类会导致着色静默失败）。新 jsdom 用例（先 alpha 后 beta，断言重新着色）调试期负向验证通过。

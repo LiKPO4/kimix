@@ -31,6 +31,11 @@ describe("normalizeGitPath", () => {
     expect(normalizeGitPath("./src/App.tsx")).toBe("src/App.tsx");
     expect(normalizeGitPath("././src/App.tsx")).toBe("src/App.tsx");
   });
+
+  it("归一多余斜杠", () => {
+    expect(normalizeGitPath("src//App.tsx")).toBe("src/App.tsx");
+    expect(normalizeGitPath("src\\\\App.tsx")).toBe("src/App.tsx");
+  });
 });
 
 describe("collectRecordedChangePaths", () => {

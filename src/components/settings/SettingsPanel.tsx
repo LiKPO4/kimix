@@ -1164,7 +1164,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   // 设置面板路径：有 runtime 时权限调整「立即写 server」（写后回读校准），
   // 与 Composer 路径统一「立即写 server」（与官方 Web 轮中可切换同语义）；
   // 轮中切换对当前轮剩余部分可能仍用旧值，下一轮起生效。
+  const permissionMutationInFlightRef = useRef(false);
   const handleSetPermissionMode = async (mode: PermissionMode) => {
+    // 并发守卫：A→B 快速连点时，A 的失败回滚可能晚于 B 的成功写入，
+    // 把全局权限回滚成旧值（review 中 8）。写 server 期间忽略新点击。
+    if (permissionMutationInFlightRef.current) return;
     // 全局默认总是本地写：这是新会话默认偏好，与当前会话权限解耦
     const globalBefore = useAppStore.getState().permissionMode;
     setPermissionMode(mode);
@@ -1196,6 +1200,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       writeLocal();
       return;
     }
+    permissionMutationInFlightRef.current = true;
     const res = await setKimiCodePermissionWithRecovery({
       sessionId: runtimeSessionId,
       mode,
@@ -1204,6 +1209,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       setPermission: window.api.setKimiCodePermission,
       resumeSession: window.api.resumeKimiCodeSession,
     });
+    permissionMutationInFlightRef.current = false;
     if (!res.success) {
       if (isKimiCodeSessionUnavailableError(res.error)) {
         // 会话不可用：保留本地值，下次发消息时生效（与 Composer 路径一致）
@@ -1214,7 +1220,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         }));
         return;
       }
-      setPermissionMode(globalBefore);
+      // 仅当全局值仍是本次写入的目标时回滚；若用户期间又改了（或守卫外路径
+      // 写入），不得把别人的新值回滚掉。
+      if (useAppStore.getState().permissionMode === mode) setPermissionMode(globalBefore);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `权限切换失败：${res.error}`,
       }));

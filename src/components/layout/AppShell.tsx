@@ -331,6 +331,10 @@ export function AppShell() {
   const [longTaskDetailLoading, setLongTaskDetailLoading] = useState(false);
   const [longTaskDetailError, setLongTaskDetailError] = useState<string | null>(null);
   const [longTaskBackgroundTasks, setLongTaskBackgroundTasks] = useState<LongTaskBackgroundTaskView[]>([]);
+  const longTaskBackgroundTasksRef = useRef<LongTaskBackgroundTaskView[]>(longTaskBackgroundTasks);
+  useEffect(() => {
+    longTaskBackgroundTasksRef.current = longTaskBackgroundTasks;
+  }, [longTaskBackgroundTasks]);
   const [longTaskBackgroundTasksLoading, setLongTaskBackgroundTasksLoading] = useState(false);
   const [longTaskBackgroundTasksError, setLongTaskBackgroundTasksError] = useState<string | null>(null);
   const navigationBackStackRef = useRef<NavigationEntry[]>([]);
@@ -1410,7 +1414,7 @@ ${isFinalStep
     ));
     if (!options?.silent) setLongTaskBackgroundTasksLoading(true);
     setLongTaskBackgroundTasksError(null);
-    void Promise.all(targets.map(async (target) => {
+    return Promise.all(targets.map(async (target) => {
       const res = await window.api.listKimiCodeBackgroundTasks({
         sessionId: target.runtimeSessionId,
         activeOnly: false,
@@ -1577,10 +1581,22 @@ ${isFinalStep
 
   useEffect(() => {
     if (!backgroundTasksRuntimeSessionId) return;
-    const hasRunningTask = longTaskBackgroundTasks.some((task) => !isBackgroundTaskTerminalStatus(task.status));
-    const timer = window.setInterval(() => refreshLongTaskBackgroundTasks({ silent: true }), hasRunningTask ? 2000 : 5000);
-    return () => window.clearInterval(timer);
-  }, [backgroundTasksRuntimeSessionId, longTaskBackgroundTasks, liveCurrentSession?.id, refreshLongTaskBackgroundTasks]);
+    // setTimeout 链式调度：间隔从上一轮完成后起算。原 setInterval 依赖任务 state，
+    // 每次结果回来都重建定时器，实际间隔 = 请求耗时 + 2s/5s 且随网络漂移（review 中 8）。
+    let cancelled = false;
+    let timer: number | undefined;
+    const tick = async () => {
+      await refreshLongTaskBackgroundTasks({ silent: true });
+      if (cancelled) return;
+      const hasRunningTask = longTaskBackgroundTasksRef.current.some((task) => !isBackgroundTaskTerminalStatus(task.status));
+      timer = window.setTimeout(() => void tick(), hasRunningTask ? 2000 : 5000);
+    };
+    timer = window.setTimeout(() => void tick(), 0);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [backgroundTasksRuntimeSessionId, liveCurrentSession?.id, refreshLongTaskBackgroundTasks]);
 
   useEffect(() => {
     if (!liveCurrentSession?.longTask) {
