@@ -164,12 +164,15 @@ describe("commitActiveTurnDraftsToBatch", () => {
   it("preserves draft arrival order when more than one identity is committed to one batch", () => {
     const firstKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-local");
     const secondKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-official");
+    // 时间戳必须真实：草稿内容先于边界到达（残留提交场景），段才落在边界之前。
     applyActiveTurnDraftDelta(firstKey, assistant("你好", {
+      timestamp: 1000,
       agentTurnId: "turn-local",
       roomAgentId: "agent-1",
       roomMessageId: "message-local",
     }) as Extract<TimelineEvent, { type: "assistant_message" }>);
     applyActiveTurnDraftDelta(secondKey, assistant("霖江路。我会补上焦点归还。", {
+      timestamp: 2000,
       agentTurnId: "turn-official",
       roomAgentId: "agent-1",
       roomMessageId: "message-official",
@@ -177,7 +180,7 @@ describe("commitActiveTurnDraftsToBatch", () => {
     const boundary: TimelineEvent = {
       id: "tool-boundary",
       type: "tool_call",
-      timestamp: 3,
+      timestamp: 3000,
       toolCallId: "call-1",
       toolName: "Edit",
       status: "running",
@@ -296,6 +299,85 @@ describe("commitActiveTurnDraftsToBatch", () => {
     expect(batches.get(batchKey)?.items.map((event) => (
       event.type === "assistant_message" ? event.content : event.type
     ))).toEqual(["你好", "霖江路。我来查"]);
+  });
+
+  it("commits a draft segment AFTER deferred running tools that arrived earlier (no tool clump)", () => {
+    // 现场（v2.20.208 截图）：running 工具帧是 deferrable，会在批次里堆积最多
+    // 500ms；草稿段提交时若插到「首个非 assistant 项」之前，思考/正文段会跳到
+    // 整串工具帧前面，连续段再被 mergeEvents 合并，多步工具粘成一张
+    // 「N 个工具调用」卡、中间思考段只剩 teaser。官方 kimi-web 永不如此。
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const runningTool = (id: string, callId: string, timestamp: number): TimelineEvent => ({
+      id,
+      type: "tool_call",
+      timestamp,
+      toolCallId: callId,
+      toolName: "Read",
+      status: "running",
+      arguments: {},
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    });
+    applyActiveTurnDraftDelta(draftKey, assistant("", {
+      timestamp: 3000,
+      thinking: "工具之后到达的思考",
+      agentTurnId: "turn-1",
+      roomAgentId: "agent-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    const batchKey = JSON.stringify(["session-1", "agent-1"]);
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>([[batchKey, {
+      roomId: "session-1",
+      roomAgentId: "agent-1",
+      items: [runningTool("tool-1", "call-1", 1000), runningTool("tool-2", "call-2", 2000)],
+    }]]);
+
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    });
+
+    expect(batches.get(batchKey)?.items.map((event) => (
+      event.type === "assistant_message" ? event.thinking : event.type
+    ))).toEqual(["tool_call", "tool_call", "工具之后到达的思考"]);
+  });
+
+  it("keeps an earlier-arrived same-millisecond thinking segment ahead of its tool", () => {
+    // 官方 wire 给思考段和随后的工具调用相同时间戳，线序是思考在前。
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const tool: TimelineEvent = {
+      id: "tool-tie",
+      type: "tool_call",
+      timestamp: 3000,
+      toolCallId: "call-tie",
+      toolName: "Bash",
+      status: "running",
+      arguments: {},
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    };
+    applyActiveTurnDraftDelta(draftKey, assistant("", {
+      timestamp: 3000,
+      thinking: "同毫秒思考",
+      agentTurnId: "turn-1",
+      roomAgentId: "agent-1",
+    }) as Extract<TimelineEvent, { type: "assistant_message" }>);
+    const batchKey = JSON.stringify(["session-1", "agent-1"]);
+    const batches = new Map<string, { roomId: string; roomAgentId: string; items: TimelineEvent[] }>([[batchKey, {
+      roomId: "session-1",
+      roomAgentId: "agent-1",
+      items: [tool],
+    }]]);
+
+    commitActiveTurnDraftsToBatch(batches, {
+      sessionId: "session-1",
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    });
+
+    expect(batches.get(batchKey)?.items.map((event) => (
+      event.type === "assistant_message" ? event.thinking : event.type
+    ))).toEqual(["同毫秒思考", "tool_call"]);
   });
 
   it("gives repeated materializations of one turn unique persisted ids", () => {

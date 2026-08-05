@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：流式期间思考/正文段跳到工具帧前——多步工具粘成一张「N 个工具调用」卡（v2.20.219）
+
+- 现场：运行中 kimi-web 展开过程流里几十步工具合并成「69 个工具调用」一张卡、中间思考段只剩末段 teaser、部分正文不可见；Ctrl+R 后 kimiHistoryReconciliation 回放 canonical 恢复正常（diag.log 有 repair 记录）。kimi Web 端任何时候都正常。
+- 取证：官方 wire.jsonl 证实 think/text/tool 帧序完全交错（排除上游）；渲染层所有容器 inline gap 无条件生效（排除样式）；截图「工具粘连」实为分组合并。
+- 根因：`commitActiveTurnDraftsToBatch` 把草稿段插到批次「首个非 assistant 项」之前。running 工具帧是 deferrable（500ms 批量 flush）会在批次堆积，后到的思考/正文段提交时跳到整串工具帧前面；连续段再被 mergeEvents 合并成一段（teaser 只显末段），工具则连成一坨。
+- 修复：插入位置改按段首 delta 时间戳定位——assistant 项同毫秒保持先到者领先（f2,f1,f3 守卫不变）；非 assistant 项同毫秒段仍在前（官方 wire 思考与随后工具同时间戳、思考在线序在前）。
+- 验收：新增回归 2 例（段落在早到 running 工具之后 / 同毫秒思考仍在工具前）；旧「双身份段保持到达序」用例时间戳改真实（原 Date.now 远大于边界 ts，恰是 bug 行为编码）；全量 1584 例 + typecheck + build 通过；实机流式交错待用户验收。
+- 知识库：无需更新（批内排序修正，事件管线不变量未变）。
+- 关键文件：`src/hooks/useEventStream.ts:169-185`、`src/hooks/__tests__/useEventStream.test.ts`。
+
 ## 2026-08-05 修复：事件归属 tie + 样式体系（review 中 7/中 10）（v2.20.218）
 
 - 中 7 site 1 复核后回滚：「canonical 回放盖章取最早匹配」改为时间戳最近匹配后，既有承重测试「同内容连发一一配对」失败——回放按序到达时 FIFO 才是正确语义，且官方/本地时间戳可能不同域；乱序场景仅为理论风险。维持现状不改，记为复核结论。

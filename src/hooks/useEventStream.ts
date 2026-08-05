@@ -167,13 +167,22 @@ export function commitActiveTurnDraftsToBatch(
       continue;
     }
     // Segments stay ahead of the triggering boundary, but never leap ahead
-    // of an assistant item that arrived earlier (same-millisecond ties keep
-    // the formal item's lead); both rules guard the "f2,f1,f3" inversion.
+    // of an item that arrived earlier: the segment timestamp is its first
+    // delta, so it lands before the first LATER item. Assistant ties keep the
+    // formal item's lead (the "f2,f1,f3" guard); official wire gives a
+    // thinking part and its following tool the same timestamp, so a
+    // non-assistant tie still inserts the segment first. Never jump ahead of
+    // already-batched running tool deltas: deferrable tool frames pile up
+    // between flushes, and leaping past them clumps many steps' tools into
+    // one merged "N 个工具调用" card while the interleaved thinking/text
+    // segments coalesce into a single block (official kimi-web never does).
     const items = [...current.items];
     for (const segment of prepended.items) {
-      let insertAt = items.findIndex((item) =>
-        item.type === "assistant_message" && item.timestamp > segment.timestamp);
-      if (insertAt === -1) insertAt = items.findIndex((item) => item.type !== "assistant_message");
+      const insertAt = items.findIndex((item) => (
+        item.type === "assistant_message"
+          ? item.timestamp > segment.timestamp
+          : item.timestamp >= segment.timestamp
+      ));
       if (insertAt === -1) items.push(segment);
       else items.splice(insertAt, 0, segment);
     }
