@@ -8,6 +8,7 @@ describe("normalizeUiStyleId", () => {
     expect(normalizeUiStyleId("default")).toBe("default");
     expect(normalizeUiStyleId("modern")).toBe("modern");
     expect(normalizeUiStyleId("retro")).toBe("retro");
+    expect(normalizeUiStyleId("nostalgia")).toBe("nostalgia");
   });
 
   it("非法或缺失值回退为 default", () => {
@@ -20,7 +21,7 @@ describe("normalizeUiStyleId", () => {
 });
 
 describe("UI_STYLES", () => {
-  it("包含 default/modern/retro 三套预设且默认在首位", () => {
+  it("包含 default/modern/retro/nostalgia 四套预设且默认在首位", () => {
     expect(UI_STYLES.map((item) => item.id)).toEqual(["default", "modern", "retro", "nostalgia"]);
     expect(UI_STYLES[0].id).toBe(DEFAULT_UI_STYLE_ID);
     for (const item of UI_STYLES) {

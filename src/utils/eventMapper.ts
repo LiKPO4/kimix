@@ -2602,8 +2602,14 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   ) {
     if (existing.some((event) => event.id === incoming.id)) return existing;
     const lastEvent = existing[existing.length - 1];
-    if (lastEvent && lastEvent.timestamp > incoming.timestamp) {
-      const insertionIndex = existing.findIndex((event) => event.timestamp > incoming.timestamp);
+    if (lastEvent && lastEvent.timestamp >= incoming.timestamp) {
+      // 触发条件含同值：同毫秒到达时严格 > 会退化成尾部追加，新轮回复被归到上一轮。
+      // 插入点为第一个更晚的帧，或同毫秒的非 user 帧（帧属于某一轮，用户边界应在
+      // 其本轮帧之前）；同值 user 帧保持先来先排。
+      const insertionIndex = existing.findIndex((event) => (
+        event.timestamp > incoming.timestamp ||
+        (event.timestamp === incoming.timestamp && event.type !== "user_message")
+      ));
       if (insertionIndex !== -1) {
         const result = [...existing];
         result.splice(insertionIndex, 0, incoming);

@@ -1241,6 +1241,17 @@
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
+/* 面板/浮层不嵌套边框面板（AGENTS.md 内层递减）：modal/floating 外壳已带边框+阴影，
+   内部内容性 section-card 只保留背景分层，去掉边框与浮雕阴影（retro/nostalgia 下
+   框套框最刺眼；default/modern 无边框阴影，天然合规）。 */
+[data-ui-style="retro"] .kimix-modal-card .kimix-section-card,
+[data-ui-style="retro"] .kimix-floating-panel .kimix-section-card,
+[data-ui-style="nostalgia"] .kimix-modal-card .kimix-section-card,
+[data-ui-style="nostalgia"] .kimix-floating-panel .kimix-section-card {
+  border: none;
+  box-shadow: none;
+}
+
 [data-ui-style="nostalgia"] .kimix-event-card {
   border-radius: 0;
   box-shadow: var(--kimix-nostalgia-raised-shadow);
@@ -1349,7 +1360,7 @@
     180deg,
     color-mix(in srgb, #ffffff 14%, transparent) 0,
     color-mix(in srgb, #ffffff 14%, transparent) 1px,
-    color-mix(in srgb, #000000 08%, transparent) 2px,
+    color-mix(in srgb, #000000 8%, transparent) 2px,
     transparent 3px
   );
   border-color: var(--ui-section-divider-color);
@@ -1440,7 +1451,7 @@
   .kimix-runtime-error-close,
   .kimix-chat-process-row,
   .kimix-settings-check-button
-):hover:not(:disabled) {
+):hover:not(:disabled):not(.bg-accent-primary) {
   border-radius: 0;
   border: var(--kimix-nostalgia-flat-border);
   background: var(--surface-hover);
@@ -3825,7 +3836,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-theme-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: 12px;
   margin-top: 12px;
 }
 
@@ -3859,7 +3870,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-settings-uistyle-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: 12px;
   margin-top: 10px;
 }
 

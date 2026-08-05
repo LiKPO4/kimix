@@ -1,4 +1,23 @@
 # Kimix 长程任务状态
+## 2026-08-05 修复：事件归属 tie + 样式体系（review 中 7/中 10）（v2.20.218）
+
+- 中 7 site 1 复核后回滚：「canonical 回放盖章取最早匹配」改为时间戳最近匹配后，既有承重测试「同内容连发一一配对」失败——回放按序到达时 FIFO 才是正确语义，且官方/本地时间戳可能不同域；乱序场景仅为理论风险。维持现状不改，记为复核结论。
+- 中 7 site 2 修复：迟到外部用户边界的插入触发从严格 > 改为 >=，同毫秒 tie 时插到同值非 user 帧之前（旧逻辑退化为尾部追加，新轮回复被归到上一轮）。新增回归 1 例。
+- 中 10 样式：① nostalgia 通用 hover 补 `:not(.bg-accent-primary)`（与 retro 对齐，实底主按钮 hover 不再视觉突变）；② 「框套框」——retro/nostalgia 下 `.kimix-modal-card`/`.kimix-floating-panel` 内的 `.kimix-section-card` 去边框去阴影只留背景分层（AGENTS.md 内层递减硬规则，LongTaskInspectorPanel 等浮层直接受益）；③ 主题/风格选择网格默认 gap 8px→12px（workspace 分段控件变体保持 6px——那是一个完整容器而非独立卡片）；④ color-mix `08%`→`8%`；⑤ uiStyles 测试描述与 nostalgia normalize 断言补齐。
+- 有意不改：4 风格预设配三列网格的第二行单卡（需视觉验收定 2×2 还是保持，留给用户截图决策）；nostalgia `--ui-nav-list-*` 显式补全（纯形式一致性问题，无实际缺陷）。
+- 验收：typecheck/定向测试通过；样式改动视觉待用户验收（重点：retro/nostalgia 下长程任务浮层内层不再带边框、设置页主题/风格卡间距）。
+- 知识库：无需更新（样式与归属修复，不变量未变）。
+- 关键文件：`src/utils/eventMapper.ts`、`src/index.css`、`src/utils/__tests__/eventMapper.test.ts`、`src/utils/__tests__/uiStyles.test.ts`。
+
+## 2026-08-05 修复：模型表单预填三项（review 中 8 余项）（v2.20.217）
+
+- type 模式清空即回填：原「为空才填」把用户手动清空当未编辑，下一次按键又填回。新增 touched 跟踪（`modelContextTouchedRef`/`modelEffortsTouchedRef`）：预填恒以空值取候选，仅未触碰字段采纳；「用户清空」是明确意图不再回填。所有草稿重置点（选供应商/新建/选模型/加模型/目录换供应商）统一复位。
+- 目录惰性加载竞态：目录返回前已选中/手输模型时首跑预填只见空目录；新增目录到达 effect——catalogModels 从空到非空且表单已有模型 ID 时，对未触碰字段补跑一次 type 预填。
+- Context 上限不一致：输入框 `max` 1048576 与 `readContextSize`/目录上限 10_000_000 对齐为 10_000_000。
+- 验收：既有「为空才填」用例更新为新语义（未触碰即可预填，无需先清空），新增「手动清空不回填 + 未触碰档位仍预填」用例；typecheck/ModelProviderManager 14 例通过。
+- 知识库：无需更新（表单交互语义，不变量未变）。
+- 关键文件：`src/components/settings/ModelProviderManager.tsx`、`src/components/settings/__tests__/ModelProviderManager.test.ts`。
+
 ## 2026-08-05 修复：竞态类三项（review 中 8 批次）（v2.20.216）
 
 - SettingsPanel 权限切换并发竞态：原无锁，A→B 快速连点时 A 的失败回滚可晚于 B 成功写入。加 in-flight ref 守卫（写 server 期间忽略新点击）+ 条件回滚（仅当全局值仍是本次目标才回滚）。

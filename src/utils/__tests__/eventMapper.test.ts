@@ -3611,6 +3611,22 @@ describe("mergeEvents canonical user replay stamping", () => {
     expect(result[1]).toMatchObject({ type: "user_message", id: "user:msg_web_0002" });
   });
 
+  it("inserts a late external user boundary before same-millisecond non-user frames", () => {
+    // 同毫秒 tie：严格 > 的旧逻辑会退化成尾部追加，新轮回复被归到上一轮（review 中 7）。
+    const boundary: TimelineEvent = { id: "user:msg_first", type: "user_message", timestamp: 1000, content: "第一轮" };
+    const sameMsFrame: TimelineEvent = { id: "st-1", type: "status_update", timestamp: 1500, message: "处理中" };
+    const lateUser: TimelineEvent = {
+      id: "user:msg_late_1",
+      type: "user_message",
+      timestamp: 1500,
+      content: "第二轮",
+      snapshotMessageId: "msg_late_1",
+      snapshotMessageIdStable: true,
+    };
+    const result = mergeEvents([boundary, sameMsFrame], lateUser);
+    expect(result.map((event) => event.id)).toEqual(["user:msg_first", "user:msg_late_1", "st-1"]);
+  });
+
   it("keeps two intentional identical prompts when the first echo was already stamped", () => {
     const stamped: TimelineEvent = {
       id: "local-echo-1",
