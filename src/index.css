@@ -1810,9 +1810,6 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
-  /* 底部 32px 渐隐：消息滚动到输入区上方时淡出，而不是被实心边硬切。 */
-  mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
 }
 
 .kimix-chat-scroll-area::-webkit-scrollbar-thumb {
@@ -4696,7 +4693,7 @@ button.bg-accent-primary:disabled:hover,
   gap: 6px;
   min-height: 26px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-xl, 10px);
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
   box-shadow: var(--ui-control-shadow);
@@ -4723,7 +4720,6 @@ button.bg-accent-primary:disabled:hover,
 /* 怀旧（Win98 直角硬边）：胶囊随风格令牌变直角。 */
 [data-ui-style="nostalgia"] .kimix-dock-capsule {
   border: var(--ui-control-border);
-  border-radius: var(--ui-radius-sm, 0px);
 }
 
 .kimix-dock-capsule .kimix-dock-capsule-count {

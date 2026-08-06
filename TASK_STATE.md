@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：胶囊圆角风格分化 + 撤掉滚动区渐隐 mask（v2.20.253）
+
+- 现场：① default/modern/retro 胶囊都是 999px 同样式，用户期望默认圆角稍小、复古更小；② 底部渐隐 mask 反而像"一层背景挡住后面内容"。修复：胶囊圆角改 `var(--ui-radius-xl, 10px)`（默认 10/modern 14/retro 6/nostalgia 0）；删除 `.kimix-chat-scroll-area` 的 mask-image——footer 本就是实色兄弟节点，消息在滚动边界干净截断，渐隐只会制造遮挡错觉。
+
 ## 2026-08-06 微调：Dock 胶囊补默认轻描边（v2.20.252）
 
 - 现场：251 令牌化后 modern/default 下 --ui-control-border 为透明，胶囊几乎隐形。修复：基础规则回退 `1px solid var(--border-subtle)` + hover `--border-default`，nostalgia 覆写保持 `--ui-control-border` 浮雕。uiStyles 18 例、build 通过。
