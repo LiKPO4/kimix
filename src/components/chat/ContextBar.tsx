@@ -202,7 +202,7 @@ function UsageProgress({ period, now }: { period: UsagePeriod; now: number }) {
         >
           <div
             className="h-full"
-            style={{ width: `${timePercent}%`, borderRadius: 0, background: "var(--accent-success)" }}
+            style={{ width: `${timePercent}%`, borderRadius: 0, background: "#2ddd19" }}
           />
         </div>
       )}
