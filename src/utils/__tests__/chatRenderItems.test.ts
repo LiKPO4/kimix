@@ -1375,31 +1375,34 @@ describe("message footer memoization", () => {
 describe("buildRenderItems steer boundary", () => {
   it("keeps a running turn together across a steer (no phantom new turn)", () => {
     // 官方 steer 只注入当前运行中的 turn（turnId 不变，steer 后同一轮继续输出，
-    // thinking.delta 按 step 从 offset=0 重启）。旧实现把 steer_message 当 turn
-    // 边界 flushTurn：steer 后的思考流进入「无 user 消息的伪新轮」，渲染出独立
-    // 轮次头部（k3-256k · 执行中）+ 新思考块，与已 settle 的上一段思考并存
-    // （实机：steer 后同一段思考出现两个块）。
+    // thinking.delta 按 step 从 offset=0 重启）。真实时序里 steer 事件插入时
+    // step1 尚未 commit（draft 流），assistant 事件在 steer 之后落数组。
+    // 旧实现把 steer_message 当 turn 边界 flushTurn：steer 后的思考流进入
+    // 「无 user 消息的伪新轮」，渲染出独立轮次头部 + 新思考块，与已 settle 的
+    // 上一段思考并存（实机：steer 后同一段思考出现两个块）。
     const events: TimelineEvent[] = [
       { id: "user-1", type: "user_message", timestamp: 1, content: "确认一下" },
+      { id: "steer-1", type: "steer_message", timestamp: 2, content: "顺便把版本迭代到162行吗", status: "accepted" },
       {
-        id: "assistant-1", type: "assistant_message", timestamp: 2,
-        content: "先看实现。", thinking: "But wait — potential issue.", isThinking: false,
-        isComplete: true, agentTurnId: "turn-7",
-      },
-      { id: "steer-1", type: "steer_message", timestamp: 3, content: "你是不是搞错的了", status: "sent" },
-      {
-        id: "assistant-2", type: "assistant_message", timestamp: 4,
-        content: "", thinking: "重新分析。", isThinking: true,
-        isComplete: false, agentTurnId: "turn-7",
+        id: "assistant-1", type: "assistant_message", timestamp: 3,
+        content: "可以，升到 v1.6.2。", thinking: "重新分析。", isThinking: false,
+        isComplete: true, agentTurnId: "turn-8",
       },
     ];
     const items = buildRenderItems(events, "kimi-code", undefined, true);
-    const unit = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
-    // 同一 turn 内：两个 assistant 片段合并为一个渲染单元，不出现「新一轮」独立头部
-    expect(unit?.type).toBe("event");
-    if (unit?.type !== "event") return;
-    // steer 气泡以 embedded 方式挂载在该轮头部（attachedSteers），而非独立成轮
-    expect(unit.attachedSteers?.map((steer) => steer.id)).toEqual(["steer-1"]);
+    // 同一 turn 内：只有一个 assistant 渲染单元（不出现「新一轮」独立头部）
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    // steer 按事件位置渲染为独立单元，且位于 assistant 内容之前（官方注入点
+    // 语义：steer 气泡在注入处、其后的回复段排在后面。旧实现 attached 到过程卡
+    // 之后渲染，实机截图出现「回复在引导气泡之前」的倒挂）
+    const steerIndex = items.findIndex((item) => item.type === "event" && item.event.type === "steer_message");
+    const assistantIndex = items.findIndex((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(steerIndex).toBeGreaterThanOrEqual(0);
+    expect(assistantIndex).toBeGreaterThan(steerIndex);
+    const steer = items[steerIndex];
+    if (steer?.type !== "event") return;
+    expect(steer.event.id).toEqual("steer-1");
   });
 
   it("renders a steer with no enclosing turn as a standalone bubble", () => {

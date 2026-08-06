@@ -866,7 +866,6 @@ export function buildRenderItems(
       .filter((event): event is Extract<TimelineEvent, { type: "compaction" }> => event.type === "compaction")
       .forEach((event) => items.push({ type: "event", event }));
     const tools = turnEvents.filter((event): event is ToolCallEvent => event.type === "tool_call");
-    const steerEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "steer_message" }> => event.type === "steer_message");
     const assistantEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
     const errorEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "error" }> => event.type === "error");
     const changedFiles = new Set(
@@ -1048,17 +1047,6 @@ export function buildRenderItems(
     let changeSummaryAttached = false;
     let diffGroupAttached = false;
     let planPreviewAttached = false;
-    let steerAttached = false;
-    const getAttachedSteers = () => {
-      if (steerAttached) return [];
-      steerAttached = true;
-      return steerEvents;
-    };
-    const pushStandaloneSteers = () => {
-      if (steerAttached) return;
-      steerEvents.forEach((event) => items.push({ type: "event", event }));
-      steerAttached = true;
-    };
     if (projectedFailureAssistant) {
       items.push({
         type: "event",
@@ -1070,7 +1058,6 @@ export function buildRenderItems(
         leadingSubagents: subagents,
         leadingHooks: hooks,
         leadingApprovals: resolvedApprovals,
-        attachedSteers: getAttachedSteers(),
         changedFiles: Array.from(changedFiles),
         changeSummary: mergedChangeSummary ?? undefined,
         trailingStatuses: trailingStatusEvents,
@@ -1108,7 +1095,6 @@ export function buildRenderItems(
         leadingSubagents: subagents,
         leadingHooks: hooks,
         leadingApprovals: resolvedApprovals,
-        attachedSteers: getAttachedSteers(),
         activeStatus: activeStatusEvent,
         changedFiles: Array.from(changedFiles),
         changeSummary: mergedChangeSummary ?? undefined,
@@ -1121,7 +1107,13 @@ export function buildRenderItems(
     }
     for (const [, event] of turnEvents.entries()) {
       if (event.type === "compaction") continue;
-      if (event.type === "steer_message") continue;
+      // steer 按其事件位置渲染（官方注入点语义：steer 气泡在注入处、其后的
+      // assistant 段排在后面）。若挂到 assistant 块上（attachedSteers 在过程卡
+      // 之后渲染），steer 会倒挂到回复文本下方（实机：引导气泡排到回复之后）。
+      if (event.type === "steer_message") {
+        items.push({ type: "event", event });
+        continue;
+      }
       if (event.type === "tool_call" || event.type === "tool_result") continue;
       if (event.type === "subagent") continue;
       if (event.type === "hook") continue;
@@ -1146,8 +1138,7 @@ export function buildRenderItems(
           leadingSubagents: assistantAttached ? [] : subagents,
           leadingHooks: assistantAttached ? [] : hooks,
           leadingApprovals: assistantAttached ? [] : resolvedApprovals,
-          attachedSteers: getAttachedSteers(),
-          activeStatus: activeStatusEvent,
+            activeStatus: activeStatusEvent,
           changedFiles: assistantAttached ? [] : Array.from(changedFiles),
           changeSummary: assistantAttached ? undefined : mergedChangeSummary ?? undefined,
           trailingStatuses: assistantAttached ? [] : trailingStatusEvents,
@@ -1207,7 +1198,6 @@ export function buildRenderItems(
       pushStandaloneTools(tools, turnStartedAt, !turnSettled, subagents, turnBlocks);
       toolsAttached = true;
     }
-    pushStandaloneSteers();
     if (mergedChangeSummary && !changeSummaryAttached) {
       items.push({ type: "event", event: mergedChangeSummary });
       changeSummaryAttached = true;
@@ -1331,9 +1321,10 @@ export function buildRenderItems(
     //（turnId 不变，steer 后同一轮继续输出），切分 turn 会让 steer 后的
     // 思考/正文流进「无 user 消息的伪新轮」，渲染出独立轮次头部（k3-256k ·
     // 执行中）+ 新思考块，与已 settle 的上一段思考并存（实机：steer 后同一
-    // 段思考出现两个块）。steer 气泡改由 renderTurnBody 归属：turn 内有
-    // assistant 块时以 attachedSteers 嵌入该轮头部，空闲轮则走
-    // pushStandaloneSteers 独立渲染。
+    // 段思考出现两个块）。steer 进入 turnBody 后由 renderTurnBody 按其事件
+    // 位置渲染为独立单元（官方注入点语义：引导气泡在注入处、其后的回复段
+    // 排在后面；不得挂 attachedSteers——过程卡之后的位置会把气泡排到回复
+    // 文本下方，实机截图倒挂）。
     if (event.type === "steer_message") {
       turnBody.push(event);
       continue;

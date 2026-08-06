@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：steer 气泡位置倒挂 + 进行中仍卡「等待官方写入」（v2.20.242）
+
+- 现场（用户复验 241，同会话第二次 steer 08:54 UTC 窗口）：① agent 回复文本渲染在轮内，steer 气泡却排在回复之后（位置倒挂）；② 官方已落库（agent 已作答）气泡仍 accepted。
+- 取证：live WS 不推送 steer 官方确认帧（无 context.spliced/prompt.steered 推送，确认只在轮末完成屏障回放携带）→ 241 的 mergeEvents 匹配轮末才有 incoming；位置倒挂根因是 attachedSteers 在 JSX 里排过程卡之后。
+- 修复：
+  - 位置：renderTurnBody 中 steer_message 按事件位置 push 独立渲染单元（官方注入点语义），删除 getAttachedSteers/pushStandaloneSteers 机制（RenderItem.attachedSteers 字段保留类型兼容、不再填充）。
+  - 收敛：新增 `electron/steerConfirm.ts`——Server 路径 steer 成功后轮询 listMessages（3s×90s 上限），发现 created_at 晚于 steer 时刻 + 角色 user + 内容匹配的官方消息即发合成确认帧（turn.steer/server-confirm），渲染层映射 sent → 进行中约一个轮询间隔收敛。护栏：created_at>startedAt 过滤（历史同文不误收敛）、角色必须 user、纯附件跳过、failed 不轮询、mergeEvents 幂等。
+- 验收：新增 steerConfirm 5 例 + eventMapper 幂等 1 例 + 位置断言更新；两处证伪（移除 created_at 过滤、steer 推迟到轮末渲染均失败）；定向 277 例、全量 1646 例、typecheck、knowledge:validate 通过。实机待用户验收。
+- 已知边界：官方落库 >90s 时由轮末 completed 兜底收敛；轮询只覆盖 Server 路径（SDK 沿用 wire 轮询）；steer 早于 step1 commit 时气泡在 step1 前（更贴用户感知，与官方注入点轻微偏差）。
+- 关键文件：`electron/steerConfirm.ts`、`electron/kimiCodeHost.ts`、`src/components/chat/ChatThread.tsx`。
+
 ## 2026-08-06 修复：引导（steer）链路三症状——236 修复的部分成功遗留（v2.20.241）
 
 - 现场（用户 v2.20.240 三截图，会话 session_532ff5cb）：① steer 后双重思考块同跑（同一段思考在旧轮 settle 块与新一轮流式块并存）；② steer 实际已注入且 agent 已针对其作答，气泡仍长期「等待官方写入」；③ 完成后同一文案双气泡（steer「引导已写入当前轮」+ 普通 user），回复中一段思考（"Reply with instructions."）也出现两次。

@@ -165,6 +165,26 @@ describe("mapStreamEvent", () => {
     expect((event as Extract<TimelineEvent, { type: "steer_message" }>).content).toBe("Please fix");
   });
 
+  it("merges the server-confirm steer sent frame into the pending accepted steer idempotently", () => {
+    const existing: TimelineEvent[] = [
+      { id: "steer-local", type: "steer_message", timestamp: 1_000, content: "顺便把版本迭代到162行吗", status: "accepted" },
+    ];
+    const confirm: TimelineEvent = {
+      id: "steer-confirm",
+      type: "steer_message",
+      timestamp: 2_000,
+      content: "顺便把版本迭代到162行吗",
+      status: "sent",
+    };
+    const first = mergeEvents(existing, confirm);
+    expect(first).toHaveLength(1);
+    expect((first[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
+    // 幂等：确认帧重复合并（重放/重试）不产生第二条气泡、状态不回退
+    const second = mergeEvents(first, confirm);
+    expect(second).toHaveLength(1);
+    expect((second[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
+  });
+
   it("maps SteerInput images", () => {
     const event = mapStreamEvent({
       type: "SteerInput",

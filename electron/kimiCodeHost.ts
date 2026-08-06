@@ -14,6 +14,7 @@ import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import { findOfficialCompactionResult, type OfficialCompactionResult } from "./compactionWire";
+import { waitForOfficialSteerUserMessage } from "./steerConfirm";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -1662,7 +1663,19 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
     const result = await getServerClient().steer(sessionId, input, serverControls(serverManaged));
     // 只有真正注入当前轮才发「已接受」合成记录；落入官方队列/已开跑的由渲染层
     // 按 IPC 结果单独呈现，官方侧届时会出自己的 user 边界。
-    if (result.steered) eventSink?.({ sessionId, event: syntheticSteerRecord(input, Date.now()) });
+    if (result.steered) {
+      const startedAt = Date.now();
+      eventSink?.({ sessionId, event: syntheticSteerRecord(input, startedAt) });
+      // live WS 不推送 steer 的官方确认（无 context.spliced/prompt.steered 帧，实测
+      // 仅轮末完成屏障回放携带该 user 消息），进行中气泡会一直卡「等待官方写入」。
+      // 轮询官方消息列表：steer 内容作为 user 消息落库（context.append_message，
+      // 实测延迟约 15s）即发合成确认帧，渲染层据此立即收敛 accepted→sent。
+      void waitForOfficialSteerUserMessage(getServerClient(), sessionId, input, startedAt)
+        .then((official) => {
+          if (official) eventSink?.({ sessionId, event: official });
+        })
+        .catch(() => undefined);
+    }
     return result;
   }
   const managed = getManagedSession(sessionId);
@@ -3710,7 +3723,6 @@ function syntheticSteerRecord(input: string | KimiCodePromptPart[], startedAt: n
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
 async function waitForOfficialSteerRecord(
   sessionId: string,
   workDir: string,
