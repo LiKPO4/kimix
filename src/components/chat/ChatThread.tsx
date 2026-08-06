@@ -1317,15 +1317,27 @@ export function buildRenderItems(
       currentTurnUserEvent = event;
       continue;
     }
-    // steer_message 不是 turn 边界：官方 steer 只注入当前运行中的 turn
-    //（turnId 不变，steer 后同一轮继续输出），切分 turn 会让 steer 后的
-    // 思考/正文流进「无 user 消息的伪新轮」，渲染出独立轮次头部（k3-256k ·
-    // 执行中）+ 新思考块，与已 settle 的上一段思考并存（实机：steer 后同一
-    // 段思考出现两个块）。steer 进入 turnBody 后由 renderTurnBody 按其事件
-    // 位置渲染为独立单元（官方注入点语义：引导气泡在注入处、其后的回复段
-    // 排在后面；不得挂 attachedSteers——过程卡之后的位置会把气泡排到回复
-    // 文本下方，实机截图倒挂）。
+    // steer_message 的 turn 边界语义是「条件化」的（v2.20.244）：
+    // 官方 steer 注入后 turnId 不变（同一 turn 继续），但官方把 steered user
+    // 作为轮间边界（kimi-web 显示「user → 工作轮 1 → steer → 工作轮 2」两个
+    // 独立工作轮）。区分两种实机形态：
+    // - steer 前（同 user 轮内）已存在「带正文的 assistant 事件」（前一 step
+    //   已产出完整正文、steer 在 step 边界后注入）→ steer 是轮间边界，切分
+    //   turn（修复 08:53 场景：轮 1/轮 2 粘连成一个折叠轮、总耗时错误累加）；
+    // - steer 前无正文（前一 step 未产出、steer 打断进行中的生成）→ 不切分
+    //   （保持 242 语义：不产生「无 user 消息的伪新轮」+ 双重思考块）。
+    // 切分后的 steer 独立渲染在轮间（官方注入点语义：引导气泡在注入处、其
+    // 后的回复段排在后面；不得挂 attachedSteers——过程卡之后的位置会把气泡
+    // 排到回复文本下方，实机截图倒挂）。
     if (event.type === "steer_message") {
+      const steerSplitsTurn = turnBody.some((candidate) => (
+        candidate.type === "assistant_message" && candidate.content.trim().length > 0
+      ));
+      if (steerSplitsTurn) {
+        flushTurn(false);
+        items.push({ type: "event", event });
+        continue;
+      }
       turnBody.push(event);
       continue;
     }

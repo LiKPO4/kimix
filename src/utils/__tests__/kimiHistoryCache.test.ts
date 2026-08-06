@@ -22,8 +22,10 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 19 to force re-hydration of thinking-inflated certified caches", () => {
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(19);
+  it("uses cache version 20 to force re-hydration of certified caches under steer-boundary comparison semantics", () => {
+    // 19→20（v2.20.244）：比较侧 steer 边界归一化改变了 repair 判定，升版让
+    // 受影响会话（steer 轮对齐错位）一次性重跑 repair 自愈。
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(20);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {

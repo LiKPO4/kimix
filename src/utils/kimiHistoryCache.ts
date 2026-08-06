@@ -3,7 +3,7 @@ import type { TimelineEvent } from "@/types/ui";
 // 19：思考虚高缓存曾被 body-only 等价认证冻结（实机实据见
 // hasInflatedLocalKimiThinkingHistory 注释）；升版强制重跑 repair，
 // canonical 更富的会话将被整体替换洗净。
-export const KIMI_HISTORY_CACHE_VERSION = 19;
+export const KIMI_HISTORY_CACHE_VERSION = 20;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 

@@ -182,15 +182,79 @@ function normalizedUserTurnContent(content: string): string {
   return content.trim().replace(/\s+/g, " ");
 }
 
+/**
+ * 比较侧 steer 边界等价映射（v2.20.244）：
+ * 241 起本地把官方 steered user 确认帧收敛进 steer_message（不再落独立
+ * user 事件），canonical 快照仍以 user 消息表达同一边界；旧版残留还可能
+ * 留下「steered user 独立事件 + 失败 steer」。两侧边界形态/数量不一致会让
+ * 按 user 边界的轮次对账错位（实机 532ff5cb：本地 12 边界 vs canonical 8，
+ * 8/5 失败 steer 抢占 canonical 轮、对齐后本地轮无匹配，fragment 补丁
+ * 错误替换/跳过，自愈失效）。
+ * 归一规则（只作用于比较视图，不改本地时间线）：
+ *  - canonical 侧：与本地 steer_message 内容匹配（时间窗 30s）的
+ *    user_message 归一为 steer_message（两侧同形态、可配对）；
+ *  - 本地侧：failed steer 一律降级为非边界（官方未落库，不参与轮次对齐，
+ *    避免抢占 canonical 轮）；无 canonical 匹配的非 failed steer（旧版
+ *    残留/快照截断）同样降级。有匹配的 steer 保留为边界。
+ */
+export function normalizeSteerBoundariesForComparison(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): { local: TimelineEvent[]; canonical: TimelineEvent[] } {
+  const localSteers = localEvents.filter(
+    (event): event is Extract<TimelineEvent, { type: "steer_message" }> => event.type === "steer_message",
+  );
+  const steerTextMatches = (a: string, b: string): boolean => {
+    const na = normalizedUserTurnContent(a);
+    const nb = normalizedUserTurnContent(b);
+    if (!na || !nb) return false;
+    return na === nb || na.includes(nb) || nb.includes(na);
+  };
+  const canonical = canonicalEvents.map((event) => {
+    if (event.type !== "user_message") return event;
+    const matchesLocalSteer = localSteers.some((steer) => (
+      Math.abs(steer.timestamp - event.timestamp) <= 30_000 &&
+      steerTextMatches(steer.content, event.content)
+    ));
+    return matchesLocalSteer ? { ...event, type: "steer_message" as const, status: "sent" as const } : event;
+  });
+  const canonicalSteerContents = canonical
+    .filter((event) => event.type === "steer_message")
+    .map((event) => normalizedUserTurnContent(event.content));
+  const local = localEvents.map((event) => {
+    if (event.type !== "steer_message") return event;
+    if (event.status === "failed") return { ...event, type: "status_update" as const };
+    const text = normalizedUserTurnContent(event.content);
+    const matchedCanonicalSteer = canonicalSteerContents.some((canonicalText) => (
+      Boolean(canonicalText && text && (
+        canonicalText === text || canonicalText.includes(text) || text.includes(canonicalText)
+      ))
+    ));
+    if (matchedCanonicalSteer) return event;
+    const matchedCanonicalUser = canonical.some((candidate) => (
+      candidate.type === "user_message" && steerTextMatches(candidate.content, text)
+    ));
+    return matchedCanonicalUser ? event : { ...event, type: "status_update" as const };
+  });
+  return { local, canonical };
+}
+
+
 type KimiHistoryTurnBody = {
   type: "user_message" | "steer_message";
   user: string;
   assistant: string;
 };
 
-function kimiHistoryTurnBodies(events: TimelineEvent[]): KimiHistoryTurnBody[] {
+function kimiHistoryTurnBodies(
+  events: TimelineEvent[],
+  comparisonPeer?: TimelineEvent[],
+): KimiHistoryTurnBody[] {
+  const normalized = comparisonPeer
+    ? normalizeSteerBoundariesForComparison(events, comparisonPeer).local
+    : events;
   const turns: KimiHistoryTurnBody[] = [];
-  for (const event of events) {
+  for (const event of normalized) {
     if (event.type === "user_message" || event.type === "steer_message") {
       turns.push({
         type: event.type,
@@ -219,8 +283,8 @@ export function hasEquivalentKimiHistoryTurnBodies(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
 ): boolean {
-  const cachedTurns = kimiHistoryTurnBodies(cachedEvents);
-  const canonicalTurns = kimiHistoryTurnBodies(canonicalEvents);
+  const cachedTurns = kimiHistoryTurnBodies(cachedEvents, canonicalEvents);
+  const canonicalTurns = kimiHistoryTurnBodies(canonicalEvents, cachedEvents);
   if (cachedTurns.length === 0 || cachedTurns.length !== canonicalTurns.length) return false;
   return cachedTurns.every((turn, index) => {
     const canonical = canonicalTurns[index];
@@ -803,8 +867,11 @@ export function mergeCanonicalFragmentTurnBodies(
     return (canonicalText.includes(localText) || localText.includes(canonicalText)) &&
       Math.abs(local.timestamp - canonical.timestamp) <= 30_000;
   };
-  const localTurns = sliceTurns(localEvents);
-  const canonicalTurns = sliceTurns(canonicalEvents);
+  // 比较侧 steer 边界等价映射：本地 steer_message 与 canonical steered user
+  // 同一边界（241 收敛后形态不同），failed/无匹配 steer 降级避免抢占。
+  const normalized = normalizeSteerBoundariesForComparison(localEvents, canonicalEvents);
+  const localTurns = sliceTurns(normalized.local);
+  const canonicalTurns = sliceTurns(normalized.canonical);
   const replacements = new Map<string, string>();
   const clearedSegmentIds = new Set<string>();
   let patchedTurns = 0;

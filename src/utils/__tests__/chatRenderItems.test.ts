@@ -1415,4 +1415,37 @@ describe("buildRenderItems steer boundary", () => {
     if (steer?.type !== "event") return;
     expect(steer.event.id).toEqual("steer-1");
   });
+
+  it("splits the turn at a steer when a committed body precedes it (official two-work-turn shape)", () => {
+    // 实机 532ff5cb 08:53：steer 在 step 1 正文（已 commit）之后注入，官方
+    // kimi-web 显示「user → 工作轮 1 → steer → 工作轮 2」两个独立工作轮。
+    // 旧实现（242 无条件不切分）把两轮内容粘连成一个折叠轮（总耗时错误累加、
+    // 轮 1 正文与轮 2 总结被折叠吞掉）。条件切分：steer 前（同 user 轮内）
+    // 已有带正文的 assistant 事件 → steer 作为轮间边界切分。
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "你找到上次我发的那个文件了吗" },
+      {
+        id: "assistant-1", type: "assistant_message", timestamp: 2,
+        content: "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面：`RemoveBlack-v1.6.1-ai-test.exe`",
+        thinking: "Done.", isThinking: false, isComplete: true, agentTurnId: "turn-8",
+      },
+      { id: "steer-1", type: "steer_message", timestamp: 3, content: "顺便把版本迭代到162行吗", status: "sent" },
+      {
+        id: "assistant-2", type: "assistant_message", timestamp: 4,
+        content: "## 版本总结", thinking: "Six spots.", isThinking: false,
+        isComplete: true, agentTurnId: "turn-8",
+      },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, false);
+    // 两个 assistant 渲染单元（轮 1 与轮 2 分开，不再粘连成一个折叠轮）
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants).toHaveLength(2);
+    // steer 独立渲染在两轮之间
+    const steerIndex = items.findIndex((item) => item.type === "event" && item.event.type === "steer_message");
+    const firstAssistantIndex = items.findIndex((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(steerIndex).toBeGreaterThan(firstAssistantIndex);
+    const steer = items[steerIndex];
+    if (steer?.type !== "event") return;
+    expect(steer.event.id).toEqual("steer-1");
+  });
 });

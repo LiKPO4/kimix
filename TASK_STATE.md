@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：steer 会话历史自愈失效——边界等价映射 + 条件切分 + 缓存升版 20（v2.20.244）
+
+- 现场（用户对照官方 kimi-web vs 重载后的 Kimix v2.20.243，session_532ff5cb）：官方结构 user → 工作轮 1 → steer → 工作轮 2（各自独立、内容完整）；Kimix 重载后两轮粘连成一个折叠轮（总耗时 7分0秒），轮 1 正文与总结长文「缺失」。重载窗口不能自愈。
+- 取证（repair 决策日志 + 逐轮比对）：持久化内容其实未丢——「缺失」是渲染层 242 无条件「steer 不切 turn」把两轮粘连 + 243 text 前缀去重跳过总结；同时对账层本地 12 边界（9 user + 3 steer）vs canonical 8 边界，8/5 failed steer 抢占 canonical 轮导致对齐错位，fragment 补丁错误替换/跳过（diag 多次 rejected reason=process-history-regression 与 mismatchedTurns）。241 让本地比 canonical 少一条 steered user 边界是本轮新变量。
+- 修复：
+  - 渲染层条件切分（buildRenderItems）：steer 前同 user 轮内已有带正文 assistant → steer 作轮间边界切分（官方两轮结构）；steer 前无正文（打断生成中）→ 不切（242 语义保持）。
+  - 对账层归一化（新增 normalizeSteerBoundariesForComparison，接入 kimiHistoryTurnBodies/mergeCanonicalFragmentTurnBodies/hasEquivalentKimiHistoryTurnBodies）：canonical 侧与本地 steer 内容匹配（30s 窗）的 user 归一为 steer 边界；本地 failed steer 与无 canonical 匹配的 steer 降级为非边界。只作用比较视图，不改本地时间线。
+  - 缓存升版 KIMI_HISTORY_CACHE_VERSION 19→20：一次性重跑 repair 让受影响 steer 会话在新比较语义下自愈（232 先例；旧逻辑下这些会话边界数不等不会被误标 cache-current，升版是清创重跑）。
+- 验收：新增 5 例（条件切分 + 归一化四例），两处证伪（禁用条件切分/禁用 failed 降级均失败）；定向 169 例、全量 1653 例、typecheck、knowledge:validate 通过。实机待用户验收（重载后两轮分开、steer 居中、各自耗时）。
+- 已知边界：canonical getSnapshot 100 条截断使长会话尾轮（turn 8）不在 canonical——本轮靠渲染层条件切分让本地完整内容直接显示官方结构；对账补 turn 8 正文需 electron 层分页/转换（记为上游边界）。总结长文因 243 去重保留较早副本，折叠轮正文显示「提交完成…」、总结在过程时间线内展开可见（展示差异，未处理）。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/utils/kimiHistoryReconciliation.ts`、`src/utils/kimiHistoryCache.ts`、`knowledge/architecture/runtime-routing.md`。
+
 ## 2026-08-06 修复：steer 轮正文段落在过程时间线重复渲染（v2.20.243）
 
 - 现场（用户 241 截图，session_532ff5cb 08:53-08:55 steer 轮）：「你好霖江路。 dist/ 里的构建产物还在，我直接再复制一份到桌面。」在时间线出现两次（ls -la 工具卡前 + CHANGELOG 工具卡前）。

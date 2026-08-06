@@ -8,6 +8,7 @@ import {
   mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
+  normalizeSteerBoundariesForComparison,
   removeIdentityCoveredDuplicateToolCalls,
   shouldReplaceWithCanonicalKimiHistory,
   stampCurrentTurnModel,
@@ -232,6 +233,83 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     expect(bodies).toEqual(["中间进度：先看一下代码。", fullBody]);
   });
 });
+
+describe("normalizeSteerBoundariesForComparison", () => {
+  const steerMsg = (id: string, content: string, status: "sent" | "failed" | "accepted", ts: number): TimelineEvent => ({
+    id,
+    type: "steer_message",
+    timestamp: ts,
+    content,
+    status,
+  });
+  const userMsg = (id: string, content: string, ts: number): TimelineEvent => ({
+    id,
+    type: "user_message",
+    timestamp: ts,
+    content,
+  });
+
+  it("normalizes a canonical steered user into steer_message matching the local steer", () => {
+    // 实机 532ff5cb 08:53：本地以 steer_message（241 收敛）表达 steer 边界，
+    // canonical 快照以 user 消息表达同一边界——归一后两侧形态一致可配对。
+    const local: TimelineEvent[] = [
+      userMsg("u1", "你找到上次我发的那个文件了吗", 100),
+      steerMsg("s1", "顺便把版本迭代到162行吗", "sent", 120),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMsg("cu1", "你找到上次我发的那个文件了吗", 100),
+      userMsg("cu2", "顺便把版本迭代到162行吗", 121),
+    ];
+    const { local: nLocal, canonical: nCanonical } = normalizeSteerBoundariesForComparison(local, canonical);
+    expect(nCanonical[1].type).toBe("steer_message");
+    expect((nCanonical[1] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
+    expect(nLocal[1].type).toBe("steer_message");
+  });
+
+  it("demotes a failed steer (official never recorded it) so it cannot steal a canonical turn", () => {
+    // 实机 8/5：failed steer「我觉得AI模型约4.6mb…」（短版）内容与 canonical
+    // user（长版「…确认一下…」）包含匹配，旧对齐会让它抢占 canonical 轮、
+    // 真正的 user 轮失去匹配。failed steer 一律降级为非边界。
+    const local: TimelineEvent[] = [
+      userMsg("u1", "我觉得AI模型约4.6mb其实很可以接受，确认一下这个方案", 200),
+      steerMsg("s1", "我觉得AI模型约4.6mb其实很可以接受", "failed", 201),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMsg("cu1", "我觉得AI模型约4.6mb其实很可以接受，确认一下这个方案", 200),
+    ];
+    const { local: nLocal } = normalizeSteerBoundariesForComparison(local, canonical);
+    expect(nLocal[1].type).toBe("status_update");
+  });
+
+  it("keeps a matched non-failed steer as a boundary", () => {
+    const local: TimelineEvent[] = [
+      userMsg("u1", "确认一下你们是对的对吗", 300),
+      steerMsg("s1", "你是不是搞错的了", "sent", 320),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMsg("cu1", "确认一下你们是对的对吗", 300),
+      userMsg("cu2", "你是不是搞错的了", 321),
+    ];
+    const { local: nLocal, canonical: nCanonical } = normalizeSteerBoundariesForComparison(local, canonical);
+    expect(nLocal[1].type).toBe("steer_message");
+    expect(nCanonical[1].type).toBe("steer_message");
+  });
+
+  it("demotes a steer with no canonical counterpart (snapshot truncation residue)", () => {
+    // 实机 turn 8：canonical（getSnapshot 100 条截断）没有 turn 8 的 steered
+    // user，本地 steer 无匹配——比较视图中降级，避免它成为无法对齐的孤轮。
+    const local: TimelineEvent[] = [
+      userMsg("u1", "你找到上次我发的那个文件了吗", 400),
+      steerMsg("s1", "顺便把版本迭代到162行吗", "sent", 420),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMsg("cu1", "快速全面了解一下当前项目", 1),
+    ];
+    const { local: nLocal } = normalizeSteerBoundariesForComparison(local, canonical);
+    expect(nLocal[1].type).toBe("status_update");
+  });
+});
+
 
 describe("collapseDuplicateMaterializations", () => {
   const longText = "完整的正文回复，包含足够长度的文本内容，超过折叠门槛。";
