@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：footer 顶边渐变遮罩（伪元素，不改布局）（v2.20.259）
+
+- 现场：258 回退后 footer 顶边仍是实色硬切，用户要求"向上延伸一点的渐变、不要改变高度"。修复：`.kimix-app-shell-footer::before` 伪元素（bottom:100%、height:28px、transparent→surface-base、pointer-events:none）叠在聊天区底部，不占文档流高度、无负 margin（255 翻车根因规避）；modern 用工作区底色覆写。
+
 ## 2026-08-06 回退：撤销 footer 负 margin 重叠渐变（v2.20.258）
 
 - 现场：v2.20.257 实机窗口顶部工具栏被裁切（用户截图箭头处），系 255 的 `margin-top:-28px` footer 重叠破坏壳层布局。用户要求立即回退。处理：`git revert 28aa0915`（仅撤 255 的页脚改动，冲突的 TASK_STATE/package.json 保留当前态）；256/257 的侧栏语义保留。页脚回到 254 实色条形态，胶囊悬浮保留。

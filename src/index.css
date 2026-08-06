@@ -3021,6 +3021,26 @@ button.bg-accent-primary:disabled:hover,
   background: var(--surface-base);
 }
 
+.kimix-app-shell-footer {
+  position: relative;
+}
+
+/* footer 顶边向上延伸 28px 渐变遮罩（伪元素，不占布局高度）：消息滚到输入区上方时淡出。 */
+.kimix-app-shell-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--surface-base));
+  pointer-events: none;
+}
+
+[data-ui-style="modern"] .kimix-app-shell-footer::before {
+  background: linear-gradient(to bottom, transparent, var(--kimix-modern-workspace-background));
+}
+
 /* ── Layout Resizer ── */
 
 .kimix-layout-resizer {
