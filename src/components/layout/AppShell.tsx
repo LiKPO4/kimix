@@ -2074,6 +2074,7 @@ ${isFinalStep
             liveCurrentSession={liveCurrentSession}
             currentProject={currentProject}
             hiddenComposerCardEntries={hiddenComposerCardEntries}
+            hiddenComposerCardKeys={hiddenComposerCardList}
             composerCardSessionId={composerCardSessionId}
             visibleSessionLongTasks={visibleSessionLongTasks}
             backgroundTasks={longTaskBackgroundTasks}

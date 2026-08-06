@@ -162,25 +162,20 @@ describe("ComposerDockBar", () => {
     expect(container.querySelector(".kimix-dock-panel")).toBeNull();
   });
 
-  it("待办/队列面板有收起到侧栏按钮，后台任务面板只有关闭按钮（侧栏由旧后台任务块展示）", () => {
+  it("四类面板都提供收起到侧栏按钮", () => {
     render(
       makeProps({
         bashTasks: [makeTask()],
         subagentTasks: [makeTask({ taskId: "sub-1", subagentType: "subagent" })],
         todoItems: todoFixture,
         queueCount: 1,
+        onHideBash: vi.fn(),
+        onHideSubagent: vi.fn(),
         onHideTodo: vi.fn(),
         onHideQueue: vi.fn(),
       }),
     );
-    // bash / subagent：只有 X 关闭，无收起到侧栏
-    for (const index of [0, 1]) {
-      clickCapsule(index);
-      expect(container.querySelector(".kimix-dock-panel button[aria-label='关闭面板']")).not.toBeNull();
-      expect(container.querySelector(".kimix-dock-panel button[aria-label='收起到侧栏']")).toBeNull();
-    }
-    // todo / queue：X 关闭 + 收起到侧栏 都有
-    for (const index of [2, 3]) {
+    for (let index = 0; index < 4; index += 1) {
       clickCapsule(index);
       expect(container.querySelector(".kimix-dock-panel button[aria-label='收起到侧栏']")).not.toBeNull();
       expect(container.querySelector(".kimix-dock-panel button[aria-label='关闭面板']")).not.toBeNull();

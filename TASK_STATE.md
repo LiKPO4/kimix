@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修正：bash/subagent 收起语义回归，恢复入口并入侧栏旧块（v2.20.257）
+
+- 现场：256 误删了 bash/subagent 的收起到侧栏按钮；用户本意是胶囊显隐逻辑不变（有任务才显示），侧栏不出现重复的独立小块。修正：恢复胶囊面板的收起到侧栏按钮与 hiddenCards 抑制（ComposerDockCard 恢复 bash/subagent）；侧栏不渲染独立恢复小块，改为在旧「后台 Bash」/「子 Agent」块头部注入「恢复胶囊」小按钮（LongTaskInspectorPanel 新增可选 prop hiddenComposerCardKeys，AppShell 传 hiddenComposerCardList）。未收起时侧栏只有旧块，无任何重复。
+
 ## 2026-08-06 修复：后台任务侧栏双块去重——去掉 bash/subagent 收起语义（v2.20.256）
 
 - 现场：侧栏出现两个后台 Bash 块——旧的内容丰富的后台任务卡 + 250 新加的「收起到侧栏」恢复条目。修复：bash/subagent 胶囊不再有收起到侧栏（侧栏展示归旧块全权负责），面板头部只留 X 关闭；`ComposerDockCard` 类型还原（去掉 bash/subagent）；Composer 不再按 hiddenCards 抑制这两个胶囊；AppShell 删恢复条目与 SquareTerminal/Users 导入。todo/queue 收起语义不变。DockBar 测试改为 7 例（bash/subagent 无收起、todo/queue 双按钮）。

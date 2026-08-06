@@ -23,6 +23,8 @@ type ComposerDockBarProps = {
   queueCount: number;
   /** 排队消息列表（拖拽排序/引导/删除交互复杂，由 Composer 组装后注入）。 */
   queueBody: ReactNode;
+  onHideBash?: () => void;
+  onHideSubagent?: () => void;
   onHideTodo?: () => void;
   onHideQueue?: () => void;
 };
@@ -67,6 +69,8 @@ export function ComposerDockBar({
   todoItems,
   queueCount,
   queueBody,
+  onHideBash,
+  onHideSubagent,
   onHideTodo,
   onHideQueue,
 }: ComposerDockBarProps) {
@@ -107,10 +111,12 @@ export function ComposerDockBar({
     bash: {
       title: `后台 Bash · ${bashTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={bashTasks} />,
+      onHide: onHideBash,
     },
     subagent: {
       title: `子 Agent · ${subagentTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={subagentTasks} />,
+      onHide: onHideSubagent,
     },
     todo: {
       title: `待办 · ${doneCount}/${todoItems.length} 已完成`,

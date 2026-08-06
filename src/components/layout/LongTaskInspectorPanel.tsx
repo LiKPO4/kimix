@@ -230,6 +230,8 @@ interface LongTaskInspectorPanelProps {
   liveCurrentSession: Session | null;
   currentProject: { name?: string; path?: string } | null;
   hiddenComposerCardEntries: HiddenComposerCardEntry[];
+  /** 已收起到侧栏的输入区胶囊 key；bash/subagent 恢复入口并入对应旧块头部，不再渲染独立小块。 */
+  hiddenComposerCardKeys?: ComposerDockCard[];
   composerCardSessionId: string;
   visibleSessionLongTasks: LongTaskSummary[];
   backgroundTasks: LongTaskBackgroundTaskView[];
@@ -299,6 +301,7 @@ export function LongTaskInspectorPanel({
   liveCurrentSession,
   currentProject,
   hiddenComposerCardEntries,
+  hiddenComposerCardKeys,
   composerCardSessionId,
   visibleSessionLongTasks,
   backgroundTasks,
@@ -1801,6 +1804,16 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  {(hiddenComposerCardKeys ?? []).includes("bash") && (
+                    <button
+                      type="button"
+                      onClick={() => onSetComposerCardHidden(composerCardSessionId, "bash", false)}
+                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0"
+                      title="恢复输入区的后台 Bash 胶囊"
+                    >
+                      恢复胶囊
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={backgroundTasksLoading}
@@ -1833,6 +1846,16 @@ export function LongTaskInspectorPanel({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  {(hiddenComposerCardKeys ?? []).includes("subagent") && (
+                    <button
+                      type="button"
+                      onClick={() => onSetComposerCardHidden(composerCardSessionId, "subagent", false)}
+                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0"
+                      title="恢复输入区的子 Agent 胶囊"
+                    >
+                      恢复胶囊
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={backgroundTasksLoading}
