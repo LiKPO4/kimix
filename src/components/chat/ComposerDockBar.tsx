@@ -133,7 +133,7 @@ export function ComposerDockBar({
 
   return (
     // 脱离文档流悬浮在聊天内容之上：不占 footer 高度，不形成实色背景带遮挡消息。
-    <div ref={rootRef} style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 8, zIndex: 20 }}>
+    <div ref={rootRef} style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 0, zIndex: 20 }}>
       {active && (
         <div
           className="kimix-dock-panel flex flex-col overflow-hidden"

@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 微调：胶囊与输入框间距减半（v2.20.260）
+
+- 现场：胶囊与输入框间 16px（dock marginBottom 8 + Composer paddingTop 8）嫌大，用户要求减半。修复：ComposerDockBar 根 marginBottom 8→0，间距只留 Composer paddingTop 的 8px。
+
 ## 2026-08-06 修复：footer 顶边渐变遮罩（伪元素，不改布局）（v2.20.259）
 
 - 现场：258 回退后 footer 顶边仍是实色硬切，用户要求"向上延伸一点的渐变、不要改变高度"。修复：`.kimix-app-shell-footer::before` 伪元素（bottom:100%、height:28px、transparent→surface-base、pointer-events:none）叠在聊天区底部，不占文档流高度、无负 margin（255 翻车根因规避）；modern 用工作区底色覆写。
