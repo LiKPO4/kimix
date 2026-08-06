@@ -1558,7 +1558,11 @@ export class KimiCodeServerClient {
     await this.ensureConnected();
   }
 
-  async steer(sessionId: string, input: unknown, controls: Record<string, unknown>) {
+  async steer(sessionId: string, input: unknown, controls: Record<string, unknown>): Promise<{
+    prompt_id: string;
+    steered: boolean;
+    disposition?: "queued" | "running";
+  }> {
     const content = await toServerPromptContent(
       input as Parameters<typeof toServerPromptContent>[0],
       (file) => this.uploadFile(file),
@@ -1570,12 +1574,28 @@ export class KimiCodeServerClient {
     });
     await this.captureServerProgressMarker(sessionId);
     this.lastSessionProgressAt.set(sessionId, Date.now());
-    await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
-      method: "POST",
-      body: JSON.stringify({ prompt_ids: [queued.prompt_id] }),
-      timeoutMs: PROMPT_TIMEOUT_MS,
-    });
-    return queued;
+    try {
+      await this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts:steer`, {
+        method: "POST",
+        body: JSON.stringify({ prompt_ids: [queued.prompt_id] }),
+        timeoutMs: PROMPT_TIMEOUT_MS,
+      });
+      return { ...queued, steered: true };
+    } catch (error) {
+      // 两步协议非原子：第一步已把内容写进官方队列（甚至已开跑）。steer 失败时
+      // 必须分辨内容去向并如实上报——调用方若一律按失败回补本地队列，官方队列
+      // 排空时会再执行一次，同一内容跑两遍（实机：双份一模一样的回复）。
+      const prompts = await this.listPrompts(sessionId).catch(() => null);
+      const disposition = prompts
+        ? prompts.active?.prompt_id === queued.prompt_id
+          ? "running" as const
+          : prompts.queued.some((prompt) => prompt.prompt_id === queued.prompt_id)
+            ? "queued" as const
+            : undefined
+        : undefined;
+      if (disposition) return { ...queued, steered: false, disposition };
+      throw error;
+    }
   }
 
   abort(sessionId: string): Promise<unknown> {

@@ -6220,20 +6220,20 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
     const steerModel = kimiCodeHost.getSessionModel(sessionId);
     const steerAdapted = adaptPromptForModel(content, images, videos, steerModel);
     try {
-      await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, steerAdapted.videos, files));
-      return { success: true, data: undefined };
+      const steerResult = await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(steerAdapted.content, steerAdapted.images, steerAdapted.videos, files));
+      return { success: true, data: steerResult };
     } catch (err) {
       if (steerAdapted.videos.length > 0 && isVideoUnsupportedError(err)) {
         markModelAsNonVideo(steerModel);
         const fallback = adaptPromptForModel(content, images, videos, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
-        return { success: true, data: undefined };
+        const retryResult = await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
+        return { success: true, data: retryResult };
       }
       if (isImageUnsupportedError(err)) {
         markModelAsNonVision(steerModel);
         const fallback = adaptPromptForModel(content, images, videos, steerModel);
-        await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
-        return { success: true, data: undefined };
+        const retryResult = await kimiCodeHost.steer(sessionId, toKimiCodePromptInput(fallback.content, fallback.images, fallback.videos, files));
+        return { success: true, data: retryResult };
       }
       throw err;
     }

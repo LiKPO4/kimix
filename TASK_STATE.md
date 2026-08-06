@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：引导/队列链路三故障（steer 双投递、accepted 永卡、队列不排空）（v2.20.236）
+
+- 现场（用户 v2.20.231 截图）：steer 卡「等待官方写入」且同一内容出现两遍回复；轮次完成但本地队列不派发；已结束会话仍显示停止按钮。
+- 取证：daemon 0.33 活探针确立官方语义——busy 投递入官方队列、任意终态约 1ms 内自动排空且用排空时刻模型、prompts:steer 两步非原子（POST 已入队）、排队项无取消接口、prompt.completed/aborted 是唯一权威 per-prompt 终态。
+- 根因与修复：
+  - I1 双投递：steer 第二步失败时内容已在官方队列，渲染层又回补本地队列 → 同一内容跑两遍。client.steer 失败时用 listPrompts 分辨去向（queued/running）并如实返回；渲染层不再回补，标「未注入当前轮，内容在官方队列」。
+  - I1 accepted 永卡：server 路径 steer 成功后官方确认帧丢失时「等待官方写入」永存 → completed 终态统一收敛 accepted/sending → sent。
+  - I2 队列不排空：completed 时本地仍挂 pending 提问（官方已过期）→ 按 skipped 结算后继续；官方 active 为终态残留时 defer 不再拦截。
+  - I3 停止按钮残留：主要由孤儿官方队列/卡住的 accepted steer 驱动，随 I1/I2 修复收敛；未单独改代码。
+- 验收：promptQueue 新增 2 例（终态 active 不拦截——旧实现恒拦截，证伪成立；未知状态保守拦截）；全量 1616、tsc、build 通过。实机待用户验收。
+- 关键文件：`electron/kimiCodeServerClient.ts`、`electron/kimiCodeHost.ts`、`electron/main.ts`、`src/components/chat/Composer.tsx`、`src/App.tsx`、`src/utils/promptQueue.ts`。
+
 ## 2026-08-06 修复：排队消息补发跟随当前模型 + 失败轮自动排空队列（v2.20.235）
 
 - 现场：k3 轮 429 挂起约 70s 后自行失败，用户只切了模型到千问，排队消息被以千问自动重发，气泡模型「瞬变」。

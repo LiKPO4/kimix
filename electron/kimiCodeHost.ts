@@ -1652,13 +1652,18 @@ async function runWithInteractiveAgent<T>(
   }
 }
 
-export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
+export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<{
+  steered: boolean;
+  disposition?: "queued" | "running";
+}> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    await getServerClient().steer(sessionId, input, serverControls(serverManaged));
-    eventSink?.({ sessionId, event: syntheticSteerRecord(input, Date.now()) });
-    return;
+    const result = await getServerClient().steer(sessionId, input, serverControls(serverManaged));
+    // 只有真正注入当前轮才发「已接受」合成记录；落入官方队列/已开跑的由渲染层
+    // 按 IPC 结果单独呈现，官方侧届时会出自己的 user 边界。
+    if (result.steered) eventSink?.({ sessionId, event: syntheticSteerRecord(input, Date.now()) });
+    return result;
   }
   const managed = getManagedSession(sessionId);
   const startedAt = Date.now();
@@ -1672,6 +1677,7 @@ export async function steer(sessionId: string, input: string | KimiCodePromptPar
       eventSink?.({ sessionId, event: officialSteer });
     })
     .catch(() => undefined);
+  return { steered: true };
 }
 
 export async function undoHistory(sessionId: string, count: number): Promise<void> {

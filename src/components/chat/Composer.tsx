@@ -4144,6 +4144,15 @@ export function Composer() {
         .filter((image) => image.kind === "video" && Boolean(image.dataUrl?.startsWith("data:video/") || image.fileId))
         .map((video) => ({ name: video.name, dataUrl: video.dataUrl, fileId: video.fileId, mediaType: video.mediaType })),
     });
+    if (res.success && res.data && res.data.steered === false) {
+      // 两步 steer 的第二步失败，但内容已在官方队列/已自行开跑：不得回补本地
+      // 队列（否则官方排空 + 本地派发各跑一次，同一内容出现两遍回复）。
+      updateSteerStatus(activeSession.id, steerId, "failed", "引导未注入当前轮；内容已在官方队列，本轮结束后自动发送", roomTarget);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "引导未注入当前轮；内容已在官方队列，本轮结束后自动发送",
+      }));
+      return;
+    }
     if (!res.success) {
       if (/not active|not found|session/i.test(res.error) && activeSession) {
         if (roomTarget) {

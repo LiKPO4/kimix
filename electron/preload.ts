@@ -182,6 +182,7 @@ import type {
   KimiCodeSetThinkingRequest,
   KimiCodeStatusPayload,
   KimiCodeStatusResponse,
+  KimiCodeSteerResponse,
   KimiCodeUsageResponse,
   KimiCodeVoidResponse,
   Project,
@@ -397,7 +398,7 @@ const api = {
     ipcRenderer.invoke("kimi-code:resumeGoal", req),
   cancelKimiCodeGoal: (req: KimiCodeGoalActionRequest): Promise<KimiCodeGoalResponse> =>
     ipcRenderer.invoke("kimi-code:cancelGoal", req),
-  steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeVoidResponse> =>
+  steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeSteerResponse> =>
     ipcRenderer.invoke("kimi-code:steer", req),
   undoKimiCodeHistory: (req: KimiCodeUndoHistoryRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:undoHistory", req),

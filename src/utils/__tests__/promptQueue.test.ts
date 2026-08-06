@@ -27,6 +27,26 @@ describe("shouldDeferLocalPendingDispatch", () => {
     expect(shouldDeferLocalPendingDispatch(null)).toBe(false);
   });
 
+  it("官方 active 处于终态时不拦截本地队列（终态残留防永卡）", () => {
+    for (const status of ["completed", "error", "interrupted", "cancelled", "failed", "aborted"]) {
+      expect(shouldDeferLocalPendingDispatch({
+        supported: true,
+        activeId: "active-1",
+        activeStatus: status,
+        queuedIds: [],
+      })).toBe(false);
+    }
+  });
+
+  it("官方 active 状态未知时仍保守拦截", () => {
+    expect(shouldDeferLocalPendingDispatch({
+      supported: true,
+      activeId: "active-1",
+      activeStatus: null,
+      queuedIds: [],
+    })).toBe(true);
+  });
+
   it("官方队列为空时允许本地队列派发", () => {
     expect(shouldDeferLocalPendingDispatch({
       supported: true,

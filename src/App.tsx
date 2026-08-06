@@ -3173,7 +3173,13 @@ function App() {
       updateSession(uiSessionId, (session) => {
         const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
         const next = updateRoomAgentEvents(session, ownerAgentId, (events) => {
-          const settled = settleInactiveEvents(events);
+          // completed 收敛：daemon 已确认接受的引导定格为 sent（官方确认帧丢失不再
+          // 永卡「等待官方写入」）；轮次完成仍挂 pending 的提问已过期，按 skipped 结算，
+          // 否则 hasPendingQuestion 会永久拦截队列派发。
+          const settled = settlePendingSteerMessages(
+            settlePendingQuestions(settleInactiveEvents(events), "skipped"),
+            "sent",
+          );
           return isPrimaryRoomAgent(session, ownerAgentId)
             ? appendSessionRecommendationIfNeeded(
                 settled,
@@ -3299,7 +3305,7 @@ function App() {
         updateSession(uiSessionId, (session) => ({
           ...session,
           events: appendSessionRecommendationIfNeeded(
-            settleInactiveEvents(session.events),
+            settlePendingSteerMessages(settleInactiveEvents(session.events), "sent"),
             useAppStore.getState().sessionRecommendationEnabled,
             useAppStore.getState().sessionRecommendationTurnLimit,
           ),
@@ -3331,8 +3337,13 @@ function App() {
 
         const latestSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         if (latestSession && hasPendingQuestion(latestSession.events)) {
-          void persistLocalConversationState();
-          return;
+          // 轮次已 completed 而本地仍挂 pending 提问 = 官方侧已过期/已答但本地未同步，
+          // 直接 return 会让本地队列永卡（实机 I2）。按 skipped 结算后继续排空。
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            events: settlePendingQuestions(session.events, "skipped"),
+            updatedAt: Date.now(),
+          }));
         }
 
         void shouldWaitForOfficialPromptQueue(payload.sessionId).then((shouldWait) => {

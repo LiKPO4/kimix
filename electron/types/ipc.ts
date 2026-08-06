@@ -2147,6 +2147,20 @@ export type KimiCodeVoidResponse = {
   error: string;
 };
 
+export type KimiCodeSteerResult = {
+  /** false 表示未注入当前轮：内容已在官方队列等待排空（queued）或已自行开跑（running）。 */
+  steered: boolean;
+  disposition?: "queued" | "running";
+};
+
+export type KimiCodeSteerResponse = {
+  success: true;
+  data: KimiCodeSteerResult;
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeStatusResponse = {
   success: true;
   data: KimiCodeSessionStatus;
