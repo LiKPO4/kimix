@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：Dock 胶囊风格化真正失效根因——用户是 nostalgia 主题（v2.20.251）
+
+- 现场（用户 v2.20.250 截图）：胶囊仍是扁平灰底细边，没吃到任何风格化。250 只补了 `[data-ui-style="retro"]` 覆写，但项目有四套界面风格（default/modern/retro/nostalgia），用户截图（直角硬边、永久浮雕按钮）是 **nostalgia（怀旧，Win98 硬浮雕）**，retro 覆写根本不命中——上一轮修错了目标。
+- 根因治本法：胶囊不再按风格打补丁，基础规则直接吃项目语义控制令牌（与其他按钮同一体系）：`border: var(--ui-control-border)`、`box-shadow: var(--ui-control-shadow)`、hover 用 `--ui-control-hover-*`、展开态用 `--ui-toggle-background/--ui-toggle-shadow`。四套风格自动生效：nostalgia 永久浮雕+展开内凹、retro 扁平 hover 浮雕、default/modern 柔和 hover。
+- 同步：删除 250 的 retro 专属覆写；nostalgia 下胶囊/面板圆角走 `--ui-radius-*`（0px 直角）；dock 面板半透明覆写扩展到 nostalgia。
+- 验收：uiStyles 契约 18 例 + DockBar 7 例、typecheck 通过。实机待用户截图验收（nostalgia 浮雕、retro 扁平 hover 浮雕）。
+- 关键文件：`src/index.css`（.kimix-dock-capsule/.kimix-dock-panel）。
+
 ## 2026-08-06 修复：Dock 胶囊 retro 风格化 + 面板遮挡 + X/收起按钮语义拆分（v2.20.250）
 
 - 现场（用户 v2.20.249 retro 主题截图）：① 胶囊本体没吃到复古风格化（扁平描边，无浮雕）；② 展开面板实心遮挡对话内容，影响阅读；③ 面板头部唯一的 X 实际是「收起到侧栏」，语义错误——X 应是关闭浮窗（同点胶囊），收起到侧栏应是另一个按钮，且四个胶囊都该有。

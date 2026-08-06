@@ -4697,24 +4697,31 @@ button.bg-accent-primary:disabled:hover,
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid var(--border-subtle);
+  border: var(--ui-control-border);
   background: var(--surface-elevated);
+  box-shadow: var(--ui-control-shadow);
   color: var(--kimix-panel-text-secondary);
   font-size: 12.5px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .kimix-dock-capsule:hover {
-  background: var(--surface-hover);
+  background: var(--ui-control-hover-background);
+  box-shadow: var(--ui-control-hover-shadow);
   color: var(--kimix-panel-text);
 }
 
 .kimix-dock-capsule[aria-expanded="true"] {
-  background: var(--accent-primary-light);
-  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: var(--ui-toggle-background);
+  box-shadow: var(--ui-toggle-shadow);
   color: var(--accent-primary);
+}
+
+/* 怀旧（Win98 直角硬边）：胶囊随风格令牌变直角。 */
+[data-ui-style="nostalgia"] .kimix-dock-capsule {
+  border-radius: var(--ui-radius-sm, 0px);
 }
 
 .kimix-dock-capsule .kimix-dock-capsule-count {
@@ -4726,27 +4733,6 @@ button.bg-accent-primary:disabled:hover,
   color: var(--accent-primary);
 }
 
-/* 复古主题：胶囊沿用浮雕按钮语言（顶高光+投影），展开态改内凹 pressed。 */
-[data-ui-style="retro"] .kimix-dock-capsule {
-  border-color: var(--kimix-retro-button-hover-border-color);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-
-[data-ui-style="retro"] .kimix-dock-capsule:hover {
-  background: var(--kimix-retro-button-hover-background);
-  box-shadow: var(--kimix-retro-button-hover-shadow);
-}
-
-[data-ui-style="retro"] .kimix-dock-capsule[aria-expanded="true"] {
-  background: var(--kimix-retro-button-hover-background);
-  border-color: var(--kimix-retro-button-hover-border-color);
-  color: var(--kimix-panel-text);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
-}
-
-[data-ui-style="retro"] .kimix-dock-capsule[aria-expanded="true"] .kimix-dock-capsule-count {
-  color: var(--kimix-panel-text);
-}
 
 /* ── Dock Panel（胶囊展开面板）：半透明 + 背景模糊，背后滚动内容隐约可见 ── */
 
@@ -4759,10 +4745,15 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-lg);
 }
 
-/* 复古主题同样半透明+轻模糊：面板只是临时浮层，不能完全挡住背后对话。 */
-[data-ui-style="retro"] .kimix-dock-panel {
+/* 复古/怀旧同样半透明+轻模糊：面板只是临时浮层，不能完全挡住背后对话。 */
+[data-ui-style="retro"] .kimix-dock-panel,
+[data-ui-style="nostalgia"] .kimix-dock-panel {
   background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
   backdrop-filter: blur(8px);
+}
+
+[data-ui-style="nostalgia"] .kimix-dock-panel {
+  border-radius: var(--ui-radius-lg, 0px);
 }
 
 /* 带业务语义色的对话事件卡只共享形状和质感，不接管其背景与边框色。 */
