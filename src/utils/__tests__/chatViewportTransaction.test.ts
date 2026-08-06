@@ -107,16 +107,28 @@ describe("chat viewport transaction", () => {
     })).toBe(true);
   });
 
-  it("releases tail compensation only after the user returns to the natural range", () => {
-    expect(canReleaseViewportTailCompensation({
-      tailCompensation: 120,
-      scrollTop: 1400,
-      naturalScrollHeight: 1880,
-      clientHeight: 600,
-    })).toBe(false);
+  it("releases tail compensation after the user returns to the natural range or reaches the compensated visual bottom", () => {
+    // 自然最大滚动 = 1880 - 600 = 1280；补偿 120 → 视觉底部 = 1400。
+    // 停在自然范围内（1200）→ 释放。
     expect(canReleaseViewportTailCompensation({
       tailCompensation: 120,
       scrollTop: 1200,
+      naturalScrollHeight: 1880,
+      clientHeight: 600,
+    })).toBe(true);
+    // 停在补偿空间内部（1300：自然最大 1280 与视觉底部 1400 之间）→ 不释放，
+    // 阅读位置仍受保护（旧实现也如此）。
+    expect(canReleaseViewportTailCompensation({
+      tailCompensation: 120,
+      scrollTop: 1300,
+      naturalScrollHeight: 1880,
+      clientHeight: 600,
+    })).toBe(false);
+    // 滚到补偿撑出的视觉底部（1400）→ 释放并贴自然底。旧实现只认自然范围，
+    // 该位置永不释放，尾部空白残留且滚不掉（完成后自动折叠的典型残留路径）。
+    expect(canReleaseViewportTailCompensation({
+      tailCompensation: 120,
+      scrollTop: 1400,
       naturalScrollHeight: 1880,
       clientHeight: 600,
     })).toBe(true);

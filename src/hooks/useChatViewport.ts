@@ -347,6 +347,7 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
     lastScrollTopRef.current = node.scrollTop;
     lastScrollHeightRef.current = node.scrollHeight;
     const tailCompensation = getDetachedTailCompensation();
+    const naturalMaximumScrollTop = Math.max(0, node.scrollHeight - tailCompensation - node.clientHeight);
     if (canReleaseViewportTailCompensation({
       tailCompensation,
       scrollTop: node.scrollTop,
@@ -354,6 +355,14 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
       clientHeight: node.clientHeight,
     })) {
       clearDetachedViewportCompensation();
+      // 释放后滚动范围收缩，真实浏览器会同步 clamp scrollTop 到自然底部；
+      // 这里显式收敛，避免依赖浏览器布局时机（jsdom/边缘场景无自动 clamp），
+      // 保证「滚到视觉底部 → 空白消失并贴自然底」在任意环境下成立。
+      if (node.scrollTop > naturalMaximumScrollTop) {
+        node.scrollTop = naturalMaximumScrollTop;
+        lastScrollTopRef.current = node.scrollTop;
+        lastScrollHeightRef.current = node.scrollHeight;
+      }
     }
     const geometricDistance = distanceFromBottom(node);
     const distance = tailCompensation > 0
@@ -592,6 +601,37 @@ export function useChatViewport(options: UseChatViewportOptions): UseChatViewpor
         naturalScrollHeight,
         clientHeight: node.clientHeight,
       });
+
+      // 无稳定 anchor（折叠节点本身就是用户视口锚点，如正在阅读的思考被
+      // 自动折叠）且需要尾部补偿时：补偿 = 视口底部悬空量，折叠后没有新
+      // 内容增长来消费它，只会撑出用户滚不到底的尾部空白（视觉底部 = 自然
+      // 最大滚动 + 补偿，canRelease 只认自然范围时永不释放）——直接贴自然
+      // 底。有稳定 anchor 的补偿保留，由 canRelease 在用户滚到视觉底部时
+      // 释放。
+      if (plan.tailCompensation > 0.01 && currentAnchorViewportTop === undefined) {
+        clearDetachedViewportCompensation();
+        ignoreScrollUntilRef.current = Date.now() + 240;
+        noteStartupScrollTopWrite();
+        node.scrollTop = Math.max(0, naturalScrollHeight - node.clientHeight);
+        clearResizeAnchor();
+        cancelPendingAnchorCapture();
+        scheduleAnchorCapture();
+        updateShowScrollToBottom(false);
+        window.api?.writeDiag?.({
+          message: "[useChatViewport] processCollapseViewportNoAnchor",
+          data: {
+            transactionId: detail.transactionId,
+            eventId: detail.eventId,
+            agentTurnId: detail.agentTurnId,
+            roomAgentId: detail.roomAgentId,
+            previousScrollTop: snapshot.scrollTop,
+            nextScrollTop: node.scrollTop,
+            naturalScrollHeight,
+            plannedTailCompensation: plan.tailCompensation,
+          },
+        }).catch(logError("writeDiag"));
+        return;
+      }
 
       setDetachedTailCompensation(plan.tailCompensation, plan.minimumScrollHeight);
       const compensatedScrollHeight = node.scrollHeight;

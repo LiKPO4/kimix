@@ -96,5 +96,14 @@ export function canReleaseViewportTailCompensation({
 }) {
   if (tailCompensation <= 0) return false;
   const naturalMaximumScrollTop = Math.max(0, naturalScrollHeight - clientHeight);
-  return scrollTop <= naturalMaximumScrollTop + 0.01;
+  // 用户滚到自然内容底部（补偿空间内）→ 释放。
+  if (scrollTop <= naturalMaximumScrollTop + 0.01) return true;
+  // 用户滚到补偿撑出的滚动容器视觉底部 → 释放并贴自然底。旧实现只认自然
+  // 范围：用户滚到视觉底部时 scrollTop = 自然最大 + 补偿 > 自然最大，补偿
+  // 永不释放，尾部空白残留且滚不掉（完成后自动折叠的典型残留路径）。
+  const compensatedMaximumScrollTop = Math.max(
+    0,
+    naturalScrollHeight + tailCompensation - clientHeight,
+  );
+  return scrollTop >= compensatedMaximumScrollTop - 0.01;
 }

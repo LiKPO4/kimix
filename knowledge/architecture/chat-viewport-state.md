@@ -99,7 +99,13 @@ changes that may need detached-anchor recovery.
 `contentVersion` participates in synchronous detached-anchor recovery but never
 creates another tail-follow loop. Process-collapse transactions may temporarily
 add exact tail compensation when content shrink would otherwise clamp the saved
-anchor beyond the new scroll range.
+anchor beyond the new scroll range. Two release guarantees keep that temporary
+space from becoming permanent tail blanks: compensation is only retained while
+a stable rendered anchor survives the collapse (no-anchor collapses pin to the
+natural bottom instead), and `canReleaseViewportTailCompensation` also releases
+when the user scrolls to the compensated visual bottom, not only when they
+return inside the natural range — otherwise the visual bottom itself is the
+blank and the space can never be scrolled away.
 
 ## Render item identity
 

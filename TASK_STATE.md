@@ -1,4 +1,14 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：输出完成后尾部大段空白（尾部补偿两条残留路径）（v2.20.238）
+
+- 现场：用户截图——一轮输出完成后最后一条消息下方约 40% 视口空白，滚到视觉底部也消不掉；用户判断是展开的长内容完成时折叠、内容变矮但尾部空间未收回。
+- 根因（代码级，两条路径）：
+  - A 释放条件过严：`canReleaseViewportTailCompensation`（chatViewportTransaction.ts:86）只认 `scrollTop <= 自然最大滚动`；补偿把视觉底部推到「自然底+补偿」，用户滚到视觉底部时永不满足 → 补偿永不释放。集成测试实证滚到视觉底部补偿仍为 300px。
+  - B 无 anchor 折叠仍设补偿：`useChatViewport.ts:602` after 分支在 `selectStableAnchor` 返回 null（折叠节点本身就是视口锚点，如正在阅读的思考被自动折叠）时 fallback 设补偿 = 视口底部悬空量；折叠后无内容增长消费它 → 空白永久残留（即截图场景）。
+- 修复：A——canRelease 增加「滚到补偿撑出的视觉底部即释放」；释放时 handleScroll 显式把 scrollTop 收敛到自然底（不依赖浏览器 clamp 时机）。B——无 anchor 且需补偿时不再设补偿，直接贴自然底（`processCollapseViewportNoAnchor` 诊断）；有 anchor 的补偿保留（阅读位置保护语义不变），由 A 在用户滚到视觉底部时释放。
+- 验收：新增 useChatViewport.processCollapse 测试 4 例（含对旧实现证伪 2 例）；canRelease 用例更新（补偿空间内不释放/视觉底部释放）；定向 38 例、全量 1628 例、typecheck、knowledge:validate 通过。实机待用户验收：完成后无空白、detached 阅读位置不跳。
+- 关键文件：`src/utils/chatViewportTransaction.ts`、`src/hooks/useChatViewport.ts`、`knowledge/architecture/chat-viewport-state.md`。
+
 ## 2026-08-06 性能：流式思考卡顿——draft 订阅下沉叶子组件（v2.20.237）
 
 - 现场：流式输出卡顿。根因（代码级）：每个 delta 触发整个活动气泡全量重渲染——`AssistantMessageBubble` 顶层 `useActiveTurnDraft` 订阅 → `buildThinkingBlocks` 全量切块 O(n) + `liveThinkingBlocks` 新数组击穿 `AssistantProcessBlock` memo → `mergeLiveDraftBlocks` 全量重跑 + `buildAssistantFullCopyText` 每帧重建 + 视口整段 reflow。
