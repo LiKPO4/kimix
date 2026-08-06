@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：思考工具链展开带动子内容一并展开（v2.20.240）
+
+- 现场：用户截图——点击展开「思考工具链」摘要行后，链条内部 running 状态的子代理任务卡（「任务 · 集成 C+D 选中主体算法」）一并展开，委托 prompt 全文直接铺开。展开父级应只露出链条条目列表，子内容展开与否由子项自身交互决定。
+- 根因（全链路排查后仅 2 条跟随路径，均在子卡首次挂载时以运行态作初始展开值）：`KimiWebTaskCard` 原 `useState(isRunning)`；`KimiWebSubagentGroupCard` 原 `useState(activeCount > 0)`。其余可折叠子项（思考条目/工具行/工具组/审批/提问/subagent detail/showAll）均各自默认折叠，无跟随。
+- 修复：两处初始值统一改 `useState(false)`。合法联动保留：父摘要自身默认展开规则（B3/expandByDefault/collapseWhileRunning）、live 流式块、settle 折叠、processManualExpand 手动恢复。
+- 验收：新增 MessageBubble 测试 4 例（临时恢复旧实现实测 3 例证伪失败）；定向 8 例、全量 1634 例、typecheck、knowledge:validate 通过。实机待用户验收。
+- 已知边界：子卡手动展开态不跨父级折叠/重展开持久化（父折叠子卡卸载回默认）——所有子卡既有行为，未扩大范围。
+- 关键文件：`src/components/chat/MessageBubble.tsx`、`knowledge/architecture/streaming-render-pipeline.md`。
+
 ## 2026-08-06 修复：teaser 覆盖全文的思考块不再可展开（v2.20.239）
 
 - 现场：用户截图——kimi-web 模式过程时间线里，单段无换行的长思考触发折叠（长度 > 200 字符），teaser 取「最后一个非空行」= 全文，折叠态与展开态内容完全相同，却仍可点击，展开后同一段文字再显示一遍（红框内同文本出现两次）。

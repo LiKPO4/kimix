@@ -40,7 +40,13 @@ replays carry the dispatch but never the subagent event — this keeps the
 task card (with prompt) intact across restore/reload. At render time a single-dispatch subagent
 group becomes an official-style 任务 card (KimiWebTaskCard: 任务 + agent type +
 status header, expanded full delegation prompt, internal activity, result
-summary); multi-dispatch groups keep the Swarm progress card. groupTurnBlocks
+summary — the card body renders only when the user expands that entry); multi-dispatch
+groups keep the Swarm progress card. Expansion is strictly per level: the
+parent 思考工具链 summary only reveals the entry list, and every inner
+collapsible card (task card, Swarm card, tool group, approval group, question
+card, subagent row, thinking teaser) starts collapsed on mount regardless of
+running/active status — inner expansion is the user's own per-entry decision,
+never inherited from the parent's expanded state. groupTurnBlocks
 lives in src/utils/turnBlocks.ts and keeps each dispatching Agent tool call
 index-aligned in subagent groups so the task card can show the full prompt. Subagent-internal assistant content is **never** promoted into the
 main timeline body: `createSubagentOnlyAssistantEvent` is gone, and a tool- or

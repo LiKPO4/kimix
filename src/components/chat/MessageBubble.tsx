@@ -2003,10 +2003,13 @@ function KimiWebSubagentRow({ subagent, isLast }: { subagent: SubagentEvent; isL
  * delegated — the core information of the official card), the sub-agent's
  * internal activity, and the result summary once completed. Multi-dispatch
  * runs keep the Swarm group card instead.
+ * The card starts collapsed: expanding the parent 思考工具链 summary only
+ * reveals the entry list, so a running task card must not auto-expand on
+ * mount — the user decides per entry.
  */
-function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; tool?: ToolEvent }) {
+export function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; tool?: ToolEvent }) {
   const isRunning = subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended";
-  const [expanded, setExpanded] = useState(isRunning);
+  const [expanded, setExpanded] = useState(false);
   const taskName = subagent.description?.trim() || subagent.agentName || "子任务";
   const prompt = typeof tool?.arguments?.prompt === "string" ? tool.arguments.prompt.trim() : "";
   const statusText = subagent.status === "queued"
@@ -2067,7 +2070,7 @@ function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; tool?: T
   );
 }
 
-function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] }) {
+export function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] }) {
   const activeCount = subagents.filter((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended").length;
   const completedCount = subagents.filter((subagent) => subagent.status === "completed").length;
   const failedCount = subagents.filter((subagent) => subagent.status === "error").length;
@@ -2075,7 +2078,7 @@ function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] })
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const descriptions = Array.from(new Set(subagents.map((subagent) => subagent.description?.trim()).filter(Boolean)));
   const title = descriptions.length === 1 ? descriptions[0] : `${totalCount} 个并行任务`;
-  const [expanded, setExpanded] = useState(activeCount > 0);
+  const [expanded, setExpanded] = useState(false);
   return (
     <div className="kimix-soft-card overflow-hidden rounded-lg">
       <button
@@ -2282,7 +2285,7 @@ function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: b
   }
 }
 
-function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
+export function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupProcessItems(items), [items]);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>

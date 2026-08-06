@@ -3,11 +3,14 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SubagentEvent, TimelineEvent } from "@/types/ui";
+import type { SubagentEvent, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import {
   KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX,
   KimiWebIntermediateTextBlock,
+  KimiWebProcessList,
   KimiWebSubagentDetails,
+  KimiWebSubagentGroupCard,
+  KimiWebTaskCard,
 } from "../MessageBubble";
 
 function makeSubagent(detailCount: number): SubagentEvent {
@@ -159,3 +162,134 @@ describe("MessageBubble Kimi Web rendering", () => {
     expect(container.querySelectorAll("button")).toHaveLength(0);
   });
 });
+
+describe("MessageBubble kimi-web cards stay collapsed unless the user expands them", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+  });
+
+  function runningTaskFixture() {
+    const subagent: SubagentEvent = {
+      id: "subagent-1",
+      type: "subagent",
+      timestamp: 1,
+      agentName: "explore",
+      description: "集成 C+D 选中主体算法",
+      status: "running",
+      events: [
+        {
+          id: "assistant-1",
+          type: "assistant_message",
+          timestamp: 2,
+          content: "第 1 条子事件详情",
+          isThinking: false,
+          isComplete: true,
+        },
+      ],
+    };
+    const tool: ToolCallEvent = {
+      id: "tool-1",
+      type: "tool_call",
+      timestamp: 1,
+      toolCallId: "call-1",
+      toolName: "Agent",
+      status: "running",
+      arguments: { prompt: "完整委托 prompt：把选中主体算法集成到 C+D 模块" },
+      agentTurnId: "turn-1",
+    };
+    return { subagent, tool };
+  }
+
+  it("keeps a running task card collapsed on mount, expanding only on user click (falsifies old auto-expand)", async () => {
+    const { subagent, tool } = runningTaskFixture();
+    await act(async () => {
+      root.render(createElement(KimiWebTaskCard, { subagent, tool }));
+    });
+
+    // 旧实现 useState(isRunning)：running 子代理挂载即展开，prompt 全文直接铺开。
+    expect(container.textContent).not.toContain("完整委托 prompt");
+    const header = container.querySelector("button");
+    expect(header).not.toBeNull();
+    act(() => header!.click());
+    expect(container.textContent).toContain("完整委托 prompt");
+  });
+
+  it("keeps a completed task card collapsed (result summary only after user click)", async () => {
+    const { subagent, tool } = runningTaskFixture();
+    await act(async () => {
+      root.render(createElement(KimiWebTaskCard, {
+        subagent: { ...subagent, status: "completed", resultSummary: "C+D 集成总结：全部通过" },
+        tool,
+      }));
+    });
+
+    expect(container.textContent).not.toContain("C+D 集成总结：全部通过");
+    act(() => container.querySelector("button")!.click());
+    expect(container.textContent).toContain("C+D 集成总结：全部通过");
+  });
+
+  it("keeps a Swarm group card collapsed while subagents are active (falsifies old auto-expand)", async () => {
+    const running = (id: string, agentName: string): SubagentEvent => ({
+      id,
+      type: "subagent",
+      timestamp: 1,
+      agentName,
+      status: "running",
+      events: [],
+    });
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentGroupCard, {
+        subagents: [running("s1", "explore"), running("s2", "coder")],
+      }));
+    });
+
+    // 旧实现 useState(activeCount > 0)：挂载即展开整张子代理行列表。
+    expect(container.textContent).not.toContain("explore");
+    act(() => container.querySelector("button")!.click());
+    expect(container.textContent).toContain("explore");
+    expect(container.textContent).toContain("coder");
+  });
+
+  it("expanding the parent process list only reveals entries: inner subagent/tool cards stay collapsed", async () => {
+    const { subagent, tool } = runningTaskFixture();
+    const runningTool: ToolCallEvent = {
+      ...tool,
+      id: "tool-2",
+      toolCallId: "call-2",
+      toolName: "Bash",
+      // 不带 prompt 参数：工具行折叠态的 header 会显示参数预览（displayTarget），
+      // 用 result 文本断言工具行折叠才可靠。
+      arguments: { command: "npm test" },
+      result: "工具输出内容：npm test 全部通过",
+    };
+    await act(async () => {
+      root.render(createElement(KimiWebProcessList, {
+        items: [
+          { type: "subagent", subagent },
+          { type: "tool", tool: runningTool },
+        ],
+        isActiveAssistant: true,
+        hasFinalContent: false,
+      }));
+    });
+
+    expect(container.textContent).not.toContain("第 1 条子事件详情");
+    expect(container.textContent).not.toContain("工具输出内容：npm test 全部通过");
+    // 父级展开只露出条目列表；对任务卡自己的操作才展开其详情。
+    act(() => container.querySelector("button")!.click());
+    expect(container.textContent).toContain("第 1 条子事件详情");
+  });
+});
+
