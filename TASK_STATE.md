@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：子代理 turn.ended(failed) 误驱动主会话状态（假「输出完成」闪屏）（v2.20.234）
+
+- 现场：用户报「显示输出完成+模型请求失败，但内容还在变」（v2.20.218 截图），要求确认当前版本是否仍存在。
+- 取证：diag.log 实机抓到现行——16:21:49 子代理 agent-37 的 `turn.ended{reason:failed}` + `prompt.completed` 到达主会话频道，40ms 内主轮 display 从 thinking → settled_complete → running。失败帧合成路径（deliverFailedPromptFrames / 快照门）自 v2.17.4 起只认主 Agent，不是本案通道。
+- 根因：`KimiCodeStatusSequencer.handle` 不看 agentId，子代理 turn.ended(failed) 直接 emit 会话级 error。SDK 主代理事件无 agentId 字段（wire 实测 0 次），守卫不误伤。
+- 修复：sequencer 顶部跳过 agentId 存在且非 "main" 的事件。知识库不变量 82 扩展（会话状态迁移同样只认主 Agent）。
+- 验收：新增 3 例（子代理 failed/cancelled/started 不发状态——旧实现会 emit error，证伪成立；主代理 failed 仍发 error）；定向 8 例通过；全量/typecheck/build 见提交前记录。实机待用户验收：Swarm 子代理失败时主轮不再闪「输出完成/报错」。
+- 关键文件：`electron/kimiCodeStatusSequencer.ts`、`knowledge/architecture/runtime-routing.md`。
+
 ## 2026-08-06 修复：body-only 等价认证冻结思考虚高缓存（认证防线 + 缓存升版）（v2.20.232）
 
 - 现场：旧会话 06b4c056 的 repair 循环 13:03 后消失，非收敛——被拒后残片补丁补齐正文，`hasEquivalentKimiHistoryTurnBodies` 只比正文判等价 → 打 cache-current → 永久移出 repair 候选，损伤固化。

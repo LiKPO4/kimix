@@ -89,3 +89,38 @@ describe("KimiCodeStatusSequencer", () => {
     expect(emitted).toEqual(["server:running"]);
   });
 });
+
+
+describe("subagent-scoped frames never drive session status", () => {
+  it("ignores a subagent turn.ended(failed) instead of emitting error for the main session", () => {
+    const emitted: string[] = [];
+    const sequencer = new KimiCodeStatusSequencer((sessionId, status) => {
+      emitted.push(`${sessionId}:${status}`);
+    });
+
+    sequencer.handle("sess", { type: "turn.ended", reason: "failed", agentId: "agent-37" }, "prompt");
+    expect(emitted).toEqual([]);
+  });
+
+  it("ignores subagent turn.ended(cancelled) and turn.started", () => {
+    const emitted: string[] = [];
+    const sequencer = new KimiCodeStatusSequencer((sessionId, status) => {
+      emitted.push(`${sessionId}:${status}`);
+    });
+
+    sequencer.handle("sess", { type: "turn.started", agentId: "agent-37" }, "prompt");
+    sequencer.handle("sess", { type: "turn.ended", reason: "cancelled", agentId: "agent-37" }, "prompt");
+    expect(emitted).toEqual([]);
+  });
+
+  it("still emits error for main-agent failures (absent or explicit main agentId)", () => {
+    const emitted: string[] = [];
+    const sequencer = new KimiCodeStatusSequencer((sessionId, status) => {
+      emitted.push(`${sessionId}:${status}`);
+    });
+
+    sequencer.handle("sess", { type: "turn.ended", reason: "failed" }, "prompt");
+    sequencer.handle("sess", { type: "turn.ended", reason: "failed", agentId: "main" }, "prompt");
+    expect(emitted).toEqual(["sess:error", "sess:error"]);
+  });
+});

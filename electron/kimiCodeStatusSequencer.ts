@@ -33,6 +33,13 @@ export class KimiCodeStatusSequencer {
     const record = eventRecord(event);
     const type = record?.type;
 
+    // 会话状态只属于主 Agent。Swarm/Agent 子代理的帧携带自己的 agentId
+    // （Server 0.29+ 实测；SDK 主代理事件无 agentId 字段），子代理的
+    // turn.ended(failed/cancelled) 不得把仍在运行的主轮置成 error/interrupted
+    // ——实机：子代理失败帧让主轮闪「输出完成」约 40ms 才被后续 delta 救回。
+    const agentId = record?.agentId;
+    if (typeof agentId === "string" && agentId && agentId !== "main") return;
+
     if (type === "turn.started") {
       this.clear(sessionId);
       this.emit(sessionId, "running");
