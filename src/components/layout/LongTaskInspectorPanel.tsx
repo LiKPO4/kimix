@@ -50,6 +50,7 @@ import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { thinkingEffortLabel } from "@/utils/thinkingEffort";
+import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
 
@@ -2636,42 +2637,3 @@ function isBackgroundTaskTerminal(status: string) {
   return ["completed", "failed", "killed", "lost"].includes(status);
 }
 
-function backgroundTaskTone(task: LongTaskBackgroundTaskView) {
-  if (task.status === "completed") return "success";
-  if (["failed", "killed", "lost"].includes(task.status)) return "danger";
-  if (task.status === "awaiting_approval") return "warning";
-  return "primary";
-}
-
-function backgroundTaskKindLabel(task: LongTaskBackgroundTaskView) {
-  if (task.subagentType === "subagent") return "subagent";
-  if (task.subagentType?.trim()) return task.subagentType;
-  // SDK 兼容链路可能不带 kind 字段，兜底按普通后台任务展示
-  return "后台任务";
-}
-
-function backgroundTaskDurationLabel(task: LongTaskBackgroundTaskView) {
-  if (!task.startedAt) return null;
-  const end = task.endedAt ?? Date.now();
-  const seconds = Math.max(0, Math.round((end - task.startedAt) / 1000));
-  return `${seconds} s`;
-}
-
-function backgroundTaskSummary(task: LongTaskBackgroundTaskView) {
-  if (task.failureReason) return task.failureReason;
-  if (task.stopReason) return task.stopReason;
-  if (task.timedOut) return "任务执行超时";
-  if (task.exitCode !== null && task.exitCode !== 0) return `进程退出码 ${task.exitCode}`;
-  if (task.status === "lost") return "SDK 认为任务状态已失联，可查看输出后决定是否继续。";
-  if (task.status === "killed") return "任务已被停止。";
-  if (task.status === "completed") return "后台任务已正常结束。";
-  if (typeof task.outputBytes === "number" && task.outputBytes > 0) return `后台任务正在运行，已有约 ${formatTaskOutputBytes(task.outputBytes)} 输出可查看。`;
-  return task.description || task.command || "后台任务正在运行。";
-}
-
-function formatTaskOutputBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}

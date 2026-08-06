@@ -4,10 +4,11 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection, UserMessageImage } from "@/types/ui";
-import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { KimiCodeBackgroundTaskInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
-import { TodoPanel, getVisibleTodos } from "./TodoPanel";
+import { getVisibleTodos } from "./TodoPanel";
+import { ComposerDockBar } from "./ComposerDockBar";
 import { ContextRing } from "./ContextRing";
 import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
@@ -482,7 +483,12 @@ function getActiveCompletion(value: string): { mode: CompletionMode; query: stri
   };
 }
 
-export function Composer() {
+type ComposerProps = {
+  bashTasks?: KimiCodeBackgroundTaskInfo[];
+  subagentTasks?: KimiCodeBackgroundTaskInfo[];
+};
+
+export function Composer({ bashTasks = [], subagentTasks = [] }: ComposerProps = {}) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
@@ -4273,6 +4279,114 @@ export function Composer() {
     window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `${label}已收起，可在右侧会话侧栏恢复。` }));
   };
 
+  const queueListBody = (
+    <>
+      {pendingMessages.map((msg, index) => (
+        <div
+          key={msg.id}
+          draggable
+          onDragStart={(event) => {
+            setDraggingPendingId(msg.id);
+            setIsDragging(false);
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", msg.id);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const dragId = draggingPendingId || event.dataTransfer.getData("text/plain");
+            if (dragId && dragId !== msg.id) reorderPendingMessage(dragId, msg.id);
+          }}
+          onDragEnd={() => setDraggingPendingId(null)}
+          className={`group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[var(--kimix-panel-divider)] last:border-b-0 hover:bg-[var(--kimix-panel-soft-bg)] ${
+            draggingPendingId === msg.id ? "bg-[var(--kimix-panel-hover)] opacity-70" : ""
+          }`}
+          style={{ paddingLeft: 18, paddingRight: 18 }}
+        >
+          <div className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] active:cursor-grabbing">
+            <GripVertical size={15} />
+          </div>
+          <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">
+            {msg.content || "[图片]"}
+            {(msg.images?.length ?? 0) > 0 && (
+              <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · {msg.images?.length} 个附件</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
+            {canSteerActiveTurn ? (
+              <button onClick={() => void handleSteerPending(msg.id)} className="kimix-icon-text-button is-compact text-[13px] text-accent-blue hover:bg-accent-blue/10" title="立即引导：把这条消息插入运行中的对话（官方 Ctrl+S steer），让 agent 尽快处理">
+                <Zap size={13} />
+                <span>引导</span>
+              </button>
+            ) : hasActiveAssistantTurn ? (
+              <span className="shrink-0 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
+                等待
+              </span>
+            ) : (
+              <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title="发送这条队列消息">
+                <Send size={13} />
+                <span>发送</span>
+              </button>
+            )}
+            <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
+              <Edit2 size={13} />
+            </button>
+            <button onClick={() => removePendingMessage(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg text-accent-red" title="删除" aria-label="删除">
+              <Trash2 size={13} />
+            </button>
+            <div className="relative" ref={(el) => { pendingMoreRefs.current[msg.id] = el; }}>
+              <button
+                type="button"
+                onClick={() => setPendingMoreId((prev) => (prev === msg.id ? null : msg.id))}
+                className={`kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${pendingMoreId === msg.id ? "bg-[var(--kimix-panel-hover)]" : ""}`}
+                title="更多"
+                aria-label="更多"
+                aria-haspopup="menu"
+                aria-expanded={pendingMoreId === msg.id}
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {pendingMoreId === msg.id && (
+                <div className="kimix-menu-panel absolute right-0 top-full z-10 mt-1 flex min-w-[120px] flex-col" style={{ padding: 5 }} role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={index === 0}
+                    onClick={() => { promotePendingMessage(msg.id); setPendingMoreId(null); }}
+                    className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                    style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                  >
+                    移到最前
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={index === 0}
+                    onClick={() => { movePendingMessage(msg.id, "up"); setPendingMoreId(null); }}
+                    className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                    style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                  >
+                    上移
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={index === pendingMessages.length - 1}
+                    onClick={() => { movePendingMessage(msg.id, "down"); setPendingMoreId(null); }}
+                    className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
+                    style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                  >
+                    下移
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+
   return (
     <div
       className="relative flex w-full flex-col"
@@ -4291,138 +4405,15 @@ export function Composer() {
         aria-hidden="true"
         onChange={handleMediaFileSelection}
       />
-      {activeSession && visibleTodos.length > 0 && !todoHidden && (
-        <TodoPanel
-          events={activeSession.events}
-          onDismiss={() => hideComposerCard("todo", "TodoList")}
-        />
-      )}
-
-      {pendingMessages.length > 0 && !pendingHidden && (
-        <div
-          className="kimix-floating-panel overflow-hidden text-[13px]"
-          style={{ marginBottom: 8 }}
-        >
-          <div className="flex h-11 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[14.5px] text-[var(--kimix-panel-text-secondary)]" style={{ gap: 12, paddingLeft: 20, paddingRight: 14 }}>
-            <span className="min-w-0 truncate">{pendingMessages.length} 条消息正在排队</span>
-            {hasActiveAssistantTurn && <span className="shrink-0 text-[var(--kimix-panel-text-muted)]">当前任务结束后继续</span>}
-            <button
-              type="button"
-              onClick={() => hideComposerCard("pending", "排队消息")}
-              className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-              title="收起到侧栏"
-              aria-label="收起排队消息"
-            >
-              <X size={13} />
-            </button>
-          </div>
-          <div className="max-h-40 overflow-y-auto">
-            {pendingMessages.map((msg, index) => (
-              <div
-                key={msg.id}
-                draggable
-                onDragStart={(event) => {
-                  setDraggingPendingId(msg.id);
-                  setIsDragging(false);
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", msg.id);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  const dragId = draggingPendingId || event.dataTransfer.getData("text/plain");
-                  if (dragId && dragId !== msg.id) reorderPendingMessage(dragId, msg.id);
-                }}
-                onDragEnd={() => setDraggingPendingId(null)}
-                className={`group flex min-h-[42px] min-w-0 items-center gap-2 border-b border-[var(--kimix-panel-divider)] last:border-b-0 hover:bg-[var(--kimix-panel-soft-bg)] ${
-                  draggingPendingId === msg.id ? "bg-[var(--kimix-panel-hover)] opacity-70" : ""
-                }`}
-                style={{ paddingLeft: 18, paddingRight: 18 }}
-              >
-                <div className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[var(--kimix-panel-text-muted)] active:cursor-grabbing">
-                  <GripVertical size={15} />
-                </div>
-                <div className="min-w-0 flex-1 truncate text-[14px] leading-5 text-[var(--kimix-panel-text)]">
-                  {msg.content || "[图片]"}
-                  {(msg.images?.length ?? 0) > 0 && (
-                    <span className="text-[12.5px] text-[var(--kimix-panel-text-muted)]"> · {msg.images?.length} 个附件</span>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1 text-[var(--kimix-panel-text-muted)]">
-                  {canSteerActiveTurn ? (
-                    <button onClick={() => void handleSteerPending(msg.id)} className="kimix-icon-text-button is-compact text-[13px] text-accent-blue hover:bg-accent-blue/10" title="立即引导：把这条消息插入运行中的对话（官方 Ctrl+S steer），让 agent 尽快处理">
-                      <Zap size={13} />
-                      <span>引导</span>
-                    </button>
-                  ) : hasActiveAssistantTurn ? (
-                    <span className="shrink-0 text-[13px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
-                      等待
-                    </span>
-                  ) : (
-                    <button onClick={() => handleSendPendingNow(msg.id)} className="kimix-icon-text-button kimix-muted-action is-compact text-[13px]" title="发送这条队列消息">
-                      <Send size={13} />
-                      <span>发送</span>
-                    </button>
-                  )}
-                  <button onClick={() => handleEditPending(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors" title="撤回到输入框修改" aria-label="撤回到输入框修改">
-                    <Edit2 size={13} />
-                  </button>
-                  <button onClick={() => removePendingMessage(msg.id)} className="kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg text-accent-red" title="删除" aria-label="删除">
-                    <Trash2 size={13} />
-                  </button>
-                  <div className="relative" ref={(el) => { pendingMoreRefs.current[msg.id] = el; }}>
-                    <button
-                      type="button"
-                      onClick={() => setPendingMoreId((prev) => (prev === msg.id ? null : msg.id))}
-                      className={`kimix-muted-action flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${pendingMoreId === msg.id ? "bg-[var(--kimix-panel-hover)]" : ""}`}
-                      title="更多"
-                      aria-label="更多"
-                      aria-haspopup="menu"
-                      aria-expanded={pendingMoreId === msg.id}
-                    >
-                      <MoreHorizontal size={14} />
-                    </button>
-                    {pendingMoreId === msg.id && (
-                      <div className="kimix-menu-panel absolute right-0 top-full z-10 mt-1 flex min-w-[120px] flex-col" style={{ padding: 5 }} role="menu">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={index === 0}
-                          onClick={() => { promotePendingMessage(msg.id); setPendingMoreId(null); }}
-                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
-                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
-                        >
-                          移到最前
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={index === 0}
-                          onClick={() => { movePendingMessage(msg.id, "up"); setPendingMoreId(null); }}
-                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
-                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
-                        >
-                          上移
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={index === pendingMessages.length - 1}
-                          onClick={() => { movePendingMessage(msg.id, "down"); setPendingMoreId(null); }}
-                          className="kimix-menu-item text-left text-[13px] disabled:text-[var(--kimix-panel-text-muted)] disabled:opacity-50"
-                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
-                        >
-                          下移
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <ComposerDockBar
+        bashTasks={bashTasks}
+        subagentTasks={subagentTasks}
+        todoItems={todoHidden ? [] : visibleTodos}
+        queueCount={pendingHidden ? 0 : pendingMessages.length}
+        queueBody={queueListBody}
+        onHideTodo={() => hideComposerCard("todo", "TodoList")}
+        onHideQueue={() => hideComposerCard("pending", "排队消息")}
+      />
 
 
 

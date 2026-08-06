@@ -2032,7 +2032,11 @@ ${isFinalStep
               </div>
               <div className="kimix-app-shell-footer kimix-content-x shrink-0" style={{ paddingTop: 10, paddingBottom: 10 }}>
                 <div className="kimix-chat-column">
-                  <Composer key={currentSession?.id ?? `project:${currentProject?.id ?? "none"}`} />
+                  <Composer
+                    key={currentSession?.id ?? `project:${currentProject?.id ?? "none"}`}
+                    bashTasks={bashTasks}
+                    subagentTasks={subagentTasks}
+                  />
                   <div style={{ marginTop: 10 }}>
                     <ContextBar onOpenGitGraph={openGitGraphFromContextBar} />
                   </div>

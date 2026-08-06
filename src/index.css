@@ -1810,6 +1810,9 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
+  /* 底部 24px 渐隐：消息滚动到输入区上方时淡出，而不是被实心边硬切。 */
+  mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
 }
 
 .kimix-chat-scroll-area::-webkit-scrollbar-thumb {
@@ -4683,6 +4686,60 @@ button.bg-accent-primary:disabled:hover,
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
   border-radius: var(--ui-radius-xl, 12px);
+}
+
+/* ── Dock Capsule（输入区胶囊行，对齐官方 kimi-web dock work chips） ── */
+
+.kimix-dock-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
+  color: var(--kimix-panel-text-secondary);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.kimix-dock-capsule:hover {
+  background: var(--surface-hover);
+  color: var(--kimix-panel-text);
+}
+
+.kimix-dock-capsule[aria-expanded="true"] {
+  background: var(--accent-primary-light);
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  color: var(--accent-primary);
+}
+
+.kimix-dock-capsule .kimix-dock-capsule-count {
+  font-weight: 600;
+  color: var(--kimix-panel-text);
+}
+
+.kimix-dock-capsule[aria-expanded="true"] .kimix-dock-capsule-count {
+  color: var(--accent-primary);
+}
+
+/* ── Dock Panel（胶囊展开面板）：半透明 + 背景模糊，背后滚动内容隐约可见 ── */
+
+.kimix-dock-panel {
+  border: var(--ui-popup-border);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  color: var(--text-primary);
+  box-shadow: var(--ui-popup-shadow);
+  backdrop-filter: blur(14px);
+  border-radius: var(--radius-lg);
+}
+
+[data-ui-style="retro"] .kimix-dock-panel {
+  background: var(--surface-elevated);
+  backdrop-filter: none;
 }
 
 /* 带业务语义色的对话事件卡只共享形状和质感，不接管其背景与边框色。 */

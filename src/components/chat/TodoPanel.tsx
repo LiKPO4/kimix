@@ -1,11 +1,5 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardList, Loader2, X } from "lucide-react";
+import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import type { TimelineEvent, TodoItem } from "@/types/ui";
-
-interface TodoPanelProps {
-  events: TimelineEvent[];
-  onDismiss?: () => void;
-}
 
 function isTodoStatus(value: unknown): value is TodoItem["status"] {
   return value === "pending" || value === "in_progress" || value === "done";
@@ -85,66 +79,35 @@ export function getVisibleTodos(events: TimelineEvent[]): TodoItem[] {
   return items.some((item) => item.status !== "done") ? items : [];
 }
 
-export function TodoPanel({ events, onDismiss }: TodoPanelProps) {
-  const [collapsed, setCollapsed] = useState(true);
-  const items = useMemo(() => getVisibleTodos(events), [events]);
-  if (items.length === 0) return null;
+export function todoCounts(items: TodoItem[]) {
+  return {
+    doneCount: items.filter((item) => item.status === "done").length,
+    activeCount: items.filter((item) => item.status === "in_progress").length,
+  };
+}
 
-  const doneCount = items.filter((item) => item.status === "done").length;
-  const activeCount = items.filter((item) => item.status === "in_progress").length;
-
+/** 待办列表体：输入区 dock 胶囊展开面板复用（原 TodoPanel 卡片外壳已并入 ComposerDockBar）。 */
+export function TodoListItems({ items }: { items: TodoItem[] }) {
   return (
-    <div
-      className="kimix-section-card overflow-hidden text-[14.5px] shadow-hover-token"
-      style={{ marginBottom: 14 }}
-    >
-      <div className={`flex h-11 items-center border-border-subtle text-text-secondary ${collapsed ? "" : "border-b"}`} style={{ paddingLeft: 24, paddingRight: 12 }}>
-        <button
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          className="no-focus-outline flex h-full min-w-0 flex-1 items-center text-left transition-colors hover:text-text-primary focus:outline-none focus-visible:outline-none"
-          style={{ gap: 11, paddingRight: 10 }}
+    <div className="flex flex-col" style={{ gap: 2 }}>
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="flex min-h-[38px] min-w-0 items-center text-[14px] leading-6 text-text-primary"
+          style={{ gap: 12, paddingLeft: 14, paddingRight: 14 }}
         >
-          {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronDown size={17} className="shrink-0" />}
-          <ClipboardList size={17} className="shrink-0 text-text-muted" />
-          <span className="min-w-0 flex-1 truncate">TodoList</span>
-          {activeCount > 0 && <span className="shrink-0 text-text-muted">{activeCount} 项进行中</span>}
-          <span className="shrink-0 text-text-muted">{doneCount}/{items.length}</span>
-        </button>
-        {onDismiss && (
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-            title="收起到侧栏"
-            aria-label="收起 TodoList"
-          >
-            <X size={13} />
-          </button>
-        )}
-      </div>
-      {!collapsed && (
-        <div className="max-h-44 overflow-y-auto">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex min-h-[42px] min-w-0 items-center border-b border-border-subtle text-[14.5px] leading-6 text-text-primary last:border-b-0"
-              style={{ gap: 12, paddingLeft: 26, paddingRight: 26 }}
-            >
-              {item.status === "done" ? (
-                <CheckCircle2 size={17} className="shrink-0 text-accent-success" />
-              ) : item.status === "in_progress" ? (
-                <Loader2 size={17} className="shrink-0 animate-spin text-accent-warning" />
-              ) : (
-                <Circle size={17} className="shrink-0 text-text-muted" />
-              )}
-              <span className={`min-w-0 flex-1 truncate ${item.status === "done" ? "text-text-muted line-through" : ""}`}>
-                {item.content}
-              </span>
-            </div>
-          ))}
+          {item.status === "done" ? (
+            <CheckCircle2 size={16} className="shrink-0 text-accent-success" />
+          ) : item.status === "in_progress" ? (
+            <Loader2 size={16} className="shrink-0 animate-spin text-accent-warning" />
+          ) : (
+            <Circle size={16} className="shrink-0 text-text-muted" />
+          )}
+          <span className={`min-w-0 flex-1 truncate ${item.status === "done" ? "text-text-muted line-through" : ""}`}>
+            {item.content}
+          </span>
         </div>
-      )}
+      ))}
     </div>
   );
 }

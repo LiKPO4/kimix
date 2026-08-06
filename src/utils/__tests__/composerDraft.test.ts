@@ -93,6 +93,7 @@ describe("composerDraft", () => {
 
     expect(composer).toContain("const initialDraft = useRef(readComposerDraft(composerDraftKey)).current;");
     expect(composer).toContain("writeComposerDraft(composerDraftKey, {");
-    expect(appShell).toContain('<Composer key={currentSession?.id ?? `project:${currentProject?.id ?? "none"}`} />');
+    expect(appShell).toContain('key={currentSession?.id ?? `project:${currentProject?.id ?? "none"}`}');
+    expect(appShell).toContain("bashTasks={bashTasks}");
   });
 });

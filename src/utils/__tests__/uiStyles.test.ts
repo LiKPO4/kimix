@@ -256,7 +256,6 @@ describe("UI_STYLES", () => {
     const changeCard = readFileSync(resolve(process.cwd(), "src/components/chat/ChangeCard.tsx"), "utf8");
     const fileCard = readFileSync(resolve(process.cwd(), "src/components/chat/FileCard.tsx"), "utf8");
     const questionCard = readFileSync(resolve(process.cwd(), "src/components/chat/QuestionCard.tsx"), "utf8");
-    const todoPanel = readFileSync(resolve(process.cwd(), "src/components/chat/TodoPanel.tsx"), "utf8");
     const eventCardSources = [
       readFileSync(resolve(process.cwd(), "src/components/chat/ApprovalCard.tsx"), "utf8"),
       readFileSync(resolve(process.cwd(), "src/components/chat/ErrorCard.tsx"), "utf8"),
@@ -283,7 +282,7 @@ describe("UI_STYLES", () => {
     expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-event-card\s*\{[^}]*border(?:-color)?:/s);
     expect(longTaskInspector.match(/className="kimix-section-card"/g)).toHaveLength(18);
     expect(hooksPanel.match(/className="kimix-section-card(?:\s[^\"]*)?"/g)).toHaveLength(6);
-    for (const source of [changeCard, fileCard, todoPanel]) {
+    for (const source of [changeCard, fileCard]) {
       expect(source).toContain("kimix-section-card");
     }
     expect(questionCard).toContain("kimix-inset-section");

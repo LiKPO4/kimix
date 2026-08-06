@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+## 2026-08-06 重构：输入区 Dock 卡片改官方式胶囊行 + 遮挡优化（v2.20.249）
+
+- 现场（用户 v2.20.246 截图）：① Composer 上方 TodoList 卡与排队消息面板是不透明实心卡+重阴影，遮挡聊天内容；② 卡片太重量级，要求改成官方 kimi-code web 的胶囊行（后台 Bash (N)/子 Agent (N)/待办 (done/total)/队列 (N)，点击向上展开面板）。用户拍板：胶囊对齐官方四类；展开面板半透明+背景模糊（复古主题保持实色）。
+- 实现：
+  - 新增 `ComposerDockBar`：四胶囊按数据>0 显隐，单面板互斥、document mousedown capture 点外关闭、数据清空自动关闭；面板 `absolute bottom:100%` 向上展开、maxHeight min(360px,50vh)。
+  - `index.css`：新增 `.kimix-dock-capsule`（999px 圆角）/`.kimix-dock-panel`（color-mix 88% + blur(14px)，retro 覆盖实色无 blur）；`.kimix-chat-scroll-area` 加底部 24px 渐隐 mask，缓解 Composer 本体实心遮挡。
+  - `TodoPanel` 删除卡片外壳，拆出 `todoCounts`/`TodoListItems` 供 dock 面板复用；`backgroundTaskTone/KindLabel/DurationLabel/Summary` 从 LongTaskInspectorPanel 迁至 `utils/backgroundTasks.ts` 双向复用。
+  - `Composer` 新增可选 props `bashTasks/subagentTasks`（AppShell 由 splitBackgroundTasksByKind 传入）；排队消息列表面板迁入 dock「队列」胶囊，拖拽排序/引导/编辑/删除/更多菜单原样保留。
+- 验收：新增 ComposerDockBar 6 例（显隐/计数/展开互斥/点外关闭/清空自闭/收起回调）；uiStyles、composerDraft 两处源码契约断言同步更新；全量 1671 例、typecheck、knowledge:validate、build 通过。实机待用户截图验收。
+- 已知边界：队列「更多」菜单在面板 overflow 内可能被裁剪（与原 max-h-40 面板行为一致，未变差）；「当前任务结束后继续」头部提示随旧面板移除（每行已有 引导/等待/发送 状态）。知识库：无需更新（纯 UI 重构，无架构不变量变化）。
+- 关键文件：`src/components/chat/ComposerDockBar.tsx`、`src/components/chat/Composer.tsx`、`src/components/chat/TodoPanel.tsx`、`src/utils/backgroundTasks.ts`、`src/index.css`。
+
 ## 2026-08-06 修复：steer 切分后前段轮不 settle（双滚动区/同文重复）+ 头部等待标签（v2.20.248）
 
 - 现场（用户复验 v2.20.247 三截图，session_532ff5cb RemoveBlack steer「另外先把163构建出来放桌面上吧」）：① 同一段思考在上下两块重复出现；② steer 后屏幕上出现两个带滑块的 live 滚动区——上一区域输出已结束应折叠成总结；③ 消息/steer 发出后头部直接「k3-256k · 正在思考 35秒」，模型尚未产出任何内容，应为「等待模型输出」。
