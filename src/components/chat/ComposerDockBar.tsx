@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ClipboardList, ListOrdered, SquareTerminal, Users, X } from "lucide-react";
+import { ClipboardList, ListOrdered, PanelRightClose, SquareTerminal, Users, X } from "lucide-react";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
 import type { TodoItem } from "@/types/ui";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
@@ -23,6 +23,8 @@ type ComposerDockBarProps = {
   queueCount: number;
   /** 排队消息列表（拖拽排序/引导/删除交互复杂，由 Composer 组装后注入）。 */
   queueBody: ReactNode;
+  onHideBash?: () => void;
+  onHideSubagent?: () => void;
   onHideTodo?: () => void;
   onHideQueue?: () => void;
 };
@@ -67,6 +69,8 @@ export function ComposerDockBar({
   todoItems,
   queueCount,
   queueBody,
+  onHideBash,
+  onHideSubagent,
   onHideTodo,
   onHideQueue,
 }: ComposerDockBarProps) {
@@ -107,10 +111,12 @@ export function ComposerDockBar({
     bash: {
       title: `后台 Bash · ${bashTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={bashTasks} />,
+      onHide: onHideBash,
     },
     subagent: {
       title: `子 Agent · ${subagentTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={subagentTasks} />,
+      onHide: onHideSubagent,
     },
     todo: {
       title: `待办 · ${doneCount}/${todoItems.length} 已完成`,
@@ -130,7 +136,7 @@ export function ComposerDockBar({
       {active && (
         <div
           className="kimix-dock-panel flex flex-col overflow-hidden"
-          style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 8, maxHeight: "min(360px, 50vh)", zIndex: 30 }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 8, maxHeight: "min(300px, 42vh)", zIndex: 30 }}
           role="dialog"
           aria-label={active.title}
         >
@@ -139,17 +145,31 @@ export function ComposerDockBar({
             style={{ gap: 12, paddingLeft: 16, paddingRight: 12 }}
           >
             <span className="min-w-0 truncate">{active.title}</span>
-            {active.onHide && (
+            <div className="flex shrink-0 items-center" style={{ gap: 4 }}>
+              {active.onHide && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    active.onHide?.();
+                    setOpenPanel(null);
+                  }}
+                  className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                  title="收起到侧栏"
+                  aria-label="收起到侧栏"
+                >
+                  <PanelRightClose size={13} />
+                </button>
+              )}
               <button
                 type="button"
-                onClick={active.onHide}
+                onClick={() => setOpenPanel(null)}
                 className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                title="收起到侧栏"
-                aria-label="收起到侧栏"
+                title="关闭面板"
+                aria-label="关闭面板"
               >
                 <X size={13} />
               </button>
-            )}
+            </div>
           </div>
           <div className="overflow-y-auto" style={{ paddingTop: 6, paddingBottom: 6 }}>
             {active.body}

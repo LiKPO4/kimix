@@ -16,6 +16,8 @@ import {
   ExternalLink,
   FileText,
   MessageSquarePlus,
+  SquareTerminal,
+  Users,
 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -1072,25 +1074,6 @@ export function AppShell() {
   const btwState: BtwPanelState = mutationSessionView
     ? { ...btwTransientState, rounds: mutationSessionView.btwRounds ?? [] }
     : EMPTY_BTW_PANEL_STATE;
-  const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
-  const hiddenComposerCardEntries = [
-    hiddenComposerCardList.includes("todo") && latestTodos.length > 0
-      ? {
-          key: "todo" as const,
-          title: "TodoList",
-          desc: `${latestTodos.filter((item) => item.status === "done").length}/${latestTodos.length} 已完成`,
-          icon: ClipboardList,
-        }
-      : null,
-    hiddenComposerCardList.includes("pending") && pendingMessages.length > 0
-      ? {
-          key: "pending" as const,
-          title: "排队消息",
-          desc: `${pendingMessages.length} 条消息正在排队`,
-          icon: MessageSquarePlus,
-        }
-      : null,
-  ].filter((item) => item !== null) as HiddenComposerCardEntry[];
   const visibleSessionLongTasks = useMemo(() => {
     const activeTaskIds = new Set(
       sessions
@@ -1452,6 +1435,42 @@ ${isFinalStep
     () => splitBackgroundTasksByKind(longTaskBackgroundTasks),
     [longTaskBackgroundTasks],
   );
+
+  const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
+  const hiddenComposerCardEntries = [
+    hiddenComposerCardList.includes("todo") && latestTodos.length > 0
+      ? {
+          key: "todo" as const,
+          title: "TodoList",
+          desc: `${latestTodos.filter((item) => item.status === "done").length}/${latestTodos.length} 已完成`,
+          icon: ClipboardList,
+        }
+      : null,
+    hiddenComposerCardList.includes("pending") && pendingMessages.length > 0
+      ? {
+          key: "pending" as const,
+          title: "排队消息",
+          desc: `${pendingMessages.length} 条消息正在排队`,
+          icon: MessageSquarePlus,
+        }
+      : null,
+    hiddenComposerCardList.includes("bash") && bashTasks.length > 0
+      ? {
+          key: "bash" as const,
+          title: "后台 Bash",
+          desc: `${bashTasks.length} 个任务`,
+          icon: SquareTerminal,
+        }
+      : null,
+    hiddenComposerCardList.includes("subagent") && subagentTasks.length > 0
+      ? {
+          key: "subagent" as const,
+          title: "子 Agent",
+          desc: `${subagentTasks.length} 个任务`,
+          icon: Users,
+        }
+      : null,
+  ].filter((item) => item !== null) as HiddenComposerCardEntry[];
 
   const copyBackgroundTaskOutput = async (task: LongTaskBackgroundTaskView) => {
     const res = await window.api.getKimiCodeBackgroundTaskOutput({

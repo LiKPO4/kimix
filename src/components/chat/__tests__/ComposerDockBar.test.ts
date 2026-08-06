@@ -136,16 +136,49 @@ describe("ComposerDockBar", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("队列面板渲染注入的列表体并支持收起到侧栏", () => {
+  it("队列面板渲染注入的列表体；X 只关面板，收起按钮才收起到侧栏", () => {
     const onHideQueue = vi.fn();
     render(makeProps({ queueCount: 2, queueBody: createElement("div", { "data-testid": "queue-body" }, "排队消息列表"), onHideQueue }));
     clickCapsule(0);
     expect(container.querySelector("[data-testid='queue-body']")?.textContent).toBe("排队消息列表");
+
+    // X 语义 = 关闭浮窗（同点击胶囊），不触发收起
+    const closeButton = container.querySelector<HTMLButtonElement>(".kimix-dock-panel button[aria-label='关闭面板']");
+    expect(closeButton).not.toBeNull();
+    act(() => {
+      closeButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.querySelector(".kimix-dock-panel")).toBeNull();
+    expect(onHideQueue).not.toHaveBeenCalled();
+
+    // 收起按钮语义 = 收起到侧栏，同时关闭浮窗
+    clickCapsule(0);
     const hideButton = container.querySelector<HTMLButtonElement>(".kimix-dock-panel button[aria-label='收起到侧栏']");
     expect(hideButton).not.toBeNull();
     act(() => {
       hideButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(onHideQueue).toHaveBeenCalledTimes(1);
+    expect(container.querySelector(".kimix-dock-panel")).toBeNull();
+  });
+
+  it("四类面板都提供收起到侧栏按钮", () => {
+    render(
+      makeProps({
+        bashTasks: [makeTask()],
+        subagentTasks: [makeTask({ taskId: "sub-1", subagentType: "subagent" })],
+        todoItems: todoFixture,
+        queueCount: 1,
+        onHideBash: vi.fn(),
+        onHideSubagent: vi.fn(),
+        onHideTodo: vi.fn(),
+        onHideQueue: vi.fn(),
+      }),
+    );
+    for (let index = 0; index < 4; index += 1) {
+      clickCapsule(index);
+      expect(container.querySelector(".kimix-dock-panel button[aria-label='收起到侧栏']")).not.toBeNull();
+      expect(container.querySelector(".kimix-dock-panel button[aria-label='关闭面板']")).not.toBeNull();
+    }
   });
 });

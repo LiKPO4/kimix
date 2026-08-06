@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：Dock 胶囊 retro 风格化 + 面板遮挡 + X/收起按钮语义拆分（v2.20.250）
+
+- 现场（用户 v2.20.249 retro 主题截图）：① 胶囊本体没吃到复古风格化（扁平描边，无浮雕）；② 展开面板实心遮挡对话内容，影响阅读；③ 面板头部唯一的 X 实际是「收起到侧栏」，语义错误——X 应是关闭浮窗（同点胶囊），收起到侧栏应是另一个按钮，且四个胶囊都该有。
+- 修复：
+  - `index.css`：`.kimix-dock-capsule` 增加 retro 覆写（浮雕按钮语言：顶高光+投影、hover 用 --kimix-retro-button-hover-*、expanded 内凹 pressed）；`.kimix-dock-panel` retro 覆写改为 92% 半透明 + blur(8px)（与现代一致思路，不再实色遮挡）；聊天滚动区底部渐隐 24px→32px。
+  - `ComposerDockBar`：头部拆两按钮——X=关闭浮窗（仅 setOpenPanel(null)），PanelRightClose=收起到侧栏（onHide + 关浮窗）；`panelConfig` 四胶囊全部支持 onHide（新增 onHideBash/onHideSubagent props）；面板 maxHeight min(360px,50vh)→min(300px,42vh)。
+  - `ComposerDockCard` 类型加 "bash"/"subagent"；Composer 按 hiddenCards 抑制对应胶囊并传收起回调；AppShell `hiddenComposerCardEntries` 增加后台 Bash/子 Agent 恢复条目（整个 entries 块移到 bashTasks 声明之后，修复声明顺序）。
+- 验收：ComposerDockBar 测试更新为 7 例（X 只关浮窗不触发收起、收起按钮两语义、四胶囊收起按钮齐全）；全量 vitest、typecheck、knowledge:validate 通过。实机待用户截图验收（retro 浮雕、面板半透明、两按钮）。
+- 已知边界：retro 面板半透明是本轮用户反馈驱动的调整，覆盖了 249 时「复古保持实色」的决定。知识库：无需更新。
+- 关键文件：`src/components/chat/ComposerDockBar.tsx`、`src/index.css`、`src/types/ui.ts`、`src/components/chat/Composer.tsx`、`src/components/layout/AppShell.tsx`。
+
 ## 2026-08-06 重构：输入区 Dock 卡片改官方式胶囊行 + 遮挡优化（v2.20.249）
 
 - 现场（用户 v2.20.246 截图）：① Composer 上方 TodoList 卡与排队消息面板是不透明实心卡+重阴影，遮挡聊天内容；② 卡片太重量级，要求改成官方 kimi-code web 的胶囊行（后台 Bash (N)/子 Agent (N)/待办 (done/total)/队列 (N)，点击向上展开面板）。用户拍板：胶囊对齐官方四类；展开面板半透明+背景模糊（复古主题保持实色）。

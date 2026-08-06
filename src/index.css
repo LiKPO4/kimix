@@ -1810,9 +1810,9 @@ body::before {
 .kimix-chat-scroll-area {
   padding-right: 8px;
   overflow-x: hidden;
-  /* 底部 24px 渐隐：消息滚动到输入区上方时淡出，而不是被实心边硬切。 */
-  mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent 100%);
+  /* 底部 32px 渐隐：消息滚动到输入区上方时淡出，而不是被实心边硬切。 */
+  mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
 }
 
 .kimix-chat-scroll-area::-webkit-scrollbar-thumb {
@@ -4726,6 +4726,28 @@ button.bg-accent-primary:disabled:hover,
   color: var(--accent-primary);
 }
 
+/* 复古主题：胶囊沿用浮雕按钮语言（顶高光+投影），展开态改内凹 pressed。 */
+[data-ui-style="retro"] .kimix-dock-capsule {
+  border-color: var(--kimix-retro-button-hover-border-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+[data-ui-style="retro"] .kimix-dock-capsule:hover {
+  background: var(--kimix-retro-button-hover-background);
+  box-shadow: var(--kimix-retro-button-hover-shadow);
+}
+
+[data-ui-style="retro"] .kimix-dock-capsule[aria-expanded="true"] {
+  background: var(--kimix-retro-button-hover-background);
+  border-color: var(--kimix-retro-button-hover-border-color);
+  color: var(--kimix-panel-text);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+[data-ui-style="retro"] .kimix-dock-capsule[aria-expanded="true"] .kimix-dock-capsule-count {
+  color: var(--kimix-panel-text);
+}
+
 /* ── Dock Panel（胶囊展开面板）：半透明 + 背景模糊，背后滚动内容隐约可见 ── */
 
 .kimix-dock-panel {
@@ -4737,9 +4759,10 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--radius-lg);
 }
 
+/* 复古主题同样半透明+轻模糊：面板只是临时浮层，不能完全挡住背后对话。 */
 [data-ui-style="retro"] .kimix-dock-panel {
-  background: var(--surface-elevated);
-  backdrop-filter: none;
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 /* 带业务语义色的对话事件卡只共享形状和质感，不接管其背景与边框色。 */
