@@ -124,7 +124,10 @@ export const SETTLED_THINKING_FOLD_MAX_CHARS = 200;
  * or none); the old paragraph-only predicate then rendered the whole block
  * as a fixed, non-clickable wall. Long blocks fold even without blank-line
  * breaks — the teaser is the last non-empty line — and the full text stays
- * one click away.
+ * one click away. Exception: when the teaser already covers the whole text
+ * (single unbroken long line is the main case), folding would render the
+ * same content twice with nothing extra on expand, so the block stays fully
+ * visible and is not foldable.
  */
 export function resolveSettledThinkingFold(text: string): {
   foldable: boolean;
@@ -135,6 +138,8 @@ export function resolveSettledThinkingFold(text: string): {
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
   if (paragraphs.length > 1) {
+    // The teaser is the LAST paragraph; blank-line breaks are trimmed away,
+    // so it can never cover the whole text here.
     return { foldable: true, teaser: paragraphs.at(-1) ?? text };
   }
   const lines = text
@@ -144,5 +149,12 @@ export function resolveSettledThinkingFold(text: string): {
   const foldable =
     lines.length > SETTLED_THINKING_FOLD_MAX_LINES ||
     text.length > SETTLED_THINKING_FOLD_MAX_CHARS;
-  return { foldable, teaser: lines.at(-1) ?? text };
+  const teaser = lines.at(-1) ?? text;
+  // A fold is only useful when expanding reveals MORE than the teaser. If
+  // the teaser covers the whole text, both states render identical content
+  // and the expand affordance is pure noise — keep the block non-foldable.
+  if (teaser.trim() === text.trim()) {
+    return { foldable: false, teaser };
+  }
+  return { foldable, teaser };
 }

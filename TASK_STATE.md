@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：teaser 覆盖全文的思考块不再可展开（v2.20.239）
+
+- 现场：用户截图——kimi-web 模式过程时间线里，单段无换行的长思考触发折叠（长度 > 200 字符），teaser 取「最后一个非空行」= 全文，折叠态与展开态内容完全相同，却仍可点击，展开后同一段文字再显示一遍（红框内同文本出现两次）。
+- 修复：`resolveSettledThinkingFold`（thinkingBlocks.ts:129）算出 teaser 后加通用判定——teaser.trim() 等于全文 trim 即返回 foldable:false，`KimiWebSettledThinkingItem` 走既有静态分支直接全量显示。多段场景（teaser=最后一段）天然不受影响。
+- 验收：旧用例「folds a single long line by length」反转（证伪点）+ 新增 3 例（单行无换行长文本不可折叠/首尾空白行 teaser 等于全文/多段长文本仍可折叠）；定向 18 例、全量 1630 例、typecheck、knowledge:validate 通过。实机待用户验收。
+- 关键文件：`src/utils/thinkingBlocks.ts`、`knowledge/architecture/streaming-render-pipeline.md`（Invariant N 补例外）。
+
 ## 2026-08-06 修复：输出完成后尾部大段空白（尾部补偿两条残留路径）（v2.20.238）
 
 - 现场：用户截图——一轮输出完成后最后一条消息下方约 40% 视口空白，滚到视觉底部也消不掉；用户判断是展开的长内容完成时折叠、内容变矮但尾部空间未收回。

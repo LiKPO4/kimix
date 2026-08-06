@@ -122,11 +122,32 @@ describe("resolveSettledThinkingFold", () => {
     expect(result.teaser).toBe("第 80 行思考内容");
   });
 
-  it("folds a single long line by length", () => {
+  it("does NOT fold a single unbroken long line (teaser covers the whole text)", () => {
+    // 对旧实现的证伪：旧实现按「长度 > 200」判定 foldable=true，但该行是
+    // 唯一一行，teaser 即全文，折叠态与展开态内容完全相同；修复后不可折叠，
+    // 直接全量显示（走静态非折叠分支）。
     const text = "很长的思考".repeat(50);
     const result = resolveSettledThinkingFold(text);
-    expect(result.foldable).toBe(true);
+    expect(result.foldable).toBe(false);
     expect(result.teaser).toBe(text);
+  });
+
+  it("does not fold when the teaser equals the trimmed full text even with surrounding blank lines", () => {
+    // 通用判定：teaser（trim 后）覆盖全文即不可折叠，不限于纯单行输入。
+    const inner = "很长的思考".repeat(50);
+    const text = `  ${inner}\n  `;
+    const result = resolveSettledThinkingFold(text);
+    expect(result.teaser.trim()).toBe(inner);
+    expect(result.teaser.trim()).toBe(text.trim());
+    expect(result.foldable).toBe(false);
+  });
+
+  it("still folds long multi-paragraph text to its last paragraph", () => {
+    const paragraph = "很长的思考".repeat(30);
+    const text = Array.from({ length: 8 }, (_, index) => `第 ${index + 1} 段 ${paragraph}`).join("\n\n");
+    const result = resolveSettledThinkingFold(text);
+    expect(result.foldable).toBe(true);
+    expect(result.teaser).toBe(`第 8 段 ${paragraph}`);
   });
 
   it("keeps short single-paragraph thinking fully visible", () => {
