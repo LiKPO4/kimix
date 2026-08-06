@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：Dock 胶囊行脱离文档流悬浮，不再占 footer 背景带（v2.20.254）
+
+- 现场：胶囊行在 footer 实色背景带上占一整行，用户要求"胶囊悬在后面的内容之上，不带一行背景"。修复：ComposerDockBar 根节点改 `position:absolute; bottom:100%`（锚定 Composer relative 根），不占 footer 高度，胶囊直接浮在聊天滚动区底部内容上；展开面板仍向上弹出。DockBar 7 例、build 通过。
+
 ## 2026-08-06 修复：胶囊圆角风格分化 + 撤掉滚动区渐隐 mask（v2.20.253）
 
 - 现场：① default/modern/retro 胶囊都是 999px 同样式，用户期望默认圆角稍小、复古更小；② 底部渐隐 mask 反而像"一层背景挡住后面内容"。修复：胶囊圆角改 `var(--ui-radius-xl, 10px)`（默认 10/modern 14/retro 6/nostalgia 0）；删除 `.kimix-chat-scroll-area` 的 mask-image——footer 本就是实色兄弟节点，消息在滚动边界干净截断，渐隐只会制造遮挡错觉。
