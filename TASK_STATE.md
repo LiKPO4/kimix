@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 微调：Dock 胶囊补默认轻描边（v2.20.252）
+
+- 现场：251 令牌化后 modern/default 下 --ui-control-border 为透明，胶囊几乎隐形。修复：基础规则回退 `1px solid var(--border-subtle)` + hover `--border-default`，nostalgia 覆写保持 `--ui-control-border` 浮雕。uiStyles 18 例、build 通过。
+
 ## 2026-08-06 修复：Dock 胶囊风格化真正失效根因——用户是 nostalgia 主题（v2.20.251）
 
 - 现场（用户 v2.20.250 截图）：胶囊仍是扁平灰底细边，没吃到任何风格化。250 只补了 `[data-ui-style="retro"]` 覆写，但项目有四套界面风格（default/modern/retro/nostalgia），用户截图（直角硬边、永久浮雕按钮）是 **nostalgia（怀旧，Win98 硬浮雕）**，retro 覆写根本不命中——上一轮修错了目标。

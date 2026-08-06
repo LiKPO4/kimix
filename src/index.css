@@ -4697,7 +4697,7 @@ button.bg-accent-primary:disabled:hover,
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  border: var(--ui-control-border);
+  border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
   box-shadow: var(--ui-control-shadow);
   color: var(--kimix-panel-text-secondary);
@@ -4708,6 +4708,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-dock-capsule:hover {
+  border-color: var(--border-default);
   background: var(--ui-control-hover-background);
   box-shadow: var(--ui-control-hover-shadow);
   color: var(--kimix-panel-text);
@@ -4721,6 +4722,7 @@ button.bg-accent-primary:disabled:hover,
 
 /* 怀旧（Win98 直角硬边）：胶囊随风格令牌变直角。 */
 [data-ui-style="nostalgia"] .kimix-dock-capsule {
+  border: var(--ui-control-border);
   border-radius: var(--ui-radius-sm, 0px);
 }
 
