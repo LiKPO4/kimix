@@ -9,7 +9,9 @@ type ScrollMetrics = {
 };
 
 const SCROLL_EDGE_EPSILON_PX = 1;
-const LIVE_THINKING_FOLLOW_THRESHOLD_PX = 12;
+// Official kimi-web behavior: follow the live viewport only while the user is
+// within 24px of the bottom; scrolling further up hands control back to them.
+const LIVE_THINKING_FOLLOW_THRESHOLD_PX = 24;
 
 export function canLiveThinkingViewportConsumeWheel(
   { scrollTop, scrollHeight, clientHeight }: ScrollMetrics,

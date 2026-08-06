@@ -19,8 +19,7 @@ import { shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
 import { compactModelDisplayName, resolveTurnHeaderModelName } from "@/utils/modelDisplay";
 import { StateIconSwap } from "@/components/common/StateIconSwap";
 import { buildThinkingBlocks, resolveSettledThinkingFold, type ThinkingBlock } from "@/utils/thinkingBlocks";
-import { resolveLiveTextBlockKey, resolveLiveThinkingBlockKey } from "@/utils/liveThinkingViewport";
-import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeFinalTextBlockIndex, computeStreamingTrailingTextContent, groupTurnBlocks, mergeLiveDraftBlocks, type TurnBlock, type TurnBlockGroup } from "@/utils/turnBlocks";
+import { turnBlocksEqual, buildTurnBlocks, computeFinalTextBlockContent, computeFinalTextBlockIndex, computeStreamingTrailingTextContent, groupTurnBlocks, type TurnBlock, type TurnBlockGroup } from "@/utils/turnBlocks";
 import { hasOfficialTurnEvidenceAfterUser, isLatestUserInputEvent, officialHistoryHasUserMessageAsLatest, truncateLatestUserTurn } from "@/utils/eventHelpers";
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { mapHistoryEvents } from "@/utils/eventMapper";
@@ -51,8 +50,10 @@ import {
 } from "@/utils/chatViewportTransaction";
 import {
   appendStreamingText,
+  draftThinkingText,
   makeActiveTurnDraftKey,
   pickDraftText,
+  pickDraftThinkingParts,
   useActiveTurnDraft,
 } from "@/utils/activeTurnDraftStore";
 import { getProcessManualExpand, noteProcessManualExpand, processManualExpandTurnKey } from "@/utils/processManualExpand";
@@ -1416,6 +1417,91 @@ function KimiWebThinkingBlock({ blocks, isLive }: { blocks: ThinkingBlock[]; isL
   );
 }
 
+/**
+ * 流式思考/正文的叶子渲染：draft 订阅下沉到这里，流式 delta 每帧只重渲染
+ * 本叶子，气泡本体、过程时间线、memo 块都不再跟随。流式期间思考以纯文本
+ * pre-wrap 单块呈现（不做 markdown、不做逐段 summarize——官方 kimi-web 的
+ * 做法），settle 后由正式路径（buildThinkingBlocks 折叠 teaser）接管。
+ * showTextTail：仅当正式 turnBlocks 存在时在时间线内流式正文 tail（与现状
+ * mergeLiveDraftBlocks 的 text 块语义一致）；无正式块时正文只出现在正文区。
+ */
+function LiveDraftTail({ draftKey, isActiveAssistant, showTextTail }: { draftKey: string | null; isActiveAssistant: boolean; showTextTail: boolean }) {
+  const activeDraft = useActiveTurnDraft(isActiveAssistant ? draftKey : null);
+  const thinkingText = activeDraft ? draftThinkingText(activeDraft) : "";
+  const draftContent = activeDraft?.content?.trim() ? activeDraft.content : "";
+  if (!thinkingText && !draftContent) return null;
+  return (
+    <div className="flex min-w-0 flex-col" style={{ gap: 10 }}>
+      {thinkingText && <LiveThinkingPre text={thinkingText} />}
+      {showTextTail && draftContent && <KimiWebIntermediateTextBlock content={draftContent} streaming />}
+    </div>
+  );
+}
+
+/**
+ * 5 行滚动窗内的实时思考纯文本。每帧只替换文本节点；距底 24px 内才跟随
+ * （用户上翻后不抢滚动，恢复滚到底部后自动重新跟随）。viewport 高度固定，
+ * 思考增长不会让外层对话逐帧 reflow。
+ */
+function LiveThinkingPre({ text }: { text: string }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
+  const contentVersion = text.length;
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !followLatestRef.current) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [contentVersion]);
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (canLiveThinkingViewportConsumeWheel(event.currentTarget, event.deltaY)) {
+      event.stopPropagation();
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const deltaY = ["ArrowUp", "PageUp", "Home"].includes(event.key)
+      ? -1
+      : ["ArrowDown", "PageDown", "End"].includes(event.key)
+        ? 1
+        : 0;
+    if (deltaY && canLiveThinkingViewportConsumeWheel(event.currentTarget, deltaY)) {
+      event.stopPropagation();
+    }
+  };
+
+  return (
+    <div
+      ref={viewportRef}
+      className="kimix-live-thinking-scroll min-w-0"
+      style={{
+        maxHeight: LIVE_THINKING_MAX_HEIGHT_PX,
+        overflowX: "hidden",
+        overflowY: "auto",
+        scrollbarGutter: "stable",
+      }}
+      role="region"
+      aria-label="正在生成的思考过程"
+      tabIndex={0}
+      onScroll={(event) => {
+        followLatestRef.current = shouldFollowLiveThinkingViewport(event.currentTarget);
+      }}
+      onWheel={handleWheel}
+      onKeyDown={handleKeyDown}
+      onTouchStart={(event) => event.stopPropagation()}
+      onTouchMove={(event) => event.stopPropagation()}
+    >
+      <div
+        className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+        style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
 function KimiWebToolRow({ tool, isLast }: { tool: ToolEvent; isLast: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
@@ -2291,7 +2377,7 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
   }
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, liveTextTail, liveTextBlockKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveThinkingBlocks?: ThinkingBlock[]; liveThinkingBlockKey?: string; liveTextTail?: string; liveTextBlockKey?: string; onExpandedChange?: (expanded: boolean) => void }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveDraftKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveDraftKey?: string | null; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
@@ -2318,16 +2404,11 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     viewportTop: number;
     anchor: "summary" | "content";
   } | null>(null);
+  // Live draft content is rendered by the LiveDraftTail leaf, not merged into
+  // these formal blocks: per-delta merging rebuilt the whole array and broke
+  // the memo chain (a fresh array reference every frame).
   const effectiveTurnBlocks = useMemo(() => {
-    if (turnBlocks && turnBlocks.length > 0) {
-      if (!liveThinkingBlocks?.length && !liveTextTail?.trim()) return turnBlocks;
-      return mergeLiveDraftBlocks(turnBlocks, {
-        thinkingBlocks: liveThinkingBlocks,
-        thinkingBlockKey: liveThinkingBlockKey,
-        textTail: liveTextTail,
-        textBlockKey: liveTextBlockKey,
-      });
-    }
+    if (turnBlocks && turnBlocks.length > 0) return turnBlocks;
     const syntheticEvents: TimelineEvent[] = [
       event,
       ...tools,
@@ -2336,7 +2417,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     ];
     const built = buildTurnBlocks(syntheticEvents);
     return built.length > 0 ? built : undefined;
-  }, [turnBlocks, liveThinkingBlocks, liveThinkingBlockKey, liveTextTail, liveTextBlockKey, event, tools, subagents, approvals]);
+  }, [turnBlocks, event, tools, subagents, approvals]);
 
   const blockThinking = useMemo(() => {
     if (!effectiveTurnBlocks) return undefined;
@@ -2386,7 +2467,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   const summaryToolCount = blockCounts?.toolCount ?? tools.length;
   const summarySubagentCount = blockCounts?.subagentCount ?? subagents.length;
   const summaryApprovalCount = blockCounts?.approvalCount ?? approvals.length;
-  const hasDetails = items.length > 0;
+  const hasDetails = items.length > 0 || (isActiveAssistant && Boolean(liveDraftKey));
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = useMemo(() => joinSummaryParts([
     thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段${detailUnit}` : "",
@@ -2536,6 +2617,11 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
             />
             )
           ) : <ProcessDetailList items={items} />}
+          <LiveDraftTail
+            draftKey={liveDraftKey ?? null}
+            isActiveAssistant={isActiveAssistant}
+            showTextTail={Boolean(effectiveTurnBlocks?.length)}
+          />
           {!isKimiWeb && (
             <button
               type="button"
@@ -2688,10 +2774,8 @@ type AssistantProcessBlockProps = {
   turnStartedAt?: number;
   activeStatusMessage?: string;
   turnBlocks?: TurnBlock[];
-  liveThinkingBlocks?: ThinkingBlock[];
-  liveThinkingBlockKey?: string;
-  liveTextTail?: string;
-  liveTextBlockKey?: string;
+  /** Stable draft key; the leaf inside subscribes, so props stay reference-stable per delta. */
+  liveDraftKey?: string | null;
   onExpandedChange?: (expanded: boolean) => void;
 };
 
@@ -2706,10 +2790,7 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.collapseWhileRunning === next.collapseWhileRunning &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
-    prev.liveThinkingBlocks === next.liveThinkingBlocks &&
-    prev.liveThinkingBlockKey === next.liveThinkingBlockKey &&
-    prev.liveTextTail === next.liveTextTail &&
-    prev.liveTextBlockKey === next.liveTextBlockKey &&
+    prev.liveDraftKey === next.liveDraftKey &&
     prev.onExpandedChange === next.onExpandedChange &&
     turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     (
@@ -2747,10 +2828,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   turnStartedAt,
   activeStatusMessage,
   turnBlocks,
-  liveThinkingBlocks,
-  liveThinkingBlockKey,
-  liveTextTail,
-  liveTextBlockKey,
+  liveDraftKey,
   onExpandedChange,
 }: AssistantProcessBlockProps) {
   const hasActualThinking = Boolean(
@@ -2767,7 +2845,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       ? "命令运行中"
       : isActiveAssistant && hasFinalContent
         ? "正在输出"
-        : isActiveAssistant && !hasActualThinking
+        : isActiveAssistant && !hasActualThinking && !liveDraftKey
           ? activeStatusMessage?.trim().replace(/…$/u, "") || "等待首个模型事件"
           : undefined;
   const processLabel = (
@@ -2791,10 +2869,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       collapseWhileRunning={collapseWhileRunning}
       label={processLabel}
       turnBlocks={turnBlocks}
-      liveThinkingBlocks={liveThinkingBlocks}
-      liveThinkingBlockKey={liveThinkingBlockKey}
-      liveTextTail={liveTextTail}
-      liveTextBlockKey={liveTextBlockKey}
+      liveDraftKey={liveDraftKey}
       onExpandedChange={onExpandedChange}
     />
   );
@@ -2813,13 +2888,19 @@ type AssistantBodyBlockProps = {
   trailingStatuses: Extract<TimelineEvent, { type: "status_update" }>[];
   hookBadgeEvents: Extract<TimelineEvent, { type: "hook" }>[];
   footerFallbackLabel: string;
-  /** Full turn text for clipboard; defaults to content when omitted. */
-  copyContent?: string;
+  /** Active-turn draft key; the body leaf subscribes for the live text tail. */
+  liveDraftKey?: string | null;
+  /** Formal blocks of the turn (commit-time updates must re-render the body). */
+  turnBlocks?: TurnBlock[];
+  /** Expanded kimi-web process detail owns the trailing text; body stays empty. */
+  hideWhileProcessExpanded?: boolean;
 };
 
 function assistantBodyBlockEqual(prev: AssistantBodyBlockProps, next: AssistantBodyBlockProps) {
   return prev.content === next.content &&
-    prev.copyContent === next.copyContent &&
+    prev.liveDraftKey === next.liveDraftKey &&
+    prev.hideWhileProcessExpanded === next.hideWhileProcessExpanded &&
+    turnBlocksEqual(prev.turnBlocks, next.turnBlocks) &&
     prev.thinking === next.thinking &&
     prev.thinkingParts === next.thinkingParts &&
     prev.timestamp === next.timestamp &&
@@ -2850,11 +2931,26 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
   trailingStatuses,
   hookBadgeEvents,
   footerFallbackLabel,
-  copyContent,
+  liveDraftKey,
+  turnBlocks,
+  hideWhileProcessExpanded = false,
 }: AssistantBodyBlockProps) {
   const { copied, trigger } = useCopyTimeout();
   const { copied: copiedAll, trigger: triggerAll } = useCopyTimeout();
-  const clipboardContent = (copyContent ?? content).trim().length > 0 ? (copyContent ?? content) : content;
+  // Draft subscription lives in this leaf: streaming deltas re-render only the
+  // body block instead of the whole bubble, so per-frame cost stays O(leaf).
+  const activeDraft = useActiveTurnDraft(isActiveAssistant && liveDraftKey ? liveDraftKey : null);
+  const draftContent = activeDraft?.content ?? "";
+  const effectiveDisplayContent = isActiveAssistant && liveDraftKey
+    ? pickDraftText(draftContent, content)
+    : content;
+  const effectiveThinking = isActiveAssistant && liveDraftKey
+    ? pickDraftText(activeDraft?.thinking ?? "", thinking ?? "")
+    : thinking;
+  const effectiveThinkingParts = isActiveAssistant && liveDraftKey
+    ? pickDraftThinkingParts(activeDraft?.thinkingParts, thinkingParts)
+    : thinkingParts;
+  const clipboardContent = effectiveDisplayContent.trim().length > 0 ? effectiveDisplayContent : content;
   const hasVisibleContent = content.trim().length > 0;
   const hasCopyableContent = clipboardContent.trim().length > 0;
   const changedFilesSignature = changedFiles.join("\u001f");
@@ -2866,19 +2962,49 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
       source.match(/(?:[\w.-]+\/)*[\w.-]+\.md\b/gi) ?? []
     )).filter((filePath) => changedSet.has(normalizePathForComparison(filePath))).slice(0, 3);
   }, [changedFilesSignature, clipboardContent, content, hasVisibleContent, isComplete]);
-  const fullCopyText = useMemo(
-    () => buildAssistantFullCopyText({ content: clipboardContent, thinking, thinkingParts, timestamp } as AssistantEvent),
-    [clipboardContent, thinking, thinkingParts, timestamp],
+  // The streaming candidate: formal trailing text plus the uncommitted draft
+  // tail (a commit takes the draft, so the two are disjoint by construction).
+  const streamingContent = useMemo(() => {
+    if (!isActiveAssistant || !liveDraftKey) return "";
+    const formalTrailing = computeStreamingTrailingTextContent(turnBlocks);
+    if (draftContent.trim()) return appendStreamingText(formalTrailing, draftContent);
+    return formalTrailing;
+  }, [draftContent, isActiveAssistant, liveDraftKey, turnBlocks]);
+  const finalText = useMemo(
+    () => computeFinalTextBlockContent(turnBlocks, effectiveDisplayContent, isComplete && !isActiveAssistant),
+    [effectiveDisplayContent, isComplete, isActiveAssistant, turnBlocks],
   );
+  const bodyText = finalText || (hideWhileProcessExpanded ? "" : streamingContent);
+  const hasVisibleBodyText = bodyText.trim().length > 0;
+  // Full copy text is built lazily on click: rebuilding it per stream delta was
+  // an O(thinking) cost on every frame even though it only matters on copy.
+  const copyAllSourceRef = useRef<{
+    content: string;
+    thinking?: string;
+    thinkingParts?: AssistantEvent["thinkingParts"];
+    timestamp: number;
+  }>({ content: clipboardContent, thinking: effectiveThinking ?? undefined, thinkingParts: effectiveThinkingParts, timestamp });
+  copyAllSourceRef.current = { content: clipboardContent, thinking: effectiveThinking ?? undefined, thinkingParts: effectiveThinkingParts, timestamp };
+  const handleCopyAll = () => {
+    const snapshot = copyAllSourceRef.current;
+    const fullText = buildAssistantFullCopyText({
+      type: "assistant_message",
+      content: snapshot.content,
+      thinking: snapshot.thinking,
+      thinkingParts: snapshot.thinkingParts,
+      timestamp: snapshot.timestamp,
+    } as AssistantEvent) || snapshot.content;
+    void triggerAll(fullText);
+  };
   const shouldShowBodyFooter = hasVisibleContent || hasCopyableContent || changeSummary || trailingStatuses.length > 0 || isComplete || isActiveAssistant;
   if (!shouldShowBodyFooter) return null;
   return (
     <div className="flex flex-col" style={{ gap: 15, paddingLeft: MESSAGE_SIDE_INDENT, paddingRight: MESSAGE_SIDE_INDENT }}>
-      {hasVisibleContent && (
+      {hasVisibleBodyText && (
         <>
           <div className="relative w-full text-[15px] leading-[1.68] text-[var(--kimix-panel-text)]">
             <MarkdownRenderer
-              content={content}
+              content={bodyText}
               streaming={isActiveAssistant}
               normalizeAssistantProgress
               deferOffscreen={!eagerMarkdown && !isActiveAssistant && isComplete && content.length > 1200}
@@ -2898,7 +3024,7 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
         statuses={trailingStatuses}
         fallbackLabel={footerFallbackLabel}
         onCopy={() => void trigger(clipboardContent)}
-        onCopyAll={() => void triggerAll(fullCopyText || clipboardContent)}
+        onCopyAll={handleCopyAll}
         copied={copied}
         copiedAll={copiedAll}
         hookBadgeEvents={hookBadgeEvents}
@@ -2948,65 +3074,15 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
     sessionId,
     turnId: draftTurnId,
   }) ? makeActiveTurnDraftKey(sessionId!, event.roomAgentId, draftTurnId!) : null;
-  const activeDraft = useActiveTurnDraft(draftKey);
-  const liveThinkingBlocks = useMemo(() => {
-    if (!activeDraft?.thinking?.trim() && !activeDraft?.thinkingParts?.some((part) => part.text.trim())) return undefined;
-    return buildThinkingBlocks({
-      thinking: activeDraft.thinking,
-      thinkingParts: activeDraft.thinkingParts,
-      timestamp: activeDraft.timestamp,
-    });
-  }, [activeDraft?.thinking, activeDraft?.thinkingParts, activeDraft?.timestamp]);
-  const liveThinkingBlockKey = resolveLiveThinkingBlockKey(draftKey, activeDraft?.materializationId);
-  // Option C: while the turn is active the trailing text streams in flow; the
-  // draft's uncommitted text tail appends to the same live block.
-  const liveTextTail = isActiveAssistant ? (activeDraft?.content ?? "") : "";
-  const liveTextBlockKey = resolveLiveTextBlockKey(draftKey, activeDraft?.materializationId);
-  const displayContent = pickDraftText(activeDraft?.content, event.content);
-  const displayThinking = pickDraftText(activeDraft?.thinking, event.thinking);
-  const displayThinkingParts = (
-    activeDraft?.thinkingParts &&
-    (activeDraft.thinkingParts?.length ?? 0) >= (event.thinkingParts?.length ?? 0)
-  ) ? activeDraft.thinkingParts : event.thinkingParts;
-  const processEvent = useMemo(() => {
-    if (
-      displayThinking === (event.thinking ?? "") &&
-      displayThinkingParts === event.thinkingParts
-    ) {
-      return event;
-    }
-    return {
-      ...event,
-      thinking: displayThinking || undefined,
-      thinkingParts: displayThinkingParts,
-    };
-  }, [event, displayThinking, displayThinkingParts]);
-  const hasContent = displayContent.trim().length > 0;
-  // In kimi-web block mode the bottom body should show only the final text
-  // segment (the answer). Earlier intermediate text segments live inside the
-  // expanded process timeline. When blocks are unavailable, fall back to the
-  // full merged content as before.
-  // 运行中即使 event.isComplete（v2 中间 step 提交）也不把段当最终正文，
-  // 避免「正文区闪一下再被收进过程」；真正展示最终正文需完成且非 active。
-  const finalTextBlockContent = useMemo(() => {
-    return computeFinalTextBlockContent(
-      turnBlocks,
-      displayContent,
-      event.isComplete && !isActiveAssistant,
-    );
-  }, [turnBlocks, displayContent, event.isComplete, isActiveAssistant]);
-  // While the turn is active, stream the trailing text candidate in the body
-  // instead of withholding everything until settle. Formal committed text and
-  // the uncommitted draft tail are disjoint (a commit takes the draft), so a
-  // prefix-safe append covers both. When a tool/subagent/approval/question
-  // block lands after the text, this becomes "" and the segment moves back
-  // into the process timeline automatically.
-  const streamingBodyContent = useMemo(() => {
-    if (!isActiveAssistant) return "";
-    const formalTrailing = computeStreamingTrailingTextContent(turnBlocks);
-    if (activeDraft?.content?.trim()) return appendStreamingText(formalTrailing, activeDraft.content);
-    return formalTrailing;
-  }, [isActiveAssistant, turnBlocks, activeDraft?.content]);
+  // The bubble itself does NOT subscribe to the draft: streaming deltas are
+  // consumed by the leaf components (LiveDraftTail in the process detail,
+  // AssistantBodyBlock for the body), so a delta re-renders only that leaf.
+  // draftKey is a stable string across deltas, keeping memoized child props
+  // reference-stable (the memo gates would otherwise fail every frame).
+  const hasContent = event.content.trim().length > 0;
+  // The body leaf (AssistantBodyBlock) computes the final-text-block selection
+  // and the streaming tail from its own draft subscription; nothing per-delta
+  // remains in this bubble.
   const hookBadgeEvents = getHookBadgeEvents(leadingHooks);
   const isInterrupted = event.isComplete && trailingStatuses.some(isInterruptedStatus);
   const shouldShowBodyFooter = hasContent || changeSummary || trailingStatuses.length > 0 || event.isComplete || isActiveAssistant;
@@ -3049,10 +3125,10 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
       <div className="w-full" style={{ display: "flex", flexDirection: "column", gap: processToBodyGap }}>
         {!hideProcessSummary && (
           <AssistantProcessBlock
-            event={processEvent}
+            event={event}
             sessionId={sessionId}
             roomAgentDisplayName={resolveTurnHeaderModelName({
-              turnModel: processEvent.model,
+              turnModel: event.model,
               agentDisplayName: roomAgent?.displayName,
               agentModelAlias: roomAgent?.modelAlias,
             })}
@@ -3068,10 +3144,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             turnStartedAt={turnStartedAt}
             activeStatusMessage={activeStatus?.message}
             turnBlocks={turnBlocks}
-            liveThinkingBlocks={liveThinkingBlocks}
-            liveThinkingBlockKey={liveThinkingBlockKey}
-            liveTextTail={liveTextTail}
-            liveTextBlockKey={liveTextBlockKey}
+            liveDraftKey={draftKey}
             onExpandedChange={setProcessExpanded}
           />
         )}
@@ -3085,12 +3158,13 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
         {shouldShowBodyFooter && (
           <AssistantBodyBlock
             // The bottom body shows the final answer segment; while the turn
-            // is active it streams the trailing text candidate live. Copy/export
-            // still receives the full displayContent so the clipboard keeps
-            // everything including intermediate text segments.
-            content={finalTextBlockContent || (processExpanded ? "" : streamingBodyContent)}
-            thinking={displayThinking || undefined}
-            thinkingParts={displayThinkingParts}
+            // is active the leaf subscribes to the draft and streams the
+            // trailing text candidate live. Copy/export reads the same merged
+            // content so the clipboard keeps everything including intermediate
+            // text segments.
+            content={event.content}
+            thinking={event.thinking ?? undefined}
+            thinkingParts={event.thinkingParts}
             timestamp={event.timestamp}
             isActiveAssistant={isActiveAssistant}
             isComplete={event.isComplete}
@@ -3100,7 +3174,9 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             trailingStatuses={trailingStatuses}
             hookBadgeEvents={hookBadgeEvents}
             footerFallbackLabel={footerFallbackLabel}
-            copyContent={displayContent}
+            liveDraftKey={draftKey}
+            turnBlocks={turnBlocks}
+            hideWhileProcessExpanded={processExpanded}
           />
         )}
       </div>

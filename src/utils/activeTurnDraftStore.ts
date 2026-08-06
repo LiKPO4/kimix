@@ -501,6 +501,32 @@ export function pickDraftText(draftText: string | undefined, eventText: string |
 }
 
 /**
+ * 与 pickDraftText 对应的 thinkingParts 选择规则：draft 段数不少于正式事件时
+ * 以 draft 为准（draft 累积了全部流式分片），否则回落到正式值。
+ */
+export function pickDraftThinkingParts(
+  draftParts: AssistantMessage["thinkingParts"],
+  eventParts: AssistantMessage["thinkingParts"],
+): AssistantMessage["thinkingParts"] {
+  if (draftParts && (draftParts.length ?? 0) >= (eventParts?.length ?? 0)) return draftParts;
+  return eventParts;
+}
+
+/**
+ * 流式思考叶子的纯文本来源：优先整段 thinking，缺失时由分片拼接。
+ * 与 buildThinkingBlocks（段落切分 + 逐段 summarize）不同——live 渲染只需要
+ * 原始全文，任何 summarize/切块都会在每帧引入 O(n) 附加计算并改变视觉。
+ */
+export function draftThinkingText(draft: Pick<ActiveTurnDraft, "thinking" | "thinkingParts">): string {
+  const thinking = draft.thinking?.trim() ?? "";
+  if (thinking) return thinking;
+  return (draft.thinkingParts ?? [])
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/**
  * Formal frames that already carry the authoritative body. Committing draft
  * text before these would append into the open assistant and then get a full
  * body again → duplicated greetings / doubled early paragraphs.

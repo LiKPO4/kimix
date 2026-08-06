@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+## 2026-08-06 性能：流式思考卡顿——draft 订阅下沉叶子组件（v2.20.237）
+
+- 现场：流式输出卡顿。根因（代码级）：每个 delta 触发整个活动气泡全量重渲染——`AssistantMessageBubble` 顶层 `useActiveTurnDraft` 订阅 → `buildThinkingBlocks` 全量切块 O(n) + `liveThinkingBlocks` 新数组击穿 `AssistantProcessBlock` memo → `mergeLiveDraftBlocks` 全量重跑 + `buildAssistantFullCopyText` 每帧重建 + 视口整段 reflow。
+- 修复（移植官方 kimi-web 做法）：
+  - 新增叶子 `LiveDraftTail`/`LiveThinkingPre`（MessageBubble.tsx:1428/1446）：流式思考纯文本 pre-wrap 单块（不 markdown、不逐段 summarize），120px 固定滚动窗，距底 24px 才跟随（原 12px），settle 后正式折叠 teaser 接管。
+  - `AssistantBodyBlock` 自建 draft 订阅合成流式正文 tail；复制全文改点击时惰性构建（ref 快照）。
+  - `AssistantProcessBlock` 四个每帧变化的 live props 收敛为稳定 `liveDraftKey` 字符串，memo delta 间全命中；`mergeLiveDraftBlocks` 退出渲染路径（函数与测试保留）。
+- 交接说明：本轮基于上一个 agent 的代码级定位执行；其半成品（不可编译的 `LiveDraftProcessTail` 删除残留）已 `git stash` 保存（stash@{0}，wip: LiveDraftProcessTail），未采用。
+- 行为差异（已记入知识条目）：运行中摘要行「N 段思考」计数不再逐帧更新；liveDraftKey 非空时过程行显示「正在思考/执行中」而非「等待首个模型事件」；live→formal 为 mount 切换。
+- 验收：新增 liveDraftTail 测试（含对旧实现证伪：旧路径每帧切块/summarize）+ 24px 跟随边界用例；定向 85 例、全量 1624 例、typecheck、knowledge:validate 通过。实机帧率改善待用户验收。
+- 关键文件：`src/components/chat/MessageBubble.tsx`、`src/utils/activeTurnDraftStore.ts`、`src/utils/liveThinkingViewport.ts`、`knowledge/architecture/streaming-render-pipeline.md`。
+
 ## 2026-08-06 修复：引导/队列链路三故障（steer 双投递、accepted 永卡、队列不排空）（v2.20.236）
 
 - 现场（用户 v2.20.231 截图）：steer 卡「等待官方写入」且同一内容出现两遍回复；轮次完成但本地队列不派发；已结束会话仍显示停止按钮。

@@ -47,7 +47,22 @@ describe("liveThinkingViewport", () => {
       scrollHeight: 300,
       clientHeight: 120,
     })).toBe(true);
+
   });
+  it("follows within 24px of the bottom and pauses beyond it (official threshold)", () => {
+    // 距底恰好 24px：仍跟随；距底 25px：停止跟随（用户上翻后不抢滚动）。
+    expect(shouldFollowLiveThinkingViewport({
+      scrollTop: 156,
+      scrollHeight: 300,
+      clientHeight: 120,
+    })).toBe(true);
+    expect(shouldFollowLiveThinkingViewport({
+      scrollTop: 155,
+      scrollHeight: 300,
+      clientHeight: 120,
+    })).toBe(false);
+  });
+
 
   it("limits only the trailing thinking group while the turn is active", () => {
     const base = {
@@ -69,7 +84,6 @@ describe("liveThinkingViewport", () => {
       preserveDuringFinalTransition: true,
     })).toBe(true);
   });
-
   it("collapses the Kimi Web process exactly when final output starts", () => {
     const base = {
       previousHasFinalContent: false,
