@@ -752,10 +752,10 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
               {event.content}
             </div>
           )}
-          <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-danger" : "text-[var(--kimix-panel-text-secondary)]"}`}>
+          <div className={`mt-1.5 text-right text-[13px] leading-5 ${event.status === "failed" ? "text-accent-danger" : "text-[var(--kimix-panel-text-secondary)]"}`} style={{ paddingRight: 15 }}>
             {label}
           </div>
-          {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger">{event.error}</div>}
+          {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger" style={{ paddingRight: 15 }}>{event.error.replace(/[。.]+$/u, "")}</div>}
         </div>
       </div>
       {previewImage?.dataUrl && (
