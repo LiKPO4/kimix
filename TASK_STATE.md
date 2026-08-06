@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-06 全面 Review：v2.20.145 → v2.20.261（137 提交 / 142 文件）
+
+- 方式：8 个只读 explore 子代理按模块分区审查，主代理对全部"中"级结论逐条读码复核（1 条证伪：steer handler throw 实际被外层 catch 转 {success:false}，Composer 有 failed+toast 处理）。分区定向测试共 1300+ 用例全过。
+- 确认的中级问题（均已复核，等用户圈定修复顺序）：① electron/kimiCodeHost.ts:1469 单会话 promote 失败→markFallback 杀整个 daemon→10s ticker 自维持循环；② kimiHistoryReconciliation.ts:947 isCrossTurnRemnant 缺本地下一轮对齐校验，可能永久丢轮内容；③ turnBlocks.ts:133 前缀去重方向不对称丢更长正文段；④ activeTurnDraftStore.ts:520 committedSegments 生产零清理只增不减；⑤ ChatThread.tsx:1276 steer 两段轮共享 completedTurnCacheKey 缓存击穿；⑥ steer 切分渲染逻辑零测试覆盖（ChatThread.test.ts 无 steer 用例）。
+- 低级问题约 20 条（post-terminal watch 永不过期、steerConfirm 时钟未校准、胶囊空态无法复位 hidden、胶囊展开色绕令牌、nostalgia 输入框无焦点指示等），清单在本轮会话 review 报告。
+- 建议修复优先级：①杀 daemon 循环 → ③丢正文 → ②历史替换 → ④内存累积 → ⑤⑥缓存 key+补测试。
+- 注意：TASK_STATE.md 已 2443 行，超 2000 行归档阈值，需尽快归档早期条目到 TASK_HISTORY.md。
+
 ## 2026-08-06 修复：胶囊弹窗与侧栏后台任务块互斥（v2.20.261）
 
 - 现场：胶囊弹窗和侧栏「后台 Bash」「子 Agent」块同时存在。用户定义终态语义：默认只显示胶囊+弹窗；点收起到侧栏 → 胶囊弹窗消失、侧栏块出现；侧栏点恢复 → 胶囊回来、侧栏块消失。修复：LongTaskInspectorPanel 两个任务卡渲染条件加 `(hiddenComposerCardKeys ?? []).includes(key)`，未收起时一律不渲染；「恢复胶囊」按钮天然只在已收起时出现。测试更新：互斥新例（有任务未收起不渲染）+ 原渲染例补 hiddenComposerCardKeys。
