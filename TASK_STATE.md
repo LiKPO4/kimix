@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 回退：撤销 footer 负 margin 重叠渐变（v2.20.258）
+
+- 现场：v2.20.257 实机窗口顶部工具栏被裁切（用户截图箭头处），系 255 的 `margin-top:-28px` footer 重叠破坏壳层布局。用户要求立即回退。处理：`git revert 28aa0915`（仅撤 255 的页脚改动，冲突的 TASK_STATE/package.json 保留当前态）；256/257 的侧栏语义保留。页脚回到 254 实色条形态，胶囊悬浮保留。
+
 ## 2026-08-06 修正：bash/subagent 收起语义回归，恢复入口并入侧栏旧块（v2.20.257）
 
 - 现场：256 误删了 bash/subagent 的收起到侧栏按钮；用户本意是胶囊显隐逻辑不变（有任务才显示），侧栏不出现重复的独立小块。修正：恢复胶囊面板的收起到侧栏按钮与 hiddenCards 抑制（ComposerDockCard 恢复 bash/subagent）；侧栏不渲染独立恢复小块，改为在旧「后台 Bash」/「子 Agent」块头部注入「恢复胶囊」小按钮（LongTaskInspectorPanel 新增可选 prop hiddenComposerCardKeys，AppShell 传 hiddenComposerCardList）。未收起时侧栏只有旧块，无任何重复。
