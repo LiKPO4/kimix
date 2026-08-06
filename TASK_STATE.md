@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：footer 上重叠 + 顶部渐变，消息淡出而非硬切（v2.20.255）
+
+- 现场：输入框上方仍有一短行实色背景硬切聊天文字。修复：`.kimix-app-shell-footer` 加 `margin-top:-28px` 向上重叠聊天滚动区（flex 布局让滚动视口随之延长 28px），背景改 `linear-gradient(transparent → surface-base 28px)`，滚来的消息在渐变带里淡出；modern 覆写同步。关键认知：此前单纯给 footer 加透明渐变无效——footer 与滚动区是兄弟节点不重叠，透明带后面只有应用底色，必须负 margin 制造重叠。
+
 ## 2026-08-06 修复：Dock 胶囊行脱离文档流悬浮，不再占 footer 背景带（v2.20.254）
 
 - 现场：胶囊行在 footer 实色背景带上占一整行，用户要求"胶囊悬在后面的内容之上，不带一行背景"。修复：ComposerDockBar 根节点改 `position:absolute; bottom:100%`（锚定 Composer relative 根），不占 footer 高度，胶囊直接浮在聊天滚动区底部内容上；展开面板仍向上弹出。DockBar 7 例、build 通过。
