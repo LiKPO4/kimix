@@ -1,4 +1,15 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：steer/resync 重放正文跨轮重复渲染（v2.20.247）
+
+- 现场（用户 v2.20.246 截图，session_532ff5cb 12:10-12:22 窗口）：同一段「你好霖江路。先看下这条线的性质…关于那条竖线…」正文上下渲染两次（steer 前正式区 + steer 后本轮区），重载窗口后仍复发。
+- 取证（IndexedDB blob 事件序列 + diag [live] anchor）：正式时间线已有 6gbye795m（正文 X，12:09:43）与 e2beahztr（正文 Y，12:10:54）；steer 后官方从 offset=0 累计重放 X+Y（12:11:41，161 字符；12:22:55 又重放到 585 字符），重放被吞进 draft 并在 12:11:46 材料化为 active-draft db5ea784（正文与正式 X 逐字节相同、thinking 是后续新段、delivery identity 相同）。三层防线各自的洞：① committedSegments 单槽——think-only 提交把 content 基准刷空，且重载后整体为空；② deduplicateTimelineEvents 的 deliveryContentKey 守卫其实能拦住这对（探针证实），但 live 时间线与 runtime-recovery 路径不经过它；③ collapseDuplicateMaterializations 只比对材料化互相签名，formal-vs-材料化同文漏过（探针证实双份存活）——这是重载后仍重复的直接原因。
+- 修复：
+  - draft 层（根因）：新增 buildFormalReplayCoverage + anchorStreamText 覆盖抑制——draft 为空且未锚定时，增量若落在「同 turn 已正式落盘正文/思考覆盖串」（各段单独 + 原始/\n\n 拼接两种累计形态）的同一 offset 前缀上即拒，偏离覆盖串自动恢复正常路径；≥8 字符才抑制（新步问候语「你好霖江路。」6 字符短前缀不误杀，正式提交时 greeting 由正式帧补全，与既有 committedSegments 误拒权衡一致）。useEventStream 按事件数组引用 WeakMap 缓存覆盖串，不引入每 delta O(历史)。
+  - 持久化自愈层：collapseDuplicateMaterializations 扩展——同轮（user/steer 边界内）active-draft 正文与此前正式事件逐字节相同（≥16 字符）则清空其正文、保留思考段（对齐 deduplicateTimelineEvents 同语义）；只认「正式在前、材料化在后」顺序。
+- 验收：证伪先行——抑制 3 例旧实现全红（累计重放/单步重放/思考重放均被吞进 draft）、collapse formal-vs-材料化 1 例旧实现红；修复后新增 9 例全绿（另含新步开头/问候短帧/无覆盖旧路径/反向顺序不误伤）；定向 309+94 例、全量 1662 例、typecheck、knowledge:validate、build 通过。实机待用户验收（同会话重载后不再双份；新 steer 后本轮只显示新增正文）。
+- 已知边界：重放碎片极细（<8 字符首帧）时首帧可能漏抑随后续锚定拼入——实测官方重放首帧为 40-85 字符大块，残留风险低；材料化在正式帧【之前】到达的反向顺序仍靠既有签名去重与 243 块级前缀去重兜底。
+- 关键文件：`src/utils/activeTurnDraftStore.ts`、`src/hooks/useEventStream.ts`、`src/utils/kimiHistoryReconciliation.ts`。
+
 ## 2026-08-06 修复：steer 会话历史自愈失效——边界等价映射 + 条件切分 + 缓存升版 20（v2.20.244）
 
 - 现场（用户对照官方 kimi-web vs 重载后的 Kimix v2.20.243，session_532ff5cb）：官方结构 user → 工作轮 1 → steer → 工作轮 2（各自独立、内容完整）；Kimix 重载后两轮粘连成一个折叠轮（总耗时 7分0秒），轮 1 正文与总结长文「缺失」。重载窗口不能自愈。

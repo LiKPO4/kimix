@@ -13,6 +13,7 @@ import {
 } from "@/utils/collaborationRooms";
 import {
   applyActiveTurnDraftDelta,
+  buildFormalReplayCoverage,
   clearActiveTurnDraft,
   draftToAssistantEvent,
   getActiveTurnDraft,
@@ -21,10 +22,36 @@ import {
   makeActiveTurnDraftKey,
   parseActiveTurnDraftKey,
   takeActiveTurnDraft,
+  type FormalReplayCoverage,
 } from "@/utils/activeTurnDraftStore";
 import { isActiveTurnDraftEnabled, isScrollYieldEnabled } from "@/utils/perfFlags";
 import { timeSync } from "@/utils/perfDiag";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
+
+// Resync 重放覆盖串缓存：按正式事件数组引用缓存每个 turn 的覆盖串。deltas 驻留
+// draft 期间时间线不变（引用稳定），只有 flush 落批换新数组后才重建，避免每
+// delta O(历史) 扫描。
+const formalReplayCoverageCache = new WeakMap<
+  readonly TimelineEvent[],
+  Map<string, FormalReplayCoverage>
+>();
+
+function getFormalReplayCoverage(
+  events: readonly TimelineEvent[],
+  agentTurnId: string,
+): FormalReplayCoverage {
+  let byTurn = formalReplayCoverageCache.get(events);
+  if (!byTurn) {
+    byTurn = new Map();
+    formalReplayCoverageCache.set(events, byTurn);
+  }
+  let coverage = byTurn.get(agentTurnId);
+  if (!coverage) {
+    coverage = buildFormalReplayCoverage(events, agentTurnId);
+    byTurn.set(agentTurnId, coverage);
+  }
+  return coverage;
+}
 
 const STREAM_EVENT_FLUSH_MS = 80;
 const STREAM_EVENT_FLUSH_MS_WHEN_SCROLLING = 250;
@@ -282,7 +309,11 @@ export function useEventStream() {
       !scoped.snapshotMessageIdStable &&
       !scoped.completionBarrierReplay
     ) {
-      applyActiveTurnDraftDelta(draftKey, scoped);
+      applyActiveTurnDraftDelta(
+        draftKey,
+        scoped,
+        getFormalReplayCoverage(getRoomAgentEvents(session, roomAgentId), scoped.agentTurnId as string),
+      );
       return;
     }
 

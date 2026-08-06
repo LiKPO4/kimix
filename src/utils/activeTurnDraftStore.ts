@@ -209,13 +209,33 @@ type StreamAnchor = number | null;
  * rejected real output instead. Anchors are now dropped at commit, so a
  * committed segment leaves no anchor for offset 0 to trip over.
  */
+/**
+ * Resync 重放抑制：draft 为空（提交后/重载后）且未锚定时，如果增量落在此前
+ * 已进入正式时间线的文本覆盖串上（同一 offset 处前缀匹配），它就是官方重放，
+ * 直接拒绝且不锚定；一旦流偏离覆盖串（真正的新内容），自动恢复正常路径。
+ * 只在「acc 空 + anchor null」的危险区生效，不影响正常步内锚定拼接。
+ * 短增量（<8 字符）不抑制：新步开头常与历史段共享问候语前缀（如实机每段都以
+ * 「你好霖江路。」开头），短片段误拒会丢掉新步开头；重放流的首帧通常是大块
+ * （实测 40-85 字符），门槛不会放跑真实重放。
+ */
+const REPLAY_SUPPRESS_MIN_DELTA = 8;
+
 function anchorStreamText(
   acc: string,
   delta: string,
   offset: number,
   anchor: StreamAnchor,
   committedText?: string,
+  formalCoverage?: readonly string[],
 ): { text: string; anchor: StreamAnchor; accepted: boolean } {
+  if (
+    !acc &&
+    anchor === null &&
+    delta.length >= REPLAY_SUPPRESS_MIN_DELTA &&
+    formalCoverage?.some((coverage) => coverage.startsWith(delta, offset))
+  ) {
+    return { text: acc, anchor: null, accepted: false };
+  }
   if (offset === 0) {
     // Offsets are per-step: 0 opens this step's stream, so the delta becomes
     // the segment's new text. A boundary commit drops the anchor
@@ -248,6 +268,7 @@ function applyStreamOffsetDelta(
   event: AssistantMessage,
   anchors: { content: StreamAnchor; think: StreamAnchor },
   committed?: { content: string; think: string },
+  formalCoverage?: FormalReplayCoverage,
 ): { event: AssistantMessage; contentAnchor: StreamAnchor; thinkAnchor: StreamAnchor; accepted: boolean } {
   const offset = event.streamOffset as number;
   if (event.thinking && !event.content) {
@@ -257,6 +278,7 @@ function applyStreamOffsetDelta(
       offset,
       anchors.think,
       committed?.think,
+      formalCoverage?.think,
     );
     const anchored = merged.anchor !== null;
     const basePart = base.thinkingParts?.[0];
@@ -283,7 +305,7 @@ function applyStreamOffsetDelta(
       accepted: merged.accepted,
     };
   }
-  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, committed?.content);
+  const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, committed?.content, formalCoverage?.content);
   return {
     event: {
       ...base,
@@ -299,9 +321,42 @@ function applyStreamOffsetDelta(
   };
 }
 
+export type FormalReplayCoverage = {
+  content?: readonly string[];
+  think?: readonly string[];
+};
+
+/**
+ * 从某个 agent turn 已进入正式时间线的 assistant 事件构建重放覆盖串：
+ * 各段正文/思考单独成串，外加原始拼接与 \n\n 拼接两种累计形态（官方 resync
+ * 重放有实测为跨段累计流：85 → 161 → 585 字符）。applyActiveTurnDraftDelta
+ * 用它识别「draft 为空时从 offset=0 重放已正式落盘内容」的增量并抑制，
+ * 覆盖 committedSegments 管不到的两种形态：think-only 提交刷掉单槽正文基准、
+ * 重载后 committedSegments 为空。
+ */
+export function buildFormalReplayCoverage(
+  events: readonly TimelineEvent[],
+  agentTurnId: string,
+): FormalReplayCoverage {
+  const bodies: string[] = [];
+  const thinks: string[] = [];
+  for (const event of events) {
+    if (event.type !== "assistant_message" || event.agentTurnId !== agentTurnId) continue;
+    const body = event.content.trim();
+    if (body) bodies.push(body);
+    const think = (event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "").trim();
+    if (think) thinks.push(think);
+  }
+  const withJoins = (parts: string[]): string[] => (
+    parts.length > 1 ? [...parts, parts.join(""), parts.join("\n\n")] : parts
+  );
+  return { content: withJoins(bodies), think: withJoins(thinks) };
+}
+
 export function applyActiveTurnDraftDelta(
   key: string,
   event: AssistantMessage,
+  formalCoverage?: FormalReplayCoverage,
 ): ActiveTurnDraft | null {
   let previous = drafts.get(key);
   let migratedFromKey: string | null = null;
@@ -365,7 +420,7 @@ export function applyActiveTurnDraftDelta(
     const isThinkDelta = Boolean(event.thinking) && !event.content;
     const anchorBefore = isThinkDelta ? thinkAnchor : contentAnchor;
     const accBefore = (isThinkDelta ? base.thinking ?? "" : base.content).length;
-    const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor }, committedSegments.get(key));
+    const applied = applyStreamOffsetDelta(base, event, { content: contentAnchor, think: thinkAnchor }, committedSegments.get(key), formalCoverage);
     contentAnchor = applied.contentAnchor;
     thinkAnchor = applied.thinkAnchor;
     noteStreamAnchorDecision({

@@ -130,17 +130,30 @@ function dedupeLocalHistoryForComparison(events: TimelineEvent[]): TimelineEvent
  * 51 字进度被材料化为 16 个不同事件）；保留首个、清空其余。只认材料化 id
  * 前缀与非空长文本，formal 事件与合法短回复不受影响；思考总量回落后单调
  * 门禁不再把干净 canonical 判「更薄」。
+ *
+ * 另有一种签名去重管不到的形态：steer/resync 重放把【已正式落盘】的正文
+ * 再次材料化，但 thinking 是后续新段（实据 session_532ff5cb：正式事件与
+ * 材料化正文逐字节相同、thinking 不同、delivery identity 相同）。此时
+ * 对照此前正式事件的正文，逐字节相同则清空材料化正文、保留其思考段——
+ * 与 deduplicateTimelineEvents 的 deliveryContentKey 守卫同语义；正式事件
+ * 自身互相不去重（合法重复回复），只认「正式在前、材料化在后」的顺序。
  */
 export function collapseDuplicateMaterializations(events: TimelineEvent[]): TimelineEvent[] {
   const seenSignatures = new Set<string>();
+  const seenFormalBodies = new Set<string>();
   let changed = false;
   const result = events.map((event) => {
     if (event.type === "user_message" || event.type === "steer_message") {
       seenSignatures.clear();
+      seenFormalBodies.clear();
       return event;
     }
-    if (event.type !== "assistant_message" || !event.id.startsWith("active-draft:")) return event;
+    if (event.type !== "assistant_message") return event;
     const body = event.content.trim();
+    if (!event.id.startsWith("active-draft:")) {
+      if (body.length >= 16) seenFormalBodies.add(body);
+      return event;
+    }
     const thinking = (event.thinkingParts?.map((part) => part.text).join("") || event.thinking || "").trim();
     const signature = body + "\n" + thinking;
     if (signature.length < 16) return event;
@@ -149,6 +162,13 @@ export function collapseDuplicateMaterializations(events: TimelineEvent[]): Time
       return { ...event, content: "", thinking: undefined, thinkingParts: undefined, isThinking: false };
     }
     seenSignatures.add(signature);
+    if (body.length >= 16 && seenFormalBodies.has(body)) {
+      changed = true;
+      if (!thinking) {
+        return { ...event, content: "", thinking: undefined, thinkingParts: undefined, isThinking: false };
+      }
+      return { ...event, content: "" };
+    }
     return event;
   });
   return changed ? result : events;

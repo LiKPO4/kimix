@@ -308,3 +308,63 @@ describe("activeTurnDraftStore", () => {
     expect(isAuthoritativeAssistantBodyEvent(delta("", { isComplete: true }))).toBe(false);
   });
 });
+
+describe("formal coverage replay suppression (steer/reload resync)", () => {
+  beforeEach(() => {
+    resetActiveTurnDraftStoreForTests();
+  });
+  const X = "你好霖江路。先看下这条线的性质——它是 AI mask 残留的半透明碎屑，我确认下现有的「透明度下限」功能能不能直接干掉它。";
+  const Y = "你好霖江路。两个问题分开答：关于那条竖线，那是 AI mask 的半透明残留，直接把低 alpha 的部分砍掉。";
+  const think1 = "The user shows a real photo, checking the alpha floor behavior.";
+
+  it("suppresses a cumulative resync replay against formal coverage, then accepts the new tail", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    const coverage = { content: [X, Y, X + Y], think: [] as string[] };
+    // 重载后 committedSegments 为空，resync 从 offset=0 累计重放 X+Y
+    applyActiveTurnDraftDelta(key, delta(X.slice(0, 40), { streamOffset: 0 }), coverage);
+    expect(getActiveTurnDraft(key)?.content ?? "").toBe("");
+    applyActiveTurnDraftDelta(key, delta(X.slice(40), { streamOffset: 40 }), coverage);
+    expect(getActiveTurnDraft(key)?.content ?? "").toBe("");
+    applyActiveTurnDraftDelta(key, delta(Y, { streamOffset: X.length }), coverage);
+    expect(getActiveTurnDraft(key)?.content ?? "").toBe("");
+    // 重放结束后的真正新内容：offset 超出覆盖长度，正常接受
+    applyActiveTurnDraftDelta(key, delta("真正的新正文内容。", { streamOffset: X.length + Y.length }), coverage);
+    expect(getActiveTurnDraft(key)?.content ?? "").toBe("真正的新正文内容。");
+  });
+
+  it("suppresses a per-step replay of a single formal body", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    const coverage = { content: [X, Y, X + Y], think: [] as string[] };
+    // 单步重放：offset=0 直接重放 Y（不是从 X 开始的累计流）
+    applyActiveTurnDraftDelta(key, delta(Y.slice(0, 30), { streamOffset: 0 }), coverage);
+    expect(getActiveTurnDraft(key)?.content ?? "").toBe("");
+  });
+
+  it("does not suppress a genuinely new step opening", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    const coverage = { content: [X, Y, X + Y], think: [] as string[] };
+    applyActiveTurnDraftDelta(key, delta("你好霖江路。好，这轮我们换个方向处理。", { streamOffset: 0 }), coverage);
+    expect(getActiveTurnDraft(key)?.content).toBe("你好霖江路。好，这轮我们换个方向处理。");
+  });
+
+  it("keeps the short greeting delta of a new step (below suppression threshold)", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    const coverage = { content: [X, Y, X + Y], think: [] as string[] };
+    applyActiveTurnDraftDelta(key, delta("你好霖江路。", { streamOffset: 0 }), coverage);
+    applyActiveTurnDraftDelta(key, delta("新的方向。", { streamOffset: 6 }), coverage);
+    expect(getActiveTurnDraft(key)?.content).toBe("你好霖江路。新的方向。");
+  });
+
+  it("suppresses a thinking resync replay against formal think coverage", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    const coverage = { content: [] as string[], think: [think1] };
+    applyActiveTurnDraftDelta(key, delta("", { thinking: think1.slice(0, 30), streamOffset: 0 }), coverage);
+    expect(getActiveTurnDraft(key)?.thinking ?? "").toBe("");
+  });
+
+  it("accepts deltas when no coverage is provided (legacy path unchanged)", () => {
+    const key = makeActiveTurnDraftKey("s1", "a", "t1");
+    applyActiveTurnDraftDelta(key, delta(X.slice(0, 40), { streamOffset: 0 }));
+    expect(getActiveTurnDraft(key)?.content).toBe(X.slice(0, 40));
+  });
+});

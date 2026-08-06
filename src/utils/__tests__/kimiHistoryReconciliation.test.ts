@@ -357,6 +357,49 @@ describe("collapseDuplicateMaterializations", () => {
     ];
     expect(collapseDuplicateMaterializations(local)).toBe(local);
   });
+
+  it("blanks a materialized body duplicating an earlier formal event, keeping its distinct thinking", () => {
+    // 实据 session_532ff5cb：steer 重放把已正式落盘的正文再次材料化，
+    // thinking 是后续新段，签名不同绕过了材料化互相比对。
+    const thinking = "另一段后续思考，长度足够跨过折叠门槛。";
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "formal-1", thinking: "正式思考" }),
+      assistant(longText, { id: "active-draft:s:t:mat-1", thinking }),
+    ];
+    const merged = collapseDuplicateMaterializations(local);
+    expect(merged.map((event) => (event.type === "assistant_message" ? event.content : event.type))).toEqual([
+      "user_message",
+      longText,
+      "",
+    ]);
+    const kept = merged[2];
+    expect(kept.type === "assistant_message" ? kept.thinking : undefined).toBe(thinking);
+  });
+
+  it("blanks a materialized duplicate of a formal body entirely when it has no thinking", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "formal-1" }),
+      assistant(longText, { id: "active-draft:s:t:mat-1" }),
+    ];
+    const merged = collapseDuplicateMaterializations(local);
+    expect(merged.map((event) => (event.type === "assistant_message" ? event.content : event.type))).toEqual([
+      "user_message",
+      longText,
+      "",
+    ]);
+  });
+
+  it("keeps a materialization whose body only matches a later formal event", () => {
+    // 只认「正式在前、材料化在后」：反向顺序不是重放材料化。
+    const local: TimelineEvent[] = [
+      { ...userMessage },
+      assistant(longText, { id: "active-draft:s:t:mat-1" }),
+      assistant(longText, { id: "formal-1" }),
+    ];
+    expect(collapseDuplicateMaterializations(local)).toBe(local);
+  });
 });
 
 describe("hasInflatedLocalKimiThinkingHistory", () => {
