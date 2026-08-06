@@ -1,4 +1,16 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：引导（steer）链路三症状——236 修复的部分成功遗留（v2.20.241）
+
+- 现场（用户 v2.20.240 三截图，会话 session_532ff5cb）：① steer 后双重思考块同跑（同一段思考在旧轮 settle 块与新一轮流式块并存）；② steer 实际已注入且 agent 已针对其作答，气泡仍长期「等待官方写入」；③ 完成后同一文案双气泡（steer「引导已写入当前轮」+ 普通 user），回复中一段思考（"Reply with instructions."）也出现两次。
+- 取证（三源交叉：官方 wire session_532ff5cb.jsonl + diag.log + IndexedDB blob 解码）：官方时间线 steer 内容只有一条 user 消息（08:08:17 context.spliced/append_message 落历史），turnId=7 全程不变（官方不重启 turn）——三症状全部判定为 **Kimix 渲染侧缺陷**，官方无异常。
+- 根因与修复：
+  - 症状 2+3 同根（mergeEvents user_message 分支）：官方回放 user（snapshot:/user: 前缀或 snapshotMessageIdStable）与本地 steer echo 并存渲染。修复：官方回放 user 内容与 sending/accepted/sent 的 steer_message 匹配（isMatchingSteerContent）→ 立即收敛 sent（不等轮次终态）且不追加独立 user 气泡；failed steer 不吞。
+  - 症状 1（buildRenderItems）：steer_message 触发 flushTurn() 切出「无 user 的伪新轮」（官方不切 turn）→ 独立轮头部 + 新思考块。修复：steer 改入 turnBody 归属——有 assistant 块时 attachedSteers 嵌入轮头，无轮包围时独立渲染。
+  - 症状 1（clearActiveTurnDraft）：step 边界权威帧删除 committedSegments（回放判定基准）→ steer 后新 step 思考流 offset=0 同前缀重放被当新内容材料化（diag 铁证 08:08:26 offset:0 regression:true prevOffset:2051）。修复：clear 保留 committedSegments，误拒代价单帧自愈。
+- 验收：新增 6 例（每处修复均有临时恢复旧实现的证伪实证）；定向 271 例、全量 1640 例、typecheck、knowledge:validate 通过。实机三症状待用户验收。
+- 已知边界：steer 后官方新 step 重新生成的相似思考是官方行为，归入同一轮单块连续显示、不做内容级去重；历史已持久化的旧双 user 事件不主动回溯（重启回放经 mergeEvents 自然去重）。
+- 关键文件：`src/utils/eventMapper.ts`、`src/components/chat/ChatThread.tsx`、`src/utils/activeTurnDraftStore.ts`、`knowledge/architecture/runtime-routing.md`（20a）、`knowledge/architecture/streaming-render-pipeline.md`。
+
 ## 2026-08-06 修复：思考工具链展开带动子内容一并展开（v2.20.240）
 
 - 现场：用户截图——点击展开「思考工具链」摘要行后，链条内部 running 状态的子代理任务卡（「任务 · 集成 C+D 选中主体算法」）一并展开，委托 prompt 全文直接铺开。展开父级应只露出链条条目列表，子内容展开与否由子项自身交互决定。

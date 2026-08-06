@@ -3,6 +3,7 @@ import type { TimelineEvent } from "@/types/ui";
 import {
   appendStreamingText,
   applyActiveTurnDraftDelta,
+  clearActiveTurnDraft,
   clearActiveTurnDraftsForSession,
   draftToAssistantEvent,
   getActiveTurnDraft,
@@ -274,6 +275,29 @@ describe("activeTurnDraftStore", () => {
 
     applyActiveTurnDraftDelta(key, delta("继续检查 IPC。", { streamOffset: firstText.length }));
     expect(getActiveTurnDraft(key)?.content).toBe("继续检查 IPC。");
+  });
+
+  it("still rejects a committed-prefix replay after an authoritative clear (step boundary)", () => {
+    // 实机（steer 后同一段思考出现两个块）：step 完成权威帧触发
+    // clearActiveTurnDraft，旧实现把 committedSegments 一并删除，下一步
+    // offset=0 的同前缀重放增量失去判定基准，被当作新内容接受并重新材料化。
+    // 修复：clear 只清 draft 与流锚点，已提交段文本保留为回放判定基准。
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const firstThink = "But wait — potential issue: the bootstrapper architecture!";
+    applyActiveTurnDraftDelta(key, delta("", { thinking: firstThink, streamOffset: 0 }));
+    expect(takeActiveTurnDraft(key)?.thinking).toBe(firstThink);
+
+    // 权威帧（如 turn.step.completed 映射的完整消息）清空 draft。
+    clearActiveTurnDraft(key);
+    expect(getActiveTurnDraft(key)).toBeNull();
+
+    // 同前缀重放（offset=0）仍应被拒绝，不得重新材料化。
+    applyActiveTurnDraftDelta(key, delta("", { thinking: firstThink, streamOffset: 0 }));
+    expect(getActiveTurnDraft(key)).toBeNull();
+
+    // 下一步非零 offset 正常恢复（self-heal，不冻结整步）。
+    applyActiveTurnDraftDelta(key, delta("", { thinking: "继续分析缓存键。", streamOffset: firstThink.length }));
+    expect(getActiveTurnDraft(key)?.thinking).toBe("继续分析缓存键。");
   });
 
   it("marks complete/barrier bodies as authoritative", () => {

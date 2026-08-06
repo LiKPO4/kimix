@@ -1371,3 +1371,45 @@ describe("message footer memoization", () => {
     expect(timelineEventMemoKey(before)).not.toBe(timelineEventMemoKey(after));
   });
 });
+
+describe("buildRenderItems steer boundary", () => {
+  it("keeps a running turn together across a steer (no phantom new turn)", () => {
+    // 官方 steer 只注入当前运行中的 turn（turnId 不变，steer 后同一轮继续输出，
+    // thinking.delta 按 step 从 offset=0 重启）。旧实现把 steer_message 当 turn
+    // 边界 flushTurn：steer 后的思考流进入「无 user 消息的伪新轮」，渲染出独立
+    // 轮次头部（k3-256k · 执行中）+ 新思考块，与已 settle 的上一段思考并存
+    // （实机：steer 后同一段思考出现两个块）。
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "确认一下" },
+      {
+        id: "assistant-1", type: "assistant_message", timestamp: 2,
+        content: "先看实现。", thinking: "But wait — potential issue.", isThinking: false,
+        isComplete: true, agentTurnId: "turn-7",
+      },
+      { id: "steer-1", type: "steer_message", timestamp: 3, content: "你是不是搞错的了", status: "sent" },
+      {
+        id: "assistant-2", type: "assistant_message", timestamp: 4,
+        content: "", thinking: "重新分析。", isThinking: true,
+        isComplete: false, agentTurnId: "turn-7",
+      },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, true);
+    const unit = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    // 同一 turn 内：两个 assistant 片段合并为一个渲染单元，不出现「新一轮」独立头部
+    expect(unit?.type).toBe("event");
+    if (unit?.type !== "event") return;
+    // steer 气泡以 embedded 方式挂载在该轮头部（attachedSteers），而非独立成轮
+    expect(unit.attachedSteers?.map((steer) => steer.id)).toEqual(["steer-1"]);
+  });
+
+  it("renders a steer with no enclosing turn as a standalone bubble", () => {
+    const events: TimelineEvent[] = [
+      { id: "steer-1", type: "steer_message", timestamp: 3, content: "先处理缓存", status: "accepted" },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, false);
+    const steer = items.find((item) => item.type === "event" && item.event.type === "steer_message");
+    expect(steer?.type).toBe("event");
+    if (steer?.type !== "event") return;
+    expect(steer.event.id).toEqual("steer-1");
+  });
+});

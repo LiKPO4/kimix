@@ -448,8 +448,13 @@ export function clearActiveTurnDraft(key: string): void {
   // An authoritative snapshot/body becomes the new formal baseline. Its
   // per-message body cannot reconstruct the Server's whole-turn offset, so let
   // the next live frame seed a fresh cursor (including a non-zero resume).
+  // committedSegments 保留：它记录「本 turn 最近一次提交的段文本」，是下一步
+  // （同一 turn 内下一 step）offset=0 增量「已提交段前缀重放」判定的唯一基准。
+  // 清掉它会让 steer/step 边界后的重放增量无法识别（实机：steer 后新 step 的
+  // thinking.delta 从 offset=0 重流，被当作新内容接受，渲染出与已 settle 思考
+  // 相同的第二个思考块）。误拒代价是单帧（self-heal 于下一条 offset=0），且
+  // 跨 turn 时 draft key 不同不共享，无串扰。
   streamAnchors.delete(key);
-  committedSegments.delete(key);
   if (!drafts.has(key)) return;
   pendingNotifyKeys.delete(key);
   flushPendingNotifications();

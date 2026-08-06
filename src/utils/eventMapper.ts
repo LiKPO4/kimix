@@ -2054,6 +2054,30 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         }
       }
     }
+    // 官方 steer 确认帧：快照/历史回放的 user 消息（稳定身份）内容与本地
+     // sending/accepted/sent 的 steer_message 相同——官方已把引导内容作为
+     // user 消息落历史（context.spliced / context.append_message），这是
+     // 「引导已写入当前轮」的权威证据。立即收敛状态（不必等轮次终态，避免
+     // 轮次进行中长期卡「等待官方写入」），且不再追加独立 user 气泡（steer
+     // 气泡已呈现同一内容，避免双气泡并把后续 assistant 切成伪新轮）。
+     const isOfficialReplayUser = incoming.snapshotMessageIdStable === true ||
+       (typeof incoming.id === "string" &&
+         (incoming.id.startsWith("snapshot:") || incoming.id.startsWith("user:")));
+     if (isOfficialReplayUser) {
+       const steerConfirmationIndex = existing.findIndex((event) => (
+         event.type === "steer_message" &&
+         (event.status === "sending" || event.status === "accepted" || event.status === "sent") &&
+         isMatchingSteerContent(event.content, incoming.content)
+       ));
+       if (steerConfirmationIndex !== -1) {
+         const result = [...existing];
+         const steer = result[steerConfirmationIndex] as Extract<TimelineEvent, { type: "steer_message" }>;
+         if (steer.status !== "sent") {
+           result[steerConfirmationIndex] = { ...steer, status: "sent", error: undefined };
+         }
+         return result;
+       }
+    }
   }
 
   // Keep compaction completion aligned with its start event. If it is appended

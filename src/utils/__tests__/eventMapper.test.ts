@@ -1010,6 +1010,69 @@ describe("mergeEvents", () => {
     expect((result[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
+  it("converges an accepted steer to sent and drops the official replay user bubble", () => {
+    // 官方把 steer 内容作为 user 消息落历史（context.spliced / context.append_message），
+    // 快照回放以稳定 id（snapshot:msg_...）送达——这是「引导已写入当前轮」的权威证据。
+    // 旧实现：追加第二条 user 气泡（症状 3 双 user + 伪 turn 边界），accepted 一直挂到
+    // 轮次终态才收敛（症状 2 轮次进行中长期「等待官方写入」）。
+    const existing: TimelineEvent[] = [
+      { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "你是不是搞错的了", status: "accepted" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "snapshot:msg_01KZB1TZXN5DRENXY6DZYW4SXM:user:0",
+      type: "user_message",
+      timestamp: 4_000,
+      content: "你是不是搞错的了",
+      roomAgentId: "room-agent:s1",
+    };
+    const result = mergeEvents(existing, incoming);
+    // 不追加独立 user 气泡（steer 气泡已呈现同一内容）
+    expect(result).toHaveLength(2);
+    expect(result.some((event) => event.type === "user_message")).toBe(false);
+    // accepted 立即收敛为 sent（权威确认，不等轮次终态）
+    const steer = result[1] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.status).toBe("sent");
+  });
+
+  it("keeps the official replay user bubble when the matching steer already failed", () => {
+    // failed steer 不代表官方已写入（236 语义：失败时内容可能已在官方队列）；
+    // 官方随后落历史的 user 消息必须保留，不得被失败 steer 吞掉。
+    const existing: TimelineEvent[] = [
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "帮我修一下", status: "failed", error: "引导失败" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "snapshot:msg_xxx:user:0",
+      type: "user_message",
+      timestamp: 4_000,
+      content: "帮我修一下",
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect(result[0].type).toBe("user_message");
+    // failed steer 保持末尾（appendAroundTrailingSteer 语义），未被吞并
+    expect(result[1].type).toBe("steer_message");
+  });
+
+  it("does not treat an identity-less local user echo as a steer confirmation", () => {
+    // 无官方身份（id 非 snapshot:/user: 前缀、无稳定 snapshotMessageId）的本地
+    // user 回显是用户真实新消息，即使内容与 steer 相同也不得收敛/吞并。
+    const existing: TimelineEvent[] = [
+      { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "再查一遍", status: "accepted" },
+    ];
+    const incoming: TimelineEvent = {
+      id: "local-echo-1",
+      type: "user_message",
+      timestamp: 4_000,
+      content: "再查一遍",
+    };
+    const result = mergeEvents(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect(result[0].type).toBe("user_message");
+    const steer = result[1] as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.status).toBe("accepted");
+  });
+
   it("keeps the previous assistant running when a steer is officially confirmed", () => {
     const existing: TimelineEvent[] = [
       { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },

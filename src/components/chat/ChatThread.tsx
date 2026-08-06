@@ -1327,9 +1327,15 @@ export function buildRenderItems(
       currentTurnUserEvent = event;
       continue;
     }
+    // steer_message 不是 turn 边界：官方 steer 只注入当前运行中的 turn
+    //（turnId 不变，steer 后同一轮继续输出），切分 turn 会让 steer 后的
+    // 思考/正文流进「无 user 消息的伪新轮」，渲染出独立轮次头部（k3-256k ·
+    // 执行中）+ 新思考块，与已 settle 的上一段思考并存（实机：steer 后同一
+    // 段思考出现两个块）。steer 气泡改由 renderTurnBody 归属：turn 内有
+    // assistant 块时以 attachedSteers 嵌入该轮头部，空闲轮则走
+    // pushStandaloneSteers 独立渲染。
     if (event.type === "steer_message") {
-      flushTurn();
-      items.push({ type: "event", event });
+      turnBody.push(event);
       continue;
     }
 
