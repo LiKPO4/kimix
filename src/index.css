@@ -446,7 +446,8 @@
 [data-ui-style="modern"] .kimix-app-shell-toolbar,
 [data-ui-style="modern"] .kimix-app-shell-footer {
   border-color: var(--ui-section-divider-color);
-  background: linear-gradient(to bottom, transparent, var(--kimix-modern-workspace-background) 28px);
+  background: var(--kimix-modern-workspace-background);
+  background-image: none;
 }
 
 /* 插件、Hooks、设置等整页工作区与对话画布使用同一亮面，外围侧栏继续保留颜色主题底色。 */
@@ -3015,13 +3016,9 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-app-shell-toolbar,
-/* footer 向上重叠聊天区 28px：顶部透明渐变让滚来的消息淡出，而不是被实色边硬切。 */
 .kimix-app-shell-footer {
-  position: relative;
-  z-index: 10;
-  margin-top: -28px;
   border-color: var(--ui-section-divider-color);
-  background: linear-gradient(to bottom, transparent, var(--surface-base) 28px);
+  background: var(--surface-base);
 }
 
 /* ── Layout Resizer ── */
