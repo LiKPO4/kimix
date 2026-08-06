@@ -25,6 +25,10 @@ export type TurnBlock =
 
 const AGENT_DISPATCH_TOOL_NAMES = new Set(["Agent", "Task", "AgentSwarm"]);
 
+// 同 turn 内 text 段「长前缀重复」判定阈值：共享开场白（如「你好霖江路。」）
+// 不达阈值；滞留 draft 双写的正文段前缀远长于此。
+const MIN_REDUNDANT_TEXT_PREFIX = 20;
+
 /**
  * Official history and snapshot replays carry the Agent dispatch itself
  * (tool_use with description/prompt/subagent_type) but not Kimix's live
@@ -118,6 +122,27 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
       }
       const content = event.content.trim();
       if (content) {
+        // 同 turn 前缀包含去重（实机 532ff5cb 08:54 steer 轮）：官方在 steer 后
+        // 重放 step 1 的完整正文（volatile delta 从 offset 0 重开），而 step 1 的
+        // draft 未在工具边界 commit，35 字符开场白滞留并在后续 step 的 draft 上
+        // 重新材料化——两个 text 段前 30+ 字符逐字相同（渲染层红框内容完全一致），
+        // 只差结尾标点（「桌面：」vs「桌面。」），旧实现渲染出两处相同正文。
+        // 跳过与既有 text 段构成「长前缀重复」的冗余段（保留更完整者）；正常
+        // 共享开场白（如「你好霖江路。」）不达阈值，不受影响。相邻 text 仍按
+        // 原有规则合并。
+        const redundantPrefix = blocks.some((block) => block.kind === "text" && (
+          block.content === content ||
+          block.content.startsWith(content) ||
+          content.startsWith(block.content) ||
+          (
+            Math.min(block.content.length, content.length) >= MIN_REDUNDANT_TEXT_PREFIX &&
+            block.content.slice(0, MIN_REDUNDANT_TEXT_PREFIX) === content.slice(0, MIN_REDUNDANT_TEXT_PREFIX)
+          )
+        ));
+        if (redundantPrefix) {
+          textBoundaryPending = false;
+          continue;
+        }
         const tail = blocks.at(-1);
         if (tail?.kind === "text" && !textBoundaryPending) {
           tail.events.push(event);

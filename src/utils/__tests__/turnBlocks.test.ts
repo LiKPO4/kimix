@@ -213,6 +213,44 @@ describe("buildTurnBlocks", () => {
     expect(textBlocks.length).toBe(1);
     expect(textBlocks[0].content).toBe("第一段。\n\n第二段。");
   });
+
+  it("drops a prefix-redundant text segment rematerialized from a stranded draft (field 532ff5cb 08:54)", () => {
+    // 实机（session_532ff5cb 08:54 steer 轮）：官方在 steer 后重放 step 1 的完整
+    // 正文（191 字符，volatile delta 从 offset 0 重开），而 step 1 的 draft 未在
+    // 工具边界 commit，35 字符开场白滞留并在后续 step 的 draft 上重新材料化——
+    // 两个 text 段构成前缀包含（完整段 + 前缀段），旧实现渲染出两处相同正文
+    //（用户红框两处：ls -la 工具卡前 + CHANGELOG 工具卡前）。
+    const fullText = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面：`RemoveBlack-v1.6.1-ai-test.exe`（98.8MB，带 AI 模型的最新构建产物，刚才是否完全删除了？）";
+    const strandedPrefix = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面。";
+    const events: TimelineEvent[] = [
+      assistant("a-full", fullText),
+      assistant("a-boundary", "", undefined, nextTimestamp()),
+      { id: "tool-grep", type: "tool_call", timestamp: nextTimestamp(), toolCallId: "call-grep", toolName: "Grep", status: "success", arguments: {}, rawArguments: "{}" } as ToolCallEvent,
+      assistant("a-stranded", strandedPrefix),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    // 冗余前缀段被跳过：只保留完整段（旧实现会产出两个 text 块，正文重复）
+    expect(textBlocks).toHaveLength(1);
+    expect(textBlocks[0].content).toContain("RemoveBlack-v1.6.1-ai-test.exe");
+    // 工具卡仍在原位（不被去重影响）
+    const kinds = blocks.map((b) => b.kind);
+    expect(kinds).toContain("tool");
+  });
+
+  it("keeps genuinely different text segments even when they share an opening", () => {
+    // 不同正文即使共享开头（如都以「你好霖江路。」开场）也不得被前缀去重误删。
+    const events: TimelineEvent[] = [
+      assistant("a-1", "你好霖江路。两个问题的调查我拆成两路并行委派。"),
+      assistant("a-boundary", "", undefined, nextTimestamp()),
+      assistant("a-2", "你好霖江路。两路调查都拿到了精确根因，我先整合。"),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    expect(textBlocks).toHaveLength(2);
+    expect(textBlocks[0].content).toContain("两个问题的调查");
+    expect(textBlocks[1].content).toContain("两路调查都拿到了精确根因");
+  });
 });
 
 describe("buildRenderItems with official-order turn", () => {

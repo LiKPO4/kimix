@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：steer 轮正文段落在过程时间线重复渲染（v2.20.243）
+
+- 现场（用户 241 截图，session_532ff5cb 08:53-08:55 steer 轮）：「你好霖江路。 dist/ 里的构建产物还在，我直接再复制一份到桌面。」在时间线出现两次（ls -la 工具卡前 + CHANGELOG 工具卡前）。
+- 取证（diag [live] anchor + wire + IndexedDB）：官方在 steer 确认后重放 step 1 完整正文（body offset=0 regression:true prevOffset=6，191 字符）；而 step 1 的 live 正文只推了 35 字符且在工具边界未 commit 滞留 draft store；重放流因 draft 非空绕过 offset=0 回放判定（`!acc` 语义）被吞进 draft；滞留 35 字符随后被 step-4 思考附着、08:55 重新材料化为第二个事件。两个 text 段前 34 字符逐字相同（仅结尾标点「：」vs「。」不同）。
+- 修复：`buildTurnBlocks` text 块分支新增同 turn 长前缀去重（完全相同/前缀包含/前 ≥20 字符逐字相同，MIN_REDUNDANT_TEXT_PREFIX=20）——跳过冗余段保留更完整者；共享开场白（6 字符）不达阈值不受影响。draft 侧 committedSegments 判定不动（主防线），块级去重是滞留场景的渲染兜底。
+- 验收：新增 2 例（滞留前缀去重证伪——临时禁用去重旧实现两 text 块失败；共享开场白不误删回归）；定向 38 例、全量 1648 例、typecheck、knowledge:validate 通过。实机待用户验收。
+- 已知边界：滞留 draft 根因（工具边界 flush 未 commit）未在协议层根治——draft 非空时 offset=0 判定放宽会误拒正常新 step 正文，权衡未动；再复现「滞留」其他表现（如思考错位附着）应从 commit 时机查。
+- 关键文件：`src/utils/turnBlocks.ts`、`knowledge/architecture/streaming-render-pipeline.md`。
+
 ## 2026-08-06 修复：steer 气泡位置倒挂 + 进行中仍卡「等待官方写入」（v2.20.242）
 
 - 现场（用户复验 241，同会话第二次 steer 08:54 UTC 窗口）：① agent 回复文本渲染在轮内，steer 气泡却排在回复之后（位置倒挂）；② 官方已落库（agent 已作答）气泡仍 accepted。
