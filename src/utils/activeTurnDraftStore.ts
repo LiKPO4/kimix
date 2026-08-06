@@ -612,6 +612,28 @@ export function useActiveTurnDraft(key: string | null): ActiveTurnDraft | null {
   );
 }
 
+/**
+ * 「draft 是否已有可见输出」的布尔快照订阅：快照值是 boolean，useSyncExternalStore
+ * 只在 empty→非空 翻转时触发重渲染，不随每条 delta 重渲染（保持 v2.20.237
+ * 叶子订阅的性能不变量）。供过程行头部区分「等待模型输出」（draft 键已建立但
+ * 模型尚未产出任何内容）与「正在思考/执行中」。
+ */
+export function useActiveTurnDraftHasOutput(key: string | null): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      if (!key) return () => {};
+      return subscribeActiveTurnDraft(key, onStoreChange);
+    },
+    () => {
+      if (!key) return false;
+      const draft = getActiveTurnDraft(key);
+      if (!draft) return false;
+      return Boolean(draft.content?.trim() || draftThinkingText(draft).trim());
+    },
+    () => false,
+  );
+}
+
 /** test helper */
 export function resetActiveTurnDraftStoreForTests(): void {
   drafts.clear();

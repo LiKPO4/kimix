@@ -1448,4 +1448,40 @@ describe("buildRenderItems steer boundary", () => {
     if (steer?.type !== "event") return;
     expect(steer.event.id).toEqual("steer-1");
   });
+
+  it("settles the pre-steer turn while the official turn keeps running after the split", () => {
+    // 实机 v2.20.247 live 窗口（session_532ff5cb 同款时序）：steer 切分后官方
+    // turn 仍在运行，roomAgentActivities 仍按同一 agentTurnId 匹配到前段轮
+    // （roomAgentActivityMatchesTurn 不看 isLatestTurn）→ 前段轮被判 active：
+    // 旧思考保持 live 滚动窗不折叠、footer 停在「消息处理中」，与 steer 后
+    // 最新轮的 live 窗并存（同一份 draft 两处渲染 → 同文上下重复出现 +
+    // 两个带滑块的滚动区）。期望：steer 轮间边界之后前段轮按 settle 渲染
+    // （思考折叠为总结、isAssistantActive=false），live 只留在 steer 后的最新轮。
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "继续上次的工作" },
+      {
+        id: "assistant-1", type: "assistant_message", timestamp: 2,
+        content: "你好霖江路。我先看代码确认橡皮的实际语义。",
+        thinking: "Understanding the app: left panel has 画笔/橡皮 tools.",
+        isThinking: false, isComplete: true, agentTurnId: "turn-8", roomAgentId: "primary",
+      },
+      { id: "steer-1", type: "steer_message", timestamp: 3, content: "另外先把163构建出来放桌面上吧", status: "sent" },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, true, [activeRoomTurn("primary", "turn-8")]);
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    // 前段轮（steer 前的已提交正文）+ steer 后最新轮的 pending 渲染占位
+    expect(assistants).toHaveLength(2);
+    const preSteer = assistants[0];
+    if (preSteer?.type !== "event" || preSteer.event.type !== "assistant_message") return;
+    // 前段轮 settle：不再 active，按完成态渲染（思考折叠 teaser、footer 不再「消息处理中」）
+    expect(preSteer.isAssistantActive).toBe(false);
+    expect(preSteer.event.isComplete).toBe(true);
+    expect(preSteer.event.isThinking).toBe(false);
+    // live 状态只留在 steer 后的最新轮
+    const postSteer = assistants[1];
+    if (postSteer?.type !== "event") return;
+    expect(postSteer.isAssistantActive).toBe(true);
+    const actives = assistants.filter((item) => item.type === "event" && item.isAssistantActive);
+    expect(actives).toHaveLength(1);
+  });
 });

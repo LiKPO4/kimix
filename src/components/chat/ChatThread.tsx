@@ -860,6 +860,7 @@ export function buildRenderItems(
     isLatestTurn = false,
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
     hasLaterUserBoundary = false,
+    hasLaterSteerBoundary = false,
   ) => {
     const turnSourceEventIds = turnEvents.map((event) => event.id);
     turnEvents
@@ -931,10 +932,18 @@ export function buildRenderItems(
     // session. Stale incomplete flags from the previous turn must not consume
     // the next turn's session-level runtime state.
     const isSupersededPrimaryTurn = isPrimaryRoomAgentTurn && hasLaterUserBoundary && !activeRoomAgentTurn;
+    // steer 轮间边界（v2.20.244 条件切分）同样终结前段轮的 live 状态：官方
+    // turn 在 steer 后继续运行，roomAgentActivityMatchesTurn 按同一 agentTurnId
+    // 匹配前段轮（不看 isLatestTurn），不看 steer 边界会把前段轮误判 active——
+    // 旧思考保持 live 滚动窗不折叠、footer 停在「消息处理中」，与 steer 后最新轮
+    // 的 live 窗并存（同一份 draft 两处渲染：同文上下重复 + 双滚动区，实机
+    // v2.20.247 截图）。steer 边界与用户边界同为所有权边界：前段轮按 settle
+    // 渲染（思考折叠 teaser、按完成态收尾），live 只留在 steer 后的最新轮。
+    const isSupersededBySteerBoundary = hasLaterSteerBoundary && !isLatestTurn;
     const hasPendingToolOrSubagent = tools.some((event) => event.status === "running") ||
       subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended");
     const isSessionLevelTurnStopped = !isSessionRunning && !activeRoomAgentTurn && !hasPendingToolOrSubagent;
-    const turnSettled = isSupersededPrimaryTurn || isSessionLevelTurnStopped || (
+    const turnSettled = isSupersededPrimaryTurn || isSupersededBySteerBoundary || isSessionLevelTurnStopped || (
       !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !hasPendingToolOrSubagent
@@ -1276,9 +1285,10 @@ export function buildRenderItems(
     isLatestTurn = false,
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
     hasLaterUserBoundary = false,
+    hasLaterSteerBoundary = false,
   ) => {
     if (!canCacheTurn(turnEvents, isLatestTurn, turnUserEvent) || !completedTurnCache) {
-      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary);
+      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
       return;
     }
     const cacheKey = completedTurnCacheKey(turnEvents);
@@ -1296,15 +1306,15 @@ export function buildRenderItems(
     }
     noteRenderTurnBodyRun(false);
     const itemStart = items.length;
-    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary);
+    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
     completedTurnCache.set(cacheKey, {
       events: [...turnEvents],
       items: items.slice(itemStart),
       sessionEngine,
     });
   };
-  const flushTurn = (isLatestTurn = false, hasLaterUserBoundary = false) => {
-    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEvent, hasLaterUserBoundary);
+  const flushTurn = (isLatestTurn = false, hasLaterUserBoundary = false, hasLaterSteerBoundary = false) => {
+    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
     turnBody = [];
     currentAgentTurnId = undefined;
   };
@@ -1328,13 +1338,15 @@ export function buildRenderItems(
     //   （保持 242 语义：不产生「无 user 消息的伪新轮」+ 双重思考块）。
     // 切分后的 steer 独立渲染在轮间（官方注入点语义：引导气泡在注入处、其
     // 后的回复段排在后面；不得挂 attachedSteers——过程卡之后的位置会把气泡
-    // 排到回复文本下方，实机截图倒挂）。
+    // 排到回复文本下方，实机截图倒挂）。切分 flush 带 hasLaterSteerBoundary：
+    // 官方 turn 在 steer 后仍以同一 agentTurnId 运行，前段轮必须按 settle
+    // 渲染（思考折叠、footer 收尾），live 状态只留给 steer 后的最新轮。
     if (event.type === "steer_message") {
       const steerSplitsTurn = turnBody.some((candidate) => (
         candidate.type === "assistant_message" && candidate.content.trim().length > 0
       ));
       if (steerSplitsTurn) {
-        flushTurn(false);
+        flushTurn(false, false, true);
         items.push({ type: "event", event });
         continue;
       }

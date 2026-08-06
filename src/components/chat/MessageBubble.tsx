@@ -55,6 +55,7 @@ import {
   pickDraftText,
   pickDraftThinkingParts,
   useActiveTurnDraft,
+  useActiveTurnDraftHasOutput,
 } from "@/utils/activeTurnDraftStore";
 import { getProcessManualExpand, noteProcessManualExpand, processManualExpandTurnKey } from "@/utils/processManualExpand";
 import { isActiveTurnDraftEnabled } from "@/utils/perfFlags";
@@ -2838,6 +2839,11 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
+  // 「draft 键已建立」不等于「模型已开始输出」：steer/发送后 draft 键随
+  // activeTurnId 立即出现，但模型可能尚未产出任何字符（实机 v2.20.247 截图：
+  // 消息发出后头部直接「正在思考」）。布尔快照订阅只在 empty→非空 翻转时
+  // 重渲染，不随 delta 击穿 memo。draft 无实际输出前头部保持「等待模型输出」。
+  const hasLiveDraftOutput = useActiveTurnDraftHasOutput(isActiveAssistant ? liveDraftKey ?? null : null);
   const elapsedStartAt = assistantTurnStartedAt({
     turnStartedAt,
     eventTimestamp: event.timestamp,
@@ -2848,8 +2854,8 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       ? "命令运行中"
       : isActiveAssistant && hasFinalContent
         ? "正在输出"
-        : isActiveAssistant && !hasActualThinking && !liveDraftKey
-          ? activeStatusMessage?.trim().replace(/…$/u, "") || "等待首个模型事件"
+        : isActiveAssistant && !hasActualThinking && !hasLiveDraftOutput
+          ? activeStatusMessage?.trim().replace(/…$/u, "") || "等待模型输出"
           : undefined;
   const processLabel = (
     <span className="inline-flex min-w-0 items-center" style={{ gap: 6 }}>

@@ -1,4 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
+import React from "react";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import type { TimelineEvent } from "@/types/ui";
 import {
   appendStreamingText,
@@ -13,6 +16,7 @@ import {
   resetActiveTurnDraftStoreForTests,
   subscribeActiveTurnDraft,
   takeActiveTurnDraft,
+  useActiveTurnDraftHasOutput,
 } from "../activeTurnDraftStore";
 
 function delta(content: string, patch: Partial<Extract<TimelineEvent, { type: "assistant_message" }>> = {}): Extract<TimelineEvent, { type: "assistant_message" }> {
@@ -368,3 +372,71 @@ describe("formal coverage replay suppression (steer/reload resync)", () => {
     expect(getActiveTurnDraft(key)?.content).toBe(X.slice(0, 40));
   });
 });
+
+describe("useActiveTurnDraftHasOutput", () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    resetActiveTurnDraftStoreForTests();
+  });
+
+  it("stays false while the draft key exists but the model has produced nothing, flips on first visible output", async () => {
+    // 实机 v2.20.247：steer/发送后 draft 键随 activeTurnId 立即建立，但模型尚未
+    // 产出任何字符——过程行头部必须保持「等待模型输出」，不能凭键的存在直接
+    // 跳「正在思考」。布尔快照只在 empty→非空 翻转时重渲染（v2.20.237 叶子
+    // 订阅性能不变量）。
+    const key = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const { result, unmount } = renderDraftHook(() => useActiveTurnDraftHasOutput(key));
+    expect(result.current).toBe(false);
+    // 思考输出 → 翻转 true
+    await act(async () => {
+      applyActiveTurnDraftDelta(key, delta("", { thinking: "第一步思考。" }));
+      await flushDraftNotify();
+    });
+    expect(result.current).toBe(true);
+    // 清空（take/clear 材料化）→ 回落 false
+    await act(async () => {
+      clearActiveTurnDraft(key);
+      await flushDraftNotify();
+    });
+    expect(result.current).toBe(false);
+    // 正文输出同样翻转
+    await act(async () => {
+      applyActiveTurnDraftDelta(key, delta("正文片段。"));
+      await flushDraftNotify();
+    });
+    expect(result.current).toBe(true);
+    unmount();
+  });
+
+  it("is false for a null key", () => {
+    const { result, unmount } = renderDraftHook(() => useActiveTurnDraftHasOutput(null));
+    expect(result.current).toBe(false);
+    unmount();
+  });
+});
+
+function renderDraftHook<T>(callback: () => T) {
+  const result = { current: null as unknown as T };
+  function Wrapper() {
+    result.current = callback();
+    return null;
+  }
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  act(() => {
+    root.render(React.createElement(Wrapper));
+  });
+  return {
+    result,
+    unmount() {
+      act(() => {
+        root.unmount();
+      });
+    },
+  };
+}
+
+/** draft 通知经 rAF/setTimeout 合并派发，测试里等待一个宏任务窗口让其落地。 */
+async function flushDraftNotify() {
+  await new Promise((resolve) => setTimeout(resolve, 30));
+}

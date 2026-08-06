@@ -1,4 +1,17 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：steer 切分后前段轮不 settle（双滚动区/同文重复）+ 头部等待标签（v2.20.248）
+
+- 现场（用户复验 v2.20.247 三截图，session_532ff5cb RemoveBlack steer「另外先把163构建出来放桌面上吧」）：① 同一段思考在上下两块重复出现；② steer 后屏幕上出现两个带滑块的 live 滚动区——上一区域输出已结束应折叠成总结；③ 消息/steer 发出后头部直接「k3-256k · 正在思考 35秒」，模型尚未产出任何内容，应为「等待模型输出」。
+- 根因（代码级定位 + 证伪测试先行）：
+  - ①②同根：244 条件切分把 steer 前段轮 flush 成独立渲染轮，但官方 turn 继续以同一 agentTurnId 运行，roomAgentActivityMatchesTurn 不看 isLatestTurn → 前段轮被判 isTurnActive → turnSettled=false → isAssistantActive=true：旧思考保持 live 滚动窗不折叠、footer 停「消息处理中」，且与 steer 后最新轮订阅同一份 draft → 同文两处渲染 + 双滚动区。重载窗口因 isSessionLevelTurnStopped 早已 settle，live 与 reload 形态不一致。
+  - ③：237 的等待标签分支以 liveDraftKey 非空为跳过条件，但 draft 键随 activeTurnId 在发送时刻即建立（roomAgentActivities），模型未产出任何字符时头部已跳「正在思考」。
+- 修复：
+  - ChatThread：steer 切分 flush 传 hasLaterSteerBoundary → 与用户边界同语义计入 turnSettled（isSupersededBySteerBoundary，仅非最新轮生效）。前段轮按完成态渲染：思考折叠 teaser、footer 收尾，live 状态只留 steer 后最新轮。
+  - activeTurnDraftStore 新增 useActiveTurnDraftHasOutput：布尔快照订阅（empty→非空才翻转重渲染，不破 237 叶子订阅性能不变量）；AssistantProcessBlock 等待分支改判 hasLiveDraftOutput，文案「等待模型输出」。
+- 验收：证伪先行——live 会话 buildRenderItems 测试（session running + roomActivity 匹配同 agentTurnId）旧实现红（isAssistantActive=true）；修复后新增 3 例全绿；全量 1665 例、typecheck 通过。实机待用户验收（steer 后前段轮折叠为总结、只剩一个滚动区、发送后头部先「等待模型输出」）。
+- 已知边界：steer 前无正文的 242 不切分语义不变；前段轮 settle 后 footer 在官方 usage.record 到达前显示「模型：X」兜底（与重载后形态一致）；模型 steer 后新 step 重新复述的相似思考属官方行为（241 边界），不做内容级去重。
+- 关键文件：`src/components/chat/ChatThread.tsx`、`src/components/chat/MessageBubble.tsx`、`src/utils/activeTurnDraftStore.ts`、`knowledge/architecture/streaming-render-pipeline.md`（Invariant R）。
+
 ## 2026-08-06 修复：steer/resync 重放正文跨轮重复渲染（v2.20.247）
 
 - 现场（用户 v2.20.246 截图，session_532ff5cb 12:10-12:22 窗口）：同一段「你好霖江路。先看下这条线的性质…关于那条竖线…」正文上下渲染两次（steer 前正式区 + steer 后本轮区），重载窗口后仍复发。
