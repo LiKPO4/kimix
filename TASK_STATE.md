@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-06 已知边界：运行中出现「输出打断」页脚+实时页脚双气泡（未闭环，等现场复现）
+
+- 现场：用户 v2.20.218 截图——运行中的轮尾部出现两个相邻页脚胶囊：「输出打断 输入:186.18k…」（数字冻结，沉底 artifact）+「模型: k3 …」（数字增长，活跃轮实时页脚）。实时页脚运行中显示是 v2.11.55 起既有设计，非回归。
+- 已确证机制：「输出打断」页脚 = 某 assistant 段 isComplete=true 且尾部挂「输出打断」status_update（来自 `turn.step.interrupted` 帧映射，`kimiCodeEventMapper.ts:747`）。合法来源实例：532ff5cb 会话 16:19:30 steer 打断 step 1。非合法通道之一（子代理失败帧误置主轮状态）已在 v2.20.234 修复。
+- 未闭环点：截图时刻「提前完结的中段 assistant」具体由哪一帧 settle 未能从事后数据唯一确定（diag 轮转 + 持久化点早于截图）；三个会话的 IndexedDB 快照（532ff5cb / 06b4c056 / 8351ce72）均未复现该形态。
+- 待查疑点（暂不修）：`eventMapper.ts:1803` 历史映射把 `turn.step.interrupted` 落成无 agentId 状态，子代理步中断若进入历史回放会漏进主时间线——无实例，列边界。
+- 下次复现取证协议：用户不刷新不切会话直接报告 → 立即 dump 该会话 IndexedDB 记录（`file__0.indexeddb.blob` 按会话 id grep 定位，V8 序列化 UTF-16LE 解码）+ diag 对应窗口，定位 settle 帧与「输出打断」状态来源。
+- 关键文件：`src/components/chat/MessageBubble.tsx:3011-3015`（isInterrupted/shouldShowBodyFooter）、`src/utils/kimiCodeEventMapper.ts:747`、`src/utils/eventMapper.ts:1803`。
+
 ## 2026-08-06 修复：子代理 turn.ended(failed) 误驱动主会话状态（假「输出完成」闪屏）（v2.20.234）
 
 - 现场：用户报「显示输出完成+模型请求失败，但内容还在变」（v2.20.218 截图），要求确认当前版本是否仍存在。
