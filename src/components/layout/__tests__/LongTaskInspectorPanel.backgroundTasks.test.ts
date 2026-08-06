@@ -151,6 +151,7 @@ describe("LongTaskInspectorPanel 会话级后台任务卡", () => {
       backgroundTasks: [bashTask, subTask],
       bashTasks: [bashTask],
       subagentTasks: [subTask],
+      hiddenComposerCardKeys: ["bash", "subagent"],
     }));
 
     const bashCard = cardSection(container, "background");
@@ -170,6 +171,19 @@ describe("LongTaskInspectorPanel 会话级后台任务卡", () => {
     expect(subagentCard?.textContent).not.toContain("停止");
     // 模型路由配置卡改名，避免与「子 Agent」任务卡同名
     expect(cardSection(container, "subagent")?.textContent).toContain("子 Agent / Swarm 模型");
+  });
+
+  it("胶囊弹窗与侧栏块互斥：未收起到侧栏时不渲染任务卡（有任务也不渲染）", async () => {
+    const bashTask = makeTask({ taskId: "bash-1", description: "拉取日志", status: "running", subagentType: "bash" });
+    const subTask = makeTask({ taskId: "sub-1", description: "调研竞品", status: "completed", subagentType: "subagent" });
+    const container = await renderPanel(createPanelProps({
+      backgroundTasks: [bashTask, subTask],
+      bashTasks: [bashTask],
+      subagentTasks: [subTask],
+    }));
+    // 默认展示位是输入区胶囊弹窗；只有用户点「收起到侧栏」（hiddenComposerCardKeys 含对应 key）才渲染侧栏块
+    expect(cardSection(container, "background")).toBeNull();
+    expect(cardSection(container, "subagentTasks")).toBeNull();
   });
 
   it("普通会话模式没有任务时自动隐藏两个任务卡", async () => {

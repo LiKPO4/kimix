@@ -1794,7 +1794,7 @@ export function LongTaskInspectorPanel({
                 </div>
               )}
             </section>
-            {bashTasks.length > 0 && (
+            {bashTasks.length > 0 && (hiddenComposerCardKeys ?? []).includes("bash") && (
             <section className="kimix-section-card" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
@@ -1836,7 +1836,7 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
             )}
-            {subagentTasks.length > 0 && (
+            {subagentTasks.length > 0 && (hiddenComposerCardKeys ?? []).includes("subagent") && (
             <section className="kimix-section-card" {...rightCardSectionProps("subagentTasks", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">

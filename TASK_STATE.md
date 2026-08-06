@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：胶囊弹窗与侧栏后台任务块互斥（v2.20.261）
+
+- 现场：胶囊弹窗和侧栏「后台 Bash」「子 Agent」块同时存在。用户定义终态语义：默认只显示胶囊+弹窗；点收起到侧栏 → 胶囊弹窗消失、侧栏块出现；侧栏点恢复 → 胶囊回来、侧栏块消失。修复：LongTaskInspectorPanel 两个任务卡渲染条件加 `(hiddenComposerCardKeys ?? []).includes(key)`，未收起时一律不渲染；「恢复胶囊」按钮天然只在已收起时出现。测试更新：互斥新例（有任务未收起不渲染）+ 原渲染例补 hiddenComposerCardKeys。
+
 ## 2026-08-06 微调：胶囊与输入框间距减半（v2.20.260）
 
 - 现场：胶囊与输入框间 16px（dock marginBottom 8 + Composer paddingTop 8）嫌大，用户要求减半。修复：ComposerDockBar 根 marginBottom 8→0，间距只留 Composer paddingTop 的 8px。
