@@ -1,4 +1,13 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：排队消息补发跟随当前模型 + 失败轮自动排空队列（v2.20.235）
+
+- 现场：k3 轮 429 挂起约 70s 后自行失败，用户只切了模型到千问，排队消息被以千问自动重发，气泡模型「瞬变」。
+- 取证：官方 wire（两次 turn.prompt + 中断 + config.update 时序）+ 两个 daemon 0.33 活探针——daemon 切模型不中断不重发（探针 1），轮次保持 dispatch 时模型（探针 2）；重发来自 Kimix 队列补发在补发时刻取当前模型。daemon 队列无取消接口（仅 prompts:steer，实测其余 action 全 unsupported）→ C 不做，记为边界。
+- 修复 A：`PendingMessage.model` 入队锁定，App.tsx 三个补发点一律 `next.model ?? currentSessionPromptModel(...)`；Composer 三个入队点（运行中发送/发送冲突回补/steer 失败回补）都传锁定模型。
+- 修复 B：error/interrupted 终态不再自动 dispatch 本地队列，改为插入「上轮已终止，N 条排队消息未自动发送」状态卡；completed 路径照常排空。
+- 验收：新增 store 测试 3 例（锁定模型保存/shift 保留/重排保留/无模型兼容）；定向 7 例、tsc 通过；全量+build 见提交记录。实机待用户验收。
+- 关键文件：`src/stores/sessionStore.ts`、`src/components/chat/Composer.tsx`、`src/App.tsx`。
+
 ## 2026-08-06 排查：切模型后气泡模型标签 k3→千问——判定为正确行为，非 bug（附一条边界）
 
 - 现场：k3 跑「刻度跳转」轮卡住无响应，用户切换千问后，该轮页脚胶囊显示千问，用户疑为归属错误。

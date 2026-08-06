@@ -62,3 +62,28 @@ describe("requeuePendingMessageFront", () => {
     expect(queue[0].id).toBe(first.id);
   });
 });
+
+
+describe("pending message model pinning", () => {
+  beforeEach(() => {
+    useSessionStore.setState({ pendingMessages: [] });
+  });
+
+  it("入队时锁定的模型随消息保存，shift 取出后仍在", () => {
+    useSessionStore.getState().addPendingMessage("s1", "带模型的消息", [], "kimi-code/k3");
+    const shifted = useSessionStore.getState().shiftPendingMessage("s1");
+    expect(shifted?.model).toBe("kimi-code/k3");
+  });
+
+  it("模型在失败重排后仍然保留", () => {
+    useSessionStore.getState().addPendingMessage("s1", "带模型的消息", [], "kimi-code/k3");
+    const shifted = useSessionStore.getState().shiftPendingMessage("s1");
+    useSessionStore.getState().requeuePendingMessageFront(shifted!);
+    expect(useSessionStore.getState().pendingMessages[0].model).toBe("kimi-code/k3");
+  });
+
+  it("未指定模型时 model 为 undefined（兼容旧持久化队列）", () => {
+    useSessionStore.getState().addPendingMessage("s1", "无模型消息");
+    expect(useSessionStore.getState().pendingMessages[0].model).toBeUndefined();
+  });
+});

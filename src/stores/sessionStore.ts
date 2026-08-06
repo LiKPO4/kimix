@@ -7,6 +7,8 @@ export interface PendingMessage {
   sessionId: string;
   content: string;
   createdAt: number;
+  /** 入队时锁定的模型：排队/补发必须使用它，而不是补发时刻的「当前模型」。 */
+  model?: string;
   images?: UserMessageImage[];
   roomAgentId?: string;
   roomMessageId?: string;
@@ -25,7 +27,7 @@ export interface SessionStore {
   deleteSession: (id: string) => void;
   archiveSession: (id: string) => void;
   setRecentProjects: (projects: Project[]) => void;
-  addPendingMessage: (sessionId: string, content: string, images?: UserMessageImage[]) => void;
+  addPendingMessage: (sessionId: string, content: string, images?: UserMessageImage[], model?: string) => void;
   updatePendingMessage: (id: string, content: string) => void;
   removePendingMessage: (id: string) => void;
   movePendingMessage: (id: string, direction: "up" | "down") => void;
@@ -35,13 +37,14 @@ export interface SessionStore {
   shiftPendingMessage: (sessionId: string) => PendingMessage | undefined;
 }
 
-function createPendingMessage(sessionId: string, content: string, images: UserMessageImage[] = []): PendingMessage {
+function createPendingMessage(sessionId: string, content: string, images: UserMessageImage[] = [], model?: string): PendingMessage {
   return {
     id: crypto.randomUUID(),
     sessionId,
     content,
     createdAt: Date.now(),
     images,
+    model,
   };
 }
 
@@ -93,12 +96,12 @@ export const useSessionStore = create<SessionStore>((rawSet) => {
 
   setRecentProjects: (projects) => set({ recentProjects: projects }),
 
-  addPendingMessage: (sessionId, content, images = []) =>
+  addPendingMessage: (sessionId, content, images = [], model) =>
     set((state) => {
       const normalized = content.trim();
       const normalizedImages = images.filter((image) => Boolean(image.dataUrl || image.filePath));
       if (!normalized && normalizedImages.length === 0) return state;
-      return { pendingMessages: [...state.pendingMessages, createPendingMessage(sessionId, normalized, normalizedImages)] };
+      return { pendingMessages: [...state.pendingMessages, createPendingMessage(sessionId, normalized, normalizedImages, model)] };
     }),
 
   updatePendingMessage: (id, content) =>

@@ -93,6 +93,14 @@ function genId(): string {
   return Math.random().toString(36).substring(2, 11);
 }
 
+// 排队消息锁定入队时刻的模型：补发/重发不得跟随用户中途切换的「当前模型」，
+// 否则一条以 k3 排队的消息会在用户切千问后被千问静默重发（实机事故）。
+function pendingMessagePinnedModel(session: Session | null | undefined): string | undefined {
+  if (!session) return undefined;
+  const primary = getPrimaryRoomAgent(session);
+  return primary.switchedToModel ?? primary.modelAlias ?? session.model ?? undefined;
+}
+
 const MAX_IMAGE_ATTACHMENTS = 20;
 const MAX_SINGLE_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_IMAGE_SIZE_BYTES = 100 * 1024 * 1024;
@@ -1855,7 +1863,7 @@ export function Composer() {
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
           // 乐观插入的用户事件已移除、输入框早已清空；把消息回补队列，避免用户文本彻底丢失。
-          addPendingMessage(targetSession.id, userEvent.content, userEvent.images);
+          addPendingMessage(targetSession.id, userEvent.content, userEvent.images, pendingMessagePinnedModel(targetSession));
           window.dispatchEvent(new CustomEvent("kimix:toast", {
             detail: "上一轮仍在运行，消息已加入队列，将在当前轮结束后发送。",
           }));
@@ -3312,7 +3320,7 @@ export function Composer() {
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
-      addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend));
+      addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend), pendingMessagePinnedModel(currentSession));
       return;
     }
     const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
@@ -4149,7 +4157,7 @@ export function Composer() {
         }
       }
       updateSteerStatus(activeSession.id, steerId, "failed", res.error, roomTarget);
-      addPendingMessage(activeSession.id, pending.content, pending.images);
+      addPendingMessage(activeSession.id, pending.content, pending.images, pendingMessagePinnedModel(activeSession));
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `引导失败：${res.error}` }));
       return;
     }

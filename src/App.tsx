@@ -2030,7 +2030,7 @@ function App() {
         images: promptImages(next.images),
         videos: promptVideos(next.images),
         files: promptFiles(next.images),
-        model: currentSessionPromptModel(uiSessionId),
+        model: next.model ?? currentSessionPromptModel(uiSessionId),
       }).then((res) => {
         if (res.success) return;
         throw new Error(res.error);
@@ -2089,7 +2089,7 @@ function App() {
               images: promptImages(next.images),
               videos: promptVideos(next.images),
               files: promptFiles(next.images),
-              model: currentSessionPromptModel(uiSessionId),
+              model: next.model ?? currentSessionPromptModel(uiSessionId),
             });
             if (retryRes.success) return;
             message = retryRes.error;
@@ -3143,11 +3143,28 @@ function App() {
           ));
           return { ...next, updatedAt: Date.now() };
         });
-        // error/interrupted 终态同样触发下一条排队消息派发：停止/失败路径已清掉 runningSessionId，
-        // reconcile 轮询不再接力，只能在此处接续（守卫与 completed 分支同款）。
+        // error/interrupted 终态不再自动排空本地队列：自动补发会在用户不知情时以
+        // 「补发时刻的当前模型」重发（实机：k3 429 失败 + 用户切千问 → 排队消息被
+        // 千问自动重跑）。队列保留并显式提示，由用户决定何时继续。
         const failedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
         if (!roomAgentId || !failedSession || isPrimaryRoomAgent(failedSession, roomAgentId)) {
-          void dispatchNextPendingKimiMessage(uiSessionId, statusRuntimeSessionId);
+          const heldCount = useSessionStore.getState().pendingMessages.filter((msg) => msg.sessionId === uiSessionId).length;
+          if (heldCount > 0) {
+            updateSession(uiSessionId, (session) => ({
+              ...session,
+              events: [
+                ...session.events,
+                {
+                  id: crypto.randomUUID(),
+                  type: "status_update" as const,
+                  timestamp: Date.now(),
+                  message: `上轮已终止，${heldCount} 条排队消息未自动发送；发送新消息或轮次正常结束后会继续。`,
+                },
+              ],
+              updatedAt: Date.now(),
+            }));
+            syncCurrentSessionFromStore(uiSessionId);
+          }
         }
         return;
       }
@@ -3359,7 +3376,7 @@ function App() {
               images: promptImages(next.images),
               videos: promptVideos(next.images),
               files: promptFiles(next.images),
-              model: currentSessionPromptModel(uiSessionId),
+              model: next.model ?? currentSessionPromptModel(uiSessionId),
             });
             sendPromise.then((res) => {
               if (res.success) return;
