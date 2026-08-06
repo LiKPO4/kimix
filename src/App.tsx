@@ -3138,7 +3138,7 @@ function App() {
             settlePendingSteerMessages(
               settlePendingQuestions(settleFailedEvents(events, failureMessage)),
               "failed",
-              payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
+              payload.status === "interrupted" ? "引导未完成，当前轮已中断" : "引导未完成，当前轮执行失败",
             )
           ));
           return { ...next, updatedAt: Date.now() };
@@ -3174,7 +3174,7 @@ function App() {
         const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
         const next = updateRoomAgentEvents(session, ownerAgentId, (events) => {
           // completed 收敛：daemon 已确认接受的引导定格为 sent（官方确认帧丢失不再
-          // 永卡「等待官方写入」）；轮次完成仍挂 pending 的提问已过期，按 skipped 结算，
+          // 永卡「等待写入」）；轮次完成仍挂 pending 的提问已过期，按 skipped 结算，
           // 否则 hasPendingQuestion 会永久拦截队列派发。
           const settled = settlePendingSteerMessages(
             settlePendingQuestions(settleInactiveEvents(events), "skipped"),
@@ -3294,7 +3294,7 @@ function App() {
           events: settlePendingSteerMessages(
             settlePendingQuestions(settleFailedEvents(session.events, failureMessage)),
             "failed",
-            payload.status === "interrupted" ? "引导未完成，当前轮已中断。" : "引导未完成，当前轮执行失败。",
+            payload.status === "interrupted" ? "引导未完成，当前轮已中断" : "引导未完成，当前轮执行失败",
           ),
           updatedAt: Date.now(),
         }));

@@ -1032,9 +1032,9 @@ describe("mergeEvents", () => {
 
   it("converges an accepted steer to sent and drops the official replay user bubble", () => {
     // 官方把 steer 内容作为 user 消息落历史（context.spliced / context.append_message），
-    // 快照回放以稳定 id（snapshot:msg_...）送达——这是「引导已写入当前轮」的权威证据。
+    // 快照回放以稳定 id（snapshot:msg_...）送达——这是「引导已写入」的权威证据。
     // 旧实现：追加第二条 user 气泡（症状 3 双 user + 伪 turn 边界），accepted 一直挂到
-    // 轮次终态才收敛（症状 2 轮次进行中长期「等待官方写入」）。
+    // 轮次终态才收敛（症状 2 轮次进行中长期「等待写入」）。
     const existing: TimelineEvent[] = [
       { id: "assistant-1", type: "assistant_message", timestamp: 1_000, content: "Before", isThinking: true, isComplete: false },
       { id: "steer-1", type: "steer_message", timestamp: 2_000, content: "你是不是搞错的了", status: "accepted" },

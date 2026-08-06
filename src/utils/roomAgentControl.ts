@@ -190,7 +190,7 @@ export function settleStoppedRoomAgent(
       return { ...event, status: "rejected" as const };
     }
     if (event.type === "steer_message" && (event.status === "sending" || event.status === "accepted")) {
-      return { ...event, status: "failed" as const, error: "引导未完成，当前轮已中断。" };
+      return { ...event, status: "failed" as const, error: "引导未完成，当前轮已中断" };
     }
     return event;
   }));

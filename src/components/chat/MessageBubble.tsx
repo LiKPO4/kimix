@@ -719,12 +719,12 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
   const previewImages = getPreviewImages(images);
   const hasText = event.content.trim().length > 0 && event.content.trim() !== "[图片]";
   const label = event.status === "sending"
-    ? "引导发送中"
+    ? "引导中"
     : event.status === "accepted"
-      ? "等待官方写入"
+      ? "等待写入"
     : event.status === "failed"
       ? "引导失败"
-      : "引导已写入当前轮";
+      : "引导已写入";
   const handleSaveDrawingBoard = (image: { name: string; dataUrl: string }) => {
     window.dispatchEvent(new CustomEvent("kimix:addDrawingImage", { detail: image }));
     setPreviewImage(null);

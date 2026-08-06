@@ -4147,9 +4147,9 @@ export function Composer() {
     if (res.success && res.data && res.data.steered === false) {
       // 两步 steer 的第二步失败，但内容已在官方队列/已自行开跑：不得回补本地
       // 队列（否则官方排空 + 本地派发各跑一次，同一内容出现两遍回复）。
-      updateSteerStatus(activeSession.id, steerId, "failed", "引导未注入当前轮；内容已在官方队列，本轮结束后自动发送", roomTarget);
+      updateSteerStatus(activeSession.id, steerId, "failed", "引导内容已在官方队列，当前轮结束后自动发送", roomTarget);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: "引导未注入当前轮；内容已在官方队列，本轮结束后自动发送",
+        detail: "引导内容已在官方队列，当前轮结束后自动发送",
       }));
       return;
     }
