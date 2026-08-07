@@ -1357,10 +1357,11 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
-                    刷新
                   </button>
                   {rightCardDragHandle("background", "Kimi 后台任务")}
                 </div>
@@ -1661,10 +1662,11 @@ export function LongTaskInspectorPanel({
                       type="button"
                       disabled={sessionLongTasksLoading || !(liveCurrentSession?.projectPath ?? currentProject?.path)}
                       onClick={() => onRefreshSessionLongTasks()}
-                      className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                      className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                      title="刷新"
+                      aria-label="刷新"
                     >
                       <RefreshCw size={13} className={sessionLongTasksLoading ? "animate-spin" : ""} />
-                      刷新
                     </button>
                     {rightCardDragHandle("longTask", "长程任务")}
                   </div>
@@ -1818,10 +1820,11 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
-                    刷新
                   </button>
                   {rightCardDragHandle("background", "后台 Bash")}
                 </div>
@@ -1860,10 +1863,11 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={backgroundTasksLoading}
                     onClick={() => onRefreshBackgroundTasks()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
-                    刷新
                   </button>
                   {rightCardDragHandle("subagentTasks", "子 Agent")}
                 </div>
@@ -2025,10 +2029,11 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
                     onClick={() => void refreshGitInfo()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
                   >
                     {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    <span>刷新</span>
                   </button>
                 </div>
               </div>
@@ -2139,10 +2144,11 @@ export function LongTaskInspectorPanel({
                     type="button"
                     disabled={!liveCurrentSession || sessionPlanState.loading}
                     onClick={() => onRefreshSessionPlan()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0 text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
                   >
                     <RefreshCw size={13} className={sessionPlanState.loading ? "animate-spin" : ""} />
-                    刷新
                   </button>
                   {rightCardDragHandle("plan", "Plan")}
                 </div>
