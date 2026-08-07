@@ -15,6 +15,7 @@ import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSess
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import { findOfficialCompactionResult, type OfficialCompactionResult } from "./compactionWire";
 import { waitForOfficialSteerUserMessage } from "./steerConfirm";
+import { isDaemonLevelPromoteError, PromoteFailureBackoff } from "./kimiCodePromotePolicy";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -1443,8 +1444,11 @@ export async function sendPrompt(
   }
 }
 
+const promoteFailureBackoff = new PromoteFailureBackoff();
+
 async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManagedSession | undefined> {
   if (sdkPinnedSessionIds.has(sessionId)) return undefined;
+  if (promoteFailureBackoff.isActive(sessionId)) return undefined;
   const sdkManaged = sessions.get(sessionId);
   if (!sdkManaged || !shouldRouteNewSessionToServer()) return undefined;
   if (sdkManaged.status === "running" || sdkManaged.status === "waiting_approval" || sdkManaged.status === "waiting_question") {
@@ -1465,13 +1469,25 @@ async function promoteSdkSessionToServer(sessionId: string): Promise<ServerManag
     });
     sessions.delete(sessionId);
     sdkManaged.unsubscribe();
+    promoteFailureBackoff.clear(sessionId);
     return serverSessions.get(sessionId);
   } catch (error) {
     serverSessions.delete(sessionId);
-    if (!isKimiCodeSessionMissingError(error)) {
+    if (isKimiCodeSessionMissingError(error)) return undefined;
+    if (isDaemonLevelPromoteError(error)) {
+      // 明确的网络/守护进程级故障才允许升级全局 fallback
       markServerRuntimeFailure(error);
-      console.warn("[KimiCodeServerHost] SDK session promotion failed; keeping SDK route:", error);
+      console.warn("[KimiCodeServerHost] SDK session promotion hit daemon-level failure; keeping SDK route:", error);
+      return undefined;
     }
+    // 会话级失败（daemon 活着但该会话记录损坏/注册失败等）：只跳过该会话并指数退避，
+    // 不得升级全局 runtime failure——否则单个损坏会话会让 10s 巡检每轮杀一次整个
+    // daemon 并迁走全部空闲会话，自维持循环还会打断其他会话运行中的轮次。
+    const retryAt = promoteFailureBackoff.noteFailure(sessionId);
+    console.warn(
+      `[KimiCodeServerHost] SDK session promotion failed (session-level, backoff until ${new Date(retryAt).toISOString()}):`,
+      error,
+    );
     return undefined;
   }
 }
