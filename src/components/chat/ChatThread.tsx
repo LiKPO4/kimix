@@ -1273,11 +1273,15 @@ export function buildRenderItems(
       (event.type === "compaction" && event.phase === "begin")
     ));
   };
-  const completedTurnCacheKey = (turnEvents: TimelineEvent[]) => {
+  const completedTurnCacheKey = (turnEvents: TimelineEvent[], segmentOrdinal: number) => {
     const first = turnEvents[0];
     const agentTurnId = turnEvents.find((event) => event.agentTurnId)?.agentTurnId;
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
-    return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${currentTurnStartedAt ?? first.timestamp}`;
+    // steer 切分（244）让同一 agentTurnId + 同一 startedAt 产生前/后两段轮，
+    // 共享 key 时双方每遍渲染都因事件身份校验不命中而互相覆盖，缓存形同虚设
+    //（review A5）。段序号取自本遍渲染内同 turnId 的 flush 次序，事件序列
+    // 稳定时跨遍一致。
+    return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${segmentOrdinal}:${currentTurnStartedAt ?? first.timestamp}`;
   };
   const renderCachedTurnBody = (
     turnEvents: TimelineEvent[],
@@ -1286,12 +1290,13 @@ export function buildRenderItems(
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
     hasLaterUserBoundary = false,
     hasLaterSteerBoundary = false,
+    segmentOrdinal = 0,
   ) => {
     if (!canCacheTurn(turnEvents, isLatestTurn, turnUserEvent) || !completedTurnCache) {
       renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
       return;
     }
-    const cacheKey = completedTurnCacheKey(turnEvents);
+    const cacheKey = completedTurnCacheKey(turnEvents, segmentOrdinal);
     usedCompletedTurnCacheKeys.add(cacheKey);
     const cached = completedTurnCache.get(cacheKey);
     if (
@@ -1313,8 +1318,14 @@ export function buildRenderItems(
       sessionEngine,
     });
   };
+  // 同一 agentTurnId 在一遍渲染内的 flush 次序（steer 切分会产生 0=前段、
+  // 1=后段）；事件序列稳定时跨遍一致，供 completedTurnCacheKey 区分段。
+  const turnFlushOrdinals = new Map<string, number>();
   const flushTurn = (isLatestTurn = false, hasLaterUserBoundary = false, hasLaterSteerBoundary = false) => {
-    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
+    const turnId = turnBody.find((event) => event.agentTurnId)?.agentTurnId ?? "";
+    const segmentOrdinal = turnFlushOrdinals.get(turnId) ?? 0;
+    turnFlushOrdinals.set(turnId, segmentOrdinal + 1);
+    renderCachedTurnBody(turnBody, currentTurnStartedAt, isLatestTurn, currentTurnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary, segmentOrdinal);
     turnBody = [];
     currentAgentTurnId = undefined;
   };

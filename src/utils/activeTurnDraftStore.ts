@@ -47,6 +47,12 @@ const streamAnchors = new Map<string, StreamAnchors>();
 // match the committed prefix (replies here often open with the same words)
 // loses just that delta and resumes on the next one, instead of freezing.
 const committedSegments = new Map<string, { content: string; think: string }>();
+// 上限兜底（review A4）：条目只在同 turn 的后续 step/迟到重放抑制时被读取，
+// 旧 turn 的条目是死重，而生产路径没有安全的统一清理点——会话切换时后台
+// 会话可能仍在流式（不能清），turn 刚结束时迟到 resync 重放仍依赖该条目
+// （不能立即清）。LRU 上限把内存增长绑定到最近活跃 turn 数；命中上限时
+// 被淘汰的只是最久未提交的旧 turn，其迟到重放由 formalCoverage 兜住。
+const COMMITTED_SEGMENTS_MAX = 40;
 const listeners = new Map<string, Set<DraftListener>>();
 const globalListeners = new Set<DraftListener>();
 
@@ -494,7 +500,14 @@ export function takeActiveTurnDraft(key: string): ActiveTurnDraft | null {
   // Keeping the anchor here made that opening delta indistinguishable from a
   // reconnect replay, so it was rejected and the anchor never advanced again.
   streamAnchors.delete(key);
+  // delete+set 把本 key 移到最新位置，超出上限时从最旧端淘汰。
+  committedSegments.delete(key);
   committedSegments.set(key, { content: draft.content, think: draft.thinking ?? "" });
+  while (committedSegments.size > COMMITTED_SEGMENTS_MAX) {
+    const oldest = committedSegments.keys().next().value;
+    if (oldest === undefined) break;
+    committedSegments.delete(oldest);
+  }
   notify(key);
   return draft;
 }

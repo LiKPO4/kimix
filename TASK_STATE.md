@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：阶段 2 渲染内存与测试保护（A4+A5+A6，v2.20.265）
+
+- A4：`committedSegments` 只增不减（生产零清理）。修复：LRU 上限 40，take 时 delete+set 移到最新、超限从 oldest 淘汰。未按原设想挂 turn 终态/会话切换清理——会话切换时后台会话可能仍在流式、turn 刚结束时迟到 resync 重放仍依赖条目，两钩子都不安全；被淘汰旧 turn 的重放由 formalCoverage 兜底。新增 LRU 淘汰回归 1 例。
+- A5：steer 切分两段轮共享 `completedTurnCacheKey`（同 agentTurnId+startedAt），事件身份校验挡住错渲染但双方每遍互相覆盖、缓存形同虚设。修复：flushTurn 按 turnId 分配段序号（0=前段、1=后段）并进 key。
+- A6：ChatThread.test.ts 新增 steer 切分 describe 3 例（切分顺序+各段正文恰好一次、双段独立缓存键+重渲染全命中引用、后段重连重放去重不丢内容），此前 steer 渲染零覆盖。
+- 阶段 2 收尾：全量 162 文件 1685 例全绿、两套 typecheck 通过。
+
 ## 2026-08-06 修复：A2 跨轮残片替换补「本地下一轮已对齐」安全前提（v2.20.264）
 
 - review A2。根因：`mergeCanonicalFragmentTurnBodies` 的 isCrossTurnRemnant 注释声称「下一轮已对齐到本地轮（否则不进此分支）」，但代码从未校验 `localTurns[i+1]`；本地缺下一轮 user 边界时，残片是下一轮内容在本地唯一副本，仍被顶成本轮官方终段，永久丢失且后续对账无法兜回。修复：对齐循环改索引式，新增 `nextLocalAligned`（`turnUsersMatch(localTurns[i+1], canonicalTurns[matchIndex+1])`）前提，不满足则跳过并计 `crossTurnUnalignedSkips` 留痕（两条日志 payload 同步带上）。测试：新增「本地缺下一轮边界残片保留」回归 1 例。阶段 1（A1/A3/A2）收尾：全量 162 文件 1681 例全绿、两套 typecheck 通过。

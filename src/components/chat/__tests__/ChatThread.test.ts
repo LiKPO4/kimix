@@ -7,7 +7,7 @@ import {
   findSubagentContentRegressionSnapshots,
   shouldRetryAsRoomDelivery,
 } from "@/components/chat/ChatThread";
-import type { RenderItem } from "@/types/chatRender";
+import type { CompletedTurnRenderCacheEntry, RenderItem } from "@/types/chatRender";
 
 function sessionStub(events: TimelineEvent[] = []): Session {
   return {
@@ -306,5 +306,63 @@ describe("question_request folding", () => {
     const blocks = assistantItem?.type === "event" ? assistantItem.turnBlocks : undefined;
     expect(blocks?.some((block) => block.kind === "question" && block.question.id === "q-resolved")).toBe(true);
     expect(blocks?.some((block) => block.kind === "question" && block.question.id === "q-pending")).toBe(false);
+  });
+});
+
+describe("buildRenderItems steer split", () => {
+  const PRE_BODY = "第一轮正文完整段落，长度足够让 steer 成为轮间边界。";
+  const POST_BODY = "引导后的第二轮正文，同样具备足够长度。";
+
+  const steerSplitEvents = (): TimelineEvent[] => [
+    { id: "user-1", type: "user_message", timestamp: 1, content: "原始问题", agentTurnId: "turn-1" } as TimelineEvent,
+    assistantEvent(PRE_BODY, { id: "a-pre", timestamp: 2, agentTurnId: "turn-1", isComplete: true }),
+    { id: "steer-1", type: "steer_message", timestamp: 3, content: "补充引导", status: "sent", agentTurnId: "turn-1" } as TimelineEvent,
+    assistantEvent(POST_BODY, { id: "a-post", timestamp: 4, agentTurnId: "turn-1", isComplete: true }),
+  ];
+
+  const assistantItems = (items: RenderItem[]) => items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+
+  it("splits the turn around the steer bubble, each body rendered exactly once", () => {
+    const items = buildRenderItems(steerSplitEvents(), "kimi-code");
+    // 顺序：user → 前段轮 → steer 气泡 → 后段轮
+    const kinds = items.map((item) => (item.type === "event" ? item.event.type : item.type));
+    expect(kinds).toEqual(["user_message", "assistant_message", "steer_message", "assistant_message"]);
+    const bubbles = assistantItems(items);
+    expect(JSON.stringify(bubbles[0])).toContain(PRE_BODY);
+    expect(JSON.stringify(bubbles[1])).toContain(POST_BODY);
+    expect(JSON.stringify(bubbles[0])).not.toContain(POST_BODY);
+    expect(JSON.stringify(bubbles[1])).not.toContain(PRE_BODY);
+  });
+
+  it("caches pre- and post-steer segments under distinct keys and hits both on re-render (A5)", () => {
+    const events = steerSplitEvents();
+    const cache = new Map<string, CompletedTurnRenderCacheEntry>();
+    const first = buildRenderItems(events, "kimi-code", undefined, false, undefined, cache);
+    // 修复前两段轮共享一个 key 互相覆盖，size 恒为 1 且每遍双方都不命中。
+    expect(cache.size).toBe(2);
+
+    const second = buildRenderItems(events, "kimi-code", undefined, false, undefined, cache);
+    expect(second).toEqual(first);
+    // 缓存命中的证据：第二遍产出的轮条目与缓存内条目是同一对象引用（未重渲染）。
+    const cachedItemRefs = new Set([...cache.values()].flatMap((entry) => entry.items));
+    const secondBubbles = assistantItems(second);
+    expect(secondBubbles.length).toBeGreaterThan(0);
+    for (const bubble of secondBubbles) expect(cachedItemRefs.has(bubble)).toBe(true);
+  });
+
+  it("dedups a reconnect replay of the post-steer body without losing it", () => {
+    // 重连重放：官方 resync 把后段正文以新事件 id 再投一次。turnBlocks 去重
+    // （含 A3 反序升级）后仍只渲染一次，且内容不丢。
+    const events = [
+      ...steerSplitEvents(),
+      assistantEvent(POST_BODY, { id: "a-post-replay", timestamp: 5, agentTurnId: "turn-1", isComplete: true }),
+    ];
+    const items = buildRenderItems(events, "kimi-code");
+    const bubbles = assistantItems(items);
+    expect(bubbles).toHaveLength(2);
+    const postBubble = bubbles[1];
+    const postBlocks = postBubble.type === "event" ? postBubble.turnBlocks : undefined;
+    const textBlocks = (postBlocks ?? []).filter((block) => block.kind === "text" && block.content.includes(POST_BODY));
+    expect(textBlocks).toHaveLength(1);
   });
 });

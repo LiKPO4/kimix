@@ -304,6 +304,35 @@ describe("activeTurnDraftStore", () => {
     expect(getActiveTurnDraft(key)?.thinking).toBe("继续分析缓存键。");
   });
 
+  it("bounds committedSegments with LRU eviction (A4)", () => {
+    // 修复前 committedSegments 只增不减，每个 turn 存一条最终段全文，跨会话
+    // 无限累积。LRU 上限（40）淘汰最久未提交的旧 turn 条目：被淘汰 key 失去
+    // 重放抑制基准（由 formalCoverage 兜底），未被淘汰 key 抑制仍然有效。
+    const thinkText = "But wait — potential issue: the bootstrapper architecture!";
+    const evictKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-evict");
+    const recentKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-recent");
+
+    applyActiveTurnDraftDelta(evictKey, delta("", { thinking: thinkText, streamOffset: 0 }));
+    takeActiveTurnDraft(evictKey);
+    applyActiveTurnDraftDelta(recentKey, delta("", { thinking: thinkText, streamOffset: 0 }));
+    takeActiveTurnDraft(recentKey);
+
+    // 再提交 39 个其他 turn：总计 41 条，超出上限 40，最旧的 turn-evict 被淘汰。
+    for (let i = 0; i < 39; i += 1) {
+      const key = makeActiveTurnDraftKey("session-1", "agent-1", `turn-${i}`);
+      applyActiveTurnDraftDelta(key, delta(`第 ${i} 轮正文。`, { streamOffset: 0 }));
+      takeActiveTurnDraft(key);
+    }
+
+    // 近期条目仍在：同前缀 offset=0 重放继续被抑制，不重新材料化。
+    applyActiveTurnDraftDelta(recentKey, delta("", { thinking: thinkText, streamOffset: 0 }));
+    expect(getActiveTurnDraft(recentKey)).toBeNull();
+
+    // 已淘汰条目失去抑制基准：同一增量作为新内容接受（formalCoverage 兜底）。
+    applyActiveTurnDraftDelta(evictKey, delta("", { thinking: thinkText, streamOffset: 0 }));
+    expect(getActiveTurnDraft(evictKey)?.thinking).toBe(thinkText);
+  });
+
   it("marks complete/barrier bodies as authoritative", () => {
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { isComplete: true }))).toBe(true);
     expect(isAuthoritativeAssistantBodyEvent(delta("全文", { completionBarrierReplay: true }))).toBe(true);
