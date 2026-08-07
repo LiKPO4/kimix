@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { mcpStatusLabel, mcpStatusTone } from "@/utils/mcpServerStatus";
 import type { KimiCodeMarketplacePlugin, KimiCodeMcpServerInfo, KimiCodePluginSummary, KimiCodeServerAgentInfo, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
 
 type KimiAuthStatus = {
@@ -814,7 +815,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                             <div className="min-w-0">
                               <div className="truncate text-[14px] font-medium text-[var(--kimix-panel-text)]">{server.name}</div>
                               <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
-                                {server.transport.toUpperCase()} · {server.toolCount} 个工具 · {server.status === "connected" ? "已连接" : server.status === "pending" ? "连接中" : server.status === "failed" ? "连接失败" : "未连接"}
+                                {server.transport.toUpperCase()} · {server.toolCount} 个工具 · <span className={mcpStatusTone(server.status)}>{mcpStatusLabel(server.status)}</span>
                               </div>
                               {server.error && <div className="break-all text-[12px] leading-5 text-accent-danger" style={{ marginTop: 5 }}>{server.error}</div>}
                               {cardMessages[`runtime:${server.id ?? server.name}`] && (
@@ -826,15 +827,17 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
                                 </div>
                               )}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => void handleRestartRuntimeServer(server)}
-                              disabled={Boolean(busyAction)}
-                              className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
-                            >
-                              <RefreshCw size={14} className={busyAction === `restart-runtime:${server.id ?? server.name}` ? "animate-spin" : ""} />
-                              <span>{busyAction === `restart-runtime:${server.id ?? server.name}` ? "重启中" : "重启"}</span>
-                            </button>
+                            {server.status !== "removed" && (
+                              <button
+                                type="button"
+                                onClick={() => void handleRestartRuntimeServer(server)}
+                                disabled={Boolean(busyAction)}
+                                className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-55"
+                              >
+                                <RefreshCw size={14} className={busyAction === `restart-runtime:${server.id ?? server.name}` ? "animate-spin" : ""} />
+                                <span>{busyAction === `restart-runtime:${server.id ?? server.name}` ? "重启中" : "重启"}</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

@@ -1645,7 +1645,7 @@ export type KimiCodeMcpServerInfo = {
   id?: string;
   name: string;
   transport: "stdio" | "http" | "sse";
-  status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
+  status: "pending" | "connected" | "failed" | "disabled" | "needs-auth" | "removed";
   toolCount: number;
   error?: string;
 };

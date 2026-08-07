@@ -26,6 +26,7 @@ import {
   resolveServerModelRefresh,
   shouldApplyServerModelRefresh,
   shouldWritePermissionToServer,
+  toKimiCodeMcpServerInfo,
 } from "../../../electron/kimiCodeHost";
 import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
@@ -445,5 +446,22 @@ describe("shouldWritePermissionToServer", () => {
 
   it("writes when the server value is unknown", () => {
     expect(shouldWritePermissionToServer(undefined, "auto")).toBe(true);
+  });
+});
+
+describe("toKimiCodeMcpServerInfo", () => {
+  const base = { id: "mcp-1", name: "docs", transport: "http" as const, tool_count: 3 };
+
+  it("passes through the upstream 0.34 status enum", () => {
+    for (const status of ["pending", "connected", "failed", "disabled", "needs-auth", "removed"] as const) {
+      expect(toKimiCodeMcpServerInfo({ ...base, status }).status).toBe(status);
+    }
+  });
+
+  it("normalizes legacy server-route statuses to the render enum", () => {
+    expect(toKimiCodeMcpServerInfo({ ...base, status: "connecting" }).status).toBe("pending");
+    expect(toKimiCodeMcpServerInfo({ ...base, status: "error" }).status).toBe("failed");
+    expect(toKimiCodeMcpServerInfo({ ...base, status: "disconnected" }).status).toBe("disabled");
+    expect(toKimiCodeMcpServerInfo({ ...base, status: "connected" }).status).toBe("connected");
   });
 });

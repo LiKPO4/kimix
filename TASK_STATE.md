@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 跟进：MCP 状态枚举对齐上游 0.34.0——removed 不再误显「未连接」（上游跟进队列 3/5，v2.20.283）
+
+- 背景：goal 队列第 3 项。上游 0.34.0（#2694）MCP status 新枚举 pending/connected/failed/disabled/needs-auth/removed；Kimix `ServerMcpServer.status` 是旧猜值，McpPanel 未知状态一律误显「未连接」。
+- 核实纠偏：server 路由 `/api/v1/mcp/servers` 仍返回旧 4 值枚举（server 端 mapMcpStatus 把新枚举压缩回旧值）；只有 SDK 会话路由与 `mcp.server.status` 事件返回新 6 值。`removed` 语义：工具保留注册但调用报移除提示。
+- 修法：`ServerMcpServer.status` 取两路由并集 9 值；`toKimiCodeMcpServerInfo` 归一化（connecting→pending、error→failed、disconnected→disabled 沿用原语义，新 6 值透传）；新增 `src/utils/mcpServerStatus.ts` 文案/配色映射（removed/disabled 次要灰、failed/needs-auth 警示红、未知值显示原始字符串）；McpPanel removed 隐藏「重启」按钮。
+- 验收：新增 5 例（mcpServerStatus 3 + kimiCodeServerHost 2），定向 113/113、typecheck 0 错误；全量 vitest/build 见提交前记录。视觉待用户截图（MCP 面板运行态卡片）。
+
 ## 2026-08-07 跟进：消费官方 last_turn_reason——侧栏失败标记 + busy 判定短路（上游跟进队列 2/5，v2.20.282）
 
 - 背景：goal 队列第 2 项。官方 0.34.0 起会话列表/恢复携带 `last_turn_reason`（completed/cancelled/failed；cancelled 不持久化、busy 中省略）。本地 daemon 已是 0.34.0。

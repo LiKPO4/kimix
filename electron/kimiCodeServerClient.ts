@@ -216,7 +216,21 @@ export type ServerMcpServer = {
   id: string;
   name: string;
   transport: "stdio" | "http" | "sse";
-  status: "connected" | "connecting" | "disconnected" | "error";
+  // status 取值来源：Server 路由 /api/v1/mcp/servers 仍返回 SDK 映射后的旧枚举
+  // （connecting/error/disconnected，见 vendor SDK mapMcpStatus）；SDK 会话路由
+  // session.listMcpServers() 返回上游 0.34.0 的新枚举
+  // （pending/failed/disabled/needs-auth/removed）。两条路由取值并集在此，
+  // 消费端 toKimiCodeMcpServerInfo 统一归一化到渲染枚举。
+  status:
+    | "pending"
+    | "connected"
+    | "failed"
+    | "disabled"
+    | "needs-auth"
+    | "removed"
+    | "connecting"
+    | "disconnected"
+    | "error";
   last_error?: string;
   tool_count: number;
 };

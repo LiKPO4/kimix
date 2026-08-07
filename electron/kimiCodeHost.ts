@@ -231,7 +231,7 @@ export type KimiCodeMcpServerInfo = {
   id?: string;
   name: string;
   transport: "stdio" | "http" | "sse";
-  status: "pending" | "connected" | "failed" | "disabled" | "needs-auth";
+  status: "pending" | "connected" | "failed" | "disabled" | "needs-auth" | "removed";
   toolCount: number;
   error?: string;
 };
@@ -2554,13 +2554,19 @@ export function toKimiCodeSkillSummary(skill: ServerSkill): KimiCodeSkillSummary
 }
 
 export function toKimiCodeMcpServerInfo(server: ServerMcpServer): KimiCodeMcpServerInfo {
+  // Server 路由仍返回旧枚举（connecting/error/disconnected），SDK 会话路由返回
+  // 上游 0.34.0 新枚举（pending/failed/disabled/needs-auth/removed）；统一归一化到渲染枚举。
   const status = server.status === "connected"
     ? "connected" as const
-    : server.status === "connecting"
+    : server.status === "pending" || server.status === "connecting"
       ? "pending" as const
-      : server.status === "error"
+      : server.status === "failed" || server.status === "error"
         ? "failed" as const
-        : "disabled" as const;
+        : server.status === "needs-auth"
+          ? "needs-auth" as const
+          : server.status === "removed"
+            ? "removed" as const
+            : "disabled" as const;
   return {
     id: server.id,
     name: server.name,
