@@ -162,6 +162,68 @@ describe("ComposerDockBar", () => {
     expect(container.querySelector(".kimix-dock-panel")).toBeNull();
   });
 
+  it("进行中的官方 Goal 显示目标胶囊并排第一，面板可暂停/取消", async () => {
+    const onPauseGoal = vi.fn();
+    const onCancelGoal = vi.fn();
+    render(
+      makeProps({
+        bashTasks: [makeTask()],
+        goal: { objective: "按 review 清单完成修复批次", completionCriterion: "全量测试通过", status: "active", turnsUsed: 3, tokensUsed: 12000 },
+        onPauseGoal,
+        onCancelGoal,
+      }),
+    );
+    const labels = capsuleLabels();
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain("目标");
+    expect(labels[0]).toContain("(进行中)");
+    expect(labels[1]).toContain("后台 Bash");
+
+    clickCapsule(0);
+    const panel = container.querySelector(".kimix-dock-panel");
+    expect(panel?.textContent).toContain("目标 · 进行中");
+    expect(panel?.textContent).toContain("按 review 清单完成修复批次");
+    expect(panel?.textContent).toContain("完成判据：全量测试通过");
+    expect(panel?.textContent).toContain("3 轮");
+
+    const pauseButton = Array.from(panel!.querySelectorAll("button")).find((el) => el.textContent?.includes("暂停"));
+    act(() => {
+      pauseButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onPauseGoal).toHaveBeenCalledTimes(1);
+
+    // 等 busy 收尾（finally 微任务）后再点下一个操作，与真实用户连点间隔一致
+    await act(async () => {});
+    const cancelButton = Array.from(panel!.querySelectorAll("button")).find((el) => el.textContent?.includes("取消"));
+    act(() => {
+      cancelButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onCancelGoal).toHaveBeenCalledTimes(1);
+  });
+
+  it("终态（完成/取消）的 Goal 不渲染目标胶囊", () => {
+    render(makeProps({ goal: { objective: "已完成的目标", status: "complete" } }));
+    expect(container.innerHTML).toBe("");
+    render(makeProps({ goal: { objective: "已取消的目标", status: "cancelled" } }));
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("已暂停的 Goal 提供继续按钮；Goal 消失后自动关闭面板", () => {
+    const onResumeGoal = vi.fn();
+    render(makeProps({ goal: { objective: "暂停中的目标", status: "paused" }, onResumeGoal }));
+    clickCapsule(0);
+    const panel = container.querySelector(".kimix-dock-panel");
+    expect(panel?.textContent).toContain("目标 · 已暂停");
+    const resumeButton = Array.from(panel!.querySelectorAll("button")).find((el) => el.textContent?.includes("继续"));
+    act(() => {
+      resumeButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onResumeGoal).toHaveBeenCalledTimes(1);
+
+    render(makeProps({ goal: null }));
+    expect(container.innerHTML).toBe("");
+  });
+
   it("四类面板都提供收起到侧栏按钮", () => {
     render(
       makeProps({

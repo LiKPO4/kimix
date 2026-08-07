@@ -3,7 +3,7 @@ import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, Shie
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection, UserMessageImage } from "@/types/ui";
+import type { ComposerDockCard, RoomAgentActivity, Session, TimelineEvent, PermissionMode, OfficialGoalSnapshot, OfficialGoalState, ThemePaletteColors, KimiThemePalette, RoomContextShareSelection, UserMessageImage } from "@/types/ui";
 import type { KimiCodeBackgroundTaskInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary } from "@electron/types/ipc";
 import { kimiThemePaletteId } from "@/utils/themePalettes";
 import { ComposerInput, type ComposerInputHandle } from "./ComposerInput";
@@ -486,9 +486,15 @@ function getActiveCompletion(value: string): { mode: CompletionMode; query: stri
 type ComposerProps = {
   bashTasks?: KimiCodeBackgroundTaskInfo[];
   subagentTasks?: KimiCodeBackgroundTaskInfo[];
+  /** 当前 mutation owner 视图的官方 Goal；由 AppShell 注入（与侧栏同一数据源）。 */
+  officialGoal?: OfficialGoalState | null;
+  onPauseOfficialGoal?: () => void | Promise<void>;
+  onResumeOfficialGoal?: () => void | Promise<void>;
+  onCancelOfficialGoal?: () => void | Promise<void>;
+  onRefreshOfficialGoal?: () => void | Promise<void>;
 };
 
-export function Composer({ bashTasks = [], subagentTasks = [] }: ComposerProps = {}) {
+export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal }: ComposerProps = {}) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
@@ -4413,6 +4419,11 @@ export function Composer({ bashTasks = [], subagentTasks = [] }: ComposerProps =
         todoItems={todoHidden ? [] : visibleTodos}
         queueCount={pendingHidden ? 0 : pendingMessages.length}
         queueBody={queueListBody}
+        goal={officialGoal?.goal ?? null}
+        onPauseGoal={onPauseOfficialGoal}
+        onResumeGoal={onResumeOfficialGoal}
+        onCancelGoal={onCancelOfficialGoal}
+        onRefreshGoal={onRefreshOfficialGoal}
         onHideBash={() => hideComposerCard("bash", "后台 Bash")}
         onHideSubagent={() => hideComposerCard("subagent", "子 Agent")}
         onHideTodo={() => hideComposerCard("todo", "TodoList")}

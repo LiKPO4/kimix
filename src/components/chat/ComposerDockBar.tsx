@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ClipboardList, ListOrdered, PanelRightClose, SquareTerminal, Users, X } from "lucide-react";
+import { ClipboardList, ListOrdered, PanelRightClose, Pause, Play, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
-import type { TodoItem } from "@/types/ui";
+import type { OfficialGoalSnapshot, TodoItem } from "@/types/ui";
+import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
 import { TodoListItems, todoCounts } from "./TodoPanel";
 
@@ -12,7 +13,7 @@ import { TodoListItems, todoCounts } from "./TodoPanel";
  * 替代原 TodoPanel 卡片与排队消息浮动面板（重量级实心卡，遮挡聊天内容）。
  */
 
-export type ComposerDockPanelId = "bash" | "subagent" | "todo" | "queue";
+export type ComposerDockPanelId = "bash" | "subagent" | "todo" | "queue" | "goal";
 
 type ComposerDockBarProps = {
   bashTasks: KimiCodeBackgroundTaskInfo[];
@@ -23,6 +24,12 @@ type ComposerDockBarProps = {
   queueCount: number;
   /** 排队消息列表（拖拽排序/引导/删除交互复杂，由 Composer 组装后注入）。 */
   queueBody: ReactNode;
+  /** 官方 Goal 快照；null 或终态（完成/取消）时不显示目标胶囊。 */
+  goal?: OfficialGoalSnapshot | null;
+  onPauseGoal?: () => void | Promise<void>;
+  onResumeGoal?: () => void | Promise<void>;
+  onCancelGoal?: () => void | Promise<void>;
+  onRefreshGoal?: () => void | Promise<void>;
   onHideBash?: () => void;
   onHideSubagent?: () => void;
   onHideTodo?: () => void;
@@ -63,12 +70,100 @@ function BackgroundTaskListItems({ tasks }: { tasks: KimiCodeBackgroundTaskInfo[
   );
 }
 
+function goalCapsuleStatusLabel(status: string) {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "active") return "进行中";
+  if (normalized === "paused") return "已暂停";
+  if (normalized === "blocked") return "受阻";
+  return status;
+}
+
+function GoalPanelBody({ goal, onPauseGoal, onResumeGoal, onCancelGoal, onRefreshGoal }: {
+  goal: OfficialGoalSnapshot;
+  onPauseGoal?: () => void | Promise<void>;
+  onResumeGoal?: () => void | Promise<void>;
+  onCancelGoal?: () => void | Promise<void>;
+  onRefreshGoal?: () => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const run = (key: string, handler?: () => void | Promise<void>) => {
+    if (!handler || busy) return;
+    setBusy(key);
+    // 同步调用 handler（点击反馈即时）；仅用 Promise 包装返回值以便异步 busy 收尾。
+    void Promise.resolve(handler()).finally(() => setBusy(null));
+  };
+  const status = goal.status.trim().toLowerCase();
+  const pausable = status === "active";
+  const resumable = status === "paused" || status === "blocked";
+  const meta = [`状态：${goalCapsuleStatusLabel(goal.status)}`];
+  if (typeof goal.turnsUsed === "number" && goal.turnsUsed > 0) meta.push(`${goal.turnsUsed} 轮`);
+  if (typeof goal.tokensUsed === "number" && goal.tokensUsed > 0) meta.push(`${goal.tokensUsed} tokens`);
+  return (
+    <div className="flex flex-col" style={{ gap: 10, paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 10 }}>
+      <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{goal.objective}</div>
+      {goal.completionCriterion ? (
+        <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>完成判据：{goal.completionCriterion}</div>
+      ) : null}
+      <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{meta.join(" · ")}</div>
+      <div className="flex items-center" style={{ gap: 8, marginTop: 2 }}>
+        {pausable && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => run("pause", onPauseGoal)}
+            className="kimix-icon-text-button text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <Pause size={13} />
+            暂停
+          </button>
+        )}
+        {resumable && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => run("resume", onResumeGoal)}
+            className="kimix-icon-text-button text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <Play size={13} />
+            继续
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => run("cancel", onCancelGoal)}
+          className="kimix-icon-text-button text-accent-red disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          <X size={13} />
+          取消
+        </button>
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => run("refresh", onRefreshGoal)}
+          className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-55"
+          title="刷新目标状态"
+          aria-label="刷新目标状态"
+        >
+          <RefreshCw size={13} className={busy === "refresh" ? "animate-spin" : ""} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ComposerDockBar({
   bashTasks,
   subagentTasks,
   todoItems,
   queueCount,
   queueBody,
+  goal,
+  onPauseGoal,
+  onResumeGoal,
+  onCancelGoal,
+  onRefreshGoal,
   onHideBash,
   onHideSubagent,
   onHideTodo,
@@ -79,6 +174,8 @@ export function ComposerDockBar({
 
   const { doneCount } = todoCounts(todoItems);
   const capsules: { id: ComposerDockPanelId; label: string; count: string; icon: ReactNode }[] = [];
+  const goalVisible = Boolean(goal && !isTerminalGoalStatus(goal.status));
+  if (goalVisible && goal) capsules.push({ id: "goal", label: "目标", count: goalCapsuleStatusLabel(goal.status), icon: <Target size={13} /> });
   if (bashTasks.length > 0) capsules.push({ id: "bash", label: "后台 Bash", count: String(bashTasks.length), icon: <SquareTerminal size={13} /> });
   if (subagentTasks.length > 0) capsules.push({ id: "subagent", label: "子 Agent", count: String(subagentTasks.length), icon: <Users size={13} /> });
   if (todoItems.length > 0) capsules.push({ id: "todo", label: "待办", count: `${doneCount}/${todoItems.length}`, icon: <ClipboardList size={13} /> });
@@ -90,7 +187,8 @@ export function ComposerDockBar({
     if (openPanel === "subagent" && subagentTasks.length === 0) setOpenPanel(null);
     if (openPanel === "todo" && todoItems.length === 0) setOpenPanel(null);
     if (openPanel === "queue" && queueCount === 0) setOpenPanel(null);
-  }, [openPanel, bashTasks.length, subagentTasks.length, todoItems.length, queueCount]);
+    if (openPanel === "goal" && !goalVisible) setOpenPanel(null);
+  }, [openPanel, bashTasks.length, subagentTasks.length, todoItems.length, queueCount, goalVisible]);
 
   // 点面板/胶囊行以外任意处关闭（capture 阶段，面板内部交互不触发）。
   useEffect(() => {
@@ -127,6 +225,18 @@ export function ComposerDockBar({
       title: `队列 · ${queueCount} 条消息正在排队`,
       body: queueBody,
       onHide: onHideQueue,
+    },
+    goal: {
+      title: `目标 · ${goal ? goalCapsuleStatusLabel(goal.status) : ""}`,
+      body: goal ? (
+        <GoalPanelBody
+          goal={goal}
+          onPauseGoal={onPauseGoal}
+          onResumeGoal={onResumeGoal}
+          onCancelGoal={onCancelGoal}
+          onRefreshGoal={onRefreshGoal}
+        />
+      ) : null,
     },
   };
   const active = openPanel ? panelConfig[openPanel] : null;

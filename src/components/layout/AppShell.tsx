@@ -1811,7 +1811,7 @@ ${isFinalStep
     try {
       const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
-      const res = await window.api.pauseKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Paused from Kimix sidebar" });
+      const res = await window.api.pauseKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Paused from Kimix" });
       if (!res.success) {
         showToast(`官方 Goal 暂停失败：${res.error}`);
         return;
@@ -1826,7 +1826,7 @@ ${isFinalStep
     try {
       const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
-      const res = await window.api.resumeKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Resumed from Kimix sidebar" });
+      const res = await window.api.resumeKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Resumed from Kimix" });
       if (!res.success) {
         showToast(`官方 Goal 继续失败：${res.error}`);
         return;
@@ -1841,7 +1841,7 @@ ${isFinalStep
     try {
       const runtime = await ensureInspectorMutationRuntime();
       if (!runtime) return;
-      const res = await window.api.cancelKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Cancelled from Kimix sidebar" });
+      const res = await window.api.cancelKimiCodeGoal({ sessionId: runtime.runtimeSessionId, reason: "Cancelled from Kimix" });
       if (!res.success) {
         showToast(`官方 Goal 取消失败：${res.error}`);
         return;
@@ -2061,6 +2061,11 @@ ${isFinalStep
                     key={currentSession?.id ?? `project:${currentProject?.id ?? "none"}`}
                     bashTasks={bashTasks}
                     subagentTasks={subagentTasks}
+                    officialGoal={mutationSessionView?.officialGoal}
+                    onPauseOfficialGoal={pauseOfficialGoal}
+                    onResumeOfficialGoal={resumeOfficialGoal}
+                    onCancelOfficialGoal={cancelOfficialGoal}
+                    onRefreshOfficialGoal={refreshOfficialGoal}
                   />
                   <div style={{ marginTop: 10 }}>
                     <ContextBar onOpenGitGraph={openGitGraphFromContextBar} />

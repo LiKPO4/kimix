@@ -330,7 +330,8 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button\.kimix-inspector-action\s*\{[^}]*background-color:\s*var\(--surface-base\);/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-inspector-list-item[\s\S]*?\{[^}]*border-radius:\s*var\(--radius-sm\);/s);
     expect(gitDetailsButton?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-icon-text-button", "kimix-inspector-action"]));
-    expect(planRefresh?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-icon-text-button", "kimix-inspector-action"]));
+    // 卡头刷新按钮为纯图标模式（v2.20.267 起，缓解标题行挤压）
+    expect(planRefresh?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-inline-icon-action", "is-roomy"]));
     expect(planRefresh?.[1].split(/\s+/)).not.toContain("bg-accent-primary-light");
     expect(serverCreate?.[1].split(/\s+/)).toEqual(expect.arrayContaining(["kimix-inline-icon-action", "is-roomy"]));
     expect(diffItem?.[1].split(/\s+/)).toContain("kimix-inspector-list-item");
