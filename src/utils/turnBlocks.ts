@@ -6,6 +6,7 @@ export type AssistantMessageEvent = Extract<TimelineEvent, { type: "assistant_me
 export type SubagentTimelineEvent = Extract<TimelineEvent, { type: "subagent" }>;
 export type ApprovalTimelineEvent = Extract<TimelineEvent, { type: "approval_request" }>;
 export type QuestionTimelineEvent = Extract<TimelineEvent, { type: "question_request" }>;
+export type StatusUpdateTimelineEvent = Extract<TimelineEvent, { type: "status_update" }>;
 
 /**
  * A turn's renderable content in official kimi-web order: thinking teasers,
@@ -21,7 +22,8 @@ export type TurnBlock =
   | { kind: "tool"; key: string; tool: ToolCallEvent }
   | { kind: "subagent"; key: string; subagent: SubagentTimelineEvent; tool?: ToolCallEvent }
   | { kind: "approval"; key: string; approval: ApprovalTimelineEvent }
-  | { kind: "question"; key: string; question: QuestionTimelineEvent };
+  | { kind: "question"; key: string; question: QuestionTimelineEvent }
+  | { kind: "notification"; key: string; event: StatusUpdateTimelineEvent };
 
 const AGENT_DISPATCH_TOOL_NAMES = new Set(["Agent", "Task", "AgentSwarm"]);
 
@@ -83,8 +85,12 @@ function synthesizeSubagentFromAgentCall(event: ToolCallEvent): SubagentTimeline
  *   subagent event arrives.
  * - approval_request / question_request: resolved (non-pending) cards stay in
  *   position; pending ones render as standalone interactive cards elsewhere.
- * - Everything else (status, compaction, steer, hooks, diffs…) keeps its
- *   existing render placement outside the block list.
+ * - status_update: only notification envelopes (background task / cron) join
+ *   the block list at their own position — they fold into the process chain
+ *   instead of floating as standalone cards below the body. Usage/progress
+ *   statuses keep their existing render placement outside the block list.
+ * - Everything else (compaction, steer, hooks, diffs…) keeps its existing
+ *   render placement outside the block list.
  */
 export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
   const subagentsByParentCall = new Map<string, SubagentTimelineEvent[]>();
@@ -205,6 +211,13 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
       blocks.push({ kind: "question", key: `question:${event.id}`, question: event });
       continue;
     }
+    if (event.type === "status_update") {
+      // 通知信封按事件位置折进过程链（不再在正文下方独立漂浮）；用量/进度状态
+      // 不进块列表（footer/伴随信息位置不变）。
+      if (!event.notification) continue;
+      blocks.push({ kind: "notification", key: `notification:${event.id}`, event });
+      continue;
+    }
   }
   return blocks;
 }
@@ -261,6 +274,8 @@ export function turnBlocksEqual(prev: TurnBlock[] | undefined, next: TurnBlock[]
       if (a.approval !== b.approval) return false;
     } else if (a.kind === "question" && b.kind === "question") {
       if (a.question !== b.question) return false;
+    } else if (a.kind === "notification" && b.kind === "notification") {
+      if (a.event !== b.event) return false;
     }
   }
   return true;
@@ -310,7 +325,8 @@ export type TurnBlockGroup =
   | { type: "tool"; key: string; tools: ToolCallEvent[]; sourceEventIds: string[] }
   | { type: "subagent"; key: string; subagents: SubagentTimelineEvent[]; tools: (ToolCallEvent | undefined)[]; sourceEventIds: string[] }
   | { type: "approval"; key: string; approvals: ApprovalTimelineEvent[]; sourceEventIds: string[] }
-  | { type: "question"; key: string; question: QuestionTimelineEvent; sourceEventIds: string[] };
+  | { type: "question"; key: string; question: QuestionTimelineEvent; sourceEventIds: string[] }
+  | { type: "notification"; key: string; events: StatusUpdateTimelineEvent[]; sourceEventIds: string[] };
 
 /**
  * Group only adjacent same-kind blocks, mirroring the official kimi-web
@@ -363,6 +379,13 @@ export function groupTurnBlocks(blocks: TurnBlock[]): TurnBlockGroup[] {
       }
     } else if (block.kind === "question") {
       groups.push({ type: "question", key: block.key, question: block.question, sourceEventIds: [block.question.id] });
+    } else if (block.kind === "notification") {
+      if (last?.type === "notification") {
+        last.events.push(block.event);
+        last.sourceEventIds.push(block.event.id);
+      } else {
+        groups.push({ type: "notification", key: block.key, events: [block.event], sourceEventIds: [block.event.id] });
+      }
     }
   }
   return groups;

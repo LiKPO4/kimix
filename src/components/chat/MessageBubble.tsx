@@ -8,6 +8,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { FileCard } from "./FileCard";
 import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
+import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
@@ -773,6 +774,7 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
 type ToolEvent = Extract<TimelineEvent, { type: "tool_call" }>;
 type SubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
 type ApprovalEvent = Extract<TimelineEvent, { type: "approval_request" }>;
+type StatusUpdateEvent = Extract<TimelineEvent, { type: "status_update" }>;
 type QuestionEvent = Extract<TimelineEvent, { type: "question_request" }>;
 type AssistantEvent = Extract<TimelineEvent, { type: "assistant_message" }>;
 
@@ -780,7 +782,8 @@ type ProcessItem =
   | { type: "thinking"; block: ThinkingBlock }
   | { type: "tool"; tool: ToolEvent }
   | { type: "subagent"; subagent: SubagentEvent }
-  | { type: "approval"; approval: ApprovalEvent };
+  | { type: "approval"; approval: ApprovalEvent }
+  | { type: "notification"; event: StatusUpdateEvent };
 
 function normalizeThinkingMarkdown(text: string) {
   return text
@@ -1015,7 +1018,9 @@ function renderProcessItem(item: ProcessItem, index: number) {
       ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
       : item.type === "approval"
         ? <ApprovalProcessItem key={item.approval.id} approval={item.approval} />
-        : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />;
+        : item.type === "notification"
+          ? <NotificationCard key={item.event.id} event={item.event} />
+          : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />;
 }
 
 const ProcessDetailList = memo(function ProcessDetailList({ items }: { items: ProcessItem[] }) {
@@ -1153,6 +1158,7 @@ function processItemTimestamp(item: ProcessItem) {
     case "tool": return item.tool.timestamp;
     case "subagent": return item.subagent.timestamp;
     case "approval": return item.approval.timestamp;
+    case "notification": return item.event.timestamp;
   }
 }
 
@@ -1162,6 +1168,7 @@ function processItemPriority(item: ProcessItem) {
     case "tool": return 1;
     case "subagent": return 2;
     case "approval": return 3;
+    case "notification": return 4;
   }
 }
 
@@ -2376,6 +2383,10 @@ function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGro
         : <KimiWebSubagentGroupCard subagents={group.subagents} />;
     case "approval":
       return <KimiWebApprovalGroupCard approvals={group.approvals} />;
+    case "notification":
+      return group.events.length === 1
+        ? <NotificationCard event={group.events[0]} />
+        : <NotificationGroupCard events={group.events} />;
   }
 }
 
@@ -2441,6 +2452,8 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
           ordered.push({ type: "subagent", subagent: block.subagent });
         } else if (block.kind === "approval") {
           ordered.push({ type: "approval", approval: block.approval });
+        } else if (block.kind === "notification") {
+          ordered.push({ type: "notification", event: block.event });
         }
       }
       return ordered;
@@ -2459,16 +2472,20 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     let toolCount = 0;
     let subagentCount = 0;
     let approvalCount = 0;
+    let notificationCount = 0;
     for (const block of effectiveTurnBlocks) {
       if (block.kind === "tool") toolCount += 1;
       else if (block.kind === "subagent") subagentCount += 1;
       else if (block.kind === "approval") approvalCount += 1;
+      else if (block.kind === "notification") notificationCount += 1;
     }
-    return { toolCount, subagentCount, approvalCount };
+    return { toolCount, subagentCount, approvalCount, notificationCount };
   }, [turnBlocks]);
   const summaryToolCount = blockCounts?.toolCount ?? tools.length;
   const summarySubagentCount = blockCounts?.subagentCount ?? subagents.length;
   const summaryApprovalCount = blockCounts?.approvalCount ?? approvals.length;
+  // 非 turnBlocks 路径（合成事件兜底）不含通知，回退 0。
+  const summaryNotificationCount = blockCounts?.notificationCount ?? 0;
   const hasDetails = items.length > 0 || (isActiveAssistant && Boolean(liveDraftKey));
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = useMemo(() => joinSummaryParts([
@@ -2476,7 +2493,8 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     summaryToolCount > 0 ? `${summaryToolCount} 条命令` : "",
     summarySubagentCount > 0 ? `${summarySubagentCount} 个子代理` : "",
     summaryApprovalCount > 0 ? `${summaryApprovalCount} 个工具请求` : "",
-  ]), [summaryApprovalCount, detailUnit, summarySubagentCount, thinkingBlocks.length, summaryToolCount]);
+    summaryNotificationCount > 0 ? `${summaryNotificationCount} 条通知` : "",
+  ]), [summaryApprovalCount, summaryNotificationCount, detailUnit, summarySubagentCount, thinkingBlocks.length, summaryToolCount]);
   const isFinalContentTransition = shouldCollapseKimiWebProcessOnFinalContent({
     previousHasFinalContent: previousHasFinalContentRef.current,
     hasFinalContent,

@@ -24,13 +24,18 @@ export function notificationStatusLabel(detail: StatusNotificationDetail): strin
   return "通知";
 }
 
-function notificationToneClass(event: StatusUpdateEvent): string {
-  if (event.tone === "success") return "bg-accent-success-light text-accent-success";
-  if (event.tone === "warning") return "bg-accent-warning-light text-accent-warning";
-  return "bg-accent-primary-light text-accent-primary";
+/**
+ * 图标色调（只给图标/计数点着色，卡片本体走 kimix-soft-card 基础样式，
+ * 跟随基础/风格化主题——早期版本整张卡铺 tone 底色，现代模式发蓝、复古模式刺眼）。
+ */
+function notificationToneIconClass(event: StatusUpdateEvent): string {
+  if (event.tone === "success") return "text-accent-success";
+  if (event.tone === "warning") return "text-accent-warning";
+  if (event.tone === "danger") return "text-accent-danger";
+  return "text-[var(--kimix-panel-text-muted)]";
 }
 
-function NotificationIcon({ detail, size = 15 }: { detail: StatusNotificationDetail; size?: number }) {
+function NotificationIcon({ detail, size = 14 }: { detail: StatusNotificationDetail; size?: number }) {
   if (detail.kind === "cron-fire") return <Clock size={size} />;
   if (detail.type === "task.completed") return <CheckCircle2 size={size} />;
   if (detail.type === "task.lost" || detail.type === "task.failed") return <AlertTriangle size={size} />;
@@ -45,103 +50,108 @@ function formatTime(timestamp: number): string {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline" style={{ gap: 14 }}>
-      <span className="shrink-0 text-[12px] leading-6 opacity-70" style={{ minWidth: 40 }}>{label}</span>
-      <span className="min-w-0 text-[12.5px] leading-6" style={{ wordBreak: "break-all" }}>{value}</span>
+      <span className="shrink-0 text-[12px] leading-6 text-[var(--kimix-panel-text-muted)]" style={{ minWidth: 40 }}>{label}</span>
+      <span className="min-w-0 text-[12.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ wordBreak: "break-all" }}>{value}</span>
     </div>
   );
 }
 
 /**
- * 单条通知详情卡（对齐官方通知卡）：头部 图标+中文标题+英文副标题+「状态 时间」，
- * 点击展开 类型/来源/严重度/正文/原始 payload。
- * embedded=true 时去掉自身背景圆角，作为分组卡内部行使用。
+ * 单条通知详情卡：头部 图标+中文标题+英文副标题+「状态 时间」，点击展开
+ * 类型/来源/严重度/正文/原始 payload。外观对齐过程链其他卡片（kimix-soft-card
+ * + 折叠行），不再整卡铺色调底色。embedded=true 时去掉卡片外壳，作为分组卡内部行。
  */
 export const NotificationCard = memo(function NotificationCard({ event, embedded = false }: { event: StatusUpdateEvent; embedded?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const detail = event.notification;
   if (!detail) return null;
-  const toneClass = notificationToneClass(event);
   const headline = notificationHeadline(detail);
   const source = [detail.sourceKind, detail.sourceId].filter(Boolean).join(" · ");
 
-  return (
-    <div className={embedded ? "" : `rounded-xl ${toneClass}`} style={embedded ? undefined : { padding: "10px 14px" }}>
-      <button
-        type="button"
-        onClick={() => setExpanded((current) => !current)}
-        className={`flex w-full items-center text-left ${embedded ? toneClass : ""}`}
-        style={{ gap: 10, padding: embedded ? "8px 14px" : 0, borderRadius: embedded ? 8 : undefined }}
-        aria-expanded={expanded}
-      >
-        <span className="shrink-0"><NotificationIcon detail={detail} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium leading-5">{headline}</span>
-          {detail.title ? <span className="block truncate text-[12px] leading-5 opacity-75">{detail.title}</span> : null}
-        </span>
-        <span className="shrink-0 text-[12px] leading-5">
-          {notificationStatusLabel(detail)} · {formatTime(event.timestamp)}
-        </span>
-        <ChevronDown size={14} className="shrink-0 transition-transform" style={{ transform: expanded ? "rotate(180deg)" : undefined }} />
-      </button>
-      {expanded && (
-        <div className={embedded ? "flex flex-col" : "flex flex-col"} style={{ gap: 4, marginTop: embedded ? 4 : 10, padding: embedded ? "0 14px 10px 39px" : 0, borderTop: embedded ? "none" : "1px solid color-mix(in srgb, currentColor 18%, transparent)", paddingTop: embedded ? 0 : 10 }}>
-          <DetailRow label="类型" value={detail.type} />
-          {source ? <DetailRow label="来源" value={source} /> : null}
-          {detail.severity ? <DetailRow label="严重度" value={detail.severity} /> : null}
-          {detail.body ? (
-            <div className="text-[12.5px] leading-6" style={{ marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{detail.body}</div>
-          ) : null}
-          <details style={{ marginTop: 4 }}>
-            <summary className="cursor-pointer select-none text-[12px] leading-6 opacity-70">原始 payload</summary>
-            <pre className="text-[11.5px] leading-5" style={{ marginTop: 6, padding: "8px 10px", borderRadius: 8, background: "color-mix(in srgb, currentColor 8%, transparent)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{detail.raw}</pre>
-          </details>
-        </div>
-      )}
-    </div>
+  const header = (
+    <button
+      type="button"
+      onClick={() => setExpanded((current) => !current)}
+      className="kimix-chat-collapse-row flex w-full items-center text-left transition-colors"
+      style={{ gap: 9, padding: "8px 12px" }}
+      aria-expanded={expanded}
+    >
+      <span className={`flex h-5 w-[18px] shrink-0 items-center justify-center ${notificationToneIconClass(event)}`}>
+        <NotificationIcon detail={detail} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{headline}</span>
+        {detail.title ? <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{detail.title}</span> : null}
+      </span>
+      <span className="shrink-0 text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
+        {notificationStatusLabel(detail)} · {formatTime(event.timestamp)}
+      </span>
+      <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+        <ChevronDown size={14} className="transition-transform" style={{ transform: expanded ? "rotate(180deg)" : undefined }} />
+      </span>
+    </button>
   );
+  const detailBlock = expanded ? (
+    <div className="flex flex-col border-t border-[var(--kimix-panel-divider)]" style={{ gap: 4, padding: "10px 14px" }}>
+      <DetailRow label="类型" value={detail.type} />
+      {source ? <DetailRow label="来源" value={source} /> : null}
+      {detail.severity ? <DetailRow label="严重度" value={detail.severity} /> : null}
+      {detail.body ? (
+        <div className="text-[12.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{detail.body}</div>
+      ) : null}
+      <details style={{ marginTop: 4 }}>
+        <summary className="cursor-pointer select-none text-[12px] leading-6 text-[var(--kimix-panel-text-muted)]">原始 payload</summary>
+        <pre className="rounded-lg bg-surface-base text-[11.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6, padding: "8px 10px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{detail.raw}</pre>
+      </details>
+    </div>
+  ) : null;
+
+  if (embedded) return <div>{header}{detailBlock}</div>;
+  return <div className="kimix-soft-card overflow-hidden rounded-xl">{header}{detailBlock}</div>;
 });
 
 /**
- * 连续通知分组卡（对齐官方「N 条通知」）：折叠态显示计数+摘要行，
- * 展开后逐条渲染嵌入版通知卡。
+ * 连续通知分组卡（对齐官方「N 条通知」）：折叠态显示计数+摘要行+逐条色调点，
+ * 展开后逐条渲染嵌入版通知卡。外壳同样走 kimix-soft-card 基础样式。
  */
 export const NotificationGroupCard = memo(function NotificationGroupCard({ events }: { events: StatusUpdateEvent[] }) {
   const [expanded, setExpanded] = useState(false);
   const first = events[0];
   if (!first?.notification) return null;
-  const toneClass = notificationToneClass(first);
   const summary = events
     .map((event) => event.notification?.title ?? event.notification?.body ?? event.message ?? "")
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <div className="rounded-xl border border-border-subtle bg-surface-elevated">
+    <div className="kimix-soft-card overflow-hidden rounded-xl">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center text-left"
-        style={{ gap: 10, padding: "10px 14px" }}
+        className="kimix-chat-collapse-row flex w-full items-center text-left transition-colors"
+        style={{ gap: 9, padding: "8px 12px" }}
         aria-expanded={expanded}
       >
-        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${toneClass}`}>
-          <NotificationIcon detail={first.notification} size={13} />
+        <span className={`flex h-5 w-[18px] shrink-0 items-center justify-center ${notificationToneIconClass(first)}`}>
+          <NotificationIcon detail={first.notification} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[13px] font-medium leading-5 text-text-primary">{events.length} 条通知</span>
           {!expanded && summary ? (
-            <span className="block truncate text-[12px] leading-5 text-text-muted">{summary}</span>
+            <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{summary}</span>
           ) : null}
         </span>
         <span className="flex shrink-0 items-center" style={{ gap: 3 }}>
           {events.map((event) => (
-            <span key={event.id} className={`h-1.5 w-1.5 rounded-full bg-current ${notificationToneClass(event).split(" ").pop()}`} />
+            <span key={event.id} className={`h-1.5 w-1.5 rounded-full bg-current ${notificationToneIconClass(event)}`} />
           ))}
         </span>
-        <ChevronDown size={14} className="shrink-0 text-text-muted transition-transform" style={{ transform: expanded ? "rotate(180deg)" : undefined }} />
+        <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
+          <ChevronDown size={14} className="transition-transform" style={{ transform: expanded ? "rotate(180deg)" : undefined }} />
+        </span>
       </button>
       {expanded && (
-        <div className="flex flex-col" style={{ gap: 6, padding: "0 6px 8px" }}>
+        <div className="flex flex-col border-t border-[var(--kimix-panel-divider)]">
           {events.map((event) => <NotificationCard key={event.id} event={event} embedded />)}
         </div>
       )}

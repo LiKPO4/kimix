@@ -300,20 +300,22 @@ describe("buildRenderItems notification cards", () => {
     },
   } as TimelineEvent);
 
-  it("通知在轮内按事件位置渲染为独立卡片，且不再进入 assistant 轮末 footer", () => {
+  it("轮内通知折进 assistant 过程链（turnBlocks），不再独立渲染、不进 footer", () => {
     const items = buildRenderItems([
       { id: "user", type: "user_message", timestamp: 1, content: "跑测试" } as TimelineEvent,
       assistantEvent("完成", { timestamp: 2 }),
       notificationStatus("n1", 3),
     ], "kimi-code");
-    const notificationItems = items.filter((item) => item.type === "event" && item.event.type === "status_update" && (item.event as { notification?: unknown }).notification);
-    expect(notificationItems.map((item) => (item.type === "event" ? item.event.id : ""))).toEqual(["n1"]);
+    const standalone = items.filter((item) => item.type === "event" && item.event.type === "status_update" && (item.event as { notification?: unknown }).notification);
+    expect(standalone).toHaveLength(0);
     const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const blocks = assistantItem?.type === "event" ? assistantItem.turnBlocks : undefined;
+    expect(blocks?.some((block) => block.kind === "notification" && block.event.id === "n1")).toBe(true);
     const trailing = assistantItem?.type === "event" ? assistantItem.trailingStatuses : undefined;
     expect(trailing?.some((status) => status.id === "n1")).toBeFalsy();
   });
 
-  it("连续 3 条通知聚合成一个 notification_group 渲染项", () => {
+  it("连续 3 条通知全部折进过程链，不产生 notification_group 渲染项", () => {
     const items = buildRenderItems([
       { id: "user", type: "user_message", timestamp: 1, content: "跑测试" } as TimelineEvent,
       assistantEvent("完成", { timestamp: 2 }),
@@ -321,14 +323,14 @@ describe("buildRenderItems notification cards", () => {
       notificationStatus("n2", 4),
       notificationStatus("n3", 5),
     ], "kimi-code");
-    const groups = items.filter((item) => item.type === "notification_group");
-    expect(groups).toHaveLength(1);
-    const group = groups[0];
-    if (group.type !== "notification_group") throw new Error("expect group");
-    expect(group.events.map((event) => event.id)).toEqual(["n1", "n2", "n3"]);
+    expect(items.filter((item) => item.type === "notification_group")).toHaveLength(0);
+    const assistantItem = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    const blocks = assistantItem?.type === "event" ? assistantItem.turnBlocks : undefined;
+    const ids = blocks?.flatMap((block) => block.kind === "notification" ? [block.event.id] : []);
+    expect(ids).toEqual(["n1", "n2", "n3"]);
   });
 
-  it("无 assistant 的已完结轮：通知只在主流渲染一次，settled 兜底不重复推", () => {
+  it("无 assistant 的已完结轮（无过程链载体）：通知回退独立渲染且只出现一次", () => {
     const items = buildRenderItems([
       { id: "user-1", type: "user_message", timestamp: 1, content: "第一轮" } as TimelineEvent,
       notificationStatus("n1", 2),
@@ -341,6 +343,20 @@ describe("buildRenderItems notification cards", () => {
       (item.type === "notification_group" && item.events.some((event) => event.id === "n1" || event.id === "n2"))
     ));
     expect(occurrences).toHaveLength(2);
+  });
+
+  it("无载体轮 ≥3 条通知经分组后聚合为一个 notification_group 渲染项", () => {
+    const items = buildRenderItems([
+      { id: "user", type: "user_message", timestamp: 1, content: "挂后台" } as TimelineEvent,
+      notificationStatus("n1", 2),
+      notificationStatus("n2", 3),
+      notificationStatus("n3", 4),
+    ], "kimi-code");
+    const groups = items.filter((item) => item.type === "notification_group");
+    expect(groups).toHaveLength(1);
+    const group = groups[0];
+    if (group.type !== "notification_group") throw new Error("expect group");
+    expect(group.events.map((event) => event.id)).toEqual(["n1", "n2", "n3"]);
   });
 });
 

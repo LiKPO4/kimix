@@ -1128,8 +1128,9 @@ export function buildRenderItems(
       if (event.type === "tool_call" || event.type === "tool_result") continue;
       if (event.type === "subagent") continue;
       if (event.type === "hook") continue;
+      // 通知信封经 turnBlocks 折进过程链（不再在正文下方独立漂浮）；没有过程链
+      // 载体的纯通知轮由本函数尾部兜底独立渲染。
       if (event.type === "status_update") {
-        if (event.notification) items.push({ type: "event", event });
         continue;
       }
       if (event.type === "change_summary") continue;
@@ -1230,6 +1231,16 @@ export function buildRenderItems(
     if (turnSettled && !assistantAttached) {
       statusEvents
         .filter((event) => shouldRenderStandaloneStatusUpdate(event) && !event.notification)
+        .forEach((event) => items.push({ type: "event", event }));
+    }
+    // 通知折进过程链的兜底：没有 assistant/工具/子代理容器承载 turnBlocks 的纯通知轮
+    // （如后台任务在会话闲置时完成），回退为独立卡，避免通知凭空消失。
+    // prompt 引擎的 tool_group 容器不带 turnBlocks，只有 assistant 块算载体。
+    const notificationCarrierPushed = assistantAttached ||
+      (sessionEngine === "kimi-code" && (tools.length > 0 || subagents.length > 0));
+    if (!notificationCarrierPushed) {
+      statusEvents
+        .filter((event) => event.notification)
         .forEach((event) => items.push({ type: "event", event }));
     }
     // Subagent progress belongs to the message stream so it stays aligned with

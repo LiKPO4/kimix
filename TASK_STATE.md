@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：通知卡折进思考工具链 + 样式走 Kimix 基础（v2.20.272）
+
+- 问题：v2.20.269 的通知详情卡/分组卡整卡铺 tone 底色（现代模式发蓝、复古刺眼），且作为独立块漂在正文下方，不进思考工具链。
+- 修法：`turnBlocks.ts` 新增 notification 块类型（buildTurnBlocks 按事件位置成块、groupTurnBlocks 相邻聚合、turnBlocksEqual）；`MessageBubble` 双显示模式接入（kimi-web 走 TurnBlocksProcessGroup、kimix 走 ProcessItem→ProcessDetailList），摘要行计「N 条通知」；`ChatThread` 轮内不再独立推，纯通知轮（无 assistant/工具载体，如闲置时后台任务完成）回退独立卡 + ≥3 分组；`NotificationCard`/`NotificationGroupCard` 重构为 kimix-soft-card 基础样式 + 仅图标/计数点着色调。
+- 审计：时间线卡片中近期新增的只有通知卡两种（上一张新增卡是 v2.5.45 QuestionCard）；pending 审批/提问保持独立可交互卡是官方式有意设计，已 resolve 的走 turnBlocks 折叠，管线归属正确。
+- 验收：定向 78/78、renderer typecheck、全量 vitest、build 均过；视觉待用户截图。
+
+
 ## 2026-08-07 修复：提问外部 settle 触发点加固（v2.20.271）
 
 - 实机复验 v2.20.270 失败：web/CLI 端已答提问在 Kimix 仍残留待回答。根因：单触发点（setStatus 迁出 waiting_question）不可靠——外部轮次的 prompt.completed/状态迁移可能整段缺席（Server 不向非发起客户端广播完成帧），状态永远停在 waiting_question，对账钩子永不触发。

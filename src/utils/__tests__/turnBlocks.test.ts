@@ -675,3 +675,52 @@ describe("agent dispatch synthesis on restore", () => {
     expect(block.subagent.resultSummary).toBeUndefined();
   });
 });
+describe("notification turn blocks", () => {
+  const notificationStatus = (id: string, timestamp: number): TimelineEvent => ({
+    id,
+    type: "status_update",
+    timestamp,
+    message: "后台任务已完成：跑测试",
+    source: "runtime",
+    tone: "success",
+    notification: {
+      kind: "notification",
+      type: "task.completed",
+      sourceKind: "background_task",
+      sourceId: "bash-1",
+      title: "Background process completed",
+      severity: "info",
+      body: "跑测试 completed.",
+      raw: "<notification>...</notification>",
+    },
+  } as TimelineEvent);
+
+  it("通知信封按事件位置成块，用量/进度状态不进块列表", () => {
+    const blocks = buildTurnBlocks([
+      { id: "u1", type: "status_update", timestamp: 1, message: "用量快照", source: "runtime" } as TimelineEvent,
+      notificationStatus("n1", 2),
+      notificationStatus("n2", 3),
+    ]);
+    expect(blocks.map((block) => block.kind)).toEqual(["notification", "notification"]);
+    const first = blocks[0];
+    const second = blocks[1];
+    if (first.kind !== "notification" || second.kind !== "notification") throw new Error("expect notification blocks");
+    expect(first.event.id).toBe("n1");
+    expect(second.event.id).toBe("n2");
+  });
+
+  it("groupTurnBlocks 聚合相邻通知块，被其他块打断则另起一组", () => {
+    const blocks = buildTurnBlocks([
+      notificationStatus("n1", 1),
+      notificationStatus("n2", 2),
+      { id: "t1", type: "tool_call", timestamp: 3, toolName: "Bash", status: "success", arguments: {} } as ToolCallEvent,
+      notificationStatus("n3", 4),
+    ]);
+    const groups = groupTurnBlocks(blocks);
+    expect(groups.map((group) => group.type)).toEqual(["notification", "tool", "notification"]);
+    const first = groups[0];
+    if (first.type !== "notification") throw new Error("expect notification group");
+    expect(first.events.map((event) => event.id)).toEqual(["n1", "n2"]);
+    expect(first.sourceEventIds).toEqual(["n1", "n2"]);
+  });
+});
