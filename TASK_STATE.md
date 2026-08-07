@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+## 2026-08-07 功能：dock 目标胶囊+弹窗，接通官方 Goal UI（v2.20.268）
+
+- 起因：用户发现 dock 胶囊缺官方客户端的「目标 · 进行中」胶囊。排查结论：不是没同步——session.officialGoal 同步链路（事件流/快照对账/手动刷新）完好，是 UI 从未实现；AppShell 传给侧栏面板的 officialGoal + 5 个 goal 回调是死 prop（面板只声明类型没解构渲染），ComposerDockBar 只有 4 类胶囊。
+- 实现（用户选定胶囊+弹窗方案，对齐官方）：ComposerDockBar 加第 5 类 goal 胶囊（排第一，非终态才显示，count 为状态文案），弹窗显示 objective/完成判据/轮次 tokens/状态 + 暂停/继续/取消/刷新按钮（busy 防连点，handler 同步调用）；AppShell 把 mutationSessionView.officialGoal 与 4 个回调经 Composer 注入（复用现有 ensureInspectorMutationRuntime 链路），goal 回调 reason 字符串从「from Kimix sidebar」改「from Kimix」。
+- 测试：ComposerDockBar +3 例（进行中胶囊排第一+面板操作、终态不显示、已暂停继续按钮+消失自动关面板）；修 busy 异步收尾致同步连点被吞的测试问题（run 改同步调用 handler）；uiStyles 断言同步上一轮侧栏刷新按钮纯图标化（遗漏，上轮未跑全量）。
+- 验收：全量 164 文件 1705 例全绿、两套 typecheck、pnpm build 通过。视觉待用户截图。
+
 ## 2026-08-06 修复：阶段 3 低级项一批（21 项，v2.20.266）
 
 - 已修 20 项（16 项子代理分区、4 项主理，关键结论已抽查复核）：
