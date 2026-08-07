@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, normalizeCompactionDisplay, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, normalizeCompactionDisplay, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, parseKimiGoalContinuation, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -357,6 +357,44 @@ describe("sanitizePersistedEvents", () => {
     }]);
   });
 
+  it("collapses goal-continuation user messages into status summaries", () => {
+    const events: TimelineEvent[] = [{
+      id: "goal-1",
+      type: "user_message",
+      timestamp: 7,
+      content: "Continue working toward the active goal.",
+    }, {
+      id: "goal-2",
+      type: "user_message",
+      timestamp: 8,
+      content: "The previous goal turn reached the per-turn step limit. Continue the goal execution; the goal is unchanged.",
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([
+      { type: "status_update", message: "目标续跑", source: "runtime", tone: "info", id: "goal-1" },
+      { type: "status_update", message: "目标续跑", source: "runtime", tone: "info", id: "goal-2" },
+    ]);
+  });
+
+  it("keeps Resume-the-goal and ordinary user messages untouched by goal sanitizing", () => {
+    const events: TimelineEvent[] = [{
+      id: "resume-1",
+      type: "user_message",
+      timestamp: 9,
+      content: "Resume the active goal.",
+    }, {
+      id: "plain-1",
+      type: "user_message",
+      timestamp: 10,
+      content: "Continue working on this task.",
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([
+      { type: "user_message", content: "Resume the active goal." },
+      { type: "user_message", content: "Continue working on this task." },
+    ]);
+  });
+
   it("sanitizes cached official Skill activation titles", () => {
     expect(sanitizeKimiSkillActivationTitle('User activated the skill "find-skills".'))
       .toBe("使用 find-skills");
@@ -367,6 +405,36 @@ describe("sanitizePersistedEvents", () => {
       .toBe("/custom-theme 做一套暗色主题");
     expect(formatKimiSkillActivationCommand("find-skills", "查找主题 Skill"))
       .toBe("/skill:find-skills 查找主题 Skill");
+  });
+});
+
+describe("parseKimiGoalContinuation", () => {
+  const GOAL_ORIGIN = { kind: "system_trigger", name: "goal_continuation" };
+
+  it("matches both official goal-continuation text prefixes", () => {
+    expect(parseKimiGoalContinuation("Continue working toward the active goal.")).not.toBeNull();
+    expect(parseKimiGoalContinuation("Continue working toward the active goal.  \n\n请继续执行。")).not.toBeNull();
+    expect(parseKimiGoalContinuation("The previous goal turn reached the per-turn step limit. 继续执行当前目标。")).not.toBeNull();
+    expect(parseKimiGoalContinuation("  The previous goal turn reached the per-turn step limit; the goal is unchanged.  ")).not.toBeNull();
+  });
+
+  it("matches the structured system_trigger origin regardless of text", () => {
+    expect(parseKimiGoalContinuation("任意文本", GOAL_ORIGIN)).not.toBeNull();
+    expect(parseKimiGoalContinuation("", GOAL_ORIGIN)).not.toBeNull();
+  });
+
+  it("does not match Resume-the-goal or ordinary user messages", () => {
+    expect(parseKimiGoalContinuation("Resume the active goal.")).toBeNull();
+    expect(parseKimiGoalContinuation("Continue working on this task.")).toBeNull();
+    expect(parseKimiGoalContinuation("帮我继续完成这个任务")).toBeNull();
+    expect(parseKimiGoalContinuation("", undefined)).toBeNull();
+  });
+
+  it("does not match origins with different kind or name", () => {
+    expect(parseKimiGoalContinuation("普通消息文本", { kind: "system_trigger", name: "skill_invocation" })).toBeNull();
+    expect(parseKimiGoalContinuation("普通消息文本", { kind: "user", name: "goal_continuation" })).toBeNull();
+    expect(parseKimiGoalContinuation("普通消息文本", { name: "goal_continuation" })).toBeNull();
+    expect(parseKimiGoalContinuation("普通消息文本", "goal_continuation")).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import type { TimelineEvent, TodoItem, UserMessageImage } from "@/types/ui";
-import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiAgentEnvelope, parseKimiSkillActivation } from "./eventHelpers";
+import { findUnmatchedCompactionBeginIndex, formatKimiSkillActivationCommand, isLegacyKimiWorkDirError, parseKimiAgentEnvelope, parseKimiGoalContinuation, parseKimiSkillActivation } from "./eventHelpers";
 import { reliableAssistantDurationBetween, reliableAssistantDurationMs } from "./duration";
 import { parseRoomDeliveryPrompt, stripRoomContextFromPrompt, type RoomDeliveryPromptIdentity } from "./roomContextBridge";
 import { logEvent } from "@/utils/reportError";
@@ -1576,6 +1576,19 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           source: "runtime",
           tone: envelope.tone,
           notification: envelope.notification,
+        };
+      }
+      // goal 续跑是系统触发消息（wire turn.prompt 记录带 origin），折叠为状态
+      // 摘要并保留事件位置以维持轮次边界，不渲染原文。
+      const goalContinuation = parseKimiGoalContinuation(userMessage.content, payload.origin);
+      if (goalContinuation) {
+        return {
+          id: generateId(),
+          type: "status_update",
+          timestamp: eventTimestamp,
+          message: "目标续跑",
+          source: "runtime",
+          tone: "info",
         };
       }
       const skillActivation = parseKimiSkillActivation(userMessage.content);

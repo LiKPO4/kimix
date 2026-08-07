@@ -86,6 +86,32 @@ export function parseKimiAgentEnvelope(content: string): AgentEnvelopeSummary | 
   return null;
 }
 
+/**
+ * goal 模式内部续跑提示词判定。官方运行时把系统触发的 goal 续跑作为 role=user
+ * 消息持久化（快照消息带 metadata.origin、wire turn.prompt 记录带 origin），
+ * 它不是用户输入，渲染时必须折叠为状态摘要，否则原文会出现在用户气泡里。
+ * 判定以 origin 为主（kind==="system_trigger" && name==="goal_continuation"），
+ * 历史/清洗层拿不到 origin 时用文本前缀兜底。
+ * 注意：首轮 /goal 原文与 "Resume the active goal." 是正常用户消息，不命中。
+ */
+export function parseKimiGoalContinuation(content: string, origin?: unknown): { kind: "goal-continuation" } | null {
+  if (typeof origin === "object" && origin !== null && !Array.isArray(origin)) {
+    const record = origin as Record<string, unknown>;
+    if (record.kind === "system_trigger" && record.name === "goal_continuation") {
+      return { kind: "goal-continuation" };
+    }
+  }
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+  if (
+    trimmed.startsWith("Continue working toward the active goal.") ||
+    trimmed.startsWith("The previous goal turn reached the per-turn step limit")
+  ) {
+    return { kind: "goal-continuation" };
+  }
+  return null;
+}
+
 const BUILTIN_SKILL_COMMAND_NAMES = new Set(["custom-theme", "import-from-cc-codex", "mcp-config"]);
 
 export function formatKimiSkillActivationCommand(name: string, args = "") {
@@ -136,6 +162,19 @@ export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[
         source: "runtime" as const,
         tone: envelope.tone,
         notification: envelope.notification,
+      }];
+    }
+    // 历史脏数据修复：goal 续跑提示词曾以 user_message 持久化，恢复路径
+    // 拿不到 origin，按文本前缀折叠为状态摘要（轮次边界由事件位置保留）。
+    const goalContinuation = parseKimiGoalContinuation(event.content);
+    if (goalContinuation) {
+      return [{
+        id: event.id,
+        type: "status_update" as const,
+        timestamp: event.timestamp,
+        message: "目标续跑",
+        source: "runtime" as const,
+        tone: "info" as const,
       }];
     }
     const activation = parseKimiSkillActivation(event.content);

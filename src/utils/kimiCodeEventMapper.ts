@@ -3,6 +3,7 @@ import { extractUserMessage, mergeEvents } from "./eventMapper";
 import {
   formatKimiSkillActivationCommand,
   parseKimiAgentEnvelope,
+  parseKimiGoalContinuation,
   parseKimiSkillActivation,
 } from "./eventHelpers";
 
@@ -429,6 +430,19 @@ export function mapKimiCodeEvent(
           source: "runtime",
           tone: envelope.tone,
           notification: envelope.notification,
+        };
+      }
+      // goal 续跑是系统触发消息（origin 或文本前缀），折叠为状态摘要并保留
+      // 事件位置以维持轮次边界，不渲染原文。
+      const goalContinuation = parseKimiGoalContinuation(userMessage.content, event.origin ?? payload.origin);
+      if (goalContinuation) {
+        return {
+          id: getId(options),
+          type: "status_update",
+          timestamp,
+          message: "目标续跑",
+          source: "runtime",
+          tone: "info",
         };
       }
       const skillActivation = parseKimiSkillActivation(userMessage.content);

@@ -2298,13 +2298,23 @@ function snapshotMessageToServerFrames(
   if (role === "user") {
     const messageText = contentToText(message.content);
     const hasPromptContent = messageText.length > 0 || hasMediaContent(message.content);
+    // 系统触发消息（如 goal 续跑）的 metadata.origin 必须透传进帧 payload，
+    // 否则渲染层只能靠文本前缀兜底识别，无法与官方渲染保持一致。
+    const origin = snapshotMessageOrigin(message);
     if (replayMode === "history" && hasPromptContent) {
       return [{
         type: "TurnBegin",
         session_id: sessionId,
         seq,
         epoch,
-        payload: snapshotReplayPayload({ user_input: message.content }, replayMode, messageIdentity, messageText, role, messageTimestamp),
+        payload: snapshotReplayPayload(
+          { user_input: message.content, ...(origin ? { origin } : {}) },
+          replayMode,
+          messageIdentity,
+          messageText,
+          role,
+          messageTimestamp,
+        ),
       }];
     }
     return replayMode === "in_flight"
@@ -2485,6 +2495,12 @@ function snapshotMessageIdentity(message: Record<string, unknown>, role: string)
   return stableId
     ? { id: stableId, stable: true }
     : { id: `${role}:${contentToText(message.content).slice(0, 512)}`, stable: false };
+}
+
+function snapshotMessageOrigin(message: Record<string, unknown>): Record<string, unknown> | undefined {
+  const metadata = isRecord(message.metadata) ? message.metadata : undefined;
+  const origin = metadata?.origin ?? message.origin;
+  return isRecord(origin) ? origin : undefined;
 }
 
 function snapshotMessageTimestamp(message: Record<string, unknown>): unknown {

@@ -71,6 +71,75 @@ describe("mapKimiCodeEvent", () => {
     }
   });
 
+  it("maps goal-continuation TurnBegin with structured origin to status_update", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "Continue working toward the active goal.",
+      origin: { kind: "system_trigger", name: "goal_continuation" },
+      snapshotMessageId: "msg_goal_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
+  });
+
+  it("maps goal-continuation TurnBegin by text prefix when origin is missing", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "The previous goal turn reached the per-turn step limit. 继续执行目标。",
+      snapshotMessageId: "msg_goal_0002",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
+  });
+
+  it("reads goal-continuation origin from the nested wire-history payload", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: "Continue working toward the active goal.",
+        origin: { kind: "system_trigger", name: "goal_continuation" },
+      },
+      time: 1000,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
+  });
+
+  it("keeps Resume-the-goal and ordinary TurnBegin messages as user_message", () => {
+    const resume = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "Resume the active goal.",
+      snapshotMessageId: "msg_resume_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+    const ordinary = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "Continue working on this task.",
+      snapshotMessageId: "msg_plain_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(resume).toMatchObject({ type: "user_message", content: "Resume the active goal." });
+    expect(ordinary).toMatchObject({ type: "user_message", content: "Continue working on this task." });
+  });
+
+  it("does not fold a non-goal system_trigger origin TurnBegin", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "普通消息文本",
+      origin: { kind: "system_trigger", name: "skill_invocation" },
+      snapshotMessageId: "msg_origin_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).toMatchObject({ type: "user_message", content: "普通消息文本" });
+  });
+
   it("returns null for empty TurnBegin content", () => {
     expect(mapKimiCodeEvent({ type: "TurnBegin", user_input: "" }, testOptions())).toBeNull();
     expect(mapKimiCodeEvent({ type: "TurnBegin" }, testOptions())).toBeNull();

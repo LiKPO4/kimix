@@ -407,7 +407,8 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
   if (record.type === "turn.prompt") {
     return {
       type: "TurnBegin",
-      payload: { user_input: record.input },
+      // 透传系统触发标记（如 goal 续跑 origin），渲染层据此折叠为状态摘要。
+      payload: { user_input: record.input, ...(record.origin ? { origin: record.origin } : {}) },
       time: record.time,
     };
   }

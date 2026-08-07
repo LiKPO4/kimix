@@ -25,6 +25,37 @@ describe("mapStreamEvent", () => {
     expect((event as Extract<TimelineEvent, { type: "user_message" }>).content).toBe("Hello");
   });
 
+  it("folds goal-continuation wire TurnBegin (origin or text prefix) into status_update", () => {
+    const byOrigin = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: "Continue working toward the active goal.",
+        origin: { kind: "system_trigger", name: "goal_continuation" },
+      },
+    });
+    const byPrefix = mapStreamEvent({
+      type: "TurnBegin",
+      payload: { user_input: "The previous goal turn reached the per-turn step limit. 继续执行。" },
+    });
+
+    expect(byOrigin).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
+    expect(byPrefix).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
+  });
+
+  it("keeps Resume-the-goal and ordinary wire TurnBegin as user_message", () => {
+    const resume = mapStreamEvent({
+      type: "TurnBegin",
+      payload: { user_input: "Resume the active goal." },
+    });
+    const ordinary = mapStreamEvent({
+      type: "TurnBegin",
+      payload: { user_input: "Continue working on this task." },
+    });
+
+    expect(resume?.type).toBe("user_message");
+    expect(ordinary?.type).toBe("user_message");
+  });
+
   it("hides room context bridge content from the visible user message", () => {
     const event = mapStreamEvent({
       type: "TurnBegin",

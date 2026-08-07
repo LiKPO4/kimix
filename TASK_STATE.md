@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：goal 续跑提示词被当用户消息渲染——三层折叠为「目标续跑」状态摘要（v2.20.288）
+
+- 现象：goal 模式每轮的内部续跑提示词（"Continue working toward the active goal.…"）在 Kimix 渲染成用户气泡；官方 web/TUI 只显示一条 12px「目标续跑」来源标记。
+- 根因（调查闭合，上游 0.34.0 源码佐证）：续跑提示词是纯文本 role=user 消息，结构化标记 `metadata.origin={kind:'system_trigger',name:'goal_continuation'}`，但 Kimix 两处帧合成（server 快照 `snapshotMessageToServerFrames`、SDK wire `parseKimiCodeRecord`）都把 origin 丢了，映射层无任何 goal 判定；`<system-reminder>` 类提醒（objective XML）此前已被 stripOfficialSystemReminders 覆盖，只有这条纯文本漏网。
+- 修法（origin 为主、文本前缀兜底）：① electron 两层透传 origin 进帧 payload；② `eventHelpers.ts` 新增 `parseKimiGoalContinuation`（origin 命中或 trim 后两个固定前缀之一）；③ 三层折叠为 status_update「目标续跑」（保留事件位置维持轮边界，不 return null）：kimiCodeEventMapper live 分支、eventMapper wire 历史路径（mapStreamEvent，brief 外必要补充——历史恢复实际走这条）、sanitizePersistedEvents 清洗层。
+- 误伤防护：`Resume the active goal.`（/goal resume）与首轮 objective 原文保持正常用户消息；近似文本「Continue working on this task.」与非 goal 的 system_trigger 均不折叠，负向用例覆盖。
+- 验收：定向 313/313（eventHelpers/kimiCodeEventMapper/eventMapper）、关联回归 103/103、typecheck 双配置 0 错误；全量 vitest/build 见提交记录。实机复验待用户（goal 会话历史里的续跑提示词应变「目标续跑」摘要行）。
+
 ## 2026-08-07 修复：官方 goal 状态不同步——接住 goal.updated 事件 + 首次发现轮询（v2.20.287）
 
 - 现象：CLI/web 侧创建的 goal（目标模式）在 kimi web 输入区上方显示「目标 进行中」pill，Kimix 同位置 pill 行缺失。
