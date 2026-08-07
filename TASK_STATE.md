@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：官方 goal 状态不同步——接住 goal.updated 事件 + 首次发现轮询（v2.20.287）
+
+- 现象：CLI/web 侧创建的 goal（目标模式）在 kimi web 输入区上方显示「目标 进行中」pill，Kimix 同位置 pill 行缺失。
+- 根因（两路只读调查闭合，含上游 0.34.0 源码佐证）：① goal 状态是专用通道（WS `goal.updated` + REST `GET /sessions/{id}/goal`），不进 snapshot/status/session 对象；SDK 路由下事件全链路透传到渲染层，但被 `kimiCodeEventMapper` 白名单 switch 的 `default: null` 丢弃；② 首次发现缺失——`scheduleOfficialGoalRefresh`/`refreshOfficialGoalState` 在 officialGoal 为空时直接 return，外部创建的 goal 永不拉取；server 路由本就无 goal 事件面，只能靠 REST 轮询。渲染层 pill 逻辑（ComposerDockBar:177）早已就绪，非根因。
+- 修法：`officialGoalState.ts` 新增纯函数（事件 snapshot 归一/写入-清除语义/空 goal 60s 限流分档/版本竞态判定）；`App.tsx` onKimiCodeEvent 入口在 mapper 前早退接住 `goal.updated`（写 store 或清除 + bump 版本），goal 未知会话事件到达时 eager 调度首次发现，放开两处空 goal 门禁并加 per-session 版本竞态保护（REST 落地前版本变了即丢弃）。
+- 验收：officialGoalState 14/14、周边回归 276/276、typecheck 双配置 0 错误；全量 vitest/build 见提交记录。实机复验待用户（CLI 创建 goal 后 Kimix 应出现「目标」pill，完成后消失）。
+- 已知边界：goal.updated 早于会话归属解析到达时丢弃，靠 REST 首次发现兜底（弱一致）；空 goal 会话 60s 限流轮询。
+
 ## 2026-08-07 跟进：SDK 路由默认切 v2 引擎，v1 留环境变量回滚（上游跟进队列 5/5，v2.20.285）
 
 - 背景：goal 队列第 5 项。前置 probe 已验证：v2 client 方法面完整（host 调用面全覆盖）、事件经 event-mapper 翻译回 v1 形状、v1/v2 会话存储（目录布局/state.json/wire.jsonl）完全同构可无缝互 resume。

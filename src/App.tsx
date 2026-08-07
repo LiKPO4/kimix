@@ -25,7 +25,7 @@ import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSe
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
 import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
-import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
+import { applyOfficialGoalUpdatedSnapshot, getOfficialGoalRefreshDelay, inferTerminalGoalFromEvent, isStaleGoalFetch, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
 import { dedupeListKimiCodeSessions } from "@/utils/listKimiCodeSessionsDedupe";
@@ -1502,6 +1502,7 @@ function App() {
   const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
   const goalRefreshTimersRef = useRef<Map<string, number>>(new Map());
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
+  const goalFetchVersionRef = useRef<Map<string, number>>(new Map());
   const pendingQueueDispatchRef = useRef<Set<string>>(new Set());
   const notifiedQuestionRequestRef = useRef<Set<string>>(new Set());
   const notifiedApprovalRequestRef = useRef<Set<string>>(new Set());
@@ -1660,10 +1661,15 @@ function App() {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (!target) return;
     const ownerAgentId = roomAgentId ?? resolveRoomRuntimeOwner([target], runtimeSessionId)?.roomAgentId ?? getPrimaryRoomAgent(target).id;
-    const targetView = getRoomAgentSessionView(target, ownerAgentId);
-    if (!targetView.officialGoal) return;
+    // 放开「从未刷新」门禁：外部（CLI/web）创建的 goal 也允许拉取，
+    // 频率由 schedule 的空 goal 限流控制。
+    const versionKey = `${uiSessionId}:${ownerAgentId}:${runtimeSessionId}`;
+    const fetchVersion = (goalFetchVersionRef.current.get(versionKey) ?? 0) + 1;
+    goalFetchVersionRef.current.set(versionKey, fetchVersion);
     try {
       const res = await window.api.getKimiCodeGoal({ sessionId: runtimeSessionId });
+      // 版本竞态：拉取期间收到更新的 goal.updated 事件则丢弃旧结果。
+      if (isStaleGoalFetch(fetchVersion, goalFetchVersionRef.current.get(versionKey))) return;
       useSessionStore.getState().updateSession(uiSessionId, (session) => {
         const view = getRoomAgentSessionView(session, ownerAgentId);
         const officialGoal = {
@@ -1681,6 +1687,7 @@ function App() {
       });
       syncCurrentSessionFromStore(uiSessionId);
     } catch (err) {
+      if (isStaleGoalFetch(fetchVersion, goalFetchVersionRef.current.get(versionKey))) return;
       useSessionStore.getState().updateSession(uiSessionId, (session) => {
         const view = getRoomAgentSessionView(session, ownerAgentId);
         const officialGoal = {
@@ -1704,11 +1711,12 @@ function App() {
     const target = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
     if (!target) return;
     const ownerAgentId = roomAgentId ?? resolveRoomRuntimeOwner([target], runtimeSessionId)?.roomAgentId ?? getPrimaryRoomAgent(target).id;
-    if (!getRoomAgentSessionView(target, ownerAgentId).officialGoal?.goal) return;
+    // 已有 goal 的会话保持 1200ms 事件后刷新；goal 未知/为空的会话同样调度，
+    // 但按 60s 限流轮询，覆盖外部（CLI/web）创建 goal 的首次发现，防空轮询风暴。
+    const hasGoal = Boolean(getRoomAgentSessionView(target, ownerAgentId).officialGoal?.goal);
     const key = `${uiSessionId}:${ownerAgentId}:${runtimeSessionId}`;
     if (goalRefreshTimersRef.current.has(key)) return;
-    const elapsed = Date.now() - (goalLastRefreshRef.current.get(key) ?? 0);
-    const delay = Math.max(0, 1200 - elapsed);
+    const delay = getOfficialGoalRefreshDelay(hasGoal, goalLastRefreshRef.current.get(key), Date.now());
     const timer = window.setTimeout(() => {
       goalRefreshTimersRef.current.delete(key);
       goalLastRefreshRef.current.set(key, Date.now());
@@ -2775,6 +2783,32 @@ function App() {
         syncSessionSwarmMode(uiSessionId, rawEvent, roomAgentId);
         syncSessionPermissionMode(uiSessionId, rawEvent, roomAgentId);
       }
+      if (rawEvent?.type === "goal.updated") {
+        // 官方 goal 实时事件：非 null snapshot 写入 store（终态保留最后状态，pill 由
+        // ComposerDockBar 按非终态条件隐藏）；snapshot 为 null → 清除。同时 bump 版本，
+        // 让进行中的 REST 拉取结果作废（版本竞态保护）。
+        if (!targetSession || !roomAgentId || !targetAgentSession) return;
+        const versionKey = `${uiSessionId}:${roomAgentId}:${payload.sessionId}`;
+        goalFetchVersionRef.current.set(versionKey, (goalFetchVersionRef.current.get(versionKey) ?? 0) + 1);
+        const goal = applyOfficialGoalUpdatedSnapshot(rawEvent.snapshot, targetAgentSession.officialGoal?.goal);
+        updateSession(uiSessionId, (session) => {
+          const officialGoal = { goal, error: null, updatedAt: Date.now() };
+          if (session.collaboration) {
+            return {
+              ...updateRoomAgent(session, roomAgentId, (agent) => ({ ...agent, officialGoal })),
+              updatedAt: Date.now(),
+            };
+          }
+          return { ...session, officialGoal, updatedAt: Date.now() };
+        });
+        syncCurrentSessionFromStore(uiSessionId);
+        return;
+      }
+      // 首次发现：外部（CLI/web）创建的 goal 本地无事件面，任何事件到达时对
+      // goal 未知的会话 eager 拉一次（schedule 内部 60s 限流 + timer 去重）。
+      if (!targetAgentSession?.officialGoal?.goal) {
+        scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId, roomAgentId);
+      }
       const officialTitle = extractOfficialSessionTitle(rawEvent);
       if (
         officialTitle &&
@@ -3537,6 +3571,7 @@ function App() {
       goalRefreshTimersRef.current.forEach(clearTimeout);
       goalRefreshTimersRef.current.clear();
       goalLastRefreshRef.current.clear();
+      goalFetchVersionRef.current.clear();
     };
   // Runtime listeners own session continuity. Preference changes are read from
   // useAppStore at operation time and must never restart bootstrap or history recovery.
