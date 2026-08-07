@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 跟进：vendor SDK 刷新 0.31.0→0.34.0（上游跟进队列 1/5，v2.20.281）
+
+- 背景：goal 队列第 1 项。vendored node-sdk 从上游 tag 0.31.0（0.15.0）刷新到 0.34.0（0.15.3）；已验证 SDK 面零破坏（87 文件零增删、wire 事件格式不变、v1 client 路径两 tag 一致）。
+- 执行：research repo（`.kimix-upstream-kimi-code-0.18.0/`，原为 shallow 克隆）fetch + checkout tag 0.34.0（commit f0614c53，注意 tag 对象 SHA ee5ad6aa≠commit）；corepack 自动切 pnpm 10.33.0 完成 install；tsdown 产出 dist/index.mjs；`scripts/vendor-kimi-code-sdk.mjs` 重打 bundle（MCP 超时补丁标记正常命中）。
+- 探针：`probe-kimi-code-host.mjs` 三轮全过——prompt 轮 completed（10.4s）、steer 轮 completed（39.9s，含 tool.call）、cancel 轮 cancelled（836ms）。
+- bundle：12,034,233 → 12,641,721 字节（+5.05%）；README provenance 表已更新（含 Bundled on 2026-08-07）。
+- 验收：kimiCodeVendorBundle 3/3（marker 全命中）、typecheck 双配置 0 错误、全量 vitest 与 build 见提交前记录。
+- 已知边界：0.34.0 新 SDK API（lastTurnReason、capability 管理、workspace trust 等）已随 bundle 就绪，消费在队列后续项；v1 引擎维护态风险记录在案（队列第 5 项切 v2 应对）。
+
 ## 2026-08-07 性能：启动恢复提速——目录扫描去重 + loadSession 并行编排（v2.20.280）
 
 - 现象：每次启动恢复上次会话长时间停在「正在同步最新会话」；用户怀疑全量加载所有未归档会话。
