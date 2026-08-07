@@ -44,6 +44,8 @@ export function chatNavigationPreviewOpenDelay(hasVisiblePreview: boolean) {
 
 export interface ChatNavigationPreviewPositionOptions {
   anchorRight: number;
+  /** 刻度条所在侧；right 时预览改向刻度线左侧展开（anchorRight 传刻度线左缘）。 */
+  side?: "left" | "right";
   anchorCenterY: number;
   viewportWidth: number;
   viewportHeight: number;
@@ -62,7 +64,7 @@ export function chatNavigationPreviewPosition(options: ChatNavigationPreviewPosi
   const gap = options.gap ?? 12;
   const width = Math.max(0, Math.min(options.previewWidth, options.viewportWidth - margin * 2));
   const left = clamp(
-    options.anchorRight + gap,
+    options.side === "right" ? options.anchorRight - gap - width : options.anchorRight + gap,
     margin,
     Math.max(margin, options.viewportWidth - width - margin),
   );

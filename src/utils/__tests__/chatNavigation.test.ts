@@ -118,6 +118,18 @@ describe("chat navigation", () => {
     })).toEqual({ left: 448, top: 408, width: 340 });
   });
 
+  it("opens the preview to the left of the marker when the rail is on the right", () => {
+    expect(chatNavigationPreviewPosition({
+      anchorRight: 400,
+      anchorCenterY: 300,
+      viewportWidth: 800,
+      viewportHeight: 600,
+      previewWidth: 340,
+      previewHeight: 180,
+      side: "right",
+    })).toEqual({ left: 48, top: 210, width: 340 });
+  });
+
   it("opens cautiously once, then follows adjacent markers within one frame", () => {
     expect(chatNavigationPreviewOpenDelay(false)).toBe(CHAT_NAVIGATION_PREVIEW_INITIAL_DELAY_MS);
     expect(chatNavigationPreviewOpenDelay(true)).toBe(CHAT_NAVIGATION_PREVIEW_SWITCH_DELAY_MS);

@@ -83,6 +83,12 @@ export interface AppState {
   defaultThinkingEffort: string;
   defaultPlanMode: boolean;
   fontSize: number;
+  /** 对话流边缘导航刻度条是否显示。 */
+  chatNavigationRailEnabled: boolean;
+  /** 刻度条贴附侧。 */
+  chatNavigationRailSide: "left" | "right";
+  /** 单条刻度线长度（px）。 */
+  chatNavigationRailWidth: number;
   additionalWorkDirs: string[];
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;

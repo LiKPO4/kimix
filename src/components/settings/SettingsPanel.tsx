@@ -382,6 +382,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
   const sessionRecommendationTurnLimit = useAppStore((s) => s.sessionRecommendationTurnLimit);
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
+  const chatNavigationRailEnabled = useAppStore((s) => s.chatNavigationRailEnabled);
+  const setChatNavigationRailEnabled = useAppStore((s) => s.setChatNavigationRailEnabled);
+  const chatNavigationRailSide = useAppStore((s) => s.chatNavigationRailSide);
+  const setChatNavigationRailSide = useAppStore((s) => s.setChatNavigationRailSide);
+  const chatNavigationRailWidth = useAppStore((s) => s.chatNavigationRailWidth);
+  const setChatNavigationRailWidth = useAppStore((s) => s.setChatNavigationRailWidth);
   const voiceShortcut = useAppStore((s) => s.voiceShortcut);
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const notificationMode = useAppStore((s) => s.notificationMode);
@@ -1412,6 +1418,51 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       onCommit={setFontSize}
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
+                  </div>
+                </div>
+                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+                  <button
+                    type="button"
+                    aria-pressed={chatNavigationRailEnabled}
+                    onClick={() => setChatNavigationRailEnabled(!chatNavigationRailEnabled)}
+                    className="flex min-w-0 items-center text-left"
+                    style={{ gap: 12 }}
+                  >
+                    <SelectionIndicator selected={chatNavigationRailEnabled} />
+                    <div className="min-w-0 flex-1">
+                      <div className="kimix-settings-permission-label">对话刻度</div>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
+                        对话流边缘的导航刻度：悬停预览、点击跳转到对应节点。
+                      </div>
+                    </div>
+                  </button>
+                  <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14, marginTop: 12 }}>
+                    <div className="min-w-0">
+                      <div className="mb-1 text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">位置</div>
+                      <select
+                        aria-label="对话刻度位置"
+                        value={chatNavigationRailSide}
+                        disabled={!chatNavigationRailEnabled}
+                        onChange={(event) => setChatNavigationRailSide(event.target.value as "left" | "right")}
+                        className="kimix-settings-input h-9 w-full rounded-lg text-[13px] outline-none"
+                        style={{ paddingLeft: 10, paddingRight: 8 }}
+                      >
+                        <option value="left">左侧</option>
+                        <option value="right">右侧</option>
+                      </select>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="mb-1 text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">宽度</div>
+                      <NumberInput
+                        aria-label="对话刻度宽度"
+                        min={6}
+                        max={28}
+                        value={chatNavigationRailWidth}
+                        disabled={!chatNavigationRailEnabled}
+                        onCommit={setChatNavigationRailWidth}
+                        className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

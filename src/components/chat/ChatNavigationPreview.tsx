@@ -5,6 +5,7 @@ import { chatNavigationPreviewPosition, type ChatNavigationItem } from "@/utils/
 export interface ChatNavigationPreviewAnchor {
   right: number;
   centerY: number;
+  side?: "left" | "right";
 }
 
 interface ChatNavigationPreviewProps {
@@ -28,6 +29,7 @@ export function ChatNavigationPreview({ item, anchor, visible, onPointerEnter, o
     const height = cardRef.current?.offsetHeight ?? 150;
     const next = chatNavigationPreviewPosition({
       anchorRight: anchor.right,
+      side: anchor.side,
       anchorCenterY: anchor.centerY,
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
@@ -37,7 +39,7 @@ export function ChatNavigationPreview({ item, anchor, visible, onPointerEnter, o
       gap: ANCHOR_GAP,
     });
     setPosition({ ...next, ready: true });
-  }, [anchor.centerY, anchor.right]);
+  }, [anchor.centerY, anchor.right, anchor.side]);
 
   useLayoutEffect(() => {
     setPosition((current) => ({ ...current, ready: false }));

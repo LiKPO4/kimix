@@ -16,6 +16,9 @@ export function useSettingsSync() {
         state.defaultThinkingEffort !== prev.defaultThinkingEffort ||
         state.defaultPlanMode !== prev.defaultPlanMode ||
         state.fontSize !== prev.fontSize ||
+        state.chatNavigationRailEnabled !== prev.chatNavigationRailEnabled ||
+        state.chatNavigationRailSide !== prev.chatNavigationRailSide ||
+        state.chatNavigationRailWidth !== prev.chatNavigationRailWidth ||
         state.additionalWorkDirs !== prev.additionalWorkDirs ||
         state.detailedContext !== prev.detailedContext ||
         state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
@@ -43,6 +46,9 @@ export function useSettingsSync() {
           defaultThinkingEffort: state.defaultThinkingEffort,
           defaultPlanMode: state.defaultPlanMode,
           fontSize: state.fontSize,
+          chatNavigationRailEnabled: state.chatNavigationRailEnabled,
+          chatNavigationRailSide: state.chatNavigationRailSide,
+          chatNavigationRailWidth: state.chatNavigationRailWidth,
           additionalWorkDirs: state.additionalWorkDirs,
           detailedContext: state.detailedContext,
           statusUpdateDisplay: state.statusUpdateDisplay,

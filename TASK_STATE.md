@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 功能：对话刻度设置——开关/左右侧/宽度（v2.20.276）
+
+- 需求：设置里可关闭对话刻度、切换刻度位于左侧或右侧、调整刻度宽度。
+- 修法：新增三个持久化设置 `chatNavigationRailEnabled/Side/Width`（默认 开/左/11px，宽度 6-28），走完整设置管线（ipc 类型 + zod + settingsService 默认值 + useBootstrap 水合 + useSettingsSync 落盘 + App bootstrapSetters + main.tsx 浏览器预览默认值）；`ChatNavigationRail` 新增 `side`/`markWidth` props（右侧时刻度线贴右缘、预览浮层改向刻度左侧展开，`chatNavigationPreviewPosition` 加 `side` 参数）；`ChatThread` 按开关条件渲染；设置面板外观区「界面字号」卡下新增「对话刻度」卡（SelectionIndicator 开关 + 位置 select + 宽度 NumberInput，关闭时后两项禁用）。
+- 验收：chatNavigation 定向 11/11（含右侧预览定位新例）、typecheck 双配置、全量 vitest、build 均过；视觉待用户截图。
+
+
 ## 2026-08-07 调整：侧栏 Git 卡布局——刷新上移头部、图谱/推送同行（v2.20.275）
 
 - 需求：Git 卡刷新按钮从底部移到头部拖拽钮左侧（替代项目目录文本，与 Kimi Code 卡同构）；图谱与推送放一行，推送恢复正常半宽。

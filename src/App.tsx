@@ -1432,6 +1432,9 @@ function App() {
   const setDefaultThinkingEffort = useAppStore((s) => s.setDefaultThinkingEffort);
   const setDefaultPlanMode = useAppStore((s) => s.setDefaultPlanMode);
   const setFontSize = useAppStore((s) => s.setFontSize);
+  const setChatNavigationRailEnabled = useAppStore((s) => s.setChatNavigationRailEnabled);
+  const setChatNavigationRailSide = useAppStore((s) => s.setChatNavigationRailSide);
+  const setChatNavigationRailWidth = useAppStore((s) => s.setChatNavigationRailWidth);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
@@ -1535,6 +1538,9 @@ function App() {
       setDefaultThinkingEffort,
       setDefaultPlanMode,
       setFontSize,
+      setChatNavigationRailEnabled,
+      setChatNavigationRailSide,
+      setChatNavigationRailWidth,
       setAdditionalWorkDirs,
       setDetailedContext,
       setStatusUpdateDisplay,
@@ -1548,6 +1554,7 @@ function App() {
     }), [
       setTheme, setUiStyle, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
       setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
+      setChatNavigationRailEnabled, setChatNavigationRailSide, setChatNavigationRailWidth,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,

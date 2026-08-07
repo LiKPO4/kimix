@@ -13,6 +13,9 @@ interface BootstrapSetters {
   setDefaultThinkingEffort: (v: string) => void;
   setDefaultPlanMode: (v: boolean) => void;
   setFontSize: (v: number) => void;
+  setChatNavigationRailEnabled: (v: boolean) => void;
+  setChatNavigationRailSide: (v: "left" | "right") => void;
+  setChatNavigationRailWidth: (v: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (v: boolean) => void;
   setStatusUpdateDisplay: (v: StatusUpdateDisplay) => void;
@@ -48,6 +51,9 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setDefaultThinkingEffort(res.data.defaultThinkingEffort ?? (res.data.defaultThinking ? "on" : "off"));
           setters.setDefaultPlanMode(res.data.defaultPlanMode);
           setters.setFontSize(res.data.fontSize);
+          setters.setChatNavigationRailEnabled(res.data.chatNavigationRailEnabled);
+          setters.setChatNavigationRailSide(res.data.chatNavigationRailSide);
+          setters.setChatNavigationRailWidth(res.data.chatNavigationRailWidth);
           setters.setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);
           setters.setDetailedContext(res.data.detailedContext);
           setters.setStatusUpdateDisplay(res.data.statusUpdateDisplay);

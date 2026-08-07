@@ -19,6 +19,10 @@ interface ChatNavigationRailProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
   onNavigate: (eventId: string, kind: ChatNavigationMarker["kind"]) => boolean;
+  /** 刻度条贴附侧，默认 left。 */
+  side?: "left" | "right";
+  /** 单条刻度线长度（px），默认 11。 */
+  markWidth?: number;
 }
 
 interface NavigationPreviewState {
@@ -44,7 +48,7 @@ function markersEqual(previous: ChatNavigationMarker[], next: ChatNavigationMark
   });
 }
 
-export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }: ChatNavigationRailProps) {
+export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, side = "left", markWidth = 11 }: ChatNavigationRailProps) {
   const navigationItems = useMemo(() => buildChatNavigationItems(items), [items]);
   const navigationItemsRef = useRef(navigationItems);
   navigationItemsRef.current = navigationItems;
@@ -201,7 +205,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
   const schedulePreviewOpen = useCallback((item: ChatNavigationMarker, target: HTMLElement) => {
     clearPreviewTimers();
     const rect = target.getBoundingClientRect();
-    const anchor = { right: rect.right, centerY: rect.top + rect.height / 2 };
+    const anchor = { right: side === "right" ? rect.left : rect.right, centerY: rect.top + rect.height / 2, side };
     const hasVisiblePreview = previewVisibleRef.current && previewRef.current !== null;
     if (hasVisiblePreview && previewRef.current?.itemKey === item.key) {
       setPreview({ itemKey: item.key, anchor });
@@ -220,7 +224,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
       }
       previewOpenTimerRef.current = null;
     }, chatNavigationPreviewOpenDelay(hasVisiblePreview));
-  }, [clearPreviewTimers]);
+  }, [clearPreviewTimers, side]);
 
   if (markers.length < 2) return null;
   const groupHeight = chatNavigationGroupHeight(markers.length, markerGap);
@@ -231,7 +235,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
       aria-label="对话导航"
       className="absolute"
       style={{
-        left: RAIL_LEFT_OFFSET_PX,
+        ...(side === "right" ? { right: RAIL_LEFT_OFFSET_PX } : { left: RAIL_LEFT_OFFSET_PX }),
         top: "50%",
         // Wide hit target extends right into the gutter; ticks render on the left edge.
         width: 28,
@@ -267,7 +271,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate }:
           >
             <span
               className="kimix-chat-navigation-mark absolute"
-              style={{ top: "50%", left: 4 }}
+              style={{ top: "50%", ...(side === "right" ? { right: 4 } : { left: 4 }), width: markWidth }}
             />
           </button>
         );

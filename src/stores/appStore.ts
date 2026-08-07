@@ -161,6 +161,9 @@ export interface AppStore extends AppState {
   setDefaultThinkingEffort: (effort: string) => void;
   setDefaultPlanMode: (enabled: boolean) => void;
   setFontSize: (size: number) => void;
+  setChatNavigationRailEnabled: (enabled: boolean) => void;
+  setChatNavigationRailSide: (side: "left" | "right") => void;
+  setChatNavigationRailWidth: (width: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (enabled: boolean) => void;
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
@@ -218,6 +221,9 @@ export const useAppStore = create<AppStore>((rawSet) => {
   defaultThinkingEffort: "on",
   defaultPlanMode: false,
   fontSize: 15,
+  chatNavigationRailEnabled: true,
+  chatNavigationRailSide: "left",
+  chatNavigationRailWidth: 11,
   additionalWorkDirs: [],
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
@@ -284,6 +290,9 @@ export const useAppStore = create<AppStore>((rawSet) => {
   }),
   setDefaultPlanMode: (enabled) => set({ defaultPlanMode: enabled }),
   setFontSize: (size) => set({ fontSize: Math.max(11, Math.min(20, Math.round(size))) }),
+  setChatNavigationRailEnabled: (enabled) => set({ chatNavigationRailEnabled: enabled }),
+  setChatNavigationRailSide: (side) => set({ chatNavigationRailSide: side }),
+  setChatNavigationRailWidth: (width) => set({ chatNavigationRailWidth: Math.max(6, Math.min(28, Math.round(width))) }),
   setAdditionalWorkDirs: (dirs) => set({ additionalWorkDirs: dirs }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),

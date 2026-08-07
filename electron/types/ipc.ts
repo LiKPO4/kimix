@@ -1520,6 +1520,9 @@ export type AppSettings = {
   kimiThemePalette?: KimiThemePalette;
   fontSize: number;
   fontSizeBaselineVersion?: number;
+  chatNavigationRailEnabled: boolean;
+  chatNavigationRailSide: "left" | "right";
+  chatNavigationRailWidth: number;
   showThinking: boolean;
   detailedContext: boolean;
   statusUpdateDisplay: "each" | "turn_end" | "never";

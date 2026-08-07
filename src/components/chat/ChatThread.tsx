@@ -1501,6 +1501,9 @@ export const ChatThread = memo(function ChatThread() {
   const updateSession = useSessionStore((s) => s.updateSession);
   const pendingMessages = useSessionStore((s) => s.pendingMessages);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
+  const chatNavigationRailEnabled = useAppStore((s) => s.chatNavigationRailEnabled);
+  const chatNavigationRailSide = useAppStore((s) => s.chatNavigationRailSide);
+  const chatNavigationRailWidth = useAppStore((s) => s.chatNavigationRailWidth);
   const session = useLiveSession(currentSession?.id);
   const [olderItemsPage, setOlderItemsPage] = useState(0);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
@@ -1985,16 +1988,20 @@ export const ChatThread = memo(function ChatThread() {
       </div>
       {/* Rail is viewport-left fixed: do not nest in centered stream column or it drifts on maximize. */}
       <div className="pointer-events-none absolute inset-0 z-10">
-          <ChatNavigationRail
-            items={visibleRenderItems}
-            scrollRef={viewport.scrollRef}
-            contentRef={viewport.streamContentRef}
-            onNavigate={(eventId) => viewport.focusTimelineEvent(
-              eventId,
-              undefined,
-              "start",
-            )}
-          />
+          {chatNavigationRailEnabled && (
+            <ChatNavigationRail
+              items={visibleRenderItems}
+              scrollRef={viewport.scrollRef}
+              contentRef={viewport.streamContentRef}
+              side={chatNavigationRailSide}
+              markWidth={chatNavigationRailWidth}
+              onNavigate={(eventId) => viewport.focusTimelineEvent(
+                eventId,
+                undefined,
+                "start",
+              )}
+            />
+          )}
       </div>
       <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-20" style={{ bottom: 24 }}>
         <div className="kimix-chat-stream-column flex justify-end">
