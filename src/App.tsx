@@ -27,6 +27,7 @@ import { selectStartupLocalSession, selectStartupProject } from "@/utils/startup
 import { inferTerminalGoalFromEvent, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
+import { dedupeListKimiCodeSessions } from "@/utils/listKimiCodeSessionsDedupe";
 import {
   approvalRequestNotificationKey,
   focusNotificationRoomAgent,
@@ -266,6 +267,28 @@ function scheduleSettledActiveSessionHistoryRepair(uiSessionId: string) {
     if (isSessionRuntimeRunning(session, useAppStore.getState().runningSessionId)) return;
     void repairKimiCodeHistoryBodies([session], { includeActive: true });
   }, 2_500));
+}
+
+// 启动恢复主链（目录扫描 → 会话恢复 → 清 isLoading）完成信号：后台修复
+// （repairKimiCodeHistoryBodies）延后到恢复链结束后再触发，避免与主链竞争
+// IPC/CPU 拖慢首屏恢复。
+let resolveStartupResumeChain: (() => void) | null = null;
+let startupResumeChainDone: Promise<void> | null = null;
+
+// 兜底：恢复链异常或长时间未完成时，修复仍会触发（原修复上限、触发条件不变）。
+const historyRepairBackupDelayMs = 20_000;
+
+function scheduleHistoryRepairAfterStartup(run: () => void) {
+  const chain = startupResumeChainDone;
+  if (!chain) {
+    // 恢复主链尚未建立（bootstrap 事件未到）：保持原有立即触发语义。
+    run();
+    return;
+  }
+  void Promise.race([
+    chain,
+    new Promise<void>((resolve) => window.setTimeout(resolve, historyRepairBackupDelayMs)),
+  ]).then(run);
 }
 
 function extractOfficialSessionTitle(event: unknown): string | null {
@@ -1574,7 +1597,7 @@ function App() {
     const projectPath = currentProject?.path;
     if (!projectPath) return;
     let cancelled = false;
-    void window.api.listKimiCodeSessions({ workDir: projectPath }).then((res) => {
+    void dedupeListKimiCodeSessions({ workDir: projectPath }).then((res) => {
       if (cancelled || !res.success) return;
       const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
       const catalogSessions = res.data.filter((session) => (
@@ -2230,6 +2253,9 @@ function App() {
         setStartupContextResolved(true);
 
         window.setTimeout(() => {
+          startupResumeChainDone = new Promise<void>((resolve) => {
+            resolveStartupResumeChain = resolve;
+          });
           void (async () => {
             try {
               const hiddenHandoffSessionIds = new Set(getHiddenHandoffSessionIds());
@@ -2246,7 +2272,7 @@ function App() {
                 !isHiddenInternalSession(session)
               );
 
-              const res = await window.api.listKimiCodeSessions({ workDir: activeProject.path });
+              const res = await dedupeListKimiCodeSessions({ workDir: activeProject.path });
               if (!res.success) return;
               const catalogSummaries = res.data.filter((session) => (
                 !hiddenHandoffSessionIds.has(session.id) && !isHiddenInternalSession(session)
@@ -2499,6 +2525,8 @@ function App() {
             } catch {
               setRunningSessionId(null);
             } finally {
+              resolveStartupResumeChain?.();
+              resolveStartupResumeChain = null;
               if (activeLocalSession) {
                 useSessionStore.setState((state) => ({
                   sessions: state.sessions.map((session) => (
@@ -2562,7 +2590,7 @@ function App() {
           markConversationStatePersisted(restoredSessions, useSessionStore.getState().pendingMessages);
           useSessionStore.setState({ sessions: restoredSessions });
           restoredSessions.filter((session) => session.archivedAt).forEach(rememberArchivedSessionTombstone);
-          void repairKimiCodeHistoryBodies(restoredSessions);
+          scheduleHistoryRepairAfterStartup(() => void repairKimiCodeHistoryBodies(restoredSessions));
         }
       } catch {
         // ignore load error

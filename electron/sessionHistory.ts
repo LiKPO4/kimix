@@ -14,6 +14,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime, type SessionHistoryResult } from "./sessionHistoryFallback";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -633,4 +634,74 @@ export async function getSessionHistoryById(
     }
   }
   return [];
+}
+// ---------------------------------------------------------------------------
+// loadSession 并行编排（server 冷启动与本地镜像解析并行）
+// ---------------------------------------------------------------------------
+
+export interface LoadSessionParallelDeps {
+  /** 当前是否处于 server 会话列表模式 */
+  isServerEnabled: () => boolean;
+  /** 冷启动 Kimi server（仅未启用时调用；内部可复用 in-flight promise） */
+  startServer: () => Promise<unknown>;
+  /** 本地 wire 镜像历史；server 快照水合与回退都复用同一结果，只解析一次 */
+  loadLocal: () => Promise<SessionHistoryEvent[]>;
+  /** server 官方快照（分页窗口，可能 truncated） */
+  loadServer: () => Promise<SessionHistoryResult>;
+}
+
+export interface LoadSessionParallelOptions {
+  /** server 冷启动最长等待，默认 4000ms，与原串行实现一致 */
+  startupWaitMs?: number;
+  /** server 快照加载超时，默认 8000ms */
+  serverTimeoutMs?: number;
+  /** 日志中的会话标识 */
+  sessionLabel?: string;
+}
+
+/**
+ * 并行编排 loadSession 的两条历史来源，消除旧的「先等 server 冷启动、再解析本地镜像」串行链路：
+ * - 本地 wire 镜像解析立即开始且只执行一次，server 快照水合与回退路径复用同一 Promise；
+ * - server 冷启动与本地解析并行，最多等待 startupWaitMs；就绪后优先 server 快照；
+ * - server 未就绪或快照加载失败时回退本地镜像，不再额外等待；
+ * - server 就绪时用本地 StatusUpdate 补齐快照缺失的用量/模型字段，行为与原 handler 一致。
+ */
+export async function loadSessionHistoryParallel(
+  deps: LoadSessionParallelDeps,
+  options?: LoadSessionParallelOptions,
+): Promise<SessionHistoryResult> {
+  const startupWaitMs = options?.startupWaitMs ?? 4_000;
+  const serverTimeoutMs = options?.serverTimeoutMs ?? 8_000;
+  const sessionLabel = options?.sessionLabel;
+  // 本地镜像只解析一次；无论最终走 server 快照还是本地路径，都复用该结果
+  const localHistoryPromise = deps.loadLocal();
+  if (!deps.isServerEnabled()) {
+    await Promise.race([
+      deps.startServer().catch(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, startupWaitMs)),
+    ]);
+  }
+  if (deps.isServerEnabled()) {
+    const history = await loadSessionHistoryWithFallback(
+      deps.loadServer,
+      () => localHistoryPromise,
+      serverTimeoutMs,
+      sessionLabel,
+    );
+    // 回退路径已返回本地镜像，无需再水合
+    if (history.source !== "server") return history;
+    try {
+      // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
+      const statusEvents = (await localHistoryPromise).filter(
+        (event) => event.type === "StatusUpdate"
+          && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>)),
+      );
+      return { ...history, events: mergeHistoryStatusEventsByTime(history.events, statusEvents) };
+    } catch (hydrationError) {
+      // wire 镜像在 existsSync 与流读取之间可能被删/独占，水合失败不应拖垮完好的 server 快照
+      console.warn("[kimi-code] loadSession wire hydration failed, falling back to unmerged server events:", hydrationError);
+      return history;
+    }
+  }
+  return { events: await localHistoryPromise, source: "local" };
 }

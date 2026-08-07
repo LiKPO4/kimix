@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 性能：启动恢复提速——目录扫描去重 + loadSession 并行编排（v2.20.280）
+
+- 现象：每次启动恢复上次会话长时间停在「正在同步最新会话」；用户怀疑全量加载所有未归档会话。
+- 调查（3 个只读子代理并行）：全量加载所有会话「历史」不成立——关键路径只加载当前会话正文；但全量「目录扫描」单次启动重复 2-3 次（恢复主链 App.tsx 原 2249 + currentProject effect 原 1577 + Sidebar 展开 296），且整条恢复链全串行；主进程 loadSession 先与 server 冷启动 4s 赛跑才开始解析本地 wire 镜像，server 路由下同一 wire.jsonl 还为 StatusUpdate 水合再全量解析一遍；后台 repairKimiCodeHistoryBodies（≤12 会话）与主链抢 IPC/CPU。
+- 修法（2 个并行子代理，按文件归属分区）：① 新建 `src/utils/listKimiCodeSessionsDedupe.ts`（按 workDir 的 in-flight 去重 + 5s TTL），App.tsx 两处扫描改用它，启动窗口内每 workDir 只扫一次（Sidebar 那处未动，留后续）；② `electron/sessionHistory.ts` 新增 `loadSessionHistoryParallel`——本地镜像解析立即开始且只执行一次，server 冷启动与之并行（4s 上限不变），server 快照 StatusUpdate 水合复用同一解析结果，消除双读；③ App.tsx 恢复主链完成信号 + `scheduleHistoryRepairAfterStartup`（20s 兜底），后台修复延后到恢复链完成后。
+- 验收：新增 5+6 例定向测试全绿，typecheck 双配置 0 错误，全量 vitest 1746/1746（基线 1741+5），build 通过；知识库 runtime-routing 新增不变量 14g，validate PASS。实机启动耗时改善幅度待用户复验。
+- 已知边界/后续候选（未做）：Sidebar.tsx:296 第三次扫描未接入去重；resume→getStatus 重复取状态未去重（改动跨 preload 类型，暂搁）；各阶段实际毫秒占比未 profile（可用 startupProfiler/cdp 脚本补证据）；SDK 路由逐会话 brief 串行扫描仍可并行化。
+
 ## 2026-08-07 修复：压缩气泡去重——同时只有一个「压缩中」、完成后只剩摘要行（v2.20.279）
 
 - 现象：① 压缩进行中同时出现两个「上下文压缩中」气泡；② 压缩完成后仍残留「耗时较长」x2 + 无摘要「压缩完成」三个气泡，只有「已生成摘要」行该留。

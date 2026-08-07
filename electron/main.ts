@@ -12,7 +12,6 @@ import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
-import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime } from "./sessionHistoryFallback";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
@@ -6798,34 +6797,18 @@ ipcMain.handle("kimi-code:loadSession", async (_, request: unknown) => {
     const workDir = typeof req.workDir === "string" ? req.workDir : "";
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!workDir || !sessionId) return { success: false, error: "Missing workDir or sessionId" };
-    if (!kimiCodeHost.isListingSessionsFromServer()) {
-      await Promise.race([
-        requestKimiServerStartup().catch(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, 4_000)),
-      ]);
-    }
-    if (kimiCodeHost.isListingSessionsFromServer()) {
-      const history = await loadSessionHistoryWithFallback(
-        () => kimiCodeHost.loadServerSessionHistory(sessionId),
-        () => sessionHistory.getSessionHistory(workDir, sessionId), 8_000, sessionId,
-      );
-      // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
-      let events = history.events;
-      if (history.source === "server") {
-        try {
-          const statusEvents = (await sessionHistory.getSessionHistory(workDir, sessionId))
-            .filter((event) => event.type === "StatusUpdate"
-              && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>)));
-          events = mergeHistoryStatusEventsByTime(history.events, statusEvents);
-        } catch (hydrationError) {
-          // wire 镜像在 existsSync 与流读取之间可能被删/独占，水合失败不应拖垮完好的 server 快照
-          console.warn("[kimi-code] loadSession wire hydration failed, falling back to unmerged server events:", hydrationError);
-        }
-      }
-      return { success: true, data: { sessionId, events, source: history.source } };
-    }
-    const events = await sessionHistory.getSessionHistory(workDir, sessionId);
-    return { success: true, data: { sessionId, events, source: "local" } };
+    // server 冷启动与本地 wire 镜像解析并行：本地历史只解析一次，server 快照水合/回退均复用；
+    // server 未就绪时本地镜像直接返回，不再被冷启动串行白等
+    const history = await sessionHistory.loadSessionHistoryParallel(
+      {
+        isServerEnabled: () => kimiCodeHost.isListingSessionsFromServer(),
+        startServer: () => requestKimiServerStartup(),
+        loadLocal: () => sessionHistory.getSessionHistory(workDir, sessionId),
+        loadServer: () => kimiCodeHost.loadServerSessionHistory(sessionId),
+      },
+      { sessionLabel: sessionId },
+    );
+    return { success: true, data: { sessionId, events: history.events, source: history.source } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
