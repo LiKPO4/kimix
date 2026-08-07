@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo } from "@electron/types/ipc";
 import { formatDownloadPercent, formatDownloadDetail, type DownloadProgressInfo } from "@/utils/format";
+import { formatIdleDuration, type CacheHintDialogAction, type CacheHintDialogData } from "@/utils/cacheHint";
 import { useRef } from "react";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -626,7 +627,75 @@ interface DialogSystemProps {
   onCheckCliUpdate: () => void;
 }
 
+interface CacheHintDialogProps {
+  dialog: CacheHintDialogData | null;
+  onAction: (action: CacheHintDialogAction) => void;
+}
+
+// 上下文缓存过期提醒（上游 0.34.0 #2646）：发送前命中提示时由 Composer 驱动。
+// 四个动作都在 Composer 内执行（压缩后重发/新建会话带原文/直接发送/不再询问），
+// 因此本组件独立导出、由 Composer 渲染，不经过 AppShell 状态提升。
+export function CacheHintDialog({ dialog, onAction }: CacheHintDialogProps) {
+  const presence = usePresence(Boolean(dialog));
+  const dialogRef = useDialogFocus<HTMLDivElement>(Boolean(dialog));
+  const retainedDialog = useRef(dialog);
+  if (dialog) retainedDialog.current = dialog;
+  if (!presence.mounted || !retainedDialog.current) return null;
+  const visibleDialog = retainedDialog.current;
+  return (
+    <div className={`kimix-presence-overlay fixed inset-0 z-[118] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)] px-5 ${presence.visible ? "is-visible" : ""}`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="上下文缓存可能已过期"
+        className={`kimix-modal-card kimix-presence-content w-full max-w-[480px] ${presence.visible ? "is-visible" : ""}`}
+        style={{ padding: "22px 24px" }}
+      >
+        <div className="text-[18px] font-semibold leading-6 text-text-primary">上下文缓存可能已过期</div>
+        <div className="mt-3 text-[14px] leading-6 text-text-secondary">
+          距上次对话完成已超过 {formatIdleDuration(visibleDialog.idleSeconds)}（该模型缓存时长 {formatIdleDuration(visibleDialog.cacheDurationSeconds)}），当前上下文约 {visibleDialog.totalTokens.toLocaleString()} tokens。直接发送可能按完整上下文计费。
+        </div>
+        <div className="mt-5 rounded-xl bg-surface-base text-[13px] leading-5 text-text-muted" style={{ padding: "12px 16px" }}>
+          建议先压缩上下文或开启新会话，减少旧上下文开销；也可以直接发送，保持当前会话继续。
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end" style={{ gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => onAction("dismiss")}
+            className="kimix-icon-text-button text-text-secondary hover:bg-surface-hover"
+          >
+            不再询问
+          </button>
+          <button
+            type="button"
+            onClick={() => onAction("continue")}
+            className="kimix-icon-text-button text-text-secondary hover:bg-surface-hover"
+          >
+            直接发送
+          </button>
+          <button
+            type="button"
+            onClick={() => onAction("new-session")}
+            className="kimix-icon-text-button text-accent-primary hover:bg-accent-primary-light"
+          >
+            开启新会话
+          </button>
+          <button
+            type="button"
+            onClick={() => onAction("compact")}
+            className="kimix-icon-text-button bg-accent-primary text-text-inverse hover:bg-accent-primary-dark"
+            style={{ paddingLeft: 16, paddingRight: 16 }}
+          >
+            压缩并继续
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 export function DialogSystem(props: DialogSystemProps) {
+
   return (
     <>
       <KimiOnboardingDialog

@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   additionalWorkDirs: [],
   hookRules: [],
   hookRunLog: [],
+  cacheHintDismissed: false,
 };
 
 function ensureDir() {

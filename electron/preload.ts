@@ -160,6 +160,7 @@ import type {
   KimiCodeFileResponse,
   KimiCodeBtwRequest,
   KimiCodeBtwResponse,
+  KimiCodeCacheHintConfigResponse,
   KimiCodeCreateGoalRequest,
   KimiCodeGoalActionRequest,
   KimiCodeGoalResponse,
@@ -360,6 +361,8 @@ const api = {
     ipcRenderer.invoke("project:exportMarkdown", req),
   getKimiCodeAccountUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi-code:getAccountUsage"),
+  getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
+    ipcRenderer.invoke("kimi-code:getCacheHintConfig"),
   startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi-code:startVis", req),
   openKimiCodeWebServer: (req?: KimiCodeOpenWebRequest): Promise<VoidResponse> =>

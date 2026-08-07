@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 跟进：缓存过期提醒——长闲置会话发送前提示 compact（上游跟进队列 4/5，v2.20.284）
+
+- 背景：goal 队列第 4 项，上游 0.34.0 #2646 的 Kimix 版。可行性已验证：端点 `POST https://api.kimi.com/coding/v1/client_configs`（body `{"name":"estimated_cache_duration"}`）匿名可达（实测 200）；规则按模型给 `cache_duration`/`min_tokens_to_hint`（k3 系 600s、kimi-for-coding 系 3600s，阈值均 200k tokens）。
+- 实现：① `src/utils/cacheHint.ts` 纯函数（schema/evaluateCacheHint/模型 id 去前缀兜底/时间线兜底 deriveSessionLastActiveAt）；② 主进程 `kimi-code:getCacheHintConfig` IPC（内存+磁盘 24h 双层缓存、5s 超时、有 token 带 Bearer 失败降级匿名、全程静默 skip）；③ lastActiveAt 双源——主进程在 SDK/Server 两事件漏斗按终态帧（turn.ended/prompt.completed/full_compaction）记录并经 `kimix.turn.activity` 下发（不进时间线），重启后渲染层时间线兜底；④ Composer 发送前同步检查（仅普通正文路径），命中弹 DialogSystem 的 CacheHintDialog 四动作：压缩并继续（compactSession 后重发）/开启新会话（带消息）/直接发送/不再询问（settingsService `cacheHintDismissed`）。
+- 取舍：不做 FIFO 吞提交拦截（第一版只发送前检查+后台预热）；对话框由 Composer 直接渲染而非 App 状态提升（四动作全依赖 Composer 内部机制）。
+- 验收：cacheHint 21/21、相关回归 127/127、typecheck 双配置 0 错误；全量 vitest/build 见提交记录。端到端 UI 与真实 Electron fetch 待用户实机（闲置>600s 且 ≥200k tokens 会话发送时应弹窗）。
+
 ## 2026-08-07 跟进：MCP 状态枚举对齐上游 0.34.0——removed 不再误显「未连接」（上游跟进队列 3/5，v2.20.283）
 
 - 背景：goal 队列第 3 项。上游 0.34.0（#2694）MCP status 新枚举 pending/connected/failed/disabled/needs-auth/removed；Kimix `ServerMcpServer.status` 是旧猜值，McpPanel 未知状态一律误显「未连接」。

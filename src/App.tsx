@@ -17,6 +17,7 @@ import { getLongTaskRoleForRuntime, getRuntimeSessionId } from "@/utils/runtimeS
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { getKimiAlreadyExistsSessionId, isKimiAbortError, isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
 import { shouldSkipKimiCodeSnapshotReplay } from "@/utils/kimiCodeSnapshotReplay";
+import { recordSessionLastActiveAt, warmCacheHintConfig } from "@/utils/cacheHint";
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { extractPermissionModeStatus } from "@/utils/kimiCodePermission";
@@ -2721,6 +2722,7 @@ function App() {
     window.addEventListener("kimix:startHandoff", handleStartHandoff);
 
     const unsubscribeKimiCodeEvent = window.api.onKimiCodeEvent((payload) => {
+      warmCacheHintConfig();
       const currentHandoffJob = handoffJobRef.current;
       if (currentHandoffJob?.runtimeSessionId === payload.sessionId) {
         const mapped = mapStreamEvent(payload.event);
@@ -2739,6 +2741,17 @@ function App() {
       }
       const uiSessionId = roomOwner?.roomId ?? resolveUiSessionId(payload.sessionId);
       if (!uiSessionId) return;
+      // 上下文缓存提醒（上游 #2646）：主进程在 LLM 轮次完成时下发活动时间，
+      // 只更新渲染层状态，不进入时间线。
+      const streamEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
+        ? payload.event as Record<string, unknown>
+        : null;
+      if (streamEvent?.type === "kimix.turn.activity") {
+        if (typeof streamEvent.lastActiveAt === "number") {
+          recordSessionLastActiveAt(uiSessionId, streamEvent.lastActiveAt);
+        }
+        return;
+      }
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
       if (targetSession?.engine && targetSession.engine !== "kimi-code" && !targetSession.longTask) return;
       const roomAgentId = roomOwner?.roomAgentId ?? (targetSession ? getPrimaryRoomAgent(targetSession).id : undefined);

@@ -18,6 +18,7 @@ import type {
   GitPullRequest,
   GitPushRequest,
   GitActionResponse,
+  KimiCodeCacheHintConfigResponse,
   KimiUsageResponse,
   ListLongTasksResponse,
   ListRecentResponse,
@@ -508,6 +509,8 @@ function installBrowserPreviewApi() {
         message: unsupported("读取 Kimi 用量"),
       },
     }),
+    getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
+      Promise.resolve({ success: true, data: null }),
     startKimiCodeVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),
     openKimiCodeWebServer: (): Promise<VoidResponse> => fail("打开 Kimi Web Server"),
     createKimiCodeSession: (): Promise<KimiCodeSessionResponse> => fail("创建 Kimi Code 会话"),

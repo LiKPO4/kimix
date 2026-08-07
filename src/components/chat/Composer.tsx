@@ -18,6 +18,9 @@ import { RoomAgentPicker } from "./RoomAgentPicker";
 import { RoomContextPicker } from "./RoomContextPicker";
 import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { CacheHintDialog } from "@/components/layout/DialogSystem";
+import { useCreateProjectSession } from "@/hooks/useCreateProjectSession";
+import { deriveSessionLastActiveAt, evaluateCacheHint, getSessionLastActiveAt, isCacheHintDismissed, setCacheHintDismissed, type CacheHintDialogAction, type CacheHintDialogData } from "@/utils/cacheHint";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
@@ -528,6 +531,8 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const completionListRef = useRef<HTMLDivElement>(null);
   const completionItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const roomDispatchingRef = useRef(new Set<string>());
+  const { createSession } = useCreateProjectSession();
+  const [cacheHintDialog, setCacheHintDialog] = useState<CacheHintDialogData | null>(null);
 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
@@ -3287,10 +3292,73 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     return nextRuntimeSessionId;
   };
 
+  const maybePromptCacheHint = async (session: Session | null | undefined, content: string, images: ImageAttachment[]): Promise<boolean> => {
+    if (!session || session.collaboration || session.events.length === 0) return false;
+    if (await isCacheHintDismissed()) return false;
+    const configRes = await window.api.getKimiCodeCacheHintConfig().catch(() => null);
+    const config = configRes && configRes.success ? configRes.data : null;
+    if (!config) return false;
+    const runtimeSessionId = getRuntimeSessionId(session);
+    if (!runtimeSessionId) return false;
+    const statusRes = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId }).catch(() => null);
+    const status = statusRes && statusRes.success ? statusRes.data : undefined;
+    const modelId = typeof status?.model === "string" && status.model.trim() ? status.model.trim() : session.model ?? undefined;
+    const totalTokens = typeof status?.contextTokens === "number" ? status.contextTokens : undefined;
+    const liveActivityAt = getSessionLastActiveAt(session.id);
+    const derivedActivityAt = deriveSessionLastActiveAt(session.events);
+    const lastActiveAt = Math.max(liveActivityAt ?? 0, derivedActivityAt ?? 0) || undefined;
+    const verdict = evaluateCacheHint({ config: config.config, modelId, lastActiveAt, totalTokens });
+    if (!verdict.shouldHint) return false;
+    setCacheHintDialog({
+      content,
+      images,
+      sessionId: session.id,
+      runtimeSessionId,
+      modelId: verdict.modelId,
+      idleSeconds: verdict.idleSeconds,
+      cacheDurationSeconds: verdict.rule.cache_duration,
+      totalTokens: verdict.totalTokens,
+      minTokensToHint: verdict.rule.min_tokens_to_hint,
+    });
+    return true;
+  };
+
+  const handleCacheHintAction = async (action: CacheHintDialogAction) => {
+    const dialog = cacheHintDialog;
+    if (!dialog) return;
+    setCacheHintDialog(null);
+    if (action === "dismiss") {
+      await setCacheHintDismissed(true);
+      await sendPromptContent(dialog.content, { images: dialog.images });
+      return;
+    }
+    if (action === "continue") {
+      await sendPromptContent(dialog.content, { images: dialog.images });
+      return;
+    }
+    if (action === "new-session") {
+      await createSession();
+      await sendPromptContent(dialog.content, { images: dialog.images });
+      return;
+    }
+    // compact：压缩成功后自动重发原文；失败则恢复输入，避免丢内容
+    window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "正在压缩上下文，完成后将自动重发消息…" }));
+    const res = await window.api.compactKimiCodeSession({ sessionId: dialog.runtimeSessionId })
+      .catch(() => ({ success: false as const, error: "压缩请求失败" }));
+    if (!res.success) {
+      setInput((prev) => (prev.trim() ? prev : dialog.content));
+      setImageAttachments((prev) => (prev.length > 0 ? prev : dialog.images));
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `上下文压缩失败：${res.error}。原消息已恢复，请重试。` }));
+      return;
+    }
+    await sendPromptContent(dialog.content, { images: dialog.images });
+  };
+
   const handleSend = async () => {
     const trimmed = input.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
+    if (cacheHintDialog) return;
     const slashRoomAgentId = activeSession?.collaboration ? activeMutationOwner?.roomAgentId : undefined;
     if (activeSession?.collaboration && trimmed.startsWith("/") && !slashRoomAgentId) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
@@ -3439,6 +3507,11 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
+      return;
+    }
+
+    // 上下文缓存过期提醒（上游 #2646）：仅普通正文路径做发送前检查；命中弹对话框等待选择
+    if (await maybePromptCacheHint(activeSession, trimmed, imagesToSend)) {
       return;
     }
     setInput("");
@@ -5155,6 +5228,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
           onSubmit={(input) => void handleRenameRoomAgent(input)}
         />
       )}
+      <CacheHintDialog
+        dialog={cacheHintDialog}
+        onAction={(action) => void handleCacheHintAction(action)}
+      />
     </div>
   );
 }

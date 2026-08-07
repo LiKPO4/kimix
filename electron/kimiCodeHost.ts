@@ -796,6 +796,27 @@ const pendingQuestions = new Map<string, PendingQuestion>();
 let eventSink: EventSink | null = null;
 let statusSink: StatusSink | null = null;
 const statusSequencer = new KimiCodeStatusSequencer((sessionId, status) => setStatus(sessionId, status));
+// 上下文缓存过期提醒（上游 0.34.0 #2646）：每会话最后一次 LLM 轮次完成时间。
+// 只有终态帧（turn.ended/prompt.completed/full_compaction）计入；Server 快照
+// 重放只产生消息类帧，不会被重放污染；closeSession 时清理。
+const lastTurnCompletedAt = new Map<string, number>();
+
+function eventTypeOf(event: unknown): unknown {
+  return event && typeof event === "object" ? (event as { type?: unknown }).type : undefined;
+}
+
+function isTurnCompletionEventType(type: unknown): boolean {
+  return type === "turn.ended" || type === "prompt.completed" || type === "full_compaction";
+}
+
+function recordTurnCompletion(sessionId: string): void {
+  const now = Date.now();
+  const previous = lastTurnCompletedAt.get(sessionId) ?? 0;
+  if (now <= previous) return;
+  lastTurnCompletedAt.set(sessionId, now);
+  eventSink?.({ sessionId, event: { type: "kimix.turn.activity", lastActiveAt: now } });
+}
+
 
 const STEER_WIRE_CONFIRM_TIMEOUT_MS = 15_000;
 const STEER_WIRE_CONFIRM_INTERVAL_MS = 120;
@@ -1823,6 +1844,7 @@ export async function compactSession(sessionId: string, instruction?: string): P
     const result = await waitForOfficialCompactionResult(sessionId, serverManaged.workDir, startedAt);
     eventSink?.({ sessionId, event: result.terminal });
     if (result.usage) eventSink?.({ sessionId, event: result.usage });
+    if (isTurnCompletionEventType(result.terminal.type)) recordTurnCompletion(sessionId);
     await refreshServerSessionStatus(sessionId, true).catch((error) => {
       console.warn(`[KimiCodeServerHost] refresh after compaction failed for ${sessionId}:`, error);
     });
@@ -2848,6 +2870,7 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
 
 export async function closeSession(sessionId: string): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
+  lastTurnCompletedAt.delete(sessionId);
   sdkPinnedSessionIds.delete(sessionId);
   if (serverSessions.has(sessionId)) {
     serverSessions.delete(sessionId);
@@ -3067,7 +3090,9 @@ function registerSession(
     }
     eventSink?.({ sessionId: session.id, event });
     updateStatusFromEvent(session.id, event);
+    if (isTurnCompletionEventType(eventTypeOf(event))) recordTurnCompletion(session.id);
   });
+
   const managed: ManagedSession = {
     session,
     status: initialStatus,
@@ -3307,6 +3332,7 @@ function handleServerFrame(frame: ServerFrame) {
   if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event, "prompt");
+  if (isTurnCompletionEventType(frame.type)) recordTurnCompletion(sessionId);
   // Live tool frames after a premature completed status prove the Server is still
   // working (agent-core may keep tool work after a prompt.completed delivery
   // barrier). Re-open running so the renderer does not stay on 已连接 / 输出完成

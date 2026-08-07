@@ -55,11 +55,12 @@ import {
   type ReleaseFeedAsset,
   type ReleaseFeedItem,
 } from "./releaseFeed";
-import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload, Project } from "./types/ipc";
+import type { AppSettings, ExportSessionBackupRequest, ExportSessionRequest, ImportSessionBackupRequest, KimiCodeCacheHintConfig, SessionBackupSnapshot, RendererHeartbeatPayload, LoggerWriteRequest, LoggerWriteResponse, NotificationClickPayload, Project } from "./types/ipc";
 
 const GITHUB_REPO = "LiKPO4/kimix";
 const KIMI_CODE_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
 const KIMI_CODE_USAGE_URL = "https://api.kimi.com/coding/v1/usages";
+const KIMI_CODE_CLIENT_CONFIGS_URL = "https://api.kimi.com/coding/v1/client_configs";
 const KIMI_CODE_REFRESH_URL = "https://auth.kimi.com/api/oauth/token";
 const KIMI_CODE_INSTALL_BASE_URL = "https://code.kimi.com/kimi-code";
 const KIMI_CODE_BINARY_BASE_URL = `${KIMI_CODE_INSTALL_BASE_URL}/binaries`;
@@ -7195,6 +7196,101 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
     return { success: true, data: parseKimiUsagePayload(payload) };
   } catch (err) {
     return { success: false, error: formatKimiUsageError(err instanceof Error ? err.message : String(err)) };
+  }
+});
+
+// ---------- 上下文缓存过期提醒（上游 0.34.0 #2646）：client_configs ----------
+
+const CACHE_HINT_CONFIG_TTL_MS = 24 * 60 * 60 * 1000;
+const cacheHintConfigCache = new Map<string, { fetchedAt: number; config: KimiCodeCacheHintConfig | null }>();
+
+function cacheHintConfigDiskPath(): string {
+  return path.join(app.getPath("userData"), "kimix-cache-hint-config.json");
+}
+
+function readCacheHintConfigFromDisk(): { fetchedAt: number; config: KimiCodeCacheHintConfig | null } | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cacheHintConfigDiskPath(), "utf-8")) as { fetchedAt?: unknown; config?: unknown };
+    if (typeof parsed.fetchedAt !== "number" || !parsed.config) return null;
+    return { fetchedAt: parsed.fetchedAt, config: parsed.config as KimiCodeCacheHintConfig };
+  } catch {
+    return null;
+  }
+}
+
+function writeCacheHintConfigToDisk(fetchedAt: number, config: KimiCodeCacheHintConfig | null): void {
+  try {
+    fs.writeFileSync(cacheHintConfigDiskPath(), `${JSON.stringify({ fetchedAt, config }, null, 2)}\n`, "utf-8");
+  } catch {
+    // 磁盘缓存失败静默降级：只影响重启后的首次请求，不影响本次内存缓存
+  }
+}
+
+/**
+ * 获取 estimated_cache_duration 配置：内存 → 磁盘（24h TTL）→ 网络（5s 超时，失败静默返回 null）。
+ * 有 OAuth token 时携带 Bearer（自动 refresh），取 token 失败不阻塞匿名请求（该端点匿名可访问）。
+ */
+async function loadCacheHintConfig(): Promise<KimiCodeCacheHintConfig | null> {
+  const memoryCached = cacheHintConfigCache.get("config");
+  if (memoryCached && Date.now() - memoryCached.fetchedAt < CACHE_HINT_CONFIG_TTL_MS) {
+    return memoryCached.config;
+  }
+  const diskCached = readCacheHintConfigFromDisk();
+  if (diskCached && Date.now() - diskCached.fetchedAt < CACHE_HINT_CONFIG_TTL_MS) {
+    cacheHintConfigCache.set("config", diskCached);
+    return diskCached.config;
+  }
+  try {
+    const headers: Record<string, string> = {
+      ...kimiCommonHeaders(),
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    };
+    try {
+      const accessToken = await resolveKimiAccessToken();
+      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+    } catch {
+      // token 获取失败不影响匿名请求（实测该端点匿名可访问）
+    }
+    const res = await fetch(KIMI_CODE_CLIENT_CONFIGS_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "estimated_cache_duration" }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) return null;
+    const payload = getRecord(await res.json());
+    const rawConfig = payload ? getRecord(payload.config) : null;
+    const rules = rawConfig ? getRecord(rawConfig.config) : null;
+    if (!rules) return null;
+    const config: KimiCodeCacheHintConfig = {
+      ...(typeof rawConfig?.version === "number" ? { version: rawConfig.version } : {}),
+      config: {},
+    };
+    for (const [modelId, ruleValue] of Object.entries(rules)) {
+      const rule = getRecord(ruleValue);
+      if (!rule) continue;
+      const cacheDuration = Number(rule.cache_duration);
+      const minTokens = Number(rule.min_tokens_to_hint);
+      if (!Number.isFinite(cacheDuration) || cacheDuration <= 0 || !Number.isFinite(minTokens) || minTokens < 0) {
+        continue;
+      }
+      config.config[modelId] = { cache_duration: cacheDuration, min_tokens_to_hint: minTokens };
+    }
+    const fetchedAt = Date.now();
+    cacheHintConfigCache.set("config", { fetchedAt, config });
+    writeCacheHintConfigToDisk(fetchedAt, config);
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle("kimi-code:getCacheHintConfig", async () => {
+  try {
+    return { success: true, data: await loadCacheHintConfig() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
 

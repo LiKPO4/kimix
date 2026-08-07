@@ -1546,6 +1546,8 @@ export type AppSettings = {
   additionalWorkDirs?: string[];
   hookRules?: HookRule[];
   hookRunLog?: HookRunLogEntry[];
+  /** 上下文缓存过期提醒：用户选择「不再询问」后置真，此后不再弹出。 */
+  cacheHintDismissed?: boolean;
 }
 
 export type HookRule = {
@@ -2357,6 +2359,28 @@ export type KimiCodeStatusPayload = {
   status: KimiCodeEngineStatus;
   /** 当 Server 会话被迁移到 SDK 会话时，提供新的 runtime session id。 */
   migratedTo?: string;
+};
+
+// 上下文缓存过期提醒（上游 0.34.0 #2646）：client_configs 下发的缓存时长规则
+export type KimiCodeCacheHintRule = {
+  /** 缓存有效时长（秒）。 */
+  cache_duration: number;
+  /** 上下文达到该 token 数后才提示。 */
+  min_tokens_to_hint: number;
+};
+
+export type KimiCodeCacheHintConfig = {
+  version?: number;
+  config: Record<string, KimiCodeCacheHintRule>;
+};
+
+export type KimiCodeCacheHintConfigResponse = {
+  success: true;
+  /** null 表示未拿到配置（网络失败/解析失败），调用方按无配置静默降级。 */
+  data: KimiCodeCacheHintConfig | null;
+} | {
+  success: false;
+  error: string;
 };
 
 export type LoggerWriteRequest = {
