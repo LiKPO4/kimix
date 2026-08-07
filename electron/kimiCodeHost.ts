@@ -3889,6 +3889,59 @@ async function settleExternallyResolvedServerApprovals(
   }
 }
 
+/** 快照 pending_questions → 仍待回答的 question_id 集合（外部 settle 对账用）。 */
+export function extractPendingServerQuestionIds(snapshot: { pending_questions?: unknown }): Set<string> {
+  return new Set(
+    (Array.isArray(snapshot.pending_questions) ? snapshot.pending_questions : [])
+      .map((question) => (question && typeof question === "object"
+        ? (question as Record<string, unknown>).question_id
+        : undefined))
+      .filter((id): id is string => typeof id === "string" && id.length > 0),
+  );
+}
+
+/** 本地跟踪且已不在官方 pending 列表的提问 → 外部已回答，需要 settle。 */
+export function selectExternallyResolvedQuestionIds(trackedIds: readonly string[], pendingIds: ReadonlySet<string>): string[] {
+  return trackedIds.filter((requestId) => !pendingIds.has(requestId));
+}
+
+// 与审批（settleExternallyResolvedServerApprovals）同理：其他客户端（官方 Web）
+// 回答提问后 Server 不广播 resolved 帧，只把条目从 pending_questions 移除并让会话
+// 状态离开 waiting_question。不补这条链路，Kimix 的提问卡会永远「待回答」。
+// 状态迁出 waiting_question 时回读 snapshot，对已不在 pending 列表的提问发 settle
+// 事件（外部回答一律视为 answered——提问没有 rejected 去向，过期/失活由本地
+// settleInactiveEvents 兜底）。本地 respondQuestion 先删 id 再改状态，不会误触发。
+async function settleExternallyResolvedServerQuestions(
+  sessionId: string,
+  attempt = 0,
+): Promise<void> {
+  const keys = [...serverQuestionIds].filter((key) => key.startsWith(`${sessionId}:`));
+  if (keys.length === 0) return;
+  let stillPending: Set<string> | null = null;
+  try {
+    const snapshot = await getServerClient().getSnapshot(sessionId);
+    stillPending = extractPendingServerQuestionIds(snapshot);
+  } catch {
+    // 快照读取失败时保守跳过 settle：无法确认哪些提问已从 pending 移除，
+    // 误 settle（把仍在等待的提问报成已回答）比多留一会儿更糟。做有上限的退避重试。
+    if (attempt < 3) {
+      setTimeout(() => {
+        void settleExternallyResolvedServerQuestions(sessionId, attempt + 1);
+      }, 2_000 * (attempt + 1));
+    }
+    return;
+  }
+  const trackedIds = keys.map((key) => key.slice(sessionId.length + 1));
+  for (const requestId of selectExternallyResolvedQuestionIds(trackedIds, stillPending)) {
+    serverQuestionIds.delete(pendingKey(sessionId, requestId));
+    serverQuestionRequests.delete(pendingKey(sessionId, requestId));
+    eventSink?.({
+      sessionId,
+      event: { type: "kimix.question.resolved", requestId, status: "answered" },
+    });
+  }
+}
+
 function setStatus(sessionId: string, status: KimiCodeEngineStatus) {
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
@@ -3897,6 +3950,9 @@ function setStatus(sessionId: string, status: KimiCodeEngineStatus) {
     serverManaged.status = status;
     if (previousStatus === "waiting_approval") {
       void settleExternallyResolvedServerApprovals(sessionId, status);
+    }
+    if (previousStatus === "waiting_question") {
+      void settleExternallyResolvedServerQuestions(sessionId);
     }
     emitStatus(sessionId, status);
     return;

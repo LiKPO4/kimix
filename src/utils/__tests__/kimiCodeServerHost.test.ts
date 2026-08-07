@@ -16,8 +16,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  extractPendingServerQuestionIds,
   resolveEngineStatusAfterPromptCompleted,
   resolveExternalApprovalSettleStatus,
+  selectExternallyResolvedQuestionIds,
   resolvePromptModel,
   resolveServerEngineStatus,
   resolveServerModelRefresh,
@@ -290,6 +292,29 @@ describe("resolveExternalApprovalSettleStatus", () => {
     expect(resolveExternalApprovalSettleStatus("error")).toBe("rejected");
     expect(resolveExternalApprovalSettleStatus("interrupted")).toBe("rejected");
     expect(resolveExternalApprovalSettleStatus("idle")).toBe("rejected");
+  });
+});
+
+describe("external question settle helpers", () => {
+  it("extractPendingServerQuestionIds 只认对象条目的 question_id 字符串", () => {
+    expect([...extractPendingServerQuestionIds({
+      pending_questions: [
+        { question_id: "q-1", questions: [] },
+        { question_id: "q-2" },
+        { no_id: true },
+        "raw-string",
+        null,
+        { question_id: "" },
+      ],
+    })].sort()).toEqual(["q-1", "q-2"]);
+    expect(extractPendingServerQuestionIds({}).size).toBe(0);
+    expect(extractPendingServerQuestionIds({ pending_questions: "oops" }).size).toBe(0);
+  });
+
+  it("selectExternallyResolvedQuestionIds 只选出已不在官方 pending 的跟踪项", () => {
+    expect(selectExternallyResolvedQuestionIds(["q-1", "q-2", "q-3"], new Set(["q-2"]))).toEqual(["q-1", "q-3"]);
+    expect(selectExternallyResolvedQuestionIds(["q-1"], new Set(["q-1"]))).toEqual([]);
+    expect(selectExternallyResolvedQuestionIds([], new Set())).toEqual([]);
   });
 });
 

@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+## 2026-08-07 修复：web 端已答提问残留待回答（v2.20.270）
+
+- 根因：官方 Server 在其他客户端（web）回答提问后不广播 resolved 帧，只把条目从 pending 列表移除；审批卡早有外部 settle 对账（`settleExternallyResolvedServerApprovals`），提问卡缺同款机制，导致 `question_request` 永远 pending。
+- 修法：`electron/kimiCodeHost.ts` 新增 `settleExternallyResolvedServerQuestions`（快照对账 + 2s/4s/6s 退避重试，与审批同款）+ 两个 export 纯函数；`setStatus` 迁出 `waiting_question` 时触发；`src/App.tsx` 新增 `kimix.question.resolved` 消费块（镜像审批块，含 collaboration 各 roomAgent）。
+- 边缘：web 答 Q1 后 agent 立即追问 Q2 的场景在下一次状态迁出 waiting_question 时自愈（单触发点，有意不加第二触发）；外部 settle 一律 answered，过期失活由 settleInactiveEvents 兜底。
+- 验收：定向 36/36、双 typecheck 过、全量 vitest 绿、build 过；实机复验待用户（web+Kimix 同开会话，web 答后 Kimix 卡片应变已答）。
+
 ## 2026-08-07 功能：后台任务/定时任务通知卡+分组卡，对齐官方（v2.20.269）
 
 - 起因：官方输出流的通知是「N 条通知」分组卡+可展开详情卡（类型/来源/严重度/正文/原始 payload），Kimix 只有摘要 pill。排查确认数据在映射层被丢：信封带全字段（type/source_kind/source_id/Title/Severity/正文），parseKimiAgentEnvelope 只提取一句 summary。

@@ -2761,6 +2761,27 @@ function App() {
         }
         return;
       }
+      if (rawEvent?.type === "kimix.question.resolved") {
+        // 其他客户端（官方 Web）已回答的提问：host 对账发现已不在官方 pending
+        // 列表后发此事件，把本地 pending 提问卡 settle 为 answered（与审批同款）。
+        const resolvedRequestId = typeof rawEvent.requestId === "string" ? rawEvent.requestId : "";
+        if (resolvedRequestId && targetSession) {
+          const settleQuestion = (events: TimelineEvent[]) => events.map((event) => (
+            event.type === "question_request" && event.requestId === resolvedRequestId && event.status === "pending"
+              ? { ...event, status: "answered" as const }
+              : event
+          ));
+          let settledSession: Session = { ...targetSession, events: settleQuestion(targetSession.events) };
+          if (settledSession.collaboration) {
+            for (const roomAgent of settledSession.collaboration.agents) {
+              settledSession = updateRoomAgentEvents(settledSession, roomAgent.id, settleQuestion);
+            }
+          }
+          updateSession(uiSessionId, () => ({ ...settledSession, updatedAt: Date.now() }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
+        return;
+      }
       if (rawEvent?.type === "kimix.turn.model") {
         // Host 权威当轮模型信号（dispatch=本地注入的本轮模型，不变量 65；settle=server
         // 实际模型）。server 路由 live 不产出 usage 状态卡，当轮 assistant 的 model
