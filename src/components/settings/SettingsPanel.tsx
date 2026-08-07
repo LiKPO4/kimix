@@ -41,6 +41,7 @@ import { isMultiAgentRoomUiEnabled, setMultiAgentRoomUiEnabled } from "@/utils/r
 import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 import { ModelProviderManager } from "./ModelProviderManager";
+import { NumberInput } from "../common/NumberInput";
 import {
   getSettingsPage,
   getSettingsPageForSection,
@@ -1403,13 +1404,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         同步影响对话正文、输入框和左侧项目/会话列表。
                       </div>
                     </div>
-                    <input
+                    <NumberInput
                       id="kimix-font-size"
-                      type="number"
                       min={11}
                       max={20}
                       value={fontSize}
-                      onChange={(event) => setFontSize(Number(event.target.value || 15))}
+                      onCommit={setFontSize}
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>
@@ -1729,14 +1729,13 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   </button>
                   <div className="min-w-0">
                     <div className="mb-1 text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">轮数上限</div>
-                    <input
+                    <NumberInput
                       id="session-turn-limit"
-                      type="number"
                       min={1}
                       max={200}
                       value={sessionRecommendationTurnLimit}
                       disabled={!sessionRecommendationEnabled}
-                      onChange={(event) => setSessionRecommendationTurnLimit(Number(event.target.value || 1))}
+                      onCommit={setSessionRecommendationTurnLimit}
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>

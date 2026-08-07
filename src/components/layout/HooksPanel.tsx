@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { Activity, Bell, Check, Loader2, Play, Plus, ShieldAlert, Sparkles, TerminalSquare, Trash2, Webhook, X, type LucideIcon } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { NumberInput } from "../common/NumberInput";
 import type { AppSettings, HookRule, HookRunLogEntry } from "@electron/types/ipc";
 
 type HookTemplate = {
@@ -371,12 +372,11 @@ export function HooksPanel({ onBackToChat }: { onBackToChat?: () => void }) {
 
       <label className="flex flex-col text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 7 }}>
         超时秒数
-        <input
-          type="number"
+        <NumberInput
           min={1}
           max={600}
           value={rule.timeout ?? 30}
-          onChange={(event) => onPatch({ timeout: Math.max(1, Math.min(600, Number(event.target.value) || 30)) })}
+          onCommit={(timeout) => onPatch({ timeout })}
           className="kimix-settings-input h-9 rounded-lg text-[13px] outline-none"
           style={{ paddingLeft: 11, paddingRight: 11 }}
         />
