@@ -898,12 +898,14 @@ export function mergeCanonicalFragmentTurnBodies(
   let alignedTurns = 0;
   let mismatchedTurns = 0;
   let crossTurnRemnants = 0;
+  let crossTurnUnalignedSkips = 0;
   // 两侧轮数天然可以不等：本地可能缺官方边界（跨轮错位/相邻轮合并），官方
   // 也可能多出「被打断后原文重发」的重复轮。因此对齐用单调游标向前搜索，
   // 匹配不到的本地轮跳过。旧实现按下标配对且首个不匹配就 break，任意一处
   // 边界错位都会让后面所有残片轮永远修不到（实测零命中的根因）。
   let cursor = 0;
-  for (const local of localTurns) {
+  for (let localIndex = 0; localIndex < localTurns.length; localIndex += 1) {
+    const local = localTurns[localIndex];
     let matchIndex = -1;
     for (let probe = cursor; probe < canonicalTurns.length; probe += 1) {
       if (turnUsersMatch(local.user, canonicalTurns[probe].user)) {
@@ -941,18 +943,27 @@ export function mergeCanonicalFragmentTurnBodies(
     // 跨轮错位：live 流式下，下一轮的首段残片可能落在上一轮的
     // user 边界下（官方边界帧比首段正文晚到）。此时展示正文不属于
     // 本轮任何官方段，旧判定恒为否；但它是【下一轮】某段的残片，这就是
-    // 错位的证据。下一轮自己也已对齐到本地轮（否则不进此分支），所以把
-    // 本轮展示正文换回本轮官方终段不会丢它的内容。必须先排除本轮命中：
-    // 短残片（如【。】）会同时命中多轮，本轮优先才不会误改正常短回复。
+    // 错位的证据。必须先排除本轮命中：短残片（如【。】）会同时命中多轮，
+    // 本轮优先才不会误改正常短回复。
+    // 安全前提（review A2）：此替换不可逆——只有本地确实存在已对齐到下一
+    // 官方轮的下一本地轮时，残片内容在本地别处才有副本，把本轮展示正文
+    // 换回本轮官方终段才不会丢它。本地缺下一轮边界时，残片可能是下一轮
+    // 内容在本地的唯一副本，宁可跳过留痕也不能顶掉（后续对账无法兜回）。
     const nextCanonical = canonicalTurns[matchIndex + 1];
-    const isCrossTurnRemnant = !isOwnTurnFragment &&
+    const nextLocal = localTurns[localIndex + 1];
+    const nextLocalAligned = nextLocal !== undefined &&
+      nextCanonical !== undefined &&
+      turnUsersMatch(nextLocal.user, nextCanonical.user);
+    const wouldBeCrossTurnRemnant = !isOwnTurnFragment &&
       localFinalBody.length > 0 &&
       nextCanonical !== undefined &&
       nextCanonical.assistants.some((event) => {
         const body = event.content.trim();
         return body.length >= MIN_CANONICAL_REPLY_MATCH_LENGTH && isFragmentOf(body);
       });
+    const isCrossTurnRemnant = wouldBeCrossTurnRemnant && nextLocalAligned;
     if (isCrossTurnRemnant) crossTurnRemnants += 1;
+    if (wouldBeCrossTurnRemnant && !nextLocalAligned) crossTurnUnalignedSkips += 1;
     const isFragment = isOwnTurnFragment || isCrossTurnRemnant;
     if (!isFragment || canonicalFinal.length < MIN_CANONICAL_REPLY_MATCH_LENGTH) continue;
     replacements.set(localFinal.id, canonicalFinalEvent.content);
@@ -975,6 +986,7 @@ export function mergeCanonicalFragmentTurnBodies(
         alignedTurns,
         mismatchedTurns,
         crossTurnRemnants,
+        crossTurnUnalignedSkips,
       });
     }
     return localEvents;
@@ -989,6 +1001,7 @@ export function mergeCanonicalFragmentTurnBodies(
     alignedTurns,
     mismatchedTurns,
     crossTurnRemnants,
+    crossTurnUnalignedSkips,
   });
   return localEvents.map((event) => {
     if (event.type !== "assistant_message") return event;

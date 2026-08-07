@@ -195,6 +195,33 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     expect(bodies).toEqual([ownFinal, nextOpening]);
   });
 
+  it("keeps the next-turn remnant when the local next-turn boundary is missing (A2)", () => {
+    // 与上一例相同的错位残片，但本地缺失下一轮的 user 边界：残片是下一轮
+    // 内容在本地唯一的副本。旧实现仍按跨轮残片把它顶成本轮官方终段，下一轮
+    // 内容永久丢失且后续对账无法兜回。修复后宁可跳过留痕也不替换。
+    const nextOpening = "你好霖江路。先看现有 recovery 机制的触发点与退避 backoff。";
+    const ownFinal = "你好霖江路。结论：确实走了 SDK 兼容链路，不是显示误标，已定位到 daemon 启动窗口。";
+    const remnant = nextOpening.slice(nextOpening.length - 9);
+    const local: TimelineEvent[] = [
+      { ...userMessage, id: "u-a", timestamp: 100 },
+      assistant(remnant, { id: "remnant", timestamp: 110 }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, id: "c-u-a", timestamp: 100 },
+      assistant(ownFinal, { id: "c-own", timestamp: 110 }),
+      { ...userMessage, id: "c-u-b", timestamp: 200, content: "next turn prompt" },
+      assistant(nextOpening, { id: "c-next", timestamp: 210 }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    // 零补丁：残片原样保留，引用不变
+    expect(merged).toBe(local);
+    const bodies = merged
+      .filter((e): e is Extract<TimelineEvent, { type: "assistant_message" }> => e.type === "assistant_message")
+      .map((e) => e.content);
+    expect(bodies).toEqual([remnant]);
+  });
+
   it("does not rewrite a short legitimate reply that also occurs in the next turn", () => {
     // Guard against the cross-turn rule firing on a real short answer: it is a
     // fragment of its OWN turn, so the own-turn branch wins and nothing moves.

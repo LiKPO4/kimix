@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：A2 跨轮残片替换补「本地下一轮已对齐」安全前提（v2.20.264）
+
+- review A2。根因：`mergeCanonicalFragmentTurnBodies` 的 isCrossTurnRemnant 注释声称「下一轮已对齐到本地轮（否则不进此分支）」，但代码从未校验 `localTurns[i+1]`；本地缺下一轮 user 边界时，残片是下一轮内容在本地唯一副本，仍被顶成本轮官方终段，永久丢失且后续对账无法兜回。修复：对齐循环改索引式，新增 `nextLocalAligned`（`turnUsersMatch(localTurns[i+1], canonicalTurns[matchIndex+1])`）前提，不满足则跳过并计 `crossTurnUnalignedSkips` 留痕（两条日志 payload 同步带上）。测试：新增「本地缺下一轮边界残片保留」回归 1 例。阶段 1（A1/A3/A2）收尾：全量 162 文件 1681 例全绿、两套 typecheck 通过。
+
 ## 2026-08-06 修复：A3 turnBlocks 同段重放去重方向修正——反序不再丢完整正文（v2.20.263）
 
 - review A3。根因：同 turn 前缀去重对「既有段是新段前缀（新段更长）」方向也 continue 丢新段，反序到达（滞留短前缀先材料化、官方完整段后重放）时完整正文被丢成 35 字符开场白；且实机两段只差结尾标点（「桌面：」vs「桌面。」），严格 startsWith 双向都不匹配，只能靠 ≥20 字符长前缀兜底。修复：统一为 nearDuplicate 判定（相等/互为前缀/长前缀分叉），按长度保留更完整者——既有不短则跳过新段，新段更长则原位升级既有段（events.push + content 替换）。测试：新增反序回归 1 例，turnBlocks 39/39 通过。
