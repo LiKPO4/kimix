@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：后台子代理/残留 running 工具挡住轮 settle，思考工具链不自动折叠（v2.20.277）
+
+- 根因：自动折叠只在 `hasFinalContent` false→true 跳变时触发（`shouldCollapseKimiWebProcessOnFinalContent`），而 `hasFinalContent = isComplete && !isActiveAssistant && hasContent`，`isActiveAssistant = !turnSettled`。`buildRenderItems` 的 `isSessionLevelTurnStopped` 要求 `!hasPendingToolOrSubagent`——轮内带 run_in_background 子代理（可能跑几十分钟）或残留 running 工具时，会话已停轮仍不 settle，折叠永不触发。
+- 依据：前台执行必然伴随会话运行中（isSessionRunning / activeRoomAgentTurn 覆盖）；会话已停时 running 条目只可能是后台任务或残留标志。
+- 修法：`ChatThread.tsx` `isSessionLevelTurnStopped` 去掉 `&& !hasPendingToolOrSubagent`（第四分支的运行中守卫保留，覆盖会话仍运行但本轮已完的语义）。
+- 复现先行：chatRenderItems 新增 2 例（后台子代理 running / 工具 result 缺失残留 running），未修复时 2 例皆失败（已验证），修复后通过。
+- 验收：定向 55/55、typecheck、全量 vitest、build 均过；实机复验待用户（后台子代理运行时主轮输出结束应收折）。
+
+
 ## 2026-08-07 功能：对话刻度设置——开关/左右侧/宽度（v2.20.276）
 
 - 需求：设置里可关闭对话刻度、切换刻度位于左侧或右侧、调整刻度宽度。

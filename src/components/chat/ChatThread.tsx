@@ -945,7 +945,11 @@ export function buildRenderItems(
     const isSupersededBySteerBoundary = hasLaterSteerBoundary && !isLatestTurn;
     const hasPendingToolOrSubagent = tools.some((event) => event.status === "running") ||
       subagents.some((event) => event.status === "queued" || event.status === "running" || event.status === "suspended");
-    const isSessionLevelTurnStopped = !isSessionRunning && !activeRoomAgentTurn && !hasPendingToolOrSubagent;
+    // 会话层面已停（runtime 不再运行、无匹配 room 活动）时，轮内仍挂 running 的
+    // 工具/子代理只可能是后台任务（run_in_background）或残留标志——前台执行必然
+    // 伴随会话运行中。它们不该挡住 settle：否则后台子代理跑多久，思考工具链就
+    // 多久不折叠（hasFinalContent 永不翻真，自动折叠永不触发）。
+    const isSessionLevelTurnStopped = !isSessionRunning && !activeRoomAgentTurn;
     const turnSettled = isSupersededPrimaryTurn || isSupersededBySteerBoundary || isSessionLevelTurnStopped || (
       !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&

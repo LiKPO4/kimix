@@ -1484,4 +1484,51 @@ describe("buildRenderItems steer boundary", () => {
     const actives = assistants.filter((item) => item.type === "event" && item.isAssistantActive);
     expect(actives).toHaveLength(1);
   });
+
+  it("settles a completed turn even when a background subagent is still running", () => {
+    // 实机：主 Agent 输出完成、会话已停，但轮内带着 run_in_background 启动的
+    // 子代理仍是 running（可能跑几十分钟）。前台执行必然伴随会话运行中，会话
+    // 已停时 running 条目只可能是后台任务或残留标志，不该挡住 settle——否则
+    // hasFinalContent 永不翻真，思考工具链始终不自动折叠。
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "后台跑个子代理" },
+      {
+        id: "assistant-1", type: "assistant_message", timestamp: 2,
+        content: "你好霖江路。子代理已在后台运行，完成后会通知你。",
+        isThinking: false, isComplete: true, agentTurnId: "turn-bg",
+      },
+      {
+        id: "subagent-1", type: "subagent", timestamp: 3,
+        agentName: "后台调研", status: "running", events: [],
+      },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, false);
+    const header = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(header?.type).toBe("event");
+    if (header?.type !== "event" || header.event.type !== "assistant_message") return;
+    expect(header.isAssistantActive).toBe(false);
+    expect(header.event.isComplete).toBe(true);
+  });
+
+  it("settles a completed turn even when a tool result never arrived", () => {
+    // 同类残留：轮已结束但工具事件没收到 result，status 永久卡在 running。
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "跑个工具" },
+      {
+        id: "assistant-1", type: "assistant_message", timestamp: 2,
+        content: "你好霖江路。工具结果缺失，但输出已结束。",
+        isThinking: false, isComplete: true, agentTurnId: "turn-orphan",
+      },
+      {
+        id: "tool-1", type: "tool_call", timestamp: 3,
+        toolCallId: "tool-1", toolName: "Bash", status: "running", arguments: {},
+      },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, false);
+    const header = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(header?.type).toBe("event");
+    if (header?.type !== "event" || header.event.type !== "assistant_message") return;
+    expect(header.isAssistantActive).toBe(false);
+    expect(header.event.isComplete).toBe(true);
+  });
 });
