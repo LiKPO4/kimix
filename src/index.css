@@ -1353,6 +1353,13 @@
   border-radius: 0;
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
+/* Win98 焦点提示：1px 点线 outline（不占尺寸），边框加深作浮雕反馈。 */
+[data-ui-style="nostalgia"] .kimix-settings-input:focus,
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-field:focus {
+  border-color: var(--border-strong);
+  outline: 1px dotted var(--accent-primary);
+  outline-offset: 1px;
+}
 
 /* Title bar: dense horizontal pinstripe (Win98 title-bar cue without locking blue). */
 [data-ui-style="nostalgia"] .kimix-app-shell-toolbar {
@@ -4702,7 +4709,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-section-card {
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
-  border-radius: var(--ui-radius-xl, 12px);
+  border-radius: var(--ui-radius-xl, 20px);
 }
 
 /* ── Dock Capsule（输入区胶囊行，对齐官方 kimi-web dock work chips） ── */
@@ -4713,7 +4720,7 @@ button.bg-accent-primary:disabled:hover,
   gap: 6px;
   min-height: 26px;
   padding: 0 10px;
-  border-radius: var(--ui-radius-xl, 10px);
+  border-radius: var(--ui-radius-xl, 20px); /* 默认风格面板 20px（--radius-lg）；:root 不定义该令牌，避免 rounded-xl 工具类全站漂移（见 tailwind.config.ts） */
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
   box-shadow: var(--ui-control-shadow);
@@ -4734,7 +4741,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-dock-capsule[aria-expanded="true"] {
   background: var(--ui-toggle-background);
   box-shadow: var(--ui-toggle-shadow);
-  color: var(--accent-primary);
+  color: var(--ui-toggle-color, var(--accent-primary));
 }
 
 /* 怀旧（Win98 直角硬边）：胶囊随风格令牌变直角。 */
@@ -4748,7 +4755,7 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-dock-capsule[aria-expanded="true"] .kimix-dock-capsule-count {
-  color: var(--accent-primary);
+  color: var(--ui-toggle-color, var(--accent-primary));
 }
 
 
@@ -4783,7 +4790,7 @@ button.bg-accent-primary:disabled:hover,
 /* 完整卡片内部的内容分层只保留背景和圆角，不建立第二个边界。 */
 .kimix-inset-section {
   border: 0;
-  border-radius: var(--ui-radius-xl, 12px);
+  border-radius: var(--ui-radius-xl, 20px);
   background: var(--surface-elevated);
   box-shadow: none;
 }

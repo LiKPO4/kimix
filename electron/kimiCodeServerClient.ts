@@ -380,9 +380,13 @@ const WS_WATCHDOG_INTERVAL_MS = 2_000;
 // 轮末观察窗：live WS 不广播新轮用户消息（TurnBegin 仅 snapshot 重放合成），既有进度探针只在静默期触发，
 // 抓不到与前轮衔接的新轮（前轮尾帧/新轮头帧使静默低于阈值），用户消息会永久缺失、两轮回复合并。
 // 主动轮询官方历史，发现晚于轮末的用户消息即以轮前 cursor 同连接重订阅（server 回放新轮早到帧）+ snapshot 补用户边界，
-// snapshot 恢复后（含进程重启/重连对账，无 in_flight_turn 时）；观察不设过期，仅在 unsubscribe/pending 时清除，
-// 覆盖重启后未观测到轮末帧的场景。terminalAt 取 snapshot 最新消息时间戳（与官方用户消息同源时钟，避免跨钟偏斜）。
+// snapshot 恢复后（含进程重启/重连对账，无 in_flight_turn 时）；重启/重连的 snapshot 恢复会重新 arm，
+// 因此单条 watch 不需要永久存活。terminalAt 取 snapshot 最新消息时间戳（与官方用户消息同源时钟，避免跨钟偏斜）。
 const POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS = 4_000;
+// 单连接长存场景下每个已结束会话一条 watch 会线性累积、每条每 4s 一次全量 snapshot
+// 拉取（review B1）。30 分钟覆盖同一场工作会话内的外部跟进；过期后该会话下次
+// snapshot 恢复（重新查看/重连对账）会重新 arm，不会永久失守。
+const POST_TERMINAL_EXTERNAL_WATCH_TTL_MS = 30 * 60_000;
 
 export function serverMessageProgressMarker(
   message: ServerMessageSummary | null | undefined,
@@ -948,7 +952,7 @@ export class KimiCodeServerClient {
   private readonly serverProgressMarkers = new Map<string, string | null>();
   private readonly lastSessionProgressAt = new Map<string, number>();
   private readonly pendingPrompts = new Map<string, { completionId: string; messageId: string }>();
-  private readonly postTerminalExternalWatch = new Map<string, { terminalAt: number; lastProbeAt: number }>();
+  private readonly postTerminalExternalWatch = new Map<string, { terminalAt: number; lastProbeAt: number; armedAt: number }>();
 
   private armWsWatchdog() {
     if (this.watchdogTimer) return;
@@ -1070,7 +1074,7 @@ export class KimiCodeServerClient {
   // snapshot 恢复即本地时间线对齐到官方快照此刻，晚于它的用户消息必为其他客户端的新轮；
   // 与 live 轮末帧路径共用挂载点。terminalAt 由调用方提供（snapshot 用最新消息时间戳，live 轮末用当前时间）。
   private armPostTerminalExternalWatch(sessionId: string, terminalAt: number): void {
-    this.postTerminalExternalWatch.set(sessionId, { terminalAt, lastProbeAt: 0 });
+    this.postTerminalExternalWatch.set(sessionId, { terminalAt, lastProbeAt: 0, armedAt: Date.now() });
   }
 
   // live 轮末帧路径的基线校准：探针把官方时间戳的 userAt 与本地时间的 terminalAt 直接比较，
@@ -1098,6 +1102,10 @@ export class KimiCodeServerClient {
     const now = Date.now();
     for (const [sessionId, watch] of [...this.postTerminalExternalWatch]) {
       if (!this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId)) {
+        this.postTerminalExternalWatch.delete(sessionId);
+        continue;
+      }
+      if (now - watch.armedAt > POST_TERMINAL_EXTERNAL_WATCH_TTL_MS) {
         this.postTerminalExternalWatch.delete(sessionId);
         continue;
       }
@@ -2049,9 +2057,6 @@ export class KimiCodeServerClient {
           void this.calibrateLivePostTerminalWatchToOfficialTime(frame.session_id);
         }
       }
-    }
-    if (frame.type === "kimix.server.snapshot" && frame.session_id) {
-      this.postTerminalExternalWatch.delete(frame.session_id);
     }
     if (frame.type === "resync_required") {
       const sessionId = (frame.payload as { session_id?: unknown } | undefined)?.session_id;

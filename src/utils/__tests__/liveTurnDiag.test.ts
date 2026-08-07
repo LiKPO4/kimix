@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   classifyLiveStreamFrame,
+  noteStreamAnchorDecision,
   resetLiveTurnDiagStateForTests,
   resolveLiveDisplayMode,
   shouldLogDisplayModeChange,
@@ -80,5 +81,50 @@ describe("liveTurnDiag", () => {
 
   it("shouldLogStreamAnchorDecision stops at the hard cap even for key signals", () => {
     expect(shouldLogStreamAnchorDecision({ rows: 2000, accepted: false, isOffsetRegression: true })).toBe(false);
+  });
+
+  it("evicts the oldest anchor diag keys once the per-map FIFO cap is exceeded", () => {
+    type DiagReq = { message?: string; data?: Record<string, unknown> };
+    const calls: DiagReq[] = [];
+    const originalWindow = (globalThis as Record<string, unknown>).window;
+    (globalThis as Record<string, unknown>).window = {
+      api: {
+        writeDiag: (req: DiagReq) => {
+          calls.push(req);
+          return Promise.resolve();
+        },
+      },
+    };
+    try {
+      // 灌入超过 FIFO key 上限（200）的 key 数；soft cap（1200 行/key）内全部留痕
+      for (let i = 0; i < 250; i += 1) {
+        noteStreamAnchorDecision({
+          key: `fifo-${i}`, kind: "body", offset: i, deltaLen: 1, accLen: 1,
+          anchorBefore: 0, anchorAfter: 0, accepted: true,
+        });
+      }
+      expect(calls).toHaveLength(250);
+      // 最旧 key 已被 FIFO 淘汰：重新出现时行号与 prevOffset 都从零开始
+      //（无淘汰时 rows 会延续为 2、prevOffset 为旧值 0，可区分）
+      calls.length = 0;
+      noteStreamAnchorDecision({
+        key: "fifo-0", kind: "body", offset: 999, deltaLen: 1, accLen: 1,
+        anchorBefore: 0, anchorAfter: 0, accepted: true,
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].data?.row).toBe(1);
+      expect(calls[0].data?.prevOffset).toBeNull();
+      // 从未出现过的 key 不受影响，行号同样从 1 开始
+      calls.length = 0;
+      noteStreamAnchorDecision({
+        key: "fifo-new", kind: "body", offset: 1, deltaLen: 1, accLen: 1,
+        anchorBefore: 0, anchorAfter: 0, accepted: true,
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].data?.row).toBe(1);
+    } finally {
+      if (originalWindow === undefined) delete (globalThis as Record<string, unknown>).window;
+      else (globalThis as Record<string, unknown>).window = originalWindow;
+    }
   });
 });

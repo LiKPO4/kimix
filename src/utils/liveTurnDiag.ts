@@ -267,6 +267,15 @@ export function noteLiveStreamFrame(input: {
  */
 const ANCHOR_DIAG_FULL_ROWS_PER_KEY = 1200;
 const ANCHOR_DIAG_HARD_ROWS_PER_KEY = 2000;
+/** 每个诊断 Map 的 key 数上限：key 只增不减，长期运行内存无界；超限 FIFO 淘汰最旧 key。 */
+const ANCHOR_DIAG_MAX_KEYS = 200;
+function evictOldestKeys<T>(map: Map<string, T>, maxKeys: number): void {
+  while (map.size > maxKeys) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
+}
 const anchorDiagRowsByKey = new Map<string, number>();
 const anchorDiagLastOffsetByKey = new Map<string, number>();
 
@@ -295,8 +304,10 @@ export function noteStreamAnchorDecision(input: {
   const lastOffset = anchorDiagLastOffsetByKey.get(trackKey);
   const isOffsetRegression = lastOffset !== undefined && input.offset < lastOffset;
   anchorDiagLastOffsetByKey.set(trackKey, input.offset);
+  evictOldestKeys(anchorDiagLastOffsetByKey, ANCHOR_DIAG_MAX_KEYS);
   if (!shouldLogStreamAnchorDecision({ rows, accepted: input.accepted, isOffsetRegression })) return;
   anchorDiagRowsByKey.set(trackKey, rows + 1);
+  evictOldestKeys(anchorDiagRowsByKey, ANCHOR_DIAG_MAX_KEYS);
   writeLive("[live] anchor", {
     key: input.key.slice(-24),
     kind: input.kind,

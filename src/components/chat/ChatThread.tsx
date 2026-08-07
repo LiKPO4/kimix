@@ -605,7 +605,7 @@ export function shouldRetryAsRoomDelivery(
   return isCollaborationRoom && Boolean(event.roomMessageId && event.roomAgentId);
 }
 
-function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedSteers, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning, isCollaborationRoom, turnBlocks }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedSteers?: Extract<TimelineEvent, { type: "steer_message" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean; isCollaborationRoom?: boolean; turnBlocks?: TurnBlock[] }) {
+function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnStartedAt, isAssistantActive, leadingTools, leadingSubagents, leadingHooks, leadingApprovals, attachedUserStatuses, activeStatus, changedFiles, changeSummary, trailingStatuses, hideProcessSummary, expandProcessByDefault, approvalDiffs, onRetryError, onDismissError, onDeleteUserMessage, deletableUserMessageIds, eagerMarkdown, isSessionRunning, isCollaborationRoom, turnBlocks }: { event: TimelineEvent; sessionId: string; runtimeSessionId?: string; projectPath: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: ToolCallEvent[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; attachedUserStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; approvalDiffs?: { path: string; oldText?: string; newText?: string; additions?: number; deletions?: number }[]; onRetryError?: () => Promise<void>; onDismissError?: (eventId: string) => void; onDeleteUserMessage?: (eventId: string) => void; deletableUserMessageIds?: ReadonlySet<string>; eagerMarkdown?: boolean; isSessionRunning?: boolean; isCollaborationRoom?: boolean; turnBlocks?: TurnBlock[] }) {
   switch (event.type) {
     case "user_message":
       return (
@@ -617,7 +617,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
     case "steer_message":
       return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} />;
     case "assistant_message":
-      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} attachedSteers={attachedSteers} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} turnBlocks={turnBlocks} />;
+      return <MessageBubble event={event} sessionId={sessionId} runtimeSessionId={runtimeSessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} turnBlocks={turnBlocks} />;
     case "tool_call":
       return <ToolCard event={event} />;
     case "tool_result":
@@ -1117,8 +1117,7 @@ export function buildRenderItems(
     for (const [, event] of turnEvents.entries()) {
       if (event.type === "compaction") continue;
       // steer 按其事件位置渲染（官方注入点语义：steer 气泡在注入处、其后的
-      // assistant 段排在后面）。若挂到 assistant 块上（attachedSteers 在过程卡
-      // 之后渲染），steer 会倒挂到回复文本下方（实机：引导气泡排到回复之后）。
+      // assistant 段排在后面），不挂到 assistant 块上，避免倒挂到回复文本下方。
       if (event.type === "steer_message") {
         items.push({ type: "event", event });
         continue;
@@ -1348,8 +1347,8 @@ export function buildRenderItems(
     // - steer 前无正文（前一 step 未产出、steer 打断进行中的生成）→ 不切分
     //   （保持 242 语义：不产生「无 user 消息的伪新轮」+ 双重思考块）。
     // 切分后的 steer 独立渲染在轮间（官方注入点语义：引导气泡在注入处、其
-    // 后的回复段排在后面；不得挂 attachedSteers——过程卡之后的位置会把气泡
-    // 排到回复文本下方，实机截图倒挂）。切分 flush 带 hasLaterSteerBoundary：
+    // 后的回复段排在后面，不挂 assistant 块，避免倒挂到回复文本下方）。
+    // 切分 flush 带 hasLaterSteerBoundary：
     // 官方 turn 在 steer 后仍以同一 agentTurnId 运行，前段轮必须按 settle
     // 渲染（思考折叠、footer 收尾），live 状态只留给 steer 后的最新轮。
     if (event.type === "steer_message") {
@@ -1956,7 +1955,7 @@ export const ChatThread = memo(function ChatThread() {
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId ?? undefined} />
                   : item.type === "change_group"
                     ? <ChangeCard changes={item.changes} />
-                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} attachedSteers={item.attachedSteers} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} isCollaborationRoom={Boolean(session.collaboration)} turnBlocks={item.turnBlocks} />
+                  : <EventRenderer event={item.event} sessionId={session.id} runtimeSessionId={runtimeSessionId ?? undefined} projectPath={session.projectPath} turnStartedAt={item.turnStartedAt} isAssistantActive={item.isAssistantActive} leadingTools={item.leadingTools} leadingSubagents={item.leadingSubagents} leadingHooks={item.leadingHooks} leadingApprovals={item.leadingApprovals} activeStatus={item.activeStatus} changedFiles={item.changedFiles} changeSummary={item.changeSummary} trailingStatuses={item.trailingStatuses} hideProcessSummary={item.hideProcessSummary} expandProcessByDefault={item.event.id === latestProcessAssistantEventId} approvalDiffs={item.approvalDiffs} onRetryError={retryLastUserMessage} onDismissError={dismissErrorEvent} onDeleteUserMessage={deleteUserMessageAttempt} deletableUserMessageIds={deletableUserMessageIds} eagerMarkdown={eagerMarkdown} isSessionRunning={hasActiveTurn} isCollaborationRoom={Boolean(session.collaboration)} turnBlocks={item.turnBlocks} />
               }
             </div>
           ))}

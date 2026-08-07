@@ -538,22 +538,26 @@ export async function getGitNumstat(projectPath: string): Promise<GitNumstatEntr
     const UNTRACKED_NUMSTAT_MAX_BYTES = 8 * 1024 * 1024;
     for (let offset = 0; offset < untracked.length; offset += UNTRACKED_NUMSTAT_BATCH) {
       const batch = untracked.slice(offset, offset + UNTRACKED_NUMSTAT_BATCH);
-      const counted = await Promise.all(batch.map(async (item): Promise<GitNumstatEntry> => {
+      const counted = await Promise.all(batch.map(async (item): Promise<GitNumstatEntry | null> => {
         let added = 0;
         try {
           const filePath = path.join(projectPath, item.path);
           const stat = await fs.promises.stat(filePath);
+          // untracked 目录（porcelain 对嵌套仓库等场景不展开，输出 `?? dir/`）不是文件
+          // 变更，跳过以免产生 added=0/removed=0 的空变更卡条目；空文件、超 8MB 放弃
+          // 统计的文件等「有文件但未统计行数」的合法条目仍保留（added=0 是合法占位）。
+          if (stat.isDirectory()) return null;
           if (stat.isFile() && stat.size > 0 && stat.size <= UNTRACKED_NUMSTAT_MAX_BYTES) {
             const content = await fs.promises.readFile(filePath, "utf-8");
             const newlineCount = (content.match(/\r\n|\r|\n/g) ?? []).length;
             added = newlineCount + (content.endsWith("\n") || content.endsWith("\r") ? 0 : 1);
           }
         } catch {
-          // 目录项或不可读文件按 0 行处理。
+          // 不可读文件按 0 行处理。
         }
         return { path: item.path, added, removed: 0 };
       }));
-      entries.push(...counted);
+      entries.push(...counted.filter((entry): entry is GitNumstatEntry => entry !== null));
     }
   } catch {
     // 状态获取失败时忽略 untracked 补充。

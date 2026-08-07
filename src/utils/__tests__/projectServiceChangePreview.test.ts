@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
-import { getChangePreview } from "../../../electron/projectService";
+import { getChangePreview, getGitNumstat } from "../../../electron/projectService";
 
 const tempDirs: string[] = [];
 
@@ -69,5 +69,26 @@ describe("getChangePreview", () => {
 
     const preview = await getChangePreview({ projectPath: cwd, filePath: "app.ts" });
     expect(preview).toMatchObject({ source: "workspace", additions: 1, deletions: 1 });
+  });
+});
+
+describe("getGitNumstat untracked directory filtering", () => {
+  it("skips untracked directory placeholders (0/0) but keeps real untracked files with zero counted lines", async () => {
+    const cwd = createRepo();
+    fs.writeFileSync(path.join(cwd, "new.txt"), "line1\nline2\n");
+    fs.writeFileSync(path.join(cwd, "empty.txt"), "");
+    fs.mkdirSync(path.join(cwd, "nested"));
+    git(path.join(cwd, "nested"), ["init"]);
+    fs.writeFileSync(path.join(cwd, "nested", "inner.txt"), "x\n");
+    expect(git(cwd, ["status", "--porcelain=v1", "-uall"])).toContain("?? nested/");
+
+    const entries = await getGitNumstat(cwd);
+    const paths = new Set(entries.map((entry) => entry.path));
+    // untracked 目录占位条目被过滤，不再产生 added=0/removed=0 空变更
+    expect(paths.has("nested/")).toBe(false);
+    // 有行数的 untracked 文件正常统计
+    expect(entries.find((entry) => entry.path === "new.txt")).toMatchObject({ added: 2, removed: 0 });
+    // 空文件（有文件但未统计行数）保留为 added=0 合法条目，不被误杀
+    expect(entries.find((entry) => entry.path === "empty.txt")).toMatchObject({ added: 0, removed: 0 });
   });
 });

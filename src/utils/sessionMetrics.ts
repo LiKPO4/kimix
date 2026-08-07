@@ -115,7 +115,11 @@ export function mergeMetricStatusUpdates(
           contextSize: preferPositiveMetric(incoming.contextSize, acc.contextSize),
           contextLimit: preferPositiveMetric(incoming.contextLimit, acc.contextLimit),
         }
-      : incoming,
+      // 首元素与后续元素走同一规则：通知文案（如「后台任务已完成：…」）
+      // 不得原样进入合并结果泄漏到轮末信息卡（review C2）。
+      : isNotificationSummaryMessage(incoming.message)
+        ? { ...incoming, message: undefined }
+        : incoming,
     undefined,
   );
   if (!merged) return undefined;

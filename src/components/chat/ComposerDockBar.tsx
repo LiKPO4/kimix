@@ -137,7 +137,11 @@ export function ComposerDockBar({
       {active && (
         <div
           className="kimix-dock-panel flex flex-col overflow-hidden"
-          style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 8, maxHeight: "min(300px, 42vh)", zIndex: 30 }}
+          // 面板 bottom:100% 向上展开；矮窗口（视口 <500px）时原 min(300px, 42vh)
+          // 可能超出锚点上方可用空间，顶部溢出被裁。改用视口约束：
+          // 预留 ≈ 胶囊行 40 + 输入区 140 + footer 34 + 面板间距 8 ≈ 220px，
+          // 超高部分由面板内部 overflow-y-auto 滚动。
+          style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 8, maxHeight: "min(342px, calc(100vh - 220px))", zIndex: 30 }}
           role="dialog"
           aria-label={active.title}
         >

@@ -1,4 +1,5 @@
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
+import type { ComposerDockCard } from "@/types/ui";
 
 /**
  * 会话级后台任务分组：按官方 tasks 的 kind（IPC 层透传为 subagentType）把任务拆成
@@ -23,6 +24,23 @@ export function splitBackgroundTasksByKind<T extends { subagentType?: string }>(
 /** 后台任务终态：completed/failed/killed/cancelled/stopped/exited，其余视为仍在运行。 */
 export function isBackgroundTaskTerminalStatus(status: string) {
   return ["completed", "failed", "killed", "cancelled", "stopped", "exited"].includes(status);
+}
+
+/**
+ * 互斥空态派生清理：某类后台任务（bash/subagent）列表为空时，侧栏对应块随之消失，
+ * 「恢复胶囊」入口不可达；hidden 状态若残留，下次同类任务出现时胶囊仍被隐藏（只能重启复位）。
+ * 在任务状态更新处调用，从 hidden keys 中剔除任务为空的类别。
+ */
+export function pruneHiddenTaskKeysWhenEmpty<T extends { subagentType?: string }>(
+  tasks: readonly T[],
+  hiddenKeys: readonly ComposerDockCard[],
+): ComposerDockCard[] {
+  const { bashTasks, subagentTasks } = splitBackgroundTasksByKind(tasks);
+  const emptyKinds = new Set<ComposerDockCard>();
+  if (bashTasks.length === 0) emptyKinds.add("bash");
+  if (subagentTasks.length === 0) emptyKinds.add("subagent");
+  if (emptyKinds.size === 0) return [...hiddenKeys];
+  return hiddenKeys.filter((key) => !emptyKinds.has(key));
 }
 
 /** 会话级后台任务中是否存在仍在运行的后台 Bash 任务（子 Agent 组的运行任务不计入）。 */

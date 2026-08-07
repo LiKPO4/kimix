@@ -1978,12 +1978,13 @@ describe("post-terminal external prompt watch probe (v2.20.195 three-step sequen
     const internals = client as unknown as {
       subscribed: Set<string>;
       pendingPrompts: Map<string, { completionId: string; messageId: string }>;
-      postTerminalExternalWatch: Map<string, { terminalAt: number; lastProbeAt: number }>;
+      postTerminalExternalWatch: Map<string, { terminalAt: number; lastProbeAt: number; armedAt: number }>;
+      pollPostTerminalExternalPrompts: () => void;
       cursors: Map<string, { seq: number; epoch?: string }>;
       probeExternalUserPromptAfterTerminal: (sessionId: string, terminalAt: number) => Promise<void>;
     };
     internals.subscribed.add("session-1");
-    internals.postTerminalExternalWatch.set("session-1", { terminalAt, lastProbeAt: 0 });
+    internals.postTerminalExternalWatch.set("session-1", { terminalAt, lastProbeAt: 0, armedAt: Date.now() });
     return { client, fetchMock, internals };
   }
 
@@ -2032,6 +2033,19 @@ describe("post-terminal external prompt watch probe (v2.20.195 three-step sequen
     await internals.probeExternalUserPromptAfterTerminal("session-1", terminalAt);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(internals.postTerminalExternalWatch.has("session-1")).toBe(false);
+    await client.close();
+  });
+
+  it("watch armed longer than the TTL -> poll evicts it without probing (review B1)", async () => {
+    const { client, fetchMock, internals } = await setup(snapshotBody([]));
+    internals.postTerminalExternalWatch.set("session-1", {
+      terminalAt,
+      lastProbeAt: 0,
+      armedAt: Date.now() - 31 * 60_000,
+    });
+    internals.pollPostTerminalExternalPrompts();
+    expect(internals.postTerminalExternalWatch.has("session-1")).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
     await client.close();
   });
 });

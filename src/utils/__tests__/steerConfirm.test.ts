@@ -105,4 +105,28 @@ describe("waitForOfficialSteerUserMessage", () => {
     expect(record).toBeNull();
     expect(client.listMessages).not.toHaveBeenCalled();
   });
+
+  it("calibrates to official time so a steer confirm is not mistaken for an old message when the local clock runs ahead", async () => {
+    // 本地时钟比官方快 1 小时：确认消息的官方时间戳早于本地 startedAt，不校准会被
+    // 「createdAt <= startedAt」误杀；校准后按官方时间纯顺序比较命中（语义与
+    // kimiCodeServerClient.calibrateLivePostTerminalWatchToOfficialTime 一致）。
+    const client = {
+      listMessages: vi
+        .fn()
+        .mockResolvedValueOnce({
+          items: [userMessage("msg_before", "steer 前最后一条消息", new Date(startedAt - 3_600_000 - 5_000).toISOString())],
+          has_more: false,
+        })
+        .mockResolvedValue({
+          items: [userMessage("msg_confirm", "顺便把版本迭代到162行吗", new Date(startedAt - 3_600_000 + 10_000).toISOString())],
+          has_more: false,
+        }),
+    };
+    const record = await waitForOfficialSteerUserMessage(client, "s1", "顺便把版本迭代到162行吗", startedAt, {
+      timeoutMs: 100,
+      intervalMs: 10,
+    });
+    expect(record).not.toBeNull();
+    expect(record).toMatchObject({ messageId: "msg_confirm", source: "server-confirm" });
+  });
 });

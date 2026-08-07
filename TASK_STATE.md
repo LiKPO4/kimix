@@ -1,4 +1,19 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：阶段 3 低级项一批（21 项，v2.20.266）
+
+- 已修 20 项（16 项子代理分区、4 项主理，关键结论已抽查复核）：
+  - B1 watch TTL：postTerminalExternalWatch 原「观察不设过期」，会话废弃后 Map 只增不减且每 30s 空探；加 30min TTL 淘汰（entry 加 armedAt）+ TTL 用例。B4 顺手删 deliver() 里 kimix.server.snapshot 删 watch 的死分支（该帧只在 recoverSnapshot 直发，不经 deliver）。
+  - B2 会话级状态清理：新模块 kimiCodeSessionState.ts（forgetSessionState），host 5 个会话销毁/迁移调用点接线 + 5 测试。
+  - B3 steerConfirm 时钟校准：本地钟偏快时确认消息被误判为旧消息；首探未命中后用官方最大时间戳覆盖基线（校准放内容匹配之后，避免吸收确认消息自身时间戳）。
+  - B5 projectService untracked 目录过滤 isDirectory + 集成测试；B6 getMcpStartupMetrics 补 resolveMigratedSessionId（与 listMcpServers 同款）。
+  - C2 sessionMetrics：通知摘要文案（「后台任务已完成：…」等前缀）作为唯一/首元素时不再原样泄漏进轮末信息卡 message，token 指标保留；acc 分支同步剥通知文案。
+  - C4 liveTurnDiag 两个 anchor Map FIFO 200 key 上限；C5 turnBlocks nearDuplicate 升级分支不再动 textBoundaryPending；C6 attachedSteers 死路径删除；C7 AssistantProcessBlock memo 比较器补 event.content。
+  - D1 互斥空态复位：backgroundTasks 新 pruneHiddenTaskKeysWhenEmpty + AppShell effect，任务列表清空时自动解除 hidden（否则「恢复胶囊」入口不可达只能重启）；D2 胶囊面板 maxHeight 改 min(342px, calc(100vh - 220px)) 防矮窗口裁顶；D3 SettingsPanel 权限变更 try/finally + 新测试文件；D4 AppShell 后台任务刷新会话守卫 ref 三处比对（无测试基建，仅 typecheck+逻辑论证）。
+  - E1 胶囊展开色走 --ui-toggle-color；E2 nostalgia settings-input 焦点 1px 点线 outline；E3 --ui-radius-xl 三处规则 fallback 12/10px 改 20px。
+- 跳过 3 项：C1 按停止规则——kimix.turn.model 信号只带 {model, phase}，host 无轮次起始追踪，渲染层纯启发式无法区分「刚完成的 settle 轮」与「流式中的下一轮」，正确修复需跨进程信号扩展，超出低级项范围；残留场景由历史对账 backfill 自愈。D5 前提不成立（latest_chat_id 全仓不存在）。E4 证伪（z-20 会盖滚动到底按钮）。
+- 方案偏离说明：E3 有意不改 :root 定义 --ui-radius-xl，避免 105 处 rounded-xl 工具类全站漂移（tailwind.config.ts），只改用到该令牌的三处规则 fallback。
+- 阶段 3 收尾：全量 164 文件 1702 例全绿、两套 typecheck 通过、pnpm build 通过（新 hash）。E 项样式仅代码自查，视觉验收留用户截图。
+
 ## 2026-08-06 修复：阶段 2 渲染内存与测试保护（A4+A5+A6，v2.20.265）
 
 - A4：`committedSegments` 只增不减（生产零清理）。修复：LRU 上限 40，take 时 delete+set 移到最新、超限从 oldest 淘汰。未按原设想挂 turn 终态/会话切换清理——会话切换时后台会话可能仍在流式、turn 刚结束时迟到 resync 重放仍依赖条目，两钩子都不安全；被淘汰旧 turn 的重放由 formalCoverage 兜底。新增 LRU 淘汰回归 1 例。

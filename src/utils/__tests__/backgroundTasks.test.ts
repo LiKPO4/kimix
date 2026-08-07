@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, splitBackgroundTasksByKind } from "../backgroundTasks";
+import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, pruneHiddenTaskKeysWhenEmpty, splitBackgroundTasksByKind } from "../backgroundTasks";
 
 describe("splitBackgroundTasksByKind", () => {
   it("subagent 进子 Agent 组，bash/tool/未知/缺失 kind 进后台 Bash 组", () => {
@@ -69,5 +69,49 @@ describe("hasRunningBackgroundBashTask", () => {
     expect(hasRunningBackgroundBashTask([
       { taskId: "sub-running", subagentType: "subagent", status: "running" },
     ])).toBe(false);
+  });
+});
+
+describe("pruneHiddenTaskKeysWhenEmpty", () => {
+  it("bash 任务列表为空时从 hidden keys 中移除 bash", () => {
+    expect(pruneHiddenTaskKeysWhenEmpty([], ["bash", "subagent", "todo"] as const)).toEqual(["todo"]);
+    expect(pruneHiddenTaskKeysWhenEmpty(
+      [{ taskId: "sub-1", subagentType: "subagent" }],
+      ["bash", "subagent"] as const,
+    )).toEqual(["subagent"]);
+  });
+
+  it("subagent 任务列表为空时从 hidden keys 中移除 subagent", () => {
+    expect(pruneHiddenTaskKeysWhenEmpty(
+      [{ taskId: "bash-1", subagentType: "bash" }],
+      ["bash", "subagent", "todo"] as const,
+    )).toEqual(["bash", "todo"]);
+  });
+
+  it("两类任务都存在时保持 hidden keys 不变", () => {
+    const hidden = ["bash", "subagent", "todo"] as const;
+    const pruned = pruneHiddenTaskKeysWhenEmpty(
+      [
+        { taskId: "bash-1", subagentType: "bash" },
+        { taskId: "sub-1", subagentType: "subagent" },
+      ],
+      hidden,
+    );
+    expect(pruned).toEqual(hidden);
+    expect(pruned).not.toBe(hidden);
+  });
+
+  it("未知 kind 任务归入 bash 组：只有 tool 任务时移除 subagent key 并保留 bash key", () => {
+    expect(pruneHiddenTaskKeysWhenEmpty(
+      [{ taskId: "tool-1", subagentType: "tool" }],
+      ["bash", "subagent"] as const,
+    )).toEqual(["bash"]);
+  });
+
+  it("空 hidden keys 返回空数组且不修改入参", () => {
+    expect(pruneHiddenTaskKeysWhenEmpty([], [])).toEqual([]);
+    const tasks = [{ taskId: "bash-1", subagentType: "bash" }];
+    pruneHiddenTaskKeysWhenEmpty(tasks, ["bash"]);
+    expect(tasks).toEqual([{ taskId: "bash-1", subagentType: "bash" }]);
   });
 });

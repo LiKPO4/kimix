@@ -49,13 +49,18 @@ export async function waitForOfficialSteerUserMessage(
   const timeoutMs = options?.timeoutMs ?? STEER_CONFIRM_TIMEOUT_MS;
   const intervalMs = options?.intervalMs ?? STEER_CONFIRM_INTERVAL_MS;
   const deadline = Date.now() + timeoutMs;
+  // 时钟校准：首次探测后若未命中，用官方时间戳最大的一条覆盖本地基线（与
+  // kimiCodeServerClient.calibrateLivePostTerminalWatchToOfficialTime 同款），避免
+  // 本地时钟偏快时把引导后落库的确认消息误判为旧消息；失败保持本地时间基线。
+  let baseline = startedAt;
+  let calibrated = false;
   while (Date.now() <= deadline) {
     const result = await client.listMessages(sessionId, 100).catch(() => null);
     if (result?.items) {
       for (const item of result.items) {
         if (item.role !== "user") continue;
         const createdAt = Date.parse(item.created_at);
-        if (!Number.isFinite(createdAt) || createdAt <= startedAt) continue;
+        if (!Number.isFinite(createdAt) || createdAt <= baseline) continue;
         const normalized = normalizeSteerText(steerUserMessageText(item.content));
         if (!normalized) continue;
         if (
@@ -70,6 +75,19 @@ export async function waitForOfficialSteerUserMessage(
             messageId: item.id,
             source: "server-confirm",
           };
+        }
+      }
+      // 校准放在内容匹配之后：校准响应若已含确认消息（确认消息先于首轮探测落库），
+      // 先匹配仍能命中；未命中才校准，避免把确认消息自身时间戳吸收进基线造成漏检。
+      if (!calibrated) {
+        let latestAt: number | undefined;
+        for (const item of result.items) {
+          const at = Date.parse(item.created_at);
+          if (Number.isFinite(at) && (latestAt === undefined || at > latestAt)) latestAt = at;
+        }
+        if (latestAt !== undefined) {
+          baseline = latestAt;
+          calibrated = true;
         }
       }
     }

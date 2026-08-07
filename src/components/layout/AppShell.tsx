@@ -23,7 +23,7 @@ import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
 import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
+import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, pruneHiddenTaskKeysWhenEmpty, splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import { collectSessionDiffs } from "@/utils/diff";
 import { TopMenuBar, type MenuEntry, type MenuAction } from "./TopMenuBar";
@@ -990,6 +990,12 @@ export function AppShell() {
   // 后台任务拉取目标：长程任务仍取执行器会话，普通会话取当前会话的 runtime 会话（无则视为不可用）
   const backgroundTasksRuntimeSessionId = longTaskMeta?.executorSessionId
     ?? (liveCurrentSession ? getRuntimeSessionId(liveCurrentSession) : null);
+  // 后台任务刷新的会话守卫：请求发起时捕获 runtime sessionId，响应落地前与当前值比对，
+  // 不一致说明已切换会话，旧响应直接丢弃（ref 渲染期同步，异步回调闭包内也能读到最新值）。
+  const backgroundTasksRuntimeSessionIdRef = useRef(backgroundTasksRuntimeSessionId);
+  useEffect(() => {
+    backgroundTasksRuntimeSessionIdRef.current = backgroundTasksRuntimeSessionId;
+  }, [backgroundTasksRuntimeSessionId]);
   const liveCurrentSessionProjectPath = liveCurrentSession?.projectPath;
   const parsedLongTaskDetail = useMemo(() => parseLongTaskDetail(longTaskDetail), [longTaskDetail]);
   const reviewedReviewItems = useMemo(() => new Set((longTaskMeta?.reviewedReviewItems ?? []).map(normalizeReviewItem)), [longTaskMeta?.reviewedReviewItems]);
@@ -1393,6 +1399,7 @@ ${isFinalStep
       Boolean(target.runtimeSessionId) &&
       list.findIndex((item) => item.runtimeSessionId === target.runtimeSessionId) === index
     ));
+    const requestedRuntimeSessionId = targets[0]?.runtimeSessionId ?? null;
     if (!options?.silent) setLongTaskBackgroundTasksLoading(true);
     setLongTaskBackgroundTasksError(null);
     return Promise.all(targets.map(async (target) => {
@@ -1408,10 +1415,14 @@ ${isFinalStep
         runtimeSessionId: target.runtimeSessionId,
       }));
     })).then((groups) => {
+      // 会话已切换则丢弃旧响应，避免旧会话的任务列表覆盖新会话
+      if (requestedRuntimeSessionId !== backgroundTasksRuntimeSessionIdRef.current) return;
       const tasks = groups.flat().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
       setLongTaskBackgroundTasks(tasks);
       syncSessionRunningBackgroundBash(tasks);
     }).catch((err: unknown) => {
+      // 会话已切换：旧会话的错误/空态回落不得覆盖新会话状态
+      if (requestedRuntimeSessionId !== backgroundTasksRuntimeSessionIdRef.current) return;
       // 会话未激活/不存在是闲置会话的正常状态，静默回落为空态，不作为错误暴露给用户
       if (isKimiCodeSessionUnavailableError(err)) {
         setLongTaskBackgroundTasks([]);
@@ -1421,6 +1432,8 @@ ${isFinalStep
       }
       setLongTaskBackgroundTasksError(err instanceof Error ? err.message : String(err));
     }).finally(() => {
+      // stale 请求不碰 loading：新会话的刷新自行管理
+      if (requestedRuntimeSessionId !== backgroundTasksRuntimeSessionIdRef.current) return;
       if (!options?.silent) setLongTaskBackgroundTasksLoading(false);
     });
   }, [
@@ -1435,6 +1448,17 @@ ${isFinalStep
   );
 
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
+  // 互斥空态自动复位：bash/subagent 任务列表变空时侧栏块随之消失，「恢复胶囊」入口不可达；
+  // 若不清理 hidden 状态，下次同类任务出现时胶囊仍被隐藏（只能重启复位）。在任务状态
+  // 更新处做派生清理，不在渲染层打补丁。
+  useEffect(() => {
+    const hiddenKeys = hiddenComposerCards[composerCardSessionId] ?? [];
+    const pruned = pruneHiddenTaskKeysWhenEmpty(longTaskBackgroundTasks, hiddenKeys);
+    if (pruned.length === hiddenKeys.length) return;
+    for (const key of hiddenKeys) {
+      if (!pruned.includes(key)) setComposerCardHidden(composerCardSessionId, key, false);
+    }
+  }, [longTaskBackgroundTasks, hiddenComposerCards, composerCardSessionId, setComposerCardHidden]);
   const hiddenComposerCardEntries = [
     hiddenComposerCardList.includes("todo") && latestTodos.length > 0
       ? {

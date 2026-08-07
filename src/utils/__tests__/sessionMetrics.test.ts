@@ -121,6 +121,22 @@ describe("getLatestMetricStatus", () => {
 });
 
 describe("mergeMetricStatusUpdates", () => {
+  it("strips a notification summary message even when it is the only/first status (review C2)", () => {
+    const merged = mergeMetricStatusUpdates([{
+      id: "usage",
+      type: "status_update",
+      timestamp: 1,
+      message: "后台任务已完成：构建 RemoveBlack",
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+    }]);
+    expect(merged).toMatchObject({
+      inputTokenCount: 29_451,
+      tokenCount: 822,
+    });
+    expect(merged?.message).toBeUndefined();
+  });
+
   it("keeps model and token usage when a later status only updates context", () => {
     const merged = mergeMetricStatusUpdates([{
       id: "usage",

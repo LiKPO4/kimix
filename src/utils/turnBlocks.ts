@@ -150,7 +150,9 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
             nearDuplicate.events.push(event);
             nearDuplicate.content = content;
           }
-          textBoundaryPending = false;
+          // 不得改动 textBoundaryPending：冗余段跳过/升级只处理正文本身，若此前
+          // 发生过空内容 step 边界（标记为 true），下一条 text 仍必须另起一块，
+          // 否则会跨 step 合并进前一个 text 块。
           continue;
         }
         const tail = blocks.at(-1);

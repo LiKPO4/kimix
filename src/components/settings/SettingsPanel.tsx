@@ -1201,38 +1201,41 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     permissionMutationInFlightRef.current = true;
-    const res = await setKimiCodePermissionWithRecovery({
-      sessionId: runtimeSessionId,
-      mode,
-      projectPath: targetSession.projectPath,
-      additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
-      setPermission: window.api.setKimiCodePermission,
-      resumeSession: window.api.resumeKimiCodeSession,
-    });
-    permissionMutationInFlightRef.current = false;
-    if (!res.success) {
-      if (isKimiCodeSessionUnavailableError(res.error)) {
-        // 会话不可用：保留本地值，下次发消息时生效（与 Composer 路径一致）
-        writeLocal();
-        const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
+    try {
+      const res = await setKimiCodePermissionWithRecovery({
+        sessionId: runtimeSessionId,
+        mode,
+        projectPath: targetSession.projectPath,
+        additionalWorkDirs: normalizeAdditionalWorkDirs(appState.additionalWorkDirs),
+        setPermission: window.api.setKimiCodePermission,
+        resumeSession: window.api.resumeKimiCodeSession,
+      });
+      if (!res.success) {
+        if (isKimiCodeSessionUnavailableError(res.error)) {
+          // 会话不可用：保留本地值，下次发消息时生效（与 Composer 路径一致）
+          writeLocal();
+          const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
+          window.dispatchEvent(new CustomEvent("kimix:toast", {
+            detail: `权限已设为${modeLabel}，将在下次发消息时生效`,
+          }));
+          return;
+        }
+        // 仅当全局值仍是本次写入的目标时回滚；若用户期间又改了（或守卫外路径
+        // 写入），不得把别人的新值回滚掉。
+        if (useAppStore.getState().permissionMode === mode) setPermissionMode(globalBefore);
         window.dispatchEvent(new CustomEvent("kimix:toast", {
-          detail: `权限已设为${modeLabel}，将在下次发消息时生效`,
+          detail: `权限切换失败：${res.error}`,
         }));
         return;
       }
-      // 仅当全局值仍是本次写入的目标时回滚；若用户期间又改了（或守卫外路径
-      // 写入），不得把别人的新值回滚掉。
-      if (useAppStore.getState().permissionMode === mode) setPermissionMode(globalBefore);
+      writeLocal();
+      const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
       window.dispatchEvent(new CustomEvent("kimix:toast", {
-        detail: `权限切换失败：${res.error}`,
+        detail: `权限模式已切换为${modeLabel}`,
       }));
-      return;
+    } finally {
+      permissionMutationInFlightRef.current = false;
     }
-    writeLocal();
-    const modeLabel = permissions.find((opt) => opt.value === mode)?.label ?? mode;
-    window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: `权限模式已切换为${modeLabel}`,
-    }));
   };
 
   const notificationModes: { value: NotificationMode; label: string; desc: string }[] = [

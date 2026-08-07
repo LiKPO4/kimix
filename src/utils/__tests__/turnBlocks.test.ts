@@ -269,6 +269,28 @@ describe("buildTurnBlocks", () => {
     expect(textBlocks[0].content).toContain("两个问题的调查");
     expect(textBlocks[1].content).toContain("两路调查都拿到了精确根因");
   });
+
+  it("keeps the step boundary when a redundant segment is skipped (boundary not reset)", () => {
+    // 回归（C5）：空内容 step 边界事件置起 textBoundaryPending 后，若紧跟着的
+    // 是前缀冗余段（被跳过/升级），旧实现会在 continue 前把标记重置为 false，
+    // 导致下一条 text 跨 step 合并进前一个 text 块。这里边界后先跳过冗余段，
+    // 再出现新 text，必须仍另起一块。
+    const fullText = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面：`RemoveBlack-v1.6.1-ai-test.exe`（98.8MB，带 AI 模型的最新构建产物，刚才是否完全删除了？）";
+    const strandedPrefix = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面。";
+    const events: TimelineEvent[] = [
+      assistant("a-full", fullText),
+      assistant("a-boundary", "", undefined, nextTimestamp()),
+      assistant("a-stranded", strandedPrefix),
+      assistant("a-next", "新步骤正文：这是边界之后的新段落。"),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    // 冗余前缀段被跳过（只保留完整段），但 step 边界标记必须保持：新 text 另起一块
+    expect(textBlocks).toHaveLength(2);
+    expect(textBlocks[0].content).toContain("RemoveBlack-v1.6.1-ai-test.exe");
+    expect(textBlocks[0].content).not.toContain("新步骤正文");
+    expect(textBlocks[1].content).toBe("新步骤正文：这是边界之后的新段落。");
+  });
 });
 
 describe("buildRenderItems with official-order turn", () => {

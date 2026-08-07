@@ -16,6 +16,7 @@ import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import { findOfficialCompactionResult, type OfficialCompactionResult } from "./compactionWire";
 import { waitForOfficialSteerUserMessage } from "./steerConfirm";
 import { isDaemonLevelPromoteError, PromoteFailureBackoff } from "./kimiCodePromotePolicy";
+import { forgetSessionState, type SessionScopedState } from "./kimiCodeSessionState";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -777,6 +778,14 @@ function cleanupSessionMigrationEntries(sessionId: string): void {
 }
 
 const serverQuestionRequests = new Map<string, Record<string, unknown>>();
+// 会话关闭/删除时统一清理的按会话作用域状态表（清理逻辑见 kimiCodeSessionState.ts）。
+const sessionScopedState: SessionScopedState = {
+  fingerprintBySession: snapshotReplayFingerprints,
+  latestMessageIdBySession: lastSnapshotLatestMessageIds,
+  approvalKeys: serverApprovalIds,
+  questionKeys: serverQuestionIds,
+  questionRequests: serverQuestionRequests,
+};
 let serverClient: KimiCodeServerClient | null = null;
 let unsubscribeServerFrames: (() => void) | null = null;
 let serverRecoveryPromise: Promise<void> | null = null;
@@ -1403,6 +1412,7 @@ export async function sendPrompt(
       statusSink?.({ sessionId, status: "error", migratedTo: fallbackSession.sessionId });
       markServerRuntimeFailure(error);
       serverSessions.delete(sessionId);
+      forgetSessionState(sessionScopedState, sessionId);
       setStatus(sessionId, "error");
       throw error;
     }
@@ -1831,6 +1841,7 @@ export async function archiveSession(sessionId: string): Promise<void> {
   if (managed) {
     await getServerClient().archiveSession(sessionId);
     serverSessions.delete(sessionId);
+    forgetSessionState(sessionScopedState, sessionId);
     settlePendingForSession(sessionId, "cancelled");
     await getServerClient().unsubscribe(sessionId).catch((error) => {
       console.warn(`[KimiCodeServerHost] unsubscribe archived session ${sessionId} failed:`, error);
@@ -2110,6 +2121,7 @@ export async function listMcpServers(sessionId: string): Promise<KimiCodeMcpServ
 }
 
 export async function getMcpStartupMetrics(sessionId: string): Promise<KimiCodeMcpStartupMetrics> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) throw new Error("当前官方 Server 会话未提供 MCP 启动指标；该数据仅由兼容链路提供。");
   const managed = getManagedSession(sessionId);
   if (!managed.session.getMcpStartupMetrics) throw new Error("当前兼容链路不支持读取 MCP 启动指标。");
@@ -2832,6 +2844,7 @@ export async function closeSession(sessionId: string): Promise<void> {
   sdkPinnedSessionIds.delete(sessionId);
   if (serverSessions.has(sessionId)) {
     serverSessions.delete(sessionId);
+    forgetSessionState(sessionScopedState, sessionId);
     await getServerClient().unsubscribe(sessionId);
     if (serverSessions.size === 0) {
       unsubscribeServerFrames?.();
@@ -2845,6 +2858,7 @@ export async function closeSession(sessionId: string): Promise<void> {
   const managed = sessions.get(sessionId);
   if (!managed) {
     cleanupSessionMigrationEntries(sessionId);
+    forgetSessionState(sessionScopedState, sessionId);
     return;
   }
   sessions.delete(sessionId);
@@ -2852,6 +2866,7 @@ export async function closeSession(sessionId: string): Promise<void> {
   managed.unsubscribe();
   await managed.session.close();
   cleanupSessionMigrationEntries(sessionId);
+  forgetSessionState(sessionScopedState, sessionId);
 }
 
 export async function closeAllSessions(): Promise<void> {
