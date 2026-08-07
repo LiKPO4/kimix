@@ -45,7 +45,6 @@ import { settleInactiveEvents } from "@/utils/eventHelpers";
 import { formatReleaseDate } from "@/utils/format";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
-import { displayProjectName } from "@/utils/projectDisplay";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
@@ -199,11 +198,6 @@ function suggestGitCommitMessage(files: GitStatusFile[]) {
   if (files.every((file) => /\.(md|mdx|txt)$/i.test(file.path))) return "更新文档说明";
   if (files.every((file) => /\.(css|scss|less|tsx|jsx)$/i.test(file.path))) return "优化界面交互";
   return "更新 Git 工作区改动";
-}
-
-function projectNameFromPath(projectPath: string) {
-  const normalized = projectPath.replace(/[\\/]+$/, "");
-  return normalized.split(/[\\/]/).pop() || projectPath;
 }
 
 interface LongTaskInspectorPanelProps {
@@ -523,11 +517,6 @@ export function LongTaskInspectorPanel({
     void loadKimiHealth();
   }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
   const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
-  const gitProjectLabel = projectPathForGit && currentProject?.path === projectPathForGit
-    ? displayProjectName(currentProject, projectNameFromPath(projectPathForGit))
-    : projectPathForGit
-      ? projectNameFromPath(projectPathForGit)
-      : "";
   const displaySessionDiffs = useMemo(
     () => alignSessionDiffsToGitStatus(sessionDiffs, gitStatus),
     [sessionDiffs, gitStatus],
@@ -1956,15 +1945,24 @@ export function LongTaskInspectorPanel({
               </div>
             </section>
             <section className="kimix-section-card" {...rightCardSectionProps("git", 3, { padding: "16px 16px 18px" })}>
-              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 96px) auto", columnGap: 10 }}>
+              <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 10 }}>
                 <div className="flex min-w-0 items-center" style={{ gap: 8 }}>
                   <GitBranch size={15} className="shrink-0 text-accent-primary" />
                   <div className="text-[13px] font-medium leading-5 text-text-muted">Git</div>
                 </div>
-                <div className="min-w-0 truncate text-right text-[13px] font-medium leading-5 text-text-muted" title={projectPathForGit}>
-                  {gitProjectLabel}
+                <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={!projectPathForGit || gitBusy !== null}
+                    onClick={() => void refreshGitInfo()}
+                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    title="刷新"
+                    aria-label="刷新"
+                  >
+                    <RefreshCw size={13} className={gitBusy === "refresh" ? "kimix-spin" : ""} />
+                  </button>
+                  {rightCardDragHandle("git", "Git")}
                 </div>
-                {rightCardDragHandle("git", "Git")}
               </div>
               <div className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
                 <div className="kimix-inset-section bg-surface-base text-[13px] leading-5" style={{ padding: "12px 12px" }}>
@@ -1982,10 +1980,7 @@ export function LongTaskInspectorPanel({
                   </div>
                   {gitError && <div className="mt-2 line-clamp-2 text-[12.5px] leading-5 text-accent-danger">{gitError}</div>}
                 </div>
-                <div
-                  className="grid"
-                  style={{ gridTemplateColumns: width < 340 ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", gap: 8 }}
-                >
+                <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
                   <button
                     type="button"
                     disabled={!projectPathForGit || gitBusy !== null}
@@ -2006,18 +2001,6 @@ export function LongTaskInspectorPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
-                    onClick={() => void pushGit()}
-                    className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
-                    style={{ gridColumn: width < 340 ? "1 / -1" : undefined }}
-                  >
-                    {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
-                    <span>推送</span>
-                  </button>
-                </div>
-                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <button
-                    type="button"
                     disabled={!projectPathForGit}
                     onClick={openGitGraph}
                     className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-accent-primary disabled:cursor-not-allowed disabled:opacity-55"
@@ -2027,13 +2010,12 @@ export function LongTaskInspectorPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={!projectPathForGit || gitBusy !== null}
-                    onClick={() => void refreshGitInfo()}
-                    className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
-                    title="刷新"
-                    aria-label="刷新"
+                    disabled={!projectPathForGit || gitBusy !== null || (!gitUpstream && !gitRemoteName)}
+                    onClick={() => void pushGit()}
+                    className="kimix-icon-text-button kimix-inspector-action is-compact justify-center text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
                   >
-                    {gitBusy === "refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    {gitBusy === "push" ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpFromLine size={14} />}
+                    <span>推送</span>
                   </button>
                 </div>
               </div>

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 调整：侧栏 Git 卡布局——刷新上移头部、图谱/推送同行（v2.20.275）
+
+- 需求：Git 卡刷新按钮从底部移到头部拖拽钮左侧（替代项目目录文本，与 Kimi Code 卡同构）；图谱与推送放一行，推送恢复正常半宽。
+- 修法：`LongTaskInspectorPanel.tsx` Git 卡头部改为 `[标题, 刷新+拖拽]` 两列；按钮区合并为单一 2 列 grid（详情/拉取、图谱/推送），去掉窄宽时推送独占整行的 `gridColumn` 逻辑；清理随之失效的 `gitProjectLabel`、`projectNameFromPath`、`displayProjectName` 导入。
+- 验收：typecheck、全量 vitest、build 通过；视觉待用户截图。
+
+
 ## 2026-08-07 修复：思考强度运行中可预切换（v2.20.274）
 
 - 根因：`Composer.tsx` `handleSetThinkingEffort` 首行 `if (isMutationOwnerRunning) return;`（自 a91929e4 引入起就存在的保守拦截），运行中点击菜单项被静默吞掉，菜单不关、显示不变，与按钮 tooltip「运行中切换将从下一轮生效」的承诺矛盾。
