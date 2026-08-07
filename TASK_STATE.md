@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：思考强度运行中可预切换（v2.20.274）
+
+- 根因：`Composer.tsx` `handleSetThinkingEffort` 首行 `if (isMutationOwnerRunning) return;`（自 a91929e4 引入起就存在的保守拦截），运行中点击菜单项被静默吞掉，菜单不关、显示不变，与按钮 tooltip「运行中切换将从下一轮生效」的承诺矛盾。
+- 依据：SDK/server 两侧 `setThinking` 均为 profile 级写入（`IAgentProfileService.setThinking` / `updateSession`），无轮次守卫；当前轮继续用旧值，下一轮生效——正是预切换语义。权限模式早已按同语义放开。
+- 修法：移除拦截；成功 toast 在运行中追加「，将从下一轮生效」。显示链路（`setActiveThinkingEffort` + `setDefaultThinkingEffort`）即时更新按钮标签。
+- 验收：typecheck、全量 vitest、build 通过；实机复验待用户。
+
+
 ## 2026-08-07 修复：数字输入框逐键 clamp 吞中间态（v2.20.273）
 
 - 问题：设置「界面字号」无法正常输入——受控值直连 store，store setter 每键 clamp 到 [11,20]，输 15 时第一个字符「1」先被压成 11、补一位又顶到 20。

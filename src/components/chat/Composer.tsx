@@ -3945,7 +3945,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const handleSetThinkingEffort = async (requestedEffort: string) => {
-    if (isMutationOwnerRunning) return;
     const effort = resolveThinkingEffort(requestedEffort, thinkingEffortOptions, thinkingModelOption?.defaultEffort);
     const previousEffort = activeThinkingEffort;
     setShowThinkingMenu(false);
@@ -3968,8 +3967,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       }
     }
     const ownerLabel = activeMutationOwner?.displayName;
+    const runningSuffix = isMutationOwnerRunning ? "，将从下一轮生效" : "";
     window.dispatchEvent(new CustomEvent("kimix:toast", {
-      detail: `${ownerLabel ? `${ownerLabel} · ` : ""}思考强度已设为${thinkingEffortLabel(effort)}`,
+      detail: `${ownerLabel ? `${ownerLabel} · ` : ""}思考强度已设为${thinkingEffortLabel(effort)}${runningSuffix}`,
     }));
   };
 
