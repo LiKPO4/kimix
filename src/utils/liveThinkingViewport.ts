@@ -1,3 +1,5 @@
+import { groupTurnBlocks, type TurnBlock } from "./turnBlocks";
+
 export const LIVE_THINKING_LINE_HEIGHT_PX = 24;
 export const LIVE_THINKING_MAX_LINES = 5;
 export const LIVE_THINKING_MAX_HEIGHT_PX = LIVE_THINKING_LINE_HEIGHT_PX * LIVE_THINKING_MAX_LINES;
@@ -52,6 +54,41 @@ export function shouldUseLiveThinkingViewport({
   // (official kimi-web behavior); keeping every phase in a live scroll box
   // leaves permanent scrollbars on completed reasoning.
   return (preserveDuringFinalTransition || isActiveAssistant) && isThinkingGroup && groupIndex === groupCount - 1;
+}
+
+/**
+ * 活跃 turn 的思考 draft 尾巴是否应并入正式时间线尾部思考组的同一个 5 行
+ * 滚动窗渲染（与已提交段首尾相接成一条连续流）。
+ * 此前 draft 尾巴固定由 LiveDraftTail 的独立 LiveThinkingPre 渲染：正式帧
+ * 一到，缓冲 draft 提交成正式思考段（已占尾部 live 滚动窗），续流 draft
+ * 又在下方新开一个滚动窗——两个窗堆叠，先提交的短段（常是整段输出的第一
+ * 句）悬在上方、不随下面的大块续流滚动。归位条件与
+ * shouldUseLiveThinkingViewport 完全一致：末尾组是思考组且仍处于 live 状态。
+ */
+export function shouldMergeLiveThinkingDraftIntoTimeline({
+  blocks,
+  isActiveAssistant,
+  hasFinalContent,
+  preserveDuringFinalTransition = false,
+}: {
+  blocks: TurnBlock[] | undefined;
+  isActiveAssistant: boolean;
+  hasFinalContent: boolean;
+  preserveDuringFinalTransition?: boolean;
+}) {
+  if (!blocks || blocks.length === 0) return false;
+  const groups = groupTurnBlocks(blocks);
+  const lastIndex = groups.length - 1;
+  const last = groups[lastIndex];
+  if (!last || last.type !== "thinking") return false;
+  return shouldUseLiveThinkingViewport({
+    groupIndex: lastIndex,
+    groupCount: groups.length,
+    isThinkingGroup: true,
+    isActiveAssistant,
+    hasFinalContent,
+    preserveDuringFinalTransition,
+  });
 }
 
 export function shouldSubscribeActiveTurnDraft({

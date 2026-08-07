@@ -42,6 +42,7 @@ import {
   resolveHasFinalProcessContent,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
+  shouldMergeLiveThinkingDraftIntoTimeline,
   shouldSubscribeActiveTurnDraft,
   shouldUseLiveThinkingViewport,
 } from "@/utils/liveThinkingViewport";
@@ -1339,7 +1340,7 @@ export function KimiWebIntermediateTextBlock({ content, streaming = false }: { c
   );
 }
 
-function KimiWebThinkingBlock({ blocks, isLive }: { blocks: ThinkingBlock[]; isLive: boolean }) {
+function KimiWebThinkingBlock({ blocks, isLive, liveDraftKey }: { blocks: ThinkingBlock[]; isLive: boolean; liveDraftKey?: string | null }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const dedupedBlocks = useMemo(() => {
@@ -1419,6 +1420,9 @@ function KimiWebThinkingBlock({ blocks, isLive }: { blocks: ThinkingBlock[]; isL
       {dedupedBlocks.map((block) => (
         <KimiWebThinkingItem key={block.id} block={block} isLive={isLive} />
       ))}
+      {isLive && liveDraftKey ? (
+        <LiveThinkingDraftTail draftKey={liveDraftKey} viewportRef={viewportRef} followLatestRef={followLatestRef} />
+      ) : null}
     </div>
   );
 }
@@ -1430,10 +1434,12 @@ function KimiWebThinkingBlock({ blocks, isLive }: { blocks: ThinkingBlock[]; isL
  * 做法），settle 后由正式路径（buildThinkingBlocks 折叠 teaser）接管。
  * showTextTail：仅当正式 turnBlocks 存在时在时间线内流式正文 tail（与现状
  * mergeLiveDraftBlocks 的 text 块语义一致）；无正式块时正文只出现在正文区。
+ * suppressThinking：尾部正式思考组仍处于 live 滚动窗时，draft 思考已并入
+ * 该组滚动窗（LiveThinkingDraftTail），这里不再单开第二个滚动窗。
  */
-function LiveDraftTail({ draftKey, isActiveAssistant, showTextTail }: { draftKey: string | null; isActiveAssistant: boolean; showTextTail: boolean }) {
+function LiveDraftTail({ draftKey, isActiveAssistant, showTextTail, suppressThinking = false }: { draftKey: string | null; isActiveAssistant: boolean; showTextTail: boolean; suppressThinking?: boolean }) {
   const activeDraft = useActiveTurnDraft(isActiveAssistant ? draftKey : null);
-  const thinkingText = activeDraft ? draftThinkingText(activeDraft) : "";
+  const thinkingText = activeDraft && !suppressThinking ? draftThinkingText(activeDraft) : "";
   const draftContent = activeDraft?.content?.trim() ? activeDraft.content : "";
   if (!thinkingText && !draftContent) return null;
   return (
@@ -1504,6 +1510,40 @@ function LiveThinkingPre({ text }: { text: string }) {
       >
         {text}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 活跃 turn 的思考 draft 尾巴，渲染进正式时间线尾部思考组的同一个 5 行
+ * 滚动窗：与已提交段首尾相接，合成一条连续流。订阅只下沉到本叶子，流式
+ * delta 每帧只重渲染这里；滚动跟随复用外层 viewport 的 followLatest 状态
+ * （用户上翻后不抢滚动）。
+ */
+function LiveThinkingDraftTail({
+  draftKey,
+  viewportRef,
+  followLatestRef,
+}: {
+  draftKey: string;
+  viewportRef: { current: HTMLDivElement | null };
+  followLatestRef: { current: boolean };
+}) {
+  const draft = useActiveTurnDraft(draftKey);
+  const text = draft ? draftThinkingText(draft) : "";
+  const textLength = text.length;
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !followLatestRef.current) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [textLength, viewportRef, followLatestRef]);
+  if (!text) return null;
+  return (
+    <div
+      className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
+      style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+    >
+      {text}
     </div>
   );
 }
@@ -2322,7 +2362,7 @@ export function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, 
  * bottom body Markdown so the answer stays in the answer area and is not
  * duplicated in the process detail.
  */
-function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
+function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false, liveThinkingDraftKey = null }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean; liveThinkingDraftKey?: string | null }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
   // 与正文区 computeFinalTextBlockContent 选中同一块：按块 key 跳过，不再按
   // "数组最后文本组"启发式。最后文本块后有迟到工具、或回放对账把旧时间戳
@@ -2349,18 +2389,20 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
             </div>
           );
         }
+        const isLiveGroup = shouldUseLiveThinkingViewport({
+          groupIndex: index,
+          groupCount: groups.length,
+          isThinkingGroup: group.type === "thinking",
+          isActiveAssistant,
+          hasFinalContent,
+          preserveDuringFinalTransition,
+        });
         return (
           <div key={group.key} data-kimix-event-ids={group.sourceEventIds.join(" ")}>
             <TurnBlocksProcessGroup
               group={group}
-              isLive={shouldUseLiveThinkingViewport({
-                groupIndex: index,
-                groupCount: groups.length,
-                isThinkingGroup: group.type === "thinking",
-                isActiveAssistant,
-                hasFinalContent,
-                preserveDuringFinalTransition,
-              })}
+              isLive={isLiveGroup}
+              liveThinkingDraftKey={isLiveGroup && group.type === "thinking" ? liveThinkingDraftKey : null}
             />
           </div>
         );
@@ -2369,10 +2411,10 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
   );
 }
 
-function TurnBlocksProcessGroup({ group, isLive }: { group: Exclude<TurnBlockGroup, { type: "text" }>; isLive: boolean }) {
+function TurnBlocksProcessGroup({ group, isLive, liveThinkingDraftKey = null }: { group: Exclude<TurnBlockGroup, { type: "text" }>; isLive: boolean; liveThinkingDraftKey?: string | null }) {
   switch (group.type) {
     case "thinking":
-      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} liveDraftKey={liveThinkingDraftKey} />;
     case "question":
       return <KimiWebQuestionGroupCard question={group.question} />;
     case "tool":
@@ -2502,6 +2544,15 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     expanded,
     manuallyExpanded: manuallyExpandedRef.current || manualExpandOverride === true,
   });
+  // 活跃 turn 尾部思考组仍处于 live 滚动窗时，draft 思考尾巴并入该组渲染
+  // （LiveThinkingDraftTail），LiveDraftTail 不再单开第二个滚动窗——否则已
+  // 提交短段（常是整段第一句）悬在上方、不随下面的续流大块滚动。
+  const mergeLiveThinkingDraft = shouldMergeLiveThinkingDraftIntoTimeline({
+    blocks: isKimiWeb && liveDraftKey ? effectiveTurnBlocks : undefined,
+    isActiveAssistant,
+    hasFinalContent,
+    preserveDuringFinalTransition: isFinalContentTransition,
+  });
 
   const dispatchProcessCollapseViewport = (
     phase: ChatProcessCollapseViewportDetail["phase"],
@@ -2627,6 +2678,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
                 isActiveAssistant={isActiveAssistant}
                 hasFinalContent={hasFinalContent}
                 preserveDuringFinalTransition={isFinalContentTransition}
+                liveThinkingDraftKey={mergeLiveThinkingDraft ? (liveDraftKey ?? null) : null}
               />
             ) : (
             <KimiWebProcessList
@@ -2641,6 +2693,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
             draftKey={liveDraftKey ?? null}
             isActiveAssistant={isActiveAssistant}
             showTextTail={Boolean(effectiveTurnBlocks?.length)}
+            suppressThinking={mergeLiveThinkingDraft}
           />
           {!isKimiWeb && (
             <button

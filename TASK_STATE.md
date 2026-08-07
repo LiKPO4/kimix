@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：流式思考首句孤立不随续流滚动——draft 思考并入尾部 live 思考组滚动窗（v2.20.278）
+
+- 现象：正在思考阶段，整段思考的第一句孤立悬在上方固定不动，下面大块续流在另一个 5 行滚动窗里滚动（用户截图红框确认孤立句是整段输出第一句）。
+- 根因：流式期间任何正式帧到达都会把缓冲 draft 提交成正式思考段（`commitActiveTurnDraftsToBatch` / useEventStream 身体帧提交路径）。已提交段进入正式 turnBlocks 尾部思考组并占用该组的 live 滚动窗（`KimiWebThinkingBlock` isLive），续流 draft 却由 `LiveDraftTail` 的独立 `LiveThinkingPre` 在下方再开一个滚动窗——两个窗堆叠，先提交的短段（常是第一句）只有一行、无滚动条，看起来固定不动、不随下文滚动。
+- 修法：新增 `shouldMergeLiveThinkingDraftIntoTimeline`（`liveThinkingViewport.ts`，条件与 `shouldUseLiveThinkingViewport` 一致：末尾组是思考组且 live）；为 true 时 draft 思考改由新叶子 `LiveThinkingDraftTail` 渲染进该组同一个滚动窗（draft 订阅下沉叶子、每帧只重渲染叶子，滚动跟随复用外层 `followLatestRef`），`LiveDraftTail` 以 `suppressThinking` 关闭自己的第二个滚动窗。
+- 验收：liveThinkingViewport 新增 3 例（末尾组非思考 / 非活跃轮 / 折叠过渡期），定向 21/21、typecheck 双配置、全量 vitest 1736/1736、build 均过；实机复验待用户（正在思考时长段思考应只有一个滚动窗、首句随流滚动）。
+
 ## 2026-08-07 修复：后台子代理/残留 running 工具挡住轮 settle，思考工具链不自动折叠（v2.20.277）
 
 - 根因：自动折叠只在 `hasFinalContent` false→true 跳变时触发（`shouldCollapseKimiWebProcessOnFinalContent`），而 `hasFinalContent = isComplete && !isActiveAssistant && hasContent`，`isActiveAssistant = !turnSettled`。`buildRenderItems` 的 `isSessionLevelTurnStopped` 要求 `!hasPendingToolOrSubagent`——轮内带 run_in_background 子代理（可能跑几十分钟）或残留 running 工具时，会话已停轮仍不 settle，折叠永不触发。

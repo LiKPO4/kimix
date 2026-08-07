@@ -9,6 +9,7 @@ import {
   resolveLiveThinkingBlockKey,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
+  shouldMergeLiveThinkingDraftIntoTimeline,
   shouldSubscribeActiveTurnDraft,
   shouldUseLiveThinkingViewport,
 } from "../liveThinkingViewport";
@@ -174,5 +175,66 @@ describe("resolveLiveTextBlockKey", () => {
     const blocks = buildTurnBlocks([segmentEvent]);
     expect(blocks[0]?.kind).toBe("text");
     expect(blocks[0]?.key).toBe(liveKey);
+  });
+});
+describe("shouldMergeLiveThinkingDraftIntoTimeline", () => {
+  const thinkingEvent = (id: string, text: string) => ({
+    id,
+    type: "assistant_message",
+    timestamp: 1,
+    content: "",
+    thinking: text,
+    isThinking: true,
+    isComplete: false,
+  }) as unknown as Parameters<typeof buildTurnBlocks>[0][number];
+  const toolEvent = (id: string) => ({
+    id,
+    type: "tool_call",
+    timestamp: 2,
+    toolName: "Read",
+    status: "completed",
+  }) as unknown as Parameters<typeof buildTurnBlocks>[0][number];
+
+  it("merges the draft tail into the trailing live thinking group while streaming", () => {
+    // 实机回归：正式帧把缓冲 draft 提交成正式思考段后，续流 draft 曾在下方
+    // 单开第二个滚动窗，先提交的短句（常是整段第一句）悬在上方不随下文滚动。
+    const blocks = buildTurnBlocks([thinkingEvent("e1", "第一句。后续思考")]);
+    expect(shouldMergeLiveThinkingDraftIntoTimeline({
+      blocks,
+      isActiveAssistant: true,
+      hasFinalContent: false,
+    })).toBe(true);
+  });
+
+  it("does not merge when the trailing group is not thinking or the turn settled", () => {
+    const thinkingOnly = buildTurnBlocks([thinkingEvent("e1", "思考")]);
+    // 非活跃轮：思考组落盘为折叠摘要，draft 尾巴仍由 LiveDraftTail 渲染。
+    expect(shouldMergeLiveThinkingDraftIntoTimeline({
+      blocks: thinkingOnly,
+      isActiveAssistant: false,
+      hasFinalContent: false,
+    })).toBe(false);
+    // 末尾组是工具：思考阶段已结束，无 live 滚动窗可并入。
+    const withTool = buildTurnBlocks([thinkingEvent("e1", "思考"), toolEvent("t1")]);
+    expect(shouldMergeLiveThinkingDraftIntoTimeline({
+      blocks: withTool,
+      isActiveAssistant: true,
+      hasFinalContent: false,
+    })).toBe(false);
+    expect(shouldMergeLiveThinkingDraftIntoTimeline({
+      blocks: undefined,
+      isActiveAssistant: true,
+      hasFinalContent: false,
+    })).toBe(false);
+  });
+
+  it("keeps merging during the final-content collapse transition", () => {
+    const blocks = buildTurnBlocks([thinkingEvent("e1", "思考")]);
+    expect(shouldMergeLiveThinkingDraftIntoTimeline({
+      blocks,
+      isActiveAssistant: false,
+      hasFinalContent: true,
+      preserveDuringFinalTransition: true,
+    })).toBe(true);
   });
 });
