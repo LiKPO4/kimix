@@ -1,4 +1,8 @@
 # Kimix 长程任务状态
+## 2026-08-06 修复：A3 turnBlocks 同段重放去重方向修正——反序不再丢完整正文（v2.20.263）
+
+- review A3。根因：同 turn 前缀去重对「既有段是新段前缀（新段更长）」方向也 continue 丢新段，反序到达（滞留短前缀先材料化、官方完整段后重放）时完整正文被丢成 35 字符开场白；且实机两段只差结尾标点（「桌面：」vs「桌面。」），严格 startsWith 双向都不匹配，只能靠 ≥20 字符长前缀兜底。修复：统一为 nearDuplicate 判定（相等/互为前缀/长前缀分叉），按长度保留更完整者——既有不短则跳过新段，新段更长则原位升级既有段（events.push + content 替换）。测试：新增反序回归 1 例，turnBlocks 39/39 通过。
+
 ## 2026-08-06 修复：A1 promote 失败不再全局杀 daemon（v2.20.262）
 
 - review A1。根因：`promoteSdkSessionToServer` catch 里凡非 404 一律 `markServerRuntimeFailure`，单个损坏会话（daemon 活着但 getSession 持续 500）让 10s 巡检每轮杀一次整个 daemon + 全部空闲会话迁 SDK，自维持循环。修复：新增纯策略模块 `electron/kimiCodePromotePolicy.ts`——`isDaemonLevelPromoteError` 只认明确网络/守护进程信号（fetch failed/ECONN*/WS 未连接等），其余一律会话级；`PromoteFailureBackoff` 指数退避（60s×4ⁿ 封顶 30min）。host 接线：会话级失败只跳过该会话+退避+warn 留痕，成功 promote 清零。测试：新增 6 例（分级+退避窗口/增长/封顶/清零/会话隔离）。

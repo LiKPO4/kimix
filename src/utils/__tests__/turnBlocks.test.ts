@@ -238,6 +238,24 @@ describe("buildTurnBlocks", () => {
     expect(kinds).toContain("tool");
   });
 
+  it("upgrades a stranded short prefix when the fuller replay arrives later (reverse order)", () => {
+    // A3 回归：滞留短前缀先材料化、官方完整段后重放（与 532ff5cb 相反的到达序）。
+    // 旧实现把更长的完整段当冗余丢弃，正文只剩 35 字符开场白。
+    const fullText = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面：`RemoveBlack-v1.6.1-ai-test.exe`（98.8MB，带 AI 模型的最新构建产物，刚才是否完全删除了？）";
+    const strandedPrefix = "你好霖江路。`dist/` 里的构建产物还在，我直接再复制一份到桌面。";
+    const events: TimelineEvent[] = [
+      assistant("a-stranded", strandedPrefix),
+      assistant("a-boundary", "", undefined, nextTimestamp()),
+      { id: "tool-grep", type: "tool_call", timestamp: nextTimestamp(), toolCallId: "call-grep", toolName: "Grep", status: "success", arguments: {}, rawArguments: "{}" } as ToolCallEvent,
+      assistant("a-full", fullText),
+    ];
+    const blocks = buildTurnBlocks(events);
+    const textBlocks = blocks.filter((b): b is Extract<TurnBlock, { kind: "text" }> => b.kind === "text");
+    // 残缺前缀被升级为完整段：仍只有一个 text 块，且内容是完整正文
+    expect(textBlocks).toHaveLength(1);
+    expect(textBlocks[0].content).toContain("RemoveBlack-v1.6.1-ai-test.exe");
+  });
+
   it("keeps genuinely different text segments even when they share an opening", () => {
     // 不同正文即使共享开头（如都以「你好霖江路。」开场）也不得被前缀去重误删。
     const events: TimelineEvent[] = [

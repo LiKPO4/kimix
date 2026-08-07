@@ -130,7 +130,13 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
         // 跳过与既有 text 段构成「长前缀重复」的冗余段（保留更完整者）；正常
         // 共享开场白（如「你好霖江路。」）不达阈值，不受影响。相邻 text 仍按
         // 原有规则合并。
-        const redundantPrefix = blocks.some((block) => block.kind === "text" && (
+        // 「同段重放」判定：完全相等、互为前缀、或共享长前缀后尾巴分叉（实机
+        // 532ff5cb 的「桌面：」vs「桌面。」只差结尾标点，严格 startsWith 两个
+        // 方向都匹配不上，必须靠长前缀兜底）。保留更完整者：既有段不短于新段
+        // → 跳过新段；新段更长（反序到达：滞留短前缀先材料化、官方完整段后
+        // 重放）→ 原位升级既有段。旧实现两个方向都跳过新段，反序时完整正文
+        // 被丢成 35 字符开场白（review A3）。
+        const nearDuplicate = blocks.find((block) => block.kind === "text" && (
           block.content === content ||
           block.content.startsWith(content) ||
           content.startsWith(block.content) ||
@@ -139,7 +145,11 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
             block.content.slice(0, MIN_REDUNDANT_TEXT_PREFIX) === content.slice(0, MIN_REDUNDANT_TEXT_PREFIX)
           )
         ));
-        if (redundantPrefix) {
+        if (nearDuplicate && nearDuplicate.kind === "text") {
+          if (content.length > nearDuplicate.content.length) {
+            nearDuplicate.events.push(event);
+            nearDuplicate.content = content;
+          }
           textBoundaryPending = false;
           continue;
         }
