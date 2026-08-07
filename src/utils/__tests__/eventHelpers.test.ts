@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, normalizeCompactionDisplay, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -617,5 +617,80 @@ describe("repairStableAssistantOrder", () => {
     }];
     const result = settleHistoricalQuestions(events, { isWaitingQuestion: undefined });
     expect(result[0]).toMatchObject({ status: "pending" });
+  });
+});
+describe("normalizeCompactionDisplay", () => {
+  const compaction = (
+    id: string,
+    phase: "begin" | "end",
+    extra: Record<string, unknown> = {},
+  ) => ({
+    id,
+    type: "compaction",
+    timestamp: 1,
+    phase,
+    ...extra,
+  }) as TimelineEvent;
+  const status = (id: string) => ({
+    id,
+    type: "status_update",
+    timestamp: 1,
+    message: "状态",
+  }) as TimelineEvent;
+
+  it("keeps only the summary end for a nested duplicate compaction cluster (b,b,b,e,e)", () => {
+    // 实机回归（图2）：一次压缩从多个通道各发一对 begin/end，时间线堆出
+    // 「耗时较长」x2 + 无摘要「压缩完成」+ 摘要行；旧折叠只删下一条恰好是
+    // end 的 begin，嵌套序列漏掉中间 begin。归一后只留带摘要的 end。
+    const events = [
+      compaction("b1", "begin"),
+      compaction("b2", "begin"),
+      compaction("b3", "begin"),
+      compaction("e1", "end"),
+      compaction("e2", "end", { summary: "摘要正文" }),
+    ];
+    expect(normalizeCompactionDisplay(events)).toEqual([
+      compaction("e2", "end", { summary: "摘要正文" }),
+    ]);
+  });
+
+  it("keeps only the latest begin while compaction is still running", () => {
+    // 实机回归（图1）：两个「压缩中」气泡同时存在，归一后只剩一个。
+    const events = [compaction("b1", "begin"), compaction("b2", "begin")];
+    expect(normalizeCompactionDisplay(events)).toEqual([compaction("b2", "begin")]);
+  });
+
+  it("keeps the single end of a simple begin/end pair", () => {
+    const events = [compaction("b", "begin"), compaction("e", "end", { summary: "摘要" })];
+    expect(normalizeCompactionDisplay(events)).toEqual([
+      compaction("e", "end", { summary: "摘要" }),
+    ]);
+  });
+
+  it("keeps a new unmatched begin that starts after a completed cluster", () => {
+    const events = [
+      compaction("b1", "begin"),
+      compaction("e1", "end", { summary: "摘要" }),
+      compaction("b2", "begin"),
+    ];
+    expect(normalizeCompactionDisplay(events)).toEqual([
+      compaction("e1", "end", { summary: "摘要" }),
+      compaction("b2", "begin"),
+    ]);
+  });
+
+  it("normalizes separated clusters independently and leaves other events untouched", () => {
+    const events = [
+      compaction("b1", "begin"),
+      compaction("e1", "end"),
+      status("s1"),
+      compaction("b2", "begin"),
+      compaction("b3", "begin"),
+    ];
+    expect(normalizeCompactionDisplay(events)).toEqual([
+      compaction("e1", "end"),
+      status("s1"),
+      compaction("b3", "begin"),
+    ]);
   });
 });

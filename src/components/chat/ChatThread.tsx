@@ -28,7 +28,7 @@ import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { groupNotificationRenderItems } from "@/utils/notificationGroups";
-import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
+import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, normalizeCompactionDisplay, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
@@ -1443,16 +1443,6 @@ export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "
   });
 }
 
-function collapseCompletedCompactions(events: TimelineEvent[]): TimelineEvent[] {
-  return events.filter((event, index) => {
-    if (event.type !== "compaction" || event.phase !== "begin") return true;
-    const nextCompaction = events
-      .slice(index + 1)
-      .find((candidate) => candidate.type === "compaction");
-    return nextCompaction?.type !== "compaction" || nextCompaction.phase !== "end";
-  });
-}
-
 function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string, runtimeSessionId?: string, isRoomRunning = false): boolean {
   const isRunningThisSession = Boolean(sessionId && (
     runningSessionId === sessionId ||
@@ -1516,7 +1506,7 @@ export const ChatThread = memo(function ChatThread() {
 
   const roomTimeline = useProjectedTimeline(session);
   const splitEvents = useMemo(
-    () => splitUserAttachedStatuses(collapseCompletedCompactions(roomTimeline)),
+    () => splitUserAttachedStatuses(normalizeCompactionDisplay(roomTimeline)),
     [roomTimeline]
   );
   const visibleEvents = useMemo(

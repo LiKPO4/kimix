@@ -497,6 +497,73 @@ export function closeOpenCompaction(events: TimelineEvent[]): TimelineEvent[] {
 }
 
 /**
+ * 压缩事件显示归一。官方一次压缩可能从多个通道各发一对 begin/end
+ * （compaction.started / full_compaction.begin …），时间线里会堆出多条
+ * 「压缩中」气泡；旧折叠只删「下一条压缩事件恰好是 end」的 begin，嵌套
+ * 重复序列（b,b,b,e,e）会漏掉中间的 begin。按「连续压缩事件簇」归一：
+ * - 簇内有 end：已配对 begin 全删，只留一个 end（优先带摘要者，并列取靠后的）；
+ * - 簇内只有 begin（仍在压缩）：只留最后一条 begin，保证同时只有一个
+ *   「压缩中」气泡；
+ * - 簇内 end 之后又有未配对 begin（上一轮刚收尾、新一轮已开始）：保留该 begin。
+ */
+export function normalizeCompactionDisplay(events: TimelineEvent[]): TimelineEvent[] {
+  const result: TimelineEvent[] = [];
+  let index = 0;
+  while (index < events.length) {
+    const event = events[index];
+    if (event.type !== "compaction") {
+      result.push(event);
+      index += 1;
+      continue;
+    }
+    let clusterEnd = index;
+    while (clusterEnd < events.length && events[clusterEnd].type === "compaction") {
+      clusterEnd += 1;
+    }
+    const cluster = events.slice(index, clusterEnd) as Extract<TimelineEvent, { type: "compaction" }>[];
+    // 栈式配对 begin→end（嵌套重复通道时内层先配对）；配对结束后仍留在栈里的
+    // begin 就是仍在进行的压缩。
+    const openBegins: number[] = [];
+    const matchedBegins = new Set<number>();
+    const endIndexes: number[] = [];
+    cluster.forEach((item, offset) => {
+      if (item.phase === "begin") {
+        openBegins.push(offset);
+        return;
+      }
+      endIndexes.push(offset);
+      const begin = openBegins.pop();
+      if (begin !== undefined) matchedBegins.add(begin);
+    });
+    // 未配对 begin 只有在最后一条 end 之后才代表「新一轮压缩进行中」；
+    // 嵌套重复通道残留的 begin 排在 end 之前，随已结束的簇一并删除。
+    const lastEnd = endIndexes.length > 0 ? endIndexes[endIndexes.length - 1] : -1;
+    const pendingBegins = openBegins.filter((offset) => offset > lastEnd);
+    const keepBegin = pendingBegins.length > 0 ? pendingBegins[pendingBegins.length - 1] : -1;
+    let keepEnd = -1;
+    for (const offset of endIndexes) {
+      if (keepEnd === -1) {
+        keepEnd = offset;
+        continue;
+      }
+      const hasSummary = Boolean(cluster[offset].summary);
+      const keptHasSummary = Boolean(cluster[keepEnd].summary);
+      // 优先带摘要的 end；摘要状态相同则取靠后的（信息更新）。
+      if (hasSummary !== keptHasSummary ? hasSummary : true) keepEnd = offset;
+    }
+    cluster.forEach((item, offset) => {
+      if (item.phase === "begin") {
+        if (!matchedBegins.has(offset) && offset === keepBegin) result.push(item);
+      } else if (offset === keepEnd) {
+        result.push(item);
+      }
+    });
+    index = clusterEnd;
+  }
+  return result;
+}
+
+/**
  * Extract a numeric sequence number from a snapshotMessageId that ends with
  * `_<digits>`. Returns undefined when no tail digit is present.
  */

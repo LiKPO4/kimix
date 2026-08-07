@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 修复：压缩气泡去重——同时只有一个「压缩中」、完成后只剩摘要行（v2.20.279）
+
+- 现象：① 压缩进行中同时出现两个「上下文压缩中」气泡；② 压缩完成后仍残留「耗时较长」x2 + 无摘要「压缩完成」三个气泡，只有「已生成摘要」行该留。
+- 根因：官方一次压缩从多个通道各发一对 begin/end（`compaction.started` / `full_compaction.begin` 等映射到同一 compaction 事件），时间线堆出嵌套重复序列（b,b,b,e,e）；旧 `collapseCompletedCompactions` 只删「下一条压缩事件恰好是 end」的 begin，嵌套序列里中间的 begin 下一条仍是 begin，被漏掉。
+- 修法：`eventHelpers.ts` 新增 `normalizeCompactionDisplay`，按「连续压缩事件簇」归一：栈式配对 begin→end，簇内有 end 时 begin 全删、只留一个 end（优先带摘要、并列取靠后）；仍在压缩只留最后一条 begin；最后一条 end 之后的未配对 begin 视为新一轮压缩予以保留。`ChatThread` 删掉旧本地函数改用该工具。
+- 验收：eventHelpers 新增 5 例（含图1/图2 实机序列复现），定向 53/53、typecheck 双配置、全量 vitest 1741/1741、build 均过；实机复验待用户（下次 /compact 观察气泡数量）。
+
 ## 2026-08-07 修复：流式思考首句孤立不随续流滚动——draft 思考并入尾部 live 思考组滚动窗（v2.20.278）
 
 - 现象：正在思考阶段，整段思考的第一句孤立悬在上方固定不动，下面大块续流在另一个 5 行滚动窗里滚动（用户截图红框确认孤立句是整段输出第一句）。
