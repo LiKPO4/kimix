@@ -1,4 +1,4 @@
-import type { TimelineEvent } from "@/types/ui";
+import type { StatusNotificationDetail, TimelineEvent } from "@/types/ui";
 import { reliableAssistantDurationMs } from "./duration";
 import { STALE_TIMELINE_WORK_MS } from "./sessionActivity";
 import { extractFileAttachmentText } from "./userFileAttachments";
@@ -24,6 +24,12 @@ export interface AgentEnvelopeSummary {
   kind: "notification" | "cron-fire";
   tone: "info" | "success" | "warning";
   summary: string;
+  /** 结构化信封字段，供通知详情卡渲染（v2.20.269 起随 status_update 持久化）。 */
+  notification: StatusNotificationDetail;
+}
+
+function envelopeAttr(attrs: string, name: string): string | undefined {
+  return attrs.match(new RegExp(`\\b${name}="([^"]*)"`, "i"))?.[1] || undefined;
 }
 
 /**
@@ -35,21 +41,47 @@ export function parseKimiAgentEnvelope(content: string): AgentEnvelopeSummary | 
   const trimmed = content.trim();
   const notification = trimmed.match(/^<notification\b([^>]*)>([\s\S]*?)<\/notification>\s*$/i);
   if (notification) {
-    const type = notification[1].match(/\btype="([^"]*)"/i)?.[1] ?? "";
+    const attrs = notification[1];
+    const type = envelopeAttr(attrs, "type") ?? "";
     const text = notification[2].replace(/<output-file\b[\s\S]*?(<\/output-file>|$)/gi, "").trim();
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const title = lines.find((line) => /^Title:/i.test(line))?.replace(/^Title:\s*/i, "") ?? "";
+    const severity = lines.find((line) => /^Severity:/i.test(line))?.replace(/^Severity:\s*/i, "") ?? "";
     const description = lines.filter((line) => !/^(Title|Severity):/i.test(line)).join(" ").trim();
     const target = description.replace(/\s+(completed|lost|failed|stopped)\.?$/i, "").trim() || description || title;
-    if (type === "task.completed") return { kind: "notification", tone: "success", summary: `后台任务已完成：${target}` };
-    if (type === "task.lost") return { kind: "notification", tone: "warning", summary: `后台任务已丢失：${target}` };
-    return { kind: "notification", tone: "info", summary: `后台任务通知：${target}` };
+    const detail: StatusNotificationDetail = {
+      kind: "notification",
+      type,
+      category: envelopeAttr(attrs, "category"),
+      sourceKind: envelopeAttr(attrs, "source_kind"),
+      sourceId: envelopeAttr(attrs, "source_id"),
+      agentId: envelopeAttr(attrs, "agent_id"),
+      title: title || undefined,
+      severity: severity || undefined,
+      body: description || undefined,
+      raw: trimmed,
+    };
+    if (type === "task.completed") return { kind: "notification", tone: "success", summary: `后台任务已完成：${target}`, notification: detail };
+    if (type === "task.lost") return { kind: "notification", tone: "warning", summary: `后台任务已丢失：${target}`, notification: detail };
+    return { kind: "notification", tone: "info", summary: `后台任务通知：${target}`, notification: detail };
   }
   const cronFire = trimmed.match(/^<cron-fire\b([^>]*)>([\s\S]*?)<\/cron-fire>\s*$/i);
   if (cronFire) {
+    const attrs = cronFire[1];
     const prompt = cronFire[2].match(/<prompt>([\s\S]*?)<\/prompt>/i)?.[1].trim() ?? "";
     const firstLine = prompt.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0] ?? "";
-    return { kind: "cron-fire", tone: "info", summary: `定时任务触发：${firstLine.slice(0, 80)}` };
+    const detail: StatusNotificationDetail = {
+      kind: "cron-fire",
+      type: "cron.fire",
+      category: "cron",
+      sourceKind: "cron",
+      sourceId: envelopeAttr(attrs, "jobId"),
+      title: "Cron job fired",
+      severity: "info",
+      body: prompt || undefined,
+      raw: trimmed,
+    };
+    return { kind: "cron-fire", tone: "info", summary: `定时任务触发：${firstLine.slice(0, 80)}`, notification: detail };
   }
   return null;
 }
@@ -103,6 +135,7 @@ export function sanitizePersistedEvents(events: TimelineEvent[]): TimelineEvent[
         message: envelope.summary,
         source: "runtime" as const,
         tone: envelope.tone,
+        notification: envelope.notification,
       }];
     }
     const activation = parseKimiSkillActivation(event.content);

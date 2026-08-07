@@ -280,7 +280,22 @@ describe("sanitizePersistedEvents", () => {
       type: "status_update",
       message: "后台任务已完成：全量 flutter test（十方杀机包）",
       tone: "success",
+      notification: {
+        kind: "notification",
+        type: "task.completed",
+        category: "task",
+        sourceKind: "background_task",
+        sourceId: "bash-hbcvffrs",
+        title: "Background process completed",
+        severity: "info",
+        body: "全量 flutter test（十方杀机包） completed.",
+      },
     }]);
+    // 原始 payload 完整保留，供详情卡「原始 payload」折叠展示
+    const sanitized = sanitizePersistedEvents(events);
+    const detail = sanitized[0].type === "status_update" ? sanitized[0].notification : undefined;
+    expect(detail?.raw).toContain('<notification id="task:bash-hbcvffrs:completed"');
+    expect(detail?.raw).toContain('</notification>');
   });
 
   it("collapses lost-task notification envelopes with warning tone", () => {
@@ -295,6 +310,14 @@ describe("sanitizePersistedEvents", () => {
       type: "status_update",
       message: "后台任务已丢失：发布 1.4.482：构建 APK 并上传 8084",
       tone: "warning",
+      notification: {
+        kind: "notification",
+        type: "task.lost",
+        sourceKind: "background_task",
+        sourceId: "bash-v",
+        title: "Background process lost",
+        severity: "warning",
+      },
     }]);
   });
 
@@ -310,6 +333,13 @@ describe("sanitizePersistedEvents", () => {
       type: "status_update",
       message: "定时任务触发：检查构建状态并汇报",
       tone: "info",
+      notification: {
+        kind: "cron-fire",
+        type: "cron.fire",
+        sourceKind: "cron",
+        sourceId: "j1",
+        body: "检查构建状态并汇报",
+      },
     }]);
   });
 

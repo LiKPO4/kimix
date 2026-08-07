@@ -583,6 +583,27 @@ export interface StatusUpdateEvent {
   source?: "runtime" | "slash" | "skill" | "ui" | "ipc" | "status_refresh";
   tone?: "default" | "info" | "success" | "warning" | "danger";
   parentEventId?: string;
+  /** 代理循环信封（后台任务通知/定时任务触发）的结构化字段，映射层从原始信封提取；
+   *  缺失（旧持久化数据）时渲染层回退为摘要 pill。 */
+  notification?: StatusNotificationDetail;
+}
+
+/** status_update 携带的通知信封详情（对齐官方通知卡的 类型/来源/严重度/原始 payload）。 */
+export interface StatusNotificationDetail {
+  kind: "notification" | "cron-fire";
+  /** 信封 type 属性（task.completed / task.lost / …）；cron-fire 合成为 "cron.fire"。 */
+  type: string;
+  category?: string;
+  sourceKind?: string;
+  sourceId?: string;
+  agentId?: string;
+  /** 信封 Title: 行原文（如 "Background process completed"）。 */
+  title?: string;
+  severity?: string;
+  /** 正文描述（已剥离 output-file 与 Title/Severity 行）；cron-fire 为 prompt 全文。 */
+  body?: string;
+  /** 原始信封文本，供「原始 payload」折叠展示。 */
+  raw: string;
 }
 
 export interface FileArtifactEvent {

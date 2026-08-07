@@ -1575,6 +1575,7 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           message: envelope.summary,
           source: "runtime",
           tone: envelope.tone,
+          notification: envelope.notification,
         };
       }
       const skillActivation = parseKimiSkillActivation(userMessage.content);

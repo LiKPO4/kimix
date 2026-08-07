@@ -1,4 +1,12 @@
 # Kimix 长程任务状态
+## 2026-08-07 功能：后台任务/定时任务通知卡+分组卡，对齐官方（v2.20.269）
+
+- 起因：官方输出流的通知是「N 条通知」分组卡+可展开详情卡（类型/来源/严重度/正文/原始 payload），Kimix 只有摘要 pill。排查确认数据在映射层被丢：信封带全字段（type/source_kind/source_id/Title/Severity/正文），parseKimiAgentEnvelope 只提取一句 summary。
+- 数据层：parseKimiAgentEnvelope 升级返回 StatusNotificationDetail（kind/type/category/sourceKind/sourceId/title/severity/body/raw，cron-fire 同构 type=cron.fire）；status_update 加可选 notification 字段（additive，旧持久化数据回退 pill）；3 个映射口（kimiCodeEventMapper 实时/eventMapper TurnBegin 回放/sanitizePersistedEvents 持久化清洗）同步带上。
+- 渲染层：新组件 NotificationCard（色调卡，头部图标+中文标题+英文副标题+「状态 HH:MM」，展开详情+原始 payload 折叠）与 NotificationGroupCard（「N 条通知」+摘要行+色调点）；新渲染项 notification_group；groupNotificationRenderItems 在 buildRenderItems 出口聚合连续 ≥3 条（1-2 条逐条详情卡，匹配官方两截图行为）。
+- 管线接线：轮内主循环通知 status_update 按事件位置独立渲染（原被统一跳过）；轮末 trailing/settled 兜底排除通知防重复；filterStatusUpdates 豁免通知（turn_end/never 档不再丢官方通知）；chatNavigation 三类函数补 notification_group 分支。
+- 测试：eventHelpers +3（detail 断言）、notificationGroups 新文件 5 例、NotificationCard 新文件 4 例、ChatThread +3（按位渲染/分组/兜底防重）。全量 164 文件 1717 例全绿、两套 typecheck、pnpm build 通过。视觉待用户截图。
+
 ## 2026-08-07 功能：dock 目标胶囊+弹窗，接通官方 Goal UI（v2.20.268）
 
 - 起因：用户发现 dock 胶囊缺官方客户端的「目标 · 进行中」胶囊。排查结论：不是没同步——session.officialGoal 同步链路（事件流/快照对账/手动刷新）完好，是 UI 从未实现；AppShell 传给侧栏面板的 officialGoal + 5 个 goal 回调是死 prop（面板只声明类型没解构渲染），ComposerDockBar 只有 4 类胶囊。

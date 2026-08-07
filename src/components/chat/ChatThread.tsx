@@ -17,6 +17,7 @@ import { ToolCard } from "./ToolCard";
 import { ChangeCard } from "./ChangeCard";
 import { FileCard } from "./FileCard";
 import { StatusCard } from "./StatusCard";
+import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
 import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
 import { ErrorCard } from "./ErrorCard";
@@ -26,6 +27,7 @@ import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { groupNotificationRenderItems } from "@/utils/notificationGroups";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
@@ -628,6 +630,7 @@ function EventRenderer({ event, sessionId, runtimeSessionId, projectPath, turnSt
       return <QuestionCard event={event} />;
     case "status_update":
       if (!shouldRenderStandaloneStatusUpdate(event)) return null;
+      if (event.notification) return <NotificationCard event={event} />;
       return <StatusCard event={event} />;
     case "file_artifact":
       return <FileCard event={event} />;
@@ -1040,7 +1043,7 @@ export function buildRenderItems(
             ? [finalUsageStatus]
             : (modelOnlyFallbackStatus
                 ? [modelOnlyFallbackStatus]
-                : settledStatusEvents.filter((status) => !hasMetricStatus(status)).slice(-1)))
+                : settledStatusEvents.filter((status) => !hasMetricStatus(status) && !status.notification).slice(-1)))
       : [];
     const activeStatusEvent = turnSettled
       ? undefined
@@ -1125,7 +1128,10 @@ export function buildRenderItems(
       if (event.type === "tool_call" || event.type === "tool_result") continue;
       if (event.type === "subagent") continue;
       if (event.type === "hook") continue;
-      if (event.type === "status_update") continue;
+      if (event.type === "status_update") {
+        if (event.notification) items.push({ type: "event", event });
+        continue;
+      }
       if (event.type === "change_summary") continue;
       if (event.type === "diff") continue;
       if (event.type === "error" && projectedFailureAssistant) continue;
@@ -1223,7 +1229,7 @@ export function buildRenderItems(
     }
     if (turnSettled && !assistantAttached) {
       statusEvents
-        .filter(shouldRenderStandaloneStatusUpdate)
+        .filter((event) => shouldRenderStandaloneStatusUpdate(event) && !event.notification)
         .forEach((event) => items.push({ type: "event", event }));
     }
     // Subagent progress belongs to the message stream so it stays aligned with
@@ -1381,13 +1387,16 @@ export function buildRenderItems(
       if (!usedCompletedTurnCacheKeys.has(cacheKey)) completedTurnCache.delete(cacheKey);
     }
   }
-  return items;
+  return groupNotificationRenderItems(items);
 }
 
 export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
   return events.filter((event, index) => {
     if (event.type !== "status_update") return true;
     if (event.source === "slash") return true;
+    // 通知信封（后台任务/定时任务）是事件而不是进度状态：不受状态显示档位过滤，
+    // 与 slash 通知同规则，否则 turn_end/never 档下官方通知卡永远丢失。
+    if (event.notification) return true;
     // Prompt-link statuses drive the live assistant process header. They are
     // intentionally retained even when standalone status cards are hidden;
     // renderTurnBody removes them again once the turn settles.
@@ -1951,6 +1960,8 @@ export const ChatThread = memo(function ChatThread() {
             >
               {item.type === "tool_group"
                 ? <ToolGroup tools={item.tools} />
+                  : item.type === "notification_group"
+                  ? <NotificationGroupCard events={item.events} />
                   : item.type === "plan_preview"
                   ? <PlanPreviewCard path={item.path} projectPath={item.projectPath} sessionId={runtimeSessionId ?? undefined} />
                   : item.type === "change_group"

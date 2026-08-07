@@ -428,6 +428,7 @@ export function mapKimiCodeEvent(
           message: envelope.summary,
           source: "runtime",
           tone: envelope.tone,
+          notification: envelope.notification,
         };
       }
       const skillActivation = parseKimiSkillActivation(userMessage.content);

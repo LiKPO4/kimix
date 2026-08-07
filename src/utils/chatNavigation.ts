@@ -87,6 +87,9 @@ export function chatNavigationEventIds(item: RenderItem): string[] {
   if (item.type === "tool_group") {
     return Array.from(new Set(item.tools.map((tool) => tool.id)));
   }
+  if (item.type === "notification_group") {
+    return Array.from(new Set(item.events.map((event) => event.id)));
+  }
   return [item.id];
 }
 
@@ -99,6 +102,7 @@ function chatNavigationKind(item: RenderItem): ChatNavigationKind {
   if (item.type === "tool_group") return "tool";
   if (item.type === "change_group") return "change";
   if (item.type === "plan_preview") return "system";
+  if (item.type === "notification_group") return "system";
 
   switch (item.event.type) {
     case "user_message":
@@ -237,6 +241,13 @@ function renderItemNavigationContent(item: RenderItem) {
       title: `文件变更 ${item.changes.length} 项`,
       preview: compactChatNavigationText(item.changes.map((change) => change.path).join("、") || "文件发生变更"),
       fileLabels: uniqueFileLabels(item.changes.map((change) => change.path)),
+    };
+  }
+  if (item.type === "notification_group") {
+    return {
+      title: `${item.events.length} 条通知`,
+      preview: compactChatNavigationText(item.events.map((event) => event.notification?.title ?? event.message ?? "").filter(Boolean).join(" · ") || "后台任务通知"),
+      fileLabels: [],
     };
   }
   return {
