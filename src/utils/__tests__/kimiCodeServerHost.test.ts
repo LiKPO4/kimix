@@ -20,6 +20,7 @@ import {
   resolveEngineStatusAfterPromptCompleted,
   resolveExternalApprovalSettleStatus,
   selectExternallyResolvedQuestionIds,
+  shouldResumeWaitingQuestionOnFrame,
   resolvePromptModel,
   resolveServerEngineStatus,
   resolveServerModelRefresh,
@@ -315,6 +316,29 @@ describe("external question settle helpers", () => {
     expect(selectExternallyResolvedQuestionIds(["q-1", "q-2", "q-3"], new Set(["q-2"]))).toEqual(["q-1", "q-3"]);
     expect(selectExternallyResolvedQuestionIds(["q-1"], new Set(["q-1"]))).toEqual([]);
     expect(selectExternallyResolvedQuestionIds([], new Set())).toEqual([]);
+  });
+});
+
+describe("shouldResumeWaitingQuestionOnFrame", () => {
+  it("waiting_question 期间主 Agent 轮次活动帧 → 翻回 running", () => {
+    for (const type of ["thinking.delta", "assistant.delta", "content.part", "tool.call.started", "tool.call.delta", "tool.result"]) {
+      expect(shouldResumeWaitingQuestionOnFrame(type, "waiting_question", undefined)).toBe(true);
+      expect(shouldResumeWaitingQuestionOnFrame(type, "waiting_question", "main")).toBe(true);
+    }
+  });
+
+  it("子代理帧不翻：Swarm 子代理在主 Agent 阻塞等回答时仍会输出", () => {
+    expect(shouldResumeWaitingQuestionOnFrame("assistant.delta", "waiting_question", "agent-51")).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("tool.call.started", "waiting_question", "sub")).toBe(false);
+  });
+
+  it("非 waiting_question 或非活动帧不翻", () => {
+    expect(shouldResumeWaitingQuestionOnFrame("assistant.delta", "running", undefined)).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("assistant.delta", "waiting_approval", undefined)).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("assistant.delta", undefined, undefined)).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("turn.ended", "waiting_question", undefined)).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("prompt.completed", "waiting_question", undefined)).toBe(false);
+    expect(shouldResumeWaitingQuestionOnFrame("event.question.requested", "waiting_question", undefined)).toBe(false);
   });
 });
 

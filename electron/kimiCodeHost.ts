@@ -3262,6 +3262,9 @@ function handleServerFrame(frame: ServerFrame) {
       if (!question || typeof question !== "object") continue;
       handleServerFrame({ type: "event.question.requested", session_id: sessionId, payload: question });
     }
+    // 快照重放后顺手对账：这份快照的 pending 列表已不含、但本地仍跟踪的提问即外部
+    // 已回答（重连恢复路径，外部轮次的 live 帧可能整段缺席）。复用快照免重复抓取。
+    void settleExternallyResolvedServerQuestions(sessionId, 0, extractPendingServerQuestionIds(payload));
     return;
   }
   if (frame.type === "event.approval.requested") {
@@ -3283,6 +3286,9 @@ function handleServerFrame(frame: ServerFrame) {
   if (frame.type === "event.question.requested") {
     const requestId = typeof payload.question_id === "string" ? payload.question_id : undefined;
     if (!requestId) return;
+    // 新提问到达即证明同会话此前跟踪的提问已被外部回答（提问阻塞 Agent，单 pending
+    // 不变量）：先对账旧条目再登记本条，覆盖「外部答 Q1→立即追问 Q2」无输出帧的场景。
+    void settleExternallyResolvedServerQuestions(sessionId);
     serverQuestionIds.add(pendingKey(sessionId, requestId));
     serverQuestionRequests.set(pendingKey(sessionId, requestId), payload);
     setStatus(sessionId, "waiting_question");
@@ -3306,6 +3312,12 @@ function handleServerFrame(frame: ServerFrame) {
     && serverSessions.get(sessionId)?.status === "completed"
     && serverSessions.get(sessionId)?.mainTurnActive !== false
   ) {
+    setStatus(sessionId, "running");
+  }
+  // 外部（Web/CLI）回答提问后 Server 不广播 resolved 帧，且外部轮次的
+  // prompt.completed/状态迁移可能整段缺席：主 Agent 恢复输出是唯一可靠信号，
+  // 翻回 running 并经 setStatus 触发提问对账（helper 已过滤子代理帧与审批场景）。
+  if (shouldResumeWaitingQuestionOnFrame(frame.type, serverSessions.get(sessionId)?.status, payload.agentId)) {
     setStatus(sessionId, "running");
   }
   if (frame.type === "prompt.completed") {
@@ -3905,31 +3917,64 @@ export function selectExternallyResolvedQuestionIds(trackedIds: readonly string[
   return trackedIds.filter((requestId) => !pendingIds.has(requestId));
 }
 
-// 与审批（settleExternallyResolvedServerApprovals）同理：其他客户端（官方 Web）
-// 回答提问后 Server 不广播 resolved 帧，只把条目从 pending_questions 移除并让会话
-// 状态离开 waiting_question。不补这条链路，Kimix 的提问卡会永远「待回答」。
-// 状态迁出 waiting_question 时回读 snapshot，对已不在 pending 列表的提问发 settle
-// 事件（外部回答一律视为 answered——提问没有 rejected 去向，过期/失活由本地
-// settleInactiveEvents 兜底）。本地 respondQuestion 先删 id 再改状态，不会误触发。
+/** waiting_question 期间到达即证明提问已被外部回答的轮次活动帧。 */
+const WAITING_QUESTION_RESUME_FRAME_TYPES: ReadonlySet<string> = new Set([
+  "thinking.delta",
+  "assistant.delta",
+  "content.part",
+  "tool.call.started",
+  "tool.call.delta",
+  "tool.result",
+]);
+
+/**
+ * waiting_question 期间收到主 Agent 的轮次活动帧 → 提问已被外部（Web/CLI）回答，
+ * 应翻回 running（经 setStatus 触发提问对账）。只认主 Agent 帧：Swarm 子代理在主
+ * Agent 阻塞等回答时仍会输出。审批不走这条：拒绝后同样有输出，无法区分去向。
+ */
+export function shouldResumeWaitingQuestionOnFrame(
+  frameType: string,
+  status: KimiCodeEngineStatus | undefined,
+  agentId: unknown,
+): boolean {
+  if (status !== "waiting_question") return false;
+  if (typeof agentId === "string" && agentId && agentId !== "main") return false;
+  return WAITING_QUESTION_RESUME_FRAME_TYPES.has(frameType);
+}
+
+// 与审批（settleExternallyResolvedServerApprovals）同理：其他客户端（官方 Web/CLI）
+// 回答提问后 Server 不广播 resolved 帧，只把条目从 pending_questions 移除。不补这条
+// 链路，Kimix 的提问卡会永远「待回答」。回读 snapshot，对已不在 pending 列表的提问
+// 发 settle 事件（外部回答一律视为 answered——提问没有 rejected 去向，过期/失活由
+// 本地 settleInactiveEvents 兜底）。本地 respondQuestion 先删 id 再改状态，不会误触发。
+// 触发点（实机 v2.20.270：外部轮次的 prompt.completed/状态迁移可能整段缺席，
+// 单触发点不可靠，提问卡残留待回答）：
+// 1) setStatus 迁出 waiting_question；2) waiting_question 期间主 Agent 输出帧到达
+//    （先翻 running 再经 1 触发）；3) 新 question.requested 到达前对账旧条目；
+// 4) 快照重放后用手头快照对账（prefetchedPendingIds，免重复抓取）。
 async function settleExternallyResolvedServerQuestions(
   sessionId: string,
   attempt = 0,
+  prefetchedPendingIds?: ReadonlySet<string>,
 ): Promise<void> {
   const keys = [...serverQuestionIds].filter((key) => key.startsWith(`${sessionId}:`));
   if (keys.length === 0) return;
-  let stillPending: Set<string> | null = null;
-  try {
-    const snapshot = await getServerClient().getSnapshot(sessionId);
-    stillPending = extractPendingServerQuestionIds(snapshot);
-  } catch {
-    // 快照读取失败时保守跳过 settle：无法确认哪些提问已从 pending 移除，
-    // 误 settle（把仍在等待的提问报成已回答）比多留一会儿更糟。做有上限的退避重试。
-    if (attempt < 3) {
-      setTimeout(() => {
-        void settleExternallyResolvedServerQuestions(sessionId, attempt + 1);
-      }, 2_000 * (attempt + 1));
+  // prefetchedPendingIds：调用方刚拿到的权威快照（快照重放路径）直接复用，免重复抓取。
+  let stillPending: Set<string> | null = prefetchedPendingIds ? new Set(prefetchedPendingIds) : null;
+  if (!stillPending) {
+    try {
+      const snapshot = await getServerClient().getSnapshot(sessionId);
+      stillPending = extractPendingServerQuestionIds(snapshot);
+    } catch {
+      // 快照读取失败时保守跳过 settle：无法确认哪些提问已从 pending 移除，
+      // 误 settle（把仍在等待的提问报成已回答）比多留一会儿更糟。做有上限的退避重试。
+      if (attempt < 3) {
+        setTimeout(() => {
+          void settleExternallyResolvedServerQuestions(sessionId, attempt + 1);
+        }, 2_000 * (attempt + 1));
+      }
+      return;
     }
-    return;
   }
   const trackedIds = keys.map((key) => key.slice(sessionId.length + 1));
   for (const requestId of selectExternallyResolvedQuestionIds(trackedIds, stillPending)) {

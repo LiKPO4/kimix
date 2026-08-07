@@ -1,4 +1,11 @@
 # Kimix 长程任务状态
+
+## 2026-08-07 修复：提问外部 settle 触发点加固（v2.20.271）
+
+- 实机复验 v2.20.270 失败：web/CLI 端已答提问在 Kimix 仍残留待回答。根因：单触发点（setStatus 迁出 waiting_question）不可靠——外部轮次的 prompt.completed/状态迁移可能整段缺席（Server 不向非发起客户端广播完成帧），状态永远停在 waiting_question，对账钩子永不触发。
+- 修法（全部汇到同一个 settleExternallyResolvedServerQuestions 对账函数）：1) 新增纯函数 shouldResumeWaitingQuestionOnFrame——waiting_question 期间主 Agent 轮次活动帧（delta/content.part/tool 系）到达即翻回 running，经 setStatus 触发对账；只认主 Agent 帧（子代理在主 Agent 阻塞时仍会输出），审批不走这条（拒绝后同样有输出，无法区分去向）；2) 新 question.requested 到达前先对账旧条目（单 pending 不变量，覆盖外部答 Q1→立即追问 Q2 无输出帧场景）；3) 快照重放后用该快照 prefetched pending 集合直接对账（重连恢复路径，免重复抓取）。
+- 验收：定向 39/39、双 typecheck、全量 vitest、build 均过；实机复验待用户。
+
 ## 2026-08-07 修复：web 端已答提问残留待回答（v2.20.270）
 
 - 根因：官方 Server 在其他客户端（web）回答提问后不广播 resolved 帧，只把条目从 pending 列表移除；审批卡早有外部 settle 对账（`settleExternallyResolvedServerApprovals`），提问卡缺同款机制，导致 `question_request` 永远 pending。
