@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore } from "@/stores/appStore";
@@ -12,7 +12,7 @@ import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { resolveSidebarSessionListWindow } from "@/utils/sidebarSessionList";
-import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, isSessionSidebarBusy } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, isSessionOfficialFailed, isSessionSidebarBusy } from "@/utils/sessionActivity";
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { backfillTurnModelsFromUsageStatuses, mergeMissingLatestCanonicalAssistant, mergeMissingUsageStatusEvents, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
@@ -1117,7 +1117,16 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       {isSessionBusy ? (
                                         <Loader2 size={14} className="animate-spin text-text-muted" aria-label="会话正在运行" />
                                       ) : (
-                                        formatRelativeTime(getSessionConversationActivityAt(s))
+                                        <span className="flex items-center" style={{ gap: 6 }}>
+                                          {isSessionOfficialFailed(s) && (
+                                            <AlertTriangle
+                                              size={13}
+                                              className="shrink-0"
+                                              aria-label="上一轮已失败"
+                                            />
+                                          )}
+                                          {formatRelativeTime(getSessionConversationActivityAt(s))}
+                                        </span>
                                       )}
                                     </span>
                                     <div

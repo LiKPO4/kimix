@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 跟进：消费官方 last_turn_reason——侧栏失败标记 + busy 判定短路（上游跟进队列 2/5，v2.20.282）
+
+- 背景：goal 队列第 2 项。官方 0.34.0 起会话列表/恢复携带 `last_turn_reason`（completed/cancelled/failed；cancelled 不持久化、busy 中省略）。本地 daemon 已是 0.34.0。
+- 字段链路（server 路由）：`kimiCodeServerClient.ts:80` wire 字段 → `kimiCodeHost.ts:3568` 摘要映射 → `sessionCatalog.ts` reconcile 三处落 `Session.officialLastTurnReason`（归一化只收三值；目录缺失字段时显式覆盖清除，对齐 busy 省略语义防残留误标）。
+- **重要纠偏**：前置调查报告称「SDK v1 路由 getStatus 已带 lastTurnReason」不实——实施子代理逐段核实 vendor 后确认 v1 引擎的 listSessions/getStatus 均不含该字段（94469 行映射的是 daemon 协议会话），SDK 路由恒缺失、走原启发式兜底，vendor 未改。
+- 消费 1：`isSessionSidebarBusy` 在无权威 runtime 状态时，官方终态字段存在即判不 busy，跳过 2 分钟窗口；字段缺失保持原启发式（兜底不删）。
+- 消费 2：Sidebar 会话项非 busy 且 `officialLastTurnReason === "failed"` 时时间旁显示 13px AlertTriangle（继承 text-text-muted，aria-label「上一轮已失败」）；cancelled/completed 不标。
+- 验收：sessionActivity 新增 5 例（21/21）、sessionCatalog+orphanRoom 46/46、kimiCodeServerClient 69/69、typecheck 0 错误；全量 vitest/build 见提交前记录。实机复验待用户（失败会话侧栏应出现警告标）。
+
 ## 2026-08-07 跟进：vendor SDK 刷新 0.31.0→0.34.0（上游跟进队列 1/5，v2.20.281）
 
 - 背景：goal 队列第 1 项。vendored node-sdk 从上游 tag 0.31.0（0.15.0）刷新到 0.34.0（0.15.3）；已验证 SDK 面零破坏（87 文件零增删、wire 事件格式不变、v1 client 路径两 tag 一致）。

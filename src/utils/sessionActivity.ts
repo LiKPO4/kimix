@@ -1,4 +1,4 @@
-import type { RoomAgentActivity, RoomAgentActivityStatus, Session, TimelineEvent } from "@/types/ui";
+import type { OfficialLastTurnReason, RoomAgentActivity, RoomAgentActivityStatus, Session, TimelineEvent } from "@/types/ui";
 import type { KimiCodeEngineStatus } from "@electron/types/ipc";
 import { getRuntimeSessionId } from "./runtimeSession";
 
@@ -7,6 +7,31 @@ const CONVERSATION_ACTIVITY_TYPES = new Set<TimelineEvent["type"]>([
   "steer_message",
   "assistant_message",
 ]);
+
+const OFFICIAL_LAST_TURN_REASONS = new Set<OfficialLastTurnReason>([
+  "completed",
+  "cancelled",
+  "failed",
+]);
+
+/** 归一化官方 last_turn_reason：只接受 completed/cancelled/failed，其余一律视为缺失。 */
+export function normalizeOfficialLastTurnReason(value: unknown): OfficialLastTurnReason | undefined {
+  return typeof value === "string" && OFFICIAL_LAST_TURN_REASONS.has(value as OfficialLastTurnReason)
+    ? value as OfficialLastTurnReason
+    : undefined;
+}
+
+/** 官方已确认上一轮以终态结束（completed/failed/cancelled 任一）。 */
+export function isOfficialTerminalLastTurnReason(
+  reason: OfficialLastTurnReason | undefined,
+): reason is OfficialLastTurnReason {
+  return reason !== undefined && OFFICIAL_LAST_TURN_REASONS.has(reason);
+}
+
+/** 官方确认上一轮失败；cancelled 一律不视为失败。 */
+export function isSessionOfficialFailed(session: Session) {
+  return session.officialLastTurnReason === "failed";
+}
 
 export function getSessionConversationActivityAt(session: Session): number {
   for (let index = session.events.length - 1; index >= 0; index -= 1) {
@@ -154,6 +179,11 @@ export function isSessionSidebarBusy(
   // state is authoritative. An incomplete local assistant/tool/subagent may
   // remain open to accept late stream frames, but it must not spin forever.
   if (hasAuthoritativeActivity) return false;
+
+  // 官方 last_turn_reason 是权威终态证据：completed/failed/cancelled 任一都说明
+  // 上一轮已结束，无需 2 分钟时间窗兜底（该兜底会把「手动取消后残留的本地未完成
+  // 帧」误判为仍在运行）。字段缺失时（旧版本、busy 中省略、SDK 路由）保持原启发式。
+  if (isOfficialTerminalLastTurnReason(session.officialLastTurnReason)) return false;
 
   // Before the first runtime status frame arrives, recent timeline work keeps
   // the row responsive. The bounded fallback expires automatically instead of

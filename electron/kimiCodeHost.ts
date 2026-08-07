@@ -205,6 +205,7 @@ export type KimiCodeSessionSummary = {
   createdAt: number;
   updatedAt: number;
   archived?: boolean;
+  lastTurnReason?: string;
   source?: "server" | "sdk";
   metadata?: JsonObject;
   additionalDirs?: readonly string[];
@@ -3564,6 +3565,7 @@ function serverSessionSummary(session: ServerSession): KimiCodeSessionSummary {
     createdAt: session.created_at ? Date.parse(session.created_at) : 0,
     updatedAt: session.updated_at ? Date.parse(session.updated_at) : 0,
     archived: session.archived,
+    lastTurnReason: session.last_turn_reason,
     source: "server",
     metadata: session.metadata,
     additionalDirs,

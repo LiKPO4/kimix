@@ -1828,6 +1828,7 @@ export type KimiCodeSessionSummary = {
   createdAt: number;
   updatedAt: number;
   archived?: boolean;
+  lastTurnReason?: string;
   source?: "server" | "sdk";
   metadata?: Record<string, unknown>;
 };

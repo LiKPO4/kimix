@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isOfficialTerminalLastTurnReason, isSessionOfficialFailed, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive, normalizeOfficialLastTurnReason } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -192,5 +192,82 @@ describe("sessionActivity", () => {
     expect(getNextTimelineWorkExpiryAt(events, 150)).toBe(100 + 2 * 60 * 1000);
     expect(getNextTimelineWorkExpiryAt(events, 100 + 2 * 60 * 1000)).toBe(200 + 2 * 60 * 1000);
     expect(getNextTimelineWorkExpiryAt(events, 200 + 2 * 60 * 1000)).toBeNull();
+  });
+
+  it("normalizes official last_turn_reason to the three known terminal values", () => {
+    expect(normalizeOfficialLastTurnReason("completed")).toBe("completed");
+    expect(normalizeOfficialLastTurnReason("cancelled")).toBe("cancelled");
+    expect(normalizeOfficialLastTurnReason("failed")).toBe("failed");
+    expect(normalizeOfficialLastTurnReason("running")).toBeUndefined();
+    expect(normalizeOfficialLastTurnReason("")).toBeUndefined();
+    expect(normalizeOfficialLastTurnReason(undefined)).toBeUndefined();
+    expect(normalizeOfficialLastTurnReason(null)).toBeUndefined();
+  });
+
+  it("recognizes any official terminal last_turn_reason as terminal evidence", () => {
+    expect(isOfficialTerminalLastTurnReason("completed")).toBe(true);
+    expect(isOfficialTerminalLastTurnReason("cancelled")).toBe(true);
+    expect(isOfficialTerminalLastTurnReason("failed")).toBe(true);
+    expect(isOfficialTerminalLastTurnReason(undefined)).toBe(false);
+  });
+
+  it("marks only failed sessions with an official failure flag", () => {
+    expect(isSessionOfficialFailed({ ...session(), officialLastTurnReason: "failed" })).toBe(true);
+    expect(isSessionOfficialFailed({ ...session(), officialLastTurnReason: "cancelled" })).toBe(false);
+    expect(isSessionOfficialFailed({ ...session(), officialLastTurnReason: "completed" })).toBe(false);
+    expect(isSessionOfficialFailed(session())).toBe(false);
+  });
+
+  it("skips the timeline fallback when the official terminal reason is present", () => {
+    const activeLocalEvent = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
+    ]);
+
+    // 时间窗内本地事件仍活跃，但官方终态字段直接判不 busy。
+    expect(isSessionSidebarBusy(
+      { ...activeLocalEvent, officialLastTurnReason: "completed" },
+      { runningSessionId: null, now: 1 },
+    )).toBe(false);
+    expect(isSessionSidebarBusy(
+      { ...activeLocalEvent, officialLastTurnReason: "cancelled" },
+      { runningSessionId: null, now: 1 },
+    )).toBe(false);
+    expect(isSessionSidebarBusy(
+      { ...activeLocalEvent, officialLastTurnReason: "failed" },
+      { runningSessionId: null, now: 1 },
+    )).toBe(false);
+  });
+
+  it("keeps the original timeline heuristic when the official reason is missing", () => {
+    const activeLocalEvent = session([
+      { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
+    ]);
+
+    expect(isSessionSidebarBusy(activeLocalEvent, { runningSessionId: null, now: 1 })).toBe(true);
+    expect(isSessionSidebarBusy(activeLocalEvent, { runningSessionId: null, now: 1 + 3 * 60 * 1000 })).toBe(false);
+  });
+
+  it("does not let the official terminal reason override an authoritative running runtime", () => {
+    const sessionWithReason = {
+      ...session([
+        { id: "assistant-1", type: "assistant_message", timestamp: 1, content: "", isThinking: false, isComplete: false },
+      ]),
+      officialLastTurnReason: "completed" as const,
+    };
+
+    expect(isSessionSidebarBusy(sessionWithReason, {
+      runningSessionId: sessionWithReason.runtimeSessionId ?? null,
+      now: 1,
+    })).toBe(true);
+    expect(isSessionSidebarBusy(sessionWithReason, {
+      runningSessionId: null,
+      activities: [{
+        roomId: sessionWithReason.id,
+        roomAgentId: "primary",
+        status: "running",
+        updatedAt: 1,
+      }],
+      now: 1,
+    })).toBe(true);
   });
 });

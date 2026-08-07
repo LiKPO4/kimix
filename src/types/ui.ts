@@ -151,6 +151,12 @@ export type RoomAgentDeliveryStatus =
   | "indeterminate"
   | "cancelled";
 
+/**
+ * 官方会话目录/快照报告的上一轮结束原因（Server 0.34+）。
+ * 官方语义：busy 中的会话省略该字段；cancelled 不持久化（重启后丢失）。
+ */
+export type OfficialLastTurnReason = "completed" | "cancelled" | "failed";
+
 export type RoomContextShareMode = "last" | "recent3" | "selected" | "all" | "none";
 
 export interface RoomContextShareSelection {
@@ -299,6 +305,8 @@ export interface Session {
   archivedAt?: number;
   btwRounds?: BtwRound[];
   officialGoal?: OfficialGoalState;
+  /** 官方会话目录报告的上一轮结束原因；缺失时（旧版本、busy 中、SDK 路由）不得推断为终态。 */
+  officialLastTurnReason?: OfficialLastTurnReason;
   /** 用户控制的多 Agent 房间；缺失时按单一 synthetic primary Agent 兼容读取。 */
   collaboration?: CollaborationState;
   /** 未知或损坏的协同结构保持原样，当前版本不得降级覆盖。 */

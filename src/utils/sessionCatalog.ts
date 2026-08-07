@@ -3,6 +3,7 @@ import { getPrimaryRoomAgent, updateRoomAgent } from "@/utils/collaborationRooms
 import { normalizePathForComparison } from "@/utils/pathCase";
 import { parseOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
 import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
+import { normalizeOfficialLastTurnReason } from "@/utils/sessionActivity";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
 /**
@@ -19,6 +20,7 @@ export interface OfficialSessionCatalogItem {
   title?: string;
   lastPrompt?: string;
   isCustomTitle?: boolean;
+  lastTurnReason?: string;
   archived?: boolean;
   source?: "server" | "sdk";
   metadata?: Record<string, unknown>;
@@ -341,6 +343,7 @@ export function reconcileOfficialSessionCatalog(
         skillForkParentSessionId,
         title,
         updatedAt,
+        officialLastTurnReason: normalizeOfficialLastTurnReason(official.lastTurnReason),
         archivedAt: undefined,
         officialCatalogConfirmedAt: catalogConfirmedAt,
       };
@@ -388,6 +391,7 @@ export function reconcileOfficialSessionCatalog(
       const runtimeSessionId = lineageIds.size > 1 ? official.id : existing.runtimeSessionId;
       const engine = existing.engine ?? "kimi-code";
       const title = existing.titleLocked ? existing.title : catalogTitle(official) ?? existing.title;
+      const officialLastTurnReason = normalizeOfficialLastTurnReason(official.lastTurnReason);
       if (
         updatedAt === existing.updatedAt &&
         officialSessionId === existing.officialSessionId &&
@@ -395,10 +399,11 @@ export function reconcileOfficialSessionCatalog(
         skillForkParentSessionId === existing.skillForkParentSessionId &&
         engine === existing.engine &&
         title === existing.title &&
+        existing.officialLastTurnReason === officialLastTurnReason &&
         existing.officialCatalogConfirmedAt
       ) continue;
       if (next === sessions) next = [...sessions];
-      next[existingIndex] = { ...existing, engine, runtimeSessionId, officialSessionId, skillForkParentSessionId, title, updatedAt, officialCatalogConfirmedAt: catalogConfirmedAt };
+      next[existingIndex] = { ...existing, engine, runtimeSessionId, officialSessionId, skillForkParentSessionId, title, updatedAt, officialLastTurnReason, officialCatalogConfirmedAt: catalogConfirmedAt };
       changed = true;
       continue;
     }
@@ -410,6 +415,7 @@ export function reconcileOfficialSessionCatalog(
       officialSessionId: official.id,
       skillForkParentSessionId,
       officialCatalogConfirmedAt: catalogConfirmedAt,
+      officialLastTurnReason: normalizeOfficialLastTurnReason(official.lastTurnReason),
       model: null,
       title: catalogTitle(official) ?? "新会话",
       projectPath,
