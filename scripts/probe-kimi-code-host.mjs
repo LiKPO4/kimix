@@ -79,9 +79,13 @@ async function main() {
     },
     uiMode: "kimix-host-probe",
   };
-  const harness = typeof sdk.createKimiHarness === "function"
-    ? sdk.createKimiHarness(options)
-    : new sdk.KimiHarness(options);
+  // KIMIX_HOST_PROBE_ENGINE=v2 时走 v2 引擎（createKimiHarnessV2），默认保持 v1 行为。
+  const useV2 = process.env.KIMIX_HOST_PROBE_ENGINE === "v2";
+  const harness = useV2
+    ? sdk.createKimiHarnessV2(options)
+    : typeof sdk.createKimiHarness === "function"
+      ? sdk.createKimiHarness(options)
+      : new sdk.KimiHarness(options);
 
   try {
     const config = await harness.getConfig();

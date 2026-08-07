@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-07 跟进：SDK 路由默认切 v2 引擎，v1 留环境变量回滚（上游跟进队列 5/5，v2.20.285）
+
+- 背景：goal 队列第 5 项。前置 probe 已验证：v2 client 方法面完整（host 调用面全覆盖）、事件经 event-mapper 翻译回 v1 形状、v1/v2 会话存储（目录布局/state.json/wire.jsonl）完全同构可无缝互 resume。
+- 修法：`KimiCodeSdkModule` 类型补 `createKimiHarnessV2` 签名；`getHarness()` 默认走 v2，`KIMIX_SDK_ENGINE=v1` 整体回退 v1，bundle 无 v2 导出时防御回退并 warn；`forcePluginSessionStartReminder` 两处传参加注「v2 忽略该参数」；探针 `probe-kimi-code-host.mjs` 加 `KIMIX_HOST_PROBE_ENGINE=v2` 参数化。
+- 探针（v2）：主探针三轮全绿（prompt completed 16.7s 首字、steer completed 含 prompt.queued 排队事件、cancel cancelled）；触点验证全绿——resume 真实 v1 会话零污染（前后 sha256 全等）、fork 成功、listPlugins/listSkills/listMcpServers 只读正常。
+- 行为差异（对 host 均无影响，已注释）：忙碌 prompt v1 丢弃 vs v2 FIFO 排队；空闲 steer v2 报 prompt.not_found；createSession 未知模型别名 v2 抛 config.invalid（host 有兜底）。
+- 验收：定向 12/12、typecheck 双配置 0 错误；全量 vitest/build 见提交记录。实机复验待用户（SDK 兜底路由下的会话行为）；回滚：KIMIX_SDK_ENGINE=v1。
+
 ## 2026-08-07 跟进：缓存过期提醒——长闲置会话发送前提示 compact（上游跟进队列 4/5，v2.20.284）
 
 - 背景：goal 队列第 4 项，上游 0.34.0 #2646 的 Kimix 版。可行性已验证：端点 `POST https://api.kimi.com/coding/v1/client_configs`（body `{"name":"estimated_cache_duration"}`）匿名可达（实测 200）；规则按模型给 `cache_duration`/`min_tokens_to_hint`（k3 系 600s、kimi-for-coding 系 3600s，阈值均 200k tokens）。

@@ -63,6 +63,14 @@ type KimiCodeSdkModule = {
     uiMode?: string;
     skillDirs?: readonly string[];
   }) => KimiHarnessLike;
+  // v2 引擎（SDKRpcClientV2）：与 v1 同一 KimiHarness 类型面、写同一份会话存储，
+  // 行为细节差异见 getHarness 注释。
+  createKimiHarnessV2?: (options: {
+    homeDir?: string;
+    identity?: KimiCodeHostIdentity;
+    uiMode?: string;
+    skillDirs?: readonly string[];
+  }) => KimiHarnessLike;
   DEFAULT_CATALOG_URL?: string;
   fetchCatalog?: (url: string, signal?: AbortSignal) => Promise<Record<string, unknown>>;
   inferWireType?: (entry: unknown) => string | undefined;
@@ -1060,6 +1068,7 @@ export async function reloadSession(sessionId: string): Promise<void> {
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.reloadSession) throw new Error("当前兼容链路不支持会话重载。");
+  // v2 引擎忽略 forcePluginSessionStartReminder（reload 本身仍会重载 Skill/Plugin 注册表）。
   await managed.session.reloadSession({ forcePluginSessionStartReminder: true });
 }
 
@@ -1078,6 +1087,7 @@ async function migrateServerSessionToSdk(
 
   const sdkHarness = await getHarness();
   let session: KimiCodeSessionLike;
+  // v2 引擎忽略 forcePluginSessionStartReminder 参数；此分支仅保证 v1 下语义一致。
   if (options.forcePluginSessionStartReminder && sdkHarness.reloadSession) {
     session = await sdkHarness.reloadSession({
       id: sessionId,
@@ -4081,12 +4091,23 @@ async function getHarness(): Promise<KimiHarnessLike> {
     },
     uiMode: "kimix",
   };
-  if (sdk.createKimiHarness) {
-    harness = sdk.createKimiHarness(options);
-  } else if (sdk.KimiHarness) {
-    harness = new sdk.KimiHarness(options);
+  // 默认走 v2 引擎（SDKRpcClientV2）：两引擎写同一份会话存储（state.json/wire.jsonl 同构），
+  // 来回切换无需数据迁移；KIMIX_SDK_ENGINE=v1 时整体回退 v1 引擎。
+  const useV1Engine = process.env.KIMIX_SDK_ENGINE === "v1";
+  if (!useV1Engine && sdk.createKimiHarnessV2) {
+    harness = sdk.createKimiHarnessV2(options);
   } else {
-    throw new Error("Official Kimi Code SDK does not export KimiHarness/createKimiHarness.");
+    if (!useV1Engine) {
+      // 防御旧 bundle：无 createKimiHarnessV2 导出时回退 v1。
+      console.warn("[KimiCodeHost] SDK bundle 未导出 createKimiHarnessV2，回退到 v1 引擎。");
+    }
+    if (sdk.createKimiHarness) {
+      harness = sdk.createKimiHarness(options);
+    } else if (sdk.KimiHarness) {
+      harness = new sdk.KimiHarness(options);
+    } else {
+      throw new Error("Official Kimi Code SDK does not export KimiHarness/createKimiHarness.");
+    }
   }
   return harness;
 }
