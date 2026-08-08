@@ -330,6 +330,14 @@ function installBrowserPreviewApi() {
         ],
       },
     }),
+    probeKimiCodeThinkingEfforts: () => Promise.resolve({
+      success: true as const,
+      data: {
+        supportEfforts: ["off", "low", "medium", "high", "xhigh"],
+        defaultEffort: "high",
+        endpoint: "https://api.deepseek.com/v1/chat/completions",
+      },
+    }),
     setKimiDefaultModel: () => Promise.resolve({
       success: true,
       data: {

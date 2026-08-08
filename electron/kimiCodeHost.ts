@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
+import { probeThinkingEfforts as probeProviderThinkingEfforts } from "./providerEffortProbe";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
@@ -2832,6 +2833,39 @@ export async function getConfigDiagnostics(): Promise<KimiCodeConfigDiagnostics>
   const sdkHarness = await getHarness();
   if (!sdkHarness.getConfigDiagnostics) return { warnings: [] };
   return sdkHarness.getConfigDiagnostics();
+}
+
+export type ThinkingEffortProbeResult = {
+  supportEfforts: string[];
+  defaultEffort?: string;
+  endpoint: string;
+};
+
+/**
+ * 自动探测模型可用思考档位：读取配置中模型对应供应商的 base_url/api_key，
+ * 向 OpenAI 兼容 chat/completions 逐个验证 reasoning_effort，返回 Kimix 词表
+ * （off + 被供应商接受的档位）。用于设置页「自动探测」按钮回填 support_efforts。
+ */
+export async function probeModelThinkingEfforts(modelAlias: string): Promise<ThinkingEffortProbeResult> {
+  const config = await getConfig({ reload: true });
+  const model = config.models?.[modelAlias];
+  if (!model?.model) throw new Error(`未找到模型「${modelAlias}」，请先保存模型配置。`);
+  const providerName = model.provider ?? config.defaultProvider ?? "";
+  const provider = config.providers?.[providerName];
+  if (!provider?.baseUrl) throw new Error(`供应商「${providerName}」未配置 base_url，无法探测。`);
+  const apiKey = provider.apiKey ?? provider.env?.OPENAI_API_KEY ?? "";
+  const result = await probeProviderThinkingEfforts({
+    baseUrl: provider.baseUrl,
+    apiKey,
+    model: model.model,
+  });
+  const nonOff = result.supported.filter((value) => value !== "off");
+  if (nonOff.length === 0) throw new Error("供应商未接受任何思考档位（可能不支持 reasoning_effort），可手动声明或留空。");
+  const efforts = ["off", ...nonOff];
+  const defaultEffort = model.defaultEffort && efforts.includes(model.defaultEffort)
+    ? model.defaultEffort
+    : nonOff[Math.floor(nonOff.length / 2)];
+  return { supportEfforts: efforts, defaultEffort, endpoint: result.endpoint };
 }
 
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {

@@ -469,6 +469,22 @@ export type DiscoverKimiProviderModelsResponse = {
   error: string;
 };
 
+export type ProbeKimiThinkingEffortsRequest = {
+  modelAlias: string;
+};
+
+export type ProbeKimiThinkingEffortsResponse = {
+  success: true;
+  data: {
+    supportEfforts: string[];
+    defaultEffort?: string;
+    endpoint: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
 export type SetKimiDefaultModelRequest = {
   modelAlias: string;
 };

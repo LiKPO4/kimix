@@ -5748,6 +5748,17 @@ ipcMain.handle("kimi:testOpenAiProvider", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:probeThinkingEfforts", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const modelAlias = typeof req.modelAlias === "string" ? req.modelAlias.trim() : "";
+    if (!modelAlias) return { success: false, error: "缺少模型别名" };
+    return { success: true, data: await kimiCodeHost.probeModelThinkingEfforts(modelAlias) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:saveSecondaryModel", async (_, request: unknown) => {
   try {
     return { success: true, data: await saveKimiSecondaryModelConfig(request) };

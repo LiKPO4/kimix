@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+import { buildChatCompletionsUrls, probeThinkingEfforts } from "../providerEffortProbe";
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+describe("buildChatCompletionsUrls", () => {
+  it("已带 /v1 的 base_url 直接补 /chat/completions", () => {
+    expect(buildChatCompletionsUrls("https://api.deepseek.com/v1")).toEqual([
+      "https://api.deepseek.com/v1/chat/completions",
+    ]);
+  });
+
+  it("不带版本段的 base_url 同时给出 /v1 候选", () => {
+    const urls = buildChatCompletionsUrls("https://example.com");
+    expect(urls).toContain("https://example.com/chat/completions");
+    expect(urls).toContain("https://example.com/v1/chat/completions");
+  });
+
+  it("已是 chat/completions 结尾不重复追加", () => {
+    expect(buildChatCompletionsUrls("https://example.com/v1/chat/completions")).toEqual([
+      "https://example.com/v1/chat/completions",
+    ]);
+  });
+
+  it("拒绝非 http(s) 协议", () => {
+    expect(() => buildChatCompletionsUrls("ftp://example.com")).toThrow();
+  });
+});
+
+describe("probeThinkingEfforts", () => {
+  it("基线成功后逐档探测，200 记支持、effort 相关 400 记不支持", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const fetchMock = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      calls.push(body);
+      const effort = body.reasoning_effort as string | undefined;
+      if (effort === undefined) return jsonResponse(200, { id: "cmpl-1" });
+      if (effort === "max") {
+        return jsonResponse(400, { error: { message: "'reasoning_effort' must be one of: 'none', 'minimal', 'low', 'medium', 'high', 'xhigh'" } });
+      }
+      return jsonResponse(200, { id: "cmpl-2" });
+    }) as typeof fetch;
+
+    const result = await probeThinkingEfforts(
+      { baseUrl: "https://api.deepseek.com/v1", apiKey: "k", model: "deepseek-chat" },
+      fetchMock,
+    );
+    expect(result.supported).toEqual(["minimal", "low", "medium", "high", "xhigh"]);
+    expect(result.supported).not.toContain("max");
+    // 基线 1 次 + 6 个候选 = 7 次请求
+    expect(calls).toHaveLength(7);
+  });
+
+  it("凭证被拒绝时整体失败", async () => {
+    const fetchMock = (async () => jsonResponse(401, { error: { message: "bad key" } })) as typeof fetch;
+    await expect(probeThinkingEfforts(
+      { baseUrl: "https://api.deepseek.com/v1", apiKey: "bad", model: "m" },
+      fetchMock,
+    )).rejects.toThrow();
+  });
+
+  it("全部档位被拒时返回空列表", async () => {
+    const fetchMock = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (body.reasoning_effort === undefined) return jsonResponse(200, { id: "ok" });
+      return jsonResponse(400, { error: { message: "unsupported reasoning_effort" } });
+    }) as typeof fetch;
+    const result = await probeThinkingEfforts(
+      { baseUrl: "https://api.deepseek.com/v1", apiKey: "k", model: "m" },
+      fetchMock,
+    );
+    expect(result.supported).toEqual([]);
+  });
+});

@@ -148,7 +148,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [discoveredModels, setDiscoveredModels] = useState<DiscoveredKimiProviderModel[]>([]);
   const [discoveredEndpoint, setDiscoveredEndpoint] = useState("");
-  const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | null>(null);
+  const [busyAction, setBusyAction] = useState<"provider" | "model" | "discover" | "test" | "default" | "remove-model" | "remove-provider" | "thinking" | "probe-effort" | null>(null);
   const [message, setMessage] = useState("");
   const [modelFormMessage, setModelFormMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -426,6 +426,34 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
       const defaultEffort = supportEfforts.includes(current.defaultEffort) ? current.defaultEffort : "";
       return { ...current, supportEfforts, defaultEffort };
     });
+  };
+
+  const handleProbeEfforts = async () => {
+    if (!selectedModelAlias) {
+      setModelFormMessage("请先保存模型，再自动探测思考档位。");
+      return;
+    }
+    setBusyAction("probe-effort");
+    setModelFormMessage("正在向供应商探测可用思考档位...");
+    try {
+      const res = await window.api.probeKimiCodeThinkingEfforts({ modelAlias: selectedModelAlias });
+      if (!res.success) {
+        setModelFormMessage(`探测失败：${res.error}`);
+        return;
+      }
+      modelEffortsTouchedRef.current = true;
+      setModelDraft((current) => ({
+        ...current,
+        supportEfforts: res.data.supportEfforts,
+        defaultEffort: res.data.defaultEffort && res.data.supportEfforts.includes(res.data.defaultEffort) ? res.data.defaultEffort : "",
+      }));
+      const usable = res.data.supportEfforts.filter((item) => item !== "off").length;
+      setModelFormMessage(`探测到 ${usable} 个可用思考档位，已回填到上方，保存模型后生效。`);
+    } catch (error) {
+      setModelFormMessage(`探测失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const handleSaveModel = async () => {
@@ -961,7 +989,19 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                     </label>
                   </div>
                   <div style={{ marginTop: 14 }}>
-                    <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>思考档位（可选）</span>
+                    <div className="flex items-center justify-between" style={{ gap: 8 }}>
+                      <span className="kimix-settings-permission-desc block" style={{ marginTop: 0 }}>思考档位（可选）</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleProbeEfforts()}
+                        disabled={Boolean(busyAction)}
+                        className="kimix-icon-text-button is-compact kimix-muted-action shrink-0 disabled:opacity-55"
+                        title="向供应商探测该模型实际接受的思考等级"
+                      >
+                        <RefreshCw size={13} className={busyAction === "probe-effort" ? "kimix-spin" : ""} />
+                        自动探测
+                      </button>
+                    </div>
                     <div className="text-[11.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
                       声明后输入区可按档位切换；不声明则仅 关闭/开启。档位会原样传给供应商，需与上游实际能力一致。
                     </div>
