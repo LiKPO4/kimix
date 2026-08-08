@@ -697,6 +697,16 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     thinkingModelOption?.defaultEffort,
   );
   const thinkingEffortForSessionCreate = activeThinkingEffort === "on" ? undefined : activeThinkingEffort;
+  // 配置阶段一次性矫正：当前模型 support_efforts 不含活动档位时（如存量配置 max，
+  // 而 OpenAI 兼容 provider 只认 xhigh），矫正为解析值。off/on 恒有效不矫正。
+  // 仅在目录已加载（supportEfforts 已声明）时矫正，避免未加载时误矫正成 off。
+  // 矫正后发送路径直接用 activeThinkingEffort，无需每次发送再校验。
+  useEffect(() => {
+    if (!thinkingModelOption?.supportEfforts?.length) return;
+    if (activeThinkingEffort === "off" || activeThinkingEffort === "on") return;
+    if (thinkingEffortOptions.some((option) => option.value === activeThinkingEffort)) return;
+    setActiveThinkingEffort(selectedThinkingEffort);
+  }, [activeThinkingEffort, thinkingEffortOptions, selectedThinkingEffort, thinkingModelOption?.supportEfforts]);
   const swarmModeEnabled = displayedSwarmMode(mutationSessionView);
   const swarmModePending = hasPendingSwarmMode(mutationSessionView);
   const canSteerActiveTurn = Boolean(
