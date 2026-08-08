@@ -809,16 +809,27 @@ let eventSink: EventSink | null = null;
 let statusSink: StatusSink | null = null;
 const statusSequencer = new KimiCodeStatusSequencer((sessionId, status) => setStatus(sessionId, status));
 // 上下文缓存过期提醒（上游 0.34.0 #2646）：每会话最后一次 LLM 轮次完成时间。
-// 只有终态帧（turn.ended/prompt.completed/full_compaction）计入；Server 快照
-// 重放只产生消息类帧，不会被重放污染；closeSession 时清理。
+// 只有终态帧计入：turn.ended / prompt.completed，以及压缩终态的两套名字——
+// emit 事件 compaction.completed/cancelled 与 wire 记录 full_compaction.complete/cancel
+// （compactSession 直接读 wire 文件拿到的是记录名）；blocked 不计入（压缩未执行）。
+// 快照重放帧（payload.snapshotReplay，含合成失败终态帧）不计入，避免污染闲置计时；closeSession 时清理。
 const lastTurnCompletedAt = new Map<string, number>();
 
 function eventTypeOf(event: unknown): unknown {
   return event && typeof event === "object" ? (event as { type?: unknown }).type : undefined;
 }
 
-function isTurnCompletionEventType(type: unknown): boolean {
-  return type === "turn.ended" || type === "prompt.completed" || type === "full_compaction";
+export function isTurnCompletionEventType(type: unknown): boolean {
+  return type === "turn.ended" || type === "prompt.completed" ||
+    type === "compaction.completed" || type === "compaction.cancelled" ||
+    type === "full_compaction.complete" || type === "full_compaction.cancel";
+}
+
+/** 快照重放帧（含合成失败终态帧）不得计入轮次活动。 */
+export function isSnapshotReplayFrame(frame: { payload?: unknown }): boolean {
+  const payload = frame.payload;
+  return typeof payload === "object" && payload !== null &&
+    typeof (payload as { snapshotReplay?: unknown }).snapshotReplay === "string";
 }
 
 function recordTurnCompletion(sessionId: string): void {
@@ -3374,7 +3385,7 @@ function handleServerFrame(frame: ServerFrame) {
   if (managed && consumeBtwEvent(managed.btwRuns, event)) return;
   eventSink?.({ sessionId, event });
   updateStatusFromEvent(sessionId, event, "prompt");
-  if (isTurnCompletionEventType(frame.type)) recordTurnCompletion(sessionId);
+  if (isTurnCompletionEventType(frame.type) && !isSnapshotReplayFrame(frame)) recordTurnCompletion(sessionId);
   // Live tool frames after a premature completed status prove the Server is still
   // working (agent-core may keep tool work after a prompt.completed delivery
   // barrier). Re-open running so the renderer does not stay on 已连接 / 输出完成

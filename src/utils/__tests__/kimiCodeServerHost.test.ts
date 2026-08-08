@@ -27,6 +27,8 @@ import {
   shouldApplyServerModelRefresh,
   shouldWritePermissionToServer,
   toKimiCodeMcpServerInfo,
+  isTurnCompletionEventType,
+  isSnapshotReplayFrame,
 } from "../../../electron/kimiCodeHost";
 import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
@@ -463,5 +465,31 @@ describe("toKimiCodeMcpServerInfo", () => {
     expect(toKimiCodeMcpServerInfo({ ...base, status: "error" }).status).toBe("failed");
     expect(toKimiCodeMcpServerInfo({ ...base, status: "disconnected" }).status).toBe("disabled");
     expect(toKimiCodeMcpServerInfo({ ...base, status: "connected" }).status).toBe("connected");
+  });
+});
+
+describe("isTurnCompletionEventType / isSnapshotReplayFrame（缓存提示活动链）", () => {
+  it("计入轮终态帧与压缩终态两套名字", () => {
+    expect(isTurnCompletionEventType("turn.ended")).toBe(true);
+    expect(isTurnCompletionEventType("prompt.completed")).toBe(true);
+    expect(isTurnCompletionEventType("compaction.completed")).toBe(true);
+    expect(isTurnCompletionEventType("compaction.cancelled")).toBe(true);
+    expect(isTurnCompletionEventType("full_compaction.complete")).toBe(true);
+    expect(isTurnCompletionEventType("full_compaction.cancel")).toBe(true);
+  });
+
+  it("不计入非终态事件、旧无后缀名与 blocked", () => {
+    expect(isTurnCompletionEventType("full_compaction")).toBe(false);
+    expect(isTurnCompletionEventType("compaction.started")).toBe(false);
+    expect(isTurnCompletionEventType("compaction.blocked")).toBe(false);
+    expect(isTurnCompletionEventType("assistant.delta")).toBe(false);
+    expect(isTurnCompletionEventType(undefined)).toBe(false);
+  });
+
+  it("快照重放帧（含合成失败终态帧）识别为 replay", () => {
+    expect(isSnapshotReplayFrame({ payload: { snapshotReplay: "history" } })).toBe(true);
+    expect(isSnapshotReplayFrame({ payload: { type: "turn.ended", snapshotReplay: "in_flight" } })).toBe(true);
+    expect(isSnapshotReplayFrame({ payload: { type: "turn.ended" } })).toBe(false);
+    expect(isSnapshotReplayFrame({})).toBe(false);
   });
 });

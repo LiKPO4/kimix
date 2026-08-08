@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-08 修复：review v2.20.272..294 后修前两批确认问题（v2.20.295）
+
+- 背景：对上次发版 v2.20.272 以来 23 个提交做全量 review（3 组并行子代理 + 主代理抽查），无严重级；用户复核结论并定修复顺序。
+- 第一批（#1+#9 同链合修，electron/kimiCodeHost.ts）：`isTurnCompletionEventType` 原匹配不带后缀的 `full_compaction`（永不命中——vendor emit 名是 `compaction.completed/cancelled`，wire 记录名是 `full_compaction.complete/cancel`），压缩成功后 `lastTurnCompletedAt` 不刷新；且快照重放帧/合成失败 `turn.ended` 会写入 `lastTurnCompletedAt`，与「重放不污染」注释矛盾。修法：匹配两套终态名（blocked 不计），`payload.snapshotReplay` 帧跳过 `recordTurnCompletion`；新增 3 单测固化。
+- 第二批（src/components/layout/SkillsPanel.tsx）：installCapability 2s 轮询 interval 存 ref 并随卸载清理（此前卸载后永久轮询）；toggleSkill 失败回滚 `enabledIds` 乐观更新。
+- 验收：typecheck 双配置 0 错误、全量 vitest 1818/1818（新增 3）、build 通过。vendor probe 未跑对照：probe 脚本无 compaction 断言，跑了也不覆盖本改动；事件名依据 vendor 源码实读（用户复核）与 compactionWire 类型定义。
+- 遗留：第三批 #4（last_turn_reason 陈旧窗）/#5（turnSettled 同 tick）需先抓 SSE/事件流快照再动；其余轻微项挂后续择机。
+
 ## 2026-08-08 修复：默认/现代化下侧栏「打开项目」加号按钮补 hover 背景+阴影（v2.20.294）
 
 - 现象：默认与现代化模式下，侧栏「项目」行右侧「打开项目」+ 按钮 hover 无背景/阴影，辨识度低（用户截图红箭头）。

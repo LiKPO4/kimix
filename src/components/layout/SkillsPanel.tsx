@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Activity, Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Store, Upload } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
@@ -60,6 +60,11 @@ export function SkillsPanel({
   const [capabilities, setCapabilities] = useState<KimiCodeCapabilityStatus[]>([]);
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const [installingCapabilityId, setInstallingCapabilityId] = useState<string | null>(null);
+  const installPollRef = useRef<number | null>(null);
+  // 安装轮询必须随卸载清理：切走插件页后 interval 不得继续每 2s 轮询 IPC。
+  useEffect(() => () => {
+    if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
+  }, []);
   const [dragActive, setDragActive] = useState(false);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
   const sdkRuntimeSessionId = currentSession?.engine === "kimi-code"
@@ -135,14 +140,19 @@ export function SkillsPanel({
 
   const installCapability = async (capability: KimiCodeCapabilityStatus) => {
     if (installingCapabilityId) return;
+    if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
     setInstallingCapabilityId(capability.id);
     setMessage(`正在安装 ${capability.displayName}...`);
     // 安装可能下载托管运行时，期间轮询进度（install.step/percent）。
-    const poll = window.setInterval(() => {
+    // interval 存 ref 并随卸载统一清理，避免切走插件页后继续轮询。
+    installPollRef.current = window.setInterval(() => {
       void refreshCapabilities();
     }, 2000);
     const res = await window.api.installKimiCodeCapability({ id: capability.id });
-    window.clearInterval(poll);
+    if (installPollRef.current !== null) {
+      window.clearInterval(installPollRef.current);
+      installPollRef.current = null;
+    }
     setInstallingCapabilityId(null);
     if (!res.success) {
       setMessage(`${capability.displayName} 安装失败：${res.error}`);
@@ -225,6 +235,7 @@ export function SkillsPanel({
     const res = await window.api.saveEnabledSkills({ ids: next });
     setSaving(false);
     if (!res.success) {
+      setEnabledIds(enabledIds); // 失败回滚乐观更新，避免 UI 与持久化不一致
       setMessage(`保存失败：${res.error}`);
       return;
     }
