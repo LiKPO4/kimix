@@ -3471,7 +3471,25 @@ async function settleServerSessionAfterPromptCompleted(sessionId: string): Promi
     } catch {
       mainTurnActive = undefined; // 无法确认时保守按 busy
     }
-    setStatus(sessionId, resolveEngineStatusAfterPromptCompleted(status, mainTurnActive));
+    const resolved = resolveEngineStatusAfterPromptCompleted(status, mainTurnActive);
+    // 中间步骤（goal 续跑 / agent 自动续轮）的 prompt.completed 后 REST 短暂返回 idle
+    // 且 main_turn_active=false（续轮还没开始），resolveEngineStatusAfterPromptCompleted
+    // 会判 completed → 渲染层 settle 折叠思考链 + 投影半截正文，续轮开始后又展开（闪烁）。
+    // grace 期内续轮的 assistant.delta 会把 mainTurnActive 翻回 true（handleServerFrame
+    // L3395），到期时检查到就不 settle。真正结束后 30s 内无新帧，才 setStatus(completed)。
+    // 实机快照 v2.20.296：prompt.completed → 34s 后续轮到达，30s grace 能覆盖。
+    if (resolved === "completed") {
+      setTimeout(() => {
+        const m = serverSessions.get(sessionId);
+        if (!m || m.status === "interrupted" || m.status === "error") return;
+        if (m.mainTurnActive === true) return; // 续轮已恢复，不 settle
+        setStatus(sessionId, "completed");
+        const settledTurnModel = status.model?.trim();
+        if (settledTurnModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: settledTurnModel, phase: "settle" } });
+      }, 30_000).unref?.();
+      return;
+    }
+    setStatus(sessionId, resolved);
     // settle 后以 server 实际模型补一次当轮盖章：覆盖外部（Web 发起）轮次——它们没有
     // sendPrompt 的意图信号；渲染层只填空，不覆盖 dispatch 时已盖章的值。
     const settledTurnModel = status.model?.trim();
