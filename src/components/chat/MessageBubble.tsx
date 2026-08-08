@@ -2331,7 +2331,7 @@ function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: b
   }
 }
 
-export function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean }) {
+export function KimiWebProcessList({ items, isActiveAssistant, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupProcessItems(items), [items]);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
@@ -2344,7 +2344,6 @@ export function KimiWebProcessList({ items, isActiveAssistant, hasFinalContent, 
             groupCount: groups.length,
             isThinkingGroup: group.type === "thinking",
             isActiveAssistant,
-            hasFinalContent,
             preserveDuringFinalTransition,
           })}
         />
@@ -2394,7 +2393,6 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
           groupCount: groups.length,
           isThinkingGroup: group.type === "thinking",
           isActiveAssistant,
-          hasFinalContent,
           preserveDuringFinalTransition,
         });
         return (
@@ -2550,7 +2548,6 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   const mergeLiveThinkingDraft = shouldMergeLiveThinkingDraftIntoTimeline({
     blocks: isKimiWeb && liveDraftKey ? effectiveTurnBlocks : undefined,
     isActiveAssistant,
-    hasFinalContent,
     preserveDuringFinalTransition: isFinalContentTransition,
   });
 
@@ -2684,7 +2681,6 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
             <KimiWebProcessList
               items={items}
               isActiveAssistant={isActiveAssistant}
-              hasFinalContent={hasFinalContent}
               preserveDuringFinalTransition={isFinalContentTransition}
             />
             )

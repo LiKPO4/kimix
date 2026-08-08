@@ -281,7 +281,6 @@ describe("MessageBubble kimi-web cards stay collapsed unless the user expands th
           { type: "tool", tool: runningTool },
         ],
         isActiveAssistant: true,
-        hasFinalContent: false,
       }));
     });
 

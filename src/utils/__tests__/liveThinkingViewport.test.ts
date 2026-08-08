@@ -71,17 +71,14 @@ describe("liveThinkingViewport", () => {
       groupCount: 3,
       isThinkingGroup: true,
       isActiveAssistant: true,
-      hasFinalContent: false,
     };
     expect(shouldUseLiveThinkingViewport(base)).toBe(true);
     // 已走完的思考阶段（后面已有正文/工具）落盘为可折叠摘要，不再挂实时滚动区。
     expect(shouldUseLiveThinkingViewport({ ...base, groupIndex: 1 })).toBe(false);
     expect(shouldUseLiveThinkingViewport({ ...base, isActiveAssistant: false })).toBe(false);
-    expect(shouldUseLiveThinkingViewport({ ...base, hasFinalContent: true })).toBe(true);
     expect(shouldUseLiveThinkingViewport({
       ...base,
       isActiveAssistant: false,
-      hasFinalContent: true,
       preserveDuringFinalTransition: true,
     })).toBe(true);
   });
@@ -202,7 +199,6 @@ describe("shouldMergeLiveThinkingDraftIntoTimeline", () => {
     expect(shouldMergeLiveThinkingDraftIntoTimeline({
       blocks,
       isActiveAssistant: true,
-      hasFinalContent: false,
     })).toBe(true);
   });
 
@@ -212,19 +208,16 @@ describe("shouldMergeLiveThinkingDraftIntoTimeline", () => {
     expect(shouldMergeLiveThinkingDraftIntoTimeline({
       blocks: thinkingOnly,
       isActiveAssistant: false,
-      hasFinalContent: false,
     })).toBe(false);
     // 末尾组是工具：思考阶段已结束，无 live 滚动窗可并入。
     const withTool = buildTurnBlocks([thinkingEvent("e1", "思考"), toolEvent("t1")]);
     expect(shouldMergeLiveThinkingDraftIntoTimeline({
       blocks: withTool,
       isActiveAssistant: true,
-      hasFinalContent: false,
     })).toBe(false);
     expect(shouldMergeLiveThinkingDraftIntoTimeline({
       blocks: undefined,
       isActiveAssistant: true,
-      hasFinalContent: false,
     })).toBe(false);
   });
 
@@ -233,7 +226,6 @@ describe("shouldMergeLiveThinkingDraftIntoTimeline", () => {
     expect(shouldMergeLiveThinkingDraftIntoTimeline({
       blocks,
       isActiveAssistant: false,
-      hasFinalContent: true,
       preserveDuringFinalTransition: true,
     })).toBe(true);
   });

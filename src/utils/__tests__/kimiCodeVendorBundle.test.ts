@@ -41,3 +41,33 @@ describe("vendored Kimi Code 0.31 fallback", () => {
     expect(fetcher).toMatch(/lookup: pinnedLookup(?:\$\d+)?\(target\.host, target\.addresses\)/);
   });
 });
+
+describe("vendored Kimi Code 0.34", () => {
+  it("导出 SDK v2 引擎创建函数 createKimiHarnessV2", () => {
+    expect(bundle).toContain("createKimiHarnessV2");
+  });
+
+  it("提供 v2 capability RPC 面（capabilityRpc / installCapability）", () => {
+    expect(bundle).toContain("function capabilityRpc(rpc)");
+    expect(bundle).toContain("capabilityRpc(this.rpc).installCapability(id)");
+  });
+
+  it("保留官方终态字段 last_turn_reason（schema 枚举）", () => {
+    expect(bundle).toContain("last_turn_reason: external_exports.enum([");
+  });
+
+  it("发出 goal.updated 状态事件", () => {
+    expect(bundle).toContain('type: "goal.updated"');
+  });
+
+  it("MCP server 状态枚举新增 removed 态", () => {
+    const statusSchema = section(
+      "mcpServerStatusPayloadSchema = external_exports.object({",
+      "mcpServerStatusEventSchema = external_exports.object({",
+    );
+    expect(statusSchema).toContain('"removed"');
+    expect(statusSchema).toContain('"needs-auth"');
+    const mapper = section("function mapMcpStatus", "function mapMcpTransport");
+    expect(mapper).toContain('case "removed":');
+  });
+});

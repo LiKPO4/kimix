@@ -45,7 +45,6 @@ export function shouldUseLiveThinkingViewport({
   groupCount: number;
   isThinkingGroup: boolean;
   isActiveAssistant: boolean;
-  hasFinalContent: boolean;
   preserveDuringFinalTransition?: boolean;
 }) {
   // Only the TRAILING (still-growing) thinking phase keeps the bounded
@@ -68,12 +67,10 @@ export function shouldUseLiveThinkingViewport({
 export function shouldMergeLiveThinkingDraftIntoTimeline({
   blocks,
   isActiveAssistant,
-  hasFinalContent,
   preserveDuringFinalTransition = false,
 }: {
   blocks: TurnBlock[] | undefined;
   isActiveAssistant: boolean;
-  hasFinalContent: boolean;
   preserveDuringFinalTransition?: boolean;
 }) {
   if (!blocks || blocks.length === 0) return false;
@@ -86,7 +83,6 @@ export function shouldMergeLiveThinkingDraftIntoTimeline({
     groupCount: groups.length,
     isThinkingGroup: true,
     isActiveAssistant,
-    hasFinalContent,
     preserveDuringFinalTransition,
   });
 }

@@ -79,13 +79,14 @@ async function main() {
     },
     uiMode: "kimix-host-probe",
   };
-  // KIMIX_HOST_PROBE_ENGINE=v2 时走 v2 引擎（createKimiHarnessV2），默认保持 v1 行为。
-  const useV2 = process.env.KIMIX_HOST_PROBE_ENGINE === "v2";
-  const harness = useV2
-    ? sdk.createKimiHarnessV2(options)
-    : typeof sdk.createKimiHarness === "function"
+  // KIMIX_HOST_PROBE_ENGINE=v1 时才走 v1 引擎（createKimiHarness / KimiHarness 回退），
+  // 默认（不设 env 或设非 "v1" 值）走 v2 引擎（createKimiHarnessV2），与产品默认引擎一致。
+  const useV1 = process.env.KIMIX_HOST_PROBE_ENGINE === "v1";
+  const harness = useV1
+    ? typeof sdk.createKimiHarness === "function"
       ? sdk.createKimiHarness(options)
-      : new sdk.KimiHarness(options);
+      : new sdk.KimiHarness(options)
+    : sdk.createKimiHarnessV2(options);
 
   try {
     const config = await harness.getConfig();
