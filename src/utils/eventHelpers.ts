@@ -87,6 +87,17 @@ export function parseKimiAgentEnvelope(content: string): AgentEnvelopeSummary | 
 }
 
 /**
+ * 前缀兜底只接受与前缀模板"高度匹配"的整句：剩余尾巴超过该长度时视为普通
+ * 用户消息，不折叠。官方续跑消息的追加说明最长约 53 字符（历史脏数据全保留），
+ * 用户长指令（典型误伤场景）被挡在门槛外，避免不可逆的渲染语义变化。
+ */
+const GOAL_CONTINUATION_MAX_TAIL_LEN = 60;
+const GOAL_CONTINUATION_PREFIXES = [
+  "Continue working toward the active goal.",
+  "The previous goal turn reached the per-turn step limit",
+] as const;
+
+/**
  * goal 模式内部续跑提示词判定。官方运行时把系统触发的 goal 续跑作为 role=user
  * 消息持久化（快照消息带 metadata.origin、wire turn.prompt 记录带 origin），
  * 它不是用户输入，渲染时必须折叠为状态摘要，否则原文会出现在用户气泡里。
@@ -103,11 +114,15 @@ export function parseKimiGoalContinuation(content: string, origin?: unknown): { 
   }
   const trimmed = content.trim();
   if (!trimmed) return null;
-  if (
-    trimmed.startsWith("Continue working toward the active goal.") ||
-    trimmed.startsWith("The previous goal turn reached the per-turn step limit")
-  ) {
-    return { kind: "goal-continuation" };
+  // 文本前缀只是拿不到 origin 时的兜底：仅接受整句与前缀模板高度匹配
+  // （剩余尾巴极短），不能只要 startsWith 就折叠。
+  for (const prefix of GOAL_CONTINUATION_PREFIXES) {
+    if (
+      trimmed.startsWith(prefix) &&
+      trimmed.length - prefix.length <= GOAL_CONTINUATION_MAX_TAIL_LEN
+    ) {
+      return { kind: "goal-continuation" };
+    }
   }
   return null;
 }
@@ -434,7 +449,14 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
   ));
   const settled = events.flatMap<TimelineEvent>((event) => {
     if (event.type === "subagent") {
-      if (event.status === "running" && isStaleRunningEvent(event, settledAt)) {
+      if (
+        (event.status === "queued" || event.status === "running" || event.status === "suspended") &&
+        isStaleRunningEvent(event, settledAt)
+      ) {
+        // 平静收敛路径：stale 的 queued/running/suspended 一并收尾为 completed，
+        // 否则侧栏 open 判定（queued/running/suspended 视为活动）永久残留。
+        // queued 超时视为 abandoned 收尾、suspended 超时视为挂起失效收尾；
+        // 统一 completed 与 running 既有语义一致（subagent 状态类型无 cancelled）。
         return [{ ...event, status: "completed" as const }];
       }
       return [event];

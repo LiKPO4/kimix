@@ -25,7 +25,7 @@ function asArray<T>(value: T[] | undefined | null): T[] {
 }
 
 export function SkillsPanel({
-  open,
+  open: _open,
   onBackToChat,
   activeTab = "skills",
   onActiveTabChange,
@@ -61,6 +61,8 @@ export function SkillsPanel({
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const [installingCapabilityId, setInstallingCapabilityId] = useState<string | null>(null);
   const installPollRef = useRef<number | null>(null);
+  const installCapabilityLockRef = useRef(false);
+  const installMarketplacePluginLockRef = useRef(false);
   // 安装轮询必须随卸载清理：切走插件页后 interval 不得继续每 2s 轮询 IPC。
   useEffect(() => () => {
     if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
@@ -75,13 +77,14 @@ export function SkillsPanel({
     setLocalActiveTab(activeTab);
   }, [activeTab]);
 
-  const refreshSdkPlugins = async (nextMessage?: string) => {
+  const refreshSdkPlugins = async (nextMessage?: string, isCancelled?: () => boolean) => {
     setSdkPluginRefreshing(true);
     const [pluginRes, skillRes, diagnosticsRes] = await Promise.all([
       window.api.listKimiCodePlugins(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
       window.api.listKimiCodeSkills(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}),
       window.api.getKimiCodeConfigDiagnostics(),
     ]);
+    if (isCancelled?.()) return;
     setSdkPluginRefreshing(false);
     if (!pluginRes.success) {
       setMessage(`刷新官方插件状态失败：${pluginRes.error}`);
@@ -105,24 +108,28 @@ export function SkillsPanel({
   };
 
   useEffect(() => {
-    if (!open) {
-      setSdkPlugins([]);
-      setSdkSkills([]);
-      return;
-    }
-    void refreshSdkPlugins();
-  }, [open, sdkRuntimeSessionId]);
+    let cancelled = false;
+    void refreshSdkPlugins(undefined, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [sdkRuntimeSessionId]);
 
   useEffect(() => {
-    if (!open) return;
+    let cancelled = false;
     void (async () => {
       const res = await window.api.listKimiCodeMarketplace();
+      if (cancelled) return;
       if (res.success) setMarketplace(asArray(res.data));
     })();
-  }, [open]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const refreshCapabilities = async () => {
+  const refreshCapabilities = async (isCancelled?: () => boolean) => {
     const res = await window.api.listKimiCodeCapabilities();
+    if (isCancelled?.()) return [] as KimiCodeCapabilityStatus[];
     setCapabilitiesLoaded(true);
     if (res.success) {
       const next = asArray(res.data);
@@ -134,48 +141,64 @@ export function SkillsPanel({
   };
 
   useEffect(() => {
-    if (!open || selectedTab !== "skills" || skillsSubTab !== "store") return;
-    void refreshCapabilities();
-  }, [open, selectedTab, skillsSubTab]);
+    if (selectedTab !== "skills" || skillsSubTab !== "store") return;
+    let cancelled = false;
+    void refreshCapabilities(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTab, skillsSubTab]);
 
   const installCapability = async (capability: KimiCodeCapabilityStatus) => {
-    if (installingCapabilityId) return;
-    if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
-    setInstallingCapabilityId(capability.id);
-    setMessage(`正在安装 ${capability.displayName}...`);
-    // 安装可能下载托管运行时，期间轮询进度（install.step/percent）。
-    // interval 存 ref 并随卸载统一清理，避免切走插件页后继续轮询。
-    installPollRef.current = window.setInterval(() => {
-      void refreshCapabilities();
-    }, 2000);
-    const res = await window.api.installKimiCodeCapability({ id: capability.id });
-    if (installPollRef.current !== null) {
-      window.clearInterval(installPollRef.current);
-      installPollRef.current = null;
-    }
-    setInstallingCapabilityId(null);
-    if (!res.success) {
-      setMessage(`${capability.displayName} 安装失败：${res.error}`);
+    if (installCapabilityLockRef.current) return;
+    installCapabilityLockRef.current = true;
+    try {
+      if (installingCapabilityId) return;
+      if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
+      setInstallingCapabilityId(capability.id);
+      setMessage(`正在安装 ${capability.displayName}...`);
+      // 安装可能下载托管运行时，期间轮询进度（install.step/percent）。
+      // interval 存 ref 并随卸载统一清理，避免切走插件页后继续轮询。
+      installPollRef.current = window.setInterval(() => {
+        void refreshCapabilities();
+      }, 2000);
+      const res = await window.api.installKimiCodeCapability({ id: capability.id });
+      if (installPollRef.current !== null) {
+        window.clearInterval(installPollRef.current);
+        installPollRef.current = null;
+      }
+      setInstallingCapabilityId(null);
+      if (!res.success) {
+        setMessage(`${capability.displayName} 安装失败：${res.error}`);
+        await refreshCapabilities();
+        return;
+      }
+      setMessage(`${capability.displayName} 安装完成`);
       await refreshCapabilities();
-      return;
+      // 安装会接线官方插件，运行时状态一并刷新。
+      void refreshSdkPlugins();
+    } finally {
+      installCapabilityLockRef.current = false;
     }
-    setMessage(`${capability.displayName} 安装完成`);
-    await refreshCapabilities();
-    // 安装会接线官方插件，运行时状态一并刷新。
-    void refreshSdkPlugins();
   };
 
   const installMarketplacePlugin = async (plugin: KimiCodeMarketplacePlugin) => {
-    if (installingMarketId) return;
-    setInstallingMarketId(plugin.id);
-    setMessage(`正在安装官方插件 ${plugin.displayName}...`);
-    const res = await window.api.installKimiCodePlugin({ source: plugin.source, ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}) });
-    setInstallingMarketId(null);
-    if (!res.success) {
-      setMessage(`${plugin.displayName} 安装失败：${res.error}`);
-      return;
+    if (installMarketplacePluginLockRef.current) return;
+    installMarketplacePluginLockRef.current = true;
+    try {
+      if (installingMarketId) return;
+      setInstallingMarketId(plugin.id);
+      setMessage(`正在安装官方插件 ${plugin.displayName}...`);
+      const res = await window.api.installKimiCodePlugin({ source: plugin.source, ...(sdkRuntimeSessionId ? { sessionId: sdkRuntimeSessionId } : {}) });
+      setInstallingMarketId(null);
+      if (!res.success) {
+        setMessage(`${plugin.displayName} 安装失败：${res.error}`);
+        return;
+      }
+      await refreshSdkPlugins(`${plugin.displayName} 安装完成`);
+    } finally {
+      installMarketplacePluginLockRef.current = false;
     }
-    await refreshSdkPlugins(`${plugin.displayName} 安装完成`);
   };
 
   const setSelectedTab = (tab: PluginPanelTab) => {
@@ -202,7 +225,6 @@ export function SkillsPanel({
   };
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     setMessage("正在扫描本地 Skills...");
     void window.api.listSkills().then((res) => {
@@ -224,7 +246,7 @@ export function SkillsPanel({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, []);
 
   const toggleSkill = async (id: string) => {
     const next = enabledIds.includes(id)
@@ -377,8 +399,6 @@ export function SkillsPanel({
 
   const configWarnings = asArray(configDiagnostics.warnings).filter((warning) => warning.trim().length > 0);
   const subSkillCount = sdkSkills.filter((skill) => skill.isSubSkill).length;
-
-  if (!open) return null;
 
   const subTabs: { id: SkillsSubTab; label: string; icon: React.ReactNode }[] = [
     { id: "local", label: "本地 Skills", icon: <Sparkles size={14} /> },

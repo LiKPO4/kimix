@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { mcpStatusLabel, mcpStatusTone } from "@/utils/mcpServerStatus";
@@ -191,7 +191,11 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
   const [cardMessages, setCardMessages] = useState<Record<string, string>>({});
   const [toolsExpanded, setToolsExpanded] = useState(false);
 
+  // 请求序列号：并发/串行多次 refresh 时，晚到的旧响应不得覆盖新数据
+  const refreshSeqRef = useRef(0);
+
   const refresh = async (nextMessage?: string) => {
+    const seq = ++refreshSeqRef.current;
     setLoading(true);
     const [authRes, listRes, runtimeRes, diagnosticsRes, pluginRes, marketplaceRes] = await Promise.all([
       window.api.getKimiAuthStatus(),
@@ -205,6 +209,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
       window.api.listKimiCodePlugins(runtimeSessionId ? { sessionId: runtimeSessionId } : {}),
       window.api.listKimiCodeMarketplace(),
     ]);
+    if (seq !== refreshSeqRef.current) return; // 已有更新的 refresh，丢弃本次过期结果
     setLoading(false);
     if (!authRes.success) {
       setMessage(`读取登录状态失败：${authRes.error}`);

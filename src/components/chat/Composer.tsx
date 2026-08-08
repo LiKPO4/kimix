@@ -20,7 +20,7 @@ import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { CacheHintDialog } from "@/components/layout/DialogSystem";
 import { useCreateProjectSession } from "@/hooks/useCreateProjectSession";
-import { deriveSessionLastActiveAt, evaluateCacheHint, getSessionLastActiveAt, isCacheHintDismissed, setCacheHintDismissed, type CacheHintDialogAction, type CacheHintDialogData } from "@/utils/cacheHint";
+import { deriveSessionLastActiveAt, evaluateCacheHint, getSessionLastActiveAt, isCacheHintDismissed, lookupCacheHintRule, setCacheHintDismissed, type CacheHintDialogAction, type CacheHintDialogData } from "@/utils/cacheHint";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import { isWindows } from "@/utils/platform";
 import { isKimiActiveTurnError, sendKimiCodePromptWithRetry } from "@/utils/kimiCodeSendRetry";
@@ -3300,13 +3300,25 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     if (!config) return false;
     const runtimeSessionId = getRuntimeSessionId(session);
     if (!runtimeSessionId) return false;
+    const liveActivityAt = getSessionLastActiveAt(session.id);
+    const derivedActivityAt = deriveSessionLastActiveAt(session.events);
+    const lastActiveAt = Math.max(liveActivityAt ?? 0, derivedActivityAt ?? 0) || undefined;
+    // 本地快速预判：用 session.model 与本地活动时间查规则，确定「未闲置」
+    // （idle < cache_duration）时直接跳过，避免每次发送都调 getKimiCodeStatus
+    // （IPC + HTTP 往返）。evaluateCacheHint 依赖 status 的 totalTokens，此处
+    // 只判闲置时长、不做最终判定；「可能需要提示」仍走原流程取精确数据。
+    if (lastActiveAt) {
+      const localModelId = session.model?.trim() || undefined;
+      const localRule = localModelId ? lookupCacheHintRule(config.config, localModelId) : undefined;
+      if (localRule) {
+        const idleSeconds = Math.max(0, Math.floor((Date.now() - lastActiveAt) / 1000));
+        if (idleSeconds < localRule.cache_duration) return false;
+      }
+    }
     const statusRes = await window.api.getKimiCodeStatus({ sessionId: runtimeSessionId }).catch(() => null);
     const status = statusRes && statusRes.success ? statusRes.data : undefined;
     const modelId = typeof status?.model === "string" && status.model.trim() ? status.model.trim() : session.model ?? undefined;
     const totalTokens = typeof status?.contextTokens === "number" ? status.contextTokens : undefined;
-    const liveActivityAt = getSessionLastActiveAt(session.id);
-    const derivedActivityAt = deriveSessionLastActiveAt(session.events);
-    const lastActiveAt = Math.max(liveActivityAt ?? 0, derivedActivityAt ?? 0) || undefined;
     const verdict = evaluateCacheHint({ config: config.config, modelId, lastActiveAt, totalTokens });
     if (!verdict.shouldHint) return false;
     setCacheHintDialog({

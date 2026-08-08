@@ -14,6 +14,7 @@ export type ScannedSkillLike = {
   name: string;
   path: string;
   sourceLabel?: string;
+  trustLevel?: "kimi-official" | "curated" | "third-party" | "local";
   enabled?: boolean;
 };
 
@@ -24,8 +25,10 @@ export type SkillMergedDuplicate = {
 };
 
 function dedupeKey(skill: ScannedSkillLike): string {
-  // 插件清单卡片（Kimi Plugin）与本地 Skill 卡片是两类实体，同名也不合并。
-  const kind = skill.sourceLabel === "Kimi Plugin" ? "plugin" : "skill";
+  // 插件清单卡片与本地 Skill 卡片是两类实体，同名也不合并。
+  // 用 trustLevel 枚举判断插件（main.ts 中 .kimi-code/plugins 产物恒为 kimi-official），
+  // 不依赖 UI 文案 sourceLabel，避免文案调整导致同名插件与本地 Skill 被误合并或失去隔离。
+  const kind = skill.trustLevel === "kimi-official" ? "plugin" : "skill";
   return `${kind}:${skill.name.trim().toLowerCase()}`;
 }
 

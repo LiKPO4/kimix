@@ -65,6 +65,19 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
   const previewCloseTimerRef = useRef<number | null>(null);
   const previewDisposeTimerRef = useRef<number | null>(null);
   const previewFrameRef = useRef<number | null>(null);
+  /** 渲染节点列表缓存：避免每次滚动都全量 querySelectorAll。 */
+  const nodeCacheRef = useRef<HTMLElement[] | null>(null);
+  const nodeCacheRefreshFrameRef = useRef<number | null>(null);
+
+  const collectRenderNodes = useCallback((): HTMLElement[] => {
+    const contentNode = contentRef.current;
+    if (!contentNode) return [];
+    return Array.from(contentNode.querySelectorAll<HTMLElement>("[data-kimix-render-key]"));
+  }, [contentRef]);
+
+  const refreshNodeCache = useCallback(() => {
+    nodeCacheRef.current = collectRenderNodes();
+  }, [collectRenderNodes]);
 
   const measure = useCallback(() => {
     const scrollNode = scrollRef.current;
@@ -75,9 +88,15 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
       return;
     }
 
+    // 优先用缓存的节点列表；缓存缺失或节点已从 DOM 移除（长会话虚拟滚动）时
+    // 回退到全量 querySelectorAll 并重建缓存。
+    let nodes = nodeCacheRef.current;
+    if (!nodes || nodes.some((node) => !node.isConnected)) {
+      nodes = collectRenderNodes();
+      nodeCacheRef.current = nodes;
+    }
     const nodesByKey = new Map(
-      Array.from(contentNode.querySelectorAll<HTMLElement>("[data-kimix-render-key]"))
-        .map((node) => [node.dataset.kimixRenderKey ?? "", node] as const),
+      nodes.map((node) => [node.dataset.kimixRenderKey ?? "", node] as const),
     );
     const scrollTop = scrollNode.getBoundingClientRect().top;
     const readingLine = chatNavigationReadingLine(scrollNode.clientHeight);
@@ -106,7 +125,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
     const availableRailHeight = Math.max(0, scrollNode.clientHeight - RAIL_VERTICAL_INSET_PX * 2);
     const nextMarkerGap = chatNavigationMarkerGap(next.length, availableRailHeight);
     setMarkerGap((current) => current === nextMarkerGap ? current : nextMarkerGap);
-  }, [contentRef, scrollRef]);
+  }, [collectRenderNodes, contentRef, scrollRef]);
 
   const lastScrollMeasureAtRef = useRef(0);
   const trailingMeasureTimerRef = useRef<number | null>(null);
@@ -142,8 +161,10 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
   }, []);
 
   useLayoutEffect(() => {
+    // items 变化即内容 DOM 变化：先刷新节点缓存，再做强制 measure。
+    refreshNodeCache();
     scheduleMeasure(true);
-  }, [items, scheduleMeasure]);
+  }, [items, refreshNodeCache, scheduleMeasure]);
 
   useEffect(() => {
     const scrollNode = scrollRef.current;
@@ -157,16 +178,33 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
       : new ResizeObserver(() => scheduleMeasure(true));
     observer?.observe(scrollNode);
     observer?.observe(contentNode);
+    // DOM 子树增删节点时刷新节点缓存；rAF 合并，避免流式输出期间密集
+    // mutation 触发大量全量收集。
+    const mutationObserver = typeof MutationObserver === "undefined"
+      ? null
+      : new MutationObserver(() => {
+        if (nodeCacheRefreshFrameRef.current !== null) return;
+        nodeCacheRefreshFrameRef.current = window.requestAnimationFrame(() => {
+          nodeCacheRefreshFrameRef.current = null;
+          refreshNodeCache();
+        });
+      });
+    mutationObserver?.observe(contentNode, { subtree: true, childList: true });
 
     return () => {
       scrollNode.removeEventListener("scroll", onScroll);
       observer?.disconnect();
+      mutationObserver?.disconnect();
+      if (nodeCacheRefreshFrameRef.current !== null) {
+        window.cancelAnimationFrame(nodeCacheRefreshFrameRef.current);
+        nodeCacheRefreshFrameRef.current = null;
+      }
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
     };
-  }, [contentRef, scheduleMeasure, scrollRef]);
+  }, [contentRef, refreshNodeCache, scheduleMeasure, scrollRef]);
 
   const clearPreviewTimers = useCallback(() => {
     if (previewOpenTimerRef.current !== null) window.clearTimeout(previewOpenTimerRef.current);

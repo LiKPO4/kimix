@@ -46,14 +46,34 @@ describe("dedupeScannedSkills", () => {
     expect(mergedDuplicates).toHaveLength(1);
   });
 
-  it("Kimi Plugin 卡与本地 Skill 卡同名不合并", () => {
+  it("kimi-official 插件卡与本地 Skill 卡同名不合并", () => {
     const input = [
-      skill({ name: "superpowers", path: "C:/u/.kimi-code/plugins/superpowers/plugin.json", sourceLabel: "Kimi Plugin" }),
-      skill({ name: "superpowers", path: "C:/u/.agents/skills/superpowers/SKILL.md", sourceLabel: "本地 Skill" }),
+      skill({ name: "superpowers", path: "C:/u/.kimi-code/plugins/superpowers/plugin.json", trustLevel: "kimi-official" }),
+      skill({ name: "superpowers", path: "C:/u/.agents/skills/superpowers/SKILL.md", trustLevel: "local" }),
     ];
     const { skills, mergedDuplicates } = dedupeScannedSkills(input);
     expect(skills).toHaveLength(2);
     expect(mergedDuplicates).toHaveLength(0);
+  });
+
+  it("插件判定只看 trustLevel，sourceLabel 文案变化不影响去重", () => {
+    const input = [
+      skill({ name: "superpowers", path: "C:/u/.kimi-code/plugins/superpowers/plugin.json", trustLevel: "kimi-official", sourceLabel: "插件（文案已改版）" }),
+      skill({ name: "superpowers", path: "C:/u/.agents/skills/superpowers/SKILL.md", trustLevel: "local", sourceLabel: "本地 Skill" }),
+    ];
+    const { skills, mergedDuplicates } = dedupeScannedSkills(input);
+    expect(skills).toHaveLength(2);
+    expect(mergedDuplicates).toHaveLength(0);
+  });
+
+  it("sourceLabel 写 Kimi Plugin 但 trustLevel 非 kimi-official 时仍按 skill 合并", () => {
+    const input = [
+      skill({ name: "legacy", path: "C:/a/SKILL.md", sourceLabel: "Kimi Plugin" }),
+      skill({ name: "legacy", path: "C:/b/SKILL.md", sourceLabel: "本地 Skill" }),
+    ];
+    const { skills, mergedDuplicates } = dedupeScannedSkills(input);
+    expect(skills).toHaveLength(1);
+    expect(mergedDuplicates).toHaveLength(1);
   });
 
   it("空名条目不参与去重", () => {
