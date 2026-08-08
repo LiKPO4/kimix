@@ -35,6 +35,8 @@ import type {
   KimiLogoutResponse,
   KimiCodeListSessionsResponse,
   KimiCodeListMarketplaceResponse,
+  KimiCodeListCapabilitiesResponse,
+  KimiCodeCapabilityResponse,
   KimiCodeLoadSessionResponse,
   KimiCodeListPluginsResponse,
   KimiCodeListSkillsResponse,
@@ -220,7 +222,7 @@ function installBrowserPreviewApi() {
     searchProjectFiles: (): Promise<SearchProjectFilesResponse> => Promise.resolve({ success: true, data: [] }),
     listSkills: (): Promise<ListSkillsResponse> => Promise.resolve({
       success: true,
-      data: { skills: [], scanErrors: [], enabledIds: [], enabledDir: "" },
+      data: { skills: [], scanErrors: [], mergedDuplicates: [], enabledIds: [], enabledDir: "" },
     }),
     saveEnabledSkills: (): Promise<SaveEnabledSkillsResponse> =>
       Promise.resolve({ success: true, data: { enabledIds: [], enabledDir: "" } }),
@@ -570,6 +572,8 @@ function installBrowserPreviewApi() {
     resizeKimiCodeServerTerminal: () => fail("调整 Kimi Code 终端"),
     listKimiCodeSessions: (): Promise<KimiCodeListSessionsResponse> => Promise.resolve({ success: true, data: [], source: "sdk" }),
     listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> => Promise.resolve({ success: true, data: [] }),
+    listKimiCodeCapabilities: (): Promise<KimiCodeListCapabilitiesResponse> => Promise.resolve({ success: true, data: [] }),
+    installKimiCodeCapability: (): Promise<KimiCodeCapabilityResponse> => fail("安装官方内置能力"),
     listKimiCodeSkills: (): Promise<KimiCodeListSkillsResponse> => Promise.resolve({ success: true, data: [] }),
     activateKimiCodeSkill: () => fail("激活 Kimi Code Skill"),
     loadKimiCodeSession: (): Promise<KimiCodeLoadSessionResponse> => fail("加载 Kimi Code 会话历史"),

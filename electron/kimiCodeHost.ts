@@ -14,6 +14,7 @@ import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
 import { KimiCodeStatusSequencer } from "./kimiCodeStatusSequencer";
 import { findOfficialCompactionResult, type OfficialCompactionResult } from "./compactionWire";
+import type { KimiCodeCapabilityStatus } from "./types/ipc";
 import { waitForOfficialSteerUserMessage } from "./steerConfirm";
 import { isDaemonLevelPromoteError, PromoteFailureBackoff } from "./kimiCodePromotePolicy";
 import { forgetSessionState, type SessionScopedState } from "./kimiCodeSessionState";
@@ -103,6 +104,9 @@ type KimiHarnessLike = {
   setPluginEnabled?(id: string, enabled: boolean): Promise<void>;
   setPluginMcpServerEnabled?(id: string, server: string, enabled: boolean): Promise<void>;
   reloadSession?(input: { id: string; forcePluginSessionStartReminder?: boolean }): Promise<KimiCodeSessionLike>;
+  // 官方内置能力（kimi-cu / kimi-webbridge）：仅 v2 引擎提供，v1 抛 TypeError。
+  listCapabilities?(): Promise<readonly KimiCodeCapabilityStatus[]>;
+  installCapability?(id: string): Promise<KimiCodeCapabilityStatus>;
   close(): Promise<void>;
 };
 
@@ -2542,6 +2546,34 @@ export async function listSkills(sessionId?: string): Promise<KimiCodeSkillSumma
   const session = await resolvePluginSession(sessionId);
   if (!session.listSkills) throw new Error("当前兼容链路不支持读取 Skill 列表。");
   return [...await session.listSkills()];
+}
+
+function isCapabilityUnsupportedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /capability surface is unavailable|requires v2/i.test(message);
+}
+
+// 官方内置能力（kimi-cu / kimi-webbridge）：app 级，不需要会话；v1 引擎/旧 bundle 降级为空列表。
+export async function listCapabilities(): Promise<KimiCodeCapabilityStatus[]> {
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.listCapabilities) return [];
+  try {
+    return [...await sdkHarness.listCapabilities()];
+  } catch (error) {
+    if (isCapabilityUnsupportedError(error)) return [];
+    throw error;
+  }
+}
+
+export async function installCapability(id: string): Promise<KimiCodeCapabilityStatus> {
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.installCapability) throw new Error("当前引擎不支持官方内置能力（需要 SDK v2 引擎）。");
+  try {
+    return await sdkHarness.installCapability(id);
+  } catch (error) {
+    if (isCapabilityUnsupportedError(error)) throw new Error("当前引擎不支持官方内置能力（需要 SDK v2 引擎）。");
+    throw error;
+  }
 }
 
 export async function activateSkill(sessionId: string, name: string, args?: string): Promise<void> {

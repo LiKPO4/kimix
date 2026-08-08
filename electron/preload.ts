@@ -142,6 +142,9 @@ import type {
   KimiCodeListPluginsResponse,
   KimiCodeListSkillsResponse,
   KimiCodeListMarketplaceResponse,
+  KimiCodeListCapabilitiesResponse,
+  KimiCodeCapabilityResponse,
+  KimiCodeInstallCapabilityRequest,
   KimiCodeConfigDiagnosticsResponse,
   KimiCodeManagedUsageRequest,
   KimiCodeManagedUsageResponse,
@@ -481,6 +484,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:loadSession", req),
   listKimiCodeMarketplace: (): Promise<KimiCodeListMarketplaceResponse> =>
     ipcRenderer.invoke("kimi-code:listMarketplace"),
+  listKimiCodeCapabilities: (): Promise<KimiCodeListCapabilitiesResponse> =>
+    ipcRenderer.invoke("kimi-code:listCapabilities"),
+  installKimiCodeCapability: (req: KimiCodeInstallCapabilityRequest): Promise<KimiCodeCapabilityResponse> =>
+    ipcRenderer.invoke("kimi-code:installCapability", req),
   listKimiCodePlugins: (req: { sessionId?: string }): Promise<KimiCodeListPluginsResponse> =>
     ipcRenderer.invoke("kimi-code:listPlugins", req),
   listKimiCodeSkills: (req: { sessionId?: string }): Promise<KimiCodeListSkillsResponse> =>

@@ -1258,6 +1258,7 @@ export type ListSkillsResponse = {
   data: {
     skills: SkillInfo[];
     scanErrors: { path: string; reason: string }[];
+    mergedDuplicates: { name: string; keptPath: string; droppedPath: string }[];
     enabledIds: string[];
     enabledDir: string;
   };
@@ -2100,6 +2101,53 @@ export type KimiCodeMarketplacePlugin = {
 export type KimiCodeListMarketplaceResponse = {
   success: true;
   data: KimiCodeMarketplacePlugin[];
+} | {
+  success: false;
+  error: string;
+};
+
+// 官方内置能力（kimi-cu / kimi-webbridge），对齐上游 agent-core-v2 capability 类型。
+export type KimiCodeCapabilityStep = {
+  id: string;
+  state: "ok" | "missing" | "failed";
+  detail?: string;
+  optional?: boolean;
+};
+
+export type KimiCodeCapabilityInstallProgress = {
+  running: boolean;
+  step?: string;
+  percent?: number;
+  error?: string;
+};
+
+export type KimiCodeCapabilityStatus = {
+  id: string;
+  pluginId?: string;
+  displayName: string;
+  description: string;
+  supported: boolean;
+  state: "not_installed" | "partial" | "ready" | "unsupported";
+  version?: string;
+  steps: KimiCodeCapabilityStep[];
+  install: KimiCodeCapabilityInstallProgress;
+};
+
+export type KimiCodeListCapabilitiesResponse = {
+  success: true;
+  data: KimiCodeCapabilityStatus[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeInstallCapabilityRequest = {
+  id: string;
+};
+
+export type KimiCodeCapabilityResponse = {
+  success: true;
+  data: KimiCodeCapabilityStatus;
 } | {
   success: false;
   error: string;

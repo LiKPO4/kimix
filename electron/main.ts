@@ -28,6 +28,7 @@ import {
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { prepareSkillDirectoryForKimi, syncAgentSkillDirectories } from "./skillMigration";
+import { dedupeScannedSkills } from "./skillScanDedupe";
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
@@ -3951,7 +3952,10 @@ function scanSkillsWithDiagnostics() {
     }
   }
 
-  return { skills: results.sort((a, b) => a.name.localeCompare(b.name)), errors };
+  // 同名 Skill 跨扫描根（如 .kimi-code/skills 与 .agents/skills）只保留先出现者，
+  // 副本明细交给 UI 明示，避免插件页出现重复卡片。
+  const { skills: dedupedSkills, mergedDuplicates } = dedupeScannedSkills(results);
+  return { skills: dedupedSkills.sort((a, b) => a.name.localeCompare(b.name)), errors, mergedDuplicates };
 }
 
 function listLocalSkills() {
@@ -5266,12 +5270,13 @@ ipcMain.handle("project:listPreviewFiles", async (_, request: unknown) => {
 ipcMain.handle("project:listSkills", async () => {
   try {
     const settings = settingsService.loadSettings();
-    const { skills, errors } = scanSkillsWithDiagnostics();
+    const { skills, errors, mergedDuplicates } = scanSkillsWithDiagnostics();
     return {
       success: true,
       data: {
         skills,
         scanErrors: errors,
+        mergedDuplicates,
         enabledIds: settings.enabledSkillNames ?? [],
         enabledDir: settings.enabledSkillsDir || enabledSkillsDir(),
       },
@@ -6842,6 +6847,26 @@ ipcMain.handle("kimi-code:listMarketplace", async () => {
           .filter((p) => p.id && p.source)
       : [];
     return { success: true, data: plugins };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// 官方内置能力（kimi-cu / kimi-webbridge）：v2 引擎独有，host 层对 v1/旧 bundle 降级为空列表。
+ipcMain.handle("kimi-code:listCapabilities", async () => {
+  try {
+    return { success: true, data: await kimiCodeHost.listCapabilities() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:installCapability", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const id = typeof req.id === "string" ? req.id.trim() : "";
+    if (!id) return { success: false, error: "Missing capability id" };
+    return { success: true, data: await kimiCodeHost.installCapability(id) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
