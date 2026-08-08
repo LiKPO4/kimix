@@ -879,7 +879,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
 
-      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto pt-2" style={{ paddingLeft: 2, paddingRight: 4, marginRight: -6, scrollbarGutter: "stable" }}>
+      {/* 顶部留白用 inline style：Tailwind 的 pt-2 在当前配置下未生成，导致复古 hover 外环被 overflow 裁切 */}
+      <div className="kimix-stable-scrollbar min-h-0 flex-1 overflow-y-auto" style={{ paddingTop: 8, paddingLeft: 2, paddingRight: 4, marginRight: -6, scrollbarGutter: "stable" }}>
         <div className="mb-2 flex items-center justify-between px-3">
           <span className="text-[13px] font-medium text-text-muted">项目</span>
           <button

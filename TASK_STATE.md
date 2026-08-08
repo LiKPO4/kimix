@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-08 修复：复古模式侧栏「打开项目」加号按钮上缘被裁切（v2.20.289）
+
+- 现象：复古模式悬停侧栏「项目」行的加号按钮时，按钮上方边缘被裁掉一条。
+- 根因（CDP 实测量化闭合）：侧栏滚动容器的 `pt-2` Tailwind 类未生成（stylesheet 中只有 `*{padding:0}` 命中），paddingTop 实测 0px，头部行与按钮贴在容器滚动口顶缘；复古 hover 的 `box-shadow: 0 0 0 1px` 外环向 border-box 外各方向多画 1px，溢出容器 padding box 上沿即被 `overflow-y:auto` 裁掉。
+- 修法：Sidebar.tsx 滚动容器移除失效的 `pt-2`，inline style 补 `paddingTop: 8`（沿用 AGENTS.md「spacing 用 inline」惯例）。
+- 验收：CDP 复测 paddingTop 8px、按钮顶部净空间 8px（1px 外环有富余）；typecheck 双配置 0 错误、全量 vitest 1803/1803、build 通过。实机视觉待用户截图复验。
+- 后续事项（未改）：同一头部行的 `mb-2`、`px-3` 同样未生成（实测 marginBottom/paddingLeft 均 0），当前视觉可接受，如需恢复设计间距再单独一轮处理。
+
 ## 2026-08-07 修复：goal 续跑提示词被当用户消息渲染——三层折叠为「目标续跑」状态摘要（v2.20.288）
 
 - 现象：goal 模式每轮的内部续跑提示词（"Continue working toward the active goal.…"）在 Kimix 渲染成用户气泡；官方 web/TUI 只显示一条 12px「目标续跑」来源标记。
