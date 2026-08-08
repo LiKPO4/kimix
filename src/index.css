@@ -2974,6 +2974,13 @@ button.bg-accent-primary:disabled:hover,
               scale var(--duration-fast) var(--ease-hover);
 }
 
+/* 默认/现代化下的 hover 辨识度：浅灰底 + 轻投影。
+   :where() 把本规则压到 (0,2,0)，低于复古/怀旧专属 hover 的 (0,3,0)，保证不串扰。 */
+.kimix-sidebar-icon-action:hover:where(:not(:disabled)) {
+  background-color: var(--surface-hover);
+  box-shadow: var(--shadow-hover);
+}
+
 .kimix-sidebar-icon-action:active:not(:disabled) {
   scale: 0.96;
 }

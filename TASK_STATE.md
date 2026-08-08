@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-08 修复：默认/现代化下侧栏「打开项目」加号按钮补 hover 背景+阴影（v2.20.294）
+
+- 现象：默认与现代化模式下，侧栏「项目」行右侧「打开项目」+ 按钮 hover 无背景/阴影，辨识度低（用户截图红箭头）。
+- 根因：`.kimix-sidebar-icon-action` 基础规则只有尺寸与 transition，默认/现代化无 hover 背景/阴影；复古/怀旧有专属 hover（描边+浮雕）。
+- 修法：index.css 新增 `.kimix-sidebar-icon-action:hover:where(:not(:disabled)) { background-color: var(--surface-hover); box-shadow: var(--shadow-hover); }`；`:where()` 把特异性压到 (0,2,0)，低于复古/怀旧专属 hover 的 (0,3,0)，不串扰。
+- 验收（CDP 真实鼠标 hover + 1s 稳态读值）：default/modern hover = 浅灰底 #E5E8EA + 软投影；retro = 复古描边浮雕（#DADDE1 底 + 1px 环 + inset 高光）；nostalgia = Win98 浮雕，均未被破坏。typecheck 双配置 0 错误、全量 vitest 1815/1815、build 通过。实机截图待用户复验。
+
 ## 2026-08-08 功能：插件页整体重组 + 官方内置能力补全（v2.20.291–293，三提交）
 
 - 背景：用户反馈插件页「草台班子」+ 官方商店缺 Computer Use。计划模式确认方向：Skills 顶部子 Tab 重组 + MCP tab 一起改。
