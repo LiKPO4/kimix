@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { Activity, Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Store, Upload } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
-import type { KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
+import type { KimiCodeCapabilityStatus, KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
 type SkillInfo = {
   id: string;
@@ -16,6 +16,7 @@ type SkillInfo = {
 };
 
 type PluginPanelTab = "skills" | "mcp";
+type SkillsSubTab = "local" | "store" | "runtime";
 const OFFICIAL_PLUGIN_STORE_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#安装与管理-plugins";
 const OFFICIAL_PLUGIN_DOCS_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#plugin-manifest";
 
@@ -38,7 +39,9 @@ export function SkillsPanel({
 }) {
   const currentSession = useAppStore((s) => s.currentSession);
   const [localActiveTab, setLocalActiveTab] = useState<PluginPanelTab>(activeTab);
+  const [skillsSubTab, setSkillsSubTab] = useState<SkillsSubTab>("local");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [mergedDuplicates, setMergedDuplicates] = useState<{ name: string; keptPath: string; droppedPath: string }[]>([]);
   const [enabledIds, setEnabledIds] = useState<string[]>([]);
   const [enabledDir, setEnabledDir] = useState("");
   const [scanErrors, setScanErrors] = useState<{ path: string; reason: string }[]>([]);
@@ -54,6 +57,9 @@ export function SkillsPanel({
   const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
   const [marketplace, setMarketplace] = useState<KimiCodeMarketplacePlugin[]>([]);
   const [installingMarketId, setInstallingMarketId] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<KimiCodeCapabilityStatus[]>([]);
+  const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
+  const [installingCapabilityId, setInstallingCapabilityId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
   const sdkRuntimeSessionId = currentSession?.engine === "kimi-code"
@@ -110,6 +116,45 @@ export function SkillsPanel({
     })();
   }, [open]);
 
+  const refreshCapabilities = async () => {
+    const res = await window.api.listKimiCodeCapabilities();
+    setCapabilitiesLoaded(true);
+    if (res.success) {
+      const next = asArray(res.data);
+      setCapabilities(next);
+      return next;
+    }
+    setMessage(`读取官方内置能力失败：${res.error}`);
+    return [] as KimiCodeCapabilityStatus[];
+  };
+
+  useEffect(() => {
+    if (!open || selectedTab !== "skills" || skillsSubTab !== "store") return;
+    void refreshCapabilities();
+  }, [open, selectedTab, skillsSubTab]);
+
+  const installCapability = async (capability: KimiCodeCapabilityStatus) => {
+    if (installingCapabilityId) return;
+    setInstallingCapabilityId(capability.id);
+    setMessage(`正在安装 ${capability.displayName}...`);
+    // 安装可能下载托管运行时，期间轮询进度（install.step/percent）。
+    const poll = window.setInterval(() => {
+      void refreshCapabilities();
+    }, 2000);
+    const res = await window.api.installKimiCodeCapability({ id: capability.id });
+    window.clearInterval(poll);
+    setInstallingCapabilityId(null);
+    if (!res.success) {
+      setMessage(`${capability.displayName} 安装失败：${res.error}`);
+      await refreshCapabilities();
+      return;
+    }
+    setMessage(`${capability.displayName} 安装完成`);
+    await refreshCapabilities();
+    // 安装会接线官方插件，运行时状态一并刷新。
+    void refreshSdkPlugins();
+  };
+
   const installMarketplacePlugin = async (plugin: KimiCodeMarketplacePlugin) => {
     if (installingMarketId) return;
     setInstallingMarketId(plugin.id);
@@ -138,6 +183,7 @@ export function SkillsPanel({
     const nextSkills = asArray(res.data.skills);
     const nextErrors = asArray(res.data.scanErrors);
     setSkills(nextSkills);
+    setMergedDuplicates(asArray(res.data.mergedDuplicates));
     setEnabledIds(asArray(res.data.enabledIds));
     setEnabledDir(res.data.enabledDir);
     setScanErrors(nextErrors);
@@ -158,6 +204,7 @@ export function SkillsPanel({
       const nextSkills = asArray(res.data.skills);
       const nextErrors = asArray(res.data.scanErrors);
       setSkills(nextSkills);
+      setMergedDuplicates(asArray(res.data.mergedDuplicates));
       setEnabledIds(asArray(res.data.enabledIds));
       setEnabledDir(res.data.enabledDir);
       setScanErrors(nextErrors);
@@ -277,16 +324,32 @@ export function SkillsPanel({
     return firstSentence.length > 96 ? `${firstSentence.slice(0, 96)}...` : firstSentence;
   };
 
-  const trustMeta = (skill: SkillInfo) => {
+  // 单个来源胶囊：文案用 sourceLabel，配色用 trustLevel，取代旧的双胶囊堆叠。
+  const sourceCapsuleMeta = (skill: SkillInfo) => {
+    const label = skill.sourceLabel ?? "本地 Skill";
     switch (skill.trustLevel) {
       case "kimi-official":
-        return { label: "插件提供", className: "bg-accent-primary text-white" };
+        return { label, className: "bg-accent-primary text-white" };
       case "curated":
-        return { label: "精选", className: "bg-accent-success-light text-accent-success" };
+        return { label, className: "bg-accent-success-light text-accent-success" };
       case "third-party":
-        return { label: "第三方", className: "bg-accent-warning-light text-accent-warning" };
+        return { label, className: "bg-accent-warning-light text-accent-warning" };
       default:
-        return { label: "本地", className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
+        return { label, className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
+    }
+  };
+
+  const capabilityStateMeta = (capability: KimiCodeCapabilityStatus) => {
+    if (!capability.supported || capability.state === "unsupported") {
+      return { label: "不支持", className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
+    }
+    switch (capability.state) {
+      case "ready":
+        return { label: "就绪", className: "bg-accent-success-light text-accent-success" };
+      case "partial":
+        return { label: "部分就绪", className: "bg-accent-warning-light text-accent-warning" };
+      default:
+        return { label: "未安装", className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
     }
   };
 
@@ -305,6 +368,12 @@ export function SkillsPanel({
   const subSkillCount = sdkSkills.filter((skill) => skill.isSubSkill).length;
 
   if (!open) return null;
+
+  const subTabs: { id: SkillsSubTab; label: string; icon: React.ReactNode }[] = [
+    { id: "local", label: "本地 Skills", icon: <Sparkles size={14} /> },
+    { id: "store", label: "插件商店", icon: <Store size={14} /> },
+    { id: "runtime", label: "运行时状态", icon: <Activity size={14} /> },
+  ];
 
   return (
     <div className="kimix-workspace-page flex h-full min-h-0 flex-col">
@@ -333,19 +402,17 @@ export function SkillsPanel({
             </div>
           </div>
           <div className="kimix-workspace-header-actions">
-            {selectedTab === "skills" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void importArchive()}
-                  disabled={importing}
-                  className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
-                  title="导入 Skill 压缩包"
-                >
-                  <Plus size={15} />
-                  <span>{importing ? "导入中" : "添加"}</span>
-                </button>
-              </>
+            {selectedTab === "skills" && skillsSubTab === "local" && (
+              <button
+                type="button"
+                onClick={() => void importArchive()}
+                disabled={importing}
+                className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+                title="导入 Skill 压缩包"
+              >
+                <Plus size={15} />
+                <span>{importing ? "导入中" : "添加"}</span>
+              </button>
             )}
             {onBackToChat && (
               <button
@@ -382,87 +449,361 @@ export function SkillsPanel({
           {selectedTab === "mcp" ? (
             <McpPanel embedded />
           ) : (
-          <div className="grid w-full items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
-            <aside className="flex flex-col" style={{ gap: 14 }}>
-              <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6" style={{ padding: "14px 16px" }}>
-                勾选后全局启用 Skill；新建/恢复会话时通过官方 `--skills-dir` 传给 Kimi Code。
+          <div className="flex min-w-0 flex-col">
+            <div className="flex items-center" style={{ gap: 8, marginBottom: 14 }}>
+              {subTabs.map((tab) => {
+                const active = skillsSubTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSkillsSubTab(tab.id)}
+                    className={`kimix-icon-text-button is-compact ${active ? "" : "kimix-muted-action"}`}
+                    style={active ? {
+                      background: "var(--kimix-panel-soft-bg)",
+                      color: "var(--kimix-panel-text)",
+                      boxShadow: "inset 0 0 0 1px var(--kimix-panel-border-soft)",
+                    } : undefined}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {message && (
+              <div
+                className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                style={{ padding: "8px 14px", marginBottom: 14 }}
+              >
+                {message}{saving ? "，正在保存..." : ""}
               </div>
-              <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                <div className="font-medium text-[var(--kimix-panel-text)]">官方插件商店</div>
-                <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                  以下为官方 Marketplace 在架插件，可一键安装到 Kimi Code。
+            )}
+
+            {skillsSubTab === "local" && (
+              <div className="flex min-w-0 flex-col">
+                <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginBottom: 14 }}>
+                  勾选后全局启用 Skill；新建/恢复会话时通过官方 <code>--skills-dir</code> 传给 Kimi Code。
+                  {enabledDir && (
+                    <span className="text-[var(--kimix-panel-text-muted)]" title={enabledDir}>（启用目录：{enabledDir}）</span>
+                  )}
                 </div>
-                {marketplace.length > 0 && (
-                  <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
-                    {marketplace.map((plugin) => {
-                      const installed = sdkPlugins.some((p) => p.id === plugin.id);
-                      return (
-                        <div
-                          key={plugin.id}
-                          className="kimix-plugin-list-item"
-                          style={{ padding: "12px 14px", border: "none" }}
-                        >
-                          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                            <div className="min-w-0">
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.displayName} <span className="text-[12px] text-[var(--kimix-panel-text-muted)]">v{plugin.version}</span></div>
-                              <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.description}>{plugin.description}</div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void installMarketplacePlugin(plugin)}
-                              disabled={Boolean(installingMarketId) || installed}
-                              className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {installed ? "已安装" : installingMarketId === plugin.id ? "安装中" : "安装"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                {mergedDuplicates.length > 0 && (
+                  <div
+                    className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                    style={{ padding: "8px 14px", marginBottom: 14 }}
+                    title={mergedDuplicates.map((item) => `${item.name}：保留 ${item.keptPath}，合并 ${item.droppedPath}`).join("\n")}
+                  >
+                    {mergedDuplicates.length} 个同名 Skill 已按来源合并展示（悬停查看明细）
                   </div>
                 )}
-                <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
-                  <button
-                    type="button"
-                    onClick={() => void openOfficialPluginStore()}
-                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center"
-                    style={{ width: "100%" }}
-                  >
-                    <ExternalLink size={14} />
-                    <span>打开官方 Marketplace</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void openPluginDocs()}
-                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center"
-                    style={{ width: "100%" }}
-                  >
-                    <ExternalLink size={14} />
-                    <span>自定义插件文档</span>
-                  </button>
+                {skills.length === 0 ? (
+                  <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "24px 22px" }}>
+                    未发现本地 Skill。可点击右上角「添加」导入 Skill 压缩包，或直接把 .zip 拖进本页面。
+                  </div>
+                ) : (
+                  <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                    {skills.map((skill) => (
+                      (() => {
+                        const source = sourceCapsuleMeta(skill);
+                        const officialPlugin = skill.trustLevel === "kimi-official" && skill.sourceLabel === "Kimi Plugin";
+                        const enabled = officialPlugin || enabledIds.includes(skill.id);
+                        return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        onClick={() => {
+                          if (!officialPlugin) void toggleSkill(skill.id);
+                        }}
+                        className={`kimix-skill-card w-full overflow-hidden rounded-xl border text-left hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
+                        style={{
+                          padding: "14px 18px",
+                          cursor: officialPlugin ? "default" : undefined,
+                          background: enabled
+                            ? "color-mix(in srgb, var(--accent-blue) 8%, var(--kimix-panel-bg))"
+                            : undefined,
+                        }}
+                      >
+                        <div className="grid min-h-0" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto", gap: 12 }}>
+                          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
+                            <Check size={13} />
+                          </span>
+                          <span className="flex min-h-0 min-w-0 flex-col">
+                            <span
+                              className="block min-w-0 text-[15px] font-semibold text-[var(--kimix-panel-text)]"
+                              style={{ lineHeight: "24px", minHeight: 24, overflowWrap: "anywhere" }}
+                              title={skill.name}
+                            >
+                              {skill.name}
+                            </span>
+                            <span className="mt-2 flex min-w-0 flex-wrap items-center" style={{ gap: 6 }}>
+                              <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${source.className}`} style={{ paddingLeft: 9, paddingRight: 9 }} title={skill.source}>
+                                {source.label}
+                              </span>
+                            </span>
+                            <span
+                              className="block text-[13px] text-[var(--kimix-panel-text-secondary)]"
+                              title={skill.description}
+                              style={{
+                                display: "-webkit-box",
+                                marginTop: 7,
+                                lineHeight: "20px",
+                                WebkitBoxOrient: "vertical",
+                                WebkitLineClamp: 3,
+                                maxHeight: 60,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {shortDescription(skill.description)}
+                            </span>
+                            <span className="mt-auto block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ paddingTop: 7 }} title={skill.path}>{skill.path}</span>
+                          </span>
+                          <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${enabled ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                            {officialPlugin ? "已安装" : enabled ? "已启用" : "未启用"}
+                          </span>
+                        </div>
+                      </button>
+                        );
+                      })()
+                    ))}
+                  </section>
+                )}
+                {scanErrors.length > 0 && (
+                  <div className="rounded-xl bg-accent-warning-light/40 text-[13px] leading-6" style={{ padding: "14px 16px", marginTop: 14 }}>
+                    <div className="font-medium text-accent-warning">{scanErrors.length} 个文件扫描异常</div>
+                    <div className="flex flex-col" style={{ gap: 8, marginTop: 10 }}>
+                      {scanErrors.slice(0, 5).map((error, index) => (
+                        <div key={`${index}:${error.path}`} className="rounded-md bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 10px" }} title={`${error.reason}: ${error.path}`}>
+                          <div className="truncate">{error.reason}</div>
+                          <div className="truncate text-[var(--kimix-panel-text-muted)]">{error.path}</div>
+                        </div>
+                      ))}
+                      {scanErrors.length > 5 && (
+                        <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {scanErrors.length - 5} 个异常文件未展示</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {skillsSubTab === "store" && (
+              <div className="flex min-w-0 flex-col" style={{ gap: 14 }}>
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
+                  <div className="font-medium text-[var(--kimix-panel-text)]">官方内置能力</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                    Kimi Code 官方产品能力（托管运行时 + 接线插件），由 v2 引擎提供，安装后可中断重试。
+                  </div>
+                  {capabilities.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
+                      {capabilities.map((capability) => {
+                        const state = capabilityStateMeta(capability);
+                        const busy = installingCapabilityId === capability.id || capability.install.running;
+                        const installable = capability.supported && capability.state !== "ready" && capability.state !== "unsupported";
+                        return (
+                          <div key={capability.id} className="rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 14px" }}>
+                            <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                              <div className="min-w-0">
+                                <div className="flex items-center" style={{ gap: 8 }}>
+                                  <span className="truncate font-medium text-[var(--kimix-panel-text)]">{capability.displayName}</span>
+                                  <span className={`h-6 shrink-0 rounded-full text-[12px] leading-6 ${state.className}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
+                                    {state.label}
+                                  </span>
+                                </div>
+                                <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                                  {capability.description}
+                                </div>
+                                {busy && (capability.install.step || typeof capability.install.percent === "number") && (
+                                  <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 4 }}>
+                                    安装中{capability.install.step ? `：${capability.install.step}` : ""}
+                                    {typeof capability.install.percent === "number" ? ` ${capability.install.percent}%` : ""}
+                                  </div>
+                                )}
+                                {!busy && capability.install.error && (
+                                  <div className="text-[12px] leading-5 text-accent-danger" style={{ marginTop: 4 }}>
+                                    上次安装失败：{capability.install.error}
+                                  </div>
+                                )}
+                              </div>
+                              {installable && (
+                                <button
+                                  type="button"
+                                  onClick={() => void installCapability(capability)}
+                                  disabled={Boolean(installingCapabilityId)}
+                                  className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {busy ? "安装中" : capability.state === "partial" || capability.install.error ? "继续安装" : "安装"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
+                      {capabilitiesLoaded ? "当前引擎未提供内置能力（需要 SDK v2 引擎）。" : "正在读取内置能力状态..."}
+                    </div>
+                  )}
+                </div>
+
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
+                  <div className="font-medium text-[var(--kimix-panel-text)]">官方插件商店</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                    官方 Marketplace 在架插件，可一键安装到 Kimi Code。
+                  </div>
+                  {marketplace.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
+                      {marketplace.map((plugin) => {
+                        const installed = sdkPlugins.some((p) => p.id === plugin.id);
+                        return (
+                          <div key={plugin.id} className="rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 14px" }}>
+                            <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-[var(--kimix-panel-text)]">
+                                  {plugin.displayName}
+                                  {plugin.version && <span className="text-[12px] text-[var(--kimix-panel-text-muted)]"> v{plugin.version}</span>}
+                                </div>
+                                <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.description}>{plugin.description}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void installMarketplacePlugin(plugin)}
+                                disabled={Boolean(installingMarketId) || installed}
+                                className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {installed ? "已安装" : installingMarketId === plugin.id ? "安装中" : "安装"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
+                      未能读取官方 Marketplace 列表（可检查网络后重新打开本页）。
+                    </div>
+                  )}
+                  <div className="flex" style={{ gap: 10, marginTop: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => void openOfficialPluginStore()}
+                      className="kimix-icon-text-button kimix-muted-action is-compact"
+                    >
+                      <ExternalLink size={14} />
+                      <span>打开官方 Marketplace</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openPluginDocs()}
+                      className="kimix-icon-text-button kimix-muted-action is-compact"
+                    >
+                      <ExternalLink size={14} />
+                      <span>自定义插件文档</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
+                  <div className="font-medium text-[var(--kimix-panel-text)]">自定义安装</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                    输入官方支持的 GitHub / ZIP plugin URL，安装后会自动刷新列表。
+                  </div>
+                  <div className="flex items-center" style={{ gap: 10, marginTop: 12 }}>
+                    <input
+                      value={pluginUrl}
+                      onChange={(event) => setPluginUrl(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !installingPlugin) void installKimiPlugin();
+                      }}
+                      placeholder="https://github.com/owner/repo 或 https://.../plugin.zip"
+                      className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
+                      style={{ paddingLeft: 12, paddingRight: 12 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void installKimiPlugin()}
+                      disabled={installingPlugin}
+                      className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:cursor-wait disabled:opacity-50"
+                    >
+                      <Plus size={14} />
+                      <span>{installingPlugin ? "安装中" : "安装 Plugin"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                  <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方运行时插件状态</div>
+            )}
+
+            {skillsSubTab === "runtime" && (
+              <div className="flex min-w-0 flex-col" style={{ gap: 14 }}>
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
+                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10 }}>
+                    <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方运行时插件</div>
                     <span className="shrink-0 rounded-full bg-accent-primary text-[12px] leading-5 text-white" style={{ paddingLeft: 8, paddingRight: 8 }}>
                       SDK
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void refreshSdkPlugins("已刷新官方运行时插件状态")}
+                      disabled={sdkPluginRefreshing || Boolean(sdkPluginToggling)}
+                      className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:cursor-wait disabled:opacity-50"
+                    >
+                      <RefreshCw size={14} className={sdkPluginRefreshing ? "kimix-spin" : ""} />
+                      <span>{sdkPluginRefreshing ? "刷新中" : "刷新"}</span>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void refreshSdkPlugins("已刷新官方运行时插件状态")}
-                    disabled={sdkPluginRefreshing || Boolean(sdkPluginToggling)}
-                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                    style={{ width: "100%", marginTop: 12 }}
-                  >
-                    <RefreshCw size={14} className={sdkPluginRefreshing ? "kimix-spin" : ""} />
-                    <span>{sdkPluginRefreshing ? "刷新中" : "刷新运行时状态"}</span>
-                  </button>
-                  <div
-                    className={`rounded-lg ${configWarnings.length > 0 ? "bg-accent-warning-light/40" : "bg-surface-elevated"}`}
-                    style={{ padding: "10px 12px", marginTop: 12 }}
-                  >
+                  {sdkPlugins.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
+                      {sdkPlugins.map((plugin) => (
+                        <div key={plugin.id} className="rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 14px" }}>
+                          <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.displayName}</div>
+                              <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.id}>
+                                {plugin.id}
+                                {plugin.version ? ` · v${plugin.version}` : ""}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void toggleSdkPlugin(plugin)}
+                              disabled={Boolean(sdkPluginToggling)}
+                              className={`kimix-plugin-status-pill shrink-0 text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                            >
+                              {sdkPluginToggling === plugin.id ? "处理中" : sdkPluginStateLabel(plugin)}
+                            </button>
+                          </div>
+                          <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 9 }}>
+                            <div className="rounded-md bg-surface-elevated text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">来源</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{sdkPluginSourceLabel(plugin.source)}</div>
+                            </div>
+                            <div className="rounded-md bg-surface-elevated text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">Skills</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.skillCount}</div>
+                            </div>
+                            <div className="rounded-md bg-surface-elevated text-center" style={{ padding: "5px 7px" }}>
+                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">MCP</div>
+                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.enabledMcpServerCount}/{plugin.mcpServerCount}</div>
+                            </div>
+                          </div>
+                          {plugin.originalSource && (
+                            <div className="truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 7 }} title={plugin.originalSource}>
+                              {plugin.originalSource}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
+                      当前官方运行时没有已安装 Plugin，或尚未刷新。
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+                  <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                       <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">配置诊断</div>
                       <span className={`shrink-0 rounded-full text-[12px] leading-5 ${configWarnings.length > 0 ? "bg-accent-warning text-white" : "bg-accent-success-light text-accent-success"}`} style={{ paddingLeft: 8, paddingRight: 8 }}>
@@ -486,15 +827,13 @@ export function SkillsPanel({
                         )}
                       </div>
                     ) : (
-                      <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
-                      官方运行时当前没有返回配置警告。
+                      <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                        官方运行时当前没有返回配置警告。
                       </div>
                     )}
                   </div>
-                  <div
-                    className="rounded-lg bg-surface-elevated"
-                    style={{ padding: "10px 12px", marginTop: 12 }}
-                  >
+
+                  <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
                     <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
                       <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">已加载 Skills</div>
                       <span className="shrink-0 rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-5 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 8, paddingRight: 8 }}>
@@ -523,175 +862,14 @@ export function SkillsPanel({
                         )}
                       </div>
                     ) : (
-                      <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
+                      <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 8 }}>
                         当前官方会话没有加载 Skill，或尚未刷新。
                       </div>
                     )}
                   </div>
-                  {sdkPlugins.length > 0 ? (
-                    <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
-                      {sdkPlugins.map((plugin) => (
-                        <div
-                          key={plugin.id}
-                          className="kimix-plugin-list-item"
-                          style={{ padding: "12px 14px", border: "none" }}
-                        >
-                          <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10 }}>
-                            <div className="min-w-0">
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.displayName}</div>
-                              <div className="truncate text-[12px] text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 2 }} title={plugin.id}>
-                                {plugin.id}
-                                {plugin.version ? ` · v${plugin.version}` : ""}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void toggleSdkPlugin(plugin)}
-                              disabled={Boolean(sdkPluginToggling)}
-                              className={`kimix-plugin-status-pill shrink-0 text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
-                            >
-                              {sdkPluginToggling === plugin.id ? "处理中" : sdkPluginStateLabel(plugin)}
-                            </button>
-                          </div>
-                          <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 9 }}>
-                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
-                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">来源</div>
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{sdkPluginSourceLabel(plugin.source)}</div>
-                            </div>
-                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
-                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">Skills</div>
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.skillCount}</div>
-                            </div>
-                            <div className="rounded-md bg-[var(--kimix-panel-soft-bg)] text-center" style={{ padding: "5px 7px" }}>
-                              <div className="text-[11px] leading-4 text-[var(--kimix-panel-text-muted)]">MCP</div>
-                              <div className="truncate font-medium text-[var(--kimix-panel-text)]">{plugin.enabledMcpServerCount}/{plugin.mcpServerCount}</div>
-                            </div>
-                          </div>
-                          {plugin.originalSource && (
-                            <div className="truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 7 }} title={plugin.originalSource}>
-                              {plugin.originalSource}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 10 }}>
-                      当前官方运行时没有已安装 Plugin，或尚未刷新。
-                    </div>
-                  )}
-              </div>
-              <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                <div className="font-medium text-[var(--kimix-panel-text)]">安装 Kimi Plugin</div>
-                <div className="text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                  输入官方支持的 GitHub / ZIP plugin URL，安装后会自动刷新列表。
-                </div>
-                <div className="flex flex-col" style={{ gap: 10, marginTop: 12 }}>
-                  <input
-                    value={pluginUrl}
-                    onChange={(event) => setPluginUrl(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !installingPlugin) void installKimiPlugin();
-                    }}
-                    placeholder="https://github.com/owner/repo 或 https://.../plugin.zip"
-                    className="h-9 w-full rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
-                    style={{ paddingLeft: 12, paddingRight: 12 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void installKimiPlugin()}
-                    disabled={installingPlugin}
-                    className="kimix-icon-text-button kimix-muted-action is-compact justify-center disabled:cursor-wait disabled:opacity-50"
-                    style={{ width: "100%" }}
-                  >
-                    <Plus size={14} />
-                    <span>{installingPlugin ? "安装中" : "安装 Plugin"}</span>
-                  </button>
                 </div>
               </div>
-              <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                <div>{message}{saving ? "，正在保存..." : ""}</div>
-                {enabledDir && <div className="mt-1 break-all" title={enabledDir}>启用目录：{enabledDir}</div>}
-              </div>
-              {scanErrors.length > 0 && (
-                <div className="kimix-soft-card rounded-xl border border-accent-warning/35 bg-accent-warning-light/40 text-[13px] leading-6" style={{ padding: "14px 16px" }}>
-                  <div className="font-medium text-accent-warning">{scanErrors.length} 个文件扫描异常</div>
-                  <div className="flex flex-col" style={{ gap: 8, marginTop: 10 }}>
-                    {scanErrors.slice(0, 5).map((error, index) => (
-                      <div key={`${index}:${error.path}`} className="rounded-md bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 10px" }} title={`${error.reason}: ${error.path}`}>
-                        <div className="truncate">{error.reason}</div>
-                        <div className="truncate text-[var(--kimix-panel-text-muted)]">{error.path}</div>
-                      </div>
-                    ))}
-                    {scanErrors.length > 5 && (
-                      <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {scanErrors.length - 5} 个异常文件未展示</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </aside>
-            <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: 174, gap: 12 }}>
-              {skills.map((skill) => (
-                (() => {
-                  const trust = trustMeta(skill);
-                  const officialPlugin = skill.trustLevel === "kimi-official" && skill.sourceLabel === "Kimi Plugin";
-                  const enabled = officialPlugin || enabledIds.includes(skill.id);
-                  return (
-                <button
-                  key={skill.id}
-                  type="button"
-                  onClick={() => {
-                    if (!officialPlugin) void toggleSkill(skill.id);
-                  }}
-                  className={`kimix-skill-card h-full w-full overflow-hidden rounded-xl border text-left hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
-                  style={{
-                    padding: "14px 18px",
-                    cursor: officialPlugin ? "default" : undefined,
-                    background: enabled
-                      ? "color-mix(in srgb, var(--accent-blue) 8%, var(--kimix-panel-bg))"
-                      : undefined,
-                  }}
-                >
-                  <div className="grid h-full min-h-0" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto", gap: 12 }}>
-                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
-                      <Check size={13} />
-                    </span>
-                    <span className="flex min-h-0 min-w-0 flex-col">
-                      <span className="block min-w-0 truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ lineHeight: "24px", minHeight: 24 }} title={skill.name}>{skill.name}</span>
-                      <span className="mt-2 flex min-w-0 flex-wrap items-center" style={{ gap: 6 }}>
-                        <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${trust.className}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
-                          {trust.label}
-                        </span>
-                        <span className="h-6 min-w-0 truncate rounded-full bg-[var(--kimix-panel-badge-bg)] text-[12px] leading-6 text-[var(--kimix-panel-badge-text)]" style={{ paddingLeft: 9, paddingRight: 9 }} title={skill.source}>
-                          {skill.sourceLabel ?? "本地 Skill"}
-                        </span>
-                      </span>
-                      <span
-                        className="block text-[13px] text-[var(--kimix-panel-text-secondary)]"
-                        title={skill.description}
-                        style={{
-                          display: "-webkit-box",
-                          marginTop: 7,
-                          lineHeight: "20px",
-                          WebkitBoxOrient: "vertical",
-                          WebkitLineClamp: 3,
-                          maxHeight: 60,
-                          overflow: "hidden",
-                        }}
-                      >
-                        {shortDescription(skill.description)}
-                      </span>
-                      <span className="mt-auto block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ paddingTop: 7 }} title={skill.path}>{skill.path}</span>
-                    </span>
-                    <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${enabled ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
-                      {officialPlugin ? "已安装" : enabled ? "已启用" : "未启用"}
-                    </span>
-                  </div>
-                </button>
-                  );
-                })()
-              ))}
-            </section>
+            )}
           </div>
           )}
           </div>
