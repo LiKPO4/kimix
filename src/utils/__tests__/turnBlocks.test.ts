@@ -398,6 +398,24 @@ describe("computeFinalTextBlockContent", () => {
     expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("最终答案");
   });
 
+  it("ignores a trailing punctuation-only block when selecting the final body", () => {
+    // 模型在真正答案后吐一个时间戳更新的纯标点小块（如「。」），折叠后正文
+    // 不应闪变成该标点，应选时间戳最新的非无意义块。
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("这是本轮的完整分析结论。", 100, "text-final"),
+      timestampedTextBlock("。", 200, "text-stray"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("这是本轮的完整分析结论。");
+  });
+
+  it("falls back to latest block when all text blocks are trivial", () => {
+    const blocks: TurnBlock[] = [
+      timestampedTextBlock("…", 100, "text-a"),
+      timestampedTextBlock("。", 200, "text-b"),
+    ];
+    expect(computeFinalTextBlockContent(blocks, "draft", true)).toBe("。");
+  });
+
   it("keeps the chronologically final body when an older stable snapshot is appended late", () => {
     const blocks: TurnBlock[] = [
       timestampedTextBlock("最终完整正文", 300, "text-final"),

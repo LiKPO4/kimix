@@ -434,6 +434,11 @@ export function mergeLiveDraftBlocks(
  * answer twice or the official final answer nowhere. Returns -1 when no block
  * is selected (streaming, or no text blocks).
  */
+/** 去掉空白/标点/符号后无剩余即视为无意义文本（如末尾 stray「。」）。 */
+function isTrivialTextBlock(content: string): boolean {
+  return content.replace(/[\s\p{P}\p{S}]/gu, "").length === 0;
+}
+
 export function computeFinalTextBlockIndex(
   turnBlocks: TurnBlock[] | undefined,
   isComplete: boolean,
@@ -443,18 +448,37 @@ export function computeFinalTextBlockIndex(
   // while retaining their older official timestamp. Array order still owns
   // the process timeline, but completed-body selection must not let such an
   // appended historical step replace the actual chronological final answer.
-  let finalIndex = -1;
-  let finalTimestamp = -Infinity;
+  const textIndexes: number[] = [];
+  const timestampOf = (index: number): number => {
+    const block = turnBlocks![index];
+    if (block.kind !== "text") return -Infinity;
+    return Math.max(-Infinity, ...block.events.map((event) => event.timestamp));
+  };
   for (let index = 0; index < turnBlocks.length; index += 1) {
-    const block = turnBlocks[index];
-    if (block.kind !== "text") continue;
-    const timestamp = Math.max(-Infinity, ...block.events.map((event) => event.timestamp));
-    if (finalIndex === -1 || timestamp >= finalTimestamp) {
-      finalIndex = index;
-      finalTimestamp = timestamp;
-    }
+    if (turnBlocks[index].kind === "text") textIndexes.push(index);
   }
-  return finalIndex;
+  if (textIndexes.length === 0) return -1;
+  // 模型常在真正答案后再吐一个纯标点小块（如「。」），其时间戳最新。若直接按
+  // 最大时间戳选，折叠后正文会闪变成该标点。存在非无意义块时优先选其中时间戳
+  // 最新者；全部无意义时回退原最大时间戳逻辑。
+  const pickLatest = (candidates: number[]): number => {
+    let finalIndex = -1;
+    let finalTimestamp = -Infinity;
+    for (const index of candidates) {
+      const timestamp = timestampOf(index);
+      if (finalIndex === -1 || timestamp >= finalTimestamp) {
+        finalIndex = index;
+        finalTimestamp = timestamp;
+      }
+    }
+    return finalIndex;
+  };
+  const substantial = textIndexes.filter((index) => {
+    const block = turnBlocks[index];
+    return block.kind === "text" && !isTrivialTextBlock(block.content);
+  });
+  if (substantial.length > 0) return pickLatest(substantial);
+  return pickLatest(textIndexes);
 }
 
 export function computeFinalTextBlockContent(
