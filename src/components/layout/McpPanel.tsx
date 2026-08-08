@@ -513,7 +513,28 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
 
   const body = (
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: embedded ? "0" : "22px 28px 30px" }}>
-        <div className="grid min-w-0 items-start" style={{ gridTemplateColumns: "320px minmax(0, 1fr)", gap: 18 }}>
+        <div className="grid min-w-0 items-start" style={{ gridTemplateColumns: embedded ? "minmax(0, 1fr)" : "320px minmax(0, 1fr)", gap: 18 }}>
+          {embedded ? (
+            <div className="flex min-w-0 flex-col">
+              <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 14px", marginBottom: 10 }}>
+                登录状态：{loading ? "读取中" : auth?.loggedIn ? "已登录" : "未登录"}
+                {" · 默认模型："}{auth?.defaultModel ?? "未设置"}
+                {" · 默认思考："}{auth?.defaultThinking ? "开启" : "关闭"}
+                <span
+                  className="text-[var(--kimix-panel-text-muted)]"
+                  title={`config.toml：${auth?.configPath || "-"}
+mcp.json：${configPath || auth?.mcpConfigPath || "-"}`}
+                >
+                  （配置文件路径悬停查看）
+                </span>
+              </div>
+              {message && (
+                <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 14px" }}>
+                  {message}
+                </div>
+              )}
+            </div>
+          ) : (
           <aside className="flex min-w-0 flex-col" style={{ gap: 14 }}>
             <div className="kimix-soft-card rounded-xl text-[13px] leading-6" style={{ padding: "16px 16px 15px" }}>
               <div className="font-medium text-[var(--kimix-panel-text)]">当前配置</div>
@@ -539,6 +560,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
               <div className="mt-2 text-[var(--kimix-panel-text-secondary)]">{message}</div>
             </div>
           </aside>
+          )}
 
           <section className="min-w-0">
             {addOpen && (
