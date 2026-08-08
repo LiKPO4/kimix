@@ -697,16 +697,23 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     thinkingModelOption?.defaultEffort,
   );
   const thinkingEffortForSessionCreate = activeThinkingEffort === "on" ? undefined : activeThinkingEffort;
-  // 配置阶段一次性矫正：当前模型 support_efforts 不含活动档位时（如存量配置 max，
-  // 而 OpenAI 兼容 provider 只认 xhigh），矫正为解析值。off/on 恒有效不矫正。
-  // 仅在目录已加载（supportEfforts 已声明）时矫正，避免未加载时误矫正成 off。
-  // 矫正后发送路径直接用 activeThinkingEffort，无需每次发送再校验。
+  // 配置阶段一次性矫正：存量配置 max 对 OpenAI 兼容 provider 无效（只认到 xhigh），
+  // 直传会被 400 拒绝。off/on 恒有效不矫正。矫正后发送路径直接用 activeThinkingEffort。
   useEffect(() => {
-    if (!thinkingModelOption?.supportEfforts?.length) return;
     if (activeThinkingEffort === "off" || activeThinkingEffort === "on") return;
-    if (thinkingEffortOptions.some((option) => option.value === activeThinkingEffort)) return;
-    setActiveThinkingEffort(selectedThinkingEffort);
-  }, [activeThinkingEffort, thinkingEffortOptions, selectedThinkingEffort, thinkingModelOption?.supportEfforts]);
+    const declared = thinkingModelOption?.supportEfforts ?? [];
+    if (declared.length > 0) {
+      // 已声明：活动档位不在列表内则回退解析值（defaultEffort/首选项）。
+      if (declared.includes(activeThinkingEffort)) return;
+      setActiveThinkingEffort(selectedThinkingEffort);
+      return;
+    }
+    // 未声明：max 对 OpenAI 兼容 provider 无效。仅当模型不像 Kimi（kimi/k3 用 max）
+    // 时兜底 max→xhigh，避免 400；Kimi 模型保留 max。
+    const modelId = (mutationModelAlias ?? "").toLowerCase();
+    const looksKimi = modelId.includes("kimi") || modelId.includes("k3");
+    if (activeThinkingEffort === "max" && !looksKimi) setActiveThinkingEffort("xhigh");
+  }, [activeThinkingEffort, thinkingEffortOptions, selectedThinkingEffort, thinkingModelOption?.supportEfforts, mutationModelAlias]);
   const swarmModeEnabled = displayedSwarmMode(mutationSessionView);
   const swarmModePending = hasPendingSwarmMode(mutationSessionView);
   const canSteerActiveTurn = Boolean(
