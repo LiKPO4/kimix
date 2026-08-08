@@ -21,7 +21,7 @@ import { recordSessionLastActiveAt, warmCacheHintConfig } from "@/utils/cacheHin
 import { shouldDeferLocalPendingDispatch } from "@/utils/promptQueue";
 import { isKimiCodeSessionInactiveError, isKimiCodeSessionMissingError, isKimiCodeSessionUnavailableError, removeStaleKimiCodeStartupErrors } from "@/utils/kimiCodeSessionRecovery";
 import { extractPermissionModeStatus } from "@/utils/kimiCodePermission";
-import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isTerminalKimiCodeEngineStatus } from "@/utils/sessionActivity";
+import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isTerminalKimiCodeEngineStatus, normalizeOfficialLastTurnReason } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
 import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
@@ -2802,6 +2802,25 @@ function App() {
           return { ...session, officialGoal, updatedAt: Date.now() };
         });
         syncCurrentSessionFromStore(uiSessionId);
+        return;
+      }
+      // 官方 work_changed 帧：vendor 在 turn.started 时 delete(last_turn_reason)，
+      // turn.ended 时写入 completed/cancelled/failed。此前渲染层不接这个事件，
+      // officialLastTurnReason 启动后永久陈旧（只在 reconcileOfficialSessionCatalog
+      // 启动/恢复时写一次），侧栏 busy 判定（isSessionSidebarBusy L186）拿陈旧终态
+      // 值当权威证据，误判不忙。补通实时链路：work_changed 到达时更新字段。
+      // #12 统一口径：侧栏与头部都从这条链路消费 last_turn_reason。
+      if (rawEvent?.type === "event.session.work_changed") {
+        const nextReason = normalizeOfficialLastTurnReason(rawEvent.last_turn_reason);
+        const currentReason = targetSession?.officialLastTurnReason;
+        if (nextReason !== currentReason && targetSession) {
+          updateSession(uiSessionId, (session) => ({
+            ...session,
+            officialLastTurnReason: nextReason,
+            updatedAt: Date.now(),
+          }));
+          syncCurrentSessionFromStore(uiSessionId);
+        }
         return;
       }
       // 首次发现：外部（CLI/web）创建的 goal 本地无事件面，任何事件到达时对
