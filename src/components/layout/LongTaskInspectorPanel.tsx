@@ -1059,7 +1059,7 @@ export function LongTaskInspectorPanel({
   const selectedSubagentModelOption = subagentModelOptions.find((option) => option.id === subagentModelDraft);
   const subagentThinkingOptions = useMemo(() => {
     const configured = selectedSubagentModelOption?.supportEfforts ?? [];
-    return configured.length > 0 ? configured : ["off", "minimal", "low", "medium", "high", "max"];
+    return configured.length > 0 ? configured : ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
   }, [selectedSubagentModelOption]);
 
   useEffect(() => {

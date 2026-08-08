@@ -2862,15 +2862,17 @@ function normalizeCatalogMaxContextSize(value: number | null) {
   return Math.max(1, input);
 }
 
-// models.dev 思考档位 → Kimix 词表（off/minimal/low/medium/high/max）：
-// none→off、low→low、medium→medium、high→high、xhigh→max、minimal→minimal。
+// models.dev 思考档位 → Kimix 词表（off/minimal/low/medium/high/xhigh/max）：
+// none→off、low→low、medium→medium、high→high、xhigh→xhigh、max→max、minimal→minimal。
+// xhigh 不再降级为 max：OpenAI 兼容 provider 只接受 xhigh 不接受 max，
+// 降级会导致 reasoning_effort=max 被 provider 400 拒绝。
 // 未认识的值一律丢弃（不猜测）；无档位信息时返回 undefined，不编造档位。
 const CATALOG_EFFORT_TO_KIMIX: Readonly<Record<string, string>> = {
   none: "off",
   low: "low",
   medium: "medium",
   high: "high",
-  xhigh: "max",
+  xhigh: "xhigh",
   max: "max",
   minimal: "minimal",
 };

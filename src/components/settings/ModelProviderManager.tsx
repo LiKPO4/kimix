@@ -30,7 +30,7 @@ import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 
 const NEW_PROVIDER_ID = "__new_provider__";
 const DEFAULT_CONTEXT_SIZE = 262144;
-const THINKING_EFFORT_CHOICES = ["off", "minimal", "low", "medium", "high", "max"];
+const THINKING_EFFORT_CHOICES = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 type Props = {
   config: KimiModelConfigSummary;

@@ -10,6 +10,7 @@ const THINKING_EFFORT_META: Record<string, Omit<ThinkingEffortOption, "value">> 
   low: { label: "低", description: "轻量分析" },
   medium: { label: "中", description: "平衡速度与深度" },
   high: { label: "高", description: "深入分析" },
+  xhigh: { label: "超高", description: "使用超高推理强度" },
   max: { label: "最高", description: "使用最大推理强度" },
   on: { label: "开启", description: "使用模型默认强度" },
 };
