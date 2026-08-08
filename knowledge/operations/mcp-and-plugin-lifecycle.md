@@ -4,7 +4,7 @@ title: MCP and Plugin Lifecycle
 description: Safe rules for configuring ordinary MCP servers and updating plugin-provided MCP servers without self-locking managed directories.
 resource: https://github.com/LiKPO4/kimix/blob/master/src/components/layout/McpPanel.tsx
 tags: [mcp, plugins, operations, troubleshooting]
-timestamp: "2026-07-22T23:30:00+08:00"
+timestamp: "2026-08-08T11:10:00+08:00"
 ---
 
 # MCP and Plugin Lifecycle
@@ -25,6 +25,17 @@ Kimix distinguishes ordinary MCP configuration from MCP servers bundled inside a
 * Before updating a plugin loaded by the active runtime, Kimix closes that runtime and any internal plugin-management session that could hold the managed plugin directory open.
 * A successful plugin change requires `/reload`, a new session, or application restart before the new MCP implementation is assumed active.
 * `EBUSY`, `EPERM`, `ENOTEMPTY`, locked-directory, and resource-busy errors mean another Kimi Code or Kimix process may still hold the plugin directory.
+
+# Built-in Capabilities
+
+* Kimi Computer Use (`kimi-cu`) and Kimi WebBridge (`kimi-webbridge`) are NOT marketplace plugins: the official `marketplace.json` carries only kimi-datasource / superpowers / vercel-plugin. Capabilities are client-injected built-in entries exposed by the v2 engine's capability service (`harness.listCapabilities` / `installCapability`); v1 has no capability surface and Kimix degrades to an empty list plus an explicit unsupported error on install.
+* A capability bundles a binary runtime plus agent wiring and reports layered readiness (`not_installed` / `partial` / `ready` / `unsupported`) with per-step states; `partial` means install can be resumed, and install progress (`install.step` / `percent`) is polled while `install.running`.
+* Kimix surfaces them in the plugin store page through `kimi-code:listCapabilities` / `kimi-code:installCapability` IPC, and refreshes the SDK plugin state after install because installation wires a managed plugin.
+
+# Local Skill Scan
+
+* Local skill scanning spans multiple roots (`~/.kimix/skills`, `~/.kimi-code/skills`, `~/.agents/skills`, ...). The same skill often exists in several roots, so scan results are deduplicated by skill name in root-priority order (not by absolute path); merged duplicates are reported explicitly in `mergedDuplicates` and the enabled flag is unioned so legacy per-path enablement is not lost.
+
 
 # Timeout Policy
 

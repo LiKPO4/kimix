@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-08 功能：插件页整体重组 + 官方内置能力补全（v2.20.291–293，三提交）
+
+- 背景：用户反馈插件页「草台班子」+ 官方商店缺 Computer Use。计划模式确认方向：Skills 顶部子 Tab 重组 + MCP tab 一起改。
+- 根因闭合：① Skill 双卡=扫描只按绝对路径去重，同名跨根（.kimi-code/skills 与 .agents/skills）不去重；② 「vundefined」=marketplace.json 的 superpowers/vercel-plugin 无 version 字段；③ 商店缺项=marketplace.json 只有 3 个插件，kimi-cu/kimi-webbridge 是 v2 引擎 capabilityService 的客户端注入内置条目，node-sdk 已暴露 listCapabilities/installCapability，vendor bundle 实测可用。
+- 阶段 A（0226c3df）：`electron/skillScanDedupe.ts` 按名去重（roots 顺序即优先级、Kimi Plugin 卡不参与、enabled 取并集、mergedDuplicates 明示）；capability 类型/host/IPC/preload 全链路（v1 降级空列表+明确报错）；探针 probe-kimi-code-capabilities.mjs 实测通过；顺带修复 vitest include 不含 electron/__tests__（280 轮测试此前从未运行）。
+- 阶段 B（c1b8f03a）：SkillsPanel 重写为 本地 Skills/插件商店/运行时状态 三子页；卡片去 174px 固定行高、名称完整显示、双胶囊合一；商店子页内置能力区块（状态胶囊+安装/继续安装+2s 进度轮询+失败重试）、修 vundefined；运行时子页双列；消息整卡改细状态条。
+- 阶段 C（3dd4fcd4）：McpPanel embedded 去 320px 左栏，配置/状态合并为顶部细信息条（路径收 title）；非 embedded 保留。
+- 验收：去重测试 6/6、全量 vitest 1815/1815（含新接入的 electron 测试 12 例）、typecheck 双配置 0 错误、build 通过；dev 实例 CDP 端到端验证 IPC（capabilities 2 项、mergedDuplicates 7 个）+ 四张实机截图核对。实机复验待用户（布局观感、内置能力安装链路——安装会下载托管运行时，未在探针中执行）。
+
 ## 2026-08-08 功能：隐藏「长程任务」侧栏入口——官方 goal 模式已取代（v2.20.290）
 
 - 背景：用户确认官方 goal 模式完全取代自建长程任务流程，要求隐藏功能入口。
