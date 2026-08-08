@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, Clock, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore } from "@/stores/appStore";
@@ -168,7 +168,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const workspaceView = useAppStore((s) => s.workspaceView);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
-  const setLongTasksOpen = useAppStore((s) => s.setLongTasksOpen);
+  // 长程任务入口已隐藏：官方 goal 模式取代（store 与面板代码保留，既有任务会话不受影响）
   const setCurrentProject = useAppStore((s) => s.setCurrentProject);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const setCreatingSessionProjectPath = useAppStore((s) => s.setCreatingSessionProjectPath);
@@ -642,15 +642,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           >
             <Webhook size={17} />
           </button>
-          <button
-            onClick={() => setLongTasksOpen(true)}
-            className={collapsedNavItemClass}
-            style={collapsedNavButtonStyle}
-            title="长程任务"
-            aria-label="长程任务"
-          >
-            <Clock size={17} />
-          </button>
         </div>
         <div style={{ marginTop: "auto", height: 36 }}>
           <button
@@ -870,12 +861,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         >
           <Webhook size={17} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
-        </button>
-        <button onClick={() => setLongTasksOpen(true)} className={navItemClass} title="长程任务">
-          <span className="flex items-center gap-3">
-            <Clock size={17} className="shrink-0 text-text-secondary" />
-            <span>长程任务</span>
-          </span>
         </button>
       </div>
 
