@@ -3,6 +3,7 @@ import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { X, Settings, Sun, Palette, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -458,6 +459,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
+  const [cacheHintDismissed, setCacheHintDismissedState] = useState(false);
   const [roomDeliveryInspectorOpen, setRoomDeliveryInspectorOpen] = useState(false);
   useEffect(() => {
     setFilePreviewExtensionDraft(filePreviewExtensions.join(", "));
@@ -994,6 +996,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     void refreshExperimentalSettings();
   };
 
+  const handleToggleCacheHintDismissed = async () => {
+    const next = !cacheHintDismissed;
+    setCacheHintDismissedState(next);
+    await setCacheHintDismissed(next);
+  };
+
   const refreshOfficialArchivedSessions = async () => {
     setOfficialArchivedLoading(true);
     const res = await window.api.listKimiCodeArchivedSessions();
@@ -1088,6 +1096,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       void refreshExperimentalSettings();
       void refreshOfficialArchivedSessions();
       loadFreezeReports();
+      void isCacheHintDismissed().then(setCacheHintDismissedState);
     }
   }, [settingsOpen, variant]);
 
@@ -2308,6 +2317,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </button>
                 </div>
+                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+                  <button
+                    type="button"
+                    aria-pressed={cacheHintDismissed}
+                    onClick={() => void handleToggleCacheHintDismissed()}
+                    className="flex min-w-0 items-center text-left"
+                    style={{ gap: 12 }}
+                  >
+                    <SelectionIndicator selected={cacheHintDismissed} />
+                    <div className="min-w-0 flex-1">
+                      <div className="kimix-settings-permission-label">关闭上下文缓存过期提示</div>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
+                        开启后对话区不再弹出上下文缓存过期提示；关闭开关可随时恢复提醒。
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
               </div>
 
               <div className="kimix-settings-section" {...settingsSectionProps("notification", 9)}>
