@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildThinkingEffortOptions, resolveModelDefaultThinkingEffort, resolveThinkingEffort, thinkingEffortLabel } from "../thinkingEffort";
+import {
+  buildThinkingEffortOptions,
+  resolveModelDefaultThinkingEffort,
+  resolveThinkingEffort,
+  thinkingEffortLabel,
+  thinkingEffortMenuLabel,
+} from "../thinkingEffort";
 
 describe("thinking effort options", () => {
   it("uses exactly the effort levels declared by the current model", () => {
@@ -19,6 +25,12 @@ describe("thinking effort options", () => {
   it("maps standard effort names to concise Chinese labels", () => {
     expect(thinkingEffortLabel("max")).toBe("最高");
     expect(thinkingEffortLabel("off")).toBe("关闭");
+  });
+
+  it("shows the exact wire value only inside the effort menu label", () => {
+    expect(thinkingEffortMenuLabel("xhigh")).toBe("超高（xhigh）");
+    expect(thinkingEffortMenuLabel("max")).toBe("最高（max）");
+    expect(thinkingEffortLabel("max")).toBe("最高");
   });
 
   it("resets a model switch to the new model's declared default", () => {

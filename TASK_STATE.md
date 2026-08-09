@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 调整：Composer 思考菜单显示精确英文档位（v2.21.2）
+
+- 界面：思考强度弹出菜单改为“中文名称（英文 wire 值）”，例如 `超高（xhigh）`、`最高（max）`；菜单外的紧凑工具栏按钮继续只显示中文，不增加英文宽度。
+- 边界：菜单仍只列出当前模型声明并经 provider 协议规范化后的档位，不为不支持 `max` 的 OpenAI 模型虚构可选项；运行时的 `max → xhigh` 防线保持不变。
+- 验证：思考档位定向测试 1 文件 / 7 项、全量测试 174 文件 / 1862 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过。
+
 ## 2026-08-09 修复：思考档位在运行时与子 Agent 配置边界校验（v2.21.1）
 
 - 根因：OpenAI 兼容模型配置可声明 Kimi 协议的 `max`，Composer 仅靠异步 effect 在部分无声明场景做 `max → xhigh`；已声明 `max`、首次创建/恢复、直接 `setThinking` 以及 `[secondary_model] default_effort=max` 都能绕过 UI 矫正，最终把 provider 不接受的 `reasoning_effort=max` 原样发出并收到 400。

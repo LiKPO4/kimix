@@ -76,3 +76,8 @@ export function thinkingEffortLabel(value: string | null | undefined) {
   const normalized = normalizeEffort(value) || "on";
   return optionFor(normalized).label;
 }
+
+export function thinkingEffortMenuLabel(value: string | null | undefined) {
+  const normalized = normalizeEffort(value) || "on";
+  return `${optionFor(normalized).label}（${normalized}）`;
+}

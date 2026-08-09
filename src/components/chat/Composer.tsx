@@ -38,7 +38,7 @@ import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { APP_VERSION } from "@/utils/appVersion";
 import { sessionToMarkdown } from "@/utils/markdownExport";
-import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel } from "@/utils/thinkingEffort";
+import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel, thinkingEffortMenuLabel } from "@/utils/thinkingEffort";
 import { mapHistoryEvents } from "@/utils/eventMapper";
 import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
 import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
@@ -5100,7 +5100,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                         >
                           <Brain size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
                           <span className="min-w-0">
-                            <span className="block text-[13px] font-medium leading-5">{option.label}</span>
+                            <span className="block text-[13px] font-medium leading-5">{thinkingEffortMenuLabel(option.value)}</span>
                             <span className="block truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">{option.description}</span>
                           </span>
                           {selected ? <Check size={14} className="shrink-0 text-[var(--kimix-panel-text)]" /> : <span aria-hidden="true" />}
