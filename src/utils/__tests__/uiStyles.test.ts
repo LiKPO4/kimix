@@ -386,6 +386,14 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\.kimix-sidebar-icon-action:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-navigation-action-hover-shadow\);/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-inline-icon-action[^)]*\)[^{}]*:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-control-hover-shadow\);/s);
   });
+  it("仅排除真正的静态 accent 背景，不误伤 hover:accent 次要操作", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
+
+    expect(css).not.toContain(':not([class*="bg-accent-"])');
+    expect(css.match(/:not\(\[class\^="bg-accent-"\]\):not\(\[class\*=" bg-accent-"\]\)/g)).toHaveLength(5);
+    expect(sidebar).toContain('kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger');
+  });
   it("内置风格触点与导入契约只允许已说明的结构差集", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const contractStart = css.indexOf("/* ── 可导入界面风格契约 ──");

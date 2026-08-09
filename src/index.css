@@ -4031,7 +4031,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary):not([class*="bg-accent-"]) {
+):not(.bg-accent-primary):not([class^="bg-accent-"]):not([class*=" bg-accent-"]) {
   border: var(--ui-role-control-resting-border);
   border-radius: var(--ui-role-control-radius);
   background: var(--ui-role-control-resting-background);
@@ -4087,7 +4087,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary):not([class*="bg-accent-"]):hover:not(:disabled) {
+):not(.bg-accent-primary):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):hover:not(:disabled) {
   border: var(--ui-role-control-hover-border);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
@@ -4114,7 +4114,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary):not([class*="bg-accent-"]):active:not(:disabled) {
+):not(.bg-accent-primary):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):active:not(:disabled) {
   border: var(--ui-role-control-active-border);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);
@@ -4385,7 +4385,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-palette-action,
   button.kimix-chat-collapse-row,
   button.kimix-chat-process-row
-):not([class*="bg-accent-"]):hover:not(:disabled) {
+):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):hover:not(:disabled) {
   border-color: var(--ui-role-control-hover-border);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
@@ -4396,7 +4396,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-palette-action,
   button.kimix-chat-collapse-row,
   button.kimix-chat-process-row
-):not([class*="bg-accent-"]):active:not(:disabled) {
+):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):active:not(:disabled) {
   border-color: var(--ui-role-control-active-border);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);

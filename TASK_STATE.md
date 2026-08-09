@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：hover accent 类不再绕过导入风格材质（v2.20.315）
+
+- 根因：自定义消费者用 `[class*="bg-accent-"]` 排除拥有常驻语义色背景的按钮，但该子串判断也会命中 `hover:bg-accent-danger/10` 等变体类；归档、删除、重试、外链等次要强调操作因此整个退出 control resting/hover/active 规则，只剩局部浅色背景，导入风格的边框与阴影完全未生效。
+- 修复：五处排除条件改为只识别位于 class token 起点或空格后的静态 `bg-accent-*`；`hover:` 变体继续保留语义文字色，但背景、边框与阴影由自定义 control 状态统一接管。真正的实心主按钮和常驻警告/危险背景仍被排除。
+- 验证：Luna 运行态中归档按钮静止透明；hover 为红色图标 + 灰色表面 + 深边框 + 双层浮雕，active 为内凹材质。定向测试 2 文件 / 36 项、全量测试 174 文件 / 1854 项、TypeScript 类型检查、生产构建、OKF validate/audit 均通过。
+
 ## 2026-08-09 修复：侧栏随行操作只在单按钮交互时凸起（v2.20.314）
 
 - 根因：导入风格把所有 `.kimix-sidebar-icon-action` / `.kimix-inline-icon-action` 当成常驻控件消费 resting 材质；项目与会话行的 6 个操作虽然只是随父行 hover 显形，却在显形瞬间全部获得浮雕，错误地把“父行 hover”表现成“三个按钮同时 hover”。
