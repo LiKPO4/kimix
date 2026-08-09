@@ -2234,7 +2234,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
             ? Math.min(target.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
             : undefined,
           content: hasCompletionBarrierBody
-            ? mergeCompletionBarrierContent(target, incoming)
+            ? (incoming.completionBarrierFullBody === true ? incoming.content : mergeCompletionBarrierContent(target, incoming))
             : mergeAssistantContentWithOffset(target, incoming),
             thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
             thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),

@@ -866,7 +866,7 @@ export function completedPromptMessagesToServerFrames(
   if (promptIndex === -1) return [];
   return chronological
     .slice(promptIndex)
-    .flatMap((message) => snapshotMessageToServerFrames(message, sessionId, seq, epoch, "history"))
+    .flatMap((message) => snapshotMessageToServerFrames(message, sessionId, seq, epoch, "history", true))
     .map((frame) => ({
       ...frame,
       payload: isRecord(frame.payload)
@@ -2290,6 +2290,7 @@ function snapshotMessageToServerFrames(
   seq: number,
   epoch: string | undefined,
   replayMode: "history" | "in_flight",
+  authoritativeTextBody = false,
 ): ServerFrame[] {
   if (!isRecord(message)) return [];
   const role = typeof message.role === "string" ? message.role : "";
@@ -2323,7 +2324,7 @@ function snapshotMessageToServerFrames(
   }
   if (role === "assistant") {
     const messageText = contentToText(message.content);
-    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageIdentity, messageText, messageTimestamp);
+    const frames = contentPartsToFrames(message.content, sessionId, seq, epoch, replayMode, messageIdentity, messageText, messageTimestamp, authoritativeTextBody);
     if (frames.length > 0 && replayMode === "history") {
       frames.push({
         type: "turn.ended",
@@ -2379,6 +2380,7 @@ function contentPartsToFrames(
   messageIdentity: SnapshotMessageIdentity,
   messageText: string,
   messageTimestamp: unknown,
+  authoritativeTextBody = false,
 ): ServerFrame[] {
   if (typeof content === "string") {
     return content ? [{
@@ -2386,11 +2388,11 @@ function contentPartsToFrames(
       session_id: sessionId,
       seq,
       epoch,
-      payload: snapshotReplayPayload({ delta: content }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
+      payload: snapshotReplayPayload({ delta: content, ...(authoritativeTextBody ? { kimixPromptCompletionFullBody: true } : {}) }, replayMode, messageIdentity, messageText, "assistant", messageTimestamp),
     }] : [];
   }
   if (!Array.isArray(content)) return [];
-  return content.flatMap((part) => {
+  const frames = content.flatMap((part) => {
     if (!isRecord(part)) return [];
     const type = typeof part.type === "string" ? part.type : "";
     if (type === "text" && typeof part.text === "string" && part.text) {
@@ -2451,6 +2453,23 @@ function contentPartsToFrames(
     }
     return [];
   });
+  if (!authoritativeTextBody) return frames;
+  const text = content.map((part) => {
+    if (typeof part === "string") return part;
+    if (!isRecord(part)) return "";
+    return part.type === "text" && typeof part.text === "string" ? part.text : "";
+  }).filter(Boolean).join("\n");
+  if (!text) return frames;
+  const firstTextIndex = frames.findIndex((frame) => isRecord(frame.payload) && isRecord(frame.payload.part) && frame.payload.part.type === "text");
+  if (firstTextIndex === -1) return frames;
+  const fullFrame: ServerFrame = {
+    ...frames[firstTextIndex],
+    payload: isRecord(frames[firstTextIndex].payload)
+      ? { ...frames[firstTextIndex].payload, part: { type: "text", text }, kimixPromptCompletionFullBody: true }
+      : frames[firstTextIndex].payload,
+  };
+  return frames.filter((frame, index) => index === firstTextIndex || !(isRecord(frame.payload) && isRecord(frame.payload.part) && frame.payload.part.type === "text"))
+    .map((frame, index) => index === firstTextIndex ? fullFrame : frame);
 }
 
 function contentToText(content: unknown): string {

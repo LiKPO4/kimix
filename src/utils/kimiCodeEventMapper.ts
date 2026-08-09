@@ -266,6 +266,10 @@ function isCompletionBarrierReplay(event: Record<string, unknown>): boolean {
   return event.kimixPromptCompletionBarrier === true;
 }
 
+function isCompletionBarrierFullBody(event: Record<string, unknown>): boolean {
+  return event.kimixPromptCompletionFullBody === true;
+}
+
 function getContentPart(event: Record<string, unknown>): Record<string, unknown> {
   return isRecord(event.part) ? event.part : event;
 }
@@ -485,6 +489,7 @@ export function mapKimiCodeEvent(
         snapshotMessageId: getSnapshotMessageId(event),
         snapshotMessageIdStable: getSnapshotMessageIdStable(event),
         completionBarrierReplay: isCompletionBarrierReplay(event),
+        completionBarrierFullBody: isCompletionBarrierFullBody(event),
         streamOffset: typeof event.offset === "number" ? event.offset : undefined,
         agentId: getAgentId(event),
         content: delta,
@@ -506,6 +511,7 @@ export function mapKimiCodeEvent(
           snapshotMessageId: getSnapshotMessageId(event),
           snapshotMessageIdStable: getSnapshotMessageIdStable(event),
           completionBarrierReplay: isCompletionBarrierReplay(event),
+          completionBarrierFullBody: isCompletionBarrierFullBody(event),
           agentId: getAgentId(event),
           content: text,
           model: isString(event.model) ? event.model : undefined,
@@ -528,6 +534,7 @@ export function mapKimiCodeEvent(
           snapshotMessageId: getSnapshotMessageId(event),
           snapshotMessageIdStable: getSnapshotMessageIdStable(event),
           completionBarrierReplay: isCompletionBarrierReplay(event),
+          completionBarrierFullBody: isCompletionBarrierFullBody(event),
           agentId: getAgentId(event),
           content: "",
           thinking: think,

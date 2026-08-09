@@ -1953,6 +1953,37 @@ describe("snapshot tool replay failure flag", () => {
     const toolFrame = frames.find((frame) => frame.type === "tool.result");
     expect(toolFrame?.payload).toMatchObject({ toolCallId: "call-err", is_error: true });
   });
+
+  it("emits one authoritative full body for completion replay text parts", () => {
+    const promptId = "msg-prompt-full-body";
+    const frames = completedPromptMessagesToServerFrames([
+      { id: "assistant-full", role: "assistant", created_at: "2026-08-09T10:00:01Z", content: [
+        { type: "text", text: "第一段正文" },
+        { type: "text", text: "第二段正文" },
+      ] },
+      { id: promptId, role: "user", created_at: "2026-08-09T10:00:00Z", content: "问题" },
+    ], "session-full-body", promptId, 3, "epoch-1");
+    const textFrames = frames.filter((frame) => (
+      frame.type === "content.part" &&
+      typeof frame.payload === "object" && frame.payload !== null &&
+      "part" in frame.payload && typeof (frame.payload as { part?: { type?: unknown } }).part === "object" &&
+      (frame.payload as { part: { type?: unknown } }).part.type === "text"
+    ));
+    expect(textFrames).toHaveLength(1);
+    expect((textFrames[0].payload as { part: { text: string }; kimixPromptCompletionFullBody?: boolean }).part.text)
+      .toBe("第一段正文\n第二段正文");
+    expect((textFrames[0].payload as { kimixPromptCompletionFullBody?: boolean }).kimixPromptCompletionFullBody).toBe(true);
+    const live = reduceKimiCodeEvents([], [{
+      type: "assistant.delta",
+      snapshotMessageId: "assistant-full",
+      snapshotMessageIdStable: true,
+      delta: "第一段正文",
+      timestamp: 1,
+    }] as Parameters<typeof reduceKimiCodeEvents>[1]);
+    const replayed = reduceKimiCodeEvents(live, frames.map((frame) => flattenServerEvent(frame as Parameters<typeof flattenServerEvent>[0])));
+    const assistant = replayed.find((event) => event.type === "assistant_message" && event.snapshotMessageId === "assistant-full");
+    expect(assistant && assistant.type === "assistant_message" ? assistant.content : "").toBe("第一段正文\n第二段正文");
+  });
 });
 
 describe("post-terminal external prompt watch probe (v2.20.195 three-step sequence)", () => {
