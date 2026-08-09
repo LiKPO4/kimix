@@ -3073,8 +3073,11 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-layout-resizer {
   position: relative;
+  z-index: 2;
   width: 12px;
   flex: 0 0 12px;
+  /* 保留 12px 拖拽热区，但让它对称覆盖分界线，不占据面板间的布局宽度。 */
+  margin-inline: -6px;
   cursor: col-resize;
   touch-action: none;
   -webkit-app-region: no-drag;
