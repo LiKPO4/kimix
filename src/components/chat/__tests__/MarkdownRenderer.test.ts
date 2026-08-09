@@ -90,6 +90,39 @@ describe("MarkdownRenderer streaming blocks", () => {
     expect(normalizeMarkdownContent(content, false)).toBe(content);
   });
 
+  it("preserves assistant source line breaks inside a markdown paragraph", async () => {
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: "《登高望远行》\n\n独上青山巅，极目望天涯。\n云海翻银浪，长风卷素纱。",
+      }));
+    });
+
+    const paragraphs = container.querySelectorAll("p");
+    expect(paragraphs).toHaveLength(2);
+    expect(paragraphs[1]?.querySelectorAll("br")).toHaveLength(1);
+    expect(paragraphs[1]?.innerHTML).toBe("独上青山巅，极目望天涯。<br>\n云海翻银浪，长风卷素纱。");
+
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: "《登高望远行》\n\n独上青山巅，极目望天涯。\n云海翻银浪，长风卷素纱。",
+        streaming: true,
+      }));
+    });
+    expect(container.querySelectorAll("p")[1]?.querySelectorAll("br")).toHaveLength(1);
+  });
+
+  it("does not turn fenced-code newlines into break elements", async () => {
+    await act(async () => {
+      root.render(createElement(MarkdownRenderer, {
+        content: "```text\nfirst line\nsecond line\n```",
+      }));
+    });
+
+    const code = container.querySelector("pre code");
+    expect(code?.textContent).toBe("first line\nsecond line\n");
+    expect(code?.querySelector("br")).toBeNull();
+  });
+
   it("repairs broken tables in both progress and default normalization modes", () => {
     const content = [
       "| 优先级 | 事项 |",

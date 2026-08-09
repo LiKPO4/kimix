@@ -96,6 +96,43 @@ export function normalizeMarkdownContent(content: string, normalizeAssistantProg
   return restoreInlineMarkdownHeadings(restoreMarkdownTables(normalizeIndentedFencedCodeBlocks(normalizeNestedMarkdownFencedCodeBlocks(content))));
 }
 
+type MarkdownAstNode = {
+  type: string;
+  value?: unknown;
+  children?: MarkdownAstNode[];
+  [key: string]: unknown;
+};
+
+/**
+ * Chat output treats a source newline as an intentional visual line break.
+ * CommonMark normally folds a soft break to a space after parsing, which made
+ * correctly persisted poetry and line-oriented output look like one paragraph.
+ * Transform only mdast text nodes: fenced/inline code and block boundaries keep
+ * their native Markdown semantics, while streaming and settled views agree.
+ */
+export function remarkPreserveAssistantLineBreaks() {
+  return (tree: MarkdownAstNode) => {
+    const visit = (node: MarkdownAstNode) => {
+      if (!Array.isArray(node.children)) return;
+      const next: MarkdownAstNode[] = [];
+      for (const child of node.children) {
+        if (child.type === "text" && typeof child.value === "string" && /\r?\n/.test(child.value)) {
+          const lines = child.value.split(/\r?\n/);
+          lines.forEach((line, index) => {
+            if (line) next.push({ ...child, value: line });
+            if (index < lines.length - 1) next.push({ type: "break" });
+          });
+        } else {
+          next.push(child);
+        }
+      }
+      node.children = next;
+      for (const child of next) visit(child);
+    };
+    visit(tree);
+  };
+}
+
 const StreamingMarkdownBlock = React.memo(function StreamingMarkdownBlock({
   content,
   components,
@@ -644,7 +681,7 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
     [wrapLongLines]
   );
 
-  const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);
+  const remarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkPreserveAssistantLineBreaks], []);
   const rehypePlugins = useMemo(() => [rehypeKatex], []);
   const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(displayContent);
 

@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T23:18:00+08:00"
+timestamp: "2026-08-09T23:28:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -377,6 +377,11 @@ The wrapper around rich Markdown must use normal whitespace collapsing:
 `white-space: pre-wrap` is reserved for raw thinking text, because inheriting it
 into ReactMarkdown makes the separator newlines around paragraphs and loose-list
 `<li><p>` nodes visible as blank rows on top of the intended Markdown margins.
+Assistant source soft breaks are preserved structurally instead: the shared
+remark transform converts newline characters only inside mdast `text` nodes to
+`break` nodes. This keeps poetry and line-oriented answers consistent between
+the streaming plain/rich and settled paths without touching fenced/inline code,
+tables, list structure, or paragraph boundaries.
 
 Feature flags (localStorage): `kimix_streaming_rich_markdown` (default on), `kimix_streaming_plain_markdown`,
 `kimix_scroll_yield`, `kimix_active_turn_draft`; diagnostics behind

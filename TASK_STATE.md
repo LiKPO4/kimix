@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：Assistant Markdown 保留模型单换行（v2.21.22）
+
+- 现场快照：新会话官方 `/messages` 中“每行两句”的 Assistant 已正确落库为单 text part、162 字、12 个换行；Renderer 最终正文同为 162 字，但截图把 11 行诗折叠成一段。模型、Provider SSE、Server 落库和完成回放均未丢换行。
+- 根因：流式轻量 Markdown 已把普通正文 `\n` 转为 `<br>`，settled/rich ReactMarkdown 却沿用 CommonMark soft-break 语义，把段落内单换行折叠为空格；所以流式与完成态显示不一致，双换行可见而单换行消失。
+- 修正：共享 ReactMarkdown 插件只把 mdast 普通 text 节点中的源换行转成 `break` 节点；代码块、行内代码、表格结构与段落边界继续使用原生 Markdown 语义，不使用 `white-space: pre-wrap`，避免 loose list/段落分隔符产生额外空白。
+- 回归：真实“两行诗”fixture 先稳定复现无 `<br>`，修正后 settled 与 streaming 均保留一个 `<br>`；另锁定 fenced code 仍保留原始换行且不生成 `<br>`。
+
 ## 2026-08-09 修复：完成回放不再人为插入短句换行（v2.21.21）
 
 - 复核官方与旧版：官方流式 transcript 使用 `open.text += delta`，多 text part 默认 `join('')`；Kimix v2.21.18 可见正文路径同样逐 part 原样发送。重复正文的根因是完成回放身份绑定错误，不是正文分隔符。
