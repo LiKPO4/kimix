@@ -4120,6 +4120,13 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-control-active-shadow);
 }
 
+/* 侧栏项目/会话行的成组操作由父行 hover 显形；显形不等于每个按钮都处于 hover。 */
+:root[data-ui-style-contract="v1"] .kimix-sidebar-reveal-action:not(:hover):not(:focus-visible):not(:active) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-split-control, .kimix-room-secondary-action) {
   border: var(--ui-role-compound-control-resting-border);
   border-radius: var(--ui-role-compound-control-radius);

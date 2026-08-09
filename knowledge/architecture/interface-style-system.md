@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-09T11:54:00+08:00"
+timestamp: "2026-08-09T12:20:00+08:00"
 ---
 
 # Interface Style System
@@ -34,6 +34,7 @@ Imported documents are parsed in the Electron main process with a JSON-only 256 
 * A nested control has one visible boundary owner. In the Composer, `.kimix-composer-card` owns border, focus, and elevation; `.kimix-composer-input` remains borderless and transparent. Settings inputs own their own inset boundary because they are standalone fields.
 * The Composer single-boundary rule is enforced below the data contract, not requested from style authors. `.kimix-composer-input` permanently has zero border/radius/shadow and a transparent background across resting/focus/focus-visible; the custom `field` role never selects it. Imported JSON may style only the outer `composer` role, so an AI-generated document cannot recreate the nested textarea frame.
 * Controls with the same role share one state language. `.kimix-control-button` represents a tool that opens more controls, while `.kimix-state-button` represents a binary mode and derives its selected appearance from `aria-pressed="true"`. Business components must not reconstruct selected borders, backgrounds, or shadows through inline styles.
+* Parent-row reveal is visibility, not interaction state. Sidebar project/session actions that appear together when their row is hovered use `.kimix-sidebar-reveal-action`: under the imported-style contract their non-hovered/non-focused resting plate is forced transparent while preserving geometry, and only the individual action's hover, focus, or active state may consume `navigationAction` / `control` material. Always-visible sidebar actions and ordinary inline controls retain their configured resting treatment.
 * Imported toggle roles consume all four interaction states. `.kimix-state-button` and `.kimix-settings-permission` use resting at rest, hover only while unselected, active while pressed, and selected for `aria-pressed=true`; selected hover must remain selected. Swarm and Plan are the canonical Composer touchpoints.
 * A complete compound button plate cannot silently lose the material language of adjacent controls through an AI omission. During custom canonicalization, a compoundControl treatment with non-transparent surface + visible border + elevation none inherits the matching control elevation when that control has depth. Transparent, borderless compound controls remain deliberately flat and are never repaired. The top Start/Open split controls consume compound resting/hover/active states.
 * Message copy actions share one compact geometry. User-message copy and Assistant single-copy are 28×28 square icon controls; Assistant copy-all may retain its text label but is exactly 28px high. The Assistant pair uses `.kimix-message-copy-action` plus the control role so both buttons receive the same preset material, border, radius, and shadow; `is-roomy` is not allowed on the single-copy action.

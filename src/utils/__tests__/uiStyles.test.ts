@@ -377,6 +377,15 @@ describe("UI_STYLES", () => {
     expect(composer).toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*32,[\s\S]*?minHeight:\s*32,/s);
     expect(composer).not.toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*34,[\s\S]*?minHeight:\s*34,/s);
   });
+  it("侧栏随行显形操作静止透明，仅单按钮交互时消费自定义材质", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
+
+    expect(sidebar.match(/kimix-sidebar-reveal-action/g)).toHaveLength(6);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-sidebar-reveal-action:not\(:hover\):not\(:focus-visible\):not\(:active\)\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.kimix-sidebar-icon-action:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-navigation-action-hover-shadow\);/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-inline-icon-action[^)]*\)[^{}]*:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-control-hover-shadow\);/s);
+  });
   it("内置风格触点与导入契约只允许已说明的结构差集", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const contractStart = css.indexOf("/* ── 可导入界面风格契约 ──");

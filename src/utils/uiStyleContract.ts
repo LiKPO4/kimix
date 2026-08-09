@@ -41,7 +41,7 @@ export const UI_STYLE_ROLE_GUIDE: Record<UiStyleRoleId, string> = {
   shell: "应用主内容外壳",
   toolbar: "顶部与底部工具栏表面",
   navigationItem: "侧栏项目、会话和设置导航项",
-  navigationAction: "侧栏新增、刷新等图标操作",
+  navigationAction: "侧栏新增、刷新等图标操作；随行显形的成组操作静止透明，仅在单按钮悬停、聚焦或按下时显示材质",
   control: "普通工具按钮、窗口按钮和次要操作",
   primaryAction: "发送、保存等主要操作",
   compoundControl: "顶部启动与打开文件的分段复合按钮",
