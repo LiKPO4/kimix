@@ -3026,9 +3026,12 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
   const effectiveThinkingParts = isActiveAssistant && liveDraftKey
     ? pickDraftThinkingParts(activeDraft?.thinkingParts, thinkingParts)
     : thinkingParts;
+  // event.content is the turn-wide aggregate and may include intermediate text
+  // segments that render inside the process timeline. Keep it only for the
+  // explicit “全部（含思考）” path; the ordinary copy action must follow the
+  // same final/trailing text boundary as the visible Assistant body.
   const clipboardContent = effectiveDisplayContent.trim().length > 0 ? effectiveDisplayContent : content;
   const hasVisibleContent = content.trim().length > 0;
-  const hasCopyableContent = clipboardContent.trim().length > 0;
   const changedFilesSignature = changedFiles.join("\u001f");
   const mdArtifacts = useMemo(() => {
     if (!isComplete) return [];
@@ -3050,8 +3053,10 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
     () => computeFinalTextBlockContent(turnBlocks, effectiveDisplayContent, isComplete && !isActiveAssistant),
     [effectiveDisplayContent, isComplete, isActiveAssistant, turnBlocks],
   );
+  const bodyCopyText = finalText || streamingContent;
   const bodyText = finalText || (hideWhileProcessExpanded ? "" : streamingContent);
   const hasVisibleBodyText = bodyText.trim().length > 0;
+  const hasCopyableContent = bodyCopyText.trim().length > 0;
   // Full copy text is built lazily on click: rebuilding it per stream delta was
   // an O(thinking) cost on every frame even though it only matters on copy.
   const copyAllSourceRef = useRef<{
@@ -3099,7 +3104,7 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
       <AssistantMessageFooter
         statuses={trailingStatuses}
         fallbackLabel={footerFallbackLabel}
-        onCopy={() => void trigger(clipboardContent)}
+        onCopy={() => void trigger(bodyCopyText)}
         onCopyAll={handleCopyAll}
         copied={copied}
         copiedAll={copiedAll}
@@ -3229,9 +3234,9 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
           <AssistantBodyBlock
             // The bottom body shows the final answer segment; while the turn
             // is active the leaf subscribes to the draft and streams the
-            // trailing text candidate live. Copy/export reads the same merged
-            // content so the clipboard keeps everything including intermediate
-            // text segments.
+            // trailing text candidate live. Ordinary copy follows that same
+            // visible-body boundary; only “全部” includes process/intermediate
+            // text and thinking.
             content={event.content}
             thinking={event.thinking ?? undefined}
             thinkingParts={event.thinkingParts}

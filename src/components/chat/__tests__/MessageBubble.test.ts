@@ -2,8 +2,9 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SubagentEvent, TimelineEvent, ToolCallEvent } from "@/types/ui";
+import type { TurnBlock } from "@/utils/turnBlocks";
 import {
   KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX,
   KimiWebIntermediateTextBlock,
@@ -11,6 +12,7 @@ import {
   KimiWebSubagentDetails,
   KimiWebSubagentGroupCard,
   KimiWebTaskCard,
+  MessageBubble,
 } from "../MessageBubble";
 
 function makeSubagent(detailCount: number): SubagentEvent {
@@ -63,6 +65,65 @@ describe("MessageBubble Kimi Web rendering", () => {
     expect(container.querySelectorAll("li")).toHaveLength(2);
     expect(container.querySelector("code")?.textContent).toBe("gambler");
     expect(container.textContent).not.toContain("**");
+  });
+
+  it("copies only the final visible body while 全部 keeps turn-wide content", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const intermediateA: Extract<TimelineEvent, { type: "assistant_message" }> = {
+      id: "assistant-intermediate-a",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "特征。",
+      isThinking: false,
+      isComplete: true,
+    };
+    const intermediateB: Extract<TimelineEvent, { type: "assistant_message" }> = {
+      id: "assistant-intermediate-b",
+      type: "assistant_message",
+      timestamp: 2,
+      content: "内）。",
+      isThinking: false,
+      isComplete: true,
+    };
+    const finalBody = "已创建：`kimix-ui-style-y2k-millennium.json`\n\n校验通过。";
+    const finalEvent: Extract<TimelineEvent, { type: "assistant_message" }> = {
+      id: "assistant-final",
+      type: "assistant_message",
+      timestamp: 3,
+      content: finalBody,
+      isThinking: false,
+      isComplete: true,
+    };
+    const aggregatedContent = [intermediateA.content, intermediateB.content, finalBody].join("\n\n");
+    const aggregateEvent = { ...finalEvent, content: aggregatedContent };
+    const turnBlocks: TurnBlock[] = [
+      { kind: "text", key: "text:a", events: [intermediateA], content: intermediateA.content },
+      { kind: "tool", key: "tool:1", tool: { id: "tool-1", type: "tool_call", timestamp: 1.5, toolCallId: "call-1", toolName: "WriteFile", status: "success", arguments: {} } },
+      { kind: "text", key: "text:b", events: [intermediateB], content: intermediateB.content },
+      { kind: "tool", key: "tool:2", tool: { id: "tool-2", type: "tool_call", timestamp: 2.5, toolCallId: "call-2", toolName: "ReadFile", status: "success", arguments: {} } },
+      { kind: "text", key: "text:final", events: [finalEvent], content: finalBody },
+    ];
+
+    await act(async () => {
+      root.render(createElement(MessageBubble, {
+        event: aggregateEvent,
+        hideProcessSummary: true,
+        turnBlocks,
+      }));
+    });
+
+    const copyBody = container.querySelector<HTMLButtonElement>('[aria-label="复制"]');
+    const copyAll = container.querySelector<HTMLButtonElement>('[aria-label="全部复制（含思考）"]');
+    expect(copyBody).not.toBeNull();
+    expect(copyAll).not.toBeNull();
+    await act(async () => copyBody!.click());
+    expect(writeText).toHaveBeenLastCalledWith(finalBody);
+    await act(async () => copyAll!.click());
+    expect(writeText).toHaveBeenLastCalledWith(`## 回复\n\n${aggregatedContent}`);
   });
 
   it("keeps a stable inner viewport from the eighth subagent detail onward", async () => {
@@ -291,4 +352,3 @@ describe("MessageBubble kimi-web cards stay collapsed unless the user expands th
     expect(container.textContent).toContain("第 1 条子事件详情");
   });
 });
-
