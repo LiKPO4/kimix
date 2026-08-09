@@ -4142,6 +4142,26 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: none;
 }
 
+/* Agent 过程头和游离的折叠思考摘要各自拥有完整边界；卡片内部的折叠行仍由父卡拥有边界。 */
+:root[data-ui-style-contract="v1"] .kimix-chat-standalone-disclosure {
+  border: var(--ui-role-control-resting-border);
+  border-radius: var(--ui-role-control-radius);
+  background: var(--ui-role-control-resting-background);
+  box-shadow: var(--ui-role-control-resting-shadow);
+}
+
+:root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure:hover:not(:disabled) {
+  border: var(--ui-role-control-hover-border);
+  background: var(--ui-role-control-hover-background);
+  box-shadow: var(--ui-role-control-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure:active:not(:disabled) {
+  border: var(--ui-role-control-active-border);
+  background: var(--ui-role-control-active-background);
+  box-shadow: var(--ui-role-control-active-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-split-control, .kimix-room-secondary-action) {
   border: var(--ui-role-compound-control-resting-border);
   border-radius: var(--ui-role-compound-control-radius);

@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：Agent 过程头与折叠思考完整消费导入风格（v2.21.7）
+
+- 根因：Agent 过程消息头与 Kimi Web 的可展开思考摘要都只带通用 `.kimix-chat-collapse-row`；UI Style v1 为避免卡片内部行重复套框，只给这个遗留大类桥接 hover/active，导致两个真正独立的边界所有者在静止态仍固定为基础 6px、透明、无边框、无阴影。Y2K 的 control resting 材质已正确编译但没有消费者，不是导入 JSON 或 AI 生成失败。
+- 修复：新增 `.kimix-chat-standalone-disclosure` 语义，只登记 Agent 过程头（含无详情静态头）与游离折叠思考摘要，完整消费 control 的 resting/hover/active 边框、圆角、表面与层次；思考摘要补 `aria-expanded`。工具卡、提问卡、通知卡等已有父卡边界的内部折叠行继续只桥接交互态，避免框套框。AI 角色目录同步说明 control 覆盖这两个触点。
+- 验证：定向 UI Style 测试 2 文件 / 40 项、全量测试 174 文件 / 1865 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过。v2.21.7 Y2K 运行态中两触点静止态均从 6px/透明/无边框/无阴影变为 control 的 999px、1px 边框、`#EAECEE` 表面与双层浮雕；hover/active 正确切换边框、表面、阴影和按压 scale。相邻“2 个工具调用”内嵌头仍为 6px/透明/无边框/无阴影，未产生框套框。
+
 ## 2026-08-09 修复：导入风格的嵌套分段控件保持同心圆角（v2.21.6）
 
 - 根因：主题三段控件有 6px 可见内边距，内部按钮消费 `interactiveCard` 圆角，外壳却直接消费无几何关联的 `insetSection` 圆角；Y2K 运行态因此形成外 14px、内 20px 的反向嵌套转角。桌面通知列表虽共享外壳材质，但其子项贴边满铺，不能与主题控件共用同一圆角推导。

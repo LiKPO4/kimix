@@ -1280,8 +1280,9 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="kimix-kimi-web-foldable-summary kimix-chat-collapse-row text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
+          className="kimix-kimi-web-foldable-summary kimix-chat-standalone-disclosure kimix-chat-collapse-row text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
           style={KIMI_WEB_THINKING_SUMMARY_STYLE}
+          aria-expanded={expanded}
         >
           {teaser}
         </button>
@@ -2654,12 +2655,12 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
           onClick={() => toggleWithStableAnchor(!expanded, "summary")}
           aria-expanded={expanded}
           data-kimix-search-expand="true"
-          className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
+          className="kimix-chat-standalone-disclosure kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)] hover:bg-[var(--kimix-panel-hover)] hover:text-[var(--kimix-panel-text-secondary)]"
         >
           {summaryContent}
         </button>
       ) : (
-        <div className="kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)]">
+        <div className="kimix-chat-standalone-disclosure kimix-chat-collapse-row max-w-full text-[15px] leading-none text-[var(--kimix-panel-text-secondary)]">
           {summaryContent}
         </div>
       )}

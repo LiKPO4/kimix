@@ -371,6 +371,16 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:hover:not\(:disabled\)\s*\{/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:active:not\(:disabled\)\s*\{/s);
   });
+  it("Agent 过程头与游离折叠思考摘要消费 control 完整三态", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const messageBubble = readFileSync(resolve(process.cwd(), "src/components/chat/MessageBubble.tsx"), "utf8");
+
+    expect(messageBubble.match(/kimix-chat-standalone-disclosure/g)).toHaveLength(3);
+    expect(messageBubble).toMatch(/kimix-kimi-web-foldable-summary kimix-chat-standalone-disclosure[\s\S]{0,300}?aria-expanded=\{expanded\}/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-chat-standalone-disclosure\s*\{[^}]*border:\s*var\(--ui-role-control-resting-border\);[^}]*border-radius:\s*var\(--ui-role-control-radius\);[^}]*background:\s*var\(--ui-role-control-resting-background\);[^}]*box-shadow:\s*var\(--ui-role-control-resting-shadow\);/s);
+    expect(css).toMatch(/button\.kimix-chat-standalone-disclosure:hover:not\(:disabled\)\s*\{[^}]*border:\s*var\(--ui-role-control-hover-border\);[^}]*background:\s*var\(--ui-role-control-hover-background\);[^}]*box-shadow:\s*var\(--ui-role-control-hover-shadow\);/s);
+    expect(css).toMatch(/button\.kimix-chat-standalone-disclosure:active:not\(:disabled\)\s*\{[^}]*border:\s*var\(--ui-role-control-active-border\);[^}]*background:\s*var\(--ui-role-control-active-background\);[^}]*box-shadow:\s*var\(--ui-role-control-active-shadow\);/s);
+  });
   it("Composer 权限与思考强度按钮均与同排紧凑按钮保持 32px 高", () => {
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
 
