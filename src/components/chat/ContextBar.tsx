@@ -13,7 +13,8 @@ import { isSessionRuntimeTracked } from "@/utils/sessionActivity";
 import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { normalizePathForComparison } from "@/utils/pathCase";
-import { runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
+import { isKimiCodeSessionUnavailableError, runKimiCodeSessionMutationWithRecovery } from "@/utils/kimiCodeSessionRecovery";
+import { resolveModelDefaultThinkingEffort, thinkingEffortLabel } from "@/utils/thinkingEffort";
 import { isRoomMutationOwnerRunning, resolveRoomMutationOwner, updateRoomMutationOwner, type RoomMutationOwner } from "@/utils/roomMutationOwner";
 import { roomHasExecutingAgentWork } from "@/utils/sessionArchive";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
@@ -265,6 +266,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const permissionMode = useAppStore((s) => s.permissionMode);
   const pendingNewSessionModel = useAppStore((s) => s.pendingNewSessionModel);
   const setPendingNewSessionModel = useAppStore((s) => s.setPendingNewSessionModel);
+  const setDefaultThinkingEffort = useAppStore((s) => s.setDefaultThinkingEffort);
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
@@ -554,6 +556,11 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   };
 
   const handleSelectModel = async (model: string) => {
+    const selectedModelOption = modelOptions.find((option) => option.id === model);
+    const modelDefaultThinkingEffort = resolveModelDefaultThinkingEffort(
+      selectedModelOption?.supportEfforts,
+      selectedModelOption?.defaultEffort,
+    );
     // 欢迎屏（无会话）：不写官方默认模型，只设置「待使用模型」——
     // 仅影响下一个新会话，创建消费后即清除；默认模型请在设置里修改。
     if (!activeSession) {
@@ -564,6 +571,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
         return;
       }
       setPendingNewSessionModel(model);
+      setDefaultThinkingEffort(modelDefaultThinkingEffort);
       setModelMenuOpen(false);
       restoreComposerFocus();
       showToast(`下一个新会话将使用 ${model}`);
@@ -623,8 +631,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       showToast(`切换模型失败：${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    setSwitchingModel(null);
     if (!result.success) {
+      setSwitchingModel(null);
       updateSession(activeSession.id, (current) => ({
         ...updateRoomMutationOwner(current, mutationOwner!.roomAgentId, (agent) => ({
           ...agent,
@@ -636,6 +644,13 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       showToast(`切换模型失败：${result.error}`);
       return;
     }
+    const thinkingResult = await window.api.setKimiCodeThinking({
+      sessionId: result.sessionId,
+      effort: modelDefaultThinkingEffort,
+    }).catch((error) => ({
+      success: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    }));
     useSessionStore.setState((state) => ({
       sessions: claimRuntimeSessionOwnership(
         state.sessions,
@@ -656,9 +671,21 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }));
     const updated = useSessionStore.getState().sessions.find((item) => item.id === activeSession.id);
     if (updated && currentSession?.id === updated.id) setCurrentSession(updated);
+    // Model is already switched even when the profile update cannot reach a
+    // temporarily unavailable runtime. Keep the new model's effort locally so
+    // the existing resume/create path replays it instead of carrying the old one.
+    setDefaultThinkingEffort(modelDefaultThinkingEffort);
+    setSwitchingModel(null);
     setModelMenuOpen(false);
     restoreComposerFocus();
-    showToast(`${mutationOwner.displayName} · 已切换为 ${compactModelDisplayName(model)}`);
+    const switchedMessage = `${mutationOwner.displayName} · 已切换为 ${compactModelDisplayName(model)}`;
+    if (thinkingResult.success) {
+      showToast(`${switchedMessage}，思考强度已重置为${thinkingEffortLabel(modelDefaultThinkingEffort)}`);
+    } else if (isKimiCodeSessionUnavailableError(thinkingResult.error)) {
+      showToast(`${switchedMessage}，思考强度已重置为${thinkingEffortLabel(modelDefaultThinkingEffort)}，将在下次消息时生效`);
+    } else {
+      showToast(`${switchedMessage}；本地思考强度已重置为${thinkingEffortLabel(modelDefaultThinkingEffort)}，但运行时同步失败：${thinkingResult.error}`);
+    }
   };
 
   const openModelSettings = async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel } from "../thinkingEffort";
+import { buildThinkingEffortOptions, resolveModelDefaultThinkingEffort, resolveThinkingEffort, thinkingEffortLabel } from "../thinkingEffort";
 
 describe("thinking effort options", () => {
   it("uses exactly the effort levels declared by the current model", () => {
@@ -19,5 +19,15 @@ describe("thinking effort options", () => {
   it("maps standard effort names to concise Chinese labels", () => {
     expect(thinkingEffortLabel("max")).toBe("最高");
     expect(thinkingEffortLabel("off")).toBe("关闭");
+  });
+
+  it("resets a model switch to the new model's declared default", () => {
+    expect(resolveModelDefaultThinkingEffort(["low", "medium", "high"], "medium")).toBe("medium");
+  });
+
+  it("delegates to the runtime when the new model has no trustworthy default", () => {
+    expect(resolveModelDefaultThinkingEffort(["low", "high"], null)).toBe("on");
+    expect(resolveModelDefaultThinkingEffort(["low", "high"], "max")).toBe("on");
+    expect(resolveModelDefaultThinkingEffort([], "high")).toBe("on");
   });
 });

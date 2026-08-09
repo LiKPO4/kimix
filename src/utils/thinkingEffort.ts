@@ -51,6 +51,18 @@ export function resolveThinkingEffort(
   return options[0]?.value ?? "on";
 }
 
+export function resolveModelDefaultThinkingEffort(
+  supportEfforts: readonly string[] | null | undefined,
+  defaultEffort?: string | null,
+) {
+  const declared = new Set((supportEfforts ?? []).map(normalizeEffort).filter(Boolean));
+  const normalizedDefault = normalizeEffort(defaultEffort);
+  if (normalizedDefault && declared.has(normalizedDefault)) return normalizedDefault;
+  // No trustworthy concrete default: "on" delegates the decision to Kimi Code
+  // instead of carrying the previous model's effort or inventing a list entry.
+  return "on";
+}
+
 export function thinkingEffortLabel(value: string | null | undefined) {
   const normalized = normalizeEffort(value) || "on";
   return optionFor(normalized).label;

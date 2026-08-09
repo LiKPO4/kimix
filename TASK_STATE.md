@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：切换模型同步重置为新模型默认思考强度（v2.20.303）
+
+- 根因：聊天底栏模型切换只调用官方 `setModel`；Composer 的既有矫正只在旧 effort 不受新模型支持时触发。因此两个模型都支持同一档位时，旧模型的思考强度会被错误保留，覆盖新模型的 `default_effort`。
+- 修复：模型切换从模型目录解析新模型有效的 `defaultEffort`，无可信默认时使用 `on` 交还官方决定；当前会话在 `setModel` 成功后对同一返回 runtime 调用 `setThinking`，欢迎屏待用模型同步更新新会话 effort。模型成功但思考 profile 暂时不可用时不回滚模型，本地保留目标 effort，由既有 resume/create 链路重放；切换按钮锁定覆盖两步操作。
+- 验证：定向 3 文件 16 项、最终全量 173 文件 1836 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-C0ZojaQD.css`、JS `assets/index-f0uNbnKK.js`）、OKF strict（14 concepts、470 links）与 180 天审计通过；实机交互待用户在 v2.20.303 切换模型复验。
+
 ## 2026-08-08 修复：review v2.20.272..294 后修前两批确认问题（v2.20.295）
 
 - 背景：对上次发版 v2.20.272 以来 23 个提交做全量 review（3 组并行子代理 + 主代理抽查），无严重级；用户复核结论并定修复顺序。
