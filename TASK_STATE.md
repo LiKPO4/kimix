@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：空白漂移的 barrier 全文不再重复追加（v2.21.18）
+
+- 现场快照：v2.21.17 本轮 live 正文完整为 273 字，完成屏障后同一个 Assistant 瞬间变成 543 字，约 2.5 秒后 canonical repair 恢复 273 字；截图表现为上下两份近乎相同的正文。
+- 根因：Server `/messages` 回放的近完整正文与 volatile live 正文存在段落/列表空白差异。v2.21.17 能识别逐片回放和原始字符串包含关系，但两份近完整正文因换行不同互不 `includes`，仍回退为顺序追加。
+- 修正：completion barrier 专用合并在原始覆盖判断之后增加空白折叠视图；规范化后一方覆盖另一方时保留对应完整正文，仅确实不同的分片继续追加。判断仍只作用于同一稳定消息 ID 的 barrier 回放，不扩散到普通 Assistant 合并。
+- 回归：新增 273→约双倍形态的“live Markdown 正文 + 空白布局不同的近完整 barrier 正文 + 空 terminal”测试，旧实现稳定产生双重正文，修正后保持单一 live 正文；相关 5 文件 / 391 项及 TypeScript 检查通过。
+
 ## 2026-08-09 修复：完成屏障分片不再把完整正文闪回尾句（v2.21.17）
 
 - 现场快照：v2.21.16 本轮 56 字 live 正文按 offset `0→56` 完整累积；`prompt.completed` 的 barrier 随后以同一个稳定消息 ID 回放 8 个 `content.part`，Renderer 在 20ms 内从完整流式正文变为最后 7 字“让我帮忙的吗？”，并显示输出完成；约 2.5 秒后 canonical repair 才恢复 56 字。

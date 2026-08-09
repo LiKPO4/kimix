@@ -268,6 +268,14 @@ function mergeCompletionBarrierContent(
   if (incoming.isComplete) return incoming.content;
   if (target.content.includes(incoming.content)) return target.content;
   if (incoming.content.includes(target.content)) return incoming.content;
+  // The messages endpoint can normalize paragraph/list whitespace relative to
+  // volatile deltas. Compare a whitespace-collapsed view before deciding that
+  // two near-full bodies are independent fragments; otherwise full + full is
+  // appended for one render frame (273 chars observed as 543).
+  const normalizedTarget = target.content.replace(/\s+/g, " ").trim();
+  const normalizedIncoming = incoming.content.replace(/\s+/g, " ").trim();
+  if (normalizedTarget.includes(normalizedIncoming)) return target.content;
+  if (normalizedIncoming.includes(normalizedTarget)) return incoming.content;
   // A cumulative replay may revise only the live fragment's trailing
   // punctuation ("如下：" → "如下（已核对）："). Treat a substantial
   // punctuation-trimmed prefix as the richer replacement, not concatenation.

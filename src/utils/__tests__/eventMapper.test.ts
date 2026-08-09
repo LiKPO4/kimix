@@ -2356,6 +2356,31 @@ describe("mergeEvents", () => {
     expect(assistants[0]).toMatchObject({ content: full, isComplete: true });
   });
 
+  it("does not append a whitespace-drifted full barrier body after the equivalent live body", () => {
+    const live = "我不能像 AI 绘图模型直接生成图片，但可以用代码帮你画图：\n\n- SVG / HTML5 Canvas\n- matplotlib、Mermaid\n- Pillow";
+    const replay = "我不能像 AI 绘图模型直接生成图片，但可以用代码帮你画图：\n- SVG / HTML5 Canvas\n- matplotlib、Mermaid\n- Pillow";
+    let events: TimelineEvent[] = [{
+      id: "live-full", type: "assistant_message", timestamp: 1_000,
+      content: live, isThinking: false, isComplete: false, agentTurnId: "turn-1",
+    }];
+    events = mergeEvents(events, {
+      id: "barrier-full-part", type: "assistant_message", timestamp: 2_000,
+      content: replay, isThinking: false, isComplete: false,
+      snapshotMessageId: "msg_session-x_000007", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+    events = mergeEvents(events, {
+      id: "barrier-end", type: "assistant_message", timestamp: 2_100,
+      content: "", isThinking: false, isComplete: true,
+      snapshotMessageId: "msg_session-x_000007", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+
+    const assistants = events.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ content: live, isComplete: true });
+  });
+
   it("barrier binding sets official timestamp so later unseen stable events sort correctly (P0 order fix)", () => {
     // Simulate the real session_6203... scenario:
     // 1. user message → placeholder assistant (isComplete: false, ts=T0+40ms)

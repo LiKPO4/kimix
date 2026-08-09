@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T20:42:00+08:00"
+timestamp: "2026-08-09T21:04:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -129,6 +129,15 @@ next part. Replacing on every barrier part collapses a complete answer to the
 last sentence for the interval before canonical repair. Only a content-bearing
 `isComplete` whole-message frame may authoritatively replace the body; the empty
 terminal only closes it.
+
+Coverage comparison for the same stable barrier message must also collapse
+whitespace before testing containment. `/messages` may normalize blank lines or
+list layout relative to volatile deltas, so two equivalent near-full bodies can
+fail raw `includes` and be concatenated into a double answer (273 live chars
+observed as 543 until canonical repair). Preserve the raw text from the side
+whose whitespace-normalized form covers the other; only genuinely independent
+parts proceed to ordered append. This relaxed comparison is barrier-scoped and
+must not become a global Assistant dedupe heuristic.
 
 The draft identity may legitimately strengthen during one dispatch: the first
 token can be scoped by a renderer-created turn id and a later frame by the
