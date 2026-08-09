@@ -2,9 +2,11 @@
 
 ## 2026-08-09 修复：完成回放不再人为插入短句换行（v2.21.21）
 
-- 现场快照：官方 `/messages` 的 text part 已携带真实换行；v2.21.20 聚合时使用 `join("\\n")`，每个短 part 又被插入一条换行，界面变成“春夜/庭前/樱初开…”逐行断句。
+- 复核官方与旧版：官方流式 transcript 使用 `open.text += delta`，多 text part 默认 `join('')`；Kimix v2.21.18 可见正文路径同样逐 part 原样发送。重复正文的根因是完成回放身份绑定错误，不是正文分隔符。
+- 分层取证：多 part 样本证明临时 `join("\\n")` 会把 128 字/15 换行膨胀为 157 字/44 换行；但最新 `..._000024` 在官方 `/messages` 中只有一个 136 字/45 换行的 text part，Kimix delta offset 与 UI 投影均为 136。最新短句已存在于上游原文，不能归因于当前回放拼接。
 - 修正：完成回放恢复为 text part 原文直接连接（`join("")`），不添加协议不存在的分隔符；原 part 内换行保持不变。
-- 回归：完成回放多 part 测试锁定不产生额外换行；事件快照见 `docs/issue-streaming-short-lines-v22120-events-snapshot.md`。
+- 边界：不增加正文空白清洗；单 part 原文必须透传，否则会破坏诗歌、Markdown 与代码。进一步区分供应商响应和 Provider 适配层需要抓原始上游 SSE。事件快照见 `docs/issue-streaming-short-lines-v22120-events-snapshot.md`。
+- 回归：完成回放多 part 与 event mapper 定向测试 2 文件 / 272 项通过。
 
 ## 2026-08-09 修复：live 草稿首次绑定权威整文时不再追加（v2.21.20）
 
