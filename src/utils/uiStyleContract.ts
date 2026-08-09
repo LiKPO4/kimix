@@ -37,6 +37,42 @@ export const UI_STYLE_ROLE_IDS = [
 
 export type UiStyleRoleId = typeof UI_STYLE_ROLE_IDS[number];
 
+/**
+ * 内容承载角色的圆角必须有可读性上限；紧凑、固定高度的控件才允许真正的 pill。
+ * 这是编译期防线，历史已导入文档也会自动收敛，无需迁移或修改原 JSON。
+ */
+export const UI_STYLE_ROLE_RADIUS_MAX_PX: Record<UiStyleRoleId, number> = {
+  shell: 32,
+  toolbar: 24,
+  navigationItem: 999,
+  navigationAction: 999,
+  control: 999,
+  primaryAction: 999,
+  compoundControl: 999,
+  toggle: 999,
+  field: 24,
+  card: 24,
+  interactiveCard: 24,
+  strongCard: 28,
+  sectionCard: 24,
+  insetSection: 24,
+  eventCard: 24,
+  popup: 28,
+  menuTrigger: 999,
+  menuItem: 20,
+  modal: 28,
+  composer: 28,
+  userBubble: 28,
+  statusSurface: 999,
+  codeBlock: 20,
+  table: 24,
+  mediaThumb: 24,
+  inspector: 28,
+  toast: 28,
+  dock: 28,
+  roomChoice: 24,
+};
+
 /** AI 提示与文档共用的角色触点目录；描述业务归属，不允许 JSON 携带选择器。 */
 export const UI_STYLE_ROLE_GUIDE: Record<UiStyleRoleId, string> = {
   shell: "应用主内容外壳",
@@ -261,7 +297,11 @@ export function compileUiStyleVariables(document: UiStyleDocumentV1): UiStyleCss
 
   for (const [roleKey, role] of Object.entries(document.roles) as [UiStyleRoleId, UiStyleRole][]) {
     const rolePrefix = `--ui-role-${kebabCase(roleKey)}` as const;
-    variables[`${rolePrefix}-radius`] = `var(--ui-radius-${kebabCase(role.radius)})`;
+    const radiusReference = `var(--ui-radius-${kebabCase(role.radius)})`;
+    const radiusMax = UI_STYLE_ROLE_RADIUS_MAX_PX[roleKey];
+    variables[`${rolePrefix}-radius`] = radiusMax >= 999
+      ? radiusReference
+      : `min(${radiusReference}, ${radiusMax}px)`;
     treatmentVariables(variables, roleKey, "resting", role.resting, document);
     for (const state of ["hover", "active", "selected", "focus"] as const) {
       treatmentVariables(variables, roleKey, state, role[state] ?? role.resting, document);

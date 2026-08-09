@@ -5,6 +5,7 @@ import {
   compileUiStyleVariables,
   parseUiStyleDocument,
   UI_STYLE_DESCRIPTION_MAX_LENGTH,
+  UI_STYLE_ROLE_RADIUS_MAX_PX,
   UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
   type UiStyleDocumentV1,
@@ -136,6 +137,8 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("Composer 内层 textarea 永远无边框");
     expect(prompt).toContain("顶部 compoundControl 默认也应使用同类 elevation");
     expect(prompt).toContain("toggle 必须分别考虑 resting、hover、active、selected");
+    expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
+    expect(prompt).toContain("内容承载角色按语义硬限制在 20–32px");
     expect(prompt).toContain('"schemaVersion": 1');
   });
 });
@@ -161,6 +164,25 @@ describe("compileUiStyleVariables", () => {
     const variables = compileUiStyleVariables(document);
     expect(variables["--ui-role-shell-hover-background"]).toBe("var(--surface-base)");
     expect(variables["--ui-role-shell-selected-shadow"]).toBe(variables["--ui-role-shell-resting-shadow"]);
+  });
+
+  it("内容承载角色硬限制超大圆角，紧凑控件仍允许 pill", () => {
+    const document = documentFixture();
+    document.roles.shell!.radius = "pill";
+    document.roles.card!.radius = "pill";
+    document.roles.modal!.radius = "pill";
+    document.roles.composer!.radius = "pill";
+    document.roles.userBubble!.radius = "pill";
+    document.roles.primaryAction!.radius = "pill";
+    const variables = compileUiStyleVariables(document);
+
+    expect(UI_STYLE_ROLE_RADIUS_MAX_PX.userBubble).toBe(28);
+    expect(variables["--ui-role-shell-radius"]).toBe("min(var(--ui-radius-pill), 32px)");
+    expect(variables["--ui-role-card-radius"]).toBe("min(var(--ui-radius-pill), 24px)");
+    expect(variables["--ui-role-modal-radius"]).toBe("min(var(--ui-radius-pill), 28px)");
+    expect(variables["--ui-role-composer-radius"]).toBe("min(var(--ui-radius-pill), 28px)");
+    expect(variables["--ui-role-user-bubble-radius"]).toBe("min(var(--ui-radius-pill), 28px)");
+    expect(variables["--ui-role-primary-action-radius"]).toBe("var(--ui-radius-pill)");
   });
 });
 

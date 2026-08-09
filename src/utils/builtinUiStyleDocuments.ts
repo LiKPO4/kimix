@@ -233,7 +233,7 @@ export function buildUiStyleAiPrompt() {
     "8. Composer 内层 textarea 永远无边框、无背景、无阴影；输入区质感只能配置 composer 外壳，禁止试图通过 field 制造第二层边界。",
     "9. 如果普通 control 使用 raised/floating 材质，顶部 compoundControl 默认也应使用同类 elevation；只有参考图明确把分段按钮设计为扁平时才设为 none。",
     "10. toggle 必须分别考虑 resting、hover、active、selected，确保 Swarm/Plan 悬停可辨且不会与选中态混淆。",
-    "11. radius 引用只能是 small、medium、large、card、panel、shell、pill。",
+    "11. radius 引用只能是 small、medium、large、card、panel、shell、pill。pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface 等紧凑单行控件；正文气泡、模态框、Composer、卡片、弹层和侧栏禁止使用 pill。Kimix 还会把内容承载角色按语义硬限制在 20–32px，避免文字侵入圆角。",
     "12. surface 只能是 transparent、ground、base、elevated、hover、active。",
     "13. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",
     "14. elevation.kind 只能是 flat、raised、floating、inset；所有数值必须保持在模板展示的合理量级内。",

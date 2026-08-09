@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：内容容器圆角按角色硬限幅（v2.21.5）
+
+- 根因：UI Style v1 虽限制 card/panel/shell primitive 最大为 40/48px，但任何角色都能引用 `pill=999`，AI 把 `userBubble` 设为 pill 后绕过数值上限；长消息气泡因此接近半圆，圆角侵入正文并把文字挤出视觉边界。
+- 修复：编译器新增覆盖全部 29 个角色的半径上限表。固定高度的导航、按钮、开关、菜单触发器和状态胶囊继续允许真正 pill；shell 最高 32px，card/code/table/menuItem 等内容面最高 20–24px，modal/composer/userBubble/popup/inspector/toast/dock 等最高 28px。历史已导入 JSON 无需迁移，重新编译即自动收敛；AI 提示同步禁止正文容器使用 pill。
+- 验证：定向 UI Style 测试 2 文件 / 39 项、全量测试 174 文件 / 1864 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过。v2.21.5 运行态中 Y2K 的 userBubble 从 `999px` 收敛为 `min(999px, 28px)`，浏览器最终解析为 28px；modal/composer 保持 24px，primaryAction/toggle 仍为 999px 胶囊。
+
 ## 2026-08-09 调整：复合按钮分割线改为短直线（v2.21.4）
 
 - 根因：分割线直接作为右半按钮的 inset box-shadow 绘制；右半按钮自身带圆角且接近外壳全高，阴影两端因此沿圆角形成上下小折。
