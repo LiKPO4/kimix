@@ -510,7 +510,7 @@ it("prefills Context and thinking efforts from the official catalog when a disco
       success: true,
       data: {
         providers: [{
-          providerId: "catalog-prod",
+          providerId: "gateway",
           type: "openai",
           baseUrl: "https://catalog.example/v1",
           modelCount: 1,
@@ -574,7 +574,7 @@ it("prefills Context and efforts from the catalog when typing a model id into an
       success: true,
       data: {
         providers: [{
-          providerId: "catalog-prod",
+          providerId: "gateway",
           type: "openai",
           baseUrl: null,
           modelCount: 1,
@@ -624,7 +624,7 @@ it("does not refill Context after the user manually cleared it (touched wins)", 
       success: true,
       data: {
         providers: [{
-          providerId: "catalog-prod",
+          providerId: "gateway",
           type: "openai",
           baseUrl: null,
           modelCount: 1,

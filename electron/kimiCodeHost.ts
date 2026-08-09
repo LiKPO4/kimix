@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
-import { probeThinkingEfforts as probeProviderThinkingEfforts } from "./providerEffortProbe";
+import { resolveCatalogThinkingEfforts } from "./providerEffortProbe";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
@@ -2911,9 +2911,8 @@ export type ThinkingEffortProbeResult = {
 };
 
 /**
- * 自动探测模型可用思考档位：读取配置中模型对应供应商的 base_url/api_key，
- * 向 OpenAI 兼容 chat/completions 逐个验证 reasoning_effort，返回 Kimix 词表
- * （off + 被供应商接受的档位）。用于设置页「自动探测」按钮回填 support_efforts。
+ * 从 models.dev 官方目录匹配模型思考档位声明。OpenAI-compatible completion 端点的
+ * 2xx 只能表明网关接受了 reasoning_effort，不能证明具体模型支持，不再用于回填。
  */
 export async function probeModelThinkingEfforts(modelAlias: string): Promise<ThinkingEffortProbeResult> {
   const config = await getConfig({ reload: true });
@@ -2921,20 +2920,25 @@ export async function probeModelThinkingEfforts(modelAlias: string): Promise<Thi
   if (!model?.model) throw new Error(`未找到模型「${modelAlias}」，请先保存模型配置。`);
   const providerName = model.provider ?? config.defaultProvider ?? "";
   const provider = config.providers?.[providerName];
-  if (!provider?.baseUrl) throw new Error(`供应商「${providerName}」未配置 base_url，无法探测。`);
-  const apiKey = provider.apiKey ?? provider.env?.OPENAI_API_KEY ?? "";
-  const result = await probeProviderThinkingEfforts({
-    baseUrl: provider.baseUrl,
-    apiKey,
-    model: model.model,
+  const resolution = resolveCatalogThinkingEfforts({
+    providerName,
+    baseUrl: provider?.baseUrl,
+    modelId: model.model,
+    providers: await listProviderCatalog(),
   });
-  const nonOff = result.supported.filter((value) => value !== "off");
-  if (nonOff.length === 0) throw new Error("供应商未接受任何思考档位（可能不支持 reasoning_effort），可手动声明或留空。");
-  const efforts = ["off", ...nonOff];
+  if (resolution.status !== "resolved") {
+    const reason = resolution.status === "ambiguous"
+      ? "目录中同名模型的档位声明不一致"
+      : resolution.status === "undeclared"
+        ? "官方目录已收录该模型，但未声明思考档位"
+        : "官方目录未找到该模型的思考档位声明";
+    throw new Error(`${reason}。供应商返回 2xx 只能证明网关接受参数，不能证明模型支持；请手动声明或留空。`);
+  }
+  const efforts = resolution.supportEfforts;
   const defaultEffort = model.defaultEffort && efforts.includes(model.defaultEffort)
     ? model.defaultEffort
-    : nonOff[Math.floor(nonOff.length / 2)];
-  return { supportEfforts: efforts, defaultEffort, endpoint: result.endpoint };
+    : undefined;
+  return { supportEfforts: efforts, defaultEffort, endpoint: `models.dev:${resolution.providerId}` };
 }
 
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {

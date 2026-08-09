@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修正：思考档位只采信模型级目录声明（v2.21.12）
+
+- 复验现象：v2.21.10 增加无效值 sentinel 后，`opencode-go/hy3` 仍探测为 minimal–max 六档。这不是版本旧图或 sentinel 未生效：该网关会拒绝非法字符串，但在 provider 全局 schema 层接受全部合法枚举。sentinel 只证明网关校验枚举，合法值 2xx 仍不能证明具体模型实际支持；chat/completions 也不回显最终生效档位，无法从输出/usage 稳定反推。
+- 实际事实：models.dev 当前对 `opencode-go/hy3` 明确声明 `none / low / high`，Kimix 应映射为 `off / low / high`。设置页原本又把所有 provider 的 models 直接 flatMap 后按裸 model id 匹配；多个 provider 都有 `hy3` 且档位声明不同，存在跨 provider 串档。
+- 修正：设置页操作改为「匹配目录」，Host 仅返回 models.dev 模型级 `supportEfforts`；先按 provider id，再按规范化 Base URL 唯一匹配 provider，然后在该 provider 内匹配模型。目录未收录、未声明或同名声明冲突时明确失败且不修改表单，不再用 HTTP 2xx 扩展档位。目录预填管线同步改为当前 provider 内匹配，不再全局裸 ID 匹配。
+- 回归：新增 provider id/Base URL 匹配、`opencode-go/hy3 → off/low/high`、provider 身份不明/重复、目录未声明与设置 UI 隔离用例；定向 3 文件 / 48 项与 Node/Renderer TypeScript 检查通过。
+
 ## 2026-08-09 修复：侧栏拖拽热区不再挤出面板宽缝（v2.21.11）
 
 - 根因：左侧栏、拖拽柄、主面板是同一 flex 行的三个兄弟节点；`.kimix-layout-resizer` 用 `width: 12px` + `flex: 0 0 12px` 保留热区时，也真实占据了 12px 布局列。中间 2px 蓝线只是伪元素，所以蓝线两侧必然剩下透明空白，不是主面板 border/radius 或侧栏内边距造成。

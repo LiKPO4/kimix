@@ -1,11 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { matchCatalogModel, prefillFromCatalog } from "../modelProviderConfig";
+import { matchCatalogModel, matchCatalogProvider, prefillFromCatalog } from "../modelProviderConfig";
 
 const catalog = [
   { id: "qwen3.8-max", maxContextSize: 1_000_000, supportEfforts: ["low", "high"] },
   { id: "gpt-5.1", maxContextSize: 400_000, supportEfforts: [] },
   { id: "Unknown-Case-Model", maxContextSize: 128_000 },
 ];
+
+describe("matchCatalogProvider", () => {
+  const providers = [
+    { providerId: "opencode-go", baseUrl: "https://opencode.ai/zen/go/v1", models: [{ id: "hy3", supportEfforts: ["off", "low", "high"] }] },
+    { providerId: "tencent-tokenhub", baseUrl: "https://api.example.com/v1/", models: [{ id: "hy3", supportEfforts: ["low", "medium", "high"] }] },
+  ];
+
+  it("优先按 provider id 隔离同名模型", () => {
+    expect(matchCatalogProvider(providers, "opencode-go")?.models[0].supportEfforts).toEqual(["off", "low", "high"]);
+  });
+
+  it("自定义 provider 名可按唯一 Base URL 匹配并忽略尾斜杠", () => {
+    expect(matchCatalogProvider(providers, "custom-alias", "https://opencode.ai/zen/go/v1/")?.providerId).toBe("opencode-go");
+  });
+
+  it("Base URL 不唯一或不匹配时不猜测", () => {
+    const duplicate = [...providers, { ...providers[0], providerId: "duplicate" }];
+    expect(matchCatalogProvider(duplicate, "custom", "https://opencode.ai/zen/go/v1")).toBeUndefined();
+    expect(matchCatalogProvider(providers, "custom", "https://unknown.example/v1")).toBeUndefined();
+  });
+});
 
 describe("matchCatalogModel", () => {
   it("matches exactly with case-insensitive ids", () => {

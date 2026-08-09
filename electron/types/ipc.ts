@@ -509,7 +509,7 @@ export type KimiProviderCatalogModelSummary = {
   maxContextSize: number | null;
   thinking: boolean;
   toolUse: boolean;
-  // models.dev 思考档位，已映射到 Kimix 词表（off/minimal/low/medium/high/max）子集；
+  // models.dev 思考档位，已映射到 Kimix 词表（off/minimal/low/medium/high/xhigh/max）子集；
   // 无档位信息的模型（如 qwen 系 toggle+budget_tokens）保持 undefined，不编造档位。
   supportEfforts?: string[];
 };

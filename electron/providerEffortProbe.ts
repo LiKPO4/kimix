@@ -1,6 +1,5 @@
-// 思考档位自动探测：向 OpenAI 兼容供应商发极小请求，逐个验证 reasoning_effort
-// 取值是否被接受，回填模型 support_efforts。复用 providerModelDiscovery 的
-// URL 构建与错误解析模式。
+// OpenAI 兼容协议接受度诊断。注意：HTTP 2xx 只能证明网关接受了枚举值，
+// 不能证明具体模型真正支持该 reasoning_effort，因此该诊断结果不得直接回填 support_efforts。
 const EFFORT_PROBE_TIMEOUT_MS = 15_000;
 const INVALID_EFFORT_CONTROL = "__kimix_invalid_effort__";
 
@@ -143,4 +142,81 @@ export async function probeThinkingEfforts(
     }
   }
   throw new Error(`无法探测思考档位：${failures.join("；") || "未知错误"}`);
+}
+
+type CatalogEffortModel = {
+  id: string;
+  supportEfforts?: string[];
+};
+
+type CatalogEffortProvider = {
+  providerId: string;
+  baseUrl: string | null;
+  models: CatalogEffortModel[];
+};
+
+export type CatalogEffortResolution =
+  | { status: "resolved"; providerId: string; supportEfforts: string[] }
+  | { status: "not-found" | "undeclared" | "ambiguous" };
+
+function normalizeCatalogBaseUrl(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  try {
+    const url = new URL(value.trim());
+    url.search = "";
+    url.hash = "";
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.href.toLowerCase();
+  } catch {
+    return value.trim().replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function bareCatalogModelId(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  const slash = normalized.indexOf("/");
+  return slash > 0 ? normalized.slice(slash + 1) : normalized;
+}
+
+/**
+ * 只从 models.dev 形状的官方目录声明解析模型档位。优先限定同 provider id，
+ * 未命中时再用唯一 Base URL 匹配；无法确定 provider 身份时不按全局裸 model id 猜测。
+ */
+export function resolveCatalogThinkingEfforts(input: {
+  providerName?: string;
+  baseUrl?: string | null;
+  modelId: string;
+  providers: readonly CatalogEffortProvider[];
+}): CatalogEffortResolution {
+  const providerName = input.providerName?.trim().toLowerCase() ?? "";
+  const baseUrl = normalizeCatalogBaseUrl(input.baseUrl);
+  const byId = providerName
+    ? input.providers.filter((provider) => provider.providerId.trim().toLowerCase() === providerName)
+    : [];
+  if (byId.length > 1) return { status: "ambiguous" };
+  const byUrl = byId.length === 0 && baseUrl
+    ? input.providers.filter((provider) => normalizeCatalogBaseUrl(provider.baseUrl) === baseUrl)
+    : [];
+  if (byUrl.length > 1) return { status: "ambiguous" };
+  const scope = byId.length === 1 ? byId : byUrl;
+  if (scope.length === 0) return { status: "not-found" };
+  const modelId = input.modelId.trim().toLowerCase();
+  if (!modelId) return { status: "not-found" };
+
+  const allModels = scope.flatMap((provider) => provider.models.map((model) => ({ provider, model })));
+  const exact = allModels.filter(({ model }) => model.id.trim().toLowerCase() === modelId);
+  const bareModelId = bareCatalogModelId(modelId);
+  const matches = exact.length > 0
+    ? exact
+    : allModels.filter(({ model }) => bareCatalogModelId(model.id) === bareModelId);
+  if (matches.length === 0) return { status: "not-found" };
+
+  const declared = matches.flatMap(({ provider, model }) => {
+    const supportEfforts = Array.from(new Set((model.supportEfforts ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean)));
+    return supportEfforts.length > 0 ? [{ providerId: provider.providerId, supportEfforts }] : [];
+  });
+  if (declared.length === 0) return { status: "undeclared" };
+  const signatures = new Set(declared.map((entry) => entry.supportEfforts.join("\u0000")));
+  if (signatures.size !== 1) return { status: "ambiguous" };
+  return { status: "resolved", ...declared[0] };
 }

@@ -72,6 +72,42 @@ export type CatalogModelLike = {
   supportEfforts?: string[];
 };
 
+export type CatalogProviderLike<TModel extends CatalogModelLike = CatalogModelLike> = {
+  providerId: string;
+  baseUrl?: string | null;
+  models: TModel[];
+};
+
+function normalizeCatalogProviderUrl(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  try {
+    const url = new URL(value.trim());
+    url.search = "";
+    url.hash = "";
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.href.toLowerCase();
+  } catch {
+    return value.trim().replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+/** 先按 provider id，再按规范化 Base URL 唯一匹配，避免同名模型跨供应商串档。 */
+export function matchCatalogProvider<TModel extends CatalogModelLike>(
+  catalog: readonly CatalogProviderLike<TModel>[],
+  providerName: string,
+  baseUrl?: string | null,
+): CatalogProviderLike<TModel> | undefined {
+  const normalizedName = providerName.trim().toLowerCase();
+  const byId = normalizedName
+    ? catalog.find((provider) => provider.providerId.trim().toLowerCase() === normalizedName)
+    : undefined;
+  if (byId) return byId;
+  const normalizedUrl = normalizeCatalogProviderUrl(baseUrl);
+  if (!normalizedUrl) return undefined;
+  const byUrl = catalog.filter((provider) => normalizeCatalogProviderUrl(provider.baseUrl) === normalizedUrl);
+  return byUrl.length === 1 ? byUrl[0] : undefined;
+}
+
 /**
  * 目录模型条目匹配：先大小写不敏感精确匹配；不中时回退「剥离 catalog id 的 provider
  * 前缀后裸 id 精确匹配」（models.dev 部分条目带前缀如 openai/gpt-5.1，探测接口返回裸

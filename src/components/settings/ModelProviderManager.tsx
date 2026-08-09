@@ -23,6 +23,7 @@ import {
   defaultModelAliasForProvider,
   groupModelsByProvider,
   matchCatalogModel,
+  matchCatalogProvider,
   prefillFromCatalog,
 } from "@/utils/modelProviderConfig";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -152,7 +153,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   const [modelFormMessage, setModelFormMessage] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
-  const catalogModels = useMemo(() => catalog.flatMap((provider) => provider.models), [catalog]);
+  const catalogProvider = useMemo(
+    () => matchCatalogProvider(catalog, selectedProviderName, providerDraft.baseUrl),
+    [catalog, providerDraft.baseUrl, selectedProviderName],
+  );
+  const catalogModels = useMemo(() => catalogProvider?.models ?? [], [catalogProvider]);
   const catalogLoadTriggeredRef = useRef(false);
   // 「用户已手动编辑」跟踪：type 模式预填只填未触碰字段——用户清空 Context/档位后
   // 不得被下一次按键的预填重新填回（review 中 8）；目录迟到补预填同样只碰未触碰字段。
@@ -429,11 +434,11 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const handleProbeEfforts = async () => {
     if (!selectedModelAlias) {
-      setModelFormMessage("请先保存模型，再自动探测思考档位。");
+      setModelFormMessage("请先保存模型，再匹配官方目录中的思考档位。");
       return;
     }
     setBusyAction("probe-effort");
-    setModelFormMessage("正在向供应商探测可用思考档位...");
+    setModelFormMessage("正在从官方模型目录匹配思考档位...");
     try {
       const res = await window.api.probeKimiCodeThinkingEfforts({ modelAlias: selectedModelAlias });
       if (!res.success) {
@@ -446,8 +451,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         supportEfforts: res.data.supportEfforts,
         defaultEffort: res.data.defaultEffort && res.data.supportEfforts.includes(res.data.defaultEffort) ? res.data.defaultEffort : "",
       }));
-      const usable = res.data.supportEfforts.filter((item) => item !== "off").length;
-      setModelFormMessage(`探测到 ${usable} 个可用思考档位，已回填到上方，保存模型后生效。`);
+      setModelFormMessage(`官方目录匹配到 ${res.data.supportEfforts.length} 个思考档位声明，已回填到上方，保存模型后生效。`);
     } catch (error) {
       setModelFormMessage(`探测失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -995,14 +999,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                         onClick={() => void handleProbeEfforts()}
                         disabled={Boolean(busyAction)}
                         className="kimix-icon-text-button is-compact kimix-muted-action shrink-0 disabled:opacity-55"
-                        title="向供应商探测该模型实际接受的思考等级"
+                        title="从 models.dev 官方模型目录匹配该模型声明的思考档位"
                       >
                         <RefreshCw size={13} className={busyAction === "probe-effort" ? "kimix-spin" : ""} />
-                        自动探测
+                        匹配目录
                       </button>
                     </div>
                     <div className="text-[11.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
-                      直接选择供应商接受的英文原值；不声明则仅 关闭/开启。OpenAI 类型使用 xhigh，max 仅用于明确支持它的协议。
+                      优先使用官方目录声明；目录无声明时手动选择或留空。不能仅凭供应商返回成功判断模型支持。
                     </div>
                     <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 8 }}>
                       {THINKING_EFFORT_CHOICES.map((effort) => {

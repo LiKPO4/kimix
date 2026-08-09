@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChatCompletionsUrls, probeThinkingEfforts } from "../providerEffortProbe";
+import { buildChatCompletionsUrls, probeThinkingEfforts, resolveCatalogThinkingEfforts } from "../providerEffortProbe";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -106,5 +106,64 @@ describe("probeThinkingEfforts", () => {
       fetchMock,
     );
     expect(result.supported).toEqual(["high"]);
+  });
+});
+
+describe("resolveCatalogThinkingEfforts", () => {
+  const providers = [
+    {
+      providerId: "opencode-go",
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      models: [{ id: "hy3", supportEfforts: ["off", "low", "high"] }],
+    },
+    {
+      providerId: "tencent-tokenhub",
+      baseUrl: "https://tokenhub.example/v1",
+      models: [{ id: "hy3", supportEfforts: ["low", "medium", "high"] }],
+    },
+  ];
+
+  it("按 provider id 返回 opencode-go/hy3 的模型级声明", () => {
+    expect(resolveCatalogThinkingEfforts({
+      providerName: "opencode-go",
+      baseUrl: "https://proxy.example/v1",
+      modelId: "hy3",
+      providers,
+    })).toEqual({ status: "resolved", providerId: "opencode-go", supportEfforts: ["off", "low", "high"] });
+  });
+
+  it("自定义 provider 名按唯一 Base URL 匹配", () => {
+    expect(resolveCatalogThinkingEfforts({
+      providerName: "custom-opencode",
+      baseUrl: "https://opencode.ai/zen/go/v1/",
+      modelId: "hy3",
+      providers,
+    })).toEqual({ status: "resolved", providerId: "opencode-go", supportEfforts: ["off", "low", "high"] });
+  });
+
+  it("无法确定 provider 身份时不用全局同名模型猜测", () => {
+    expect(resolveCatalogThinkingEfforts({
+      providerName: "custom",
+      baseUrl: "https://unknown.example/v1",
+      modelId: "hy3",
+      providers,
+    })).toEqual({ status: "not-found" });
+  });
+
+  it("Base URL 同时命中多个 provider 时返回 ambiguous", () => {
+    expect(resolveCatalogThinkingEfforts({
+      providerName: "custom",
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      modelId: "hy3",
+      providers: [...providers, { ...providers[0], providerId: "duplicate" }],
+    })).toEqual({ status: "ambiguous" });
+  });
+
+  it("目录模型未声明档位时返回 undeclared", () => {
+    expect(resolveCatalogThinkingEfforts({
+      providerName: "opencode-go",
+      modelId: "hy3",
+      providers: [{ ...providers[0], models: [{ id: "hy3" }] }],
+    })).toEqual({ status: "undeclared" });
   });
 });
