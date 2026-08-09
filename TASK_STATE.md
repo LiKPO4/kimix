@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：live 草稿首次绑定权威整文时不再追加（v2.21.20）
+
+- 现场快照：本轮 volatile `assistant.delta` offset 从 0 连续到 128，官方 `/messages` 也只有一个 128 字 Assistant；完成屏障后 UI 却变成 285 字，约 2.5 秒 canonical repair 后恢复 128 字。
+- 根因：live draft 没有 `snapshotMessageId`，权威回放首次带稳定 ID，因此走 completion binding 分支；v2.21.19 只在“已有相同稳定 ID”分支识别 `completionBarrierFullBody`，binding 分支仍按旧启发式追加。
+- 修正：首次绑定稳定 ID 时同步保留 full-body 语义并直接整体替换 live 正文；普通 delta、非完整 barrier part 和不同官方消息仍沿用原边界。
+- 回归：把完成回放测试改为真实的“无稳定 ID live draft → 稳定 ID 权威整文”序列，断言时间线始终只有一份完整正文。快照见 `docs/issue-streaming-body-duplicate-v22119-events-snapshot.md`。
+
 ## 2026-08-09 修复：完成回放正文改为权威整文（v2.21.19）
 
 - 现场快照：v2.21.18 仍出现 live 正文与 `/messages` 完整正文短暂并排/重复；两者内容并非单纯空白差异，渲染层无法可靠判断应覆盖还是追加。

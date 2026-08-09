@@ -13,6 +13,8 @@ timestamp: "2026-08-09T21:04:00+08:00"
 
 The Server completion barrier reads the persisted `/messages` record after the volatile stream ends. That replay is semantic state, not another stream: for each stable assistant message it emits one full text body marked `kimixPromptCompletionFullBody`, while preserving thinking and tool frames. The event mapper carries the marker into the UI timeline, and the event reducer replaces the matching live body instead of applying delta/substring heuristics. Ordinary streaming and history snapshots continue to use incremental parts. This prevents a short-lived duplicate body when the persisted answer differs in paragraph or wording from the volatile draft.
 
+The replacement invariant also applies when the volatile draft has no snapshot identity yet. The first completion replay binds its stable `snapshotMessageId` to that draft and must preserve the full-body marker through the binding branch; identity acquisition is not a content boundary and must never turn authoritative replacement into append.
+
 Streaming scroll performance is governed as three isolated layers: sparse/local
 writes, cheap active-block rendering, and viewport work that yields to user
 scrolling. The full plan and acceptance criteria live in

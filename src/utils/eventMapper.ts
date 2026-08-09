@@ -2280,9 +2280,12 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           snapshotMessageId: incoming.snapshotMessageId,
           snapshotMessageIdStable: incoming.snapshotMessageIdStable,
           completionBarrierReplay: true,
+          completionBarrierFullBody: incoming.completionBarrierFullBody ?? target.completionBarrierFullBody,
           agentRole: incoming.agentRole ?? target.agentRole,
           model: incoming.model ?? target.model,
-          content: mergeCompletionBarrierContent(target, incoming),
+          content: incoming.completionBarrierFullBody === true
+            ? incoming.content
+            : mergeCompletionBarrierContent(target, incoming),
           thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
           thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
           isThinking: target.isThinking || Boolean(incoming.thinking),

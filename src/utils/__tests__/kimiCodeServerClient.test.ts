@@ -1975,13 +1975,14 @@ describe("snapshot tool replay failure flag", () => {
     expect((textFrames[0].payload as { kimixPromptCompletionFullBody?: boolean }).kimixPromptCompletionFullBody).toBe(true);
     const live = reduceKimiCodeEvents([], [{
       type: "assistant.delta",
-      snapshotMessageId: "assistant-full",
-      snapshotMessageIdStable: true,
+      agentTurnId: "turn-full",
       delta: "第一段正文",
       timestamp: 1,
     }] as Parameters<typeof reduceKimiCodeEvents>[1]);
     const replayed = reduceKimiCodeEvents(live, frames.map((frame) => flattenServerEvent(frame as Parameters<typeof flattenServerEvent>[0])));
-    const assistant = replayed.find((event) => event.type === "assistant_message" && event.snapshotMessageId === "assistant-full");
+    const assistants = replayed.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    const assistant = assistants.find((event) => event.snapshotMessageId === "assistant-full");
     expect(assistant && assistant.type === "assistant_message" ? assistant.content : "").toBe("第一段正文\n第二段正文");
   });
 });
