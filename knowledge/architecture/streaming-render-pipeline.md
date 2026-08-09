@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T23:05:00+08:00"
+timestamp: "2026-08-09T23:18:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -16,6 +16,8 @@ The Server completion barrier reads the persisted `/messages` record after the v
 The replacement invariant also applies when the volatile draft has no snapshot identity yet. The first completion replay binds its stable `snapshotMessageId` to that draft and must preserve the full-body marker through the binding branch; identity acquisition is not a content boundary and must never turn authoritative replacement into append.
 
 When aggregating persisted text parts for that full body, concatenate parts without an inserted separator. This matches official Kimi Code semantics: transcript deltas use direct `+=`, and text extraction defaults to `join('')`. Server parts already carry the exact whitespace and line breaks; adding `\n` between them changes multipart poetry/code fragments into artificial one-line paragraphs. Conversely, a single persisted text part whose source already contains excessive line breaks must pass through unchanged. Completion dedupe is an identity/ownership operation, never a whitespace-normalization operation; renderer-side cleanup would corrupt intentional poetry, Markdown, and code.
+
+Network chunks are not content parts or paragraph boundaries. A controlled OpenAI-compatible SSE capture produced 105 mostly 1–3-character text chunks but only five source newlines; direct concatenation and the official Server's persisted message both retained normal formatting. If a persisted single part already has excessive newlines, compare the provider stream before changing projection. Terse follow-ups such as “again” can perpetuate a malformed answer already present in model context; start a clean turn/session or state the complete format instead of teaching the renderer to rewrite source text.
 
 Streaming scroll performance is governed as three isolated layers: sparse/local
 writes, cheap active-block rendering, and viewport work that yields to user
