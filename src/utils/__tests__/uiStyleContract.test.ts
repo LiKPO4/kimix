@@ -82,11 +82,15 @@ describe("uiStyleDocumentV1Schema", () => {
     }
   });
 
-  it("AI 提示由当前角色目录生成并明确禁止颜色和自由 CSS", () => {
+  it("AI 提示由当前角色目录生成、禁止自由 CSS 并优先要求创建 JSON 文件", () => {
     const prompt = buildUiStyleAiPrompt();
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(roleId);
     expect(prompt).toContain("忽略参考图中的颜色");
     expect(prompt).toContain("禁止出现颜色值、CSS、选择器、url() 或脚本");
+    expect(prompt).toContain("必须优先使用你可用的文件工具");
+    expect(prompt).toContain("kimix-ui-style-<id>.json");
+    expect(prompt).toContain("不要在对话中重复整份 JSON");
+    expect(prompt).toContain("只有当当前环境确实没有文件写入能力时");
     expect(prompt).toContain('"schemaVersion": 1');
   });
 });

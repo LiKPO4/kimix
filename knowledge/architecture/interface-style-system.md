@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-09T10:10:00+08:00"
+timestamp: "2026-08-09T10:22:00+08:00"
 ---
 
 # Interface Style System
@@ -23,7 +23,7 @@ UI Style v1 is the only data boundary for imported interface styles. `src/utils/
 
 Every document declares a built-in `basedOn` baseline and role treatments. `src/utils/builtinUiStyleDocuments.ts` defines complete v1 documents for Default, Modern, Retro, and Nostalgia so custom documents can inherit a protected baseline and the AI prompt can expose a complete template. Rendering ownership remains deliberately asymmetric for compatibility: Default uses the unscoped baseline and Modern/Retro/Nostalgia retain their previously validated preset CSS; only `custom:*` compiles the selected document to inline `--ui-*` and activates the fixed consumer layer through `data-ui-style-contract="v1"`. Missing custom roles inherit from the declared baseline during canonicalization; the canonical persisted copy materializes every role, making later rendering deterministic. The public role catalog covers shell, toolbar, navigation items/actions, ordinary and compound controls, toggles, fields, cards/sections/events, popups/menu items/modals, Composer/message/status/Markdown surfaces, inspectors, toast/dock, and Multi-Agent choices.
 
-Imported documents are parsed in the Electron main process with a JSON-only 256 KB boundary, canonicalized, then persisted inside Kimix settings rather than referenced through the original file path. `custom:<id>` is the selected-style identity. The first-paint theme snapshot stores only the active custom document; authoritative settings retain the full custom library. Deleting a custom document removes only that library entry and falls back to Default when it was active. Built-in documents never enter the delete path. The AI-generation prompt is produced from the current schema, role catalog, and full template so a schema change cannot silently leave the prompt coverage behind.
+Imported documents are parsed in the Electron main process with a JSON-only 256 KB boundary, canonicalized, then persisted inside Kimix settings rather than referenced through the original file path. `custom:<id>` is the selected-style identity. The first-paint theme snapshot stores only the active custom document; authoritative settings retain the full custom library. Deleting a custom document removes only that library entry and falls back to Default when it was active. Built-in documents never enter the delete path. The AI-generation prompt is produced from the current schema, role catalog, and full template so a schema change cannot silently leave the prompt coverage behind. Its delivery contract is file-first: a capable Agent writes `kimix-ui-style-<id>.json` into the current workspace and returns only the path; an inline JSON code block is a fallback reserved for environments without file-write capability.
 
 # Invariants
 
