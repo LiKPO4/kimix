@@ -4941,7 +4941,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 disabled={!canUseComposer || !hasUniqueMutationOwner}
                 onClick={() => setShowPermissionMenu((v) => !v)}
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
-                style={{ width: "100%", maxWidth: "100%", height: 34, minHeight: 34, gap: 6, paddingLeft: 12, paddingRight: 12 }}
+                style={{ width: "100%", maxWidth: "100%", height: 32, minHeight: 32, gap: 6, paddingLeft: 12, paddingRight: 12 }}
                 title={!hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
