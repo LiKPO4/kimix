@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Session, TimelineEvent } from "@/types/ui";
@@ -614,6 +614,51 @@ describe("enqueueStreamEvent authoritative body frames", () => {
     expect(assistants).toHaveLength(1);
     expect(assistants[0]).toMatchObject({ content: full, isComplete: true, durationMs: 3_893 });
     unmount();
+  });
+
+  it("does not let interleaved status flushes split an offset stream into tail fragments", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useEventStream());
+    const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");
+    const full = "我是 Kimi Code，一个可以帮助你完成编程、分析和项目维护工作的 AI 助手。有什么我可以帮你的吗？";
+    const chunks = [[0, 2], [2, 16], [16, 23], [23, 31], [31, 37], [37, 47], [47, 49], [49, 56], [56, 58], [58, 65], [65, 71], [71, 77], [77, 85], [85, 92], [92, full.length]] as const;
+
+    for (const [start, end] of chunks) {
+      act(() => {
+        result.current.enqueueStreamEvent("session-1", assistant(full.slice(start, end), {
+          id: `interleaved-delta-${start}`,
+          streamOffset: start,
+          roomAgentId: "agent-1",
+          agentTurnId: "turn-1",
+        }));
+        result.current.enqueueStreamEvent("session-1", {
+          id: `status-${start}`,
+          type: "status_update",
+          timestamp: Date.now(),
+          message: "Context: 10%",
+          roomAgentId: "agent-1",
+          agentTurnId: "turn-1",
+        });
+        vi.advanceTimersByTime(100);
+      });
+    }
+
+    expect(getActiveTurnDraft(draftKey)?.content).toBe(full);
+    act(() => {
+      result.current.enqueueStreamEvent("session-1", assistant("", {
+        id: "interleaved-prompt-completed",
+        isComplete: true,
+        roomAgentId: "agent-1",
+        agentTurnId: "turn-1",
+      }));
+    });
+    const body = useSessionStore.getState().sessions[0].events
+      .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message")
+      .map((event) => event.content)
+      .join("");
+    expect(body).toBe(full);
+    unmount();
+    vi.useRealTimers();
   });
 
   it("still drops the draft when the authoritative frame carries its own thinking", () => {

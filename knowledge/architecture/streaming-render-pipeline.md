@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T19:50:00+08:00"
+timestamp: "2026-08-09T20:15:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -99,9 +99,14 @@ to leaf components — `LiveDraftTail` renders the streaming thinking inside the
 process detail and `AssistantBodyBlock` renders the body tail from its own
 `useActiveTurnDraft` + `pickDraftText` merge-over-event — so a delta re-renders
 only those leaves while memoized process blocks keep reference-stable props. The
-single commit point is `commitActiveTurnDraftsToBatch`, invoked before every formal
-flush and before any boundary event merges; snapshot/barrier frames stay on the
-formal path because they may replace body text while the draft only appends.
+single commit point is `commitActiveTurnDraftsToBatch`, invoked before every
+structural/formal boundary merges; snapshot/barrier frames stay on the formal
+path because they may replace body text while the draft only appends. An
+informational `status_update` timer may flush its own 80 ms event batch, but it
+must never materialize the active draft. Status heartbeats can arrive between
+every text fragment: clearing the accumulator while retaining its stream-offset
+anchor makes every later fragment look consumed and leaves only the final tail.
+The public/terminal flush path still commits drafts synchronously.
 When reading assistant content, always treat formal events as authority once
 committed.
 

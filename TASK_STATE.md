@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：状态刷新不再把流式正文截成最后一片（v2.21.16）
+
+- 现场快照：新一轮正文实际按 15 个连续 offset 分片完整输出 93 字，但每个分片之间都夹有 `agent.status.updated`；日志中正文 anchor 持续前进而 `accChars` 每次都回到 0，最终正式时间线只剩最后一个“？”。`prompt.completed` 后 Host 又对普通提示无条件保留 30 秒续轮 grace，界面因此停在“消息处理中”，随后 canonical repair 才恢复完整正文。
+- 根因：80ms 信息状态批处理定时器复用了“正式边界 flush”，每次状态刷新都会提交并清空 active-turn draft，却不重置同一步的 offset anchor；下一片只能从空 accumulator 继续。另一个独立问题是所有正常 `prompt.completed` 都套用长续轮等待，即使没有 Goal 或排队任务。
+- 修正：信息性 `status_update` 的定时批处理只刷新事件，不再物化 active draft；正文、工具、完成等真实结构边界仍同步提交草稿。普通提示完成后立即发布 Host 完成态，仅活动 Goal 或明确 queued prompt 保留 30 秒自动续轮窗口，等待审批/提问期间也不会被延迟回调误置为完成。
+- 回归：新增与现场一致的 15 段 offset + 每段状态刷新 fixture，锁定活动草稿与最终正式正文均为完整 93 字；新增普通提示、活动 Goal 与 queued prompt 的续轮 grace 判定测试。
+
 ## 2026-08-09 修复：流式正文只在完整落盘后完成并保留耗时（v2.21.15）
 
 - 现场快照：同一 Server 会话真实输出按 offset `0→9→14→20→21→28→33→40` 连续到达并正常 `prompt.completed`，SDK wire 记录本轮 3893ms；Renderer 正式时间线却只剩最后 7 字。App 随后连续两次读取 REST `/status=idle`，在 Host 仍处于 30 秒续轮 grace 的情况下提前清除运行态并显示“输出完成”；约 30 秒后 canonical repair 用完整 40 字替换正文，同时丢掉显示层临时推导的耗时。

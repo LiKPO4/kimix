@@ -3567,6 +3567,18 @@ export function resolveEngineStatusAfterPromptCompleted(
   return "completed";
 }
 
+/** Long continuation grace is only justified by explicit continuation work. */
+export function shouldDelayServerPromptCompletion(input: {
+  goalStatus?: unknown;
+  queuedPromptCount?: unknown;
+}): boolean {
+  const goalStatus = typeof input.goalStatus === "string" ? input.goalStatus.trim().toLowerCase() : "";
+  const queuedPromptCount = typeof input.queuedPromptCount === "number" && Number.isFinite(input.queuedPromptCount)
+    ? input.queuedPromptCount
+    : 0;
+  return goalStatus === "active" || queuedPromptCount > 0;
+}
+
 /**
  * After main-agent prompt.completed, ask Server /status (busy-authoritative) and
  * only terminalize when activity is not active.
@@ -3593,21 +3605,33 @@ async function settleServerSessionAfterPromptCompleted(sessionId: string): Promi
       mainTurnActive = undefined; // 无法确认时保守按 busy
     }
     const resolved = resolveEngineStatusAfterPromptCompleted(status, mainTurnActive);
-    // 中间步骤（goal 续跑 / agent 自动续轮）的 prompt.completed 后 REST 短暂返回 idle
-    // 且 main_turn_active=false（续轮还没开始），resolveEngineStatusAfterPromptCompleted
-    // 会判 completed → 渲染层 settle 折叠思考链 + 投影半截正文，续轮开始后又展开（闪烁）。
-    // grace 期内续轮的 assistant.delta 会把 mainTurnActive 翻回 true（handleServerFrame
-    // L3395），到期时检查到就不 settle。真正结束后 30s 内无新帧，才 setStatus(completed)。
-    // 实机快照 v2.20.296：prompt.completed → 34s 后续轮到达，30s grace 能覆盖。
+    // 中间步骤（活动 Goal / 已排队 prompt）的 prompt.completed 后 REST 会短暂返回
+    // idle 且 main_turn_active=false。仅有明确续轮证据时才保留 grace；普通提示立即
+    // settle，避免完整输出后仍卡 30s。grace 内 assistant.delta 会重新置 active，
+    // 到期回调便不再 settle（实机曾观测 prompt.completed 后延迟续轮）。
     if (resolved === "completed") {
-      setTimeout(() => {
+      const [prompts, goalState] = await Promise.all([
+        getServerClient().listPrompts(sessionId).catch(() => null),
+        getServerClient().getGoal(sessionId).catch(() => null) as Promise<{ goal?: KimiCodeGoalSnapshot | null } | null>,
+      ]);
+      const shouldDelay = shouldDelayServerPromptCompletion({
+        goalStatus: goalState?.goal?.status,
+        queuedPromptCount: prompts?.queued.length,
+      });
+      const publishCompletion = () => {
         const m = serverSessions.get(sessionId);
         if (!m || m.status === "interrupted" || m.status === "error") return;
+        if (m.status === "waiting_approval" || m.status === "waiting_question") return;
         if (m.mainTurnActive === true) return; // 续轮已恢复，不 settle
         setStatus(sessionId, "completed");
         const settledTurnModel = status.model?.trim();
         if (settledTurnModel) eventSink?.({ sessionId, event: { type: "kimix.turn.model", model: settledTurnModel, phase: "settle" } });
-      }, 30_000).unref?.();
+      };
+      if (shouldDelay) {
+        setTimeout(publishCompletion, 30_000).unref?.();
+      } else {
+        publishCompletion();
+      }
       return;
     }
     setStatus(sessionId, resolved);

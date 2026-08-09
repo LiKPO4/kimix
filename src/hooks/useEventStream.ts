@@ -261,9 +261,9 @@ export function useEventStream() {
   const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const updateSession = useSessionStore((s) => s.updateSession);
 
-  const flushStreamEventsInner = useCallback(() => {
+  const flushStreamEventsInner = useCallback((commitDrafts = true) => {
     streamFlushTimerRef.current = null;
-    if (isActiveTurnDraftEnabled()) {
+    if (commitDrafts && isActiveTurnDraftEnabled()) {
       commitActiveTurnDraftsToBatch(streamBatchRef.current);
     }
     const batches = streamBatchRef.current;
@@ -317,7 +317,7 @@ export function useEventStream() {
       return;
     }
 
-    if (isActiveTurnDraftEnabled() && !hasSubagentEventScope(scoped)) {
+    if (isActiveTurnDraftEnabled() && !hasSubagentEventScope(scoped) && scoped.type !== "status_update") {
       // Authoritative full-body frames (barrier / stable snapshot / complete with
       // content) own the final text. Drop the draft instead of committing it so
       // mergeEvents does not append draft + full body (duplicate greeting).
@@ -383,9 +383,14 @@ export function useEventStream() {
         current.items,
         isScrollYieldEnabled() && isUserScrollActive(),
       );
-      streamFlushTimerRef.current = setTimeout(flushStreamEvents, delay);
+      // Informational status/tool-progress batches may flush between every text
+      // delta. They must not materialize the active draft: doing so resets the
+      // per-step accumulator while its offset anchor keeps advancing, reducing
+      // the formal body to the final fragment (observed as a lone "？"). True
+      // boundaries commit synchronously above or call the public flush path.
+      streamFlushTimerRef.current = setTimeout(() => flushStreamEventsInner(false), delay);
     }
-  }, [flushStreamEvents]);
+  }, [flushStreamEvents, flushStreamEventsInner]);
 
   return { streamBatchRef, streamFlushTimerRef, enqueueStreamEvent, flushStreamEvents };
 }

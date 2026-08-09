@@ -22,6 +22,7 @@ import {
   resolveExternalApprovalSettleStatus,
   selectExternallyResolvedQuestionIds,
   shouldResumeWaitingQuestionOnFrame,
+  shouldDelayServerPromptCompletion,
   resolvePromptModel,
   resolveServerEngineStatus,
   resolveServerModelRefresh,
@@ -368,6 +369,18 @@ describe("resolveEngineStatusAfterPromptCompleted", () => {
   it("keeps running when activity is unknown rather than faking completed", () => {
     expect(resolveEngineStatusAfterPromptCompleted({})).toBe("running");
     expect(resolveEngineStatusAfterPromptCompleted({ status: "unknown-future" })).toBe("running");
+  });
+});
+
+describe("shouldDelayServerPromptCompletion", () => {
+  it("finishes an ordinary prompt without the long continuation grace", () => {
+    expect(shouldDelayServerPromptCompletion({})).toBe(false);
+    expect(shouldDelayServerPromptCompletion({ goalStatus: "complete", queuedPromptCount: 0 })).toBe(false);
+  });
+
+  it("keeps the grace only for explicit goal or queued continuation work", () => {
+    expect(shouldDelayServerPromptCompletion({ goalStatus: "active" })).toBe(true);
+    expect(shouldDelayServerPromptCompletion({ queuedPromptCount: 1 })).toBe(true);
   });
 });
 
