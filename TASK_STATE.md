@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：导入风格的嵌套分段控件保持同心圆角（v2.21.6）
+
+- 根因：主题三段控件有 6px 可见内边距，内部按钮消费 `interactiveCard` 圆角，外壳却直接消费无几何关联的 `insetSection` 圆角；Y2K 运行态因此形成外 14px、内 20px 的反向嵌套转角。桌面通知列表虽共享外壳材质，但其子项贴边满铺，不能与主题控件共用同一圆角推导。
+- 修复：共享边框、背景和层次继续来自 `insetSection`；主题外壳按 `interactiveCard radius + 6px inset` 推导同心外圆角，通知列表保持直接使用 `insetSection` 并由外壳裁切。6px 间距抽成局部结构变量，测试锁定半径与内边距的关系，避免以后只改其中一侧。
+- 验证：定向 UI Style 测试 2 文件 / 39 项、全量测试 174 文件 / 1864 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过。v2.21.6 运行态中 Y2K 主题外壳为 26px、内部三项均为 20px、padding/gap 均为 6px；通知外壳仍为 14px、padding 0、四个满铺子项均为 0px，由父层正确裁切。
+
 ## 2026-08-09 修复：内容容器圆角按角色硬限幅（v2.21.5）
 
 - 根因：UI Style v1 虽限制 card/panel/shell primitive 最大为 40/48px，但任何角色都能引用 `pill=999`，AI 把 `userBubble` 设为 pill 后绕过数值上限；长消息气泡因此接近半圆，圆角侵入正文并把文字挤出视觉边界。

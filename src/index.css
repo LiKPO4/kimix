@@ -3762,13 +3762,14 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-theme-grid {
+  --kimix-settings-theme-segment-inset: 6px;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface-elevated);
   margin-top: 10px;
-  padding: 6px;
-  gap: 6px;
+  padding: var(--kimix-settings-theme-segment-inset);
+  gap: var(--kimix-settings-theme-segment-inset);
 }
 
 .kimix-settings-panel.is-workspace .kimix-settings-theme {
@@ -4330,15 +4331,24 @@ button.bg-accent-primary:disabled:hover,
 }
 
 /* 工作区分段外壳的基础选择器带三层 class；保留显式工作区作用域，
-   确保导入契约的 insetSection 材质不会被基础 6px 圆角覆盖。 */
+   确保导入契约的 insetSection 材质不会被基础声明覆盖。 */
 :root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace :where(
   .kimix-settings-theme-grid,
   .kimix-settings-permissions
 ) {
   border: var(--ui-role-inset-section-resting-border);
-  border-radius: var(--ui-role-inset-section-radius);
   background: var(--ui-role-inset-section-resting-background);
   box-shadow: var(--ui-role-inset-section-resting-shadow);
+}
+
+/* 主题选项与外壳之间有可见内边距，外壳必须按 inner + inset 保持同心。 */
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-theme-grid {
+  border-radius: calc(var(--ui-role-interactive-card-radius) + var(--kimix-settings-theme-segment-inset));
+}
+
+/* 权限列表的子项贴边满铺，由外壳裁切，因此直接使用 insetSection 半径。 */
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permissions {
+  border-radius: var(--ui-role-inset-section-radius);
 }
 
 :root[data-ui-style-contract="v1"] .kimix-event-card {

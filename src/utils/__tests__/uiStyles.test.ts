@@ -396,10 +396,13 @@ describe("UI_STYLES", () => {
     expect(css.match(/:not\(\[class\^="bg-accent-"\]\):not\(\[class\*=" bg-accent-"\]\)/g)).toHaveLength(5);
     expect(sidebar).toContain('kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger');
   });
-  it("工作区分段外壳以足够优先级消费自定义 insetSection 材质", () => {
+  it("工作区分段外壳按结构消费材质并保持同心圆角", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-settings-panel\.is-workspace\s+:where\(\s*\.kimix-settings-theme-grid,\s*\.kimix-settings-permissions\s*\)\s*\{[^}]*border:\s*var\(--ui-role-inset-section-resting-border\);[^}]*border-radius:\s*var\(--ui-role-inset-section-radius\);[^}]*background:\s*var\(--ui-role-inset-section-resting-background\);[^}]*box-shadow:\s*var\(--ui-role-inset-section-resting-shadow\);/s);
+    expect(css).toMatch(/\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*--kimix-settings-theme-segment-inset:\s*6px;[^}]*padding:\s*var\(--kimix-settings-theme-segment-inset\);[^}]*gap:\s*var\(--kimix-settings-theme-segment-inset\);/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-settings-panel\.is-workspace\s+:where\(\s*\.kimix-settings-theme-grid,\s*\.kimix-settings-permissions\s*\)\s*\{[^}]*border:\s*var\(--ui-role-inset-section-resting-border\);[^}]*background:\s*var\(--ui-role-inset-section-resting-background\);[^}]*box-shadow:\s*var\(--ui-role-inset-section-resting-shadow\);/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-theme-grid\s*\{[^}]*border-radius:\s*calc\(var\(--ui-role-interactive-card-radius\)\s*\+\s*var\(--kimix-settings-theme-segment-inset\)\);/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-settings-panel\.is-workspace\s+\.kimix-settings-permissions\s*\{[^}]*border-radius:\s*var\(--ui-role-inset-section-radius\);/s);
   });
   it("内置风格触点与导入契约只允许已说明的结构差集", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
