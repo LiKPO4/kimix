@@ -477,7 +477,8 @@ export type ProbeKimiThinkingEffortsRequest = {
 export type ProbeKimiThinkingEffortsResponse = {
   success: true;
   data: {
-    supportEfforts: string[];
+    supportEfforts?: string[];
+    maxContextSize?: number;
     defaultEffort?: string;
     endpoint: string;
   };

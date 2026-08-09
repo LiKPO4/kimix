@@ -434,24 +434,33 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
 
   const handleProbeEfforts = async () => {
     if (!selectedModelAlias) {
-      setModelFormMessage("请先保存模型，再匹配官方目录中的思考档位。");
+      setModelFormMessage("请先保存模型，再匹配目录中的模型信息。");
       return;
     }
     setBusyAction("probe-effort");
-    setModelFormMessage("正在从官方模型目录匹配思考档位...");
+    setModelFormMessage("正在从 models.dev 匹配模型信息...");
     try {
       const res = await window.api.probeKimiCodeThinkingEfforts({ modelAlias: selectedModelAlias });
       if (!res.success) {
         setModelFormMessage(`探测失败：${res.error}`);
         return;
       }
-      modelEffortsTouchedRef.current = true;
+      if (res.data.maxContextSize) modelContextTouchedRef.current = true;
+      if (res.data.supportEfforts) modelEffortsTouchedRef.current = true;
       setModelDraft((current) => ({
         ...current,
-        supportEfforts: res.data.supportEfforts,
-        defaultEffort: res.data.defaultEffort && res.data.supportEfforts.includes(res.data.defaultEffort) ? res.data.defaultEffort : "",
+        maxContextSize: res.data.maxContextSize ? String(res.data.maxContextSize) : current.maxContextSize,
+        supportEfforts: res.data.supportEfforts ?? current.supportEfforts,
+        defaultEffort: res.data.supportEfforts
+          ? (res.data.defaultEffort && res.data.supportEfforts.includes(res.data.defaultEffort) ? res.data.defaultEffort : "")
+          : current.defaultEffort,
       }));
-      setModelFormMessage(`官方目录匹配到 ${res.data.supportEfforts.length} 个思考档位声明，已回填到上方，保存模型后生效。`);
+      const matched = [
+        res.data.maxContextSize ? `Context ${res.data.maxContextSize}` : "",
+        res.data.supportEfforts ? `${res.data.supportEfforts.length} 个思考档位` : "",
+      ].filter(Boolean).join(" 和 ");
+      const undeclared = res.data.supportEfforts ? "" : "；目录未声明可选思考档位，现有选择保持不变";
+      setModelFormMessage(`已从 models.dev 回填${matched}${undeclared}，保存模型后生效。`);
     } catch (error) {
       setModelFormMessage(`探测失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -999,14 +1008,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                         onClick={() => void handleProbeEfforts()}
                         disabled={Boolean(busyAction)}
                         className="kimix-icon-text-button is-compact kimix-muted-action shrink-0 disabled:opacity-55"
-                        title="从 models.dev 官方模型目录匹配该模型声明的思考档位"
+                        title="从 models.dev 匹配该模型的最大上下文与思考档位声明"
                       >
                         <RefreshCw size={13} className={busyAction === "probe-effort" ? "kimix-spin" : ""} />
-                        匹配目录
+                        匹配模型信息
                       </button>
                     </div>
                     <div className="text-[11.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
-                      优先使用官方目录声明；目录无声明时手动选择或留空。不能仅凭供应商返回成功判断模型支持。
+                      Context 与思考档位分别按 models.dev 声明回填；目录未声明的项目保持现值。不能仅凭供应商返回成功判断模型支持。
                     </div>
                     <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 8 }}>
                       {THINKING_EFFORT_CHOICES.map((effort) => {

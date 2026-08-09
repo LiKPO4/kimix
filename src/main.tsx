@@ -335,6 +335,7 @@ function installBrowserPreviewApi() {
     probeKimiCodeThinkingEfforts: () => Promise.resolve({
       success: true as const,
       data: {
+        maxContextSize: 131072,
         supportEfforts: ["off", "low", "medium", "high", "xhigh"],
         defaultEffort: "high",
         endpoint: "https://api.deepseek.com/v1/chat/completions",

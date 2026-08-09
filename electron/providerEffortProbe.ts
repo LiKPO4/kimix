@@ -144,19 +144,20 @@ export async function probeThinkingEfforts(
   throw new Error(`无法探测思考档位：${failures.join("；") || "未知错误"}`);
 }
 
-type CatalogEffortModel = {
+type CatalogMetadataModel = {
   id: string;
+  maxContextSize?: number | null;
   supportEfforts?: string[];
 };
 
-type CatalogEffortProvider = {
+type CatalogMetadataProvider = {
   providerId: string;
   baseUrl: string | null;
-  models: CatalogEffortModel[];
+  models: CatalogMetadataModel[];
 };
 
-export type CatalogEffortResolution =
-  | { status: "resolved"; providerId: string; supportEfforts: string[] }
+export type CatalogModelMetadataResolution =
+  | { status: "resolved"; providerId: string; maxContextSize?: number; supportEfforts?: string[] }
   | { status: "not-found" | "undeclared" | "ambiguous" };
 
 function normalizeCatalogBaseUrl(value: string | null | undefined): string {
@@ -179,15 +180,15 @@ function bareCatalogModelId(value: string): string {
 }
 
 /**
- * 只从 models.dev 形状的官方目录声明解析模型档位。优先限定同 provider id，
+ * 只从 models.dev 形状的目录解析模型元数据。优先限定同 provider id，
  * 未命中时再用唯一 Base URL 匹配；无法确定 provider 身份时不按全局裸 model id 猜测。
  */
-export function resolveCatalogThinkingEfforts(input: {
+export function resolveCatalogModelMetadata(input: {
   providerName?: string;
   baseUrl?: string | null;
   modelId: string;
-  providers: readonly CatalogEffortProvider[];
-}): CatalogEffortResolution {
+  providers: readonly CatalogMetadataProvider[];
+}): CatalogModelMetadataResolution {
   const providerName = input.providerName?.trim().toLowerCase() ?? "";
   const baseUrl = normalizeCatalogBaseUrl(input.baseUrl);
   const byId = providerName
@@ -213,10 +214,19 @@ export function resolveCatalogThinkingEfforts(input: {
 
   const declared = matches.flatMap(({ provider, model }) => {
     const supportEfforts = Array.from(new Set((model.supportEfforts ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean)));
-    return supportEfforts.length > 0 ? [{ providerId: provider.providerId, supportEfforts }] : [];
+    const maxContextSize = typeof model.maxContextSize === "number" && Number.isInteger(model.maxContextSize) && model.maxContextSize > 0
+      ? model.maxContextSize
+      : undefined;
+    return supportEfforts.length > 0 || maxContextSize !== undefined
+      ? [{
+          providerId: provider.providerId,
+          ...(maxContextSize !== undefined ? { maxContextSize } : {}),
+          ...(supportEfforts.length > 0 ? { supportEfforts } : {}),
+        }]
+      : [];
   });
   if (declared.length === 0) return { status: "undeclared" };
-  const signatures = new Set(declared.map((entry) => entry.supportEfforts.join("\u0000")));
+  const signatures = new Set(declared.map((entry) => `${entry.maxContextSize ?? ""}\u0001${entry.supportEfforts?.join("\u0000") ?? ""}`));
   if (signatures.size !== 1) return { status: "ambiguous" };
   return { status: "resolved", ...declared[0] };
 }

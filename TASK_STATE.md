@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：目录匹配独立回填 Context 与思考档位（v2.21.13）
+
+- 复验现象：`opencode-go/mimo-v2.5` 已被 models.dev 收录且声明 `limit.context = 1000000`，但目录没有声明可选 effort 档位。v2.21.12 的“匹配目录”把两类元数据绑死为 effort-only 结果；Host/IPC/UI 均丢弃已解析的 Context，并把“无 effort 声明”整体当成失败。
+- 修正：目录解析改为 provider/model 范围内的一次模型元数据匹配，`maxContextSize` 与 `supportEfforts` 分别可选、独立回填；按钮改为“匹配模型信息”。目录有 Context、无档位时更新 Context 并保留现有手动档位；缺失 Context 不再伪造 262144。SDK 目录模型的 `offEffort` 也纳入 Kimix 档位映射，避免 `none` 在 SDK 转换层丢失。
+- 数据源边界：Provider `/models` 仍优先提供实际路由返回的 Context，models.dev 提供 provider-aware 元数据，名称推断仅作最低优先级兜底。OpenRouter/LiteLLM 可作通用模型信息参考，但不能证明当前网关的 provider-specific effort 或 Context 上限，本轮不引入跨供应商猜测。
+- 回归：新增 `hy3 → 256000 + off/low/high`、`mimo-v2.5` 无档位仍返回 1000000 Context，以及 UI Context-only 回填且保留手动档位用例；定向 2 文件 / 30 项与 Node/Renderer TypeScript 检查通过。
+
 ## 2026-08-09 修正：思考档位只采信模型级目录声明（v2.21.12）
 
 - 复验现象：v2.21.10 增加无效值 sentinel 后，`opencode-go/hy3` 仍探测为 minimal–max 六档。这不是版本旧图或 sentinel 未生效：该网关会拒绝非法字符串，但在 provider 全局 schema 层接受全部合法枚举。sentinel 只证明网关校验枚举，合法值 2xx 仍不能证明具体模型实际支持；chat/completions 也不回显最终生效档位，无法从输出/usage 稳定反推。

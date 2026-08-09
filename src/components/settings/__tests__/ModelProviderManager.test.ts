@@ -348,6 +348,46 @@ describe("ModelProviderManager", () => {
     await act(async () => root.unmount());
   });
 
+  it("fills Context even when the catalog does not declare thinking effort tiers", async () => {
+    const existingModel = {
+      alias: "gateway/mimo-v2.5",
+      provider: "gateway",
+      model: "mimo-v2.5",
+      displayName: "gateway/mimo-v2.5",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+      supportEfforts: ["high"],
+      defaultEffort: "high",
+    };
+    const probeKimiCodeThinkingEfforts = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        maxContextSize: 1_000_000,
+        endpoint: "models.dev:gateway",
+      },
+    });
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { probeKimiCodeThinkingEfforts },
+    });
+    const { container, root } = await renderManager({ ...emptyProviderConfig, models: [existingModel] });
+
+    await act(async () => (container.querySelector(".kimix-model-row") as HTMLElement).click());
+    await act(async () => buttonByText(container, "匹配模型信息")?.click());
+
+    expect(probeKimiCodeThinkingEfforts).toHaveBeenCalledWith({ modelAlias: existingModel.alias });
+    const contextInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => (input as HTMLInputElement).type === "number") as HTMLInputElement;
+    expect(contextInput.value).toBe("1000000");
+    const card = Array.from(container.querySelectorAll(".kimix-settings-card"))
+      .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
+    expect(Array.from(card.querySelectorAll('button[aria-pressed="true"]')).map((button) => button.textContent?.trim()))
+      .toEqual(["high"]);
+    expect(container.textContent).toContain("目录未声明可选思考档位，现有选择保持不变");
+    await act(async () => root.unmount());
+  });
+
   it("re-enables the panel when model discovery rejects at the IPC level", async () => {
     const discoverKimiProviderModels = vi.fn().mockRejectedValue(new Error("ipc broken"));
     Object.defineProperty(window, "api", {

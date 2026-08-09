@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
-import { resolveCatalogThinkingEfforts } from "./providerEffortProbe";
+import { resolveCatalogModelMetadata } from "./providerEffortProbe";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
@@ -620,6 +620,7 @@ export type KimiCodeCatalogModel = {
   maxOutputSize?: number;
   reasoningKey?: string;
   supportEfforts?: string[];
+  offEffort?: string;
   capability?: {
     image_in?: boolean;
     video_in?: boolean;
@@ -2905,14 +2906,15 @@ export async function getConfigDiagnostics(): Promise<KimiCodeConfigDiagnostics>
 }
 
 export type ThinkingEffortProbeResult = {
-  supportEfforts: string[];
+  supportEfforts?: string[];
+  maxContextSize?: number;
   defaultEffort?: string;
   endpoint: string;
 };
 
 /**
- * 从 models.dev 官方目录匹配模型思考档位声明。OpenAI-compatible completion 端点的
- * 2xx 只能表明网关接受了 reasoning_effort，不能证明具体模型支持，不再用于回填。
+ * 从 models.dev 目录匹配模型 Context 与思考档位声明。两项元数据彼此独立；
+ * OpenAI-compatible completion 端点的 2xx 不能证明具体模型支持某个思考档位。
  */
 export async function probeModelThinkingEfforts(modelAlias: string): Promise<ThinkingEffortProbeResult> {
   const config = await getConfig({ reload: true });
@@ -2920,7 +2922,7 @@ export async function probeModelThinkingEfforts(modelAlias: string): Promise<Thi
   if (!model?.model) throw new Error(`未找到模型「${modelAlias}」，请先保存模型配置。`);
   const providerName = model.provider ?? config.defaultProvider ?? "";
   const provider = config.providers?.[providerName];
-  const resolution = resolveCatalogThinkingEfforts({
+  const resolution = resolveCatalogModelMetadata({
     providerName,
     baseUrl: provider?.baseUrl,
     modelId: model.model,
@@ -2928,17 +2930,22 @@ export async function probeModelThinkingEfforts(modelAlias: string): Promise<Thi
   });
   if (resolution.status !== "resolved") {
     const reason = resolution.status === "ambiguous"
-      ? "目录中同名模型的档位声明不一致"
+      ? "目录中同名模型的元数据不一致"
       : resolution.status === "undeclared"
-        ? "官方目录已收录该模型，但未声明思考档位"
-        : "官方目录未找到该模型的思考档位声明";
+        ? "目录已收录该模型，但未声明可用的 Context 或思考档位"
+        : "目录未找到该模型的元数据";
     throw new Error(`${reason}。供应商返回 2xx 只能证明网关接受参数，不能证明模型支持；请手动声明或留空。`);
   }
   const efforts = resolution.supportEfforts;
-  const defaultEffort = model.defaultEffort && efforts.includes(model.defaultEffort)
+  const defaultEffort = model.defaultEffort && efforts?.includes(model.defaultEffort)
     ? model.defaultEffort
     : undefined;
-  return { supportEfforts: efforts, defaultEffort, endpoint: `models.dev:${resolution.providerId}` };
+  return {
+    ...(efforts ? { supportEfforts: efforts } : {}),
+    ...(resolution.maxContextSize ? { maxContextSize: resolution.maxContextSize } : {}),
+    defaultEffort,
+    endpoint: `models.dev:${resolution.providerId}`,
+  };
 }
 
 export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeConfig> {
@@ -2963,10 +2970,8 @@ export async function setExperimentalFeature(id: "tool-select", enabled: boolean
   return setConfig({ experimental: { [id]: enabled } } as KimiCodeConfigPatch);
 }
 
-function normalizeCatalogMaxContextSize(value: number | null) {
-  const fallback = 262144;
-  const input = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  return Math.max(1, input);
+function normalizeCatalogMaxContextSize(value: number | null): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 // models.dev 思考档位 → Kimix 词表（off/minimal/low/medium/high/xhigh/max）：
@@ -3014,7 +3019,10 @@ export async function listProviderCatalog(): Promise<KimiCodeProviderCatalogEntr
             maxContextSize: normalizeCatalogMaxContextSize(rawMaxContextSize),
             thinking: Boolean(model.capability?.thinking),
             toolUse: model.capability?.tool_use !== false,
-            supportEfforts: mapCatalogEffortValues(model.supportEfforts),
+            supportEfforts: mapCatalogEffortValues([
+              ...(model.offEffort ? [model.offEffort] : []),
+              ...(model.supportEfforts ?? []),
+            ]),
           };
         })
         .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
