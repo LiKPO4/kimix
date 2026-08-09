@@ -72,6 +72,19 @@ describe("settings workspace scroll layout", () => {
     );
   });
 
+  it("让设置侧栏控件随拖拽宽度对齐到同一右边界", () => {
+    expect(settingsSidebar).toContain('style={{ width, minHeight: 0, padding: "0 0 12px 12px" }}');
+    expect(css).toMatch(
+      /\.kimix-settings-sidebar-scroll\s*\{[^}]*padding:\s*0 0 16px 8px;[^}]*scrollbar-gutter:\s*stable;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-search\.is-sidebar\s*\{[^}]*margin-left:\s*8px;[^}]*margin-right:\s*8px;/s,
+    );
+    expect(css).toMatch(
+      /\.kimix-settings-navigation-item,\s*\.kimix-settings-search-result\s*\{[^}]*width:\s*100%;/s,
+    );
+  });
+
   it("keeps settings navigation and focus feedback aligned with the native sidebar style", () => {
     const activeNavigationRule = css.match(
       /\.kimix-settings-navigation-item\.is-active\s*\{([^}]*)\}/s,

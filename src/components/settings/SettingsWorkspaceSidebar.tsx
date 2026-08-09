@@ -124,7 +124,7 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
   return (
     <aside
       className="kimix-sidebar kimix-settings-workspace-sidebar flex h-full shrink-0 select-none flex-col"
-      style={{ width, minHeight: 0, padding: "0 10px 12px 12px" }}
+      style={{ width, minHeight: 0, padding: "0 0 12px 12px" }}
       aria-label="设置导航"
     >
       <div className="kimix-settings-sidebar-header">
