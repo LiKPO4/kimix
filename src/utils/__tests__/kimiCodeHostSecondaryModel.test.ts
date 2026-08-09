@@ -19,6 +19,16 @@ provider = "deepseek"
 model = "deepseek-v4-flash"
 `;
 
+const OPENAI_CONFIG_WITH_MAX = `[providers.gateway]
+type = "openai"
+
+[models."gateway/qwen"]
+provider = "gateway"
+model = "qwen"
+support_efforts = ["low", "medium", "max"]
+default_effort = "max"
+`;
+
 const tempDirs: string[] = [];
 
 function createTempConfig(content: string) {
@@ -56,6 +66,16 @@ describe("secondary_model 保存写前校验", () => {
     // 既有 models 段保持不动
     expect(next).toContain(`[models."${ALIAS}"]`);
     expect(next).toContain(`support_efforts = ["low", "medium", "high"]`);
+  });
+
+  it("OpenAI 子模型把 Kimi max 规范化为协议支持的 xhigh", () => {
+    const next = applySecondaryModelConfigToml(OPENAI_CONFIG_WITH_MAX, "gateway/qwen", "max");
+
+    expect(next).toContain('[secondary_model]');
+    expect(next).toContain('model = "gateway/qwen"');
+    expect(next).toContain('support_efforts = [ "low", "medium", "xhigh" ]');
+    expect(next).toContain('default_effort = "xhigh"');
+    expect(next).not.toContain('[secondary_model]\ndefault_effort = "max"');
   });
 
   it("模型未声明 support_efforts 时跳过校验", () => {

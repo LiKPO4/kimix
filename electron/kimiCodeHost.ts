@@ -19,6 +19,7 @@ import type { KimiCodeCapabilityStatus } from "./types/ipc";
 import { waitForOfficialSteerUserMessage } from "./steerConfirm";
 import { isDaemonLevelPromoteError, PromoteFailureBackoff } from "./kimiCodePromotePolicy";
 import { forgetSessionState, type SessionScopedState } from "./kimiCodeSessionState";
+import { resolveRuntimeThinkingEffort } from "./kimiCodeRuntimePolicy";
 import {
   classifyServerSessionActivity,
   flattenServerEvent,
@@ -534,23 +535,58 @@ function removeTomlSection(raw: string, sectionName: string) {
   return result;
 }
 
-// 写前校验：模型在 config.toml 的 models."<alias>" 段声明了非空 support_efforts，
-// 且请求档位不在其中时抛出中文错误（官方运行时会静默丢弃非法档位，这里提前拒绝）；
-// 模型无 support_efforts 声明、或未同时提供 model 与 defaultEffort 时跳过校验。
+// 写前校验：先按 Provider 协议规范化档位（OpenAI max→xhigh），再以模型在
+// config.toml 中声明的 support_efforts 校验；无法回到声明集合时提前抛出中文错误。
+// 模型无 support_efforts 声明、或未同时提供 model 与 defaultEffort 时只做协议规范化。
 export function assertSecondaryModelEffortDeclared(rawConfigToml: string, modelAlias: string | null, defaultEffort: string | null) {
-  if (!modelAlias || !defaultEffort) return;
+  if (!modelAlias || !defaultEffort) return defaultEffort;
   const body = readTomlSectionBody(rawConfigToml, `models.${toTomlTableKey(modelAlias)}`);
-  if (!body) return;
+  if (!body) return defaultEffort;
+  const providerName = readTomlString(body, "provider");
+  const providerBody = providerName
+    ? readTomlSectionBody(rawConfigToml, `providers.${toTomlTableKey(providerName)}`)
+    : null;
+  const providerType = providerBody ? readTomlString(providerBody, "type") : null;
   const supportEfforts = readTomlStringArray(body, "support_efforts");
-  if (!supportEfforts || supportEfforts.length === 0) return;
-  if (!supportEfforts.includes(defaultEffort)) {
+  const resolved = resolveRuntimeThinkingEffort({
+    requestedEffort: defaultEffort,
+    supportEfforts,
+    defaultEffort,
+    providerType,
+  });
+  if (supportEfforts && supportEfforts.length > 0 && resolved.reason === "first-supported") {
     throw new Error(`模型 ${modelAlias} 未声明思考档位 "${defaultEffort}"（可用：${supportEfforts.join("、")}）`);
   }
+  return resolved.effort ?? defaultEffort;
+}
+
+function normalizedSecondarySupportEfforts(rawConfigToml: string, modelAlias: string | null, resolvedDefaultEffort: string | null) {
+  if (!modelAlias || !resolvedDefaultEffort) return null;
+  const body = readTomlSectionBody(rawConfigToml, `models.${toTomlTableKey(modelAlias)}`);
+  if (!body) return null;
+  const supportEfforts = readTomlStringArray(body, "support_efforts");
+  if (!supportEfforts || supportEfforts.length === 0) return null;
+  const providerName = readTomlString(body, "provider");
+  const providerBody = providerName
+    ? readTomlSectionBody(rawConfigToml, `providers.${toTomlTableKey(providerName)}`)
+    : null;
+  const providerType = providerBody ? readTomlString(providerBody, "type") : null;
+  const normalized = Array.from(new Set(supportEfforts.map((effort) => (
+    resolveRuntimeThinkingEffort({ requestedEffort: effort, providerType }).effort ?? effort
+  ))));
+  return normalized.includes(resolvedDefaultEffort) ? normalized : null;
+}
+
+function readTomlString(sectionText: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*"((?:\\\\.|[^"])*)"\\s*$`, "m"));
+  return match ? unescapeTomlString(match[1]) : null;
 }
 
 // 校验 + 重写 config.toml 文本并返回新内容；校验失败抛错时调用方不得写盘。
 export function applySecondaryModelConfigToml(raw: string, model: string | null, defaultEffort: string | null) {
-  assertSecondaryModelEffortDeclared(raw, model, defaultEffort);
+  const resolvedDefaultEffort = assertSecondaryModelEffortDeclared(raw, model, defaultEffort);
+  const resolvedSupportEfforts = normalizedSecondarySupportEfforts(raw, model, resolvedDefaultEffort);
   // Remove ALL existing [secondary_model] sections first (prior writes may have
   // left duplicates with non-standard formatting that the TOML editor cannot
   // match), then write a single clean section if needed.
@@ -558,11 +594,14 @@ export function applySecondaryModelConfigToml(raw: string, model: string | null,
   // Also strip any malformed inline-section remnants like `[secondary_model]key = ...`
   next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
   next = next.replace(/\n{3,}/g, "\n\n");
-  if (model || defaultEffort) {
+  if (model || resolvedDefaultEffort) {
     const newline = next.includes("\r\n") ? "\r\n" : "\n";
     const lines: string[] = [`[secondary_model]`];
     if (model) lines.push(`model = "${escapeTomlString(model)}"`);
-    if (defaultEffort) lines.push(`default_effort = "${escapeTomlString(defaultEffort)}"`);
+    if (resolvedSupportEfforts && resolvedDefaultEffort !== defaultEffort) {
+      lines.push(`support_efforts = [ ${resolvedSupportEfforts.map((effort) => `"${escapeTomlString(effort)}"`).join(", ")} ]`);
+    }
+    if (resolvedDefaultEffort) lines.push(`default_effort = "${escapeTomlString(resolvedDefaultEffort)}"`);
     const base = next.trimEnd();
     next = `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
   }
@@ -865,7 +904,36 @@ export function setKimiCodeStatusSink(sink: StatusSink | null) {
 export { isKimiCodeSessionMissingError };
 export { isKimiCodeSessionAlreadyExistsError };
 
+async function resolveConfiguredThinkingEffort(modelAlias: string | undefined, requestedEffort: string) {
+  try {
+    const config = await getConfig({ reload: true });
+    const alias = modelAlias ?? config.defaultModel;
+    const model = alias ? config.models?.[alias] : undefined;
+    const provider = model?.provider ? config.providers?.[model.provider] : undefined;
+    const resolved = resolveRuntimeThinkingEffort({
+      requestedEffort,
+      supportEfforts: model?.overrides?.supportEfforts ?? model?.supportEfforts,
+      defaultEffort: model?.overrides?.defaultEffort ?? model?.defaultEffort,
+      providerType: provider?.type,
+    });
+    if (resolved.changed && resolved.effort) {
+      console.warn(`[KimiCodeHost] normalized thinking effort for ${alias ?? "unknown model"}: ${requestedEffort} -> ${resolved.effort} (${resolved.reason})`);
+    }
+    return resolved.effort ?? requestedEffort;
+  } catch (error) {
+    console.warn("[KimiCodeHost] thinking effort validation unavailable; preserving requested value:", error);
+    return requestedEffort;
+  }
+}
+
+async function normalizeSessionThinkingOptions(options: CreateKimiCodeSessionOptions): Promise<CreateKimiCodeSessionOptions> {
+  if (!options.thinking) return options;
+  const thinking = await resolveConfiguredThinkingEffort(options.model, options.thinking);
+  return thinking === options.thinking ? options : { ...options, thinking };
+}
+
 export async function createSession(options: CreateKimiCodeSessionOptions): Promise<KimiCodeEngineSession> {
+  options = await normalizeSessionThinkingOptions(options);
   const roomMetadata = parseOfficialRoomMetadata(options.metadata);
   if (roomMetadata) {
     const existing = await findExistingRoomSession(options.workDir, roomMetadata);
@@ -1810,17 +1878,18 @@ export async function setPlanMode(sessionId: string, enabled: boolean): Promise<
 export async function setThinking(sessionId: string, level: string): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
+  const resolvedLevel = await resolveConfiguredThinkingEffort(serverManaged?.model ?? sessions.get(sessionId)?.model, level);
   if (serverManaged) {
-    if (serverManaged.thinking === level) return;
-    await getServerClient().updateSession(sessionId, { thinking: level });
-    serverManaged.thinking = level;
+    if (serverManaged.thinking === resolvedLevel) return;
+    await getServerClient().updateSession(sessionId, { thinking: resolvedLevel });
+    serverManaged.thinking = resolvedLevel;
     return;
   }
   const managed = getManagedSession(sessionId);
-  if (managed.thinking === level) return;
+  if (managed.thinking === resolvedLevel) return;
   if (!managed.session.setThinking) throw new Error("当前兼容链路不支持切换思考强度。");
-  await managed.session.setThinking(level);
-  managed.thinking = level;
+  await managed.session.setThinking(resolvedLevel);
+  managed.thinking = resolvedLevel;
 }
 
 /**

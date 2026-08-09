@@ -322,17 +322,17 @@ describe("ModelProviderManager", () => {
     };
 
     expect(defaultSelect.disabled).toBe(true);
-    await act(async () => chipByLabel("低").click());
-    await act(async () => chipByLabel("高").click());
+    await act(async () => chipByLabel("low").click());
+    await act(async () => chipByLabel("high").click());
     expect(defaultSelect.disabled).toBe(false);
     await setDefaultEffort("high");
     expect(defaultSelect.value).toBe("high");
 
     // 取消选中当前默认档时，默认档自动清空
-    await act(async () => chipByLabel("高").click());
+    await act(async () => chipByLabel("high").click());
     expect(defaultSelect.value).toBe("");
 
-    await act(async () => chipByLabel("高").click());
+    await act(async () => chipByLabel("high").click());
     await setDefaultEffort("high");
     await act(async () => buttonByText(container, "保存模型")?.click());
 
@@ -544,7 +544,7 @@ it("prefills Context and thinking efforts from the official catalog when a disco
     .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
   const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
     .map((button) => button.textContent?.trim());
-  expect(pressedEfforts).toEqual(["低", "高"]);
+  expect(pressedEfforts).toEqual(["low", "high"]);
 
   await act(async () => buttonByText(container, "保存模型")?.click());
   expect(saveKimiProviderModel).toHaveBeenCalledWith({
@@ -605,7 +605,7 @@ it("prefills Context and efforts from the catalog when typing a model id into an
     .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
   const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
     .map((button) => button.textContent?.trim());
-  expect(pressedEfforts).toEqual(["中"]);
+  expect(pressedEfforts).toEqual(["medium"]);
   await act(async () => root.unmount());
 });
 
@@ -660,7 +660,7 @@ it("does not refill Context after the user manually cleared it (touched wins)", 
     .find((element) => element.textContent?.includes("思考档位（可选）")) as HTMLElement;
   const pressedEfforts = Array.from(card.querySelectorAll('button[aria-pressed="true"]'))
     .map((button) => button.textContent?.trim());
-  expect(pressedEfforts).toEqual(["中"]);
+  expect(pressedEfforts).toEqual(["medium"]);
   await act(async () => root.unmount());
 });
 

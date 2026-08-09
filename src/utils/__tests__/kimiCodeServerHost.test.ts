@@ -30,7 +30,7 @@ import {
   isTurnCompletionEventType,
   isSnapshotReplayFrame,
 } from "../../../electron/kimiCodeHost";
-import { resolveRuntimeModelPolicy } from "../../../electron/kimiCodeRuntimePolicy";
+import { resolveRuntimeModelPolicy, resolveRuntimeThinkingEffort } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
@@ -430,6 +430,40 @@ describe("server prompt model ownership", () => {
       false,
       false,
     )).toBe("opencode-go/deepseek-v4-pro");
+  });
+});
+
+describe("runtime thinking effort policy", () => {
+  it("normalizes OpenAI max declarations and defaults to xhigh", () => {
+    expect(resolveRuntimeThinkingEffort({
+      requestedEffort: "max",
+      supportEfforts: ["low", "medium", "max"],
+      defaultEffort: "max",
+      providerType: "openai",
+    })).toEqual({ effort: "xhigh", changed: true, reason: "provider-normalized" });
+  });
+
+  it("keeps Kimi max unchanged", () => {
+    expect(resolveRuntimeThinkingEffort({
+      requestedEffort: "max",
+      supportEfforts: ["low", "high", "max"],
+      defaultEffort: "high",
+      providerType: "kimi",
+    })).toEqual({ effort: "max", changed: false, reason: "declared" });
+  });
+
+  it("falls back to a valid declared default for stale selections", () => {
+    expect(resolveRuntimeThinkingEffort({
+      requestedEffort: "xhigh",
+      supportEfforts: ["low", "medium", "high"],
+      defaultEffort: "medium",
+      providerType: "openai",
+    })).toEqual({ effort: "medium", changed: true, reason: "default" });
+  });
+
+  it("preserves unknown capabilities after protocol normalization", () => {
+    expect(resolveRuntimeThinkingEffort({ requestedEffort: " MAX ", providerType: "openai" }))
+      .toEqual({ effort: "xhigh", changed: true, reason: "provider-normalized" });
   });
 });
 

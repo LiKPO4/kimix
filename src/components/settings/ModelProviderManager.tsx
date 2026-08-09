@@ -26,7 +26,6 @@ import {
   prefillFromCatalog,
 } from "@/utils/modelProviderConfig";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
-import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 
 const NEW_PROVIDER_ID = "__new_provider__";
 const DEFAULT_CONTEXT_SIZE = 262144;
@@ -1003,7 +1002,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       </button>
                     </div>
                     <div className="text-[11.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>
-                      声明后输入区可按档位切换；不声明则仅 关闭/开启。档位会原样传给供应商，需与上游实际能力一致。
+                      直接选择供应商接受的英文原值；不声明则仅 关闭/开启。OpenAI 类型使用 xhigh，max 仅用于明确支持它的协议。
                     </div>
                     <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 8 }}>
                       {THINKING_EFFORT_CHOICES.map((effort) => {
@@ -1017,7 +1016,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                             className="kimix-state-button flex items-center justify-center rounded-lg text-[12px] leading-none"
                             style={{ height: 28, paddingLeft: 11, paddingRight: 11 }}
                           >
-                            {thinkingEffortLabel(effort)}
+                            {effort}
                           </button>
                         );
                       })}
@@ -1034,7 +1033,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                       >
                         <option value="">不设置</option>
                         {modelDraft.supportEfforts.map((effort) => (
-                          <option key={effort} value={effort}>{thinkingEffortLabel(effort)}</option>
+                          <option key={effort} value={effort}>{effort}</option>
                         ))}
                       </select>
                     </div>

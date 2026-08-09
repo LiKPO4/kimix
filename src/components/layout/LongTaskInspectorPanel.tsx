@@ -48,7 +48,6 @@ import type { ParsedLongTaskDetail } from "@/utils/longTaskParser";
 import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
-import { thinkingEffortLabel } from "@/utils/thinkingEffort";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
@@ -1919,7 +1918,7 @@ export function LongTaskInspectorPanel({
                     style={{ paddingLeft: 12, paddingRight: 12 }}
                   >
                     <option value="">跟随主 Agent</option>
-                    {subagentThinkingOptions.map((effort) => <option key={effort} value={effort}>{thinkingEffortLabel(effort)}</option>)}
+                    {subagentThinkingOptions.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
                   </select>
                 </label>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：思考档位在运行时与子 Agent 配置边界校验（v2.21.1）
+
+- 根因：OpenAI 兼容模型配置可声明 Kimi 协议的 `max`，Composer 仅靠异步 effect 在部分无声明场景做 `max → xhigh`；已声明 `max`、首次创建/恢复、直接 `setThinking` 以及 `[secondary_model] default_effort=max` 都能绕过 UI 矫正，最终把 provider 不接受的 `reasoning_effort=max` 原样发出并收到 400。
+- 修复：新增共享运行时思考档位策略，OpenAI/OpenAI Responses 协议将 `max` 规范化为 `xhigh`，再按 `support_efforts → default_effort → 首个声明档位` 校验回退；Host 的 Server/SDK 共用 `createSession` 与 `setThinking` 入口统一执行。保存 secondary_model 时使用同一策略，避免再次写入 OpenAI `max`；Kimi `max` 保持不变。
+- 界面：模型配置页的全部思考档位按钮和默认档下拉直接显示英文原值（`off/minimal/low/medium/high/xhigh/max`），子 Agent 思考档位下拉同步显示英文，避免中文“超高/最高”掩盖真实 wire 值。
+- 验证：定向策略、secondary_model 与模型配置 UI 测试 3 文件 / 69 项通过；全量测试 174 文件 / 1860 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过，构建产物已确认注入 2.21.1。旧 Electron/Node 进程为空；`out`/`.vite` 递归清理两次被本机策略拒绝，因此本轮构建沿用现有缓存。开发版启动后因已安装的 `Kimix.exe` 占用单实例锁而退出，未擅自关闭用户当前正式版窗口；运行态交互待用户关闭正式版后启动 v2.21.1 复验。
+
 ## 2026-08-09 发布：v2.21.0 中版本
 
 - 范围：从上一个实际发布版本 v2.20.272 起算，汇总自定义界面风格、插件页重组、Goal/SDK v2 稳定性、思考档位、对话体验与性能等 49 个本地提交。
