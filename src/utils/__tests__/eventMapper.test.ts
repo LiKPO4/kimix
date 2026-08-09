@@ -2327,6 +2327,35 @@ describe("mergeEvents", () => {
     expect(assistants[0]).toMatchObject({ content: "替换内容", isComplete: true });
   });
 
+  it("keeps the complete live body while a completion barrier replays the same message as content parts", () => {
+    const full = "我是 Kimi Code CLI，底层运行的语言模型是千问（Qwen）3.8 Max。\n\n有什么想让我帮忙的吗？";
+    const parts = ["我是", " Kimi Code CLI，", "底层运行的", "语言模型是", "千问（Qwen）", "3.8 Max。", "\n\n有什么想", "让我帮忙的吗？"];
+    let events: TimelineEvent[] = [{
+      id: "live-full", type: "assistant_message", timestamp: 1_000,
+      content: full, thinking: "核对当前模型。", isThinking: true, isComplete: false,
+      agentTurnId: "turn-1",
+    }];
+
+    for (const [index, content] of parts.entries()) {
+      events = mergeEvents(events, {
+        id: `barrier-part-${index}`, type: "assistant_message", timestamp: 2_000,
+        content, isThinking: false, isComplete: false,
+        snapshotMessageId: "msg_session-x_000005", snapshotMessageIdStable: true,
+        completionBarrierReplay: true, agentTurnId: "turn-1",
+      });
+    }
+    events = mergeEvents(events, {
+      id: "barrier-end", type: "assistant_message", timestamp: 2_100,
+      content: "", isThinking: false, isComplete: true,
+      snapshotMessageId: "msg_session-x_000005", snapshotMessageIdStable: true,
+      completionBarrierReplay: true, agentTurnId: "turn-1",
+    });
+
+    const assistants = events.filter((event) => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ content: full, isComplete: true });
+  });
+
   it("barrier binding sets official timestamp so later unseen stable events sort correctly (P0 order fix)", () => {
     // Simulate the real session_6203... scenario:
     // 1. user message → placeholder assistant (isComplete: false, ts=T0+40ms)

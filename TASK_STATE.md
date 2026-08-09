@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：完成屏障分片不再把完整正文闪回尾句（v2.21.17）
+
+- 现场快照：v2.21.16 本轮 56 字 live 正文按 offset `0→56` 完整累积；`prompt.completed` 的 barrier 随后以同一个稳定消息 ID 回放 8 个 `content.part`，Renderer 在 20ms 内从完整流式正文变为最后 7 字“让我帮忙的吗？”，并显示输出完成；约 2.5 秒后 canonical repair 才恢复 56 字。
+- 根因：事件合并把每个 `completionBarrierReplay` 正文帧都当作“整条官方消息快照”并覆盖已绑定的 live Assistant；但 Server barrier 实际逐 part 回放同一消息，因此前七片依次被后一片覆盖。
+- 修正：未完成的 barrier content part 改为覆盖感知合并：live 正文已包含该片时保留完整正文，累计回放更丰富时升级，彼此独立时顺序追加；只有携带正文且 `isComplete` 的整条权威帧才整体替换。空 terminal 仅负责完成，不改正文。
+- 回归：新增与现场一致的“完整 live 正文 + 同稳定 ID 的 8 段 barrier 回放 + 空 terminal”测试，旧实现稳定失败并只剩最后 7 字，修正后保持单一完整 Assistant；相关 5 文件 / 390 项及 TypeScript 检查通过。
+
 ## 2026-08-09 修复：状态刷新不再把流式正文截成最后一片（v2.21.16）
 
 - 现场快照：新一轮正文实际按 15 个连续 offset 分片完整输出 93 字，但每个分片之间都夹有 `agent.status.updated`；日志中正文 anchor 持续前进而 `accChars` 每次都回到 0，最终正式时间线只剩最后一个“？”。`prompt.completed` 后 Host 又对普通提示无条件保留 30 秒续轮 grace，界面因此停在“消息处理中”，随后 canonical repair 才恢复完整正文。

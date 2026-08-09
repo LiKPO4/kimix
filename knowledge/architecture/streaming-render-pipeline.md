@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T20:15:00+08:00"
+timestamp: "2026-08-09T20:42:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -119,6 +119,16 @@ boundary. Completion presentation requires this formal `isComplete` evidence;
 briefly disappear while only a tail fragment is formal. Canonical history may
 later replace the body, but reconciliation must retain a reliable local
 duration when the canonical Assistant omits it.
+
+The Server completion barrier may replay one official Assistant message as
+several `content.part` frames sharing a stable message id before an empty
+terminal. A part is not a whole-message snapshot. Binding it to a complete live
+draft must use coverage-aware accumulation: keep the live body when it already
+contains the part, upgrade to a richer cumulative replay, otherwise append the
+next part. Replacing on every barrier part collapses a complete answer to the
+last sentence for the interval before canonical repair. Only a content-bearing
+`isComplete` whole-message frame may authoritatively replace the body; the empty
+terminal only closes it.
 
 The draft identity may legitimately strengthen during one dispatch: the first
 token can be scoped by a renderer-created turn id and a later frame by the

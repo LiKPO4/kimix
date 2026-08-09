@@ -252,6 +252,30 @@ export function mergeAssistantContentWithOffset(
   return first.content + secondSuffix;
 }
 
+/**
+ * Completion-barrier history is emitted as several content.part frames with
+ * one stable message id before its empty terminal. Those parts are not full
+ * snapshots: replacing the bound live body on every part leaves only the last
+ * sentence until a later canonical repair. Preserve whichever side already
+ * covers the other; otherwise append the next part. A content-bearing complete
+ * frame remains an authoritative whole-message replacement.
+ */
+function mergeCompletionBarrierContent(
+  target: { content: string; streamOffset?: number },
+  incoming: { content: string; streamOffset?: number; isComplete?: boolean },
+): string {
+  if (!incoming.content) return target.content;
+  if (incoming.isComplete) return incoming.content;
+  if (target.content.includes(incoming.content)) return target.content;
+  if (incoming.content.includes(target.content)) return incoming.content;
+  // A cumulative replay may revise only the live fragment's trailing
+  // punctuation ("如下：" → "如下（已核对）："). Treat a substantial
+  // punctuation-trimmed prefix as the richer replacement, not concatenation.
+  const targetStem = target.content.replace(/[\s\p{P}\p{S}]+$/gu, "");
+  if (targetStem.length >= 8 && incoming.content.startsWith(targetStem)) return incoming.content;
+  return mergeAssistantContentWithOffset(target, incoming);
+}
+
 type AssistantThinkingPart = NonNullable<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>[number];
 
 /** Collapse whitespace so live deltas and snapshot replays compare equal despite formatting drift. */
@@ -2191,7 +2215,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           // multi-part / multi-step frames. Replacing thinkingParts with the latest
           // frame alone drops earlier tool-step thoughts (only the last "N 个工具调用"
           // row remains visible).
-        const replaceCanonicalBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
+        const hasCompletionBarrierBody = incoming.completionBarrierReplay === true && Boolean(incoming.content);
         const result = [...existing];
         result[stableAssistantIndex] = {
           ...target,
@@ -2201,8 +2225,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           streamOffset: target.streamOffset !== undefined || incoming.streamOffset !== undefined
             ? Math.min(target.streamOffset ?? Infinity, incoming.streamOffset ?? Infinity)
             : undefined,
-          content: replaceCanonicalBody
-            ? incoming.content
+          content: hasCompletionBarrierBody
+            ? mergeCompletionBarrierContent(target, incoming)
             : mergeAssistantContentWithOffset(target, incoming),
             thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
             thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
@@ -2250,7 +2274,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           completionBarrierReplay: true,
           agentRole: incoming.agentRole ?? target.agentRole,
           model: incoming.model ?? target.model,
-          content: incoming.content || target.content,
+          content: mergeCompletionBarrierContent(target, incoming),
           thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
           thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
           isThinking: target.isThinking || Boolean(incoming.thinking),
