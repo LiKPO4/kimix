@@ -2,6 +2,7 @@ import {
   parseUiStyleDocument,
   UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
+  UI_STYLE_DESCRIPTION_MAX_LENGTH,
   type UiStyleDocumentV1,
   type UiStyleRole,
   type UiStyleRoleId,
@@ -196,7 +197,13 @@ export function normalizeCustomUiStyleDocuments(value: unknown): UiStyleDocument
   if (!Array.isArray(value)) return [];
   const byId = new Map<string, UiStyleDocumentV1>();
   for (const item of value) {
-    const document = canonicalizeCustomUiStyleDocument(item);
+    const migratedItem = item && typeof item === "object" && !Array.isArray(item) && typeof (item as { description?: unknown }).description === "string"
+      ? {
+          ...item,
+          description: (item as { description: string }).description.trim().slice(0, UI_STYLE_DESCRIPTION_MAX_LENGTH),
+        }
+      : item;
+    const document = canonicalizeCustomUiStyleDocument(migratedItem);
     if (document) byId.set(document.id, document);
   }
   return [...byId.values()];
@@ -218,7 +225,7 @@ export function buildUiStyleAiPrompt() {
     "1. 只分析形状、圆角、边框宽度、浮雕/内凹/悬浮层次、控件状态与动效倾向。",
     "2. 忽略参考图中的颜色、字体、间距和布局；JSON 中禁止出现颜色值、CSS、选择器、url() 或脚本。",
     "3. schemaVersion 必须是 1；id 只能使用小写字母、数字、点、下划线和连字符。",
-    "4. description 必须简洁，不超过 48 个中文字符；只概括最有辨识度的形状与质感，不逐项罗列控件。",
+    `4. description 必须简洁，硬性上限为 ${UI_STYLE_DESCRIPTION_MAX_LENGTH} 个字符（包含标点与空格），超出后 Kimix 会拒绝导入；只概括最有辨识度的形状与质感，不逐项罗列控件。`,
     "5. basedOn 只能是 default、modern、retro、nostalgia 之一。",
     "6. roles 只写你有意改变的角色；未写角色由 basedOn 自动继承。禁止新增下列目录之外的角色，也不要为了看起来完整而机械重写全部角色。",
     "7. 角色触点目录：",

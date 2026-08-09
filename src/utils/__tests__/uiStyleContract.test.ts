@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileUiStyleVariables,
   parseUiStyleDocument,
+  UI_STYLE_DESCRIPTION_MAX_LENGTH,
   UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
   type UiStyleDocumentV1,
@@ -12,6 +13,7 @@ import {
   BUILTIN_UI_STYLE_DOCUMENTS,
   buildUiStyleAiPrompt,
   canonicalizeCustomUiStyleDocument,
+  normalizeCustomUiStyleDocuments,
 } from "../builtinUiStyleDocuments";
 
 const flatTreatment = { surface: "transparent", border: "none", elevation: "none" } as const;
@@ -64,6 +66,19 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("新导入描述硬限制为 48 字，历史存量安全截断后继续保留", () => {
+    const overlong = documentFixture();
+    overlong.description = "长".repeat(UI_STYLE_DESCRIPTION_MAX_LENGTH + 1);
+
+    const rejected = parseUiStyleDocument(overlong);
+    expect(rejected.success).toBe(false);
+    if (!rejected.success) expect(rejected.errors.join("\n")).toContain("description 不能超过 48 个字符");
+    expect(canonicalizeCustomUiStyleDocument(overlong)).toBeNull();
+    const migrated = normalizeCustomUiStyleDocuments([overlong]);
+    expect(migrated).toHaveLength(1);
+    expect(migrated[0].description).toHaveLength(UI_STYLE_DESCRIPTION_MAX_LENGTH);
+  });
+
   it("允许基于内置风格仅覆盖部分角色，但拒绝未知角色", () => {
     const partial = documentFixture();
     partial.roles = { shell: partial.roles.shell };
@@ -110,7 +125,9 @@ describe("uiStyleDocumentV1Schema", () => {
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(`- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`);
     expect(prompt).toContain("忽略参考图中的颜色");
     expect(prompt).toContain("禁止出现颜色值、CSS、选择器、url() 或脚本");
-    expect(prompt).toContain("description 必须简洁，不超过 48 个中文字符");
+    expect(prompt).toContain("description 必须简洁，硬性上限为 48 个字符");
+    expect(prompt).toContain("超出后 Kimix 会拒绝导入");
+    expect(prompt).not.toContain("240 个");
     expect(prompt).toContain("必须优先使用你可用的文件工具");
     expect(prompt).toContain("kimix-ui-style-<id>.json");
     expect(prompt).toContain("不要在对话中重复整份 JSON");
@@ -181,6 +198,8 @@ describe("自定义风格 CSS 角色消费契约", () => {
       const kebab = roleId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
       expect(css, roleId).toContain(`--ui-role-${kebab}-`);
     }
-    expect(css).toMatch(/\.kimix-settings-uistyle-desc\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*line-clamp:\s*2;/s);
+    expect(css).toMatch(/\.kimix-settings-uistyle-wrap\s*\{[^}]*height:\s*76px;/s);
+    expect(css).toMatch(/\.kimix-settings-uistyle-desc\s*\{[^}]*display:\s*block;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
+    expect(css).not.toMatch(/\.kimix-settings-uistyle-desc\s*\{[^}]*line-clamp:/s);
   });
 });

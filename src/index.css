@@ -4539,6 +4539,7 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-settings-uistyle-wrap {
   position: relative;
+  height: 76px;
   min-width: 0;
 }
 
@@ -4613,11 +4614,11 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-uistyle-desc {
-  display: -webkit-box;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;

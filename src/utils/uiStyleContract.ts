@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const UI_STYLE_SCHEMA_VERSION = 1 as const;
+export const UI_STYLE_DESCRIPTION_MAX_LENGTH = 48 as const;
 
 export const UI_STYLE_ROLE_IDS = [
   "shell",
@@ -111,7 +112,10 @@ export const uiStyleDocumentV1Schema = z.object({
   schemaVersion: z.literal(UI_STYLE_SCHEMA_VERSION),
   id: z.string().trim().min(1).max(64).regex(/^[a-z0-9][a-z0-9._-]*$/),
   name: z.string().trim().min(1).max(80),
-  description: z.string().trim().max(240).default(""),
+  description: z.string().trim().max(
+    UI_STYLE_DESCRIPTION_MAX_LENGTH,
+    `description 不能超过 ${UI_STYLE_DESCRIPTION_MAX_LENGTH} 个字符`,
+  ).default(""),
   author: z.string().trim().max(80).optional(),
   basedOn: z.enum(["default", "modern", "retro", "nostalgia"]),
   primitives: z.object({

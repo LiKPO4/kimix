@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-09T12:40:00+08:00"
+timestamp: "2026-08-09T12:50:00+08:00"
 ---
 
 # Interface Style System
@@ -29,7 +29,7 @@ Imported documents are parsed in the Electron main process with a JSON-only 256 
 
 * Interface-style root blocks must not assign `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` color tokens. Dark theme color ownership still requires an elevated ladder: ground/base/elevated/hover must stay distinguishable, borders lift toward white (not crush into the fill), and muted text should remain near WCAG AA on elevated surfaces. Dark tokens are produced by `buildDarkTokens` / the `[data-theme="dark"]` baseline, not by style presets. Style rules consume those tokens and may use neutral transparent light/dark overlays only to express depth.
 * The importable V1 consumer layer is opt-in, never a replacement baseline. Only an existing `custom:*` document may set `data-ui-style-contract="v1"` and inline compiled variables. Default must have neither style attribute nor compiled variables; protected built-ins keep only their existing `data-ui-style` identity and dedicated CSS. Switching away from a custom style or failing to resolve one must clear the contract marker and every previously applied inline variable before the fallback renders.
-* Imported style descriptions are metadata, not layout content. Settings cards clamp them to two lines and expose the complete string through a title tooltip; the AI prompt asks for at most 48 Chinese characters so newly generated descriptions remain summaries rather than control-by-control inventories.
+* Imported style descriptions are bounded metadata, not layout content. UI Style v1 rejects new descriptions above 48 characters; persisted pre-limit documents are truncated to 48 during normalization so tightening the schema cannot delete an active custom style. Settings cards are fixed at 76px, render the description as one ellipsized line, and expose the complete normalized string through a title tooltip. The AI prompt declares the same hard limit and warns that longer files are rejected.
 * Visual treatment is assigned by component role, not by global element selectors. Rules such as `[data-ui-style] button`, `[data-ui-style] textarea`, or a global `.kimix-icon-text-button` skin are prohibited because the same primitives serve unrelated roles across navigation, forms, dialogs, and primary actions.
 * A nested control has one visible boundary owner. In the Composer, `.kimix-composer-card` owns border, focus, and elevation; `.kimix-composer-input` remains borderless and transparent. Settings inputs own their own inset boundary because they are standalone fields.
 * The Composer single-boundary rule is enforced below the data contract, not requested from style authors. `.kimix-composer-input` permanently has zero border/radius/shadow and a transparent background across resting/focus/focus-visible; the custom `field` role never selects it. Imported JSON may style only the outer `composer` role, so an AI-generated document cannot recreate the nested textarea frame.
