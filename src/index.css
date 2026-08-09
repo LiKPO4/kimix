@@ -4068,7 +4068,39 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-compound-control-resting-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"] {
+:root[data-ui-style-contract="v1"] :where(.kimix-split-control, .kimix-room-secondary-action):hover {
+  border: var(--ui-role-compound-control-hover-border);
+  background: var(--ui-role-compound-control-hover-background);
+  box-shadow: var(--ui-role-compound-control-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-split-control, .kimix-room-secondary-action):active {
+  border: var(--ui-role-compound-control-active-border);
+  background: var(--ui-role-compound-control-active-background);
+  box-shadow: var(--ui-role-compound-control-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission) {
+  border: var(--ui-role-toggle-resting-border);
+  border-radius: var(--ui-role-toggle-radius);
+  background: var(--ui-role-toggle-resting-background);
+  box-shadow: var(--ui-role-toggle-resting-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):hover:not(:disabled):not([aria-pressed="true"]) {
+  border: var(--ui-role-toggle-hover-border);
+  background: var(--ui-role-toggle-hover-background);
+  box-shadow: var(--ui-role-toggle-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):active:not(:disabled):not([aria-pressed="true"]) {
+  border: var(--ui-role-toggle-active-border);
+  background: var(--ui-role-toggle-active-background);
+  box-shadow: var(--ui-role-toggle-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"],
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"]:hover:not(:disabled) {
   border: var(--ui-role-toggle-selected-border);
   border-radius: var(--ui-role-toggle-radius);
   background: var(--ui-role-toggle-selected-background);
@@ -4077,7 +4109,6 @@ button.bg-accent-primary:disabled:hover,
 
 :root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
-  .kimix-composer-input,
   .kimix-inspector-field
 ) {
   border: var(--ui-role-field-resting-border);
@@ -4088,7 +4119,6 @@ button.bg-accent-primary:disabled:hover,
 
 :root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
-  .kimix-composer-input,
   .kimix-inspector-field
 ):focus {
   border: var(--ui-role-field-focus-border);
@@ -5106,7 +5136,14 @@ button.bg-accent-primary:disabled:hover,
   line-height: 1.45 !important;
 }
 
-.kimix-composer-input {
+.kimix-composer-input,
+.kimix-composer-input:focus,
+.kimix-composer-input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
   scrollbar-width: none;
 }
 

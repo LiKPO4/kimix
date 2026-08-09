@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileUiStyleVariables,
   parseUiStyleDocument,
+  UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
   type UiStyleDocumentV1,
 } from "../uiStyleContract";
@@ -74,6 +75,27 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(parseUiStyleDocument(unknownRole).success).toBe(false);
   });
 
+  it("完整复合按钮遗漏 elevation 时继承普通控件材质，但透明扁平按钮保持 none", () => {
+    const input = documentFixture();
+    input.roles.control = {
+      radius: "medium",
+      resting: { surface: "base", border: "default", elevation: "control" },
+      hover: { surface: "hover", border: "default", elevation: "control" },
+    };
+    input.roles.compoundControl = {
+      radius: "medium",
+      resting: { surface: "base", border: "default", elevation: "none" },
+      hover: { surface: "hover", border: "default", elevation: "none" },
+    };
+    const harmonized = canonicalizeCustomUiStyleDocument(input);
+    expect(harmonized?.roles.compoundControl?.resting.elevation).toBe("control");
+    expect(harmonized?.roles.compoundControl?.hover?.elevation).toBe("control");
+
+    input.roles.compoundControl.resting = { surface: "transparent", border: "none", elevation: "none" };
+    const deliberatelyFlat = canonicalizeCustomUiStyleDocument(input);
+    expect(deliberatelyFlat?.roles.compoundControl?.resting.elevation).toBe("none");
+  });
+
   it("四套内置风格本身就是完整且合法的同版契约", () => {
     for (const document of Object.values(BUILTIN_UI_STYLE_DOCUMENTS)) {
       const result = parseUiStyleDocument(document);
@@ -85,6 +107,7 @@ describe("uiStyleDocumentV1Schema", () => {
   it("AI 提示由当前角色目录生成、禁止自由 CSS 并优先要求创建 JSON 文件", () => {
     const prompt = buildUiStyleAiPrompt();
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(roleId);
+    for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(`- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`);
     expect(prompt).toContain("忽略参考图中的颜色");
     expect(prompt).toContain("禁止出现颜色值、CSS、选择器、url() 或脚本");
     expect(prompt).toContain("description 必须简洁，不超过 48 个中文字符");
@@ -92,6 +115,10 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("kimix-ui-style-<id>.json");
     expect(prompt).toContain("不要在对话中重复整份 JSON");
     expect(prompt).toContain("只有当当前环境确实没有文件写入能力时");
+    expect(prompt).toContain("未写角色由 basedOn 自动继承");
+    expect(prompt).toContain("Composer 内层 textarea 永远无边框");
+    expect(prompt).toContain("顶部 compoundControl 默认也应使用同类 elevation");
+    expect(prompt).toContain("toggle 必须分别考虑 resting、hover、active、selected");
     expect(prompt).toContain('"schemaVersion": 1');
   });
 });
@@ -126,6 +153,12 @@ describe("自定义风格 CSS 角色消费契约", () => {
     expect(css).toContain(':root[data-ui-style-contract="v1"] .kimix-app-shell-main');
     expect(css).not.toContain('@scope (:root[data-ui-style-contract="v1"])');
     expect(css).not.toContain(":is(:root:not([data-ui-style]), [data-ui-style])");
+    const customFieldSelectors = css.match(/:root\[data-ui-style-contract="v1"\]\s+:where\(\s*\.kimix-settings-input,\s*\.kimix-inspector-field\s*\)(?::focus)?\s*\{/g) ?? [];
+    expect(customFieldSelectors).toHaveLength(2);
+    expect(customFieldSelectors.join("\n")).not.toContain(".kimix-composer-input");
+    expect(css).toMatch(/\.kimix-composer-input,[\s\S]*?\.kimix-composer-input:focus-visible\s*\{[^}]*border:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;[^}]*box-shadow:\s*none\s*!important;/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-split-control[\s\S]*?:hover[\s\S]*?--ui-role-compound-control-hover-shadow/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-state-button[\s\S]*?:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)[\s\S]*?--ui-role-toggle-hover-shadow/s);
     for (const roleId of UI_STYLE_ROLE_IDS) {
       const kebab = roleId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
       expect(css, roleId).toContain(`--ui-role-${kebab}-`);

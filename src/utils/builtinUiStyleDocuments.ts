@@ -1,5 +1,6 @@
 import {
   parseUiStyleDocument,
+  UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
   type UiStyleDocumentV1,
   type UiStyleRole,
@@ -159,13 +160,35 @@ export function getBuiltinUiStyleDocument(id: BuiltinUiStyleId) {
   return BUILTIN_UI_STYLE_DOCUMENTS[id];
 }
 
+function harmonizeCompoundControlElevation(
+  roles: Record<UiStyleRoleId, UiStyleRole>,
+): Record<UiStyleRoleId, UiStyleRole> {
+  const control = roles.control;
+  const compoundControl: UiStyleRole = { ...roles.compoundControl };
+  for (const state of ["resting", "hover", "active"] as const) {
+    const compoundTreatment = state === "resting"
+      ? compoundControl.resting
+      : compoundControl[state] ?? compoundControl.resting;
+    const controlTreatment = state === "resting"
+      ? control.resting
+      : control[state] ?? control.resting;
+    const hasCompletePlate = compoundTreatment.surface !== "transparent" && compoundTreatment.border !== "none";
+    if (!hasCompletePlate || compoundTreatment.elevation !== "none" || controlTreatment.elevation === "none") continue;
+    const nextTreatment = { ...compoundTreatment, elevation: controlTreatment.elevation };
+    if (state === "resting") compoundControl.resting = nextTreatment;
+    else if (compoundControl[state]) compoundControl[state] = nextTreatment;
+  }
+  return { ...roles, compoundControl };
+}
+
 export function canonicalizeCustomUiStyleDocument(value: unknown): UiStyleDocumentV1 | null {
   const parsed = parseUiStyleDocument(value);
   if (!parsed.success) return null;
   const base = BUILTIN_UI_STYLE_DOCUMENTS[parsed.data.basedOn];
+  const mergedRoles = { ...base.roles, ...parsed.data.roles } as Record<UiStyleRoleId, UiStyleRole>;
   return {
     ...parsed.data,
-    roles: { ...base.roles, ...parsed.data.roles },
+    roles: harmonizeCompoundControlElevation(mergedRoles),
   };
 }
 
@@ -197,15 +220,19 @@ export function buildUiStyleAiPrompt() {
     "3. schemaVersion 必须是 1；id 只能使用小写字母、数字、点、下划线和连字符。",
     "4. description 必须简洁，不超过 48 个中文字符；只概括最有辨识度的形状与质感，不逐项罗列控件。",
     "5. basedOn 只能是 default、modern、retro、nostalgia 之一。",
-    "6. roles 必须完整保留下列全部角色，不能删除或新增角色：",
-    UI_STYLE_ROLE_IDS.join(", "),
-    "7. radius 引用只能是 small、medium、large、card、panel、shell、pill。",
-    "8. surface 只能是 transparent、ground、base、elevated、hover、active。",
-    "9. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",
-    "10. elevation.kind 只能是 flat、raised、floating、inset；所有数值必须保持在模板展示的合理量级内。",
-    "11. 完成 JSON 后，必须优先使用你可用的文件工具在当前工作目录创建 `kimix-ui-style-<id>.json`；`<id>` 使用最终 JSON 中的 id。文件必须是 UTF-8 编码的纯 JSON，不得包含 Markdown 代码围栏或 JSON 注释。",
-    "12. 文件创建成功后，不要在对话中重复整份 JSON，只需简洁说明已创建并给出可点击或可复制的文件路径。",
-    "13. 只有当当前环境确实没有文件写入能力时，才允许降级为在对话中输出一个 JSON 代码块，并明确说明未能创建文件。",
+    "6. roles 只写你有意改变的角色；未写角色由 basedOn 自动继承。禁止新增下列目录之外的角色，也不要为了看起来完整而机械重写全部角色。",
+    "7. 角色触点目录：",
+    ...UI_STYLE_ROLE_IDS.map((roleId) => `- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`),
+    "8. Composer 内层 textarea 永远无边框、无背景、无阴影；输入区质感只能配置 composer 外壳，禁止试图通过 field 制造第二层边界。",
+    "9. 如果普通 control 使用 raised/floating 材质，顶部 compoundControl 默认也应使用同类 elevation；只有参考图明确把分段按钮设计为扁平时才设为 none。",
+    "10. toggle 必须分别考虑 resting、hover、active、selected，确保 Swarm/Plan 悬停可辨且不会与选中态混淆。",
+    "11. radius 引用只能是 small、medium、large、card、panel、shell、pill。",
+    "12. surface 只能是 transparent、ground、base、elevated、hover、active。",
+    "13. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",
+    "14. elevation.kind 只能是 flat、raised、floating、inset；所有数值必须保持在模板展示的合理量级内。",
+    "15. 完成 JSON 后，必须优先使用你可用的文件工具在当前工作目录创建 `kimix-ui-style-<id>.json`；`<id>` 使用最终 JSON 中的 id。文件必须是 UTF-8 编码的纯 JSON，不得包含 Markdown 代码围栏或 JSON 注释。",
+    "16. 文件创建成功后，不要在对话中重复整份 JSON，只需简洁说明已创建并给出可点击或可复制的文件路径。",
+    "17. 只有当当前环境确实没有文件写入能力时，才允许降级为在对话中输出一个 JSON 代码块，并明确说明未能创建文件。",
     "",
     "请以这份完整模板为结构生成结果：",
     "```json",

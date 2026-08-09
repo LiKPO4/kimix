@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：Composer 单边界、模式键状态与复合按钮材质（v2.20.308）
+
+- 输入内线根因：自定义 `field` 消费选择器错误包含 `.kimix-composer-input`，与 `composer` 外壳同时拥有边界，形成双框。修复将内层 textarea 永久固定为 border/radius/background/shadow/outline = 0/transparent，且 field 只覆盖独立设置/检查器字段，JSON 无法重新制造内线。
+- Swarm/Plan 根因：V1 toggle 只消费 `aria-pressed=true`，resting/hover/active 三态完全漏接。现补齐四态且 hover 排除已选中项，选中态在 hover 时保持自身材质。
+- 启动/打开根因：组件已消费 compoundControl，但 Luna JSON 明确把完整表面按钮的 resting/hover elevation 写为 none；提示此前只有角色名且强迫 AI 重写全部角色，容易盲猜不一致。提示新增 29 角色触点目录、Composer 单边界/compound/toggle 一致性规则，并允许未覆盖角色继承 basedOn。
+- 兼容现有配置：规范化阶段仅在 compoundControl 已有非透明完整表面+边框、普通 control 有材质而 compound elevation 独缺时，继承同状态 control elevation；真正 transparent+border none 的扁平复合按钮仍保留 none。现有 Luna 无需重导入，运行态已确认 textarea 零边界、Swarm hover 内凹材质、split hover 凸起高光与投影。
+- 验证：定向契约/风格 2 文件 29 项、最终全量 174 文件 1847 项、Node/Renderer typecheck、生产构建（main `702.26 kB`、renderer CSS `assets/index-B-Be-sDv.css`、JS `assets/index-CLDZ8FWI.js`）、OKF strict（14 concepts、475 links）与 180 天审计通过；Luna 运行态用 CDP 强制 hover 量化核对 input/state/split 三类计算样式，最终视觉待用户在 v2.20.308 截图复验。
+
 ## 2026-08-09 修复：自定义风格消费规则真正生效并收紧描述卡片（v2.20.307）
 
 - 现象一：自定义风格的长 description 完整铺开，Windows XP Luna 卡片达到 8 行并撑高整行。修复为最多两行（36px）截断，完整说明保留在 title；AI 生成提示同时限制后续 description 不超过 48 个中文字符。

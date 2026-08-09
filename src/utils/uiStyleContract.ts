@@ -36,6 +36,39 @@ export const UI_STYLE_ROLE_IDS = [
 
 export type UiStyleRoleId = typeof UI_STYLE_ROLE_IDS[number];
 
+/** AI 提示与文档共用的角色触点目录；描述业务归属，不允许 JSON 携带选择器。 */
+export const UI_STYLE_ROLE_GUIDE: Record<UiStyleRoleId, string> = {
+  shell: "应用主内容外壳",
+  toolbar: "顶部与底部工具栏表面",
+  navigationItem: "侧栏项目、会话和设置导航项",
+  navigationAction: "侧栏新增、刷新等图标操作",
+  control: "普通工具按钮、窗口按钮和次要操作",
+  primaryAction: "发送、保存等主要操作",
+  compoundControl: "顶部启动与打开文件的分段复合按钮",
+  toggle: "Composer 中的 Swarm、Plan 等模式开关",
+  field: "设置输入框与独立表单字段；不包括 Composer 内层 textarea",
+  card: "普通内容卡片",
+  interactiveCard: "可点击或可选择卡片",
+  strongCard: "需要更强层次的主卡片",
+  sectionCard: "侧栏检查器与内容分区卡",
+  insetSection: "卡片内部的内嵌内容区",
+  eventCard: "审批、问题、错误等事件卡",
+  popup: "弹出面板与下拉面板",
+  menuTrigger: "菜单标题和菜单触发按钮",
+  menuItem: "菜单中的可操作条目",
+  modal: "模态框与引导卡外壳",
+  composer: "Composer 整体输入外壳；它是输入区唯一边界所有者",
+  userBubble: "用户消息气泡",
+  statusSurface: "状态胶囊与行内状态面",
+  codeBlock: "Markdown 代码块",
+  table: "Markdown 表格外框",
+  mediaThumb: "图片与媒体缩略图",
+  inspector: "检查器、Diff 和模型侧栏",
+  toast: "通知和对话导航预览",
+  dock: "底部停靠面板与胶囊",
+  roomChoice: "多 Agent 房间中的模型、权限和范围选项",
+};
+
 const radiusTokenSchema = z.enum(["small", "medium", "large", "card", "panel", "shell", "pill"]);
 const surfaceTokenSchema = z.enum(["transparent", "ground", "base", "elevated", "hover", "active"]);
 const borderTokenSchema = z.enum(["none", "subtle", "default", "strong"]);
