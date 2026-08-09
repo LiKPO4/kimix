@@ -40,6 +40,9 @@ describe("probeThinkingEfforts", () => {
       calls.push(body);
       const effort = body.reasoning_effort as string | undefined;
       if (effort === undefined) return jsonResponse(200, { id: "cmpl-1" });
+      if (!(["minimal", "low", "medium", "high", "xhigh", "max"] as string[]).includes(effort)) {
+        return jsonResponse(400, { error: { message: "unsupported reasoning_effort" } });
+      }
       if (effort === "max") {
         return jsonResponse(400, { error: { message: "'reasoning_effort' must be one of: 'none', 'minimal', 'low', 'medium', 'high', 'xhigh'" } });
       }
@@ -52,8 +55,8 @@ describe("probeThinkingEfforts", () => {
     );
     expect(result.supported).toEqual(["minimal", "low", "medium", "high", "xhigh"]);
     expect(result.supported).not.toContain("max");
-    // 基线 1 次 + 6 个候选 = 7 次请求
-    expect(calls).toHaveLength(7);
+    // 基线 1 次 + 无效值对照 1 次 + 6 个候选 = 8 次请求
+    expect(calls).toHaveLength(8);
   });
 
   it("凭证被拒绝时整体失败", async () => {
@@ -75,5 +78,33 @@ describe("probeThinkingEfforts", () => {
       fetchMock,
     );
     expect(result.supported).toEqual([]);
+  });
+
+  it("供应商静默忽略 reasoning_effort 时不误报全档位支持", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const fetchMock = (async (_url: string, init?: RequestInit) => {
+      calls.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return jsonResponse(200, { id: "ok" });
+    }) as typeof fetch;
+
+    await expect(probeThinkingEfforts(
+      { baseUrl: "https://example.com/v1", apiKey: "k", model: "m" },
+      fetchMock,
+    )).rejects.toThrow("无效 reasoning_effort 也返回成功");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("兼容使用 422 拒绝无效档位的供应商", async () => {
+    const fetchMock = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (body.reasoning_effort === undefined) return jsonResponse(200, { id: "ok" });
+      if (body.reasoning_effort === "high") return jsonResponse(200, { id: "ok" });
+      return jsonResponse(422, { error: { message: "invalid reasoning_effort" } });
+    }) as typeof fetch;
+    const result = await probeThinkingEfforts(
+      { baseUrl: "https://example.com/v1", apiKey: "k", model: "m" },
+      fetchMock,
+    );
+    expect(result.supported).toEqual(["high"]);
   });
 });

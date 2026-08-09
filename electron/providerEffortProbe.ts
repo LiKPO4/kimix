@@ -2,6 +2,7 @@
 // 取值是否被接受，回填模型 support_efforts。复用 providerModelDiscovery 的
 // URL 构建与错误解析模式。
 const EFFORT_PROBE_TIMEOUT_MS = 15_000;
+const INVALID_EFFORT_CONTROL = "__kimix_invalid_effort__";
 
 /** 候选探测档位（OpenAI 兼容词表，不含 none/off——关闭恒可用，由调用方补）。 */
 export const EFFORT_PROBE_CANDIDATES = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -94,7 +95,8 @@ export type EffortProbeResult = {
 
 /**
  * 先发一个不带 reasoning_effort 的基线请求确认连通/凭证/端点；
- * 再逐个候选档位探测，200 记为支持，400 记为不支持，凭证/端点错误则整体失败。
+ * 再用一个必然无效的档位确认供应商确实校验该字段，避免把“静默忽略字段”误判为全部支持；
+ * 最后逐个候选档位探测，2xx 记为支持，400/422 记为不支持，凭证/端点错误则整体失败。
  */
 export async function probeThinkingEfforts(
   input: { baseUrl: string; apiKey: string; model: string },
@@ -112,15 +114,24 @@ export async function probeThinkingEfforts(
         failures.push(`${new URL(endpoint).pathname}: HTTP ${baseline.status}${baseline.detail ? ` · ${baseline.detail}` : ""}`);
         continue;
       }
+      const control = await postCompletion(endpoint, input.apiKey, input.model, INVALID_EFFORT_CONTROL, fetchImpl);
+      if (control.ok) {
+        throw new Error(
+          "供应商对无效 reasoning_effort 也返回成功，说明该字段可能被静默忽略，无法通过请求可靠探测；请使用官方目录预填或手动声明。",
+        );
+      }
+      if (control.status !== 400 && control.status !== 422) {
+        throw new Error(`无效档位对照请求失败（HTTP ${control.status}）`);
+      }
       const supported: string[] = [];
       for (const effort of EFFORT_PROBE_CANDIDATES) {
         const result = await postCompletion(endpoint, input.apiKey, input.model, effort, fetchImpl);
         if (result.ok) {
           supported.push(effort);
-        } else if (result.status === 400 && isEffortRelatedError(result.detail)) {
+        } else if ((result.status === 400 || result.status === 422) && isEffortRelatedError(result.detail)) {
           // 该档位被拒，跳过。
-        } else if (result.status === 400) {
-          // 非 effort 相关 400：保守视为该档位不可用，继续。
+        } else if (result.status === 400 || result.status === 422) {
+          // 非 effort 相关的请求校验失败：保守视为该档位不可用，继续。
         } else {
           // 其它状态（5xx/401 等）无法判定，记失败但继续其余档位。
           failures.push(`${new URL(endpoint).pathname} [${effort}]: HTTP ${result.status}`);
