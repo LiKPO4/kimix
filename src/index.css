@@ -3076,8 +3076,8 @@ button.bg-accent-primary:disabled:hover,
   z-index: 2;
   width: 12px;
   flex: 0 0 12px;
-  /* 保留 12px 拖拽热区，但让它对称覆盖分界线，不占据面板间的布局宽度。 */
-  margin-inline: -6px;
+  /* 保留 12px 拖拽热区，但覆盖到后继面板内，不占布局宽度、也不抢前一面板的滚动条。 */
+  margin-right: -12px;
   cursor: col-resize;
   touch-action: none;
   -webkit-app-region: no-drag;
@@ -3093,7 +3093,7 @@ button.bg-accent-primary:disabled:hover,
   position: absolute;
   top: 16px;
   bottom: 16px;
-  left: 5px;
+  left: -1px;
   width: 2px;
   border-radius: 999px;
   background: transparent;

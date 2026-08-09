@@ -10,7 +10,10 @@ describe("layout resizer styles", () => {
 
     expect(rule).toContain("width: 12px");
     expect(rule).toContain("flex: 0 0 12px");
-    expect(rule).toContain("margin-inline: -6px");
+    expect(rule).toContain("margin-right: -12px");
     expect(rule).toContain("z-index: 2");
+
+    const indicatorRule = css.match(/\.kimix-layout-resizer::after\s*\{([^}]*)\}/s)?.[1] ?? "";
+    expect(indicatorRule).toContain("left: -1px");
   });
 });
