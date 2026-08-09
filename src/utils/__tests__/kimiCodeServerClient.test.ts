@@ -1971,7 +1971,7 @@ describe("snapshot tool replay failure flag", () => {
     ));
     expect(textFrames).toHaveLength(1);
     expect((textFrames[0].payload as { part: { text: string }; kimixPromptCompletionFullBody?: boolean }).part.text)
-      .toBe("第一段正文\n第二段正文");
+      .toBe("第一段正文第二段正文");
     expect((textFrames[0].payload as { kimixPromptCompletionFullBody?: boolean }).kimixPromptCompletionFullBody).toBe(true);
     const live = reduceKimiCodeEvents([], [{
       type: "assistant.delta",
@@ -1983,7 +1983,7 @@ describe("snapshot tool replay failure flag", () => {
     const assistants = replayed.filter((event) => event.type === "assistant_message");
     expect(assistants).toHaveLength(1);
     const assistant = assistants.find((event) => event.snapshotMessageId === "assistant-full");
-    expect(assistant && assistant.type === "assistant_message" ? assistant.content : "").toBe("第一段正文\n第二段正文");
+    expect(assistant && assistant.type === "assistant_message" ? assistant.content : "").toBe("第一段正文第二段正文");
   });
 });
 

@@ -15,6 +15,8 @@ The Server completion barrier reads the persisted `/messages` record after the v
 
 The replacement invariant also applies when the volatile draft has no snapshot identity yet. The first completion replay binds its stable `snapshotMessageId` to that draft and must preserve the full-body marker through the binding branch; identity acquisition is not a content boundary and must never turn authoritative replacement into append.
 
+When aggregating persisted text parts for that full body, concatenate parts without an inserted separator. Server parts already carry the exact whitespace and line breaks; adding `\n` between them changes short poetry/code fragments into artificial one-line paragraphs.
+
 Streaming scroll performance is governed as three isolated layers: sparse/local
 writes, cheap active-block rendering, and viewport work that yields to user
 scrolling. The full plan and acceptance criteria live in

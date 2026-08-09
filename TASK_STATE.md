@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：完成回放不再人为插入短句换行（v2.21.21）
+
+- 现场快照：官方 `/messages` 的 text part 已携带真实换行；v2.21.20 聚合时使用 `join("\\n")`，每个短 part 又被插入一条换行，界面变成“春夜/庭前/樱初开…”逐行断句。
+- 修正：完成回放恢复为 text part 原文直接连接（`join("")`），不添加协议不存在的分隔符；原 part 内换行保持不变。
+- 回归：完成回放多 part 测试锁定不产生额外换行；事件快照见 `docs/issue-streaming-short-lines-v22120-events-snapshot.md`。
+
 ## 2026-08-09 修复：live 草稿首次绑定权威整文时不再追加（v2.21.20）
 
 - 现场快照：本轮 volatile `assistant.delta` offset 从 0 连续到 128，官方 `/messages` 也只有一个 128 字 Assistant；完成屏障后 UI 却变成 285 字，约 2.5 秒 canonical repair 后恢复 128 字。

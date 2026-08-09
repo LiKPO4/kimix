@@ -2458,7 +2458,10 @@ function contentPartsToFrames(
     if (typeof part === "string") return part;
     if (!isRecord(part)) return "";
     return part.type === "text" && typeof part.text === "string" ? part.text : "";
-  }).filter(Boolean).join("\n");
+  // Server text parts already carry their own leading/trailing whitespace and
+  // line breaks. Completion replay must reconstruct the exact persisted body;
+  // inserting a separator here turns every short part into a new visual line.
+  }).filter(Boolean).join("");
   if (!text) return frames;
   const firstTextIndex = frames.findIndex((frame) => isRecord(frame.payload) && isRecord(frame.payload.part) && frame.payload.part.type === "text");
   if (firstTextIndex === -1) return frames;
