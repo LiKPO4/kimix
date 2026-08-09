@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { matchCatalogModel, matchCatalogProvider, prefillFromCatalog } from "../modelProviderConfig";
+import { buildModelMetadataAiQuestion, matchCatalogModel, matchCatalogProvider, prefillFromCatalog } from "../modelProviderConfig";
 
 const catalog = [
   { id: "qwen3.8-max", maxContextSize: 1_000_000, supportEfforts: ["low", "high"] },
   { id: "gpt-5.1", maxContextSize: 400_000, supportEfforts: [] },
   { id: "Unknown-Case-Model", maxContextSize: 128_000 },
 ];
+
+describe("buildModelMetadataAiQuestion", () => {
+  it("includes the provider, Base URL and model identity without inviting guesses", () => {
+    const question = buildModelMetadataAiQuestion({
+      providerName: "opencode-go",
+      baseUrl: "https://opencode.ai/zen/go/v1?api_key=secret#private",
+      modelId: "mimo-v2.5",
+      modelAlias: "opencode-go/mimo-v2.5",
+      missingFields: ["efforts"],
+      matchResult: "models.dev 已返回 Context 1000000，但未声明档位",
+      currentContextSize: "262144",
+      currentSupportEfforts: ["high"],
+      currentDefaultEffort: "high",
+    });
+    expect(question).toContain("供应商：opencode-go");
+    expect(question).toContain("Base URL：https://opencode.ai/zen/go/v1");
+    expect(question).not.toContain("secret");
+    expect(question).not.toContain("private");
+    expect(question).toContain("模型名称/ID：mimo-v2.5");
+    expect(question).toContain("Kimix 模型别名：opencode-go/mimo-v2.5");
+    expect(question).toContain("reasoning_effort");
+    expect(question).toContain("Kimix 目录匹配结果：models.dev 已返回 Context 1000000，但未声明档位");
+    expect(question).toContain("当前 Context：262144");
+    expect(question).toContain("当前思考档位：high");
+    expect(question).not.toContain("最大上下文窗口是多少");
+    expect(question).toContain("无法可靠确认的字段请明确写“未知”");
+  });
+});
 
 describe("matchCatalogProvider", () => {
   const providers = [

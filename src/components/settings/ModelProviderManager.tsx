@@ -19,6 +19,7 @@ import type {
   KimiProviderCatalogEntrySummary,
 } from "@electron/types/ipc";
 import {
+  buildModelMetadataAiQuestion,
   chooseInitialModelProvider,
   defaultModelAliasForProvider,
   groupModelsByProvider,
@@ -433,8 +434,33 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
   };
 
   const handleProbeEfforts = async () => {
+    const copyAiQuestion = async (
+      missingFields: readonly ("context" | "efforts")[],
+      matchResult: string,
+    ) => {
+      const question = buildModelMetadataAiQuestion({
+        providerName: providerDraft.providerName,
+        baseUrl: providerDraft.baseUrl,
+        modelId: modelDraft.model,
+        modelAlias: modelDraft.modelAlias || selectedModelAlias,
+        missingFields,
+        matchResult,
+        currentContextSize: modelDraft.maxContextSize,
+        currentSupportEfforts: modelDraft.supportEfforts,
+        currentDefaultEffort: modelDraft.defaultEffort,
+      });
+      try {
+        await navigator.clipboard.writeText(question);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     if (!selectedModelAlias) {
-      setModelFormMessage("请先保存模型，再匹配目录中的模型信息。");
+      const copied = await copyAiQuestion(["context", "efforts"], "模型尚未保存，未执行目录匹配");
+      setModelFormMessage(copied
+        ? "请先保存模型再匹配目录。已自动复制模型信息提问词，可直接粘贴给 AI 查询。"
+        : "请先保存模型再匹配目录；自动复制提问词失败，请检查剪贴板权限。");
       return;
     }
     setBusyAction("probe-effort");
@@ -442,7 +468,10 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
     try {
       const res = await window.api.probeKimiCodeThinkingEfforts({ modelAlias: selectedModelAlias });
       if (!res.success) {
-        setModelFormMessage(`探测失败：${res.error}`);
+        const copied = await copyAiQuestion(["context", "efforts"], `目录匹配失败：${res.error}`);
+        setModelFormMessage(`目录匹配失败：${res.error}${copied
+          ? "。已自动复制模型信息提问词，可直接粘贴给 AI 查询。"
+          : "；自动复制提问词失败，请检查剪贴板权限。"}`);
         return;
       }
       if (res.data.maxContextSize) modelContextTouchedRef.current = true;
@@ -460,9 +489,25 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
         res.data.supportEfforts ? `${res.data.supportEfforts.length} 个思考档位` : "",
       ].filter(Boolean).join(" 和 ");
       const undeclared = res.data.supportEfforts ? "" : "；目录未声明可选思考档位，现有选择保持不变";
-      setModelFormMessage(`已从 models.dev 回填${matched}${undeclared}，保存模型后生效。`);
+      const missingFields = [
+        ...(!res.data.maxContextSize ? ["context" as const] : []),
+        ...(!res.data.supportEfforts ? ["efforts" as const] : []),
+      ];
+      const copied = missingFields.length > 0
+        ? await copyAiQuestion(missingFields, `models.dev 已返回${matched}，但仍缺少${missingFields.join("、")}`)
+        : false;
+      const askAi = missingFields.length === 0
+        ? ""
+        : copied
+          ? " 已自动复制缺失信息提问词，可直接粘贴给 AI 查询。"
+          : " 自动复制缺失信息提问词失败，请检查剪贴板权限。";
+      setModelFormMessage(`已从 models.dev 回填${matched}${undeclared}，保存模型后生效。${askAi}`);
     } catch (error) {
-      setModelFormMessage(`探测失败：${error instanceof Error ? error.message : String(error)}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const copied = await copyAiQuestion(["context", "efforts"], `目录匹配请求异常：${errorMessage}`);
+      setModelFormMessage(`目录匹配失败：${errorMessage}${copied
+        ? "。已自动复制模型信息提问词，可直接粘贴给 AI 查询。"
+        : "；自动复制提问词失败，请检查剪贴板权限。"}`);
     } finally {
       setBusyAction(null);
     }

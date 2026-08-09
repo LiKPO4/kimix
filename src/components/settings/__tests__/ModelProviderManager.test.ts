@@ -25,6 +25,7 @@ const emptyProviderConfig: KimiModelConfigSummary = {
 afterEach(() => {
   document.body.innerHTML = "";
   Reflect.deleteProperty(window, "api");
+  Reflect.deleteProperty(navigator, "clipboard");
   vi.restoreAllMocks();
 });
 
@@ -349,6 +350,8 @@ describe("ModelProviderManager", () => {
   });
 
   it("fills Context even when the catalog does not declare thinking effort tiers", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     const existingModel = {
       alias: "gateway/mimo-v2.5",
       provider: "gateway",
@@ -385,6 +388,72 @@ describe("ModelProviderManager", () => {
     expect(Array.from(card.querySelectorAll('button[aria-pressed="true"]')).map((button) => button.textContent?.trim()))
       .toEqual(["high"]);
     expect(container.textContent).toContain("目录未声明可选思考档位，现有选择保持不变");
+    expect(container.textContent).toContain("可直接粘贴给 AI 查询");
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("模型名称/ID：mimo-v2.5"));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("供应商：gateway"));
+    await act(async () => root.unmount());
+  });
+
+  it("copies an AI question automatically when catalog matching fails", async () => {
+    const existingModel = {
+      alias: "gateway/unknown-model",
+      provider: "gateway",
+      model: "unknown-model",
+      displayName: "gateway/unknown-model",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+      supportEfforts: null,
+      defaultEffort: null,
+    };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const probeKimiCodeThinkingEfforts = vi.fn().mockResolvedValue({ success: false, error: "目录未找到该模型" });
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { probeKimiCodeThinkingEfforts },
+    });
+    const { container, root } = await renderManager({ ...emptyProviderConfig, models: [existingModel] });
+
+    await act(async () => (container.querySelector(".kimix-model-row") as HTMLElement).click());
+    await act(async () => buttonByText(container, "匹配模型信息")?.click());
+
+    expect(container.textContent).toContain("目录匹配失败：目录未找到该模型");
+    expect(container.textContent).toContain("已自动复制模型信息提问词，可直接粘贴给 AI 查询");
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("供应商：gateway"));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("模型名称/ID：unknown-model"));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Kimix 目录匹配结果：目录匹配失败：目录未找到该模型"));
+    await act(async () => root.unmount());
+  });
+
+  it("reports clipboard permission failures when the catalog request rejects", async () => {
+    const existingModel = {
+      alias: "gateway/unknown-model",
+      provider: "gateway",
+      model: "unknown-model",
+      displayName: "gateway/unknown-model",
+      maxContextSize: 262144,
+      adaptiveThinking: null,
+      isDefault: true,
+      supportEfforts: null,
+      defaultEffort: null,
+    };
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const probeKimiCodeThinkingEfforts = vi.fn().mockRejectedValue(new Error("network unavailable"));
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: { probeKimiCodeThinkingEfforts },
+    });
+    const { container, root } = await renderManager({ ...emptyProviderConfig, models: [existingModel] });
+
+    await act(async () => (container.querySelector(".kimix-model-row") as HTMLElement).click());
+    await act(async () => buttonByText(container, "匹配模型信息")?.click());
+
+    expect(container.textContent).toContain("目录匹配失败：network unavailable");
+    expect(container.textContent).toContain("自动复制提问词失败，请检查剪贴板权限");
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("目录匹配请求异常：network unavailable"));
+    expect((buttonByText(container, "匹配模型信息") as HTMLButtonElement).disabled).toBe(false);
     await act(async () => root.unmount());
   });
 

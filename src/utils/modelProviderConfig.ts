@@ -64,6 +64,57 @@ export function defaultModelAliasForProvider(providerName: string, modelId: stri
   return `${normalizedProvider}/${normalizedModel}`;
 }
 
+export function buildModelMetadataAiQuestion(input: {
+  providerName: string;
+  baseUrl?: string | null;
+  modelId: string;
+  modelAlias?: string | null;
+  missingFields?: readonly ("context" | "efforts")[];
+  matchResult?: string | null;
+  currentContextSize?: string | null;
+  currentSupportEfforts?: readonly string[] | null;
+  currentDefaultEffort?: string | null;
+}): string {
+  const baseUrl = (() => {
+    const value = input.baseUrl?.trim();
+    if (!value) return "未提供";
+    try {
+      const url = new URL(value);
+      url.search = "";
+      url.hash = "";
+      return url.toString();
+    } catch {
+      return value.split(/[?#]/, 1)[0] || "未提供";
+    }
+  })();
+  const missing = input.missingFields ?? ["context", "efforts"];
+  const questions = [
+    ...(missing.includes("context")
+      ? ["- 该供应商实际开放的最大上下文窗口是多少 token？请区分模型原生上限和供应商路由上限。"]
+      : []),
+    ...(missing.includes("efforts")
+      ? ["- 该线路实际接受并生效的 reasoning_effort 精确值有哪些（off/minimal/low/medium/high/xhigh/max）？默认值是什么？"]
+      : []),
+  ];
+  return [
+    "请帮我核实下面这个具体供应商线路的模型元数据。不要只根据模型名称、通用 OpenAI 参数枚举或 HTTP 2xx 猜测；优先查供应商和模型官方文档，并附可访问的来源链接。无法可靠确认的字段请明确写“未知”。",
+    "",
+    `供应商：${input.providerName.trim() || "未知"}`,
+    `Base URL：${baseUrl}`,
+    `模型名称/ID：${input.modelId.trim() || "未知"}`,
+    `Kimix 模型别名：${input.modelAlias?.trim() || "未提供"}`,
+    `Kimix 目录匹配结果：${input.matchResult?.trim() || "未提供"}`,
+    `当前 Context：${input.currentContextSize?.trim() || "未设置"}`,
+    `当前思考档位：${input.currentSupportEfforts?.length ? input.currentSupportEfforts.join(", ") : "未设置"}`,
+    `当前默认档：${input.currentDefaultEffort?.trim() || "未设置"}`,
+    "",
+    "请确认：",
+    ...questions,
+    "",
+    "最后请给出一段可直接填入 Kimix 的结果：Context=<整数或未知>；reasoning_effort=<逗号分隔的精确值或未知>；default_effort=<精确值或未知>。",
+  ].join("\n");
+}
+
 // ---- 官方 Provider 目录（models.dev）模型条目匹配与预填 ----
 
 export type CatalogModelLike = {
