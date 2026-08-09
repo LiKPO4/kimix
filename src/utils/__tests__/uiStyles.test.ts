@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { applyUiStyle, DEFAULT_UI_STYLE_ID, normalizeUiStyleId, UI_STYLE_ATTRIBUTE, UI_STYLES } from "../uiStyles";
+import {
+  applyUiStyle,
+  DEFAULT_UI_STYLE_ID,
+  normalizeUiStyleId,
+  UI_STYLE_ATTRIBUTE,
+  UI_STYLE_CONTRACT_ATTRIBUTE,
+  UI_STYLES,
+} from "../uiStyles";
 import { BUILTIN_UI_STYLE_DOCUMENTS } from "../builtinUiStyleDocuments";
 
 describe("normalizeUiStyleId", () => {
@@ -347,11 +354,14 @@ describe("UI_STYLES", () => {
 describe("applyUiStyle", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute(UI_STYLE_ATTRIBUTE);
+    document.documentElement.removeAttribute(UI_STYLE_CONTRACT_ATTRIBUTE);
   });
 
   it("modern/retro 设置 data-ui-style 属性", () => {
     applyUiStyle("modern");
     expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("modern");
+    expect(document.documentElement.hasAttribute(UI_STYLE_CONTRACT_ATTRIBUTE)).toBe(false);
+    expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("");
     applyUiStyle("retro");
     expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("retro");
     applyUiStyle("nostalgia");
@@ -378,12 +388,14 @@ describe("applyUiStyle", () => {
     };
     applyUiStyle("custom:platinum-soft", [custom]);
     expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("custom:platinum-soft");
+    expect(document.documentElement.getAttribute(UI_STYLE_CONTRACT_ATTRIBUTE)).toBe("v1");
     expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("6px");
     expect(document.documentElement.style.getPropertyValue("--ui-role-section-card-resting-border"))
       .toBe("1px solid var(--border-default)");
 
     applyUiStyle("custom:missing", []);
     expect(document.documentElement.hasAttribute(UI_STYLE_ATTRIBUTE)).toBe(false);
-    expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("12px");
+    expect(document.documentElement.hasAttribute(UI_STYLE_CONTRACT_ATTRIBUTE)).toBe(false);
+    expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("");
   });
 });

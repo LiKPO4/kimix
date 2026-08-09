@@ -3910,7 +3910,9 @@ button.bg-accent-primary:disabled:hover,
 }
 
 /* ── 可导入界面风格契约 ──
-   自定义风格只注入 --ui-*；选择器和可变属性由 Kimix 固定，JSON 不能携带 CSS。 */
+   自定义风格只注入 --ui-*；选择器和可变属性由 Kimix 固定，JSON 不能携带 CSS。
+   该作用域必须只由自定义风格显式开启，不能重画已经验收的默认/内置风格。 */
+@scope (:root[data-ui-style-contract="v1"]) {
 :is(:root:not([data-ui-style]), [data-ui-style]) {
   --duration-fast: var(--ui-motion-hover-duration);
   --duration-base: var(--ui-motion-hover-duration);
@@ -4310,6 +4312,7 @@ button.bg-accent-primary:disabled:hover,
   border: var(--ui-role-room-choice-selected-border);
   background: var(--ui-role-room-choice-selected-background);
   box-shadow: var(--ui-role-room-choice-selected-shadow);
+}
 }
 
 .kimix-settings-uistyle-wrap {

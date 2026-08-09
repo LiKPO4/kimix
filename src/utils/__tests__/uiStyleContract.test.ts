@@ -118,6 +118,7 @@ describe("compileUiStyleVariables", () => {
 describe("自定义风格 CSS 角色消费契约", () => {
   it("每一个公开角色都由固定选择器消费，避免 JSON 存在无效配置点", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    expect(css).toContain('@scope (:root[data-ui-style-contract="v1"])');
     expect(css).toContain(":is(:root:not([data-ui-style]), [data-ui-style])");
     for (const roleId of UI_STYLE_ROLE_IDS) {
       const kebab = roleId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);

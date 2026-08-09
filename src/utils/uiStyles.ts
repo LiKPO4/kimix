@@ -1,9 +1,11 @@
 import type { UiStyleId } from "@/types/ui";
-import { BUILTIN_UI_STYLE_DOCUMENTS, type BuiltinUiStyleId } from "@/utils/builtinUiStyleDocuments";
+import { BUILTIN_UI_STYLE_DOCUMENTS } from "@/utils/builtinUiStyleDocuments";
 import { compileUiStyleVariables, type UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 
 /** 根元素上标记当前界面风格的 data 属性；default 时移除以回退 :root 变量。 */
 export const UI_STYLE_ATTRIBUTE = "data-ui-style";
+/** 仅自定义 JSON 风格启用 V1 角色消费层；内置风格继续使用已验收的专属 CSS。 */
+export const UI_STYLE_CONTRACT_ATTRIBUTE = "data-ui-style-contract";
 
 export const DEFAULT_UI_STYLE_ID: UiStyleId = "default";
 
@@ -51,18 +53,25 @@ export function applyUiStyle(id: unknown, customDocuments: UiStyleDocumentV1[] =
   const normalized = normalizeUiStyleId(id);
   const root = document.documentElement;
   clearAppliedUiStyleVariables(root);
-  const styleDocument = normalized.startsWith("custom:")
-    ? customDocuments.find((document) => `custom:${document.id}` === normalized)
-    : BUILTIN_UI_STYLE_DOCUMENTS[normalized as BuiltinUiStyleId];
-  if (!styleDocument) {
-    applyCompiledVariables(root, compileUiStyleVariables(BUILTIN_UI_STYLE_DOCUMENTS.default));
-    root.removeAttribute(UI_STYLE_ATTRIBUTE);
-    return;
-  }
-  applyCompiledVariables(root, compileUiStyleVariables(styleDocument));
+  root.removeAttribute(UI_STYLE_CONTRACT_ATTRIBUTE);
+
   if (normalized === DEFAULT_UI_STYLE_ID) {
     root.removeAttribute(UI_STYLE_ATTRIBUTE);
     return;
   }
+
+  if (!normalized.startsWith("custom:")) {
+    root.setAttribute(UI_STYLE_ATTRIBUTE, normalized);
+    return;
+  }
+
+  const styleDocument = customDocuments.find((document) => `custom:${document.id}` === normalized);
+  if (!styleDocument) {
+    root.removeAttribute(UI_STYLE_ATTRIBUTE);
+    return;
+  }
+
+  applyCompiledVariables(root, compileUiStyleVariables(styleDocument));
   root.setAttribute(UI_STYLE_ATTRIBUTE, normalized);
+  root.setAttribute(UI_STYLE_CONTRACT_ATTRIBUTE, "v1");
 }
