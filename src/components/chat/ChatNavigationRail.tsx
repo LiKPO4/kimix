@@ -287,7 +287,7 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
           <button
             key={marker.key}
             type="button"
-            className="kimix-chat-navigation-hit absolute left-0"
+            className="kimix-style-exempt kimix-chat-navigation-hit absolute left-0"
             data-active={marker.active ? "true" : "false"}
             data-kind={marker.kind}
             aria-label={`${marker.label}，跳转到第 ${index + 1} 个对话节点`}

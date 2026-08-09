@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import * as ts from "typescript";
 import {
   applyUiStyle,
   DEFAULT_UI_STYLE_ID,
@@ -364,9 +365,91 @@ describe("UI_STYLES", () => {
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
 
     expect(composer).toContain('kimix-icon-text-button kimix-control-button is-compact justify-center text-[13px] text-text-secondary');
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)\s*\{/s);
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\):hover:not\(:disabled\)\s*\{/s);
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\):active:not\(:disabled\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:hover:not\(:disabled\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:active:not\(:disabled\)\s*\{/s);
+  });
+  it("内置风格触点与导入契约只允许已说明的结构差集", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const contractStart = css.indexOf("/* ── 可导入界面风格契约 ──");
+    const contractEnd = css.indexOf(".kimix-settings-uistyle-wrap", contractStart);
+    expect(contractStart).toBeGreaterThan(0);
+    expect(contractEnd).toBeGreaterThan(contractStart);
+
+    const classesFromRules = (source: string, requireBuiltinScope: boolean) => {
+      const classes = new Set<string>();
+      for (const match of source.matchAll(/([^{}]+)\{/gs)) {
+        const selector = match[1];
+        if (requireBuiltinScope && !selector.includes("data-ui-style")) continue;
+        for (const classMatch of selector.matchAll(/\.(kimix-[A-Za-z0-9_-]+)/g)) classes.add(classMatch[1]);
+      }
+      return classes;
+    };
+    const builtinClasses = classesFromRules(css.slice(0, contractStart), true);
+    const customClasses = classesFromRules(css.slice(contractStart, contractEnd), false);
+    const structuralOrDelegated = [
+      "kimix-composer-input",
+      "kimix-context-bar",
+      "kimix-file-open-control",
+      "kimix-long-task-button",
+      "kimix-settings-section-title",
+      "kimix-settings-theme-grid",
+      "kimix-tabular-nums",
+      "kimix-workspace-header",
+      "kimix-workspace-page",
+    ];
+    const missing = [...builtinClasses].filter((className) => !customClasses.has(className)).sort();
+    expect(missing).toEqual(structuralOrDelegated.sort());
+  });
+  it("新增 button 必须声明界面风格角色或显式豁免", () => {
+    const componentRoot = resolve(process.cwd(), "src/components");
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const contractStart = css.indexOf("/* ── 可导入界面风格契约 ──");
+    const contractEnd = css.indexOf(".kimix-settings-uistyle-wrap", contractStart);
+    const styleMarkers = new Set(
+      [...css.slice(contractStart, contractEnd).matchAll(/\.(kimix-[A-Za-z0-9_-]+)/g)].map((match) => match[1]),
+    );
+    styleMarkers.add("kimix-style-exempt");
+    const hasStyleMarker = (value: string) => [...value.matchAll(/\bkimix-[A-Za-z0-9_-]+\b/g)]
+      .some((match) => styleMarkers.has(match[0]));
+    const collectTsx = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const fullPath = join(directory, entry.name);
+      if (entry.isDirectory()) return collectTsx(fullPath);
+      return entry.isFile() && entry.name.endsWith(".tsx") ? [fullPath] : [];
+    });
+    const uncovered: string[] = [];
+
+    for (const filePath of collectTsx(componentRoot)) {
+      const sourceText = readFileSync(filePath, "utf8");
+      const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const classConstants = new Map<string, string>();
+      const collectConstants = (node: ts.Node) => {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer))) {
+          classConstants.set(node.name.text, node.initializer.text);
+        }
+        ts.forEachChild(node, collectConstants);
+      };
+      collectConstants(sourceFile);
+
+      const visit = (node: ts.Node) => {
+        if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(sourceFile) === "button") {
+          const classAttribute = node.attributes.properties.find((attribute): attribute is ts.JsxAttribute => (
+            ts.isJsxAttribute(attribute) && attribute.name.getText(sourceFile) === "className"
+          ));
+          const classSource = classAttribute?.getText(sourceFile) ?? "";
+          const referencedConstantProvidesRole = [...classSource.matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
+            .some((match) => hasStyleMarker(classConstants.get(match[0]) ?? ""));
+          if (!hasStyleMarker(classSource) && !referencedConstantProvidesRole) {
+            const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+            uncovered.push(`${relative(process.cwd(), filePath)}:${line}`);
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+    }
+
+    expect(uncovered).toEqual([]);
   });
 });
 

@@ -661,7 +661,7 @@ export function SkillsPanel({
                                   type="button"
                                   onClick={() => void installCapability(capability)}
                                   disabled={Boolean(installingCapabilityId)}
-                                  className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="kimix-style-exempt kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {busy ? "安装中" : capability.state === "partial" || capability.install.error ? "继续安装" : "安装"}
                                 </button>
@@ -701,7 +701,7 @@ export function SkillsPanel({
                                 type="button"
                                 onClick={() => void installMarketplacePlugin(plugin)}
                                 disabled={Boolean(installingMarketId) || installed}
-                                className="kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="kimix-style-exempt kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 {installed ? "已安装" : installingMarketId === plugin.id ? "安装中" : "安装"}
                               </button>
@@ -799,7 +799,7 @@ export function SkillsPanel({
                               type="button"
                               onClick={() => void toggleSdkPlugin(plugin)}
                               disabled={Boolean(sdkPluginToggling)}
-                              className={`kimix-plugin-status-pill shrink-0 text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                              className={`kimix-style-exempt kimix-plugin-status-pill shrink-0 text-[12px] leading-5 disabled:cursor-wait disabled:opacity-50 ${plugin.enabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
                             >
                               {sdkPluginToggling === plugin.id ? "处理中" : sdkPluginStateLabel(plugin)}
                             </button>

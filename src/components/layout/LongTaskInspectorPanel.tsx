@@ -1541,7 +1541,7 @@ export function LongTaskInspectorPanel({
                       key={`${index}-${item}`}
                       type="button"
                       onClick={() => onSetReviewItemChecked(item, true)}
-                      className="flex w-full items-start rounded-lg border border-accent-warning/30 bg-accent-warning-light text-left text-[13px] leading-5 text-accent-warning transition-colors hover:bg-accent-warning-light/70"
+                      className="kimix-style-exempt flex w-full items-start rounded-lg border border-accent-warning/30 bg-accent-warning-light text-left text-[13px] leading-5 text-accent-warning transition-colors hover:bg-accent-warning-light/70"
                       style={{ gap: 10, padding: "12px 12px" }}
                       title="点击标记为已确认"
                     >
@@ -1583,7 +1583,7 @@ export function LongTaskInspectorPanel({
                       key={`${index}-${item}`}
                       type="button"
                       onClick={() => onSetReviewItemChecked(item, false)}
-                      className="flex w-full items-start rounded-lg border border-accent-success/30 bg-accent-success-light text-left text-[13px] leading-5 text-accent-success transition-colors hover:bg-accent-success-light/70"
+                      className="kimix-style-exempt flex w-full items-start rounded-lg border border-accent-success/30 bg-accent-success-light text-left text-[13px] leading-5 text-accent-success transition-colors hover:bg-accent-success-light/70"
                       style={{ gap: 10, padding: "12px 12px" }}
                       title="点击撤回到审查清单"
                     >
@@ -1683,7 +1683,7 @@ export function LongTaskInspectorPanel({
                 <button
                   type="button"
                   onClick={() => setKimiHealthOpen((value) => !value)}
-                  className="flex min-w-0 items-center text-left"
+                  className="kimix-style-exempt flex min-w-0 items-center text-left"
                   style={{ gap: 8 }}
                   title="Kimi Code 健康状态"
                 >
@@ -2081,7 +2081,7 @@ export function LongTaskInspectorPanel({
                             <button
                               type="button"
                               onClick={() => toggleBtwRoundCollapsed(round.id)}
-                              className="flex w-full items-center justify-between text-left text-[12.5px] leading-5 text-text-muted transition-colors hover:text-text-primary"
+                              className="kimix-style-exempt flex w-full items-center justify-between text-left text-[12.5px] leading-5 text-text-muted transition-colors hover:text-text-primary"
                               style={{ gap: 10, minHeight: 24 }}
                             >
                               <span>{index === 0 ? "最新回复" : "回复"}</span>
@@ -2397,7 +2397,7 @@ export function LongTaskInspectorPanel({
                     <button
                       type="button"
                       onClick={() => openFile(file.path, projectPathForGit)}
-                      className="min-w-0 text-left"
+                      className="kimix-style-exempt min-w-0 text-left"
                       title={file.path}
                     >
                       <span className="block truncate text-[13px] font-medium leading-5 text-text-primary">{file.path}</span>
@@ -2647,4 +2647,3 @@ const backgroundTaskStatusLabels: Record<string, string> = {
 function isBackgroundTaskTerminal(status: string) {
   return ["completed", "failed", "killed", "lost"].includes(status);
 }
-

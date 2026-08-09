@@ -948,7 +948,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           <button
                             onClick={() => void handleProjectClick(project, pSessions, isExpanded)}
                             disabled={pSessions.length === 0 && Boolean(creatingSessionProjectPath)}
-                            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                            className="kimix-style-exempt flex min-w-0 flex-1 items-center gap-2.5 text-left"
                           >
                             <FolderOpen size={16} className="shrink-0 text-text-muted" />
                             <span className="min-w-0 flex-1 truncate">{displayProjectName(project, "未命名项目")}</span>
@@ -1094,7 +1094,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       setWorkspaceView("chat");
                                       void selectSession(s.id);
                                     }}
-                                    className="min-w-0 flex-1 truncate text-left"
+                                    className="kimix-style-exempt min-w-0 flex-1 truncate text-left"
                                   >
                                     {s.title}
                                   </button>

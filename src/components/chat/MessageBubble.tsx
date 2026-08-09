@@ -445,7 +445,7 @@ function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index
           type="button"
           onClick={() => void loadVideo()}
           disabled={loading || !image.fileId}
-          className="flex h-full w-full flex-col items-center justify-center text-white transition-[background-color,scale] duration-150 ease-out hover:bg-white/10 active:scale-[0.96] disabled:cursor-not-allowed"
+          className="kimix-style-exempt flex h-full w-full flex-col items-center justify-center text-white transition-[background-color,scale] duration-150 ease-out hover:bg-white/10 active:scale-[0.96] disabled:cursor-not-allowed"
           style={{ gap: 10, paddingLeft: 16, paddingRight: 16 }}
           aria-label={`加载视频 ${image.name}`}
         >
@@ -1280,7 +1280,7 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="kimix-kimi-web-foldable-summary text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
+          className="kimix-kimi-web-foldable-summary kimix-chat-collapse-row text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)] transition-colors hover:text-[var(--kimix-panel-text)]"
           style={KIMI_WEB_THINKING_SUMMARY_STYLE}
         >
           {teaser}

@@ -159,6 +159,24 @@ describe("自定义风格 CSS 角色消费契约", () => {
     expect(css).toMatch(/\.kimix-composer-input,[\s\S]*?\.kimix-composer-input:focus-visible\s*\{[^}]*border:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;[^}]*box-shadow:\s*none\s*!important;/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-split-control[\s\S]*?:hover[\s\S]*?--ui-role-compound-control-hover-shadow/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-state-button[\s\S]*?:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)[\s\S]*?--ui-role-toggle-hover-shadow/s);
+    const interactiveStateCoverage = {
+      "navigation-item": ["resting", "hover", "active", "selected"],
+      "navigation-action": ["resting", "hover", "active"],
+      control: ["resting", "hover", "active"],
+      "primary-action": ["resting", "hover", "active"],
+      "compound-control": ["resting", "hover", "active"],
+      toggle: ["resting", "hover", "active", "selected"],
+      field: ["resting", "focus"],
+      "interactive-card": ["resting", "hover", "active", "selected"],
+      "menu-trigger": ["resting", "hover", "active", "selected"],
+      "menu-item": ["resting", "hover", "active", "selected"],
+      "media-thumb": ["resting", "hover", "active"],
+      dock: ["resting", "hover", "active", "selected"],
+      "room-choice": ["resting", "hover", "active", "selected"],
+    } as const;
+    for (const [role, states] of Object.entries(interactiveStateCoverage)) {
+      for (const state of states) expect(css, `${role}.${state}`).toContain(`--ui-role-${role}-${state}-`);
+    }
     for (const roleId of UI_STYLE_ROLE_IDS) {
       const kebab = roleId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
       expect(css, roleId).toContain(`--ui-role-${kebab}-`);

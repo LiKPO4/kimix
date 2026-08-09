@@ -455,7 +455,7 @@ function HelpDialogPanel({
                     <button
                       onClick={onOpenLatestRelease}
                       disabled={updateState.loading}
-                      className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
+                      className="kimix-style-exempt text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
                       style={updateLinkButtonStyle}
                     >
                       浏览器查看
@@ -528,7 +528,7 @@ function HelpDialogPanel({
                     <button
                       onClick={() => void window.api.openExternal(KIMI_CODE_UPDATE_PAGE_URL)}
                       disabled={cliUpdateState.loading || cliUpdateState.updating}
-                      className="text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
+                      className="kimix-style-exempt text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
                       style={updateLinkButtonStyle}
                     >
                       浏览器查看
@@ -547,7 +547,7 @@ function HelpDialogPanel({
                       <button
                         type="button"
                         onClick={() => void window.api.openExternal(release.htmlUrl)}
-                        className="flex min-w-0 items-center text-left font-semibold text-text-primary hover:text-accent-primary"
+                        className="kimix-style-exempt flex min-w-0 items-center text-left font-semibold text-text-primary hover:text-accent-primary"
                         style={{ gap: 8, minHeight: 32 }}
                         title="在 GitHub 查看完整 Release"
                       >

@@ -536,7 +536,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           onFocus={() => canExpand && setHeaderToggleActive(true)}
           onBlur={() => setHeaderToggleActive(false)}
           disabled={!canExpand}
-          className="flex min-w-0 items-center text-[14px] leading-5 text-text-primary disabled:cursor-default"
+          className="kimix-style-exempt flex min-w-0 items-center text-[14px] leading-5 text-text-primary disabled:cursor-default"
           style={{ gap: 8, height: 30, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
           aria-expanded={canExpand ? expanded : undefined}
         >

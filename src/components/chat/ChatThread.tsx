@@ -2007,7 +2007,7 @@ export const ChatThread = memo(function ChatThread() {
             tabIndex={-1}
             title="滚动到底部"
             onClick={viewport.enableAutoFollow}
-            className="kimix-chat-floating-action flex items-center justify-center"
+            className="kimix-chat-floating-action kimix-control-button flex items-center justify-center"
             style={{
               opacity: 0,
               pointerEvents: "none",

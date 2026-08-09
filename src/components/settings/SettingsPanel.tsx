@@ -610,7 +610,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
         window.addEventListener("pointerup", finishDrag);
         window.addEventListener("pointercancel", cancelDrag);
       }}
-      className="kimix-settings-drag-handle"
+      className="kimix-settings-drag-handle kimix-control-button"
       title="长按拖动调整位置"
       aria-label={`拖动${label}设置分区`}
     >
@@ -1522,7 +1522,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       type="button"
                       aria-pressed={chatNavigationRailEnabled}
                       onClick={() => setChatNavigationRailEnabled(!chatNavigationRailEnabled)}
-                      className="flex min-w-0 items-center text-left"
+                      className="kimix-style-exempt flex min-w-0 items-center text-left"
                       style={{ gap: 12 }}
                     >
                       <SelectionIndicator selected={chatNavigationRailEnabled} />
@@ -1590,7 +1590,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         type="button"
                         aria-pressed={themePalette === palette.value}
                         onClick={() => setThemePalette(palette.value)}
-                        className="kimix-settings-palette"
+                        className="kimix-style-exempt kimix-settings-palette"
                         title={palette.description}
                       >
                         <span className="kimix-settings-palette-copy">
@@ -1863,7 +1863,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     type="button"
                     aria-pressed={sessionRecommendationEnabled}
                     onClick={() => setSessionRecommendationEnabled(!sessionRecommendationEnabled)}
-                    className="flex min-w-0 items-center text-left"
+                    className="kimix-style-exempt flex min-w-0 items-center text-left"
                     style={{ gap: 12 }}
                   >
                     <SelectionIndicator selected={sessionRecommendationEnabled} />
@@ -2409,7 +2409,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     type="button"
                     aria-pressed={cacheHintDismissed}
                     onClick={() => void handleToggleCacheHintDismissed()}
-                    className="flex min-w-0 items-center text-left"
+                    className="kimix-style-exempt flex min-w-0 items-center text-left"
                     style={{ gap: 12 }}
                   >
                     <SelectionIndicator selected={cacheHintDismissed} />

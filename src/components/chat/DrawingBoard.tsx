@@ -1157,7 +1157,7 @@ export function DrawingBoard({ request, onClose, onSave }: DrawingBoardProps) {
                       setBackgroundColor(item.value);
                       applyBackgroundColor(item.value);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border transition-colors"
+                    className="kimix-style-exempt flex h-8 w-8 items-center justify-center rounded-full border transition-colors"
                     style={{ backgroundColor: item.value, borderColor: (colorPanelMode === "stroke" ? color : backgroundColor) === item.value ? "#339af0" : "var(--kimix-panel-border)" }}
                     title={`${colorPanelMode === "stroke" ? "" : "背景"}${item.label}`}
                     aria-label={`选择${colorPanelMode === "stroke" ? "" : "背景"}${item.label}色`}

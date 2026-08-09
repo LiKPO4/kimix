@@ -3946,7 +3946,8 @@ button.bg-accent-primary:disabled:hover,
   .kimix-sidebar-session-row,
   .kimix-settings-entry,
   .kimix-settings-navigation-item,
-  .kimix-settings-search-result
+  .kimix-settings-search-result,
+  .kimix-model-provider-item
 ) {
   border: var(--ui-role-navigation-item-resting-border);
   border-radius: var(--ui-role-navigation-item-radius);
@@ -3960,15 +3961,31 @@ button.bg-accent-primary:disabled:hover,
   .kimix-sidebar-session-row,
   .kimix-settings-entry,
   .kimix-settings-navigation-item,
-  .kimix-settings-search-result
+  .kimix-settings-search-result,
+  .kimix-model-provider-item
 ):hover {
   border: var(--ui-role-navigation-item-hover-border);
   background: var(--ui-role-navigation-item-hover-background);
   box-shadow: var(--ui-role-navigation-item-hover-shadow);
 }
 
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-sidebar-nav-item,
+  .kimix-sidebar-project-row,
+  .kimix-sidebar-session-row,
+  .kimix-settings-entry,
+  .kimix-settings-navigation-item,
+  .kimix-settings-search-result,
+  .kimix-model-provider-item
+):active {
+  border: var(--ui-role-navigation-item-active-border);
+  background: var(--ui-role-navigation-item-active-background);
+  box-shadow: var(--ui-role-navigation-item-active-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-sidebar-project-row, .kimix-sidebar-session-row).is-active,
-:root[data-ui-style-contract="v1"] .kimix-settings-navigation-item[aria-current="page"] {
+:root[data-ui-style-contract="v1"] .kimix-settings-navigation-item[aria-current="page"],
+:root[data-ui-style-contract="v1"] .kimix-model-provider-item:is(.is-active, [aria-pressed="true"]) {
   border: var(--ui-role-navigation-item-selected-border);
   background: var(--ui-role-navigation-item-selected-background);
   box-shadow: var(--ui-role-navigation-item-selected-shadow);
@@ -3987,11 +4004,26 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-navigation-action-hover-shadow);
 }
 
+:root[data-ui-style-contract="v1"] .kimix-sidebar-icon-action:active:not(:disabled) {
+  border: var(--ui-role-navigation-action-active-border);
+  background: var(--ui-role-navigation-action-active-background);
+  box-shadow: var(--ui-role-navigation-action-active-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(
   .kimix-toolbar-button,
   .kimix-window-control,
   .kimix-control-button,
   .kimix-composer-tool-button,
+  .kimix-icon-text-button,
+  .kimix-inspector-action,
+  .kimix-modal-close-button,
+  .kimix-preview-close,
+  .kimix-preview-nav,
+  .kimix-room-trigger,
+  .kimix-runtime-error-close,
+  .kimix-settings-icon-button,
+  .kimix-chat-banner-button,
   .kimix-contextbar-action,
   .kimix-inline-icon-action,
   .kimix-inspector-drag-handle,
@@ -3999,7 +4031,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary) {
+):not(.bg-accent-primary):not([class*="bg-accent-"]) {
   border: var(--ui-role-control-resting-border);
   border-radius: var(--ui-role-control-radius);
   background: var(--ui-role-control-resting-background);
@@ -4039,6 +4071,15 @@ button.bg-accent-primary:disabled:hover,
   .kimix-window-control,
   .kimix-control-button,
   .kimix-composer-tool-button,
+  .kimix-icon-text-button,
+  .kimix-inspector-action,
+  .kimix-modal-close-button,
+  .kimix-preview-close,
+  .kimix-preview-nav,
+  .kimix-room-trigger,
+  .kimix-runtime-error-close,
+  .kimix-settings-icon-button,
+  .kimix-chat-banner-button,
   .kimix-contextbar-action,
   .kimix-inline-icon-action,
   .kimix-inspector-drag-handle,
@@ -4046,7 +4087,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary):hover:not(:disabled) {
+):not(.bg-accent-primary):not([class*="bg-accent-"]):hover:not(:disabled) {
   border: var(--ui-role-control-hover-border);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
@@ -4057,6 +4098,15 @@ button.bg-accent-primary:disabled:hover,
   .kimix-window-control,
   .kimix-control-button,
   .kimix-composer-tool-button,
+  .kimix-icon-text-button,
+  .kimix-inspector-action,
+  .kimix-modal-close-button,
+  .kimix-preview-close,
+  .kimix-preview-nav,
+  .kimix-room-trigger,
+  .kimix-runtime-error-close,
+  .kimix-settings-icon-button,
+  .kimix-chat-banner-button,
   .kimix-contextbar-action,
   .kimix-inline-icon-action,
   .kimix-inspector-drag-handle,
@@ -4064,7 +4114,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle-delete,
   .kimix-runtime-error-button,
   .kimix-success-action
-):not(.bg-accent-primary):active:not(:disabled) {
+):not(.bg-accent-primary):not([class*="bg-accent-"]):active:not(:disabled) {
   border: var(--ui-role-control-active-border);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);
@@ -4114,6 +4164,28 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--ui-role-toggle-radius);
   background: var(--ui-role-toggle-selected-background);
   box-shadow: var(--ui-role-toggle-selected-shadow);
+}
+
+/* 工作区设置把权限项组织为一个分段容器：外层拥有边界，内项只消费状态表面。 */
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission:hover:not(:disabled):not([aria-pressed="true"]) {
+  border: 0;
+  background: var(--ui-role-toggle-hover-background);
+  box-shadow: none;
+}
+
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission[aria-pressed="true"],
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission[aria-pressed="true"]:hover:not(:disabled) {
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-role-toggle-selected-background);
+  box-shadow: none;
 }
 
 :root[data-ui-style-contract="v1"] :where(
@@ -4179,6 +4251,32 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-interactive-card-hover-shadow);
 }
 
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-settings-theme,
+  .kimix-settings-uistyle,
+  .kimix-settings-palette-wrap,
+  .kimix-skill-card,
+  .kimix-plugin-list-item,
+  .kimix-model-row,
+  .kimix-runtime-error-card
+):active:not(:disabled) {
+  border: var(--ui-role-interactive-card-active-border);
+  box-shadow: var(--ui-role-interactive-card-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-settings-theme,
+  .kimix-settings-uistyle,
+  .kimix-settings-palette-wrap,
+  .kimix-skill-card,
+  .kimix-plugin-list-item,
+  .kimix-model-row,
+  .kimix-runtime-error-card
+):is(.is-active, [aria-pressed="true"], [aria-selected="true"]) {
+  border: var(--ui-role-interactive-card-selected-border);
+  box-shadow: var(--ui-role-interactive-card-selected-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-soft-card-strong, .kimix-model-provider-manager) {
   border: var(--ui-role-strong-card-resting-border);
   border-radius: var(--ui-role-strong-card-radius);
@@ -4199,7 +4297,10 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: none;
 }
 
-:root[data-ui-style-contract="v1"] .kimix-inset-section {
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-inset-section,
+  .kimix-settings-panel.is-workspace .kimix-settings-permissions
+) {
   border: var(--ui-role-inset-section-resting-border);
   border-radius: var(--ui-role-inset-section-radius);
   background: var(--ui-role-inset-section-resting-background);
@@ -4221,7 +4322,7 @@ button.bg-accent-primary:disabled:hover,
   backdrop-filter: none;
 }
 
-:root[data-ui-style-contract="v1"] .kimix-menu-item {
+:root[data-ui-style-contract="v1"] :where(.kimix-menu-item, .kimix-inspector-list-item) {
   border: var(--ui-role-menu-item-resting-border);
   border-radius: var(--ui-role-menu-item-radius);
   background: var(--ui-role-menu-item-resting-background);
@@ -4241,10 +4342,57 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-menu-trigger-hover-shadow);
 }
 
-:root[data-ui-style-contract="v1"] .kimix-menu-item:hover:not(:disabled):not([aria-disabled="true"]) {
+:root[data-ui-style-contract="v1"] :where(.kimix-top-menu-trigger, .kimix-menu-trigger):active {
+  border: var(--ui-role-menu-trigger-active-border);
+  background: var(--ui-role-menu-trigger-active-background);
+  box-shadow: var(--ui-role-menu-trigger-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-top-menu-trigger, .kimix-menu-trigger):is([aria-expanded="true"], [aria-pressed="true"]) {
+  border: var(--ui-role-menu-trigger-selected-border);
+  background: var(--ui-role-menu-trigger-selected-background);
+  box-shadow: var(--ui-role-menu-trigger-selected-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-menu-item, .kimix-inspector-list-item):hover:not(:disabled):not([aria-disabled="true"]) {
   border: var(--ui-role-menu-item-hover-border);
   background: var(--ui-role-menu-item-hover-background);
   box-shadow: var(--ui-role-menu-item-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-menu-item, .kimix-inspector-list-item):active:not(:disabled):not([aria-disabled="true"]) {
+  border: var(--ui-role-menu-item-active-border);
+  background: var(--ui-role-menu-item-active-background);
+  box-shadow: var(--ui-role-menu-item-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-menu-item, .kimix-inspector-list-item):is([aria-checked="true"], [aria-selected="true"]) {
+  border: var(--ui-role-menu-item-selected-border);
+  background: var(--ui-role-menu-item-selected-background);
+  box-shadow: var(--ui-role-menu-item-selected-shadow);
+}
+
+/* 遗留的上下文动作没有稳定的静态表面角色；只桥接交互态，避免整行被误画成凸起按钮。 */
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-muted-action,
+  .kimix-settings-palette-action,
+  button.kimix-chat-collapse-row,
+  button.kimix-chat-process-row
+):not([class*="bg-accent-"]):hover:not(:disabled) {
+  border-color: var(--ui-role-control-hover-border);
+  background: var(--ui-role-control-hover-background);
+  box-shadow: var(--ui-role-control-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(
+  .kimix-muted-action,
+  .kimix-settings-palette-action,
+  button.kimix-chat-collapse-row,
+  button.kimix-chat-process-row
+):not([class*="bg-accent-"]):active:not(:disabled) {
+  border-color: var(--ui-role-control-active-border);
+  background: var(--ui-role-control-active-background);
+  box-shadow: var(--ui-role-control-active-shadow);
 }
 
 :root[data-ui-style-contract="v1"] :where(
@@ -4278,7 +4426,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-user-bubble-resting-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-status-surface, .markdown-body .kimix-inline-code) {
+:root[data-ui-style-contract="v1"] :where(.kimix-status-surface, .kimix-settings-badge, .markdown-body .kimix-inline-code) {
   border: var(--ui-role-status-surface-resting-border);
   border-radius: var(--ui-role-status-surface-radius);
   background: var(--ui-role-status-surface-resting-background);
@@ -4312,6 +4460,12 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-media-thumb-hover-shadow);
 }
 
+:root[data-ui-style-contract="v1"] .kimix-media-thumb:active {
+  border: var(--ui-role-media-thumb-active-border);
+  background: var(--ui-role-media-thumb-active-background);
+  box-shadow: var(--ui-role-media-thumb-active-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-longtask-inspector, .kimix-diff-panel, .kimix-model-provider-sidebar) {
   border: var(--ui-role-inspector-resting-border);
   border-radius: var(--ui-role-inspector-radius);
@@ -4333,6 +4487,24 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-dock-resting-shadow);
 }
 
+:root[data-ui-style-contract="v1"] :where(.kimix-dock-panel, .kimix-dock-capsule):hover {
+  border: var(--ui-role-dock-hover-border);
+  background: var(--ui-role-dock-hover-background);
+  box-shadow: var(--ui-role-dock-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-dock-panel, .kimix-dock-capsule):active {
+  border: var(--ui-role-dock-active-border);
+  background: var(--ui-role-dock-active-background);
+  box-shadow: var(--ui-role-dock-active-shadow);
+}
+
+:root[data-ui-style-contract="v1"] :where(.kimix-dock-panel, .kimix-dock-capsule)[aria-expanded="true"] {
+  border: var(--ui-role-dock-selected-border);
+  background: var(--ui-role-dock-selected-background);
+  box-shadow: var(--ui-role-dock-selected-shadow);
+}
+
 :root[data-ui-style-contract="v1"] .kimix-room-choice {
   border: var(--ui-role-room-choice-resting-border);
   border-radius: var(--ui-role-room-choice-radius);
@@ -4344,6 +4516,12 @@ button.bg-accent-primary:disabled:hover,
   border: var(--ui-role-room-choice-hover-border);
   background: var(--ui-role-room-choice-hover-background);
   box-shadow: var(--ui-role-room-choice-hover-shadow);
+}
+
+:root[data-ui-style-contract="v1"] .kimix-room-choice:active:not(:disabled) {
+  border: var(--ui-role-room-choice-active-border);
+  background: var(--ui-role-room-choice-active-background);
+  box-shadow: var(--ui-role-room-choice-active-shadow);
 }
 
 :root[data-ui-style-contract="v1"] .kimix-room-choice:is([aria-pressed="true"], [data-selected="true"]) {

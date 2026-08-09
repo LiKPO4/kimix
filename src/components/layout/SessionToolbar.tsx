@@ -507,7 +507,7 @@ export function SessionToolbar({
             <div className={`kimix-split-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : ""}`}>
               <button
                 onClick={() => void launchExecutable()}
-                className="kimix-split-control-part flex h-full flex-1 items-center justify-center"
+                className="kimix-style-exempt kimix-split-control-part flex h-full flex-1 items-center justify-center"
                 style={{ paddingLeft: 9, paddingRight: 4 }}
                 title="启动当前启动文件"
                 aria-label="启动"
@@ -520,7 +520,7 @@ export function SessionToolbar({
                   e.stopPropagation();
                   setLaunchMenuOpen((value) => !value);
                 }}
-                className="kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center"
+                className="kimix-style-exempt kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center"
                 title="启动方式"
                 aria-label="启动方式"
                 aria-haspopup="menu"
@@ -582,7 +582,7 @@ export function SessionToolbar({
             <button
               onClick={openProjectPath}
               disabled={!projectPath}
-              className="kimix-split-control-part flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
+              className="kimix-style-exempt kimix-split-control-part flex h-full flex-1 items-center justify-center disabled:cursor-not-allowed"
               style={{ paddingLeft: 8, paddingRight: 3 }}
               title={currentProject?.path ?? "工作区"}
               aria-label="在文件资源管理器中打开项目"
@@ -596,7 +596,7 @@ export function SessionToolbar({
                 setProjectMenuOpen((value) => !value);
               }}
               disabled={!projectPath}
-              className="kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center disabled:cursor-not-allowed"
+              className="kimix-style-exempt kimix-split-control-part mr-0.5 flex h-8 w-6 items-center justify-center disabled:cursor-not-allowed"
               title="打开方式"
               aria-label="打开方式"
               aria-haspopup="menu"

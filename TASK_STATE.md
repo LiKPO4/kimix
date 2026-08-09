@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 收口：导入风格触点与交互状态覆盖门禁（v2.20.311）
+
+- 根因：内置 modern/retro/nostalgia 仍有大量组件级选择器，导入风格则只依靠固定语义角色消费段；过去的测试仅确认 29 个 role token 被编译和“至少出现一次”，没有校验内置触点差集、每个交互角色的状态完整度，也没有阻止新 JSX button 继续裸写 Tailwind，因此新控件会出现内置正常、导入遗漏。
+- 触点补齐：通用 `.kimix-icon-text-button`、检查器操作、弹窗关闭、媒体预览导航、房间触发、运行时错误关闭、设置图标操作、聊天 banner 操作统一接入 control；检查器列表接入 menuItem；模型供应商条目接入 navigationItem；设置徽章接入 statusSurface；工作区权限分组外壳接入 insetSection；muted、配色侧操作和对话折叠/过程行通过只覆盖 hover/active 的兼容桥消费 control 状态，避免静态整行误变成凸起按钮。
+- 状态补齐：navigationItem/navigationAction、interactiveCard、menuTrigger/menuItem、mediaThumb、dock、roomChoice 增加此前缺失的 active/selected 消费；工作区分段权限由外壳拥有边界，内项只消费 hover/selected 表面，避免自定义风格形成嵌套边框。
+- 防回退：新增“内置触点 vs 导入契约”集合差分测试，差集只允许 9 个已说明的结构或委托类；新增 13 个交互角色状态矩阵测试；扫描全部组件 JSX button，要求声明 `kimix-*` 风格角色或显式 `kimix-style-exempt`，以后新增裸按钮直接失败。
+- 验证：定向契约/风格测试 2 文件 / 33 项、全量测试 174 文件 / 1851 项、TypeScript 类型检查、生产构建、OKF validate/audit 均通过。
+
 ## 2026-08-09 修复：Composer 加号与画板比例项接入自定义 hover（v2.20.310）
 
 - 根因：加号已有 `.kimix-composer-tool-button`，但该角色遗漏于自定义 control 的 resting/hover/active 消费清单，导致导入风格下 hover 仍走基础 token；画板比例项仅有通用 `.kimix-icon-text-button`，完全没有自定义控件角色，Luna hover 只出现透明背景与空阴影。

@@ -4766,7 +4766,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                     <button
                       type="button"
                       onClick={() => setPreviewImage(attachment as ImageAttachment & { dataUrl: string })}
-                      className="block h-full w-full"
+                      className="kimix-style-exempt block h-full w-full"
                       title="点击查看图片"
                       aria-label={`查看图片 ${attachment.name}`}
                     >

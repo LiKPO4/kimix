@@ -94,7 +94,7 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         <button
           type="button"
           onClick={() => setWorkspaceView("chat")}
-          className="kimix-settings-sidebar-icon-button"
+          className="kimix-settings-sidebar-icon-button kimix-settings-navigation-item"
           title="返回对话"
           aria-label="返回对话"
         >
@@ -107,7 +107,7 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
               type="button"
               aria-current={activeSettingsPageId === page.id ? "page" : undefined}
               data-settings-page-button={page.id}
-              className={`kimix-settings-sidebar-icon-button ${activeSettingsPageId === page.id ? "is-active" : ""}`}
+              className={`kimix-settings-sidebar-icon-button kimix-settings-navigation-item ${activeSettingsPageId === page.id ? "is-active" : ""}`}
               title={page.label}
               aria-label={page.label}
               onClick={() => navigateToPage(page.id)}
@@ -131,7 +131,7 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         <button
           type="button"
           onClick={() => setWorkspaceView("chat")}
-          className="kimix-settings-sidebar-back"
+          className="kimix-settings-sidebar-back kimix-settings-navigation-item"
         >
           <ArrowLeft size={16} />
           <span>返回对话</span>
