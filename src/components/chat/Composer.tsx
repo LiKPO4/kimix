@@ -5052,8 +5052,8 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: "100%",
-                  height: 34,
-                  minHeight: 34,
+                  height: 32,
+                  minHeight: 32,
                   fontSize: 13,
                   lineHeight: "20px",
                   gap: 6,

@@ -369,6 +369,12 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:hover:not\(:disabled\)\s*\{/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:active:not\(:disabled\)\s*\{/s);
   });
+  it("Composer 思考强度按钮与同排紧凑按钮保持 32px 高", () => {
+    const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+
+    expect(composer).toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*32,[\s\S]*?minHeight:\s*32,/s);
+    expect(composer).not.toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*34,[\s\S]*?minHeight:\s*34,/s);
+  });
   it("内置风格触点与导入契约只允许已说明的结构差集", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const contractStart = css.indexOf("/* ── 可导入界面风格契约 ──");
