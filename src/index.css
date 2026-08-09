@@ -3911,9 +3911,8 @@ button.bg-accent-primary:disabled:hover,
 
 /* ── 可导入界面风格契约 ──
    自定义风格只注入 --ui-*；选择器和可变属性由 Kimix 固定，JSON 不能携带 CSS。
-   该作用域必须只由自定义风格显式开启，不能重画已经验收的默认/内置风格。 */
-@scope (:root[data-ui-style-contract="v1"]) {
-:is(:root:not([data-ui-style]), [data-ui-style]) {
+   仅由 data-ui-style-contract="v1" 显式开启，不能重画已经验收的默认/内置风格。 */
+:root[data-ui-style-contract="v1"] {
   --duration-fast: var(--ui-motion-hover-duration);
   --duration-base: var(--ui-motion-hover-duration);
   --duration-panel: var(--ui-motion-panel-duration);
@@ -3921,21 +3920,21 @@ button.bg-accent-primary:disabled:hover,
   --ease-enter: var(--ui-motion-easing);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-app-shell-main {
+:root[data-ui-style-contract="v1"] .kimix-app-shell-main {
   border: var(--ui-role-shell-resting-border);
   border-radius: var(--ui-role-shell-radius);
   background: var(--ui-role-shell-resting-background);
   box-shadow: var(--ui-role-shell-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-app-shell-toolbar, .kimix-app-shell-footer) {
+:root[data-ui-style-contract="v1"] :where(.kimix-app-shell-toolbar, .kimix-app-shell-footer) {
   border-color: var(--ui-section-divider-color);
   border-radius: var(--ui-role-toolbar-radius);
   background: var(--ui-role-toolbar-resting-background);
   box-shadow: var(--ui-role-toolbar-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-sidebar-nav-item,
   .kimix-sidebar-project-row,
   .kimix-sidebar-session-row,
@@ -3949,7 +3948,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-navigation-item-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-sidebar-nav-item,
   .kimix-sidebar-project-row,
   .kimix-sidebar-session-row,
@@ -3962,27 +3961,27 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-navigation-item-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-sidebar-project-row, .kimix-sidebar-session-row).is-active,
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-settings-navigation-item[aria-current="page"] {
+:root[data-ui-style-contract="v1"] :where(.kimix-sidebar-project-row, .kimix-sidebar-session-row).is-active,
+:root[data-ui-style-contract="v1"] .kimix-settings-navigation-item[aria-current="page"] {
   border: var(--ui-role-navigation-item-selected-border);
   background: var(--ui-role-navigation-item-selected-background);
   box-shadow: var(--ui-role-navigation-item-selected-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-sidebar-icon-action {
+:root[data-ui-style-contract="v1"] .kimix-sidebar-icon-action {
   border: var(--ui-role-navigation-action-resting-border);
   border-radius: var(--ui-role-navigation-action-radius);
   background: var(--ui-role-navigation-action-resting-background);
   box-shadow: var(--ui-role-navigation-action-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-sidebar-icon-action:hover:not(:disabled) {
+:root[data-ui-style-contract="v1"] .kimix-sidebar-icon-action:hover:not(:disabled) {
   border: var(--ui-role-navigation-action-hover-border);
   background: var(--ui-role-navigation-action-hover-background);
   box-shadow: var(--ui-role-navigation-action-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-toolbar-button,
   .kimix-window-control,
   .kimix-control-button,
@@ -4000,7 +3999,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-control-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-composer-primary-button,
   .kimix-room-primary-action,
   button.bg-accent-primary,
@@ -4010,7 +4009,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-primary-action-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-composer-primary-button,
   .kimix-room-primary-action,
   button.bg-accent-primary,
@@ -4019,7 +4018,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-primary-action-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-composer-primary-button,
   .kimix-room-primary-action,
   button.bg-accent-primary,
@@ -4028,7 +4027,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-primary-action-active-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-toolbar-button,
   .kimix-window-control,
   .kimix-control-button,
@@ -4045,7 +4044,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-control-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-toolbar-button,
   .kimix-window-control,
   .kimix-control-button,
@@ -4062,21 +4061,21 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-control-active-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-split-control, .kimix-room-secondary-action) {
+:root[data-ui-style-contract="v1"] :where(.kimix-split-control, .kimix-room-secondary-action) {
   border: var(--ui-role-compound-control-resting-border);
   border-radius: var(--ui-role-compound-control-radius);
   background: var(--ui-role-compound-control-resting-background);
   box-shadow: var(--ui-role-compound-control-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"] {
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"] {
   border: var(--ui-role-toggle-selected-border);
   border-radius: var(--ui-role-toggle-radius);
   background: var(--ui-role-toggle-selected-background);
   box-shadow: var(--ui-role-toggle-selected-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
   .kimix-composer-input,
   .kimix-inspector-field
@@ -4087,7 +4086,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-field-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
   .kimix-composer-input,
   .kimix-inspector-field
@@ -4098,7 +4097,7 @@ button.bg-accent-primary:disabled:hover,
   outline: none;
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-soft-card,
   .kimix-settings-card,
   .kimix-settings-connection,
@@ -4114,7 +4113,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-card-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
@@ -4128,7 +4127,7 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-interactive-card-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
@@ -4141,41 +4140,41 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-interactive-card-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-soft-card-strong, .kimix-model-provider-manager) {
+:root[data-ui-style-contract="v1"] :where(.kimix-soft-card-strong, .kimix-model-provider-manager) {
   border: var(--ui-role-strong-card-resting-border);
   border-radius: var(--ui-role-strong-card-radius);
   background: var(--ui-role-strong-card-resting-background);
   box-shadow: var(--ui-role-strong-card-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-section-card {
+:root[data-ui-style-contract="v1"] .kimix-section-card {
   border: var(--ui-role-section-card-resting-border);
   border-radius: var(--ui-role-section-card-radius);
   background: var(--ui-role-section-card-resting-background);
   box-shadow: var(--ui-role-section-card-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-modal-card, .kimix-floating-panel) .kimix-section-card {
+:root[data-ui-style-contract="v1"] :where(.kimix-modal-card, .kimix-floating-panel) .kimix-section-card {
   border: 0;
   background: var(--surface-base);
   box-shadow: none;
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-inset-section {
+:root[data-ui-style-contract="v1"] .kimix-inset-section {
   border: var(--ui-role-inset-section-resting-border);
   border-radius: var(--ui-role-inset-section-radius);
   background: var(--ui-role-inset-section-resting-background);
   box-shadow: var(--ui-role-inset-section-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-event-card {
+:root[data-ui-style-contract="v1"] .kimix-event-card {
   border: var(--ui-role-event-card-resting-border);
   border-radius: var(--ui-role-event-card-radius);
   background: var(--ui-role-event-card-resting-background);
   box-shadow: var(--ui-role-event-card-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-floating-panel, .kimix-menu-panel) {
+:root[data-ui-style-contract="v1"] :where(.kimix-floating-panel, .kimix-menu-panel) {
   border: var(--ui-role-popup-resting-border);
   border-radius: var(--ui-role-popup-radius);
   background: var(--ui-role-popup-resting-background);
@@ -4183,33 +4182,33 @@ button.bg-accent-primary:disabled:hover,
   backdrop-filter: none;
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-menu-item {
+:root[data-ui-style-contract="v1"] .kimix-menu-item {
   border: var(--ui-role-menu-item-resting-border);
   border-radius: var(--ui-role-menu-item-radius);
   background: var(--ui-role-menu-item-resting-background);
   box-shadow: var(--ui-role-menu-item-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-top-menu-trigger, .kimix-menu-trigger) {
+:root[data-ui-style-contract="v1"] :where(.kimix-top-menu-trigger, .kimix-menu-trigger) {
   border: var(--ui-role-menu-trigger-resting-border);
   border-radius: var(--ui-role-menu-trigger-radius);
   background: var(--ui-role-menu-trigger-resting-background);
   box-shadow: var(--ui-role-menu-trigger-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-top-menu-trigger, .kimix-menu-trigger):hover {
+:root[data-ui-style-contract="v1"] :where(.kimix-top-menu-trigger, .kimix-menu-trigger):hover {
   border: var(--ui-role-menu-trigger-hover-border);
   background: var(--ui-role-menu-trigger-hover-background);
   box-shadow: var(--ui-role-menu-trigger-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-menu-item:hover:not(:disabled):not([aria-disabled="true"]) {
+:root[data-ui-style-contract="v1"] .kimix-menu-item:hover:not(:disabled):not([aria-disabled="true"]) {
   border: var(--ui-role-menu-item-hover-border);
   background: var(--ui-role-menu-item-hover-background);
   box-shadow: var(--ui-role-menu-item-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(
+:root[data-ui-style-contract="v1"] :where(
   .kimix-modal-card,
   .kimix-onboarding-card,
   .kimix-settings-panel:not(.is-workspace)
@@ -4220,99 +4219,98 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-modal-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-composer-card {
+:root[data-ui-style-contract="v1"] .kimix-composer-card {
   border: var(--ui-role-composer-resting-border);
   border-radius: var(--ui-role-composer-radius);
   background: var(--ui-role-composer-resting-background);
   box-shadow: var(--ui-role-composer-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-composer-card.is-focused {
+:root[data-ui-style-contract="v1"] .kimix-composer-card.is-focused {
   border: var(--ui-role-composer-focus-border);
   background: var(--ui-role-composer-focus-background);
   box-shadow: var(--ui-role-composer-focus-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-user-bubble {
+:root[data-ui-style-contract="v1"] .kimix-user-bubble {
   border: var(--ui-role-user-bubble-resting-border);
   border-radius: var(--ui-role-user-bubble-radius);
   background: var(--ui-role-user-bubble-resting-background);
   box-shadow: var(--ui-role-user-bubble-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-status-surface, .markdown-body .kimix-inline-code) {
+:root[data-ui-style-contract="v1"] :where(.kimix-status-surface, .markdown-body .kimix-inline-code) {
   border: var(--ui-role-status-surface-resting-border);
   border-radius: var(--ui-role-status-surface-radius);
   background: var(--ui-role-status-surface-resting-background);
   box-shadow: var(--ui-role-status-surface-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-markdown-code-block, .markdown-body .kimix-streaming-plain-code) {
+:root[data-ui-style-contract="v1"] :where(.kimix-markdown-code-block, .markdown-body .kimix-streaming-plain-code) {
   border: var(--ui-role-code-block-resting-border);
   border-radius: var(--ui-role-code-block-radius);
   background: var(--ui-role-code-block-resting-background);
   box-shadow: var(--ui-role-code-block-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-markdown-table-frame {
+:root[data-ui-style-contract="v1"] .kimix-markdown-table-frame {
   border: var(--ui-role-table-resting-border);
   border-radius: var(--ui-role-table-radius);
   background: var(--ui-role-table-resting-background);
   box-shadow: var(--ui-role-table-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-media-thumb {
+:root[data-ui-style-contract="v1"] .kimix-media-thumb {
   border: var(--ui-role-media-thumb-resting-border);
   border-radius: var(--ui-role-media-thumb-radius);
   background: var(--ui-role-media-thumb-resting-background);
   box-shadow: var(--ui-role-media-thumb-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-media-thumb:hover {
+:root[data-ui-style-contract="v1"] .kimix-media-thumb:hover {
   border: var(--ui-role-media-thumb-hover-border);
   background: var(--ui-role-media-thumb-hover-background);
   box-shadow: var(--ui-role-media-thumb-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-longtask-inspector, .kimix-diff-panel, .kimix-model-provider-sidebar) {
+:root[data-ui-style-contract="v1"] :where(.kimix-longtask-inspector, .kimix-diff-panel, .kimix-model-provider-sidebar) {
   border: var(--ui-role-inspector-resting-border);
   border-radius: var(--ui-role-inspector-radius);
   background: var(--ui-role-inspector-resting-background);
   box-shadow: var(--ui-role-inspector-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-toast, .kimix-chat-navigation-preview) {
+:root[data-ui-style-contract="v1"] :where(.kimix-toast, .kimix-chat-navigation-preview) {
   border: var(--ui-role-toast-resting-border);
   border-radius: var(--ui-role-toast-radius);
   background: var(--ui-role-toast-resting-background);
   box-shadow: var(--ui-role-toast-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) :where(.kimix-dock-panel, .kimix-dock-capsule) {
+:root[data-ui-style-contract="v1"] :where(.kimix-dock-panel, .kimix-dock-capsule) {
   border: var(--ui-role-dock-resting-border);
   border-radius: var(--ui-role-dock-radius);
   background: var(--ui-role-dock-resting-background);
   box-shadow: var(--ui-role-dock-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-room-choice {
+:root[data-ui-style-contract="v1"] .kimix-room-choice {
   border: var(--ui-role-room-choice-resting-border);
   border-radius: var(--ui-role-room-choice-radius);
   background: var(--ui-role-room-choice-resting-background);
   box-shadow: var(--ui-role-room-choice-resting-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-room-choice:hover:not(:disabled) {
+:root[data-ui-style-contract="v1"] .kimix-room-choice:hover:not(:disabled) {
   border: var(--ui-role-room-choice-hover-border);
   background: var(--ui-role-room-choice-hover-background);
   box-shadow: var(--ui-role-room-choice-hover-shadow);
 }
 
-:is(:root:not([data-ui-style]), [data-ui-style]) .kimix-room-choice:is([aria-pressed="true"], [data-selected="true"]) {
+:root[data-ui-style-contract="v1"] .kimix-room-choice:is([aria-pressed="true"], [data-selected="true"]) {
   border: var(--ui-role-room-choice-selected-border);
   background: var(--ui-role-room-choice-selected-background);
   box-shadow: var(--ui-role-room-choice-selected-shadow);
-}
 }
 
 .kimix-settings-uistyle-wrap {
@@ -4391,6 +4389,11 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-settings-uistyle-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;

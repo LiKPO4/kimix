@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：自定义风格消费规则真正生效并收紧描述卡片（v2.20.307）
+
+- 现象一：自定义风格的长 description 完整铺开，Windows XP Luna 卡片达到 8 行并撑高整行。修复为最多两行（36px）截断，完整说明保留在 title；AI 生成提示同时限制后续 description 不超过 48 个中文字符。
+- 现象二：设置显示 `custom:windows-xp-luna` 已选中，但多数控件仍接近默认。运行态证据显示 JSON 已加载（壳层/卡片角色变量为 8px/4px），实际壳层/卡片却是 20px/6px。
+- 根因：v2.20.305 用 `@scope (:root[data-ui-style-contract="v1"])` 隔离自定义规则，但内部仍以根祖先选择器开头，作用域根无法按该写法参与匹配；移除 `@scope` 后，文件后半段的同特异性基础组件规则又覆盖了自定义规则。
+- 修复：47 组固定消费规则统一使用 `:root[data-ui-style-contract="v1"]`，既只命中自定义风格，又以根伪类 + 属性标记的稳定特异性压过后置基础形状，不使用 `!important`。Windows XP Luna 实机计算样式复核：shell 8px、活动风格卡 4px、普通按钮 3px + raised shadow、输入 2px/2px border + inset shadow，均与 JSON 一致。
+- 验证：定向契约/风格 2 文件 28 项、最终全量 174 文件 1846 项、Node/Renderer typecheck、生产构建（main `701.24 kB`、renderer CSS `assets/index-DM6_vo8-.css`、JS `assets/index-C9D1Dd-5.js`）、OKF strict（14 concepts、474 links）与 180 天审计通过；自定义 Luna 运行态计算样式已量化核对，最终视觉待用户在 v2.20.307 截图复验。
+
 ## 2026-08-09 修复：AI 风格提示优先创建可导入 JSON 文件（v2.20.306）
 
 - 根因：复制提示的终止指令是“只输出一个 JSON 代码块”，会明确诱导具备文件工具的 Agent 也把配置留在对话正文，用户还要手动复制并另存。

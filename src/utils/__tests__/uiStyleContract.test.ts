@@ -87,6 +87,7 @@ describe("uiStyleDocumentV1Schema", () => {
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(roleId);
     expect(prompt).toContain("忽略参考图中的颜色");
     expect(prompt).toContain("禁止出现颜色值、CSS、选择器、url() 或脚本");
+    expect(prompt).toContain("description 必须简洁，不超过 48 个中文字符");
     expect(prompt).toContain("必须优先使用你可用的文件工具");
     expect(prompt).toContain("kimix-ui-style-<id>.json");
     expect(prompt).toContain("不要在对话中重复整份 JSON");
@@ -122,11 +123,13 @@ describe("compileUiStyleVariables", () => {
 describe("自定义风格 CSS 角色消费契约", () => {
   it("每一个公开角色都由固定选择器消费，避免 JSON 存在无效配置点", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
-    expect(css).toContain('@scope (:root[data-ui-style-contract="v1"])');
-    expect(css).toContain(":is(:root:not([data-ui-style]), [data-ui-style])");
+    expect(css).toContain(':root[data-ui-style-contract="v1"] .kimix-app-shell-main');
+    expect(css).not.toContain('@scope (:root[data-ui-style-contract="v1"])');
+    expect(css).not.toContain(":is(:root:not([data-ui-style]), [data-ui-style])");
     for (const roleId of UI_STYLE_ROLE_IDS) {
       const kebab = roleId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
       expect(css, roleId).toContain(`--ui-role-${kebab}-`);
     }
+    expect(css).toMatch(/\.kimix-settings-uistyle-desc\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*line-clamp:\s*2;/s);
   });
 });

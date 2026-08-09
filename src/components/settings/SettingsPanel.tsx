@@ -1479,7 +1479,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         className={`kimix-settings-uistyle ${uiStyle === style.id ? "is-active" : ""}`}
                       >
                         <span className="kimix-settings-uistyle-label">{style.label}</span>
-                        <span className="kimix-settings-uistyle-desc">{style.description}</span>
+                        <span className="kimix-settings-uistyle-desc" title={style.description}>{style.description}</span>
                       </button>
                       {style.custom && (
                         <button
