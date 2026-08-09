@@ -4197,6 +4197,8 @@ button.bg-accent-primary:disabled:hover,
 
 :root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
+  .kimix-settings-color-value,
+  .kimix-settings-search,
   .kimix-inspector-field
 ) {
   border: var(--ui-role-field-resting-border);
@@ -4207,8 +4209,10 @@ button.bg-accent-primary:disabled:hover,
 
 :root[data-ui-style-contract="v1"] :where(
   .kimix-settings-input,
+  .kimix-settings-color-value,
   .kimix-inspector-field
-):focus {
+):focus,
+:root[data-ui-style-contract="v1"] .kimix-settings-search:focus-within {
   border: var(--ui-role-field-focus-border);
   background: var(--ui-role-field-focus-background);
   box-shadow: var(--ui-role-field-focus-shadow);
@@ -4304,9 +4308,18 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: none;
 }
 
-:root[data-ui-style-contract="v1"] :where(
-  .kimix-inset-section,
-  .kimix-settings-panel.is-workspace .kimix-settings-permissions
+:root[data-ui-style-contract="v1"] .kimix-inset-section {
+  border: var(--ui-role-inset-section-resting-border);
+  border-radius: var(--ui-role-inset-section-radius);
+  background: var(--ui-role-inset-section-resting-background);
+  box-shadow: var(--ui-role-inset-section-resting-shadow);
+}
+
+/* 工作区分段外壳的基础选择器带三层 class；保留显式工作区作用域，
+   确保导入契约的 insetSection 材质不会被基础 6px 圆角覆盖。 */
+:root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace :where(
+  .kimix-settings-theme-grid,
+  .kimix-settings-permissions
 ) {
   border: var(--ui-role-inset-section-resting-border);
   border-radius: var(--ui-role-inset-section-radius);

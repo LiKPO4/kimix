@@ -170,9 +170,9 @@ describe("自定义风格 CSS 角色消费契约", () => {
     expect(css).toContain(':root[data-ui-style-contract="v1"] .kimix-app-shell-main');
     expect(css).not.toContain('@scope (:root[data-ui-style-contract="v1"])');
     expect(css).not.toContain(":is(:root:not([data-ui-style]), [data-ui-style])");
-    const customFieldSelectors = css.match(/:root\[data-ui-style-contract="v1"\]\s+:where\(\s*\.kimix-settings-input,\s*\.kimix-inspector-field\s*\)(?::focus)?\s*\{/g) ?? [];
-    expect(customFieldSelectors).toHaveLength(2);
-    expect(customFieldSelectors.join("\n")).not.toContain(".kimix-composer-input");
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\(\s*\.kimix-settings-input,\s*\.kimix-settings-color-value,\s*\.kimix-settings-search,\s*\.kimix-inspector-field\s*\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\(\s*\.kimix-settings-input,\s*\.kimix-settings-color-value,\s*\.kimix-inspector-field\s*\):focus,\s*:root\[data-ui-style-contract="v1"\]\s+\.kimix-settings-search:focus-within\s*\{/s);
+    expect(css.slice(css.indexOf("/* ── 可导入界面风格契约 ──"))).not.toMatch(/:where\([^)]*\.kimix-composer-input[^)]*\)\s*(?::focus)?\s*\{/s);
     expect(css).toMatch(/\.kimix-composer-input,[\s\S]*?\.kimix-composer-input:focus-visible\s*\{[^}]*border:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;[^}]*box-shadow:\s*none\s*!important;/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-split-control[\s\S]*?:hover[\s\S]*?--ui-role-compound-control-hover-shadow/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-state-button[\s\S]*?:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)[\s\S]*?--ui-role-toggle-hover-shadow/s);
