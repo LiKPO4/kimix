@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset } from "@/types/ui";
+import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
 interface BootstrapSetters {
   setTheme: (theme: Theme) => void;
   setUiStyle: (id: UiStyleId) => void;
+  setCustomUiStyles: (documents: UiStyleDocumentV1[]) => void;
   setThemePalette: (palette: ThemePaletteId) => void;
   setCustomThemePalette: (colors: ThemePaletteColors) => void;
   setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
@@ -41,8 +43,10 @@ export function useBootstrap(setters: BootstrapSetters) {
             customThemePalette: res.data.customThemePalette,
             kimiThemePalettes: res.data.kimiThemePalettes ?? [],
             uiStyle: res.data.uiStyle,
+            customUiStyles: res.data.customUiStyles ?? [],
           });
           setters.setTheme(res.data.theme);
+          setters.setCustomUiStyles(res.data.customUiStyles ?? []);
           setters.setUiStyle(res.data.uiStyle);
           setters.setThemePalette(res.data.themePalette);
           setters.setCustomThemePalette(res.data.customThemePalette);

@@ -1,4 +1,6 @@
 import type { KimiThemePreset, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId } from "@/types/ui";
+import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
+import { normalizeCustomUiStyleDocuments } from "@/utils/builtinUiStyleDocuments";
 import { applyUiStyle, DEFAULT_UI_STYLE_ID, normalizeUiStyleId } from "@/utils/uiStyles";
 import {
   applyThemePalette,
@@ -18,6 +20,7 @@ export type ThemeSnapshot = {
   customThemePalette: ThemePaletteColors;
   kimiThemePalettes: KimiThemePreset[];
   uiStyle: UiStyleId;
+  customUiStyles: UiStyleDocumentV1[];
 };
 
 export const DEFAULT_THEME_SNAPSHOT: ThemeSnapshot = {
@@ -26,6 +29,7 @@ export const DEFAULT_THEME_SNAPSHOT: ThemeSnapshot = {
   customThemePalette: DEFAULT_CUSTOM_THEME_PALETTE,
   kimiThemePalettes: DEFAULT_KIMI_THEME_PRESETS,
   uiStyle: DEFAULT_UI_STYLE_ID,
+  customUiStyles: [],
 };
 
 function normalizeTheme(value: unknown): Theme {
@@ -44,6 +48,7 @@ export function readCachedThemeSnapshot(): ThemeSnapshot {
       customThemePalette: normalizeThemePaletteColors(snapshot.customThemePalette),
       kimiThemePalettes: normalizeKimiThemePresets(snapshot.kimiThemePalettes),
       uiStyle: normalizeUiStyleId(snapshot.uiStyle),
+      customUiStyles: normalizeCustomUiStyleDocuments(snapshot.customUiStyles),
     };
   } catch {
     return DEFAULT_THEME_SNAPSHOT;
@@ -59,6 +64,9 @@ export function writeCachedThemeSnapshot(snapshot: ThemeSnapshot) {
       customThemePalette: normalizeThemePaletteColors(snapshot.customThemePalette),
       kimiThemePalettes: normalizeKimiThemePresets(snapshot.kimiThemePalettes),
       uiStyle: normalizeUiStyleId(snapshot.uiStyle),
+      customUiStyles: normalizeCustomUiStyleDocuments(snapshot.customUiStyles).filter((document) => (
+        `custom:${document.id}` === normalizeUiStyleId(snapshot.uiStyle)
+      )),
     }));
   } catch {
     // Cache misses only affect first-paint polish; persisted settings remain authoritative.
@@ -76,7 +84,7 @@ export function applyThemeSnapshot(snapshot: ThemeSnapshot) {
   const mode = resolveThemeMode(snapshot.theme);
   document.documentElement.setAttribute("data-theme", mode);
   applyThemePalette(snapshot.themePalette, snapshot.customThemePalette, mode, snapshot.kimiThemePalettes);
-  applyUiStyle(snapshot.uiStyle);
+  applyUiStyle(snapshot.uiStyle, snapshot.customUiStyles);
 }
 
 export function applyCachedThemeSnapshot() {

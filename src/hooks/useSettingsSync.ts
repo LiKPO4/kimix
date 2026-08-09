@@ -11,6 +11,7 @@ export function useSettingsSync() {
         state.customThemePalette !== prev.customThemePalette ||
         state.kimiThemePalettes !== prev.kimiThemePalettes ||
         state.uiStyle !== prev.uiStyle ||
+        state.customUiStyles !== prev.customUiStyles ||
         state.permissionMode !== prev.permissionMode ||
         state.defaultThinking !== prev.defaultThinking ||
         state.defaultThinkingEffort !== prev.defaultThinkingEffort ||
@@ -34,6 +35,7 @@ export function useSettingsSync() {
           customThemePalette: state.customThemePalette,
           kimiThemePalettes: state.kimiThemePalettes,
           uiStyle: state.uiStyle,
+          customUiStyles: state.customUiStyles,
         });
         window.api.saveSettings({
           theme: state.theme,
@@ -41,6 +43,7 @@ export function useSettingsSync() {
           customThemePalette: state.customThemePalette,
           kimiThemePalettes: state.kimiThemePalettes,
           uiStyle: state.uiStyle,
+          customUiStyles: state.customUiStyles,
           defaultPermissionMode: state.permissionMode,
           defaultThinking: state.defaultThinking,
           defaultThinkingEffort: state.defaultThinkingEffort,

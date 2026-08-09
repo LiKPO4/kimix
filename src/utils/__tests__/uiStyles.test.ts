@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { applyUiStyle, DEFAULT_UI_STYLE_ID, normalizeUiStyleId, UI_STYLE_ATTRIBUTE, UI_STYLES } from "../uiStyles";
+import { BUILTIN_UI_STYLE_DOCUMENTS } from "../builtinUiStyleDocuments";
 
 describe("normalizeUiStyleId", () => {
   it("保留合法风格 id", () => {
@@ -9,6 +10,7 @@ describe("normalizeUiStyleId", () => {
     expect(normalizeUiStyleId("modern")).toBe("modern");
     expect(normalizeUiStyleId("retro")).toBe("retro");
     expect(normalizeUiStyleId("nostalgia")).toBe("nostalgia");
+    expect(normalizeUiStyleId("custom:platinum-soft")).toBe("custom:platinum-soft");
   });
 
   it("非法或缺失值回退为 default", () => {
@@ -16,6 +18,7 @@ describe("normalizeUiStyleId", () => {
     expect(normalizeUiStyleId(null)).toBe("default");
     expect(normalizeUiStyleId("")).toBe("default");
     expect(normalizeUiStyleId("flat")).toBe("default");
+    expect(normalizeUiStyleId("custom:../../escape")).toBe("default");
     expect(normalizeUiStyleId(42)).toBe("default");
   });
 });
@@ -365,5 +368,22 @@ describe("applyUiStyle", () => {
     applyUiStyle("modern");
     applyUiStyle("unknown");
     expect(document.documentElement.hasAttribute(UI_STYLE_ATTRIBUTE)).toBe(false);
+  });
+
+  it("自定义风格使用规范化文档注入变量，缺失文档则安全回退默认", () => {
+    const custom = {
+      ...BUILTIN_UI_STYLE_DOCUMENTS.retro,
+      id: "platinum-soft",
+      name: "白金小圆角",
+    };
+    applyUiStyle("custom:platinum-soft", [custom]);
+    expect(document.documentElement.getAttribute(UI_STYLE_ATTRIBUTE)).toBe("custom:platinum-soft");
+    expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("6px");
+    expect(document.documentElement.style.getPropertyValue("--ui-role-section-card-resting-border"))
+      .toBe("1px solid var(--border-default)");
+
+    applyUiStyle("custom:missing", []);
+    expect(document.documentElement.hasAttribute(UI_STYLE_ATTRIBUTE)).toBe(false);
+    expect(document.documentElement.style.getPropertyValue("--ui-radius-card")).toBe("12px");
   });
 });

@@ -1,6 +1,8 @@
+import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
+
 export type Theme = "dark" | "light" | "system";
 export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
-export type UiStyleId = "default" | "modern" | "retro" | "nostalgia";
+export type UiStyleId = "default" | "modern" | "retro" | "nostalgia" | `custom:${string}`;
 export interface ThemePaletteColors {
   primary: string;
   surface: string;
@@ -121,6 +123,7 @@ export interface AppState {
   sidebarOpen: boolean;
   theme: Theme;
   uiStyle: UiStyleId;
+  customUiStyles: UiStyleDocumentV1[];
   themePalette: ThemePaletteId;
   customThemePalette: ThemePaletteColors;
   kimiThemePalettes: KimiThemePreset[];

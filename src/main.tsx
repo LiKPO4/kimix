@@ -95,6 +95,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   theme: "light",
   themePalette: "warm-paper" as const,
   uiStyle: "default" as const,
+  customUiStyles: [],
   customThemePalette: {
     primary: "#1982FF",
     surface: "#EDE9E0",
@@ -234,6 +235,7 @@ function installBrowserPreviewApi() {
     applyImportFromCcCodex: () => fail("导入 CC/Codex 配置"),
     previewKimiThemeImport: () => fail("预览 Kimi 主题导入"),
     applyKimiThemeImport: () => fail("导入 Kimi 主题"),
+    importUiStyle: () => fail("导入界面风格"),
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),
     getLongTaskDetail: () => fail("读取长程任务详情"),
@@ -743,6 +745,7 @@ void (async () => {
       customThemePalette: res.data.customThemePalette,
       kimiThemePalettes: res.data.kimiThemePalettes,
       uiStyle: res.data.uiStyle,
+      customUiStyles: res.data.customUiStyles ?? [],
     };
     applyThemeSnapshot(snapshot);
     writeCachedThemeSnapshot(snapshot);

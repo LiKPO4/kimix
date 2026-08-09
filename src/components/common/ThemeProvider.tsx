@@ -8,10 +8,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const customThemePalette = useAppStore((s) => s.customThemePalette);
   const kimiThemePalettes = useAppStore((s) => s.kimiThemePalettes);
   const uiStyle = useAppStore((s) => s.uiStyle);
+  const customUiStyles = useAppStore((s) => s.customUiStyles);
 
   useLayoutEffect(() => {
     const applyMode = (mode: "light" | "dark") => {
-      applyThemeSnapshot({ theme: mode, themePalette, customThemePalette, kimiThemePalettes, uiStyle });
+      applyThemeSnapshot({ theme: mode, themePalette, customThemePalette, kimiThemePalettes, uiStyle, customUiStyles });
     };
 
     if (theme === "system") {
@@ -25,7 +26,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       applyMode(theme);
     }
-  }, [theme, themePalette, customThemePalette, kimiThemePalettes, uiStyle]);
+  }, [theme, themePalette, customThemePalette, kimiThemePalettes, uiStyle, customUiStyles]);
 
   return <>{children}</>;
 }

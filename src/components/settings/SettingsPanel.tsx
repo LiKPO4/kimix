@@ -16,6 +16,7 @@ import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecove
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
 import { UI_STYLES } from "@/utils/uiStyles";
+import { buildUiStyleAiPrompt } from "@/utils/builtinUiStyleDocuments";
 import {
   applySessionBackupImportPlan,
   buildSessionBackupSnapshot,
@@ -364,6 +365,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setTheme = useAppStore((s) => s.setTheme);
   const uiStyle = useAppStore((s) => s.uiStyle);
   const setUiStyle = useAppStore((s) => s.setUiStyle);
+  const customUiStyles = useAppStore((s) => s.customUiStyles);
+  const upsertCustomUiStyle = useAppStore((s) => s.upsertCustomUiStyle);
+  const removeCustomUiStyle = useAppStore((s) => s.removeCustomUiStyle);
   const themePalette = useAppStore((s) => s.themePalette);
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const customThemePalette = useAppStore((s) => s.customThemePalette);
@@ -450,6 +454,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
   const [themeDeleteBusyId, setThemeDeleteBusyId] = useState<string | null>(null);
+  const [uiStyleImportBusy, setUiStyleImportBusy] = useState(false);
+  const [uiStyleImportMessage, setUiStyleImportMessage] = useState<string | null>(null);
   const [modelConfig, setModelConfig] = useState<KimiModelConfigSummary | null>(settingsStatusCache.modelConfig);
   const [modelConfigLoading, setModelConfigLoading] = useState(!settingsStatusCache.modelConfig);
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
@@ -787,6 +793,40 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const updateCustomThemeColor = (key: keyof ThemePaletteColors, value: string) => {
     setCustomThemePalette({ ...customThemePalette, [key]: value });
     if (themePalette !== "custom") setThemePalette("custom");
+  };
+
+  const importCustomUiStyle = async () => {
+    setUiStyleImportBusy(true);
+    setUiStyleImportMessage(null);
+    try {
+      const result = await window.api.importUiStyle();
+      if (!result.success) {
+        setUiStyleImportMessage(`导入失败：${result.error}`);
+        return;
+      }
+      if (result.data.canceled || !result.data.document) return;
+      upsertCustomUiStyle(result.data.document);
+      setUiStyleImportMessage(`已导入并应用「${result.data.document.name}」。`);
+    } catch (error) {
+      setUiStyleImportMessage(`导入失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setUiStyleImportBusy(false);
+    }
+  };
+
+  const deleteCustomUiStyle = (id: string, name: string) => {
+    if (!window.confirm(`删除自定义界面风格「${name}」？\n\n内置风格不会受到影响。`)) return;
+    removeCustomUiStyle(id);
+    setUiStyleImportMessage(`已删除「${name}」。`);
+  };
+
+  const copyUiStyleAiPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(buildUiStyleAiPrompt());
+      setUiStyleImportMessage("已复制界面风格 AI 生成提示。可直接发给 AI，再补充参考图或关键词。");
+    } catch (error) {
+      setUiStyleImportMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const scanOfficialKimiThemes = async () => {
@@ -1396,21 +1436,68 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   ))}
                 </div>
-                <div className="kimix-settings-subsection-title" style={{ marginTop: 16 }}>界面风格</div>
-                <div className="kimix-settings-uistyle-grid">
-                  {UI_STYLES.map((style) => (
+                <div className="kimix-settings-row-title" style={{ marginTop: 16 }}>
+                  <div className="kimix-settings-subsection-title">界面风格</div>
+                  <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <button
-                      key={style.id}
                       type="button"
-                      aria-pressed={uiStyle === style.id}
-                      onClick={() => setUiStyle(style.id)}
-                      className={`kimix-settings-uistyle ${uiStyle === style.id ? "is-active" : ""}`}
+                      className="kimix-settings-check-button"
+                      onClick={() => void importCustomUiStyle()}
+                      disabled={uiStyleImportBusy}
                     >
-                      <span className="kimix-settings-uistyle-label">{style.label}</span>
-                      <span className="kimix-settings-uistyle-desc">{style.description}</span>
+                      {uiStyleImportBusy ? <RefreshCw size={15} className="kimix-spin" /> : <Upload size={15} />}
+                      <span>{uiStyleImportBusy ? "导入中" : "导入 JSON"}</span>
                     </button>
+                    <button
+                      type="button"
+                      className="kimix-settings-check-button"
+                      onClick={() => void copyUiStyleAiPrompt()}
+                    >
+                      <FileText size={15} />
+                      <span>复制 AI 提示</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="kimix-settings-uistyle-grid">
+                  {[
+                    ...UI_STYLES.map((style) => ({ ...style, custom: false as const })),
+                    ...customUiStyles.map((document) => ({
+                      id: `custom:${document.id}` as const,
+                      label: document.name,
+                      description: document.description || `基于${document.basedOn}的自定义界面风格`,
+                      custom: true as const,
+                    })),
+                  ].map((style) => (
+                    <div
+                      key={style.id}
+                      className={`kimix-settings-uistyle-wrap ${uiStyle === style.id ? "is-active" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={uiStyle === style.id}
+                        onClick={() => setUiStyle(style.id)}
+                        className={`kimix-settings-uistyle ${uiStyle === style.id ? "is-active" : ""}`}
+                      >
+                        <span className="kimix-settings-uistyle-label">{style.label}</span>
+                        <span className="kimix-settings-uistyle-desc">{style.description}</span>
+                      </button>
+                      {style.custom && (
+                        <button
+                          type="button"
+                          className="kimix-settings-uistyle-delete"
+                          onClick={() => deleteCustomUiStyle(style.id, style.label)}
+                          title={`删除自定义界面风格 ${style.label}`}
+                          aria-label={`删除自定义界面风格 ${style.label}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
+                {uiStyleImportMessage && (
+                  <div className="kimix-settings-theme-scan-message">{uiStyleImportMessage}</div>
+                )}
                 <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
                   <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14 }}>
                     <div className="min-w-0">

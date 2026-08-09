@@ -39,6 +39,8 @@ import { activateWindow } from "./windowActivation";
 import { discoverOpenAiModels, ModelListEndpointUnsupportedError } from "./providerModelDiscovery";
 import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
 import { mergeRuntimeAndDiskModelConfig } from "../src/utils/modelConfigSummary";
+import { canonicalizeCustomUiStyleDocument } from "../src/utils/builtinUiStyleDocuments";
+import { parseUiStyleDocument, uiStyleDocumentV1Schema } from "../src/utils/uiStyleContract";
 import {
   createDeferredOnceTask,
   createDistinctAsyncWriter,
@@ -7485,6 +7487,39 @@ ipcMain.handle("kimi:deleteThemeSource", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("app:importUiStyle", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { path?: unknown } : {};
+    let filePath = typeof req.path === "string" && req.path.trim() ? path.resolve(req.path.trim()) : "";
+    if (!filePath) {
+      const result = await showOpenDialog({
+        title: "导入 Kimix 界面风格",
+        properties: ["openFile"],
+        filters: [
+          { name: "Kimix 界面风格", extensions: ["json"] },
+          { name: "所有文件", extensions: ["*"] },
+        ],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: true, data: { document: null, path: "", canceled: true } };
+      }
+      filePath = path.resolve(result.filePaths[0]);
+    }
+    if (path.extname(filePath).toLowerCase() !== ".json") throw new Error("界面风格文件必须是 JSON。 ");
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) throw new Error("界面风格路径不是文件。");
+    if (stat.size > 256 * 1024) throw new Error("界面风格文件不能超过 256 KB。");
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
+    const parsed = parseUiStyleDocument(raw);
+    if (!parsed.success) throw new Error(`界面风格格式无效：${parsed.errors.slice(0, 6).join("；")}`);
+    const document = canonicalizeCustomUiStyleDocument(parsed.data);
+    if (!document) throw new Error("界面风格无法规范化。");
+    return { success: true, data: { document, path: filePath, canceled: false } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:exportMarkdown", async (_, request: unknown) => {
   try {
     return { success: true, data: await exportMarkdownDocument(request) };
@@ -7672,7 +7707,11 @@ const SettingsSchema = z.object({
     ["warm-paper", "neutral-gray", "soft-green", "warm-orange", "custom", "kimi"].includes(value) ||
     /^kimi:[^:]+/.test(value)
   ).optional(),
-  uiStyle: z.enum(["default", "modern", "retro", "nostalgia"]).optional(),
+  uiStyle: z.string().refine((value) =>
+    ["default", "modern", "retro", "nostalgia"].includes(value) ||
+    /^custom:[a-z0-9][a-z0-9._-]{0,63}$/.test(value)
+  ).optional(),
+  customUiStyles: z.array(uiStyleDocumentV1Schema).max(100).optional(),
   customThemePalette: ThemePaletteColorsSchema.optional(),
   kimiThemePalette: KimiThemePaletteSchema.optional(),
   kimiThemePalettes: z.array(z.object({

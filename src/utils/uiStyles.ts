@@ -1,4 +1,6 @@
 import type { UiStyleId } from "@/types/ui";
+import { BUILTIN_UI_STYLE_DOCUMENTS, type BuiltinUiStyleId } from "@/utils/builtinUiStyleDocuments";
+import { compileUiStyleVariables, type UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 
 /** 根元素上标记当前界面风格的 data 属性；default 时移除以回退 :root 变量。 */
 export const UI_STYLE_ATTRIBUTE = "data-ui-style";
@@ -16,23 +18,51 @@ export interface UiStylePreset {
  * 字体不纳入切换，保持 LXGW WenKai 不变。
  */
 export const UI_STYLES: UiStylePreset[] = [
-  { id: "default", label: "Kimix 默认", description: "温和圆角、轻阴影，延续现有熟悉界面。" },
-  { id: "modern", label: "现代化", description: "安静侧栏、大圆角内容区与轻薄悬浮层次。" },
-  { id: "retro", label: "复古", description: "小圆角、清晰描边与克制高光的经典桌面感。" },
-  { id: "nostalgia", label: "怀旧", description: "直角硬边、立体浮雕与按下内凹的经典桌面。" },
+  ...Object.values(BUILTIN_UI_STYLE_DOCUMENTS).map((document) => ({
+    id: document.id as UiStyleId,
+    label: document.name,
+    description: document.description,
+  })),
 ];
 
 export function normalizeUiStyleId(value: unknown): UiStyleId {
-  return value === "modern" || value === "retro" || value === "nostalgia" ? value : DEFAULT_UI_STYLE_ID;
+  if (value === "modern" || value === "retro" || value === "nostalgia") return value;
+  if (typeof value === "string" && /^custom:[a-z0-9][a-z0-9._-]{0,63}$/.test(value)) return value as UiStyleId;
+  return DEFAULT_UI_STYLE_ID;
+}
+
+const appliedVariables = new Set<string>();
+
+function clearAppliedUiStyleVariables(root: HTMLElement) {
+  for (const variable of appliedVariables) root.style.removeProperty(variable);
+  appliedVariables.clear();
+}
+
+function applyCompiledVariables(root: HTMLElement, variables: Record<string, string>) {
+  for (const [name, value] of Object.entries(variables)) {
+    root.style.setProperty(name, value);
+    appliedVariables.add(name);
+  }
 }
 
 /** 应用界面风格：default 移除属性回退 :root，其余设为对应 data-ui-style 值。 */
-export function applyUiStyle(id: unknown) {
+export function applyUiStyle(id: unknown, customDocuments: UiStyleDocumentV1[] = []) {
   if (typeof document === "undefined") return;
   const normalized = normalizeUiStyleId(id);
-  if (normalized === DEFAULT_UI_STYLE_ID) {
-    document.documentElement.removeAttribute(UI_STYLE_ATTRIBUTE);
+  const root = document.documentElement;
+  clearAppliedUiStyleVariables(root);
+  const styleDocument = normalized.startsWith("custom:")
+    ? customDocuments.find((document) => `custom:${document.id}` === normalized)
+    : BUILTIN_UI_STYLE_DOCUMENTS[normalized as BuiltinUiStyleId];
+  if (!styleDocument) {
+    applyCompiledVariables(root, compileUiStyleVariables(BUILTIN_UI_STYLE_DOCUMENTS.default));
+    root.removeAttribute(UI_STYLE_ATTRIBUTE);
     return;
   }
-  document.documentElement.setAttribute(UI_STYLE_ATTRIBUTE, normalized);
+  applyCompiledVariables(root, compileUiStyleVariables(styleDocument));
+  if (normalized === DEFAULT_UI_STYLE_ID) {
+    root.removeAttribute(UI_STYLE_ATTRIBUTE);
+    return;
+  }
+  root.setAttribute(UI_STYLE_ATTRIBUTE, normalized);
 }

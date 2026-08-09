@@ -63,6 +63,8 @@ import type {
   KimiThemeImportPreviewResponse,
   KimiThemeSourceDeleteRequest,
   KimiThemeSourceDeleteResponse,
+  UiStyleImportRequest,
+  UiStyleImportResponse,
   ExportSessionRequest,
   ExportSessionResponse,
   ExportSessionBackupRequest,
@@ -356,6 +358,8 @@ const api = {
     ipcRenderer.invoke("kimi:applyThemeImport", req),
   deleteKimiThemeSource: (req: KimiThemeSourceDeleteRequest): Promise<KimiThemeSourceDeleteResponse> =>
     ipcRenderer.invoke("kimi:deleteThemeSource", req),
+  importUiStyle: (req?: UiStyleImportRequest): Promise<UiStyleImportResponse> =>
+    ipcRenderer.invoke("app:importUiStyle", req),
   listKimiCodeHistorySessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi-code:listHistorySessions", req),
   exportKimiCodeSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>

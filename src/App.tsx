@@ -1448,6 +1448,7 @@ async function createSessionAndSendPrompt(projectPath: string, content: string) 
 function App() {
   const setTheme = useAppStore((s) => s.setTheme);
   const setUiStyle = useAppStore((s) => s.setUiStyle);
+  const setCustomUiStyles = useAppStore((s) => s.setCustomUiStyles);
   const setThemePalette = useAppStore((s) => s.setThemePalette);
   const setCustomThemePalette = useAppStore((s) => s.setCustomThemePalette);
   const setKimiThemePalettes = useAppStore((s) => s.setKimiThemePalettes);
@@ -1555,6 +1556,7 @@ function App() {
     const bootstrapSetters = useMemo(() => ({
       setTheme,
       setUiStyle,
+      setCustomUiStyles,
       setThemePalette,
       setCustomThemePalette,
       setKimiThemePalettes,
@@ -1577,7 +1579,7 @@ function App() {
       setFilePreviewExtensions,
       setRecentProjects,
     }), [
-      setTheme, setUiStyle, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
+      setTheme, setUiStyle, setCustomUiStyles, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
       setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
       setChatNavigationRailEnabled, setChatNavigationRailSide, setChatNavigationRailWidth,
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,

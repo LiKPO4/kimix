@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import type { AppSettings } from "./types/ipc";
+import { normalizeCustomUiStyleDocuments } from "../src/utils/builtinUiStyleDocuments";
 
 const CONFIG_DIR = path.join(os.homedir(), ".kimix");
 const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: "light",
   themePalette: "warm-paper",
   uiStyle: "default",
+  customUiStyles: [],
   customThemePalette: {
     primary: "#1982FF",
     surface: "#EDE9E0",
@@ -135,7 +137,13 @@ export function loadSettings(): AppSettings {
     if ((settings.themePalette as string) === "kimi") {
       settings.themePalette = settings.kimiThemePalettes[0]?.id ? `kimi:${settings.kimiThemePalettes[0].id}` : "warm-paper";
     }
-    if (!["default", "modern", "retro", "nostalgia"].includes(settings.uiStyle)) {
+    if (!["default", "modern", "retro", "nostalgia"].includes(settings.uiStyle) &&
+      !/^custom:[a-z0-9][a-z0-9._-]{0,63}$/.test(settings.uiStyle)) {
+      settings.uiStyle = "default";
+    }
+    settings.customUiStyles = normalizeCustomUiStyleDocuments(settings.customUiStyles);
+    if (settings.uiStyle.startsWith("custom:") &&
+      !settings.customUiStyles.some((document) => `custom:${document.id}` === settings.uiStyle)) {
       settings.uiStyle = "default";
     }
     if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {

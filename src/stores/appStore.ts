@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
 import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId } from "@/types/ui";
+import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
-import { normalizeUiStyleId } from "@/utils/uiStyles";
+import { DEFAULT_UI_STYLE_ID, normalizeUiStyleId } from "@/utils/uiStyles";
+import { canonicalizeCustomUiStyleDocument, normalizeCustomUiStyleDocuments } from "@/utils/builtinUiStyleDocuments";
 import { roomAgentActivityKey } from "@/utils/collaborationRooms";
 
 const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
@@ -188,6 +190,9 @@ export interface AppStore extends AppState {
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   setUiStyle: (id: UiStyleId) => void;
+  setCustomUiStyles: (documents: UiStyleDocumentV1[]) => void;
+  upsertCustomUiStyle: (document: UiStyleDocumentV1) => void;
+  removeCustomUiStyle: (id: string) => void;
   setThemePalette: (palette: ThemePaletteId) => void;
   setCustomThemePalette: (colors: ThemePaletteColors) => void;
   setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
@@ -248,6 +253,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   sidebarOpen: true,
   theme: cachedThemeSnapshot.theme,
   uiStyle: cachedThemeSnapshot.uiStyle,
+  customUiStyles: cachedThemeSnapshot.customUiStyles,
   themePalette: cachedThemeSnapshot.themePalette,
   customThemePalette: cachedThemeSnapshot.customThemePalette,
   kimiThemePalettes: cachedThemeSnapshot.kimiThemePalettes,
@@ -357,6 +363,21 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setSearchOpen: (open) => set({ searchOpen: open }),
   setTheme: (theme) => set({ theme }),
   setUiStyle: (id) => set({ uiStyle: normalizeUiStyleId(id) }),
+  setCustomUiStyles: (documents) => set({ customUiStyles: normalizeCustomUiStyleDocuments(documents) }),
+  upsertCustomUiStyle: (document) => set((state) => {
+    const normalized = canonicalizeCustomUiStyleDocument(document);
+    if (!normalized) return {};
+    const next = state.customUiStyles.filter((item) => item.id !== normalized.id);
+    next.push(normalized);
+    return { customUiStyles: next, uiStyle: `custom:${normalized.id}` as UiStyleId };
+  }),
+  removeCustomUiStyle: (id) => set((state) => {
+    const normalizedId = id.replace(/^custom:/, "");
+    return {
+      customUiStyles: state.customUiStyles.filter((item) => item.id !== normalizedId),
+      uiStyle: state.uiStyle === `custom:${normalizedId}` ? DEFAULT_UI_STYLE_ID : state.uiStyle,
+    };
+  }),
   setThemePalette: (palette) => set({ themePalette: normalizeThemePaletteId(palette) }),
   setCustomThemePalette: (colors) => set({ customThemePalette: normalizeThemePaletteColors(colors) }),
   setKimiThemePalettes: (presets) => set({ kimiThemePalettes: normalizeKimiThemePresets(presets) }),

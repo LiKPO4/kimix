@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-04T09:00:00+08:00"
+timestamp: "2026-08-09T09:55:00+08:00"
 ---
 
 # Interface Style System
@@ -16,6 +16,14 @@ Kimix treats color themes and interface styles as orthogonal systems. A color th
 The contract has three layers. Theme tokens (`--surface-*`, `--text-*`, `--accent-*`, and `--border-*`) remain the only color authority. Semantic interface tokens (`--ui-control-*`, `--ui-compound-*`, `--ui-nav-action-*`, `--ui-nav-list-*`, `--ui-selection-*`, `--ui-toggle-*`, `--ui-popup-*`, `--ui-field-*`, `--ui-menu-trigger-*`, and `--ui-shell-*`) describe how a role should feel. Components enroll through role classes such as `.kimix-window-control`, `.kimix-split-control`, `.kimix-sidebar-nav-item`, `.kimix-sidebar-project-row`, `.kimix-menu-panel`, and `.kimix-modal-card`.
 
 Adding a style preset therefore starts by overriding the semantic interface tokens at its root attribute. Component-specific preset selectors are reserved for a genuine signature device or a structural exception that cannot be expressed by the contract; they are not the default integration mechanism.
+
+# Importable Style Contract
+
+UI Style v1 is the only data boundary for imported interface styles. `src/utils/uiStyleContract.ts` owns the strict versioned schema and compiles accepted documents into `--ui-*` variables; imported JSON cannot carry color values, arbitrary CSS, selectors, URLs, scripts, fonts, spacing, or layout instructions. Shape primitives are bounded numeric radii and border widths. Depth is a structured kind/depth/opacity tuple whose highlight and shadow colors are always derived from the active `--surface-*`, `--text-*`, and `--border-*` theme tokens. Motion uses bounded durations and an easing allowlist.
+
+Every document declares a built-in `basedOn` baseline and role treatments. `src/utils/builtinUiStyleDocuments.ts` defines the same v1 documents for Default, Modern, Retro, and Nostalgia, so built-in and custom styles share parsing, compilation, and CSS consumption. Missing custom roles inherit from the declared baseline during canonicalization; the canonical persisted copy materializes every role, making later rendering deterministic. The public role catalog covers shell, toolbar, navigation items/actions, ordinary and compound controls, toggles, fields, cards/sections/events, popups/menu items/modals, Composer/message/status/Markdown surfaces, inspectors, toast/dock, and Multi-Agent choices.
+
+Imported documents are parsed in the Electron main process with a JSON-only 256 KB boundary, canonicalized, then persisted inside Kimix settings rather than referenced through the original file path. `custom:<id>` is the selected-style identity. The first-paint theme snapshot stores only the active custom document; authoritative settings retain the full custom library. Deleting a custom document removes only that library entry and falls back to Default when it was active. Built-in documents never enter the delete path. The AI-generation prompt is produced from the current schema, role catalog, and full template so a schema change cannot silently leave the prompt coverage behind.
 
 # Invariants
 
@@ -55,12 +63,16 @@ Adding a style preset therefore starts by overriding the semantic interface toke
 
 # Regression Gates
 
+`src/utils/__tests__/uiStyleContract.test.ts` locks schema safety, built-in-document validity, color-free compilation, complete state fallback, fixed CSS consumption for every public role, and schema-derived AI prompt coverage.
+
 `src/utils/__tests__/uiStyles.test.ts` verifies that interface-style roots do not assign color-theme tokens, that Modern derives and applies its brighter workspace presentation surface without mutating source colors, that Modern establishes its Codex-style shell without a navigation leading edge, that the toolbar structural bottom rule is not suppressed, that split-control dividers consume the role token and Modern disables only that local divider, that its nested theme segment derives the outer radius from inner control radius plus inset, that grouped/card/panel content surfaces enroll in the correct radius role, that neutral sections and semantic event cards keep separate color ownership, that inspector action matrices and standalone fields enroll without leaking into a global icon-text skin, that enrolled shell/media roles do not regress to fixed radius or shadow utilities, that Modern Markdown tables remove outer/vertical/zebra layers while retaining a theme-derived horizontal rule, that Retro consumes the semantic contract rather than skinning the global icon-text primitive, that Retro keeps all four structural shell borders, that active-plus-hover keeps each preset's navigation selection treatment, that button modes use `--ui-toggle-*` instead of `--ui-selection-*`, that the removed sidebar rule cannot return, that the Kimix default toolbar and context hover baseline remain scoped and visible, that Multi-Agent controls enroll in their room roles, that shell controls and navigation are enrolled, and that the Composer input remains borderless under its styled outer shell.
 
 # Main Components
 
 * `src/index.css` defines style tokens and component-role selectors.
-* `src/utils/uiStyles.ts` defines the selectable presets and root attribute.
+* `src/utils/uiStyleContract.ts` defines UI Style v1 validation and safe variable compilation.
+* `src/utils/builtinUiStyleDocuments.ts` defines the four protected built-in documents, custom canonicalization, and the schema-derived AI prompt.
+* `src/utils/uiStyles.ts` resolves built-in/custom identities and applies compiled variables to the root attribute.
 * `src/components/chat/Composer.tsx`, `ContextRing.tsx`, and `ContextBar.tsx` expose role-specific controls and expanded/pressed state hooks.
 * `src/components/chat/AddRoomAgentDialog.tsx`, `EditRoomAgentDialog.tsx`, `RoomAgentPicker.tsx`, and `RoomContextPicker.tsx` expose the Multi-Agent room trigger, choice, secondary-action, and primary-action roles.
 * `src/components/layout/Sidebar.tsx` enrolls primary actions, projects, sessions, settings, and the project menu in navigation and popup roles.
