@@ -349,6 +349,16 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-longtask-inspector\s+\.kimix-inspector-field\s*\{[^}]*border:\s*var\(--ui-field-border\);[^}]*border-radius:\s*var\(--radius-sm\);[^}]*box-shadow:\s*var\(--ui-field-shadow\);/s);
     expect(css).not.toMatch(/\[data-ui-style="(?:modern|retro)"\]\s+\.kimix-icon-text-button\s*\{/);
   });
+  it("Agent 单条复制与用户复制同为 28px 方形，复制全部保持同高并共享控件材质", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const messageBubble = readFileSync(resolve(process.cwd(), "src/components/chat/MessageBubble.tsx"), "utf8");
+
+    expect(messageBubble).toContain('kimix-message-copy-action kimix-inline-icon-action kimix-control-button');
+    expect(messageBubble).not.toContain('kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary"\n              title="复制"');
+    expect(messageBubble).toContain('kimix-message-copy-action kimix-control-button kimix-muted-action');
+    expect(messageBubble).toContain('style={{ height: 28, minHeight: 28, gap: 5, paddingLeft: 8, paddingRight: 8');
+    expect(css).toMatch(/\.kimix-message-copy-action\s*\{[^}]*height:\s*28px;[^}]*min-height:\s*28px;/s);
+  });
 });
 
 describe("applyUiStyle", () => {

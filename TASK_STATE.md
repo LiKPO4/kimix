@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：Agent 消息复制操作统一尺寸与材质（v2.20.309）
+
+- 根因：用户消息复制使用基础 `.kimix-inline-icon-action`（28×28），Agent 单条复制额外带 `is-roomy`（32×32），复制全部又使用独立 `.kimix-muted-action`（62×32、无控件边框/阴影），三者尺寸和风格角色不一致。
+- 修复：Agent 单条复制移除 `is-roomy`，固定为与用户复制相同的 28×28 方形；复制全部保留文字但固定 28px 高。两者统一加入 `.kimix-message-copy-action` 与 control 角色，间距收为 4px，在自定义风格下共享同一边框、圆角和材质。
+- 运行态量化：用户复制 28×28、Agent 复制 28×28、复制全部 62×28；Luna 下三者均为 1px border、3px radius、同一 raised shadow。
+- 验证：定向风格测试 20/20、全量测试 174 文件 / 1848 项、TypeScript 类型检查、生产构建、OKF validate/audit 均通过。
+
 ## 2026-08-09 修复：Composer 单边界、模式键状态与复合按钮材质（v2.20.308）
 
 - 输入内线根因：自定义 `field` 消费选择器错误包含 `.kimix-composer-input`，与 `composer` 外壳同时拥有边界，形成双框。修复将内层 textarea 永久固定为 border/radius/background/shadow/outline = 0/transparent，且 field 只覆盖独立设置/检查器字段，JSON 无法重新制造内线。

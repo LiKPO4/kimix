@@ -3909,6 +3909,12 @@ button.bg-accent-primary:disabled:hover,
   margin-top: 10px;
 }
 
+.kimix-message-copy-action {
+  height: 28px;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+}
+
 /* ── 可导入界面风格契约 ──
    自定义风格只注入 --ui-*；选择器和可变属性由 Kimix 固定，JSON 不能携带 CSS。
    仅由 data-ui-style-contract="v1" 显式开启，不能重画已经验收的默认/内置风格。 */

@@ -2739,13 +2739,13 @@ function AssistantMessageFooter({
     >
       <div
         className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-        style={{ gap: 6 }}
+        style={{ gap: 4 }}
       >
         {showActions && (
           <>
             <button
               onClick={onCopy}
-              className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-bg-hover hover:text-text-primary"
+              className="kimix-message-copy-action kimix-inline-icon-action kimix-control-button text-text-muted hover:bg-bg-hover hover:text-text-primary"
               title="复制"
               aria-label="复制"
             >
@@ -2757,8 +2757,8 @@ function AssistantMessageFooter({
             </button>
             <button
               onClick={onCopyAll}
-              className="kimix-muted-action flex h-8 items-center rounded-md text-text-muted"
-              style={{ gap: 5, paddingLeft: 9, paddingRight: 9, ...STATUS_CARD_TEXT_STYLE }}
+              className="kimix-message-copy-action kimix-control-button kimix-muted-action flex items-center text-text-muted"
+              style={{ height: 28, minHeight: 28, gap: 5, paddingLeft: 8, paddingRight: 8, ...STATUS_CARD_TEXT_STYLE }}
               title="全部复制（含思考）"
               aria-label="全部复制（含思考）"
             >
