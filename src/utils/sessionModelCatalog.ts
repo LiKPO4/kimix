@@ -1,5 +1,6 @@
 import type { KimiCodeServerModelCatalog, KimiModelConfigSummary } from "../../electron/types/ipc";
 import { compactModelDisplayName } from "@/utils/modelDisplay";
+import { normalizeThinkingEffortForProvider } from "@/utils/thinkingEffort";
 
 export type SessionModelOption = {
   id: string;
@@ -89,15 +90,22 @@ export function buildSessionModelOptions(
     const id = model.alias.trim();
     if (!id) continue;
     const provider = model.provider?.trim() || id.split("/")[0] || "其他";
+    const providerType = config?.providers.find((item) => item.name === provider)?.type
+      ?? (provider === "managed:kimi-code" || provider === "kimi-code" ? "kimi" : null);
     const catalogModel = catalogById.get(id);
+    const rawSupportEfforts = catalogModel?.supportEfforts?.length ? catalogModel.supportEfforts : (model.supportEfforts ?? []);
+    const supportEfforts = Array.from(new Set(rawSupportEfforts
+      .map((effort) => normalizeThinkingEffortForProvider(effort, providerType))
+      .filter(Boolean)));
+    const defaultEffort = normalizeThinkingEffortForProvider(catalogModel?.defaultEffort ?? model.defaultEffort, providerType) || null;
     options.set(id, {
       id,
       label: compactModelDisplayName(model.displayName?.trim() || catalogModel?.displayName?.trim() || id),
       provider,
       providerLabel: providerLabel(provider),
       maxContextSize: model.maxContextSize ?? catalogModel?.maxContextSize ?? null,
-      supportEfforts: catalogModel?.supportEfforts?.length ? catalogModel.supportEfforts : (model.supportEfforts ?? []),
-      defaultEffort: catalogModel?.defaultEffort ?? model.defaultEffort ?? null,
+      supportEfforts,
+      defaultEffort: defaultEffort && supportEfforts.includes(defaultEffort) ? defaultEffort : null,
     });
   }
   return Array.from(options.values()).sort((a, b) => (

@@ -19,6 +19,15 @@ function normalizeEffort(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? "";
 }
 
+export function normalizeThinkingEffortForProvider(
+  effort: string | null | undefined,
+  providerType: string | null | undefined,
+) {
+  const normalized = normalizeEffort(effort);
+  const type = providerType?.trim().toLowerCase();
+  return (type === "openai" || type === "openai_responses") && normalized === "max" ? "xhigh" : normalized;
+}
+
 function optionFor(value: string): ThinkingEffortOption {
   const meta = THINKING_EFFORT_META[value];
   return {

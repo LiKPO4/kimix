@@ -1,3 +1,5 @@
+import { normalizeThinkingEffortForProvider } from "../src/utils/thinkingEffort";
+
 export type RuntimeModelPolicyInput = {
   isResume: boolean;
   requestedModel?: string | null;
@@ -31,14 +33,6 @@ function normalizeEffort(effort: string | null | undefined): string | undefined 
   return effort?.trim().toLowerCase() || undefined;
 }
 
-function normalizeEffortForProvider(effort: string | undefined, providerType: string | null | undefined) {
-  if (!effort) return undefined;
-  const type = providerType?.trim().toLowerCase();
-  // Kimi's strongest tier is `max`; OpenAI-compatible protocols use `xhigh`.
-  // Passing `max` through reasoning_effort is rejected by standard OpenAI providers.
-  return (type === "openai" || type === "openai_responses") && effort === "max" ? "xhigh" : effort;
-}
-
 /**
  * Normalize and validate a requested effort at the runtime boundary.
  * Empty declarations mean capability is unknown, so only protocol-level
@@ -49,11 +43,11 @@ export function resolveRuntimeThinkingEffort(input: RuntimeThinkingEffortPolicyI
   const requestedRaw = normalizeEffort(input.requestedEffort);
   if (!requestedRaw) return { effort: undefined, changed: false, reason: "empty" };
 
-  const requested = normalizeEffortForProvider(requestedRaw, input.providerType);
+  const requested = normalizeThinkingEffortForProvider(requestedRaw, input.providerType);
   const declared = Array.from(new Set((input.supportEfforts ?? [])
-    .map((effort) => normalizeEffortForProvider(normalizeEffort(effort), input.providerType))
+    .map((effort) => normalizeThinkingEffortForProvider(normalizeEffort(effort), input.providerType))
     .filter((effort): effort is string => Boolean(effort))));
-  const normalizedDefault = normalizeEffortForProvider(normalizeEffort(input.defaultEffort), input.providerType);
+  const normalizedDefault = normalizeThinkingEffortForProvider(normalizeEffort(input.defaultEffort), input.providerType);
   const providerChanged = requested !== requestedRaw;
 
   // `on` delegates to the runtime/model default. Non-Kimi `off` is also a

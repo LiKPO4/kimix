@@ -1063,8 +1063,12 @@ export function LongTaskInspectorPanel({
 
   useEffect(() => {
     setSubagentModelDraft(subagentModelConfig?.secondaryModel?.model ?? "");
-    setSubagentThinkingDraft(subagentModelConfig?.secondaryModel?.defaultEffort ?? "");
-  }, [subagentModelConfig?.secondaryModel?.model, subagentModelConfig?.secondaryModel?.defaultEffort]);
+    const persistedEffort = subagentModelConfig?.secondaryModel?.defaultEffort ?? "";
+    const modelOption = subagentModelOptions.find((option) => option.id === subagentModelConfig?.secondaryModel?.model);
+    setSubagentThinkingDraft(modelOption && !modelOption.supportEfforts.includes(persistedEffort)
+      ? modelOption.defaultEffort ?? ""
+      : persistedEffort);
+  }, [subagentModelConfig?.secondaryModel?.model, subagentModelConfig?.secondaryModel?.defaultEffort, subagentModelOptions]);
 
   useEffect(() => {
     let cancelled = false;

@@ -7,6 +7,20 @@ import {
 } from "../sessionModelCatalog";
 
 describe("session model catalog", () => {
+  it("normalizes OpenAI max metadata to the visible xhigh wire value", () => {
+    const options = buildSessionModelOptions({
+      configPath: "config.toml",
+      exists: true,
+      defaultModel: "gateway/qwen",
+      providers: [{ name: "gateway", type: "openai", baseUrl: null, hasApiKey: true, hasEnv: false, hasOauth: false }],
+      models: [{ alias: "gateway/qwen", provider: "gateway", model: "qwen", displayName: "Qwen", maxContextSize: 1_000_000, adaptiveThinking: null, supportEfforts: ["low", "medium", "max"], defaultEffort: "max", isDefault: true }],
+      secondaryModel: { model: "gateway/qwen", defaultEffort: "max" },
+    }, null);
+
+    expect(options[0]?.supportEfforts).toEqual(["low", "medium", "xhigh"]);
+    expect(options[0]?.defaultEffort).toBe("xhigh");
+  });
+
   it("uses configured aliases and groups models by provider", () => {
     const options = buildSessionModelOptions({
       configPath: "config.toml",
