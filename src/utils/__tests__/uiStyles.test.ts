@@ -100,7 +100,8 @@ describe("UI_STYLES", () => {
     expect(css).toContain('[data-ui-style="modern"] .kimix-floating-panel');
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-main\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).not.toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-toolbar\s*\{[^}]*border-bottom:\s*0;/s);
-    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*position:\s*relative;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part::before\s*\{[^}]*top:\s*50%;[^}]*left:\s*0;[^}]*width:\s*1px;[^}]*height:\s*16px;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);[^}]*transform:\s*translateY\(-50%\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-workspace-page,\s*\[data-ui-style="modern"\]\s+\.kimix-settings-panel\.is-workspace\s*\{[^}]*background:\s*var\(--kimix-modern-workspace-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-user-bubble\s*\{[^}]*background:\s*var\(--kimix-modern-user-bubble-background\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-soft-card\s*\{[^}]*background:\s*var\(--kimix-modern-process-background\);/s);
@@ -197,7 +198,8 @@ describe("UI_STYLES", () => {
     // Resting split controls must not paint a permanent compound plate (looks selected-at-rest).
     expect(css).toMatch(/\.kimix-split-control\s*\{[^}]*overflow:\s*hidden;[^}]*\}/s);
     expect(css).not.toMatch(/\.kimix-split-control\s*\{[^}]*(?:--ui-compound-border|--ui-compound-background|--ui-compound-shadow)/s);
-    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part\s*\{[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.kimix-split-control-part\s*\+\s*\.kimix-split-control-part::before\s*\{[^}]*height:\s*16px;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*var\(--ui-compound-divider-shadow\);/s);
   });
 
   it("Kimix 默认顶栏保留原有工具键边界且底栏 hover 可辨识", () => {

@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 调整：复合按钮分割线改为短直线（v2.21.4）
+
+- 根因：分割线直接作为右半按钮的 inset box-shadow 绘制；右半按钮自身带圆角且接近外壳全高，阴影两端因此沿圆角形成上下小折。
+- 修复：右半按钮不再直接承载 divider shadow，改由左侧垂直居中的 1×16px、零圆角伪元素绘制；播放、工作区和文件卡的同类 `.kimix-split-control` 统一生效，既有风格 token 与 hover/expanded 材质保持不变。
+- 验证：定向 UI Style 测试 1 文件 / 27 项、全量测试 174 文件 / 1863 项、Node/Renderer 类型检查、生产构建、OKF strict validate 与 180 天 audit 均通过。v2.21.4 运行态中启动/工作区两处分割线均为 1×16px、border-radius=0、translateY(-8px) 居中，右半按钮自身 box-shadow=none。
+
 ## 2026-08-09 修复：设置分段外壳完整消费导入风格（v2.21.3）
 
 - 根因：主题三段控件外壳被测试白名单标成“结构性元素”，完全未消费 UI Style v1；桌面通知外壳虽被写入 `insetSection` 消费者，但放在零 specificity 的 `:where(...)` 内，实际优先级低于工作区基础选择器，Y2K JSON 提供的 14px 圆角被基础 6px 覆盖。

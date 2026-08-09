@@ -2358,7 +2358,21 @@ body::before {
 }
 
 .kimix-split-control-part + .kimix-split-control-part {
+  position: relative;
+  box-shadow: none;
+}
+
+.kimix-split-control-part + .kimix-split-control-part::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 16px;
+  border-radius: 0;
   box-shadow: var(--ui-compound-divider-shadow);
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 /* 二元状态按钮统一依赖 aria-pressed；业务组件不再内联拼装选中边框。 */
