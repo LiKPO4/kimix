@@ -137,7 +137,7 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("Composer 内层 textarea 永远无边框");
     expect(prompt).toContain("顶部 compoundControl 默认也应使用同类 elevation");
     expect(prompt).toContain("toggle 必须分别考虑 resting、hover、active、selected");
-    expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要");
+    expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要仅在悬停、聚焦或按下时显示此材质");
     expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
     expect(prompt).toContain("内容承载角色按语义硬限制在 20–32px");
     expect(prompt).toContain('"schemaVersion": 1');

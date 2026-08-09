@@ -3950,7 +3950,8 @@ button.bg-accent-primary:disabled:hover,
 
 :root[data-ui-style-contract="v1"] :where(.kimix-app-shell-toolbar, .kimix-app-shell-footer) {
   border-color: var(--ui-section-divider-color);
-  border-radius: var(--ui-role-toolbar-radius);
+  /* 两者都是 shell 内部的满宽分区：外轮廓由 overflow-hidden 的父 shell 裁切，内部相接边必须为直线。 */
+  border-radius: 0;
   background: var(--ui-role-toolbar-resting-background);
   box-shadow: var(--ui-role-toolbar-resting-shadow);
 }
@@ -4142,22 +4143,25 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: none;
 }
 
-/* Agent 过程头和游离的折叠思考摘要各自拥有完整边界；卡片内部的折叠行仍由父卡拥有边界。 */
-:root[data-ui-style-contract="v1"] .kimix-chat-standalone-disclosure {
-  border: var(--ui-role-control-resting-border);
-  border-radius: var(--ui-role-control-radius);
-  background: var(--ui-role-control-resting-background);
-  box-shadow: var(--ui-role-control-resting-shadow);
+/* Agent 过程头和游离的折叠思考摘要静止时保持安静，只预留 hover 边框宽度以避免位移。 */
+:root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure {
+  border: var(--ui-role-control-hover-border);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
-:root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure:hover:not(:disabled) {
+:root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure:is(:hover, :focus-visible):not(:disabled) {
   border: var(--ui-role-control-hover-border);
+  border-radius: var(--ui-role-control-radius);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
+  outline: none;
 }
 
 :root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure:active:not(:disabled) {
   border: var(--ui-role-control-active-border);
+  border-radius: var(--ui-role-control-radius);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);
 }
