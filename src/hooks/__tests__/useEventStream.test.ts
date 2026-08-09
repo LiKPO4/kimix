@@ -575,6 +575,47 @@ describe("enqueueStreamEvent authoritative body frames", () => {
     unmount();
   });
 
+  it("atomically materializes the full offset stream before a content-less prompt completion", () => {
+    useSessionStore.setState({ sessions: [seedSession([{
+      id: "user-real-sequence",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "你好呀",
+      roomAgentId: "agent-1",
+      agentTurnId: "turn-1",
+    }])] });
+    const { result, unmount } = renderHook(() => useEventStream());
+    const full = "你好！有什么我可以帮你的吗？比如写代码、查问题、处理文件，或者只是聊聊技术都行。";
+    const chunks = [
+      [0, 9], [9, 14], [14, 20], [20, 21], [21, 28], [28, 33], [33, 40],
+    ] as const;
+
+    act(() => {
+      for (const [start, end] of chunks) {
+        result.current.enqueueStreamEvent("session-1", assistant(full.slice(start, end), {
+          id: `delta-${start}`,
+          timestamp: 4_000,
+          streamOffset: start,
+          roomAgentId: "agent-1",
+          agentTurnId: "turn-1",
+        }));
+      }
+      result.current.enqueueStreamEvent("session-1", assistant("", {
+        id: "prompt-completed",
+        timestamp: 4_893,
+        isComplete: true,
+        roomAgentId: "agent-1",
+        agentTurnId: "turn-1",
+      }));
+    });
+
+    const assistants = useSessionStore.getState().sessions[0].events
+      .filter((event): event is Extract<TimelineEvent, { type: "assistant_message" }> => event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+    expect(assistants[0]).toMatchObject({ content: full, isComplete: true, durationMs: 3_893 });
+    unmount();
+  });
+
   it("still drops the draft when the authoritative frame carries its own thinking", () => {
     const { result, unmount } = renderHook(() => useEventStream());
     const draftKey = makeActiveTurnDraftKey("session-1", "agent-1", "turn-1");

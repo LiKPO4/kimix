@@ -452,6 +452,21 @@ describe("mapKimiCodeEvent", () => {
     }, testOptions())).toBeNull();
   });
 
+  it("maps prompt.completed to an authoritative content-less completion marker", () => {
+    const completed = mapKimiCodeEvent({
+      type: "prompt.completed",
+      agent: { id: "main" },
+      time: 4_000,
+    }, testOptions()) as Extract<TimelineEvent, { type: "assistant_message" }>;
+
+    expect(completed).toMatchObject({
+      type: "assistant_message",
+      timestamp: 4_000,
+      content: "",
+      isComplete: true,
+    });
+  });
+
   it("maps official turn.steer as the steer success marker", () => {
     const steer = mapKimiCodeEvent({
       type: "turn.steer",

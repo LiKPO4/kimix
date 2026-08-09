@@ -18,6 +18,7 @@ import path from "node:path";
 import {
   extractPendingServerQuestionIds,
   resolveEngineStatusAfterPromptCompleted,
+  resolveEffectiveServerEngineStatus,
   resolveExternalApprovalSettleStatus,
   selectExternallyResolvedQuestionIds,
   shouldResumeWaitingQuestionOnFrame,
@@ -367,6 +368,20 @@ describe("resolveEngineStatusAfterPromptCompleted", () => {
   it("keeps running when activity is unknown rather than faking completed", () => {
     expect(resolveEngineStatusAfterPromptCompleted({})).toBe("running");
     expect(resolveEngineStatusAfterPromptCompleted({ status: "unknown-future" })).toBe("running");
+  });
+});
+
+describe("resolveEffectiveServerEngineStatus", () => {
+  it("keeps the Host continuation grace authoritative over raw REST idle", () => {
+    expect(resolveEffectiveServerEngineStatus({ status: "idle", busy: false }, "running")).toBe("running");
+    expect(resolveEffectiveServerEngineStatus({ status: "completed", busy: false }, "running")).toBe("running");
+  });
+
+  it("still exposes newly active and blocking raw Server states", () => {
+    expect(resolveEffectiveServerEngineStatus({ status: "running", busy: true }, "completed")).toBe("running");
+    expect(resolveEffectiveServerEngineStatus({ status: "awaiting_approval", busy: true }, "running")).toBe("waiting_approval");
+    expect(resolveEffectiveServerEngineStatus({ status: "idle" }, "waiting_question")).toBe("waiting_question");
+    expect(resolveEffectiveServerEngineStatus({ status: "idle" }, "error")).toBe("error");
   });
 });
 

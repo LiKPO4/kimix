@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：流式正文只在完整落盘后完成并保留耗时（v2.21.15）
+
+- 现场快照：同一 Server 会话真实输出按 offset `0→9→14→20→21→28→33→40` 连续到达并正常 `prompt.completed`，SDK wire 记录本轮 3893ms；Renderer 正式时间线却只剩最后 7 字。App 随后连续两次读取 REST `/status=idle`，在 Host 仍处于 30 秒续轮 grace 的情况下提前清除运行态并显示“输出完成”；约 30 秒后 canonical repair 用完整 40 字替换正文，同时丢掉显示层临时推导的耗时。
+- 根因：Host 管理态与 Renderer REST poll 构成两套终态权威；`prompt.completed` 没有映射成正式时间线完成屏障，草稿没有在权威边界原子落盘；ChatThread/MessageBubble 又把“运行态消失 + 有可见残片”投影成完成；canonical 整体替换未保留本地可靠 duration。
+- 修正：Server `getStatus` 对 Renderer 暴露 Host effective status，grace 内 raw idle 不再越权终结；主 `prompt.completed` 映射成无正文 completion marker，使完整 active draft 先落批、再按用户边界计算并持久化 duration；未完成可见正文保持执行中；canonical repair 按用户轮次保留本地可靠时长。
+- 回归：真实 7 段 offset fixture 锁定完整 40 字、一次完成与 3893ms；另覆盖 grace 内 raw idle、inactive incomplete 假完成、prompt completion marker、canonical 40 字修复后 duration 保留及错位边界不串时长。定向 6 文件 / 209 项、全量 175 文件 / 1891 项、Node/Renderer TypeScript、生产构建与 OKF 严格校验通过。
+
 ## 2026-08-09 功能：目录缺失时自动复制 AI 核对提问词（v2.21.14）
 
 - 目标：模型目录完全匹配失败或只返回部分元数据时，不让用户停在错误提示；自动向剪贴板写入一段可直接粘贴给 AI 的核对请求。

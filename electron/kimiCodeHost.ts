@@ -2132,7 +2132,11 @@ export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatu
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    return serverStatusToKimiCodeStatus(await refreshServerSessionStatus(sessionId, false), serverManaged.session.usage);
+    return serverStatusToKimiCodeStatus(
+      await refreshServerSessionStatus(sessionId, false),
+      serverManaged.session.usage,
+      serverManaged.status,
+    );
   }
   const managed = getManagedSession(sessionId);
   return normalizeSdkSessionStatus(await managed.session.getStatus(), managed.status);
@@ -3670,9 +3674,34 @@ export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<st
   };
 }
 
-function serverStatusToKimiCodeStatus(status: ServerSessionStatus, usage: unknown): KimiCodeSessionStatus {
+/**
+ * Renderer polling must consume the same effective status as the Host state
+ * machine. During the prompt.completed continuation grace, Server REST may
+ * already report idle while the Host deliberately remains running. Exposing
+ * that raw idle created a second terminal authority in App.tsx and completed
+ * a still-open assistant before its buffered body was materialized.
+ */
+export function resolveEffectiveServerEngineStatus(
+  status: { status?: unknown; busy?: unknown },
+  managedStatus?: KimiCodeEngineStatus,
+): KimiCodeEngineStatus {
+  const rawStatus = resolveServerEngineStatus(status);
+  if (managedStatus === "waiting_approval" || managedStatus === "waiting_question") return managedStatus;
+  if (managedStatus === "error" || managedStatus === "interrupted") return managedStatus;
+  if (rawStatus === "running" || rawStatus === "waiting_approval" || rawStatus === "waiting_question") {
+    return rawStatus;
+  }
+  if (managedStatus === "running") return "running";
+  return rawStatus;
+}
+
+function serverStatusToKimiCodeStatus(
+  status: ServerSessionStatus,
+  usage: unknown,
+  managedStatus?: KimiCodeEngineStatus,
+): KimiCodeSessionStatus {
   return {
-    engineStatus: resolveServerEngineStatus(status),
+    engineStatus: resolveEffectiveServerEngineStatus(status, managedStatus),
     model: status.model,
     thinkingLevel: status.thinking_level,
     permission: status.permission === "manual" || status.permission === "auto" || status.permission === "yolo"

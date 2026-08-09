@@ -37,7 +37,7 @@ export function resolveLiveDisplayMode(input: {
     return input.isThinking ? "thinking" : "running";
   }
   if (input.isComplete) return "settled_complete";
-  if (input.hasVisibleOutput) return "settled_visible";
+  if (input.hasVisibleOutput) return "running";
   return "idle";
 }
 

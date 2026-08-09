@@ -22,12 +22,12 @@ describe("liveTurnDiag", () => {
       isThinking: true,
     })).toBe("thinking");
 
-    // 关键：非 active + 仅有可见输出 → 会显示「输出完成」（假完成窗口）
+    // 非 active + 仅有可见输出仍不是终态证据，保持执行中。
     expect(resolveLiveDisplayMode({
       isActiveAssistant: false,
       isComplete: false,
       hasVisibleOutput: true,
-    })).toBe("settled_visible");
+    })).toBe("running");
 
     expect(resolveLiveDisplayMode({
       isActiveAssistant: false,
@@ -39,7 +39,7 @@ describe("liveTurnDiag", () => {
   it("shouldLogDisplayModeChange only on transition", () => {
     expect(shouldLogDisplayModeChange(undefined, "thinking")).toBe(true);
     expect(shouldLogDisplayModeChange("thinking", "thinking")).toBe(false);
-    expect(shouldLogDisplayModeChange("thinking", "settled_visible")).toBe(true);
+    expect(shouldLogDisplayModeChange("thinking", "running")).toBe(true);
   });
 
   it("summarizeLiveTurn counts open body and tools", () => {

@@ -949,8 +949,9 @@ export function buildRenderItems(
     // 工具/子代理只可能是后台任务（run_in_background）或残留标志——前台执行必然
     // 伴随会话运行中。它们不该挡住 settle：否则后台子代理跑多久，思考工具链就
     // 多久不折叠（hasFinalContent 永不翻真，自动折叠永不触发）。
-    const isSessionLevelTurnStopped = !isSessionRunning && !activeRoomAgentTurn;
-    const turnSettled = isSupersededPrimaryTurn || isSupersededBySteerBoundary || isSessionLevelTurnStopped || (
+    const hasAuthoritativeAssistantCompletion = !isTurnActive && assistantEvents.length > 0 &&
+      assistantEvents.every((event) => event.isComplete);
+    const turnSettled = isSupersededPrimaryTurn || isSupersededBySteerBoundary || hasAuthoritativeAssistantCompletion || (
       !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !hasPendingToolOrSubagent

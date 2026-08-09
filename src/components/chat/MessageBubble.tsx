@@ -1089,7 +1089,10 @@ function AssistantProcessLabel({
     event.thinking?.trim() ||
     event.thinkingParts?.some((part) => part.text.trim().length > 0)
   );
-  const isSettledForDisplay = !isActiveAssistant && (event.isComplete || hasVisibleOutput);
+  // Visible partial output is not terminal evidence. Runtime ownership can
+  // briefly disappear during reconnect/status polling; showing completion in
+  // that window produced a false "输出完成" header over a truncated body.
+  const isSettledForDisplay = !isActiveAssistant && event.isComplete;
   // 症状 11：记录「输出完成」文案与 active/complete/duration 是否一致（假完成窗口）。
   const displayMode = resolveLiveDisplayMode({
     isActiveAssistant,

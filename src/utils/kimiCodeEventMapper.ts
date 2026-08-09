@@ -620,6 +620,23 @@ export function mapKimiCodeEvent(
         isComplete: true,
       };
 
+    case "prompt.completed":
+      // This is the authoritative delivery barrier for the main prompt. Map a
+      // content-less completion marker so useEventStream atomically commits the
+      // active draft before formal completion. ChatThread keeps the marker
+      // visually open while the Host-managed continuation grace is running.
+      return {
+        id: getId(options),
+        type: "assistant_message",
+        timestamp,
+        agentId: getAgentId(event),
+        content: "",
+        model: isString(event.model) ? event.model : undefined,
+        isThinking: false,
+        isComplete: true,
+        durationMs: typeof event.durationMs === "number" ? event.durationMs : undefined,
+      };
+
     case "step.end": {
       const finishReason = isString(event.finishReason) ? event.finishReason : "";
       if (finishReason !== "end_turn" || event.kimixTerminalScope === "prompt") return null;

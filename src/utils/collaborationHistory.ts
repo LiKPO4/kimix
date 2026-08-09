@@ -13,6 +13,7 @@ import { preserveLocalUserMediaInCanonicalHistory } from "@/utils/eventMapper";
 import { reconcileRunningKimiSnapshot } from "@/utils/kimiCodeSnapshotReplay";
 import { applyCanonicalUndoHistory } from "@/utils/undoHistory";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
+import { reliableAssistantDurationMs } from "@/utils/duration";
 import {
   isOfficialUserEventIdUniqueToDelivery,
   resolveRoomDeliveryUserEvents,
@@ -33,6 +34,71 @@ export interface ReconcileAgentCanonicalHistoryResult {
   events: TimelineEvent[];
   applied: boolean;
   discardedReason?: "agent-missing" | "runtime-changed";
+}
+
+/**
+ * Canonical history owns message bodies, but older Server snapshots may omit
+ * renderer-side turn metadata. Preserve a reliable local duration only when
+ * the user boundary has a stable identity or a unique text/time match, so a
+ * missing canonical/local boundary cannot shift durations onto another turn.
+ */
+export function preserveLocalAssistantDurations(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): TimelineEvent[] {
+  type TurnDuration = {
+    userId: string;
+    roomMessageId?: string;
+    agentTurnId?: string;
+    text: string;
+    timestamp: number;
+    durationMs?: number;
+  };
+  const localTurns: TurnDuration[] = [];
+  let localTurn: TurnDuration | undefined;
+  for (const event of localEvents) {
+    if (event.type === "user_message") {
+      localTurn = {
+        userId: event.id,
+        roomMessageId: event.roomMessageId,
+        agentTurnId: event.agentTurnId,
+        text: event.content.trim().replace(/\s+/g, " "),
+        timestamp: event.timestamp,
+      };
+      localTurns.push(localTurn);
+      continue;
+    }
+    if (event.type !== "assistant_message" || !localTurn) continue;
+    const duration = reliableAssistantDurationMs(event.durationMs);
+    if (duration === undefined) continue;
+    localTurn.durationMs = Math.max(localTurn.durationMs ?? 0, duration);
+  }
+  if (!localTurns.some((turn) => turn.durationMs !== undefined)) return canonicalEvents;
+
+  let canonicalDuration: number | undefined;
+  let changed = false;
+  const result = canonicalEvents.map((event) => {
+    if (event.type === "user_message") {
+      const identityMatches = localTurns.filter((turn) => (
+        (event.roomMessageId && turn.roomMessageId === event.roomMessageId) ||
+        (event.agentTurnId && turn.agentTurnId === event.agentTurnId) ||
+        turn.userId === event.id
+      ));
+      const text = event.content.trim().replace(/\s+/g, " ");
+      const textTimeMatches = localTurns.filter((turn) => (
+        turn.text === text && Math.abs(turn.timestamp - event.timestamp) <= 30_000
+      ));
+      const matches = identityMatches.length > 0 ? identityMatches : textTimeMatches;
+      canonicalDuration = matches.length === 1 ? matches[0].durationMs : undefined;
+      return event;
+    }
+    if (event.type !== "assistant_message") return event;
+    if (reliableAssistantDurationMs(event.durationMs) !== undefined) return event;
+    if (canonicalDuration === undefined) return event;
+    changed = true;
+    return { ...event, durationMs: canonicalDuration };
+  });
+  return changed ? result : canonicalEvents;
 }
 
 /** Mark a Kimi history cache current only after its caller adopts canonical events. */
@@ -218,7 +284,9 @@ export function reconcileAgentCanonicalHistory({
     : reason === "undo"
       ? applyCanonicalUndoHistory(localEvents, boundCanonical.events)
       : preserveLocalUserMediaInCanonicalHistory(localEvents, boundCanonical.events);
-  const events = backfillTurnModelsFromUsageStatuses(reconciledEvents);
+  const events = backfillTurnModelsFromUsageStatuses(
+    preserveLocalAssistantDurations(localEvents, reconciledEvents),
+  );
 
   let next = updateRoomAgentEvents(session, roomAgentId, () => events);
   if (next.collaboration && boundCanonical.messages) {

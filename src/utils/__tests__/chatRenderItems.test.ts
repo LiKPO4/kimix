@@ -774,6 +774,27 @@ describe("buildRenderItems usage footer", () => {
     expect(assistant.event.isComplete).toBe(false);
   });
 
+  it("does not project an incomplete visible tail as completed when runtime ownership disappears", () => {
+    const items = buildRenderItems([{
+      id: "user-tail",
+      type: "user_message",
+      timestamp: 1_000,
+      content: "你好呀",
+    }, {
+      id: "assistant-tail",
+      type: "assistant_message",
+      timestamp: 4_000,
+      content: "聊聊技术都行。",
+      isThinking: false,
+      isComplete: false,
+    }], "kimi-code", undefined, false);
+    const assistant = items.find((item) => item.type === "event" && item.event.id === "assistant-tail");
+    expect(assistant?.type).toBe("event");
+    if (assistant?.type !== "event" || assistant.event.type !== "assistant_message") return;
+    expect(assistant.isAssistantActive).toBe(true);
+    expect(assistant.event.isComplete).toBe(false);
+  });
+
   it("shows only the final usage after the runtime turn settles", () => {
     const assistant = buildRenderItems(events, "kimi-code", undefined, false)
       .find((item) => item.type === "event" && item.event.type === "assistant_message");

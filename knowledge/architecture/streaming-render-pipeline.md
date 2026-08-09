@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T17:55:00+08:00"
+timestamp: "2026-08-09T19:50:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -104,6 +104,16 @@ flush and before any boundary event merges; snapshot/barrier frames stay on the
 formal path because they may replace body text while the draft only appends.
 When reading assistant content, always treat formal events as authority once
 committed.
+
+The main prompt's delivered `prompt.completed` is also a formal completion
+marker. It carries no duplicate body: enqueueing the marker commits every
+offset-assembled draft segment ahead of it in one synchronous batch, then
+`mergeEvents` closes the Assistant and records a duration from the owning user
+boundary. Completion presentation requires this formal `isComplete` evidence;
+`!runtimeActive + visible text` is not completion because status ownership can
+briefly disappear while only a tail fragment is formal. Canonical history may
+later replace the body, but reconciliation must retain a reliable local
+duration when the canonical Assistant omits it.
 
 The draft identity may legitimately strengthen during one dispatch: the first
 token can be scoped by a renderer-created turn id and a later frame by the

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RoomAgent, Session, TimelineEvent } from "@/types/ui";
 import { createCollaborationStateFromSession } from "../collaborationRooms";
-import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "../collaborationHistory";
+import { markAgentKimiHistoryCacheCurrent, preserveLocalAssistantDurations, reconcileAgentCanonicalHistory } from "../collaborationHistory";
 import { KIMI_HISTORY_CACHE_VERSION } from "../kimiHistoryCache";
 import { projectCollaborationTimeline } from "../collaborationTimeline";
 
@@ -53,6 +53,39 @@ function room(): { session: Session; primaryId: string; secondaryId: string } {
     },
   };
 }
+
+describe("preserveLocalAssistantDurations", () => {
+  it("keeps reliable turn duration when canonical repair replaces a truncated body", () => {
+    const local: TimelineEvent[] = [
+      { id: "u1", type: "user_message", timestamp: 1_000, content: "你好呀" },
+      { id: "a1", type: "assistant_message", timestamp: 4_000, content: "聊聊技术都行。", isThinking: false, isComplete: true, durationMs: 3_893 },
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "u1-official", type: "user_message", timestamp: 1_000, content: "你好呀" },
+      { id: "a1-official", type: "assistant_message", timestamp: 4_000, content: "你好！有什么我可以帮你的吗？比如写代码、查问题、处理文件，或者只是聊聊技术都行。", isThinking: false, isComplete: true },
+    ];
+
+    const repaired = preserveLocalAssistantDurations(local, canonical);
+    expect(repaired[1]).toMatchObject({
+      content: "你好！有什么我可以帮你的吗？比如写代码、查问题、处理文件，或者只是聊聊技术都行。",
+      durationMs: 3_893,
+    });
+  });
+
+  it("does not shift a duration across an unmatched canonical user boundary", () => {
+    const local: TimelineEvent[] = [
+      { id: "local-u", type: "user_message", timestamp: 1_000, content: "第一问" },
+      { id: "local-a", type: "assistant_message", timestamp: 2_000, content: "第一答", isThinking: false, isComplete: true, durationMs: 1_000 },
+    ];
+    const canonical: TimelineEvent[] = [
+      { id: "extra-u", type: "user_message", timestamp: 50_000, content: "不同的问题" },
+      { id: "extra-a", type: "assistant_message", timestamp: 51_000, content: "不同的回答", isThinking: false, isComplete: true },
+    ];
+
+    expect(preserveLocalAssistantDurations(local, canonical)).toBe(canonical);
+    expect((canonical[1] as Extract<TimelineEvent, { type: "assistant_message" }>).durationMs).toBeUndefined();
+  });
+});
 
 describe("reconcileAgentCanonicalHistory", () => {
   it("does not mark an unaccepted canonical candidate as a migrated cache", () => {
