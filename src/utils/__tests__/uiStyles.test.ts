@@ -359,6 +359,15 @@ describe("UI_STYLES", () => {
     expect(messageBubble).toContain('style={{ height: 28, minHeight: 28, gap: 5, paddingLeft: 8, paddingRight: 8');
     expect(css).toMatch(/\.kimix-message-copy-action\s*\{[^}]*height:\s*28px;[^}]*min-height:\s*28px;/s);
   });
+  it("Composer 加号与画板比例按钮消费自定义控件的完整交互状态", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+
+    expect(composer).toContain('kimix-icon-text-button kimix-control-button is-compact justify-center text-[13px] text-text-secondary');
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\):hover:not\(:disabled\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\):active:not\(:disabled\)\s*\{/s);
+  });
 });
 
 describe("applyUiStyle", () => {

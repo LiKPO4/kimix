@@ -4887,7 +4887,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                             key={ratio}
                             type="button"
                             onClick={() => openBlankDrawingBoard(ratio)}
-                            className="kimix-icon-text-button is-compact justify-center text-[13px] text-text-secondary"
+                            className="kimix-icon-text-button kimix-control-button is-compact justify-center text-[13px] text-text-secondary"
                             style={{ width: 38, paddingLeft: 0, paddingRight: 0 }}
                           >
                             {ratio}

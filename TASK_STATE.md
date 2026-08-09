@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-09 修复：Composer 加号与画板比例项接入自定义 hover（v2.20.310）
+
+- 根因：加号已有 `.kimix-composer-tool-button`，但该角色遗漏于自定义 control 的 resting/hover/active 消费清单，导致导入风格下 hover 仍走基础 token；画板比例项仅有通用 `.kimix-icon-text-button`，完全没有自定义控件角色，Luna hover 只出现透明背景与空阴影。
+- 修复：将 `.kimix-composer-tool-button` 纳入自定义 control 三态消费清单；画板比例按钮加入 `.kimix-control-button`，不再用局部 hover 颜色模拟材质。
+- 运行态量化：Luna 下加号与 1:1 比例项 hover 均从白色 `rgb(255,255,255)` 切换为灰色 `rgb(229,232,234)`，同时保留 1px 边框与统一浮雕阴影；比例项静态状态也从透明无阴影接入完整 control 材质。
+- 验证：定向风格测试 21/21、全量测试 174 文件 / 1849 项、TypeScript 类型检查、生产构建、OKF validate/audit 均通过。
+
 ## 2026-08-09 修复：Agent 消息复制操作统一尺寸与材质（v2.20.309）
 
 - 根因：用户消息复制使用基础 `.kimix-inline-icon-action`（28×28），Agent 单条复制额外带 `is-roomy`（32×32），复制全部又使用独立 `.kimix-muted-action`（62×32、无控件边框/阴影），三者尺寸和风格角色不一致。
