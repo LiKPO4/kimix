@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 修复：Agent 房间首条 live assistant 仍缺模型（v2.21.27）
+
+- 根因：协作房间消息先写入 `collaboration.messages`，再按 Agent 独立派发，没有普通会话那种空 Assistant 占位；`kimix.turn.model` 可能先到，`stampCurrentTurnModel` 当时无目标可盖章，后续首条 assistant 仍可能沿用旧 Agent 名称。
+- 修正：实时事件映射后、入队前，为无模型且非历史回放的 assistant 使用所属房间 Agent 当前发送模型；历史回放仍只接受自身 turn-scoped 模型。
+- 验证：房间投递/多 Agent/历史模型 100 项测试通过，typecheck 通过；待补生产构建与全量回归。
+
 ## 2026-08-10 修复：旧会话切换模型后新轮消息头仍显示旧模型（v2.21.26）
 
 - 现场快照：旧会话底栏已切到 `qwen3.8-max`，新一轮空占位消息头仍显示 `k3 · 等待模型输出`；Host 发送路径以新模型作为 `promptModel` 并在 dispatch 发出 `kimix.turn.model`，错误位于 Renderer 本轮占位/消息头投影。

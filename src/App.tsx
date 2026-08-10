@@ -2931,6 +2931,20 @@ function App() {
             roomMessageId: roomScopedEvent.roomMessageId ?? (mayInheritActiveTurnIdentity ? roomActivity?.roomMessageId : undefined),
             agentTurnId: roomScopedEvent.agentTurnId ?? (mayInheritActiveTurnIdentity ? roomActivity?.activeTurnId : undefined),
           };
+      // A collaboration-room dispatch signal can arrive before the first
+      // assistant event. Room deliveries have no renderer placeholder, so
+      // stamp the live event at the enqueue boundary; historical replay keeps
+      // its own turn-scoped model.
+      const liveRoomModel = targetSession?.collaboration && roomAgentId
+        ? getRoomAgent(targetSession, roomAgentId)?.switchedToModel
+          ?? getRoomAgent(targetSession, roomAgentId)?.modelAlias
+        : targetAgentSession?.model;
+      const mappedWithLiveModel = mappedForRoom.type === "assistant_message"
+        && !mappedForRoom.model
+        && rawEvent?.snapshotReplay !== "history"
+        && liveRoomModel
+        ? { ...mappedForRoom, model: liveRoomModel }
+        : mappedForRoom;
       if (mappedForRoom.type !== "status_update") {
         runtimeLastStreamEventAtRef.current.set(payload.sessionId, Date.now());
       }
@@ -3017,9 +3031,9 @@ function App() {
         }
       }
       if (isLongTaskRuntimeHiddenFromChat(targetSession, payload.sessionId)) {
-        mergeHiddenLongTaskEvent(payload.sessionId, mappedForRoom);
-        if (shouldMirrorHiddenLongTaskEvent(mappedForRoom)) {
-          enqueueStreamEvent(uiSessionId, mappedForRoom);
+        mergeHiddenLongTaskEvent(payload.sessionId, mappedWithLiveModel);
+        if (shouldMirrorHiddenLongTaskEvent(mappedWithLiveModel)) {
+          enqueueStreamEvent(uiSessionId, mappedWithLiveModel);
         }
         if (mappedForRoom.type === "question_request" || mappedForRoom.type === "approval_request" || mappedForRoom.type === "error") {
           flushStreamEvents();
@@ -3027,7 +3041,7 @@ function App() {
         }
         return;
       }
-      enqueueStreamEvent(uiSessionId, mappedForRoom);
+      enqueueStreamEvent(uiSessionId, mappedWithLiveModel);
       scheduleOfficialGoalRefresh(uiSessionId, payload.sessionId, roomAgentId);
       if ((mappedForRoom.type === "tool_call" || mappedForRoom.type === "tool_result") && roomAgentId) {
         updateSession(uiSessionId, (session) => {
