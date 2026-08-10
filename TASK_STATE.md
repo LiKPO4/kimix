@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 修复：旧会话切换模型后新轮消息头仍显示旧模型（v2.21.26）
+
+- 现场快照：旧会话底栏已切到 `qwen3.8-max`，新一轮空占位消息头仍显示 `k3 · 等待模型输出`；Host 发送路径以新模型作为 `promptModel` 并在 dispatch 发出 `kimix.turn.model`，错误位于 Renderer 本轮占位/消息头投影。
+- 根因：旧会话转成 collaboration state 时，主 Agent `displayName` 由当时模型生成并持久化；切换只更新 `modelAlias`。消息头把 `displayName !== compact(modelAlias)` 误判为自定义 Agent 身份，使旧 `k3` 压过本轮 `qwen3.8-max`；空占位又未在用户边界冻结模型，扩大了 dispatch 前的错误窗口。
+- 修正：主 Agent 消息头始终优先使用本轮事件模型，次级 Agent 自定义名称保持不变；正常发送和两条本地队列补发路径创建占位 Assistant 时立即写入入队/发送时选中的模型。
+- 回归：模型显示 fixture 覆盖“旧主 Agent 名 + 新 turn model”和“次级自定义 Agent 名”两条边界；事件快照见 `docs/issue-old-session-turn-model-header-events-snapshot.md`。
+
 ## 2026-08-10 修复：统一右侧面板标题按钮悬停态（v2.21.25）
 
 - 根因：会话侧栏标题栏使用 `.kimix-inline-icon-action is-roomy`，文件预览标题栏刷新/关闭按钮却使用 `.kimix-muted-action` 加 Tailwind 几何类；两者虽然都是 32px，但 hover/active 材质、圆角和自定义 UI Style 接入点不同。

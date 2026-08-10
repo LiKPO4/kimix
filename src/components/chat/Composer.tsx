@@ -1599,6 +1599,11 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       type: "assistant_message",
       timestamp: Date.now(),
       content: "",
+      // Freeze the selected model at the user boundary. Runtime recovery can
+      // take long enough for the empty placeholder to render before the Host's
+      // kimix.turn.model dispatch signal; without this snapshot an old primary
+      // Agent name (for example k3) leaks into the new turn header.
+      model: pendingMessagePinnedModel(targetSession),
       isThinking: activeThinkingEffort !== "off",
       isComplete: false,
       roomAgentId: primaryAgentId,

@@ -3129,6 +3129,9 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
   const roomAgentActivities = useAppStore((s) => s.roomAgentActivities);
   const roomSession = useSessionStore((state) => sessionId ? state.sessions.find((session) => session.id === sessionId) : undefined);
   const roomAgent = roomSession && event.roomAgentId ? getRoomAgent(roomSession, event.roomAgentId) : undefined;
+  const isPrimaryRoomAgentHeader = Boolean(
+    roomSession && roomAgent && getPrimaryRoomAgent(roomSession).id === roomAgent.id
+  );
   const roomDelivery = roomSession?.collaboration?.messages
     .find((message) => message.id === event.roomMessageId)
     ?.deliveries[event.roomAgentId ?? ""];
@@ -3215,6 +3218,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
               turnModel: event.model,
               agentDisplayName: roomAgent?.displayName,
               agentModelAlias: roomAgent?.modelAlias,
+              isPrimaryAgent: isPrimaryRoomAgentHeader,
             })}
             tools={leadingTools}
             subagents={leadingSubagents}

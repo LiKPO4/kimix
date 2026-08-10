@@ -117,6 +117,24 @@ describe("resolveTurnHeaderModelName", () => {
     })).toBe("kimi-for-coding");
   });
 
+  it("uses the selected turn model for a primary Agent whose persisted name is from an old model", () => {
+    expect(resolveTurnHeaderModelName({
+      turnModel: "opencode-go/qwen3.8-max",
+      agentDisplayName: "k3",
+      agentModelAlias: "opencode-go/qwen3.8-max",
+      isPrimaryAgent: true,
+    })).toBe("qwen3.8-max");
+  });
+
+  it("keeps a secondary Agent custom identity after its model changes", () => {
+    expect(resolveTurnHeaderModelName({
+      turnModel: "opencode-go/qwen3.8-max",
+      agentDisplayName: "代码审查",
+      agentModelAlias: "opencode-go/qwen3.8-max",
+      isPrimaryAgent: false,
+    })).toBe("代码审查");
+  });
+
   it("keeps a custom agent name as identity instead of replacing it with the model", () => {
     expect(resolveTurnHeaderModelName({
       turnModel: "kimi-code/kimi-for-coding",

@@ -77,11 +77,19 @@ export function resolveTurnHeaderModelName(input: {
   turnModel?: string | null;
   agentDisplayName?: string | null;
   agentModelAlias?: string | null;
+  isPrimaryAgent?: boolean;
 }): string | undefined {
   const displayName = input.agentDisplayName?.trim() || undefined;
   const turnModel = input.turnModel?.trim() || undefined;
   if (!turnModel) return displayName;
   const compactTurn = compactModelDisplayName(turnModel);
+  // The primary Agent name is historically derived from the model that was
+  // active when collaboration state was first materialized. After switching
+  // an old conversation that persisted name can be stale (for example `k3`)
+  // even though this turn is dispatched to `qwen3.8-max`. A turn-scoped model
+  // is authoritative for the primary header; secondary Agent names remain
+  // user identities and must not be replaced by their model.
+  if (input.isPrimaryAgent) return compactTurn;
   if (!displayName) return compactTurn;
   const alias = input.agentModelAlias?.trim() || "";
   if (alias && compactModelDisplayName(alias) === displayName) return compactTurn;
