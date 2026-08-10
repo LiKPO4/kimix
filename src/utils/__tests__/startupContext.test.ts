@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LocalActiveContext } from "../persistence";
-import { selectStartupLocalSession, selectStartupProject } from "../startupContext";
+import { selectStartupLocalSession, selectStartupProject, shouldBlockStartupSessionOnHistorySync } from "../startupContext";
 import type { Project, Session } from "@/types/ui";
 
 const projectA: Project = { id: "project-a", name: "A", path: "D:/A", lastOpenedAt: 100 };
@@ -13,6 +13,17 @@ function activeContext(project: Project | null, sessionId: string | null): Local
 }
 
 describe("startup context selection", () => {
+  it("does not block a cached conversation while official history refreshes", () => {
+    expect(shouldBlockStartupSessionOnHistorySync({ events: [{ type: "user_message" }] })).toBe(false);
+    expect(shouldBlockStartupSessionOnHistorySync({ events: [{ type: "assistant_message" }] })).toBe(false);
+    expect(shouldBlockStartupSessionOnHistorySync({
+      events: [],
+      collaboration: { agentEvents: { secondary: [{ type: "assistant_message" }] } },
+    })).toBe(false);
+    expect(shouldBlockStartupSessionOnHistorySync({ events: [{ type: "status_update" }] })).toBe(true);
+    expect(shouldBlockStartupSessionOnHistorySync({ events: [] })).toBe(true);
+  });
+
   it("restores the saved session instead of the latest local session", () => {
     expect(selectStartupLocalSession({
       activeContext: activeContext(projectA, sessionA.id),

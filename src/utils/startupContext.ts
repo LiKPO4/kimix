@@ -16,6 +16,21 @@ export function selectStartupLocalSession<T extends StartupSession>(input: {
   return hasSavedActiveContext ? undefined : input.latestLocalSession;
 }
 
+/**
+ * A persisted conversation can render immediately while official history is
+ * refreshed in the background. Only an empty local session needs a blocking
+ * loading surface during startup.
+ */
+export function shouldBlockStartupSessionOnHistorySync(session: {
+  events?: readonly { type?: unknown }[];
+  collaboration?: { agentEvents?: Record<string, readonly { type?: unknown }[]> };
+}): boolean {
+  const hasConversation = (events: readonly { type?: unknown }[] | undefined) => (events ?? []).some((event) => (
+    event.type === "user_message" || event.type === "assistant_message"
+  ));
+  return !hasConversation(session.events) && !Object.values(session.collaboration?.agentEvents ?? {}).some(hasConversation);
+}
+
 export function selectStartupProject(input: {
   activeContext: LocalActiveContext | null;
   activeLocalSession?: StartupSession;

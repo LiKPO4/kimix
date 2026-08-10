@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 性能：启动同步最新会话不再阻塞本地首屏（v2.21.30）
+
+- 现场：启动恢复已有会话时，全屏显示“正在同步最新会话”约 7-8 秒；本地持久化消息已经存在但不可见。
+- 根因：启动链无条件把 active local session 设为 `isLoading=true`，ChatThread 随即用全屏门禁遮住非空本地时间线；门禁要等待 `listSessions → loadSessionHistory → resume → getStatus`。官方历史路径包含最长 4 秒 Server 冷启动等待和 8 秒 snapshot 回退上限，7-8 秒与该网络/超时链吻合，不是 React 渲染慢。
+- 修正：采用 stale-while-revalidate：本地已有 user/assistant（含房间次级 Agent 时间线）时立即渲染，仅空本地会话保留阻塞占位；官方历史继续后台对账。启动历史加载与 `resume/status` 改为并行，缩短后台收敛总时长。
+- 回归：启动上下文测试覆盖普通会话、房间次级 Agent 与空会话三种门禁语义；全量 175 文件 / 1909 项、typecheck、knowledge validate 和生产构建通过。
+
 ## 2026-08-10 修复：引导/压缩会话重复刻度与双重流式（v2.21.29）
 
 - 现场：同一逻辑对话在 steer、canonical user 和压缩事件附近显示为三段；左侧刻度出现多个点且都跳到上方同一位置，上下两个 Assistant 同时渲染同一份流式正文，切换会话后旧刻度/滚动还会短暂污染新会话。

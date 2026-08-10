@@ -24,7 +24,7 @@ import { extractPermissionModeStatus } from "@/utils/kimiCodePermission";
 import { compareSessionsByRecentConversation, isActiveKimiCodeEngineStatus, isSessionRuntimeRunning, isSessionRuntimeTracked, isTerminalKimiCodeEngineStatus, normalizeOfficialLastTurnReason } from "@/utils/sessionActivity";
 import { shouldAppendRuntimeStatusToTimeline } from "@/utils/runtimeStatusTimeline";
 import { createStartupHydrationGate } from "@/utils/startupHydration";
-import { selectStartupLocalSession, selectStartupProject } from "@/utils/startupContext";
+import { selectStartupLocalSession, selectStartupProject, shouldBlockStartupSessionOnHistorySync } from "@/utils/startupContext";
 import { applyOfficialGoalUpdatedSnapshot, getOfficialGoalRefreshDelay, inferTerminalGoalFromEvent, isStaleGoalFetch, reconcileOfficialGoalSnapshot } from "@/utils/officialGoalState";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath } from "@/utils/pathCase";
@@ -2244,7 +2244,7 @@ function App() {
           fallbackProject: payload.project,
         });
         const startupActiveSession = activeLocalSession
-          ? { ...activeLocalSession, isLoading: true }
+          ? { ...activeLocalSession, isLoading: shouldBlockStartupSessionOnHistorySync(activeLocalSession) }
           : null;
         if (startupActiveSession) {
           useSessionStore.setState((state) => {
@@ -2333,6 +2333,14 @@ function App() {
               );
               const runtimeOwner = roomRuntimeOwner?.session
                 ?? findLocalSessionForRuntime(historySessionId, undefined, latest?.id);
+              const runtimeStatusPromise = (async () => {
+                const resumedRuntime = await window.api.resumeKimiCodeSession({ sessionId: historySessionId })
+                  .then((res) => (res.success ? res.data : null))
+                  .catch(() => null);
+                const runtimeStatusSessionId = resumedRuntime?.sessionId ?? historySessionId;
+                const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: runtimeStatusSessionId }).catch(() => null);
+                return runtimeStatus;
+              })().catch(() => null);
               let loaded = await window.api.loadKimiCodeSession({
                 workDir: activeProject.path,
                 sessionId: historySessionId,
@@ -2382,11 +2390,7 @@ function App() {
                 }
                 return;
               }
-              const resumedRuntime = await window.api.resumeKimiCodeSession({ sessionId: historySessionId })
-                .then((res) => (res.success ? res.data : null))
-                .catch(() => null);
-              const runtimeStatusSessionId = resumedRuntime?.sessionId ?? historySessionId;
-              const runtimeStatus = await window.api.getKimiCodeStatus({ sessionId: runtimeStatusSessionId }).catch(() => null);
+              const runtimeStatus = await runtimeStatusPromise;
               const runtimeIsActive = Boolean(
                 runtimeStatus?.success && isActiveKimiCodeEngineStatus(runtimeStatus.data.engineStatus)
               );
@@ -2588,7 +2592,7 @@ function App() {
               engine: knownEngine ? rawEngine : "kimi-code",
               runtimeSessionId: knownEngine ? session.runtimeSessionId : undefined,
               events: removeStaleKimiCodeStartupErrors(resetStaleSessionRecommendationEvents(sanitizePersistedEvents(Array.isArray(session.events) ? settleInactiveEvents(session.events) : []))),
-              isLoading: session.id === restoringActiveSessionId,
+              isLoading: session.id === restoringActiveSessionId && shouldBlockStartupSessionOnHistorySync(session),
             });
           });
           // Register the restored sessions together with the store's current
