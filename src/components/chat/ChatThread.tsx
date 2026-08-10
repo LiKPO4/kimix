@@ -812,7 +812,7 @@ export function buildRenderItems(
     }
   };
 
-  const mergeAssistantProcessEvents = (assistantEvents: Extract<TimelineEvent, { type: "assistant_message" }>[]) => {
+  const mergeAssistantProcessEvents = (assistantEvents: Extract<TimelineEvent, { type: "assistant_message" }>[], segmentOrdinal = 0) => {
     const visible = assistantEvents.filter((event) => (
       event.content.trim().length > 0 ||
       Boolean(event.thinking?.trim()) ||
@@ -837,7 +837,9 @@ export function buildRenderItems(
       : undefined;
     return {
       ...first,
-      id: first.agentTurnId || first.roomMessageId ? `assistant:${first.agentTurnId ?? first.roomMessageId}` : first.id,
+      id: first.agentTurnId || first.roomMessageId
+        ? `assistant:${first.agentTurnId || first.roomMessageId}${segmentOrdinal > 0 ? `:segment-${segmentOrdinal}` : ""}`
+        : first.id,
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
       // Reuse the idempotent merges so a full thinking replay overlapping live
@@ -864,6 +866,7 @@ export function buildRenderItems(
     turnUserEvent?: Extract<TimelineEvent, { type: "user_message" }>,
     hasLaterUserBoundary = false,
     hasLaterSteerBoundary = false,
+    segmentOrdinal = 0,
   ) => {
     const turnSourceEventIds = turnEvents.map((event) => event.id);
     turnEvents
@@ -879,7 +882,7 @@ export function buildRenderItems(
     );
     let toolsAttached = false;
     let assistantAttached = false;
-    const mergedAssistantEvent = mergeAssistantProcessEvents(assistantEvents);
+    const mergedAssistantEvent = mergeAssistantProcessEvents(assistantEvents, segmentOrdinal);
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
@@ -935,6 +938,7 @@ export function buildRenderItems(
     // session. Stale incomplete flags from the previous turn must not consume
     // the next turn's session-level runtime state.
     const isSupersededPrimaryTurn = isPrimaryRoomAgentTurn && hasLaterUserBoundary && !activeRoomAgentTurn;
+    const isSupersededByUserBoundary = Boolean(roomAgentId && activeRoomAgentTurn && hasLaterUserBoundary && !isLatestTurn);
     // steer 轮间边界（v2.20.244 条件切分）同样终结前段轮的 live 状态：官方
     // turn 在 steer 后继续运行，roomAgentActivityMatchesTurn 按同一 agentTurnId
     // 匹配前段轮（不看 isLatestTurn），不看 steer 边界会把前段轮误判 active——
@@ -951,7 +955,7 @@ export function buildRenderItems(
     // 多久不折叠（hasFinalContent 永不翻真，自动折叠永不触发）。
     const hasAuthoritativeAssistantCompletion = !isTurnActive && assistantEvents.length > 0 &&
       assistantEvents.every((event) => event.isComplete);
-    const turnSettled = isSupersededPrimaryTurn || isSupersededBySteerBoundary || hasAuthoritativeAssistantCompletion || (
+    const turnSettled = isSupersededPrimaryTurn || isSupersededByUserBoundary || isSupersededBySteerBoundary || hasAuthoritativeAssistantCompletion || (
       !isTurnActive &&
       !assistantEvents.some((event) => !event.isComplete) &&
       !hasPendingToolOrSubagent
@@ -1314,7 +1318,7 @@ export function buildRenderItems(
     segmentOrdinal = 0,
   ) => {
     if (!canCacheTurn(turnEvents, isLatestTurn, turnUserEvent) || !completedTurnCache) {
-      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
+      renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary, segmentOrdinal);
       return;
     }
     const cacheKey = completedTurnCacheKey(turnEvents, segmentOrdinal);
@@ -1332,7 +1336,7 @@ export function buildRenderItems(
     }
     noteRenderTurnBodyRun(false);
     const itemStart = items.length;
-    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary);
+    renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary, segmentOrdinal);
     completedTurnCache.set(cacheKey, {
       events: [...turnEvents],
       items: items.slice(itemStart),
@@ -1353,7 +1357,10 @@ export function buildRenderItems(
 
   for (const event of events) {
     if (event.type === "user_message") {
-      flushTurn(false, true);
+      const currentRoomAgentId = turnBody.find((candidate) => candidate.roomAgentId)?.roomAgentId
+        ?? currentTurnUserEvent?.roomAgentId;
+      const sameRoomAgentBoundary = !currentRoomAgentId || currentRoomAgentId === event.roomAgentId;
+      flushTurn(false, sameRoomAgentBoundary);
       items.push({ type: "event", event, attachedUserStatuses: attachedUserStatuses?.get(event.id) });
       currentTurnStartedAt = event.timestamp;
       currentTurnUserEvent = event;
@@ -1986,6 +1993,7 @@ export const ChatThread = memo(function ChatThread() {
           {chatNavigationRailEnabled && (
             <ChatNavigationRail
               items={visibleRenderItems}
+              sessionKey={session.id}
               scrollRef={viewport.scrollRef}
               contentRef={viewport.streamContentRef}
               side={chatNavigationRailSide}

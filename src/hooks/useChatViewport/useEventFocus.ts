@@ -297,8 +297,15 @@ export function useEventFocus(options: UseEventFocusOptions): UseEventFocusResul
       window.clearTimeout(highlightClearTimerRef.current);
       highlightClearTimerRef.current = null;
     }
+    // Cancel an in-flight native smooth scroll before this DOM container is
+    // reused by the next session.
+    const node = scrollRef.current;
+    if (node) {
+      if (typeof node.scrollTo === "function") node.scrollTo({ top: node.scrollTop, behavior: "auto" });
+      else node.scrollTop = node.scrollTop;
+    }
     onHighlightEvent?.(null);
-  }, [onHighlightEvent, cancelPostFocusAnchorCapture]);
+  }, [onHighlightEvent, cancelPostFocusAnchorCapture, scrollRef]);
 
   useEffect(() => () => {
     if (highlightClearTimerRef.current !== null) {

@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 修复：引导/压缩会话重复刻度与双重流式（v2.21.29）
+
+- 现场：同一逻辑对话在 steer、canonical user 和压缩事件附近显示为三段；左侧刻度出现多个点且都跳到上方同一位置，上下两个 Assistant 同时渲染同一份流式正文，切换会话后旧刻度/滚动还会短暂污染新会话。
+- 根因：steer 会把相同 `agentTurnId` 切成多个 Assistant 渲染段，但所有段都派生为同一个 `assistant:<turnId>`；该值同时充当 React key、DOM 锚点和导航 key，节点 Map 覆盖与同 ID 查询导致所有刻度命中同一节点。旧段又可能按同一 active turn 订阅同一 live draft key。导航栏节点缓存/marker 状态和原生 smooth scroll 也未在会话边界同步清理。
+- 修正：同 turn 的后续渲染段加入稳定 `segment-N` 身份；空 turn id 回退有效 `roomMessageId`；同一房间 Agent 的后续用户边界结算旧段；导航栏按 session 清空节点/预览/刻度状态，viewport 切会话时取消在途平滑滚动。
+- 取证与回归：最小六事件快照见 `docs/issue-steer-compaction-navigation-events-snapshot.md`；回归锁定三段 ID 唯一、仅最新段 active，以及切会话执行 auto 滚动冻结。
+- 验证：全量 175 个测试文件 / 1907 项通过；新增并行 Agent 边界保护后，定向 3 文件 / 91 项与 `pnpm typecheck` 再次通过；`pnpm knowledge:validate` 和 `pnpm build` 通过。
+
 ## 2026-08-10 修复：Agent 房间撤回后消息仍残留（v2.21.28）
 
 - 官方逻辑：`undo(count: 1)` 从历史尾部删除最近一个真实用户输入及其后整轮 assistant/tool；官方历史可能不返回 `officialUserEventId`。

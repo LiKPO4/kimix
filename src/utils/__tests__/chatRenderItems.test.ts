@@ -863,6 +863,21 @@ describe("buildRenderItems completed turn cache", () => {
 });
 
 describe("buildRenderItems assistant identity", () => {
+  it("uses roomMessageId when agentTurnId is an empty string", () => {
+    const items = buildRenderItems([{
+      id: "assistant-source",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "正文",
+      isThinking: false,
+      isComplete: true,
+      agentTurnId: "",
+      roomMessageId: "room-message-1",
+    }], "kimi-code");
+    const assistant = items.find((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistant?.type === "event" ? assistant.event.id : undefined).toBe("assistant:room-message-1");
+  });
+
   it("keeps the merged Assistant render id stable when another stream segment is appended", () => {
     const user: TimelineEvent = {
       id: "user-live",
@@ -1461,6 +1476,11 @@ describe("buildRenderItems steer boundary", () => {
     // 两个 assistant 渲染单元（轮 1 与轮 2 分开，不再粘连成一个折叠轮）
     const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
     expect(assistants).toHaveLength(2);
+    expect(new Set(assistants.map((item) => item.type === "event" ? item.event.id : "")).size).toBe(2);
+    expect(assistants.map((item) => item.type === "event" ? item.event.id : "")).toEqual([
+      "assistant:turn-8",
+      "assistant:turn-8:segment-1",
+    ]);
     // steer 独立渲染在两轮之间
     const steerIndex = items.findIndex((item) => item.type === "event" && item.event.type === "steer_message");
     const firstAssistantIndex = items.findIndex((item) => item.type === "event" && item.event.type === "assistant_message");
@@ -1504,6 +1524,33 @@ describe("buildRenderItems steer boundary", () => {
     expect(postSteer.isAssistantActive).toBe(true);
     const actives = assistants.filter((item) => item.type === "event" && item.isAssistantActive);
     expect(actives).toHaveLength(1);
+  });
+
+  it("keeps only the latest same-Agent segment live after a canonical user boundary", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-1", type: "user_message", timestamp: 1, content: "开始", roomAgentId: "primary", roomMessageId: "room-1", agentTurnId: "turn-8" },
+      { id: "assistant-1", type: "assistant_message", timestamp: 2, content: "第一段", thinking: "已完成", isThinking: false, isComplete: true, roomAgentId: "primary", roomMessageId: "room-1", agentTurnId: "turn-8" },
+      { id: "steer-1", type: "steer_message", timestamp: 3, content: "引导", status: "sent", roomAgentId: "primary", roomMessageId: "room-1", agentTurnId: "turn-8" },
+      { id: "assistant-2", type: "assistant_message", timestamp: 4, content: "第二段", thinking: "继续", isThinking: true, isComplete: false, roomAgentId: "primary", roomMessageId: "room-1", agentTurnId: "turn-8" },
+      { id: "user-2", type: "user_message", timestamp: 5, content: "确认", roomAgentId: "primary", roomMessageId: "room-2", agentTurnId: "turn-8" },
+      { id: "assistant-3", type: "assistant_message", timestamp: 6, content: "", isThinking: false, isComplete: false, roomAgentId: "primary", roomMessageId: "room-2", agentTurnId: "turn-8" },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, true, [activeRoomTurn("primary", "turn-8", "room-2")]);
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants.filter((item) => item.type === "event" && item.isAssistantActive)).toHaveLength(1);
+    const stale = assistants.find((item) => item.type === "event" && item.event.id === "assistant:turn-8:segment-1");
+    expect(stale?.type === "event" ? stale.isAssistantActive : undefined).toBe(false);
+  });
+
+  it("does not settle an active Agent when a different Agent receives the later user boundary", () => {
+    const events: TimelineEvent[] = [
+      { id: "user-a", type: "user_message", timestamp: 1, content: "交给 A", roomAgentId: "agent-a", roomMessageId: "room-a", agentTurnId: "turn-a" },
+      { id: "assistant-a", type: "assistant_message", timestamp: 2, content: "A 正在处理", isThinking: true, isComplete: false, roomAgentId: "agent-a", roomMessageId: "room-a", agentTurnId: "turn-a" },
+      { id: "user-b", type: "user_message", timestamp: 3, content: "同时交给 B", roomAgentId: "agent-b", roomMessageId: "room-b", agentTurnId: "turn-b" },
+    ];
+    const items = buildRenderItems(events, "kimi-code", undefined, true, [activeRoomTurn("agent-a", "turn-a", "room-a")]);
+    const assistantA = items.find((item) => item.type === "event" && item.event.id === "assistant:turn-a");
+    expect(assistantA?.type === "event" ? assistantA.isAssistantActive : undefined).toBe(true);
   });
 
   it("settles a completed turn even when a background subagent is still running", () => {

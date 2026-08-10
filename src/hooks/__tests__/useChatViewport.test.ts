@@ -177,7 +177,12 @@ describe("useChatViewport", () => {
   });
 
   it("resets userHasScrolled when the session changes", () => {
-    const { viewport, rerender } = renderTest({ sessionId: "session-1", renderItems: [eventRenderItem("a")] });
+    const { viewport, rerender, scroll } = renderTest({ sessionId: "session-1", renderItems: [eventRenderItem("a")] });
+    const scrollTo = vi.fn();
+    Object.defineProperties(scroll, {
+      scrollTop: { configurable: true, writable: true, value: 120 },
+      scrollTo: { configurable: true, value: scrollTo },
+    });
 
     act(() => {
       viewport().handlers.onWheel({ deltaY: -10 } as React.WheelEvent<HTMLDivElement>);
@@ -187,6 +192,7 @@ describe("useChatViewport", () => {
     rerender({ sessionId: "session-2", renderItems: [eventRenderItem("b")] });
 
     expect(viewport().userHasScrolled).toBe(false);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: "auto" });
   });
 
   it("primes the session after a loading placeholder is replaced by the scroll viewport", () => {

@@ -16,6 +16,8 @@ import { ChatNavigationPreview, type ChatNavigationPreviewAnchor } from "./ChatN
 
 interface ChatNavigationRailProps {
   items: RenderItem[];
+  /** 会话身份；切换会话时同步丢弃旧节点几何和刻度状态。 */
+  sessionKey?: string;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
   onNavigate: (eventId: string, kind: ChatNavigationMarker["kind"]) => boolean;
@@ -48,7 +50,7 @@ function markersEqual(previous: ChatNavigationMarker[], next: ChatNavigationMark
   });
 }
 
-export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, side = "left", markWidth = 11 }: ChatNavigationRailProps) {
+export function ChatNavigationRail({ items, sessionKey = "", scrollRef, contentRef, onNavigate, side = "left", markWidth = 11 }: ChatNavigationRailProps) {
   const navigationItems = useMemo(() => buildChatNavigationItems(items), [items]);
   const navigationItemsRef = useRef(navigationItems);
   navigationItemsRef.current = navigationItems;
@@ -68,6 +70,15 @@ export function ChatNavigationRail({ items, scrollRef, contentRef, onNavigate, s
   /** 渲染节点列表缓存：避免每次滚动都全量 querySelectorAll。 */
   const nodeCacheRef = useRef<HTMLElement[] | null>(null);
   const nodeCacheRefreshFrameRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    nodeCacheRef.current = null;
+    setMarkers([]);
+    setPreview(null);
+    setPreviewVisible(false);
+    previewRef.current = null;
+    previewVisibleRef.current = false;
+  }, [sessionKey]);
 
   const collectRenderNodes = useCallback((): HTMLElement[] => {
     const contentNode = contentRef.current;

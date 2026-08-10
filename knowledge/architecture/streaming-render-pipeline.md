@@ -4,10 +4,16 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-09T23:28:00+08:00"
+timestamp: "2026-08-10T19:32:00+08:00"
 ---
 
 # Streaming Render Pipeline
+
+## Split turns keep protocol identity and unique render identity
+
+Steer and canonical user boundaries may split one official `agentTurnId` into several visible Assistant work segments. The protocol identity remains shared so live routing and reconciliation can still recognize the official turn, but every rendered segment must have a stable unique id: the first uses `assistant:<turnId>` and later segments append `:segment-N`. That render id is simultaneously a React key, DOM anchor, navigation key, and focus target; reusing it makes marker geometry collapse and leaves React reconciliation undefined. An empty `agentTurnId` never outranks a valid `roomMessageId` when deriving this identity.
+
+Only the latest segment owned by a room Agent may subscribe to that Agent turn's active draft. A later user boundary for the same room Agent settles the earlier segment even when the official runtime reuses the same `agentTurnId`; boundaries for another concurrently running Agent do not settle it. Session changes synchronously discard navigation marker/node state and cancel an in-flight smooth scroll before the shared viewport DOM is reused.
 
 ## Completion replay uses an explicit authoritative body
 
