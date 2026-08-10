@@ -598,7 +598,7 @@
 }
 
 [data-ui-style="modern"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
-[data-ui-style="modern"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+[data-ui-style="modern"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy {
   border-radius: var(--kimix-modern-control-radius);
 }
 
@@ -867,19 +867,19 @@
 }
 
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
-[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+[data-ui-style="retro"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy {
   border-radius: var(--radius-sm);
 }
 
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
-[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+[data-ui-style="retro"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
   border-color: var(--ui-control-hover-border-color);
   background-color: var(--ui-control-hover-background);
   box-shadow: var(--ui-control-hover-shadow);
 }
 
 [data-ui-style="retro"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:active:not(:disabled),
-[data-ui-style="retro"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
+[data-ui-style="retro"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
   box-shadow: var(--ui-control-active-shadow);
 }
 
@@ -1331,19 +1331,19 @@
 }
 
 [data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
-[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+[data-ui-style="nostalgia"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy {
   border-radius: 0;
 }
 
 [data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
-[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+[data-ui-style="nostalgia"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
   border: var(--kimix-nostalgia-flat-border);
   background-color: var(--surface-hover);
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
 [data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:active:not(:disabled),
-[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
+[data-ui-style="nostalgia"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:active:not(:disabled) {
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 
@@ -2203,7 +2203,8 @@ body::before {
 
 /* 侧栏头部 32px 图标钮：接入 inline-icon + control 触感。 */
 .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy,
-.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy {
+.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy,
+.kimix-diff-panel .kimix-inline-icon-action.is-roomy {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background-color: transparent;
@@ -2212,7 +2213,8 @@ body::before {
 }
 
 .kimix-longtask-inspector .kimix-section-card .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
-.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
+.kimix-longtask-inspector .kimix-inline-icon-action.is-roomy:hover:not(:disabled),
+.kimix-diff-panel .kimix-inline-icon-action.is-roomy:hover:not(:disabled) {
   border-color: var(--border-subtle);
   background-color: var(--surface-hover);
 }

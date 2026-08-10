@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 修复：统一右侧面板标题按钮悬停态（v2.21.25）
+
+- 根因：会话侧栏标题栏使用 `.kimix-inline-icon-action is-roomy`，文件预览标题栏刷新/关闭按钮却使用 `.kimix-muted-action` 加 Tailwind 几何类；两者虽然都是 32px，但 hover/active 材质、圆角和自定义 UI Style 接入点不同。
+- 修正：文件预览标题栏两个按钮改用与会话侧栏关闭按钮完全一致的 `.kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary`。
+- 扫描：右侧同位置的会话侧栏与文件预览是当前两处面板标题按钮入口；同时补齐 Default/Modern/Retro/Nostalgia 对 `.kimix-diff-panel` 的标题按钮覆盖。契约测试锁定 JSX 类名和四套主题选择器，防止同层样式再次分叉。
+
 ## 2026-08-10 修复：关闭文件预览侧栏不清空中间预览（v2.21.24）
 
 - 根因：AppShell 监听 `diffPanelOpen`，侧栏关闭时同时清空 `previewFile`、正文、解析路径和错误；这把“文件列表侧栏”与“中间文件预览”错误绑定，覆盖了预览自身的返回会话按钮。

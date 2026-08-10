@@ -76,7 +76,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
           <button
             type="button"
             onClick={() => void loadFiles()}
-            className="kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg"
+            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary"
             aria-label="刷新文件列表"
             title="刷新"
           >
@@ -85,7 +85,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
           <button
             type="button"
             onClick={onClose}
-            className="kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg"
+            className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary"
             aria-label="关闭文件预览"
             title="关闭"
           >

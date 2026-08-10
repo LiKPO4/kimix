@@ -40,4 +40,17 @@ describe("layout resizer styles", () => {
     expect(appShell).toContain('onClose={() => setDiffPanelOpen(false)}');
     expect(appShell).not.toContain('if (!diffPanelOpen) {\n      setPreviewFile(null);');
   });
+
+  it("右侧面板标题栏的图标按钮共享同一悬停材质", () => {
+    const headerActionClass = "kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover hover:text-text-primary";
+
+    expect(diffPanel.split(headerActionClass).length - 1).toBe(2);
+    expect(longTaskInspector).toContain(headerActionClass);
+    expect(diffPanel).not.toContain('className="kimix-muted-action flex h-8 w-8 items-center justify-center rounded-lg"');
+
+    expect(css).toContain('[data-ui-style="modern"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy');
+    expect(css).toContain('[data-ui-style="retro"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:hover:not(:disabled)');
+    expect(css).toContain('[data-ui-style="nostalgia"] :where(.kimix-longtask-inspector, .kimix-diff-panel) .kimix-inline-icon-action.is-roomy:hover:not(:disabled)');
+    expect(css).toContain('.kimix-diff-panel .kimix-inline-icon-action.is-roomy:hover:not(:disabled)');
+  });
 });
