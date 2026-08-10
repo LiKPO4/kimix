@@ -680,6 +680,44 @@ describe("reconcileAgentCanonicalHistory", () => {
     expect(result.session.collaboration?.messages.map((message) => message.id)).toEqual(["message-b"]);
     expect(result.session.collaboration?.agentEvents[current.secondaryId].map((event) => event.id)).toEqual(["b-old"]);
   });
+
+  it("removes the explicit undo target when official history omits its user-event id", () => {
+    const current = room();
+    current.session.collaboration!.messages = [{
+      id: "message-without-official-id",
+      content: "Latest",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          agentTurnId: "turn-latest",
+        },
+      },
+      timestamp: 100,
+    }, {
+      id: "message-to-keep",
+      content: "Keep",
+      recipientAgentIds: [current.primaryId],
+      deliveries: {
+        [current.primaryId]: {
+          status: "completed",
+          agentTurnId: "turn-keep",
+        },
+      },
+      timestamp: 90,
+    }];
+
+    const result = reconcileAgentCanonicalHistory({
+      session: current.session,
+      roomAgentId: current.primaryId,
+      expectedRuntimeSessionId: "runtime-a",
+      canonicalEvents: [],
+      reason: "undo",
+      undoRoomMessageId: "message-without-official-id",
+    });
+
+    expect(result.session.collaboration?.messages.map((message) => message.id)).toEqual(["message-to-keep"]);
+  });
   it("accepts first canonical load for an Agent without any runtime identity", () => {
     const current = room();
     // 未绑定任何 runtime/official session 的新 agent

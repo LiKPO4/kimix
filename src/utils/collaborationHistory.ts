@@ -27,6 +27,8 @@ export interface ReconcileAgentCanonicalHistoryInput {
   expectedRuntimeSessionId?: string;
   canonicalEvents: TimelineEvent[];
   reason: AgentCanonicalHistoryReason;
+  /** Exact room delivery clicked by the user for an authoritative undo. */
+  undoRoomMessageId?: string;
 }
 
 export interface ReconcileAgentCanonicalHistoryResult {
@@ -262,6 +264,7 @@ export function reconcileAgentCanonicalHistory({
   expectedRuntimeSessionId,
   canonicalEvents,
   reason,
+  undoRoomMessageId,
 }: ReconcileAgentCanonicalHistoryInput): ReconcileAgentCanonicalHistoryResult {
   const agent = getRoomAgent(session, roomAgentId);
   if (!agent) {
@@ -297,6 +300,15 @@ export function reconcileAgentCanonicalHistory({
     next = {
       ...next,
       collaboration,
+    };
+  }
+  if (reason === "undo" && undoRoomMessageId && next.collaboration) {
+    next = {
+      ...next,
+      collaboration: {
+        ...next.collaboration,
+        messages: next.collaboration.messages.filter((message) => message.id !== undoRoomMessageId),
+      },
     };
   }
   return {

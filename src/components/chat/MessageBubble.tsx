@@ -587,6 +587,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
             expectedRuntimeSessionId: runtimeSessionId,
             canonicalEvents,
             reason: "undo",
+            undoRoomMessageId: roomMessage?.id,
           });
           if (!reconciliation.applied) {
             throw new Error("官方撤回完成后会话运行时已变化，请重新打开会话确认历史。");

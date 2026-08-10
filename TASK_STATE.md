@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-10 修复：Agent 房间撤回后消息仍残留（v2.21.28）
+
+- 官方逻辑：`undo(count: 1)` 从历史尾部删除最近一个真实用户输入及其后整轮 assistant/tool；官方历史可能不返回 `officialUserEventId`。
+- 根因：房间 undo 对账在缺失官方用户 ID 时保守保留 `collaboration.messages`，导致撤回成功后房间投递记录仍投影为上一条消息。
+- 修正：撤回调用把用户点击的 `undoRoomMessageId` 传入 canonical reconciliation；官方调用成功后按该明确 ID 删除对应房间投递，其他 Agent/消息保持不变。
+- 验证：新增缺失官方用户 ID 的回归，22 项 collaborationHistory 测试与 typecheck 通过；待补全量测试、知识校验和生产构建。
+
 ## 2026-08-10 修复：Agent 房间首条 live assistant 仍缺模型（v2.21.27）
 
 - 根因：协作房间消息先写入 `collaboration.messages`，再按 Agent 独立派发，没有普通会话那种空 Assistant 占位；`kimix.turn.model` 可能先到，`stampCurrentTurnModel` 当时无目标可盖章，后续首条 assistant 仍可能沿用旧 Agent 名称。
