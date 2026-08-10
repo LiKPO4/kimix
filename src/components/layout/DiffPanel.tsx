@@ -65,7 +65,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
 
   return (
     <aside style={{ width, backgroundColor: "var(--surface-base)" }} className="kimix-diff-panel flex h-full shrink-0 flex-col overflow-hidden border border-border-subtle">
-      <div className="grid h-14 shrink-0 items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 14, paddingRight: 12, columnGap: 10 }}>
+      <div className="grid h-14 shrink-0 items-center border-b border-border-subtle" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", paddingLeft: 18, paddingRight: 14, columnGap: 10 }}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold leading-5 text-text-primary">文件预览</div>
           <div className="truncate text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 2 }}>
@@ -94,7 +94,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
         </div>
       </div>
       {/* Outer shell stays surface-base; section card + file rows use elevated so the list is not same-color inset. */}
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: "10px 12px 12px" }}>
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
         {error && (
           <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ padding: "12px 12px", marginBottom: 10, backgroundColor: "var(--accent-danger-light)" }}>
             {error}

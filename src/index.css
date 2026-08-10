@@ -3076,11 +3076,16 @@ button.bg-accent-primary:disabled:hover,
   z-index: 2;
   width: 12px;
   flex: 0 0 12px;
-  /* 保留 12px 拖拽热区，但覆盖到后继面板内，不占布局宽度、也不抢前一面板的滚动条。 */
+  /* 左侧栏保持无缝：12px 热区全部覆盖到主面板内，不抢前一面板的滚动条。 */
   margin-right: -12px;
   cursor: col-resize;
   touch-action: none;
   -webkit-app-region: no-drag;
+}
+
+/* 右侧检查器保留 4px 呼吸缝，热区仍以 12px 覆盖相邻面板，拖拽手感不缩水。 */
+.kimix-layout-resizer.has-panel-gap {
+  margin-right: -8px;
 }
 
 .kimix-layout-spacer {
@@ -3098,6 +3103,10 @@ button.bg-accent-primary:disabled:hover,
   border-radius: 999px;
   background: transparent;
   transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.kimix-layout-resizer.has-panel-gap::after {
+  left: 1px;
 }
 
 .kimix-layout-resizer:hover::after,

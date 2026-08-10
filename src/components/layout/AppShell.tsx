@@ -2076,7 +2076,7 @@ ${isFinalStep
           )}
         </main>
         {chatWorkspaceActive && (longTaskInspectorOpen || diffPanelOpen) && (
-          <ResizeHandle ariaLabel="调整右侧栏宽度" onPointerDown={startRightPanelResize} />
+          <ResizeHandle ariaLabel="调整右侧栏宽度" onPointerDown={startRightPanelResize} withPanelGap />
         )}
         {chatWorkspaceActive && (longTaskInspectorOpen || gitDetailsOpenSignal > 0 || gitGraphOpenSignal > 0) && (
           <LongTaskInspectorPanel
