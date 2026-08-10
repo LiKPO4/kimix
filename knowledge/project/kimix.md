@@ -4,7 +4,7 @@ title: Kimix
 description: Codex-style Electron desktop interface that exposes official Kimi Code capabilities through a project-aware graphical workflow.
 resource: https://github.com/LiKPO4/kimix
 tags: [kimix, electron, kimi-code, desktop]
-timestamp: "2026-08-01T21:05:00+08:00"
+timestamp: "2026-08-10T11:18:00+08:00"
 ---
 
 # Kimix
@@ -27,6 +27,7 @@ Kimix is an Electron application with a React renderer and a Node-based main pro
 * Expanded sidebar projects use a compact three-level rhythm without collapsing rows: 6px between project sections, 4px between a project header and its session list, and 2px between session rows. Project and session row heights remain 36px and 32px so density changes come from removing accumulated empty space rather than shrinking text or controls.
 * Project empty-state suggestions use explicit slot priority rather than persisted insertion order. The project-overview action always occupies the first slot; latest conversation context contributes at most one canonical `继续：…` action; historical continue variants are removed before saved non-continue suggestions and unused defaults fill the remaining slots. Icons follow action semantics rather than row position or exact display-copy equality.
 * The chat main grid must declare `grid-template-columns: minmax(0, 1fr)`; an implicit `auto` column can retain a child's intrinsic width even when the main element's border box shrinks for the right inspector. The session toolbar additionally uses `minmax(0, 1fr) auto` title/actions columns and sets `min-width: 0` plus `width/max-width: 100%`. The title column owns truncation while the fixed action column remains inside the main area.
+* The file-preview list and the middle project-file viewer are independent surfaces. Closing the right file-preview list only sets `diffPanelOpen=false`; it must not clear `previewFile`, preview content, or resolved path. The viewer owns its own “返回会话” action, while project/session changes remain the boundary that clears preview state to prevent cross-context files.
 * The resizable right inspector supports a 280px minimum width. Three icon-and-text Git actions cannot fit one row after inspector and card padding at that width, so the Git action grid switches below 340px to two columns with Push spanning the second row; wider inspectors retain three equal `minmax(0, 1fr)` columns.
 * Editing a queued prompt is a destructive restore-to-Composer action, not a separate edit mode: the queued item is removed, its text and attachments become the ordinary draft, and subsequent send/queue behavior is identical to newly typed input. Kimix does not retain an edit snapshot or expose Save/Cancel Edit controls.
 * Sidebar project rows own expansion only. Clicking a project toggles its session list without changing the active project/session or creating a conversation; only a session row changes the active conversation, and the explicit New Conversation action creates one.

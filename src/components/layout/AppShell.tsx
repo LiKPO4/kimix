@@ -1036,15 +1036,6 @@ export function AppShell() {
   }, [previewProjectPath]);
 
   useEffect(() => {
-    if (!diffPanelOpen) {
-      setPreviewFile(null);
-      setPreviewContent("");
-      setPreviewResolvedPath("");
-      setPreviewError("");
-    }
-  }, [diffPanelOpen]);
-
-  useEffect(() => {
     if (!previewProjectPath || !previewFile) return;
     let cancelled = false;
     setPreviewLoading(true);

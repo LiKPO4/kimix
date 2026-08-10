@@ -35,4 +35,9 @@ describe("layout resizer styles", () => {
     expect(diffPanel).toContain(bodySpacing);
     expect(longTaskInspector).toContain(bodySpacing);
   });
+
+  it("关闭文件预览侧栏不会清空中间文件预览", () => {
+    expect(appShell).toContain('onClose={() => setDiffPanelOpen(false)}');
+    expect(appShell).not.toContain('if (!diffPanelOpen) {\n      setPreviewFile(null);');
+  });
 });
