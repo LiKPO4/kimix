@@ -2447,7 +2447,7 @@ body::before {
   gap: 8px;
   padding-left: 12px;
   padding-right: 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ui-role-control-radius, var(--radius-sm));
   transition: background-color var(--duration-base) var(--ease-hover),
               color var(--duration-base) var(--ease-hover),
               box-shadow var(--duration-base) var(--ease-hover),
@@ -4462,6 +4462,7 @@ button.bg-accent-primary:disabled:hover,
   button.kimix-chat-process-row
 ):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):hover:not(:disabled) {
   border-color: var(--ui-role-control-hover-border);
+  border-radius: var(--ui-role-control-radius, inherit);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
 }
@@ -4473,6 +4474,7 @@ button.bg-accent-primary:disabled:hover,
   button.kimix-chat-process-row
 ):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):active:not(:disabled) {
   border-color: var(--ui-role-control-active-border);
+  border-radius: var(--ui-role-control-radius, inherit);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);
 }
