@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, PauseCircle, Radio, Search, Settings2, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download, FolderOpen, GitBranch, Loader2, PauseCircle, Radio, RefreshCw, Search, Settings2, X } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -920,10 +920,13 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
+                    disabled={usageLoading}
                     onClick={() => void loadUsage()}
-                    className="kimix-icon-text-button kimix-muted-action is-compact shrink-0"
+                    className="kimix-inline-icon-action is-roomy shrink-0"
+                    title="刷新套餐用量"
+                    aria-label="刷新套餐用量"
                   >
-                    {usageLoading ? <Loader2 size={14} className="animate-spin" /> : "刷新"}
+                    <RefreshCw size={14} className={usageLoading ? "animate-spin" : ""} />
                   </button>
                 </div>
               </div>
