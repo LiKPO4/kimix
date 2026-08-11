@@ -2453,7 +2453,7 @@ export async function logoutServerOAuth(): Promise<boolean> {
 
 export async function listBackgroundTasks(sessionId: string, options: { activeOnly?: boolean; limit?: number } = {}): Promise<KimiCodeBackgroundTaskInfo[]> {
   sessionId = resolveMigratedSessionId(sessionId);
-  if (serverSessions.has(sessionId)) {
+  try {
     const tasks = await getServerClient().listTasks(sessionId, options.activeOnly ? "running" : undefined);
     const mapped = tasks.map((task) => ({
       taskId: task.id,
@@ -2472,13 +2472,19 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
       failureReason: task.status === "failed" && task.output_bytes ? `任务失败，已有约 ${formatBytes(task.output_bytes)} 输出可查看。` : undefined,
     }));
     return options.limit ? mapped.slice(0, options.limit) : mapped;
+  } catch (serverErr) {
+    if (serverSessions.has(sessionId)) throw serverErr;
+    try {
+      const managed = getManagedSession(sessionId);
+      if (!managed.session.listBackgroundTasks) throw new Error("当前兼容链路不支持读取后台任务。");
+      return [...await managed.session.listBackgroundTasks(options)].map((task) => ({
+        ...task,
+        transport: "sdk" as const,
+      }));
+    } catch {
+      throw serverErr;
+    }
   }
-  const managed = getManagedSession(sessionId);
-  if (!managed.session.listBackgroundTasks) throw new Error("当前兼容链路不支持读取后台任务。");
-  return [...await managed.session.listBackgroundTasks(options)].map((task) => ({
-    ...task,
-    transport: "sdk" as const,
-  }));
 }
 
 export async function getBackgroundTaskOutput(sessionId: string, taskId: string, options: { tail?: number } = {}): Promise<string> {
