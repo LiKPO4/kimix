@@ -208,4 +208,9 @@ describe("roomContextBridge", () => {
     room.collaboration!.messages = [];
     expect(() => buildRoomContextSharePlan(room, "agent-2", { mode: "all" })).toThrow("安全上限");
   });
+  it("支持半角竖线与 fallback 标记的解析剥离", () => {
+    const halfWidthPrompt = "【Kimix 房间正文 | 仅作背景】\n正文字符数：0\n\n【Kimix 当前消息】\n半角测试";
+    expect(parseRoomDeliveryPrompt(halfWidthPrompt)).toEqual({ currentPrompt: "半角测试" });
+    expect(stripRoomContextFromPrompt(halfWidthPrompt)).toBe("半角测试");
+  });
 });

@@ -327,24 +327,34 @@ function parseDeliveryIdentity(header: string): RoomDeliveryPromptIdentity | und
   return { roomMessageId: roomMessageId!, agentTurnId: agentTurnId!, dispatchAttemptId: dispatchAttemptId! };
 }
 
+const ROOM_CONTEXT_HEADER_PATTERN = /^【Kimix 房间正文\s*[\|｜]\s*仅作背景】/;
+
 export function parseRoomDeliveryPrompt(content: string): ParsedRoomDeliveryPrompt {
-  if (!content.startsWith(ROOM_CONTEXT_HEADER)) return { currentPrompt: content };
+  if (!ROOM_CONTEXT_HEADER_PATTERN.test(content)) return { currentPrompt: content };
   const lengthLineStart = content.indexOf(`\n${ROOM_CONTEXT_LENGTH_LABEL}`);
   if (lengthLineStart < 0) return { currentPrompt: "" };
   const lengthLineEnd = content.indexOf("\n\n", lengthLineStart);
   if (lengthLineEnd < 0) return { currentPrompt: "" };
   const lengthText = content.slice(lengthLineStart + ROOM_CONTEXT_LENGTH_LABEL.length + 1, lengthLineEnd).trim();
   const historyLength = Number(lengthText);
-  if (!Number.isSafeInteger(historyLength) || historyLength < 0) return { currentPrompt: "" };
-  const historyStart = lengthLineEnd + 2;
-  const markerIndex = historyStart + historyLength;
-  if (content.slice(markerIndex, markerIndex + ROOM_CONTEXT_ORIGINAL_MARKER.length) !== ROOM_CONTEXT_ORIGINAL_MARKER) {
-    return { currentPrompt: "" };
+  if (Number.isSafeInteger(historyLength) && historyLength >= 0) {
+    const historyStart = lengthLineEnd + 2;
+    const markerIndex = historyStart + historyLength;
+    if (content.slice(markerIndex, markerIndex + ROOM_CONTEXT_ORIGINAL_MARKER.length) === ROOM_CONTEXT_ORIGINAL_MARKER) {
+      return {
+        currentPrompt: content.slice(markerIndex + ROOM_CONTEXT_ORIGINAL_MARKER.length),
+        deliveryIdentity: parseDeliveryIdentity(content.slice(0, lengthLineStart)),
+      };
+    }
   }
-  return {
-    currentPrompt: content.slice(markerIndex + ROOM_CONTEXT_ORIGINAL_MARKER.length),
-    deliveryIdentity: parseDeliveryIdentity(content.slice(0, lengthLineStart)),
-  };
+  const fallbackMarkerIndex = content.indexOf(ROOM_CONTEXT_ORIGINAL_MARKER);
+  if (fallbackMarkerIndex >= 0) {
+    return {
+      currentPrompt: content.slice(fallbackMarkerIndex + ROOM_CONTEXT_ORIGINAL_MARKER.length),
+      deliveryIdentity: parseDeliveryIdentity(content.slice(0, lengthLineStart)),
+    };
+  }
+  return { currentPrompt: "" };
 }
 
 export function stripRoomContextFromPrompt(content: string) {
