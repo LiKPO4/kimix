@@ -1597,15 +1597,18 @@ ${isFinalStep
 
   useEffect(() => {
     if (!backgroundTasksRuntimeSessionId) return;
-    // setTimeout 链式调度：间隔从上一轮完成后起算。原 setInterval 依赖任务 state，
-    // 每次结果回来都重建定时器，实际间隔 = 请求耗时 + 2s/5s 且随网络漂移（review 中 8）。
     let cancelled = false;
     let timer: number | undefined;
+    let fastTicksRemaining = 4;
     const tick = async () => {
       await refreshLongTaskBackgroundTasks({ silent: true });
       if (cancelled) return;
       const hasRunningTask = longTaskBackgroundTasksRef.current.some((task) => !isBackgroundTaskTerminalStatus(task.status));
-      timer = window.setTimeout(() => void tick(), hasRunningTask ? 2000 : 5000);
+      const nextDelay = hasRunningTask
+        ? 1500
+        : (fastTicksRemaining > 0 ? 1000 : 4000);
+      if (fastTicksRemaining > 0) fastTicksRemaining -= 1;
+      timer = window.setTimeout(() => void tick(), nextDelay);
     };
     timer = window.setTimeout(() => void tick(), 0);
     return () => {
