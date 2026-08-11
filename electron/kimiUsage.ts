@@ -234,6 +234,30 @@ function nextWeekRefreshAt(now: number) {
   return date.getTime();
 }
 
+function nextMonthRefreshAt(now: number): number {
+  const date = new Date(now);
+  date.setMonth(date.getMonth() + 1, 1);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function findMonthlyLimit(limits: unknown[]) {
+  if (!Array.isArray(limits)) return null;
+  for (const item of limits) {
+    const row = getRecord(item);
+    if (!row) continue;
+    const label = typeof row.label === "string" ? row.label : "";
+    if (/month|monthly|本月|每月|月度|30d|30天/i.test(label)) return row;
+    const window = getRecord(row.window);
+    if (window) {
+      const unit = String(window.unit ?? window.timeUnit ?? "").toUpperCase();
+      const duration = toNumber(window.duration);
+      if (unit.includes("MONTH") || (unit.includes("DAY") && duration === 30)) return row;
+    }
+  }
+  return null;
+}
+
 export function parseKimiUsagePayload(payload: Record<string, unknown>, now = Date.now()): KimiUsageData {
   const fiveHourLimit = findWindowLimit(payload, 300, "MINUTE");
   const fiveHour = usagePeriodFromDetail(
@@ -252,15 +276,25 @@ export function parseKimiUsagePayload(payload: Record<string, unknown>, now = Da
     now,
     windowMsFromWindow(weeklyWindow),
   );
+  const limits = Array.isArray(payload.limits) ? payload.limits : [];
+  const subscription = getRecord(payload.subscription);
+  const monthlyRow = findMonthlyLimit(limits) ?? getRecord(payload.monthlyUsage) ?? (subscription ? {
+    limit: subscription.total_quota ?? subscription.totalQuota ?? subscription.limit ?? subscription.quota,
+    used: subscription.used_quota ?? subscription.usedQuota ?? subscription.used,
+    resetAt: subscription.reset_at ?? subscription.resetAt ?? subscription.refreshAt,
+  } : null);
+  const monthly = usagePeriodFromManagedRow("本月", monthlyRow, nextMonthRefreshAt(now), now);
   const totalQuota = toNumber(payload.totalQuota);
   const extraUsage = extraUsageFromPayload(payload);
+  const periods = [fiveHour, weekly];
+  if (monthly.available) periods.push(monthly);
   return {
-    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
+    available: periods.some((period) => period.available) || Boolean(extraUsage),
     updatedAt: now,
     source: "Kimi Code 官方用量接口",
     ...(totalQuota !== undefined ? { totalQuota } : {}),
     ...(extraUsage ? { extraUsage } : {}),
-    periods: [fiveHour, weekly],
+    periods,
   };
 }
 
@@ -285,9 +319,6 @@ function usagePeriodFromManagedRow(
     percent: Math.max(0, Math.min(100, (used / limit) * 100)),
     available: true,
     refreshAt,
-    // Managed usage rows don't carry explicit duration+timeUnit. The UI falls
-    // back to label-based heuristics (5h / weekly) in getPeriodWindowMs(),
-    // which are reliable for the current managed plan types.
   };
 }
 
@@ -312,15 +343,19 @@ export function parseManagedUsagePayload(payload: unknown, now = Date.now()): Ki
   const limits = Array.isArray(record.limits) ? record.limits : [];
   const fiveHourRow = findManagedUsageLimit(limits, /(^|\b)(5h|300m|5\s*小时)/i);
   const weeklyRow = getRecord(record.summary) ?? findManagedUsageLimit(limits, /week|weekly|本周|每周|一周/i);
+  const monthlyRow = findMonthlyLimit(limits);
   const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000, now);
   const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now), now);
+  const monthly = usagePeriodFromManagedRow("本月", monthlyRow, nextMonthRefreshAt(now), now);
   const extraUsage = extraUsageFromPayload(record);
+  const periods = [fiveHour, weekly];
+  if (monthly.available) periods.push(monthly);
   return {
-    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
+    available: periods.some((period) => period.available) || Boolean(extraUsage),
     updatedAt: now,
     source: "Kimi Code 官方用量接口",
     ...(extraUsage ? { extraUsage } : {}),
-    periods: [fiveHour, weekly],
+    periods,
   };
 }
 
@@ -343,7 +378,7 @@ function serverUsageRowToManagedRow(row: Record<string, unknown> | null): Record
   return resetAt === undefined ? row : { ...row, refreshAt: resetAt };
 }
 
-/** 官方 Server `/api/v1/oauth/usage` 载荷解析（0.31.1 实测结构：summary.window + limits[].window，无 label 字段）。 */
+/** 官方 Server `/api/v1/oauth/usage` 载荷解析（支持 5小时、本周 及动态 本月 探针）。 */
 export function parseServerUsagePayload(payload: unknown, now = Date.now()): KimiUsageData {
   const record = getRecord(payload);
   if (!record) throw new Error("Kimi 用量接口返回格式异常");
@@ -355,15 +390,19 @@ export function parseServerUsagePayload(payload: unknown, now = Date.now()): Kim
   const limits = Array.isArray(record.limits) ? record.limits : [];
   const fiveHourRow = serverUsageRowToManagedRow(findServerWindowLimit(limits, 5, "HOUR"));
   const weeklyRow = serverUsageRowToManagedRow(getRecord(record.summary));
+  const monthlyRow = serverUsageRowToManagedRow(findMonthlyLimit(limits));
   const fiveHour = usagePeriodFromManagedRow("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000, now);
   const weekly = usagePeriodFromManagedRow("本周", weeklyRow, nextWeekRefreshAt(now), now);
+  const monthly = usagePeriodFromManagedRow("本月", monthlyRow, nextMonthRefreshAt(now), now);
   const extraUsage = extraUsageFromPayload(record);
+  const periods = [fiveHour, weekly];
+  if (monthly.available) periods.push(monthly);
   return {
-    available: [fiveHour, weekly].some((period) => period.available) || Boolean(extraUsage),
+    available: periods.some((period) => period.available) || Boolean(extraUsage),
     updatedAt: now,
     source: "Kimi Code 官方 Server 用量接口",
     ...(extraUsage ? { extraUsage } : {}),
-    periods: [fiveHour, weekly],
+    periods,
   };
 }
 

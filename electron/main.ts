@@ -7231,11 +7231,45 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
     }
     const payload = getRecord(await res.json());
     if (!payload) throw new Error("Kimi 用量接口返回格式异常");
+    try {
+      const sub = await fetchKimiSubscriptionQuota(accessToken);
+      if (sub) payload.subscription = sub;
+    } catch {
+      // 静默探测
+    }
     return { success: true, data: parseKimiUsagePayload(payload) };
   } catch (err) {
     return { success: false, error: formatKimiUsageError(err instanceof Error ? err.message : String(err)) };
   }
 });
+
+async function fetchKimiSubscriptionQuota(accessToken: string): Promise<Record<string, unknown> | null> {
+  const urls = [
+    "https://www.kimi.com/api/user/v1/subscription",
+    "https://api.kimi.com/coding/v1/subscription",
+    "https://www.kimi.com/api/membership/subscription",
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          ...kimiCommonHeaders(),
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        signal: AbortSignal.timeout(3_500),
+      });
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        const record = getRecord(json);
+        if (record) return record;
+      }
+    } catch {
+      // 静默回落
+    }
+  }
+  return null;
+}
 
 // ---------- 上下文缓存过期提醒（上游 0.34.0 #2646）：client_configs ----------
 

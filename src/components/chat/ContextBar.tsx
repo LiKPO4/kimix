@@ -167,6 +167,7 @@ function getDisplaySessionId(session: Session | null | undefined): string | null
 function getPeriodWindowMs(label: string): number | null {
   if (/5\s*小时/.test(label)) return 5 * 3600 * 1000;
   if (/本周|每周|一周|\bweek\b/i.test(label)) return 7 * 24 * 3600 * 1000;
+  if (/本月|每月|月度|\bmonth\b/i.test(label)) return 30 * 24 * 3600 * 1000;
   return null;
 }
 
