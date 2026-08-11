@@ -63,6 +63,7 @@ import {
 } from "@/utils/roomAgentRecovery";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
+import { degradeSingleAgentRoomSession } from "@/utils/sessionDegrade";
 import {
   bindProvisionedRoomAgent,
   failRoomAgentProvisioning,
@@ -1569,6 +1570,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
+    if (targetSession.collaboration && !hasMultipleRoomAgents(targetSession)) {
+      const degraded = degradeSingleAgentRoomSession(targetSession);
+      if (degraded !== targetSession) {
+        updateSession(targetSession.id, () => degraded);
+        await persistLocalConversationState();
+        targetSession = syncCurrentSessionFromStore(targetSession.id) ?? degraded;
+      }
+    }
     if (targetSession.collaboration && hasMultipleRoomAgents(targetSession)) {
       return sendRoomPrompt(targetSession, content, {
         images,

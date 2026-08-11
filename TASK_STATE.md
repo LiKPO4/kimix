@@ -1,10 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-08-11 修复：单 Agent 残留态发送路径真正降级为普通会话（v2.21.32）
+
+- 现场：v2.21.31 的 hasMultipleRoomAgents 入口门禁让“单 Agent 残留态”（collaboration 存在但 active Agent 只剩 primary，如加过 Agent 又全部移出）改走普通发送路径，但该路径只写 session.events；projectCollaborationTimeline 在有 collaboration 时只从 collaboration.messages + agentEvents 投影、忽略 session.events，回流时 replaceRoomAgentEvents 又经 mirrorPrimaryAgentToLegacySession 用 agentEvents[primary] 整体替换 session.events，导致新发 userEvent 在聊天时间线不可见、回流后被覆盖丢失（临时 vitest 复现：发送后时间线无该事件，回流后 session.events 不含该事件）。
+- 根因：门禁只改了“路由”（绕过房间投递），没改“状态”（collaboration 仍挂在会话上），下游投影/回流/mirror 仍按房间逻辑处理，数据流断裂。
+- 修正（方案 A）：发送入口检测到 collaboration && !hasMultipleRoomAgents 时调用 degradeSingleAgentRoomSession（src/utils/sessionDegrade.ts）一次性降级为普通会话——用 projectCollaborationTimeline 投影合并 messages + agentEvents 历史进 session.events、过滤 open delivery 空占位、清除 collaboration/unsupportedCollaboration 并持久化（持久化失败忽略、幂等）；此后下游全走纯普通逻辑，重新添加 Agent 时也从最新 events 重建房间，历史不丢。
+- 验证：新增 sessionDegrade.test.ts 5 项（无 collaboration 同引用 / 多 Agent 不降级 / 残留态合并历史并过滤占位 / 幂等 / 降级后普通发送在时间线可见）；房间相关 6 文件 87 项全绿；双 tsconfig typecheck 通过。子代理并行实现与测试，主代理抽查复核后收尾。
+
 
 ## 2026-08-11 修复：发送路径单 Agent 惰性降级避免误拼房间模板（v2.21.31）
 
 - 现场：天然的普通对话（从未增加过其他房间 Agent）发出的消息在官方 Kimi Code 后端历史记录中带有 【Kimix 房间正文｜仅作背景】 前缀。
-- 根因：发送逻辑 sendPromptContent（Composer.tsx:1572）只要 	argetSession.collaboration 结构存在就无条件走 sendRoomPrompt。uildRoomDeliveryPrompt 的无前缀保护要求 contextShare/identity/deliveryIdentity 三者全缺才返回原文，而房间链路默认总是传入 Agent 身份，导致单 Agent 会话（或移出所有 Secondary Agent 后的残留房间态）发送给后端的 Prompt 也被强制拼上了多 Agent 房间前缀。
+- 根因：发送逻辑 sendPromptContent（Composer.tsx:1572）只要 targetSession.collaboration 结构存在就无条件走 sendRoomPrompt。buildRoomDeliveryPrompt 的无前缀保护要求 contextShare/identity/deliveryIdentity 三者全缺才返回原文，而房间链路默认总是传入 Agent 身份，导致单 Agent 会话（或移出所有 Secondary Agent 后的残留房间态）发送给后端的 Prompt 也被强制拼上了多 Agent 房间前缀。
 - 修正：在 Composer.tsx:1572 的入口处使用 hasMultipleRoomAgents(targetSession) 进行门禁拦截。当会话仅有 1 个主 Agent（单 Agent 对话/移出后残留态）时，直接走普通消息发送流程，不再进行房间前缀包装与队列投递；保留原有的 collaboration 历史数据与被移出 Agent 的恢复能力，避免静默破坏存储结构。
 - 验证：全量 175 个测试文件 / 1910 项单元测试（新增 hasMultipleRoomAgents 状态识别断言）与 pnpm typecheck 全部一次性通过。
 
