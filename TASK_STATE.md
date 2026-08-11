@@ -1,6 +1,14 @@
 # Kimix 长程任务状态
 
-## 2026-08-10 性能：启动同步最新会话不再阻塞本地首屏（v2.21.30）
+
+## 2026-08-11 修复：发送路径单 Agent 惰性降级避免误拼房间模板（v2.21.31）
+
+- 现场：天然的普通对话（从未增加过其他房间 Agent）发出的消息在官方 Kimi Code 后端历史记录中带有 【Kimix 房间正文｜仅作背景】 前缀。
+- 根因：发送逻辑 sendPromptContent（Composer.tsx:1572）只要 	argetSession.collaboration 结构存在就无条件走 sendRoomPrompt。uildRoomDeliveryPrompt 的无前缀保护要求 contextShare/identity/deliveryIdentity 三者全缺才返回原文，而房间链路默认总是传入 Agent 身份，导致单 Agent 会话（或移出所有 Secondary Agent 后的残留房间态）发送给后端的 Prompt 也被强制拼上了多 Agent 房间前缀。
+- 修正：在 Composer.tsx:1572 的入口处使用 hasMultipleRoomAgents(targetSession) 进行门禁拦截。当会话仅有 1 个主 Agent（单 Agent 对话/移出后残留态）时，直接走普通消息发送流程，不再进行房间前缀包装与队列投递；保留原有的 collaboration 历史数据与被移出 Agent 的恢复能力，避免静默破坏存储结构。
+- 验证：全量 175 个测试文件 / 1910 项单元测试（新增 hasMultipleRoomAgents 状态识别断言）与 pnpm typecheck 全部一次性通过。
+
+# 2026-08-10 性能：启动同步最新会话不再阻塞本地首屏（v2.21.30）
 
 - 现场：启动恢复已有会话时，全屏显示“正在同步最新会话”约 7-8 秒；本地持久化消息已经存在但不可见。
 - 根因：启动链无条件把 active local session 设为 `isLoading=true`，ChatThread 随即用全屏门禁遮住非空本地时间线；门禁要等待 `listSessions → loadSessionHistory → resume → getStatus`。官方历史路径包含最长 4 秒 Server 冷启动等待和 8 秒 snapshot 回退上限，7-8 秒与该网络/超时链吻合，不是 React 渲染慢。
