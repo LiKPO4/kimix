@@ -7245,7 +7245,10 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
 
 async function fetchKimiSubscriptionQuota(accessToken: string): Promise<Record<string, unknown> | null> {
   const urls = [
+    "https://www.kimi.com/api/user/v1/quota",
     "https://www.kimi.com/api/user/v1/subscription",
+    "https://www.kimi.com/api/membership/detail",
+    "https://www.kimi.com/api/user/subscription",
     "https://api.kimi.com/coding/v1/subscription",
     "https://www.kimi.com/api/membership/subscription",
   ];
@@ -7262,7 +7265,9 @@ async function fetchKimiSubscriptionQuota(accessToken: string): Promise<Record<s
       if (res.ok) {
         const json = await res.json().catch(() => null);
         const record = getRecord(json);
-        if (record) return record;
+        if (record && (record.data || record.monthly_limit || record.subscription || record.limits || record.total_quota)) {
+          return getRecord(record.data) ?? record;
+        }
       }
     } catch {
       // 静默回落
