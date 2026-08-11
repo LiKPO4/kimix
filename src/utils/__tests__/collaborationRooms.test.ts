@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoomAgent, RoomAgentDeliveryAttempt, RoomUserMessage, Session, TimelineEvent } from "@/types/ui";
 import {
   createCollaborationStateFromSession,
+  hasMultipleRoomAgents,
   findRoomRuntimeOwners,
   getEventRoomAgentId,
   getPrimaryRoomAgent,
@@ -796,5 +797,24 @@ describe("repairMissingRoomDeliveryAttemptIds", () => {
     const next = repairMissingRoomDeliveryAttemptIds(collaboration);
 
     expect(next.messages[0].deliveries["agent-primary"].dispatchAttemptId).toBe("attempt-1");
+  });
+
+  it("correctly identifies whether a room has multiple active agents", () => {
+    const session = legacySession();
+    expect(hasMultipleRoomAgents(session)).toBe(false);
+
+    const collaboration = createCollaborationStateFromSession(session);
+    expect(hasMultipleRoomAgents({ ...session, collaboration })).toBe(false);
+
+    const secondary = secondaryAgent();
+    expect(hasMultipleRoomAgents({
+      ...session,
+      collaboration: { ...collaboration, agents: [...collaboration.agents, secondary] },
+    })).toBe(true);
+
+    expect(hasMultipleRoomAgents({
+      ...session,
+      collaboration: { ...collaboration, agents: [...collaboration.agents, { ...secondary, removedAt: Date.now() }] },
+    })).toBe(false);
   });
 });

@@ -40,7 +40,7 @@ import { APP_VERSION } from "@/utils/appVersion";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { buildThinkingEffortOptions, resolveThinkingEffort, thinkingEffortLabel, thinkingEffortMenuLabel } from "@/utils/thinkingEffort";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { getPrimaryRoomAgent, getRoomAgent, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
+import { getPrimaryRoomAgent, getRoomAgent, hasMultipleRoomAgents, roomAgentActivityKey, updateRoomAgent, updateRoomAgentEvents } from "@/utils/collaborationRooms";
 import { markAgentKimiHistoryCacheCurrent, reconcileAgentCanonicalHistory } from "@/utils/collaborationHistory";
 import {
   appendRoomAgentSteerEvent,
@@ -1569,7 +1569,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     if (!ensuredSession) return false;
     let targetSession = ensuredSession;
     const images = options?.images ?? [];
-    if (targetSession.collaboration) {
+    if (targetSession.collaboration && hasMultipleRoomAgents(targetSession)) {
       return sendRoomPrompt(targetSession, content, {
         images,
         manualSubmitAutoScroll: options?.manualSubmitAutoScroll,
