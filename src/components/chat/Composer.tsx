@@ -4134,6 +4134,17 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     }));
   };
 
+  const isMultiAgentRoomActive = Boolean(activeSession?.collaboration) && selectedRoomAgents.length > 1;
+  const placeholder = roomReadOnly
+    ? "多 Agent 房间功能当前处于只读 gate"
+    : isMultiAgentRoomActive
+      ? `默认发送给 ${selectedRoomAgents.map((agent) => agent.displayName).join("、")}；@Agent 可临时覆盖`
+      : canUseComposer
+        ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
+        : isCurrentSessionHandoff
+          ? "正在生成交接内容..."
+          : "请先选择项目";
+
   const handleDragOver = (e: React.DragEvent) => {
     if (!hasDraggedFiles(e)) return;
     e.preventDefault();
@@ -4379,15 +4390,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   }[mutationPermissionMode ?? permissionMode];
   const permissionLabelFontSize = permissionLabel.length > 5 ? 11 : permissionLabel.length > 4 ? 12 : 13;
 
-  const placeholder = roomReadOnly
-    ? "多 Agent 房间功能当前处于只读 gate"
-    : selectedRoomAgents.length > 0 && activeSession?.collaboration
-      ? `默认发送给 ${selectedRoomAgents.map((agent) => agent.displayName).join("、")}；@Agent 可临时覆盖`
-        : canUseComposer
-          ? "向 Agent 询问任何事。输入 @ 使用插件或提及文件"
-    : isCurrentSessionHandoff
-      ? "正在生成交接内容..."
-      : "请先选择项目";
   const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
   const visibleTodos = activeSession ? getVisibleTodos(activeSession.events) : [];
