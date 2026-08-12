@@ -9,6 +9,8 @@ export type SettingsSectionId =
   | "identity"
   | "model"
   | "theme"
+  | "uiStyle"
+  | "display"
   | "palette"
   | "permission"
   | "context"
@@ -53,8 +55,8 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     id: "appearance",
     group: "基础设置",
     label: "外观",
-    description: "调整界面主题、字号和色彩方案。",
-    sections: ["theme", "palette"],
+    description: "调整明暗主题、界面风格、显示偏好和色彩方案。",
+    sections: ["theme", "uiStyle", "display", "palette"],
   },
   {
     id: "conversation",
@@ -135,11 +137,27 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
   },
   {
     id: "theme",
-    label: "主题与字号",
-    description: "浅色、深色和界面字号",
+    label: "主题",
+    description: "浅色、深色和跟随系统",
     pageId: "appearance",
     sectionId: "theme",
-    keywords: ["外观", "字号", "深色", "浅色"],
+    keywords: ["外观", "深色", "浅色", "跟随系统"],
+  },
+  {
+    id: "ui-style",
+    label: "界面风格",
+    description: "选择或导入界面材质、圆角、边框和阴影风格",
+    pageId: "appearance",
+    sectionId: "uiStyle",
+    keywords: ["外观", "风格", "复古", "现代", "JSON", "AI 提示"],
+  },
+  {
+    id: "display",
+    label: "显示与阅读",
+    description: "调整界面字号和对话导航刻度",
+    pageId: "appearance",
+    sectionId: "display",
+    keywords: ["外观", "字号", "字体", "对话刻度", "导航", "宽度"],
   },
   {
     id: "palette",

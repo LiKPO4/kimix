@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-10T11:06:00+08:00"
+timestamp: "2026-08-12T10:45:00+08:00"
 ---
 
 # Interface Style System
@@ -27,6 +27,7 @@ Imported documents are parsed in the Electron main process with a JSON-only 256 
 
 # Invariants
 
+* Appearance settings preserve the same orthogonal ownership as the runtime style system. `主题` owns light/dark/system mode; `界面风格` owns material presets and JSON/AI import; `显示与阅读` owns font size and chat navigation rail; `色彩方案` owns palettes and official-theme scanning. Each is a distinct `SettingsSectionId`, focus/search target, and draggable section. Readability or navigation preferences must never be appended inside the interface-style section merely because they are visually observable.
 * Interface-style root blocks must not assign `--surface-*`, `--text-*`, `--accent-*`, or `--border-*` color tokens. Dark theme color ownership still requires an elevated ladder: ground/base/elevated/hover must stay distinguishable, borders lift toward white (not crush into the fill), and muted text should remain near WCAG AA on elevated surfaces. Dark tokens are produced by `buildDarkTokens` / the `[data-theme="dark"]` baseline, not by style presets. Style rules consume those tokens and may use neutral transparent light/dark overlays only to express depth.
 * The importable V1 consumer layer is opt-in, never a replacement baseline. Only an existing `custom:*` document may set `data-ui-style-contract="v1"` and inline compiled variables. Default must have neither style attribute nor compiled variables; protected built-ins keep only their existing `data-ui-style` identity and dedicated CSS. Switching away from a custom style or failing to resolve one must clear the contract marker and every previously applied inline variable before the fallback renders.
 * Imported style descriptions are bounded metadata, not layout content. UI Style v1 rejects new descriptions above 48 characters; persisted pre-limit documents are truncated to 48 during normalization so tightening the schema cannot delete an active custom style. Settings cards are fixed at 76px, render the description as one ellipsized line, and expose the complete normalized string through a title tooltip. The AI prompt declares the same hard limit and warns that longer files are rejected.

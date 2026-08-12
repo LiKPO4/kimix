@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -82,6 +82,8 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "experiment",
   "model",
   "theme",
+  "uiStyle",
+  "display",
   "palette",
   "permission",
   "context",
@@ -1436,8 +1438,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </button>
                   ))}
                 </div>
-                <div className="kimix-settings-row-title" style={{ marginTop: 16 }}>
-                  <div className="kimix-settings-subsection-title">界面风格</div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("uiStyle", 4)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <LayoutTemplate size={16} className="text-text-muted" />
+                    <span>界面风格</span>
+                  </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
                     <button
                       type="button"
@@ -1456,6 +1464,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <FileText size={15} />
                       <span>复制 AI 提示</span>
                     </button>
+                    {settingsDragHandle("uiStyle", "界面风格")}
                   </div>
                 </div>
                 <div className="kimix-settings-uistyle-grid">
@@ -1498,7 +1507,15 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 {uiStyleImportMessage && (
                   <div className="kimix-settings-theme-scan-message">{uiStyleImportMessage}</div>
                 )}
-                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("display", 5)}>
+                <div className="kimix-settings-section-title">
+                  <Monitor size={16} className="text-text-muted" />
+                  <span>显示与阅读</span>
+                  {settingsDragHandle("display", "显示与阅读")}
+                </div>
+                <div className="kimix-settings-card" style={{ marginTop: 12, padding: "14px 16px" }}>
                   <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px", gap: 14 }}>
                     <div className="min-w-0">
                       <label htmlFor="kimix-font-size" className="kimix-settings-permission-label block">界面字号</label>
@@ -1561,7 +1578,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                 </div>
               </div>
 
-              <div className="kimix-settings-section" {...settingsSectionProps("palette", 4)}>
+              <div className="kimix-settings-section" {...settingsSectionProps("palette", 6)}>
                 <div className="kimix-settings-row-title">
                   <div className="kimix-settings-section-title">
                     <Palette size={16} className="text-text-muted" />

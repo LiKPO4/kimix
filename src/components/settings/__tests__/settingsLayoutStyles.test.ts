@@ -112,4 +112,21 @@ describe("settings workspace scroll layout", () => {
       /\.kimix-settings-permission-status\s*\{[^}]*justify-self:\s*end;/s,
     );
   });
+
+  it("keeps UI style, display preferences, and palette in separate appearance sections", () => {
+    const themeStart = settingsPanel.indexOf('settingsSectionProps("theme", 3)');
+    const styleStart = settingsPanel.indexOf('settingsSectionProps("uiStyle", 4)');
+    const displayStart = settingsPanel.indexOf('settingsSectionProps("display", 5)');
+    const paletteStart = settingsPanel.indexOf('settingsSectionProps("palette", 6)');
+
+    expect(themeStart).toBeGreaterThan(-1);
+    expect(styleStart).toBeGreaterThan(themeStart);
+    expect(displayStart).toBeGreaterThan(styleStart);
+    expect(paletteStart).toBeGreaterThan(displayStart);
+    expect(settingsPanel.slice(styleStart, displayStart)).toContain("界面风格");
+    expect(settingsPanel.slice(styleStart, displayStart)).not.toContain("界面字号");
+    expect(settingsPanel.slice(styleStart, displayStart)).not.toContain("对话刻度");
+    expect(settingsPanel.slice(displayStart, paletteStart)).toContain("界面字号");
+    expect(settingsPanel.slice(displayStart, paletteStart)).toContain("对话刻度");
+  });
 });
