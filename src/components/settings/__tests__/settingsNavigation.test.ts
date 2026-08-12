@@ -13,6 +13,7 @@ describe("settingsNavigation", () => {
     expect(new Set(sections).size).toBe(sections.length);
     expect(getSettingsPageForSection("model")).toBe("models");
     expect(getSettingsPageForSection("auth")).toBe("account");
+    expect(getSettingsPageForSection("monthlyQuota")).toBe("account");
     expect(getSettingsPageForSection("freeze")).toBe("diagnostics");
     expect(getSettingsPageForSection("palette")).toBe("appearance");
     expect(getSettingsPageForSection("uiStyle")).toBe("appearance");
@@ -30,6 +31,7 @@ describe("settingsNavigation", () => {
     expect(searchSettings("调色板").map((item) => item.id)).toEqual(["palette"]);
     expect(searchSettings("界面字号").map((item) => item.id)).toEqual(["display"]);
     expect(searchSettings("复古").map((item) => item.id)).toEqual(["ui-style"]);
+    expect(searchSettings("kimi-auth").map((item) => item.id)).toEqual(["monthly-quota"]);
     expect(searchSettings("上下文").map((item) => item.id)).toEqual(expect.arrayContaining(["new-session", "tool-select"]));
     expect(searchSettings("   ")).toEqual([]);
   });

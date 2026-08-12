@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -72,6 +72,7 @@ const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const SETTINGS_SECTION_ORDER_KEY = "kimix_settings_section_order";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+const KIMI_MONTHLY_QUOTA_CHANGED_EVENT = "kimix:kimi-monthly-quota-settings-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
@@ -79,6 +80,7 @@ const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "connection",
   "auth",
+  "monthlyQuota",
   "experiment",
   "model",
   "theme",
@@ -453,6 +455,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
   const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
+  const [monthlyQuotaEnabled, setMonthlyQuotaEnabled] = useState(false);
+  const [monthlyQuotaToken, setMonthlyQuotaToken] = useState("");
+  const [monthlyQuotaConfigured, setMonthlyQuotaConfigured] = useState(false);
+  const [monthlyQuotaTokenExpiresAt, setMonthlyQuotaTokenExpiresAt] = useState<number | undefined>();
+  const [monthlyQuotaStorageAvailable, setMonthlyQuotaStorageAvailable] = useState(true);
+  const [monthlyQuotaLoading, setMonthlyQuotaLoading] = useState(true);
+  const [monthlyQuotaSaving, setMonthlyQuotaSaving] = useState(false);
+  const [monthlyQuotaMessage, setMonthlyQuotaMessage] = useState("");
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
   const [themeDeleteBusyId, setThemeDeleteBusyId] = useState<string | null>(null);
@@ -1038,6 +1048,80 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     void refreshExperimentalSettings();
   };
 
+  const refreshMonthlyQuotaSettings = async () => {
+    setMonthlyQuotaLoading(true);
+    const [settingsResult, credentialResult] = await Promise.all([
+      window.api.getSettings(),
+      window.api.getKimiMonthlyQuotaCredentialStatus(),
+    ]);
+    setMonthlyQuotaLoading(false);
+    if (settingsResult.success) {
+      setMonthlyQuotaEnabled(Boolean(settingsResult.data.kimiMonthlyQuotaEnabled));
+    }
+    if (credentialResult.success) {
+      setMonthlyQuotaConfigured(credentialResult.data.configured);
+      setMonthlyQuotaTokenExpiresAt(credentialResult.data.tokenExpiresAt);
+      setMonthlyQuotaStorageAvailable(credentialResult.data.storageAvailable);
+      setMonthlyQuotaMessage(!credentialResult.data.storageAvailable
+        ? "当前系统安全存储不可用，Kimix 不会以明文方式保存 Token。"
+        : credentialResult.data.expired
+          ? "已保存的网页 Token 已过期，请重新配置。"
+          : credentialResult.data.configured
+            ? "网页 Token 已使用系统安全存储保存；Kimix 不会在设置中回显明文。"
+            : "开启后需配置 kimi.com 网页登录 Token，基础套餐用量不受影响。");
+      return;
+    }
+    setMonthlyQuotaMessage(`读取月度额度配置失败：${credentialResult.error}`);
+  };
+
+  const saveMonthlyQuotaEnabled = async (enabled: boolean) => {
+    setMonthlyQuotaEnabled(enabled);
+    setMonthlyQuotaSaving(true);
+    const result = await window.api.saveSettings({ kimiMonthlyQuotaEnabled: enabled });
+    setMonthlyQuotaSaving(false);
+    if (!result.success) {
+      setMonthlyQuotaMessage(`保存月度额度开关失败：${result.error}`);
+      void refreshMonthlyQuotaSettings();
+      return;
+    }
+    setMonthlyQuotaMessage(enabled
+      ? (monthlyQuotaConfigured ? "已开启月度额度查询。" : "已开启，请继续配置 Kimi 网页登录 Token。")
+      : "已关闭月度额度查询；已保存的 Token 不会自动删除。");
+    window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
+  };
+
+  const saveMonthlyQuotaToken = async () => {
+    if (!monthlyQuotaToken.trim()) {
+      setMonthlyQuotaMessage("请先粘贴 kimi-auth Cookie 值或网页登录 JWT。");
+      return;
+    }
+    setMonthlyQuotaSaving(true);
+    const result = await window.api.saveKimiMonthlyQuotaCredential({ token: monthlyQuotaToken });
+    setMonthlyQuotaSaving(false);
+    if (!result.success) {
+      setMonthlyQuotaMessage(`保存 Token 失败：${result.error}`);
+      return;
+    }
+    setMonthlyQuotaToken("");
+    await refreshMonthlyQuotaSettings();
+    window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
+  };
+
+  const clearMonthlyQuotaToken = async () => {
+    setMonthlyQuotaSaving(true);
+    const result = await window.api.clearKimiMonthlyQuotaCredential();
+    setMonthlyQuotaSaving(false);
+    if (!result.success) {
+      setMonthlyQuotaMessage(`清除 Token 失败：${result.error}`);
+      return;
+    }
+    setMonthlyQuotaToken("");
+    setMonthlyQuotaConfigured(false);
+    setMonthlyQuotaTokenExpiresAt(undefined);
+    setMonthlyQuotaMessage("已清除网页 Token。月度额度查询会提示尚未配置。");
+    window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
+  };
+
   const handleToggleCacheHintDismissed = async () => {
     const next = !cacheHintDismissed;
     setCacheHintDismissedState(next);
@@ -1136,6 +1220,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (!settingsStatusCache.auth) void refreshAuth();
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       void refreshExperimentalSettings();
+      void refreshMonthlyQuotaSettings();
       void refreshOfficialArchivedSessions();
       loadFreezeReports();
       void isCacheHintDismissed().then(setCacheHintDismissedState);
@@ -2247,6 +2332,107 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     )}
                   </div>
 
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("monthlyQuota", 2)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <Gauge size={16} className="text-text-muted" />
+                    <span>月度额度查询</span>
+                  </div>
+                  {settingsDragHandle("monthlyQuota", "月度额度查询")}
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "16px" }}>
+                  <button
+                    type="button"
+                    aria-pressed={monthlyQuotaEnabled}
+                    onClick={() => void saveMonthlyQuotaEnabled(!monthlyQuotaEnabled)}
+                    disabled={monthlyQuotaLoading || monthlyQuotaSaving}
+                    className="kimix-style-exempt grid w-full min-w-0 items-center text-left disabled:cursor-wait disabled:opacity-60"
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12 }}
+                  >
+                    <SelectionIndicator selected={monthlyQuotaEnabled} />
+                    <div className="min-w-0">
+                      <div className="kimix-settings-permission-label">在套餐用量中显示月度额度</div>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
+                        使用 kimi.com 网页登录态补充月度总额度与赠送额度；默认关闭。
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full text-[11.5px] leading-5 ${monthlyQuotaEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                      style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      {monthlyQuotaEnabled ? "已开启" : "关闭"}
+                    </span>
+                  </button>
+
+                  {monthlyQuotaEnabled && (
+                    <div
+                      className="rounded-xl bg-[var(--kimix-panel-soft-bg)]"
+                      style={{ marginTop: 16, padding: "16px" }}
+                    >
+                      <div className="flex items-start" style={{ gap: 10 }}>
+                        <KeyRound size={16} className="mt-0.5 shrink-0 text-text-muted" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
+                            {monthlyQuotaConfigured ? "网页 Token 已配置" : "配置 Kimi 网页 Token"}
+                          </div>
+                          <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
+                            登录 kimi.com 后，在开发者工具的 Application → Cookies 中复制 <code>kimi-auth</code> 的值；也可直接粘贴完整 <code>kimi-auth=...</code>。
+                          </div>
+                          {monthlyQuotaTokenExpiresAt && (
+                            <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
+                              Token 到期时间：{new Date(monthlyQuotaTokenExpiresAt).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="password"
+                        value={monthlyQuotaToken}
+                        onChange={(event) => setMonthlyQuotaToken(event.target.value)}
+                        disabled={monthlyQuotaSaving || !monthlyQuotaStorageAvailable}
+                        placeholder={monthlyQuotaConfigured ? "粘贴新 Token 可覆盖现有配置" : "粘贴 kimi-auth Cookie 值或 JWT"}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="kimix-settings-input h-10 w-full rounded-lg text-[13px] outline-none"
+                        style={{ marginTop: 14, paddingLeft: 12, paddingRight: 12 }}
+                      />
+                      <div className="flex flex-wrap" style={{ gap: 8, marginTop: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => void saveMonthlyQuotaToken()}
+                          disabled={monthlyQuotaSaving || !monthlyQuotaStorageAvailable || !monthlyQuotaToken.trim()}
+                          className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <KeyRound size={14} />
+                          <span>{monthlyQuotaSaving ? "保存中" : monthlyQuotaConfigured ? "更新 Token" : "保存 Token"}</span>
+                        </button>
+                        {monthlyQuotaConfigured && (
+                          <button
+                            type="button"
+                            onClick={() => void clearMonthlyQuotaToken()}
+                            disabled={monthlyQuotaSaving}
+                            className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            <span>清除 Token</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                    style={{ marginTop: 14, padding: "12px 14px" }}
+                  >
+                    {monthlyQuotaLoading ? "正在读取月度额度配置..." : monthlyQuotaMessage}
+                    <div className="text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
+                      Token 仅经系统安全存储加密后保存在本机。该会员统计接口未公开，Kimi 官方调整后可能暂时不可用。
+                    </div>
+                  </div>
                 </div>
               </div>
 

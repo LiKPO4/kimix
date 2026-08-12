@@ -5,6 +5,7 @@ export type { SettingsPageId } from "@/types/ui";
 export type SettingsSectionId =
   | "connection"
   | "auth"
+  | "monthlyQuota"
   | "experiment"
   | "identity"
   | "model"
@@ -69,8 +70,8 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     id: "account",
     group: "Kimi Code",
     label: "账户与连接",
-    description: "检查 Kimi Code 连接并管理当前登录状态。",
-    sections: ["connection", "auth"],
+    description: "检查 Kimi Code 连接、登录状态与月度额度查询。",
+    sections: ["connection", "auth", "monthlyQuota"],
   },
   {
     id: "models",
@@ -214,6 +215,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     pageId: "account",
     sectionId: "auth",
     keywords: ["账号", "认证", "OAuth", "退出"],
+  },
+  {
+    id: "monthly-quota",
+    label: "月度额度查询",
+    description: "配置 Kimi 网页登录 Token，显示月度与赠送额度",
+    pageId: "account",
+    sectionId: "monthlyQuota",
+    keywords: ["月度", "额度", "赠送", "token", "cookie", "kimi-auth", "会员"],
   },
   {
     id: "models",

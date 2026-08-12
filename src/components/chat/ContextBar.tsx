@@ -4,7 +4,7 @@ import { AlertCircle, BarChart3, Bot, Check, CheckCircle2, ChevronDown, Download
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import type { ExtraUsageInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
+import type { ExtraUsageInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiMonthlyQuotaInfo, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
 import type { Session } from "@/types/ui";
 import { compactModelDisplayName, getSessionModelForDisplay } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
@@ -22,6 +22,7 @@ import { claimRuntimeSessionOwnership } from "@/utils/sessionCatalog";
 type UsageData = Extract<KimiUsageResponse, { success: true }>["data"];
 const FALLBACK_KIMI_MODEL = "kimi-for-coding";
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
+const KIMI_MONTHLY_QUOTA_CHANGED_EVENT = "kimix:kimi-monthly-quota-settings-changed";
 const KIMI_MODEL_CONFIG_CHANGED_EVENT = "kimix:kimi-model-config-changed";
 const CONTEXT_BAR_POPOVER_VIEWPORT_MARGIN = 12;
 const CONTEXT_BAR_POPOVER_GAP = 8;
@@ -259,6 +260,58 @@ function ExtraUsageSection({ usage }: { usage: ExtraUsageInfo }) {
   );
 }
 
+function MonthlyQuotaSection({
+  quota,
+  loading,
+  now,
+  onOpenSettings,
+}: {
+  quota: KimiMonthlyQuotaInfo | null;
+  loading: boolean;
+  now: number;
+  onOpenSettings: () => void;
+}) {
+  if (!quota && !loading) return null;
+  const periods = quota
+    ? [quota.subscription, ...quota.gifts].filter((period): period is UsagePeriod => Boolean(period?.available))
+    : [];
+  return (
+    <section className="kimix-menu-separator" style={{ marginTop: 16, padding: "14px 2px 0" }} aria-label="月度额度">
+      <div className="flex items-center justify-between" style={{ marginBottom: periods.length > 0 ? 12 : 8 }}>
+        <span className="text-[13.5px] font-medium leading-5 text-[var(--kimix-panel-text-secondary)]">月度与赠送额度</span>
+        {loading && <Loader2 size={14} className="animate-spin text-[var(--kimix-panel-text-muted)]" />}
+      </div>
+      {periods.length > 0 ? (
+        <div className="flex flex-col" style={{ gap: 15 }}>
+          {periods.map((period) => <UsageProgress key={period.label} period={period} now={now} />)}
+        </div>
+      ) : quota?.message ? (
+        <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 14px" }}>
+          <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">{quota.message}</div>
+          {quota && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="kimix-icon-text-button is-compact kimix-muted-action"
+              style={{ marginTop: 10 }}
+            >
+              <Settings2 size={14} />
+              <span>前往设置</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">正在读取月度额度...</div>
+      )}
+      {quota?.tokenExpiresAt && (
+        <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 10 }}>
+          网页 Token 将于 {new Date(quota.tokenExpiresAt).toLocaleDateString()} 到期
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) {
   const project = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
@@ -271,6 +324,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const additionalWorkDirs = useAppStore((s) => s.additionalWorkDirs);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setWorkspaceView = useAppStore((s) => s.setWorkspaceView);
+  const setActiveSettingsPageId = useAppStore((s) => s.setActiveSettingsPageId);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const triggerFocusInput = useAppStore((s) => s.triggerFocusInput);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -280,6 +334,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const [usageOpen, setUsageOpen] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [monthlyQuota, setMonthlyQuota] = useState<KimiMonthlyQuotaInfo | null>(null);
+  const [monthlyQuotaLoading, setMonthlyQuotaLoading] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -292,6 +348,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const usagePanelRef = useRef<HTMLDivElement>(null);
   const usageRequestIdRef = useRef(0);
+  const monthlyQuotaRequestIdRef = useRef(0);
   const workDirsRef = useRef<HTMLDivElement>(null);
   const workDirsPanelRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -481,6 +538,47 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
     }
   };
 
+  const loadMonthlyQuota = async ({ background = false }: { background?: boolean } = {}) => {
+    const requestId = monthlyQuotaRequestIdRef.current + 1;
+    monthlyQuotaRequestIdRef.current = requestId;
+    if (!background) setMonthlyQuotaLoading(true);
+    try {
+      const result = await window.api.getKimiMonthlyQuota();
+      if (monthlyQuotaRequestIdRef.current !== requestId) return;
+      if (result.success) {
+        setMonthlyQuota(result.data);
+      } else {
+        setMonthlyQuota({
+          enabled: true,
+          configured: true,
+          available: false,
+          gifts: [],
+          message: result.error,
+        });
+      }
+    } catch (error) {
+      if (monthlyQuotaRequestIdRef.current !== requestId) return;
+      setMonthlyQuota({
+        enabled: true,
+        configured: true,
+        available: false,
+        gifts: [],
+        message: error instanceof Error ? error.message : "月度额度查询失败。",
+      });
+    } finally {
+      if (monthlyQuotaRequestIdRef.current === requestId && !background) setMonthlyQuotaLoading(false);
+    }
+  };
+
+  const openMonthlyQuotaSettings = () => {
+    setUsageOpen(false);
+    setActiveSettingsPageId("account");
+    setWorkspaceView("settings");
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("kimix:focus-settings-section", { detail: { sectionId: "monthlyQuota" } }));
+    }, 0);
+  };
+
   const toggleUsage = () => {
     const next = !usageOpen;
     setModelMenuOpen(false);
@@ -489,7 +587,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       // Refresh on open, but only spin when there is nothing to show yet.
       // With cached data present, refresh silently in the background so the
       // panel shows current numbers immediately without a loading spinner.
-      void loadUsage({ background: Boolean(usageData) });
+      void loadUsage({ background: Boolean(usageData) })
+        .finally(() => loadMonthlyQuota({ background: Boolean(monthlyQuota) }));
     }
   };
 
@@ -781,6 +880,15 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   }, []);
 
   useEffect(() => {
+    const handleMonthlyQuotaChanged = () => {
+      setMonthlyQuota(null);
+      if (usageOpen) void loadMonthlyQuota();
+    };
+    window.addEventListener(KIMI_MONTHLY_QUOTA_CHANGED_EVENT, handleMonthlyQuotaChanged);
+    return () => window.removeEventListener(KIMI_MONTHLY_QUOTA_CHANGED_EVENT, handleMonthlyQuotaChanged);
+  }, [usageOpen]);
+
+  useEffect(() => {
     if (!usageOpen && !workDirsOpen && !modelMenuOpen) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
@@ -921,13 +1029,15 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    disabled={usageLoading}
-                    onClick={() => void loadUsage()}
+                    disabled={usageLoading || monthlyQuotaLoading}
+                    onClick={() => {
+                      void loadUsage().finally(() => loadMonthlyQuota());
+                    }}
                     className="kimix-inline-icon-action is-roomy shrink-0"
                     title="刷新套餐用量"
                     aria-label="刷新套餐用量"
                   >
-                    <RefreshCw size={14} className={usageLoading ? "animate-spin" : ""} />
+                    <RefreshCw size={14} className={usageLoading || monthlyQuotaLoading ? "animate-spin" : ""} />
                   </button>
                 </div>
               </div>
@@ -949,6 +1059,12 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
                 </div>
               )}
               {usageData?.extraUsage && <ExtraUsageSection usage={usageData.extraUsage} />}
+              <MonthlyQuotaSection
+                quota={monthlyQuota}
+                loading={monthlyQuotaLoading}
+                now={now}
+                onOpenSettings={openMonthlyQuotaSettings}
+              />
               {usageData?.message && (
                 <div className="kimix-inset-section mt-5 text-[12.5px] leading-relaxed text-[var(--kimix-panel-text-secondary)]" style={{ padding: "13px 12px" }}>
                   {usageData.message}

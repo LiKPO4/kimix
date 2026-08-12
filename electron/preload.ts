@@ -84,6 +84,9 @@ import type {
   GitPushRequest,
   GitActionResponse,
   KimiUsageResponse,
+  KimiMonthlyQuotaCredentialStatusResponse,
+  KimiMonthlyQuotaResponse,
+  SaveKimiMonthlyQuotaCredentialRequest,
   OpenFileRequest,
   ChangePreviewRequest,
   ChangePreviewResponse,
@@ -372,6 +375,14 @@ const api = {
     ipcRenderer.invoke("project:exportMarkdown", req),
   getKimiCodeAccountUsage: (): Promise<KimiUsageResponse> =>
     ipcRenderer.invoke("kimi-code:getAccountUsage"),
+  getKimiMonthlyQuota: (): Promise<KimiMonthlyQuotaResponse> =>
+    ipcRenderer.invoke("kimi-code:getMonthlyQuota"),
+  getKimiMonthlyQuotaCredentialStatus: (): Promise<KimiMonthlyQuotaCredentialStatusResponse> =>
+    ipcRenderer.invoke("kimi-code:getMonthlyQuotaCredentialStatus"),
+  saveKimiMonthlyQuotaCredential: (req: SaveKimiMonthlyQuotaCredentialRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:saveMonthlyQuotaCredential", req),
+  clearKimiMonthlyQuotaCredential: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:clearMonthlyQuotaCredential"),
   getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
     ipcRenderer.invoke("kimi-code:getCacheHintConfig"),
   startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>

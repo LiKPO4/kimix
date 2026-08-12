@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, protocol, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, protocol, safeStorage, session, shell } from "electron";
 import type { MessageBoxOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -18,6 +18,7 @@ import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
+import { fetchKimiMonthlyQuota, inspectKimiWebToken, normalizeKimiWebToken } from "./kimiMonthlyQuota";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -7195,14 +7196,16 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
     try {
       const usage = await kimiCodeHost.getManagedUsage();
       if (usage && typeof usage === "object" && (usage as { source?: string }).source === "server") {
-        return { success: true, data: parseServerUsagePayload((usage as { payload: unknown }).payload) };
+        const payload = (usage as { payload: unknown }).payload;
+        rememberKimiUsageUserId(payload);
+        return { success: true, data: parseServerUsagePayload(payload) };
       }
       // getManagedUsage SDK 分支返回 { source: "sdk", payload } 包装，解包后再解析
+      const payload = usage && typeof usage === "object" ? (usage as { payload?: unknown }).payload : usage;
+      rememberKimiUsageUserId(payload);
       return {
         success: true,
-        data: parseManagedUsagePayload(
-          usage && typeof usage === "object" ? (usage as { payload?: unknown }).payload : usage,
-        ),
+        data: parseManagedUsagePayload(payload),
       };
     } catch (sdkError) {
       const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
@@ -7231,50 +7234,107 @@ ipcMain.handle("kimi-code:getAccountUsage", async () => {
     }
     const payload = getRecord(await res.json());
     if (!payload) throw new Error("Kimi 用量接口返回格式异常");
-    try {
-      const sub = await fetchKimiSubscriptionQuota(accessToken);
-      if (sub) payload.subscription = sub;
-    } catch {
-      // 静默探测
-    }
+    rememberKimiUsageUserId(payload);
     return { success: true, data: parseKimiUsagePayload(payload) };
   } catch (err) {
     return { success: false, error: formatKimiUsageError(err instanceof Error ? err.message : String(err)) };
   }
 });
 
-async function fetchKimiSubscriptionQuota(accessToken: string): Promise<Record<string, unknown> | null> {
-  const urls = [
-    "https://www.kimi.com/api/user/v1/quota",
-    "https://www.kimi.com/api/user/v1/subscription",
-    "https://www.kimi.com/api/membership/detail",
-    "https://www.kimi.com/api/user/subscription",
-    "https://api.kimi.com/coding/v1/subscription",
-    "https://www.kimi.com/api/membership/subscription",
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          ...kimiCommonHeaders(),
-          "Authorization": `Bearer ${accessToken}`,
-        },
-        signal: AbortSignal.timeout(3_500),
-      });
-      if (res.ok) {
-        const json = await res.json().catch(() => null);
-        const record = getRecord(json);
-        if (record && (record.data || record.monthly_limit || record.subscription || record.limits || record.total_quota)) {
-          return getRecord(record.data) ?? record;
-        }
-      }
-    } catch {
-      // 静默回落
-    }
+let lastKimiCodeUsageUserId: string | undefined;
+
+function rememberKimiUsageUserId(payload: unknown): void {
+  const user = getRecord(getRecord(payload)?.user);
+  if (typeof user?.userId === "string" && user.userId.trim()) {
+    lastKimiCodeUsageUserId = user.userId.trim();
   }
-  return null;
 }
+
+function kimiMonthlyQuotaCredentialPath(): string {
+  return path.join(app.getPath("userData"), "kimi-monthly-quota-token.bin");
+}
+
+function readKimiMonthlyQuotaCredential(): string | null {
+  const credentialPath = kimiMonthlyQuotaCredentialPath();
+  if (!fs.existsSync(credentialPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("当前系统安全存储不可用，无法读取 Kimi 网页 Token。");
+  }
+  return safeStorage.decryptString(fs.readFileSync(credentialPath));
+}
+
+function writeKimiMonthlyQuotaCredential(token: string): void {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("当前系统安全存储不可用，未保存 Kimi 网页 Token。");
+  }
+  const credentialPath = kimiMonthlyQuotaCredentialPath();
+  const tempPath = `${credentialPath}.tmp`;
+  fs.mkdirSync(path.dirname(credentialPath), { recursive: true });
+  try {
+    fs.writeFileSync(tempPath, safeStorage.encryptString(token), { mode: 0o600 });
+    if (fs.existsSync(credentialPath)) fs.rmSync(credentialPath, { force: true });
+    fs.renameSync(tempPath, credentialPath);
+  } catch (error) {
+    try { fs.rmSync(tempPath, { force: true }); } catch {}
+    throw error;
+  }
+}
+
+ipcMain.handle("kimi-code:getMonthlyQuota", async () => {
+  try {
+    if (!settingsService.loadSettings().kimiMonthlyQuotaEnabled) {
+      return { success: true, data: null };
+    }
+    const token = readKimiMonthlyQuotaCredential();
+    return {
+      success: true,
+      data: await fetchKimiMonthlyQuota(token ?? "", { expectedUserId: lastKimiCodeUsageUserId }),
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("kimi-code:getMonthlyQuotaCredentialStatus", async () => {
+  try {
+    const credentialPath = kimiMonthlyQuotaCredentialPath();
+    const configured = fs.existsSync(credentialPath);
+    const storageAvailable = safeStorage.isEncryptionAvailable();
+    if (!configured || !storageAvailable) {
+      return { success: true, data: { configured, expired: false, storageAvailable } };
+    }
+    const tokenInfo = inspectKimiWebToken(readKimiMonthlyQuotaCredential() ?? "");
+    return {
+      success: true,
+      data: { configured, expired: tokenInfo.expired, tokenExpiresAt: tokenInfo.expiresAt, storageAvailable },
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("kimi-code:saveMonthlyQuotaCredential", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ token: z.string().trim().min(1).max(16_384) }).parse(request);
+    const token = normalizeKimiWebToken(parsed.token);
+    const tokenInfo = inspectKimiWebToken(token);
+    if (!tokenInfo.valid) throw new Error("Token 格式无效，请粘贴 kimi-auth Cookie 值或网页登录 JWT。");
+    if (tokenInfo.expired) throw new Error("Token 已过期，请从 kimi.com 重新获取。");
+    writeKimiMonthlyQuotaCredential(token);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("kimi-code:clearMonthlyQuotaCredential", async () => {
+  try {
+    fs.rmSync(kimiMonthlyQuotaCredentialPath(), { force: true });
+    return { success: true, data: undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
 
 // ---------- 上下文缓存过期提醒（上游 0.34.0 #2646）：client_configs ----------
 
@@ -7781,6 +7841,7 @@ const SettingsSchema = z.object({
   experimentalKimiServer: z.boolean().optional(),
   experimentalKimiServerSessions: z.boolean().optional(),
   experimentalKimiToolSelect: z.boolean().optional(),
+  kimiMonthlyQuotaEnabled: z.boolean().optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),
   selectedLaunchCommand: z.string().optional(),

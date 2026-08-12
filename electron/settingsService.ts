@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiServer: true,
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
+  kimiMonthlyQuotaEnabled: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   enabledSkillNames: [],

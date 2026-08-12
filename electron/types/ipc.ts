@@ -1099,6 +1099,42 @@ export type ExtraUsageInfo = {
   currency: string;
 };
 
+export type KimiMonthlyQuotaInfo = {
+  enabled: true;
+  configured: boolean;
+  available: boolean;
+  tokenExpiresAt?: number;
+  accountMismatch?: boolean;
+  subscription?: UsagePeriod;
+  gifts: UsagePeriod[];
+  message?: string;
+};
+
+export type KimiMonthlyQuotaCredentialStatusResponse = {
+  success: true;
+  data: {
+    configured: boolean;
+    tokenExpiresAt?: number;
+    expired: boolean;
+    storageAvailable: boolean;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SaveKimiMonthlyQuotaCredentialRequest = {
+  token: string;
+};
+
+export type KimiMonthlyQuotaResponse = {
+  success: true;
+  data: KimiMonthlyQuotaInfo | null;
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiUsageResponse = {
   success: true;
   data: {
@@ -1572,6 +1608,7 @@ export type AppSettings = {
   experimentalKimiServer: boolean;
   experimentalKimiServerSessions: boolean;
   experimentalKimiToolSelect: boolean;
+  kimiMonthlyQuotaEnabled: boolean;
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
   selectedLaunchCommand?: string;

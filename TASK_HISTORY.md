@@ -6434,6 +6434,60 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 关键文件：`electron/main.ts`、`electron/kimiCodeServerClient.ts`、`src/utils/kimiHistoryReconciliation.ts`、`src/App.tsx`、`src/components/layout/Sidebar.tsx`。
 - 下一步：全量回归、知识校验并提交；用户在 v2.16.62 窗口视觉复验。
 
+---
+
+> 本批次收纳范围：2026-08-01 v2.20.92 至 v2.20.98。
+> 归档时间：2026-08-12；仅搬运、内容未改写。最新任务状态见 TASK_STATE.md。
+
+## 2026-08-01 修复：复古壳层边框与现代嵌套圆角（v2.20.98）
+
+- 根因一：v2.20.96 为移除无语义的侧栏分隔线，错误地在复古 `.kimix-app-shell-main` 上设置 `border-left-width: 0`，把主内容壳本身的结构边框也一并删除，设置页与对话页左边缘因此像被裁切。
+- 根因二：v2.20.97 将 Modern 的全局 `rounded-*` 工具档位整体放大，同时把设置主题选项纳入通用卡片圆角，造成主题分段控件外壳 10px、内部选中块 14px 的反向嵌套；大壳层与小控件缺少角色化圆角边界。
+- 修复：复古主壳恢复完整 1px 四边结构边框，装饰分隔继续保持关闭；Modern 拆分 control/card/panel/shell 四级角色圆角，通用 utility 恢复递进尺度，主题分段控件固定为外 16px = 内 10px + 6px 间距。
+- 实机验收：Windows 直接操作 v2.20.98，现代设置页同心圆角、复古设置页完整左边框、复古对话页完整左边框均通过；证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22098/01-modern-settings.png`、`02-retro-settings.png`、`03-retro-main.png`。详细结论见根目录 `design-qa.md`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、清缓存生产构建（renderer CSS `assets/index-D_k4R3YX.css`、JS `assets/index--ouAyPud.js`）、OKF strict/audit 校验（12 concepts、375 links）通过。
+
+## 2026-08-01 重做：现代化风格转向 Codex 式静谧工作台（v2.20.97）
+
+- 根因：旧“现代化”只把默认 Kimix 的圆角统一压到 6px、删除阴影并淡化 hairline，默认本身又已经是现代视觉，导致两者只有数值差异、没有可辨识的设计身份；同时旧规则直接覆盖 `--border-subtle`，越过了“界面风格不接管颜色主题”的边界。
+- 修复：Modern 改为完整导航选中胶囊（无方向性主题刻度）、18–20px 主内容/Composer/浮层壳、低扩散悬浮阴影、安静扁平控件、轻量复合按钮与统一设置卡；所有表面、文字、强调色和边框颜色继续消费当前颜色主题，不改变 Skills、设置和对话的业务布局。
+- 实机验收：Windows 直接操作 v2.20.97，切换现代化后检查对话主界面、外观设置、插件工作区及导航切换；三张实现截图与用户提供的三张 Codex 参考图同轮对照，无 P0/P1/P2 视觉问题。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22097/01-main.jpg`、`02-settings.jpg`、`03-plugins.jpg`；详细结论见根目录 `design-qa.md`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-cqYO6o5q.js`）、OKF strict/audit 校验（12 concepts、374 links）通过。
+
+## 2026-08-01 修复：复古风格收回常驻控件框并拆分状态语义（v2.20.96）
+
+- 用户截图确认 v2.20.95 虽然覆盖了壳层触点，但将“接入风格契约”错误实现成“所有控件常驻描边和凸起”：侧栏五个主动作堆成工具条，窗口按钮和会话菜单过度盒化，主区左侧边界仍像无语义竖线；Swarm/Plan 又误用纵向导航的左侧主题刻度。
+- 修复将普通控件、窗口动作、侧栏动作和列表恢复为平面静止态，仅 hover/active 显示复古触感；启动/打开使用独立 `--ui-compound-*` 保留复合控件边界。`--ui-selection-*` 仅服务项目/会话等纵向导航，新增 `--ui-toggle-*` 服务 Swarm、Plan、pressed/expanded 控件，按钮开启态改为完整轻内凹面，绝不带方向性蓝条；复古主内容面板去掉左边框和多余投影。
+- 实机验收：通过 Windows 直接操作 v2.20.96 开发窗口，检查主界面、项目/会话 active+hover、Swarm/Plan 分别与同时开启、启动菜单展开；确认侧栏恢复安静列表、导航刻度悬停不丢失、两种模式按钮均无左侧蓝条、复合按钮和弹窗仍保留复古层级。验收截图：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22096/02-main-clean.png`。
+- 验证：定向 UI 风格 11 项、全量 152 文件 1457 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-D2IUv33I.js`）、OKF strict/spec/audit 校验（12 concepts、373 links）通过。
+
+## 2026-08-01 重构：全局界面风格合约与壳层触点覆盖（v2.20.95）
+
+- 用户在 v2.20.94 截图中确认，选中项目悬停时左侧主题刻度消失、侧栏与主区之间出现无语义全高竖线，侧栏主动作/项目/会话和标题栏右侧启动/打开控件仍没有进入复古语言，说明上一轮仍以预设选择器补点为主，缺少可批量扩展的角色契约。
+- 根因一是复古 `.kimix-sidebar-project-row:hover` 后置覆盖完整 `box-shadow`，抹掉 active 刻度；根因二是复古侧栏直接写入 `inset -1px` 全高阴影；更深层根因是组件只暴露零散类名，预设自行寻找触点，没有 `主题颜色 -> 语义风格令牌 -> 组件角色` 的稳定边界。
+- v2.20.95 建立 `--ui-control-*`、`--ui-nav-action-*`、`--ui-nav-list-*`、`--ui-selection-*`、`--ui-popup-*`、`--ui-menu-trigger-*`、`--ui-shell-*` 等契约；侧栏主动作/项目/会话/设置、窗口控制、顶部菜单、启动/打开 split control、工具按钮与菜单分隔线统一消费角色令牌。active+hover 显式保持 selection 优先级，装饰性侧栏全高线移除。
+- 验证：定向 UI 风格 10 项、全量 152 文件 1456 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-BihEH33x.js`）、OKF strict/spec/audit 校验（12 concepts、372 links）通过；本机开发窗口已重启为 v2.20.95，视觉验收待用户截图确认。
+
+## 2026-08-01 重构：全局控件状态与浮层骨架统一（v2.20.94）
+
+- 用户在 v2.20.93 截图中确认，项目选中态叠加边框/内框/主题刻度，Swarm/Plan 与套餐用量分别使用三套选中语法，各类菜单和小浮层仍由业务组件自行定义圆角、阴影及菜单项，导致默认 Kimix 与复古模式同时漂移。
+- 初版 Kimix 先建立共享角色：二元模式统一 `.kimix-state-button` + `aria-pressed`，下拉控件统一 `.kimix-control-button` + `aria-expanded`，菜单/浮层/弹窗统一 `.kimix-menu-panel`、`.kimix-menu-item`、`.kimix-floating-panel`、`.kimix-modal-card`；复古模式只覆盖这些角色的材质。侧栏项目/会话选中态收敛为单一浅表面与左侧主题刻度。
+- Composer、ContextBar、顶部菜单、侧栏项目菜单、文字/图片右键菜单、文件菜单、Diff 排序菜单及主要模态窗已接入共享骨架；颜色仍完全由主题 token 决定。
+- 验证：定向 2 文件 11 项、全量 152 文件 1455 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-QQs-QpyB.js`）、OKF strict/spec/audit 校验（12 concepts、371 links）通过；本机开发窗口已重启为 v2.20.94，视觉验收待用户截图确认。
+
+## 2026-08-01 修复：复古风格组件语言统一（v2.20.93）
+
+- 用户截图确认 v2.20.92 仍有三类割裂：Composer 外壳与内部 textarea 同时描边形成“双框”；复古规则只覆盖 `.kimix-toolbar-button` / `.kimix-icon-text-button`，导致输入区部分按钮风格化、部分仍扁平；侧栏和 ContextBar 仍使用现代平面语言，局部 Platinum 控件像外贴皮肤。
+- 修复改为按组件角色接入：Composer 只有外壳拥有边界和 focus，所有二级工具/模式键统一轻凹面，发送/引导/停止保留圆形主操作；ContextBar 统一为连续控制带；侧栏项目/会话显式 active class 使用同款内框与主题刻度；标题栏增加唯一的极淡 Platinum 横向细纹，其他表面保持克制。
+- 稳定边界写入 `/architecture/interface-style-system.md`：颜色主题拥有颜色，界面风格只拥有形状/质感；禁止全局按钮、textarea 和基础 primitive 铺皮肤。
+- 验证：定向 2 文件 10 项、全量 152 文件 1454 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-DHUUXMwX.js`）、OKF strict/spec/audit 校验（12 concepts、370 links）通过；本机开发窗口已重启为 v2.20.93，视觉验收待用户截图确认。
+
+## 2026-08-01 重做：复古风格转向 Classic Mac OS Platinum（v2.20.92）
+
+- 用户截图反馈 v2.20.91 的 Win95/98 全局直角与双边框只顾风格化、整体不美观。参考 1997 Mac OS 8 Human Interface Guidelines 与 Classic Mac OS 8/9 Platinum，复古风格改为小圆角、薄边界、轻微顶高光和仅用于交互控件的克制层次，不再让所有内容卡片承担强浮雕。
+- 界面风格与颜色主题保持正交：复古规则不覆盖 `surface`、`text`、`accent`、`border` 颜色 token，新增源码门禁防止风格预设重新接管配色。
+- 验证：全量 152 文件 1453 项测试、Node/Renderer typecheck、生产构建（renderer `assets/index-RSanmFOM.js`）、OKF 校验（365 链接）通过；本机开发窗口已重启为 v2.20.92，视觉验收待用户截图确认。
+
 ## 2026-07-20 v2.16.61 第三方模型失败轮次可见性
 
 - 当前目标：修复切换第三方模型后请求失败时，整轮只剩用户消息、Assistant 消息头与左侧刻度消失的问题。
