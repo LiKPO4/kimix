@@ -565,6 +565,14 @@ export async function getGitNumstat(projectPath: string): Promise<GitNumstatEntr
   return entries;
 }
 
+export async function getGitTurnSnapshot(projectPath: string): Promise<{ head: string; entries: GitNumstatEntry[] }> {
+  const headBefore = (await runGit(projectPath, ["rev-parse", "HEAD"], 5000).catch(() => "")).trim();
+  const entries = await getGitNumstat(projectPath);
+  const headAfter = (await runGit(projectPath, ["rev-parse", "HEAD"], 5000).catch(() => "")).trim();
+  if (headBefore !== headAfter) throw new Error("Git HEAD changed while capturing turn snapshot");
+  return { head: headAfter, entries };
+}
+
 const MAX_CHANGE_PREVIEW_CHARS = 64 * 1024;
 const HISTORICAL_CHANGE_WINDOW_MS = 15 * 60 * 1000;
 

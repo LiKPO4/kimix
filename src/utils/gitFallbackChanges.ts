@@ -13,6 +13,45 @@ export interface GitFallbackPlan {
   deletions: number;
 }
 
+function indexNumstat(entries: GitNumstatEntryLike[]): Map<string, GitNumstatEntryLike> {
+  return new Map(entries.map((entry) => [normalizeGitPath(entry.path), entry]));
+}
+
+/**
+ * 比较轮次开始与结束时的累计 Git numstat，只保留本轮造成净变化的路径。
+ * 对已有脏文件使用计数差值，避免把会话开始前的整份改动量归给当前轮次。
+ */
+export function diffGitNumstatBaseline(
+  baseline: GitNumstatEntryLike[],
+  current: GitNumstatEntryLike[],
+): GitNumstatEntryLike[] {
+  const before = indexNumstat(baseline);
+  const after = indexNumstat(current);
+  const changed: GitNumstatEntryLike[] = [];
+  const paths = new Set([...before.keys(), ...after.keys()]);
+  for (const normalizedPath of paths) {
+    const previous = before.get(normalizedPath);
+    const entry = after.get(normalizedPath);
+    if (!previous) {
+      if (entry) changed.push(entry);
+      continue;
+    }
+    if (!entry) {
+      changed.push({ path: previous.path, added: previous.removed, removed: previous.added });
+      continue;
+    }
+    if (previous.added === entry.added && previous.removed === entry.removed) continue;
+    changed.push({
+      path: entry.path,
+      // 累计 numstat 可能因本轮“恢复”而下降：removed 下降等价于净新增，
+      // added 下降等价于净删除。这里表达端点间净变化，而非重复展示 HEAD 总量。
+      added: Math.max(0, entry.added - previous.added) + Math.max(0, previous.removed - entry.removed),
+      removed: Math.max(0, entry.removed - previous.removed) + Math.max(0, previous.added - entry.added),
+    });
+  }
+  return changed;
+}
+
 /** 统一路径书写差异（反斜杠、`./` 前缀），避免同一文件因写法不同被重复统计。 */
 export function normalizeGitPath(filePath: string): string {
   let normalized = filePath.replace(/\\/g, "/");
@@ -46,12 +85,14 @@ export function collectRecordedChangePaths(events: TimelineEvent[]): Set<string>
 export function planGitFallbackChanges(
   events: TimelineEvent[],
   numstat: GitNumstatEntryLike[],
+  baseline: GitNumstatEntryLike[],
 ): GitFallbackPlan | null {
   const recorded = collectRecordedChangePaths(events);
+  const turnChanges = diffGitNumstatBaseline(baseline, numstat);
   const files: GitFallbackPlan["files"] = [];
   let additions = 0;
   let deletions = 0;
-  for (const entry of numstat) {
+  for (const entry of turnChanges) {
     if (recorded.has(normalizeGitPath(entry.path))) continue;
     files.push({ path: entry.path, additions: entry.added, deletions: entry.removed });
     additions += entry.added;

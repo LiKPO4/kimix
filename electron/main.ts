@@ -4833,6 +4833,17 @@ ipcMain.handle("project:gitNumstat", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("project:gitTurnSnapshot", async (_, request: unknown) => {
+  try {
+    const parsed = z.object({ projectPath: z.string().min(1).max(4096) }).safeParse(request);
+    if (!parsed.success) return { success: false, error: "Invalid git turn snapshot request" };
+    if (!fs.existsSync(parsed.data.projectPath)) return { success: false, error: "Project path does not exist" };
+    return { success: true, data: await projectService.getGitTurnSnapshot(parsed.data.projectPath) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:getGitGraph", async (_, request: unknown) => {
   try {
     const parsed = z.object({
@@ -6157,6 +6168,18 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
     if (!sessionId || (!content && images.length === 0 && videos.length === 0 && files.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
+    const dispatchWorkDir = kimiCodeHost.getSessionWorkDir(sessionId);
+    if (dispatchWorkDir) {
+      // 必须在 prompt/hook 进入 runtime 前抓取：renderer 收到 running 后再读 Git 已有竞态，
+      // Agent 可能已经完成第一次写入。失败时不发送基线事件，renderer 会关闭该轮兜底。
+      const gitBaseline = await projectService.getGitTurnSnapshot(dispatchWorkDir).catch(() => null);
+      if (gitBaseline && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("kimi-code:event", {
+          sessionId,
+          event: { type: "kimix.turn.git-baseline", ...gitBaseline },
+        });
+      }
+    }
     const trySend = async (
       promptContent: string,
       promptImages: { name: string; dataUrl: string }[],

@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：文件变更只归属本轮 Git 增量（v2.21.54）
+
+- 现场：新会话只发“你好”，回复没有调用任何工具，却显示 154 个文件、43891 行新增。
+- 实证：官方 `session_cfa8b107-3980-46dc-bda4-fa95ca1f56b5` wire 只有 prompt、LLM、think/text 与 turn ended，思考还明确写明“不需要使用任何工具”；项目在会话前已有大量暂存/未跟踪文件。
+- 根因：轮次结束 Git fallback 读取整个工作区相对 HEAD 的累计 numstat，新会话没有历史 change path 可排除，导致既有脏状态全部冒充本轮变更。
+- 修正：主进程在 prompt hooks/runtime dispatch 前抓取并发布 Git HEAD + numstat 基线；completed 在 HEAD 未变化时只补基线到结束快照的净增量。没有可信发送前基线、或本轮 commit/rebase/reset 令 HEAD 改变时关闭 fallback，继续信任 Write/Edit/diff 等协议事件。
+- 快照：`docs/issue-git-fallback-preexisting-worktree-events-snapshot.md`。
+
 ## 2026-08-12 修复：未连接的新会话仍可配置和操作（v2.21.53）
 
 - 现场：选中项目的新会话尚未创建官方 runtime 时，权限、Swarm、Plan、思考强度等 Composer 控件因没有 `activeMutationOwner` 被统一禁用；欢迎页快捷任务还会被其他会话残留/后台运行的全局 `runningSessionId` 一并锁住。

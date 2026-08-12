@@ -802,15 +802,22 @@ async function reconcileGitFallbackChanges(options: {
   roomAgentId?: string;
   projectPath?: string;
   eventStartIndex: number;
+  gitBaselinePromise: Promise<{ head: string; entries: GitNumstatEntryLike[] } | null>;
 }) {
-  const { uiSessionId, runtimeSessionId, roomAgentId, eventStartIndex } = options;
+  const { uiSessionId, runtimeSessionId, roomAgentId, eventStartIndex, gitBaselinePromise } = options;
   const projectPath = options.projectPath || useAppStore.getState().currentSession?.projectPath;
   if (!projectPath) return;
+  const gitBaseline = await gitBaselinePromise;
+  // 没有“轮次开始”基线就无法证明工作区改动属于本轮；此时只信任工具协议事件。
+  if (!gitBaseline) return;
   let numstat: GitNumstatEntryLike[];
   try {
-    const response = await window.api.getGitNumstat({ projectPath });
+    const response = await window.api.getGitTurnSnapshot({ projectPath });
     if (!response.success) return;
-    numstat = response.data;
+    // HEAD 改变说明本轮执行了 commit/rebase/reset；两个 numstat 不再共享同一参照系，
+    // 端点相减会制造反向巨量变更。此时仅信任协议工具事件。
+    if (response.data.head !== gitBaseline.head) return;
+    numstat = response.data.entries;
   } catch (error) {
     console.warn("Git numstat fallback failed:", error);
     return;
@@ -821,6 +828,7 @@ async function reconcileGitFallbackChanges(options: {
   const plan = planGitFallbackChanges(
     getRoomAgentEvents(session, ownerAgentId),
     numstat,
+    gitBaseline.entries,
   );
   if (!plan) return;
   const fallbackEvent: TimelineEvent = {
@@ -1500,7 +1508,11 @@ function App() {
   const handoffJobRef = useRef<HandoffJob | null>(null);
   const longTaskRoundAppendRef = useRef<Set<string>>(new Set());
   const hiddenLongTaskEventsRef = useRef<Map<string, TimelineEvent[]>>(new Map());
-  const runtimeTurnStartRef = useRef<Map<string, { eventStartIndex: number; openAssistantIds: Set<string> }>>(new Map());
+  const runtimeTurnStartRef = useRef<Map<string, {
+    eventStartIndex: number;
+    openAssistantIds: Set<string>;
+    gitBaselinePromise?: Promise<{ head: string; entries: GitNumstatEntryLike[] } | null>;
+  }>>(new Map());
   const goalRefreshTimersRef = useRef<Map<string, number>>(new Map());
   const goalLastRefreshRef = useRef<Map<string, number>>(new Map());
   const goalFetchVersionRef = useRef<Map<string, number>>(new Map());
@@ -2890,6 +2902,30 @@ function App() {
         }
         return;
       }
+      if (rawEvent?.type === "kimix.turn.git-baseline") {
+        const entries = Array.isArray(rawEvent.entries)
+          ? rawEvent.entries.filter((entry): entry is GitNumstatEntryLike => (
+              Boolean(entry) && typeof entry === "object" &&
+              typeof (entry as GitNumstatEntryLike).path === "string" &&
+              typeof (entry as GitNumstatEntryLike).added === "number" &&
+              typeof (entry as GitNumstatEntryLike).removed === "number"
+            ))
+          : null;
+        const head = typeof rawEvent.head === "string" ? rawEvent.head : null;
+        if (entries && head !== null && targetSession && !targetSession.longTask) {
+          const ownerEvents = roomAgentId
+            ? getRoomAgentEvents(targetSession, roomAgentId)
+            : targetSession.events;
+          runtimeTurnStartRef.current.set(payload.sessionId, {
+            eventStartIndex: ownerEvents.length,
+            openAssistantIds: new Set(ownerEvents.flatMap((event) => (
+              event.type === "assistant_message" && !event.isComplete ? [event.id] : []
+            ))),
+            gitBaselinePromise: Promise.resolve({ head, entries }),
+          });
+        }
+        return;
+      }
       if (rawEvent?.type === "kimix.turn.model") {
         // Host 权威当轮模型信号（dispatch=本地注入的本轮模型，不变量 65；settle=server
         // 实际模型）。server 路由 live 不产出 usage 状态卡，当轮 assistant 的 model
@@ -3347,13 +3383,14 @@ function App() {
 
       // Git 兜底：Bash/python 等非 Write/Edit 工具改动的文件不会被工具拦截统计到，
       // 轮次完成时用 git numstat 对照本轮已记录的变更路径补齐 change_summary。
-      if (turnStart) {
+      if (turnStart?.gitBaselinePromise) {
         void reconcileGitFallbackChanges({
           uiSessionId,
           runtimeSessionId: statusRuntimeSessionId,
           roomAgentId,
           projectPath: completedSession?.projectPath,
           eventStartIndex: turnStart.eventStartIndex,
+          gitBaselinePromise: turnStart.gitBaselinePromise,
         });
       }
 

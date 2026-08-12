@@ -79,6 +79,7 @@ import type {
   GitGraphResponse,
   GitNumstatRequest,
   GitNumstatResponse,
+  GitTurnSnapshotResponse,
   GitCommitRequest,
   GitPullRequest,
   GitPushRequest,
@@ -236,6 +237,8 @@ const api = {
     ipcRenderer.invoke("project:getGitDetails", projectPath),
   getGitNumstat: (req: GitNumstatRequest): Promise<GitNumstatResponse> =>
     ipcRenderer.invoke("project:gitNumstat", req),
+  getGitTurnSnapshot: (req: GitNumstatRequest): Promise<GitTurnSnapshotResponse> =>
+    ipcRenderer.invoke("project:gitTurnSnapshot", req),
   getGitGraph: (req: GitGraphRequest): Promise<GitGraphResponse> =>
     ipcRenderer.invoke("project:getGitGraph", req),
   commitGitChanges: (req: GitCommitRequest): Promise<GitActionResponse> =>

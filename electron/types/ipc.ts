@@ -1005,6 +1005,11 @@ export type GitNumstatEntry = {
   removed: number;
 };
 
+export type GitTurnBaseline = {
+  head: string;
+  entries: GitNumstatEntry[];
+};
+
 export type GitNumstatRequest = {
   projectPath: string;
 };
@@ -1012,6 +1017,14 @@ export type GitNumstatRequest = {
 export type GitNumstatResponse = {
   success: true;
   data: GitNumstatEntry[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type GitTurnSnapshotResponse = {
+  success: true;
+  data: GitTurnBaseline;
 } | {
   success: false;
   error: string;
