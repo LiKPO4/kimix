@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：月度额度选择真实 access_token 并发送会话身份（v2.21.47）
+
+- 复验：v2.21.46 补齐通用网页头后仍返回 HTTP 401，说明“接口拒绝”只是准确诊断，不是功能闭环。
+- 根因：Kimi Code 控制台明确使用 `localStorage.access_token`；Kimix v2.21.45 将所有 localStorage JWT 混合后按到期时间择优，长期 refresh Token 可能压过短期 access Token。当前会员请求还需要从 access JWT 提取 `device_id`、`ssid`、`sub`，分别发送 `x-msh-device-id`、`x-msh-session-id`、`x-traffic-id`。
+- 修正：页面存储捕获保留键名并给精确 `access_token` 最高优先级，其次才比较 Kimi app、设备、会话、用户声明与到期时间；会员请求补齐三项 JWT 派生身份头。
+- 回归：候选测试锁定长期 `refresh_token` 不得压过较短期 `access_token`；请求契约锁定设备、会话、流量身份头。
+
 ## 2026-08-12 修复：有效网页 Token 不再被会员接口误判过期（v2.21.46）
 
 - 现场：v2.21.45 自动获取成功，套餐小窗却立即提示“Token 无效或已过期”，同一卡片显示 JWT 本地到期日为 2026/11/10。

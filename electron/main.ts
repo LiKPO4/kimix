@@ -7359,9 +7359,9 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
         if (authWindow.isDestroyed() || !isAllowedKimiWebAuthUrl(authWindow.webContents.getURL())) return;
         const storageCandidates = await authWindow.webContents.executeJavaScript(`(() => {
           try {
-            return Object.values(localStorage)
-              .filter((value) => typeof value === "string" && value.startsWith("eyJ") && value.length <= 16384)
-              .slice(0, 32);
+            return Object.fromEntries(Object.entries(localStorage)
+              .filter(([, value]) => typeof value === "string" && value.startsWith("eyJ") && value.length <= 16384)
+              .slice(0, 32));
           } catch {
             return [];
           }

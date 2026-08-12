@@ -35,10 +35,10 @@ describe("Kimi 月度额度", () => {
 
   it("从页面存储 JWT 中优先选择有效的 Kimi 用户凭证", () => {
     const expired = jwt({ app_id: "kimi", sub: "old-user", exp: 1 });
-    const generic = jwt({ sub: "generic-user", exp: 4_102_444_900 });
-    const kimi = jwt({ app_id: "kimi", sub: "kimi-user", exp: 4_102_444_800 });
-    expect(selectKimiWebTokenCandidate(["not-a-token", expired, generic, kimi])).toBe(kimi);
-    expect(selectKimiWebTokenCandidate({ token: kimi })).toBeNull();
+    const refresh = jwt({ app_id: "kimi", sub: "kimi-user", exp: 4_102_444_900 });
+    const access = jwt({ app_id: "kimi", device_id: "device-1", ssid: "session-1", sub: "kimi-user", exp: 4_102_444_800 });
+    expect(selectKimiWebTokenCandidate({ misc: "not-a-token", expired, refresh_token: refresh, access_token: access })).toBe(access);
+    expect(selectKimiWebTokenCandidate([access])).toBeNull();
   });
 
   it("把月度与赠送额度占比归一为套餐小窗使用的周期", () => {
@@ -73,7 +73,7 @@ describe("Kimi 月度额度", () => {
       giftBalances: [],
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
-    const token = jwt({ sub: "user-1", exp: 4_102_444_800 });
+    const token = jwt({ device_id: "device-1", ssid: "session-1", sub: "user-1", exp: 4_102_444_800 });
     const result = await fetchKimiMonthlyQuota(token);
     expect(result).toMatchObject({ available: true, subscription: { percent: 42 } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -89,6 +89,9 @@ describe("Kimi 月度额度", () => {
         "connect-protocol-version": "1",
         "x-language": "zh-CN",
         "x-msh-platform": "web",
+        "x-msh-device-id": "device-1",
+        "x-msh-session-id": "session-1",
+        "x-traffic-id": "user-1",
       }),
     }));
   });

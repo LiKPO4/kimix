@@ -6,7 +6,9 @@ export const KIMI_WEB_AUTH_URL = "https://www.kimi.com/code/console";
 
 type JwtPayload = {
   app_id?: unknown;
+  device_id?: unknown;
   exp?: unknown;
+  ssid?: unknown;
   sub?: unknown;
 };
 
@@ -72,6 +74,8 @@ export function isAllowedKimiWebAuthUrl(value: string): boolean {
 export function inspectKimiWebToken(value: string): {
   valid: boolean;
   appId?: string;
+  deviceId?: string;
+  sessionId?: string;
   subject?: string;
   expiresAt?: number;
   expired: boolean;
@@ -82,6 +86,8 @@ export function inspectKimiWebToken(value: string): {
   return {
     valid: token.split(".").length === 3 && Boolean(payload),
     appId: typeof payload?.app_id === "string" ? payload.app_id : undefined,
+    deviceId: typeof payload?.device_id === "string" ? payload.device_id : undefined,
+    sessionId: typeof payload?.ssid === "string" ? payload.ssid : undefined,
     subject: typeof payload?.sub === "string" ? payload.sub : undefined,
     expiresAt,
     expired: expiresAt !== undefined && expiresAt <= Date.now(),
@@ -89,14 +95,18 @@ export function inspectKimiWebToken(value: string): {
 }
 
 export function selectKimiWebTokenCandidate(values: unknown): string | null {
-  if (!Array.isArray(values)) return null;
+  if (!values || typeof values !== "object" || Array.isArray(values)) return null;
   let best: { token: string; score: number; expiresAt: number } | null = null;
-  for (const value of values.slice(0, 32)) {
+  for (const [key, value] of Object.entries(values).slice(0, 32)) {
     if (typeof value !== "string" || value.length > 16_384) continue;
     const token = normalizeKimiWebToken(value);
     const tokenInfo = inspectKimiWebToken(token);
     if (!tokenInfo.valid || tokenInfo.expired || tokenInfo.expiresAt === undefined) continue;
-    const score = (tokenInfo.appId === "kimi" ? 2 : 0) + (tokenInfo.subject ? 1 : 0);
+    const score = (key === "access_token" ? 8 : 0)
+      + (tokenInfo.appId === "kimi" ? 4 : 0)
+      + (tokenInfo.deviceId ? 2 : 0)
+      + (tokenInfo.sessionId ? 2 : 0)
+      + (tokenInfo.subject ? 1 : 0);
     if (!best || score > best.score || (score === best.score && tokenInfo.expiresAt > best.expiresAt)) {
       best = { token, score, expiresAt: tokenInfo.expiresAt };
     }
@@ -169,6 +179,9 @@ export async function fetchKimiMonthlyQuota(
         "x-language": "zh-CN",
         "x-msh-platform": "web",
         "r-timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+        ...(tokenInfo.deviceId ? { "x-msh-device-id": tokenInfo.deviceId } : {}),
+        ...(tokenInfo.sessionId ? { "x-msh-session-id": tokenInfo.sessionId } : {}),
+        ...(tokenInfo.subject ? { "x-traffic-id": tokenInfo.subject } : {}),
       },
       body: "{}",
       signal: AbortSignal.timeout(options.timeoutMs ?? 8_000),
