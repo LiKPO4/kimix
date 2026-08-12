@@ -9,6 +9,7 @@ import { FileCard } from "./FileCard";
 import { StatusCard, STATUS_CARD_TEXT_STYLE } from "./StatusCard";
 import { ChangeCard } from "./ChangeCard";
 import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
+import { QuestionCard } from "./QuestionCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
@@ -785,6 +786,7 @@ type ProcessItem =
   | { type: "tool"; tool: ToolEvent }
   | { type: "subagent"; subagent: SubagentEvent }
   | { type: "approval"; approval: ApprovalEvent }
+  | { type: "question"; question: QuestionEvent }
   | { type: "notification"; event: StatusUpdateEvent };
 
 function normalizeThinkingMarkdown(text: string) {
@@ -1020,8 +1022,10 @@ function renderProcessItem(item: ProcessItem, index: number) {
       ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
       : item.type === "approval"
         ? <ApprovalProcessItem key={item.approval.id} approval={item.approval} />
-        : item.type === "notification"
+      : item.type === "notification"
           ? <NotificationCard key={item.event.id} event={item.event} />
+          : item.type === "question"
+            ? <QuestionCard key={item.question.id} event={item.question} variant="process" />
           : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />;
 }
 
@@ -1163,6 +1167,7 @@ function processItemTimestamp(item: ProcessItem) {
     case "tool": return item.tool.timestamp;
     case "subagent": return item.subagent.timestamp;
     case "approval": return item.approval.timestamp;
+    case "question": return item.question.timestamp;
     case "notification": return item.event.timestamp;
   }
 }
@@ -1173,7 +1178,8 @@ function processItemPriority(item: ProcessItem) {
     case "tool": return 1;
     case "subagent": return 2;
     case "approval": return 3;
-    case "notification": return 4;
+    case "question": return 4;
+    case "notification": return 5;
   }
 }
 
@@ -2248,6 +2254,9 @@ function KimiWebApprovalGroupCard({ approvals }: { approvals: ApprovalEvent[] })
  */
 function KimiWebQuestionGroupCard({ question }: { question: QuestionEvent }) {
   const [expanded, setExpanded] = useState(false);
+  if (question.status === "pending") {
+    return <QuestionCard event={question} variant="process" />;
+  }
   const answerCount = question.questions.filter((item) => savedQuestionAnswer(question, item)).length;
   const statusText = question.status === "answered"
     ? `${Math.max(answerCount, 1)} 个回答`
@@ -2497,6 +2506,8 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
           ordered.push({ type: "subagent", subagent: block.subagent });
         } else if (block.kind === "approval") {
           ordered.push({ type: "approval", approval: block.approval });
+        } else if (block.kind === "question") {
+          ordered.push({ type: "question", question: block.question });
         } else if (block.kind === "notification") {
           ordered.push({ type: "notification", event: block.event });
         }
@@ -2531,7 +2542,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
   const summaryApprovalCount = blockCounts?.approvalCount ?? approvals.length;
   // 非 turnBlocks 路径（合成事件兜底）不含通知，回退 0。
   const summaryNotificationCount = blockCounts?.notificationCount ?? 0;
-  const hasDetails = items.length > 0 || (isActiveAssistant && Boolean(liveDraftKey));
+  const hasDetails = Boolean(effectiveTurnBlocks?.length) || items.length > 0 || (isActiveAssistant && Boolean(liveDraftKey));
   const detailUnit = event.agentRole ? "内容" : "思考";
   const summary = useMemo(() => joinSummaryParts([
     thinkingBlocks.length > 0 ? `${thinkingBlocks.length} 段${detailUnit}` : "",

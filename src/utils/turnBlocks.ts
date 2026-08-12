@@ -83,8 +83,12 @@ function synthesizeSubagentFromAgentCall(event: ToolCallEvent): SubagentTimeline
  *   events) synthesizes a display-layer subagent so the task card survives
  *   restore; running unmatched calls stay plain tool blocks until the real
  *   subagent event arrives.
- * - approval_request / question_request: resolved (non-pending) cards stay in
- *   position; pending ones render as standalone interactive cards elsewhere.
+ * - approval_request: resolved cards stay in position; pending ones keep the
+ *   existing standalone approval flow.
+ * - question_request: pending and resolved questions both stay at their wire
+ *   position. The process renderer owns the interactive pending state, so the
+ *   question never jumps out below the thinking/tool chain while awaiting an
+ *   answer.
  * - status_update: only notification envelopes (background task / cron) join
  *   the block list at their own position — they fold into the process chain
  *   instead of floating as standalone cards below the body. Usage/progress
@@ -207,7 +211,6 @@ export function buildTurnBlocks(turnEvents: TimelineEvent[]): TurnBlock[] {
       continue;
     }
     if (event.type === "question_request") {
-      if (event.status === "pending") continue;
       blocks.push({ kind: "question", key: `question:${event.id}`, question: event });
       continue;
     }

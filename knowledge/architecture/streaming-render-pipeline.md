@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-10T19:32:00+08:00"
+timestamp: "2026-08-12T10:32:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -42,9 +42,15 @@ timestamp-based reordering (or tool-timestamp cutting of thinking phases)
 scrambles the sequence into multiple split tool groups and mis-ordered Swarm
 cards. Continuous tool blocks still aggregate into one "N 个工具调用" card;
 a thinking/text/subagent boundary starts a new run — the same rule as official
-kimi-web `assistantRenderBlocks`. Non-pending approval/question_request cards
-become blocks at their own wire position (folded into the assistant process
-flow); pending ones stay as standalone interactive cards below the body.
+kimi-web `assistantRenderBlocks`. Non-pending approval cards and every
+`question_request` become blocks at their own wire position. A pending question
+keeps its interactive controls inside that process block instead of becoming a
+standalone card below the Assistant body; answering it changes the same block
+to the settled read-only projection. This preserves both event order and one
+stable visual owner for the request. The interactive process card and its
+answer controls consume semantic `.kimix-soft-card`, `.kimix-room-choice`, and
+field roles, so imported UI styles own resting/selected/focus material rather
+than being overwritten by local utility colors.
 
 Agent/Task/AgentSwarm tool calls are absorbed into the matching subagent card
 via `parentToolCallId` at the tool-call position (official treats the Agent

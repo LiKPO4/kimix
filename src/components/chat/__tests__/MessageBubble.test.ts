@@ -14,6 +14,7 @@ import {
   KimiWebTaskCard,
   MessageBubble,
 } from "../MessageBubble";
+import { QuestionCard } from "../QuestionCard";
 
 function makeSubagent(detailCount: number): SubagentEvent {
   const events: TimelineEvent[] = Array.from({ length: detailCount }, (_, index) => ({
@@ -221,6 +222,66 @@ describe("MessageBubble Kimi Web rendering", () => {
     expect(container.textContent).toContain("继续按方案 A 实施？");
     // 只读展示：不渲染任何可交互的审批/提问按钮
     expect(container.querySelectorAll("button")).toHaveLength(0);
+  });
+});
+
+describe("QuestionCard process styling", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+  });
+
+  it("uses the standard process surface and keeps answer controls on semantic theme roles", async () => {
+    const question: Extract<TimelineEvent, { type: "question_request" }> = {
+      id: "question-process",
+      type: "question_request",
+      timestamp: 1,
+      requestId: "ask-1",
+      rpcRequestId: "rpc-1",
+      toolCallId: "tool-1",
+      status: "pending",
+      questions: [{
+        id: "q1",
+        header: "偏好",
+        question: "你平时在哪里写诗？",
+        options: [
+          { id: "home", label: "家里", description: "安静" },
+          { id: "park", label: "公园", description: "自然" },
+        ],
+      }],
+    };
+
+    await act(async () => {
+      root.render(createElement(QuestionCard, { event: question, variant: "process" }));
+    });
+
+    expect(container.querySelector(".kimix-soft-card")).not.toBeNull();
+    expect(container.querySelector(".kimix-event-card")).toBeNull();
+    const choices = container.querySelectorAll<HTMLButtonElement>(".kimix-room-choice");
+    expect(choices).toHaveLength(2);
+    expect(choices[0].dataset.selected).toBe("true");
+    expect(choices[0].className).not.toContain("data-[selected=true]");
+
+    const customInput = container.querySelector<HTMLInputElement>(".kimix-question-custom-input");
+    expect(customInput).not.toBeNull();
+    expect(customInput?.classList.contains("kimix-settings-input")).toBe(true);
+    await act(async () => {
+      customInput!.focus();
+      customInput!.value = "书房";
+      customInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(customInput?.classList.contains("kimix-settings-input")).toBe(true);
   });
 });
 

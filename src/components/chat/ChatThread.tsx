@@ -897,12 +897,12 @@ export function buildRenderItems(
       (event): event is Extract<TimelineEvent, { type: "approval_request" }> =>
         event.type === "approval_request" && event.status !== "pending"
     );
-    // Resolved questions fold into the assistant process flow at their own
-    // position (official kimi-web); only pending ones stay as standalone
-    // interactive cards below the body.
-    const resolvedQuestions = turnEvents.filter(
+    // Questions stay inside the assistant process flow at their original wire
+    // position, including the pending interactive state. A standalone card is
+    // retained only when this turn has no Assistant/process carrier at all.
+    const turnQuestions = turnEvents.filter(
       (event): event is Extract<TimelineEvent, { type: "question_request" }> =>
-        event.type === "question_request" && event.status !== "pending"
+        event.type === "question_request"
     );
     const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
     const roomAgentId = identityEvent?.roomAgentId ?? turnUserEvent?.roomAgentId;
@@ -933,7 +933,7 @@ export function buildRenderItems(
     );
     const isTurnActive = Boolean(activeRoomAgentTurn || isRuntimeAwaitingTurnOutput);
     const foldApprovals = Boolean(mergedAssistantEvent || isTurnActive) && resolvedApprovals.length > 0;
-    const foldQuestions = Boolean(mergedAssistantEvent || isTurnActive) && resolvedQuestions.length > 0;
+    const foldQuestions = Boolean(mergedAssistantEvent || isTurnActive) && turnQuestions.length > 0;
     // The next user message is a hard ownership boundary for a single-Agent
     // session. Stale incomplete flags from the previous turn must not consume
     // the next turn's session-level runtime state.
@@ -1207,11 +1207,9 @@ export function buildRenderItems(
         continue;
       }
       if (event.type === "question_request") {
-        // Resolved questions fold into the assistant process flow; do not
-        // render them as standalone cards below the body.
-        if (foldQuestions && (event as Extract<TimelineEvent, { type: "question_request" }>).status !== "pending") {
-          continue;
-        }
+        // Pending and resolved questions are rendered by their process block;
+        // do not duplicate the interactive card below the Assistant body.
+        if (foldQuestions) continue;
         items.push({ type: "event", event });
         continue;
       }

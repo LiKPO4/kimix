@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：结构化提问进入思考工具链并保持主题样式（v2.21.40）
+
+- 现场：待回答的 `question_request` 被排除在 `turnBlocks` 外，显示为思考工具链下方独立的大卡片；选择答案或聚焦“其他回答”后，局部 Tailwind 状态色覆盖导入 UI Style 的控件材质。
+- 根因：`buildTurnBlocks` 明确跳过 pending question，`ChatThread` 又只折叠 resolved question；`QuestionCard` 的选中/聚焦态直接声明 border/background，而没有持续消费 `.kimix-room-choice` 与 field 语义角色。
+- 修正：pending/answered/skipped 提问统一保留在原始事件位置的 question block；过程链内 pending 状态渲染可交互标准过程卡，提交后同位置切为只读结果；答案选项与自定义输入分别由 room-choice/field 主题契约完整接管。
+- 回归：turnBlocks 与 ChatThread 锁定 pending 不再生成独立行；MessageBubble 组件测试锁定过程卡表面和答案控件语义类。全量 176 文件 / 1918 项、typecheck、knowledge validate 和生产构建通过。
+
 ## 2026-08-12 修复：无差异提示可正常展开与收起（v2.21.39）
 
 - 现场：文件变更行点击预览后显示“未找到可确认属于本轮的差异”，但箭头仍朝右、操作仍显示“预览”，再次点击无法收起提示。

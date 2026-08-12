@@ -485,7 +485,7 @@ describe("computeFinalTextBlockContent", () => {
 });
 
 describe("question_request turn blocks", () => {
-  it("keeps resolved questions in stream position and skips pending ones", () => {
+  it("keeps resolved and pending questions in their stream positions", () => {
     const question = (id: string, status: "pending" | "answered"): TimelineEvent => ({
       id,
       type: "question_request",
@@ -503,8 +503,9 @@ describe("question_request turn blocks", () => {
       question("q-pending", "pending"),
     ];
     const blocks = buildTurnBlocks(events);
-    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "question", "text"]);
+    expect(blocks.map((block) => block.kind)).toEqual(["thinking", "text", "question", "text", "question"]);
     expect(blocks[2]).toMatchObject({ kind: "question", key: "question:q-resolved" });
+    expect(blocks[4]).toMatchObject({ kind: "question", key: "question:q-pending" });
   });
 });
 

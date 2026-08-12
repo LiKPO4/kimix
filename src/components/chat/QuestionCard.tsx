@@ -8,6 +8,7 @@ import { resolveRoomEventOwner, updateRoomEventForOwner } from "@/utils/roomEven
 
 interface QuestionCardProps {
   event: Extract<TimelineEvent, { type: "question_request" }>;
+  variant?: "standalone" | "process";
 }
 
 type LocalAnswers = Record<string, string[]>;
@@ -30,7 +31,7 @@ function optionLabelForSavedValue(question: QuestionItem, value: string) {
   return question.options.find((option) => option.label === value || option.id === value)?.label;
 }
 
-export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardProps) {
+export const QuestionCard = memo(function QuestionCard({ event, variant = "standalone" }: QuestionCardProps) {
   const currentSession = useAppStore((s) => s.currentSession);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -160,6 +161,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
   };
 
   const isPending = event.status === "pending";
+  const isProcessVariant = variant === "process";
   const summary = event.status === "answered"
     ? `已提交：${Object.values(event.answers ?? {}).filter(Boolean).join(" / ") || "已回答"}`
     : event.status === "skipped"
@@ -167,34 +169,58 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
       : "等待选择后继续执行";
 
   return (
-    <div id={`kimix-question-${event.id}`} className="flex justify-center">
+    <div id={`kimix-question-${event.id}`} className={isProcessVariant ? "w-full" : "flex justify-center"}>
       <div
-        className="kimix-event-card w-full border border-accent-primary-soft bg-accent-primary-light text-text-primary"
-        style={{ maxWidth: 832, paddingLeft: 22, paddingRight: 22, paddingTop: 13, paddingBottom: collapsed ? 13 : 12 }}
+        className={isProcessVariant
+          ? "kimix-soft-card w-full overflow-hidden rounded-xl text-text-primary"
+          : "kimix-event-card w-full border border-accent-primary-soft bg-accent-primary-light text-text-primary"}
+        style={isProcessVariant
+          ? undefined
+          : { maxWidth: 832, paddingLeft: 22, paddingRight: 22, paddingTop: 13, paddingBottom: collapsed ? 13 : 12 }}
       >
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="kimix-chat-collapse-row flex w-full items-center rounded-xl text-left transition-colors hover:bg-surface-elevated/60"
-          style={{ gap: 14, minHeight: 48, paddingLeft: 10, paddingRight: 10 }}
+          className={`kimix-chat-collapse-row flex w-full items-center text-left transition-colors ${isProcessVariant ? "text-[13.5px] text-[var(--kimix-panel-text-secondary)]" : "rounded-xl hover:bg-surface-elevated/60"}`}
+          style={isProcessVariant
+            ? { gap: 9, minHeight: 42, paddingLeft: 12, paddingRight: 12 }
+            : { gap: 14, minHeight: 48, paddingLeft: 10, paddingRight: 10 }}
+          aria-expanded={!collapsed}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]">
-            <CircleHelp size={16} />
+          <span className={isProcessVariant
+            ? "flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]"
+            : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-accent-primary shadow-[0_1px_2px_rgba(25,23,20,0.08)]"}
+          >
+            <CircleHelp size={isProcessVariant ? 14 : 16} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-medium leading-6">需要你确认一下</div>
-            <div className="mt-0.5 truncate text-[13px] leading-5 text-text-secondary">
-              {roomAgentName ? `${roomAgentName} · ${summary}` : summary}
+            <div className={isProcessVariant ? "truncate leading-5" : "text-[15px] font-medium leading-6"}>
+              {isProcessVariant ? "需要回答" : "需要你确认一下"}
             </div>
+            {!isProcessVariant && (
+              <div className="mt-0.5 truncate text-[13px] leading-5 text-text-secondary">
+                {roomAgentName ? `${roomAgentName} · ${summary}` : summary}
+              </div>
+            )}
           </div>
-          <span className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent-primary-soft">
+          {isProcessVariant && (
+            <span className="max-w-[45%] shrink-0 truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
+              {roomAgentName ? `${roomAgentName} · ${summary}` : summary}
+            </span>
+          )}
+          <span className={`${isProcessVariant ? "h-5 w-[18px] text-[var(--kimix-process-muted)]" : "h-8 w-8 rounded-lg text-accent-primary-soft"} ml-auto flex shrink-0 items-center justify-center`}>
             {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
           </span>
         </button>
 
         {!collapsed && (
-          <>
-        <div className="text-[13px] leading-5 text-text-secondary" style={{ marginTop: 8, marginBottom: 18, paddingLeft: 58, paddingRight: 10 }}>
+          <div
+            className={isProcessVariant ? "border-t border-[var(--kimix-panel-divider)]" : undefined}
+            style={isProcessVariant ? { padding: "12px 12px 14px" } : undefined}
+          >
+        <div className="text-[13px] leading-5 text-text-secondary" style={isProcessVariant
+          ? { marginBottom: 14, paddingLeft: 4, paddingRight: 4 }
+          : { marginTop: 8, marginBottom: 18, paddingLeft: 58, paddingRight: 10 }}>
           Kimi 官方结构化提问会在你选择后继续执行。
         </div>
 
@@ -205,7 +231,11 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
             const customValue = customAnswers[key] ?? "";
             const customActive = Boolean(customSelected[key] && customValue.trim().length > 0);
             return (
-              <div key={`${question.question}-${questionIndex}`} className="kimix-inset-section" style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}>
+              <div
+                key={`${question.question}-${questionIndex}`}
+                className={isProcessVariant ? "rounded-xl bg-[var(--kimix-panel-soft-bg)]" : "kimix-inset-section"}
+                style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 17 }}
+              >
                 <div className="flex items-center" style={{ gap: 12, minHeight: 30 }}>
                   {question.header && (
                     <span className="shrink-0 rounded-md bg-accent-primary-light text-[12px] leading-5 text-accent-primary" style={{ paddingLeft: 9, paddingRight: 9 }}>
@@ -223,7 +253,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
                         type="button"
                         disabled={!isPending || isSubmitting}
                         onClick={() => setQuestionAnswer(key, option.label, question.multiSelect)}
-                        className={`kimix-room-choice flex w-full items-center rounded-xl border text-left text-[13.5px] disabled:cursor-not-allowed border-border-subtle bg-surface-elevated text-text-primary hover:bg-surface-hover data-[selected=true]:border-accent-primary data-[selected=true]:bg-accent-primary-light data-[selected=true]:text-accent-primary-dark`}
+                        className="kimix-room-choice flex w-full items-center text-left text-[13.5px] text-text-primary disabled:cursor-not-allowed"
                         style={{ gap: 10, minHeight: 62, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10 }}
                         data-selected={active}
                         title={option.description}
@@ -246,8 +276,9 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
                     onClick={() => selectQuestionCustomAnswer(key)}
                     onFocus={() => selectQuestionCustomAnswer(key)}
                     placeholder="其他回答（可选）"
-                    className={`w-full rounded-xl border text-[13.5px] outline-none transition-colors placeholder:text-text-muted ${customActive ? "border-accent-primary bg-accent-primary-light text-accent-primary-dark" : "border-border-subtle bg-surface-base text-text-primary focus:border-accent-primary-soft focus:bg-surface-elevated"}`}
+                    className="kimix-settings-input kimix-question-custom-input w-full text-[13.5px]"
                     style={{ height: 40, marginTop: 14, paddingLeft: 14, paddingRight: 14 }}
+                    data-selected={customActive}
                     disabled={!isPending || isSubmitting}
                   />
                 )}
@@ -283,7 +314,7 @@ export const QuestionCard = memo(function QuestionCard({ event }: QuestionCardPr
             {event.status === "answered" ? "已提交回答，Kimi 会继续执行。" : "已跳过澄清，Kimi 会按当前信息继续。"}
           </div>
         )}
-          </>
+          </div>
         )}
       </div>
     </div>
