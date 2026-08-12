@@ -18,7 +18,7 @@ import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
-import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KIMI_WEB_AUTH_URL, normalizeKimiWebToken } from "./kimiMonthlyQuota";
+import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KIMI_WEB_AUTH_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -7312,6 +7312,7 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     let capturing = false;
+    let searching = false;
     let cookiePollTimer: NodeJS.Timeout | null = null;
     const clearTemporarySession = () => {
       void authSession.clearStorageData().catch(() => {});
@@ -7342,17 +7343,35 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
         finish(error instanceof Error ? error : new Error(String(error)));
       }
     };
-    const findTokenCookie = async () => {
-      if (settled || capturing) return;
+    const findTokenCredential = async () => {
+      if (settled || capturing || searching) return;
+      searching = true;
       try {
         const cookies = await authSession.cookies.get({ name: "kimi-auth" });
         const cookie = cookies.find((item) => {
           const domain = (item.domain ?? "").replace(/^\./, "").toLowerCase();
           return domain === "kimi.com" || domain.endsWith(".kimi.com");
         });
-        if (cookie?.value) await captureToken(cookie.value);
+        if (cookie?.value) {
+          await captureToken(cookie.value);
+          return;
+        }
+        if (authWindow.isDestroyed() || !isAllowedKimiWebAuthUrl(authWindow.webContents.getURL())) return;
+        const storageCandidates = await authWindow.webContents.executeJavaScript(`(() => {
+          try {
+            return Object.values(localStorage)
+              .filter((value) => typeof value === "string" && value.startsWith("eyJ") && value.length <= 16384)
+              .slice(0, 32);
+          } catch {
+            return [];
+          }
+        })()`, true);
+        const storageToken = selectKimiWebTokenCandidate(storageCandidates);
+        if (storageToken) await captureToken(storageToken);
       } catch {
-        // 登录窗口仍在时继续等待下一次 Cookie 事件或轮询，不因一次读取失败中断流程。
+        // 登录窗口仍在时继续等待下一次 Cookie、页面存储事件或轮询，不因一次读取失败中断流程。
+      } finally {
+        searching = false;
       }
     };
     function handleCookieChanged(
@@ -7372,8 +7391,8 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     };
 
     authSession.cookies.on("changed", handleCookieChanged);
-    authWindow.webContents.on("did-finish-load", () => void findTokenCookie());
-    cookiePollTimer = setInterval(() => void findTokenCookie(), 750);
+    authWindow.webContents.on("did-finish-load", () => void findTokenCredential());
+    cookiePollTimer = setInterval(() => void findTokenCredential(), 750);
     authWindow.webContents.on("will-navigate", keepKimiNavigationInside);
     authWindow.webContents.on("will-redirect", keepKimiNavigationInside);
     authWindow.webContents.setWindowOpenHandler(({ url }) => {

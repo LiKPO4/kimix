@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：内置登录同时捕获页面存储凭证（v2.21.45）
+
+- 复验：v2.21.44 已直达 Kimi Code 控制台，页面头像确认登录成功，但 Kimix 仍显示“等待登录”；持续查询 Electron Cookie store 也未得到 `kimi-auth`。
+- 根因：参考仓库的真实提取逻辑并非 Cookie-only，而是同时收集 `document.cookie` 与 `localStorage` 中的 JWT，并按 `app_id=kimi`、`sub` 和有效期择优。Kimix v2.21.43/v2.21.44 只观察 Cookie，因此 Token 落在页面存储时永远无法完成。
+- 修正：主进程在受限的 HTTPS kimi.com 登录窗口中，Cookie 未命中时读取最多 32 个、单项不超过 16 KiB 且以 `eyJ` 开头的 localStorage 候选；只保留结构有效、未过期、有到期时间的 JWT，并优先选择 `app_id=kimi` 且带用户身份的候选。捕获值仍不进入 renderer 或日志。
+- 回归：新增过期、通用 JWT、Kimi 用户 JWT 的候选优先级测试，以及登录窗口页面存储捕获的源契约测试。
+
 ## 2026-08-12 修复：内置登录完成后未自动获取月度额度凭证（v2.21.44）
 
 - 现场：一次性内置浏览器在 Kimi 首页完成账号登录后仍停留在窗口内，设置页一直等待，未保存网页 Token。

@@ -6,6 +6,7 @@ import {
   isAllowedKimiWebAuthUrl,
   normalizeKimiWebToken,
   parseKimiMonthlyQuotaPayload,
+  selectKimiWebTokenCandidate,
 } from "../kimiMonthlyQuota";
 
 function jwt(payload: Record<string, unknown>): string {
@@ -30,6 +31,14 @@ describe("Kimi 月度额度", () => {
     expect(isAllowedKimiWebAuthUrl("https://auth.kimi.com/callback")).toBe(true);
     expect(isAllowedKimiWebAuthUrl("http://www.kimi.com/")).toBe(false);
     expect(isAllowedKimiWebAuthUrl("https://kimi.com.example.test/")).toBe(false);
+  });
+
+  it("从页面存储 JWT 中优先选择有效的 Kimi 用户凭证", () => {
+    const expired = jwt({ app_id: "kimi", sub: "old-user", exp: 1 });
+    const generic = jwt({ sub: "generic-user", exp: 4_102_444_900 });
+    const kimi = jwt({ app_id: "kimi", sub: "kimi-user", exp: 4_102_444_800 });
+    expect(selectKimiWebTokenCandidate(["not-a-token", expired, generic, kimi])).toBe(kimi);
+    expect(selectKimiWebTokenCandidate({ token: kimi })).toBeNull();
   });
 
   it("把月度与赠送额度占比归一为套餐小窗使用的周期", () => {
