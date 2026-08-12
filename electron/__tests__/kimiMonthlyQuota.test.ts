@@ -67,7 +67,7 @@ describe("Kimi 月度额度", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("只请求会员统计接口并携带 Connect 协议头", async () => {
+  it("只请求会员统计接口并携带完整 Kimi 网页请求上下文", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       subscriptionBalance: { amountUsedRatio: 0.42 },
       giftBalances: [],
@@ -82,8 +82,21 @@ describe("Kimi 月度额度", () => {
       body: "{}",
       headers: expect.objectContaining({
         Authorization: `Bearer ${token}`,
+        Cookie: `kimi-auth=${token}`,
+        Origin: "https://www.kimi.com",
+        Referer: "https://www.kimi.com/code/console",
+        "User-Agent": expect.stringContaining("Mozilla/5.0"),
         "connect-protocol-version": "1",
+        "x-language": "zh-CN",
+        "x-msh-platform": "web",
       }),
     }));
+  });
+
+  it("有效期尚未到时把 401 识别为接口拒绝而不是已过期", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+    const result = await fetchKimiMonthlyQuota(jwt({ app_id: "kimi", sub: "user-1", exp: 4_102_444_800 }));
+    expect(result.message).toContain("接口拒绝");
+    expect(result.message).not.toContain("已过期");
   });
 });

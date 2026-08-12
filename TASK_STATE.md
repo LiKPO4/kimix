@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：有效网页 Token 不再被会员接口误判过期（v2.21.46）
+
+- 现场：v2.21.45 自动获取成功，套餐小窗却立即提示“Token 无效或已过期”，同一卡片显示 JWT 本地到期日为 2026/11/10。
+- 根因：本地 `exp` 证明 Token 尚未过期；401 来自会员接口。Kimix 请求只发送 Bearer、Content-Type 和 Connect 版本，而成熟网页用量实现还会携带 `Cookie: kimi-auth=...`、`Origin`、`Referer`、浏览器 User-Agent、语言、平台与时区上下文。服务端拒绝缺少网页上下文的请求后，Kimix 又把所有 401 错误统称成“无效或已过期”。
+- 修正：会员统计请求补齐 Kimi 网页上下文头，Bearer 与 Cookie 使用同一 safeStorage 凭证；本地到期判定仍只依据 JWT `exp`。HTTP 401 改为“会员接口拒绝当前凭证”，不再冒充本地过期结论。
+- 回归：请求契约测试锁定 Cookie/Origin/Referer/User-Agent/平台/语言头；新增未过期 JWT 收到 401 时不得显示“已过期”的诊断测试。
+
 ## 2026-08-12 修复：内置登录同时捕获页面存储凭证（v2.21.45）
 
 - 复验：v2.21.44 已直达 Kimi Code 控制台，页面头像确认登录成功，但 Kimix 仍显示“等待登录”；持续查询 Electron Cookie store 也未得到 `kimi-auth`。

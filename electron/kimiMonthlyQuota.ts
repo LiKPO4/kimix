@@ -158,15 +158,24 @@ export async function fetchKimiMonthlyQuota(
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
+        Cookie: `kimi-auth=${token}`,
         "Content-Type": "application/json",
+        Origin: "https://www.kimi.com",
+        Referer: KIMI_WEB_AUTH_URL,
+        Accept: "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
         "connect-protocol-version": "1",
+        "x-language": "zh-CN",
+        "x-msh-platform": "web",
+        "r-timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
       },
       body: "{}",
       signal: AbortSignal.timeout(options.timeoutMs ?? 8_000),
     });
     if (!response.ok) {
       const message = response.status === 401
-        ? "网页登录 Token 无效或已过期，请重新配置。"
+        ? "Kimi 会员接口拒绝了当前网页登录凭证（HTTP 401），请重新自动获取。"
         : `月度额度查询失败（HTTP ${response.status}）。`;
       return { ...base, available: false, message };
     }
