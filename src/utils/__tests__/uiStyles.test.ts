@@ -367,9 +367,9 @@ describe("UI_STYLES", () => {
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
 
     expect(composer).toContain('kimix-icon-text-button kimix-control-button is-compact justify-center text-[13px] text-text-secondary');
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*\s*\{/s);
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:hover:not\(:disabled\)\s*\{/s);
-    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\):not\(\.bg-accent-primary\)(?::not\([^)]*\))*:active:not\(:disabled\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\)(?::not\([^)]*\))*:not\(\.bg-accent-primary\)(?::not\([^)]*\))*\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\)(?::not\([^)]*\))*:not\(\.bg-accent-primary\)(?::not\([^)]*\))*:hover:not\(:disabled\)\s*\{/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-composer-tool-button[^)]*\)(?::not\([^)]*\))*:not\(\.bg-accent-primary\)(?::not\([^)]*\))*:active:not\(:disabled\)\s*\{/s);
   });
   it("Agent 过程头与游离折叠思考摘要静止安静，仅交互态消费 control", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");

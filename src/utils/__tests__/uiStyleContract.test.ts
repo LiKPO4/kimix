@@ -276,6 +276,7 @@ describe("自定义风格 CSS 角色消费契约", () => {
     expect(css).toMatch(/\.kimix-composer-input,[\s\S]*?\.kimix-composer-input:focus-visible\s*\{[^}]*border:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;[^}]*box-shadow:\s*none\s*!important;/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-split-control[\s\S]*?:hover[\s\S]*?--ui-role-compound-control-hover-shadow/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-state-button[\s\S]*?:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)[\s\S]*?--ui-role-toggle-hover-shadow/s);
+    expect(css.match(/:not\(\.kimix-state-button\)/g)).toHaveLength(3);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-control-button\[aria-expanded="true"\]\s*\{[^}]*--ui-role-menu-trigger-selected-border[^}]*--ui-role-menu-trigger-selected-background[^}]*--ui-role-menu-trigger-selected-shadow[^}]*\}/s);
     const interactiveStateCoverage = {
       "navigation-item": ["resting", "hover", "active", "selected"],

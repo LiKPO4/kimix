@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：Swarm 开启态被通用按钮静止态覆盖（v2.21.52）
+
+- 现场：v2.21.51 已生成正确的 toggle selected 内凹材质，Swarm DOM 也有 `aria-pressed=true`，但截图中仍无浮雕。
+- 根因：Swarm 同时带 `.kimix-icon-text-button` 与 `.kimix-state-button`。自定义风格的通用 control 选择器包含三个 `:not(...)`，优先级高于专用 toggle selected 选择器，导致后声明的 selected 阴影仍被通用 resting 覆盖。
+- 修正：`.kimix-state-button` 从通用 control 的 resting/hover/active 三组消费者中退出，完整交由 toggle 专用状态机管理；未开启静止、hover、active、`aria-pressed=true` 不再互相抢样式。
+- 回归：CSS 消费契约断言通用 control 三个状态都显式排除 `.kimix-state-button`。
+
 ## 2026-08-12 修复：开启、选中和菜单展开态恢复持续立体强调（v2.21.51）
 
 - 现场：普通按钮静止态收敛后，Swarm/Plan 开启态、菜单选中项及部分已展开菜单触发器可能缺少持续浮雕，状态与未选中项辨识不足。
