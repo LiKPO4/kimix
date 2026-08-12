@@ -2398,11 +2398,11 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             {monthlyQuotaConfigured ? "网页 Token 已配置" : "登录 Kimi 自动获取"}
                           </div>
                           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                            打开一次性 Kimi 登录窗口；登录成功后 Kimix 会自动读取凭证、加密保存并关闭窗口。
+                            登录一次后保留专用网页会话；查询额度时 Kimix 会在后台自动刷新短期凭证，无需反复登录。
                           </div>
                           {monthlyQuotaTokenExpiresAt && (
                             <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
-                              Token 到期时间：{new Date(monthlyQuotaTokenExpiresAt).toLocaleString()}
+                              当前访问凭证到期：{new Date(monthlyQuotaTokenExpiresAt).toLocaleString()}（到期前会按需自动更新）
                             </div>
                           )}
                         </div>
@@ -2465,7 +2465,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   >
                     {monthlyQuotaLoading ? "正在读取月度额度配置..." : monthlyQuotaMessage}
                     <div className="text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
-                      Token 仅经系统安全存储加密后保存在本机。该会员统计接口未公开，Kimi 官方调整后可能暂时不可用。
+                      访问凭证副本经系统安全存储加密；专用网页会话会在本机保留 Kimi 登录数据，用于后台续期。清除 Token 会一并退出该专用会话。
                     </div>
                   </div>
                 </div>

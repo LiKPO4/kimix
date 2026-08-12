@@ -7281,14 +7281,16 @@ function writeKimiMonthlyQuotaCredential(token: string): void {
 }
 
 let kimiMonthlyQuotaAuthWindow: BrowserWindow | null = null;
+let kimiMonthlyQuotaAuthTask: Promise<void> | null = null;
+const KIMI_MONTHLY_QUOTA_PARTITION = "persist:kimix-monthly-quota-auth";
 
-async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
+async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolean; timeoutMs?: number } = {}): Promise<void> {
+  const interactive = options.interactive !== false;
   if (kimiMonthlyQuotaAuthWindow && !kimiMonthlyQuotaAuthWindow.isDestroyed()) {
-    activateWindow(kimiMonthlyQuotaAuthWindow);
-    throw new Error("Kimi 登录窗口已经打开，请在该窗口中完成登录。");
+    if (interactive) activateWindow(kimiMonthlyQuotaAuthWindow);
+    if (kimiMonthlyQuotaAuthTask) return kimiMonthlyQuotaAuthTask;
   }
-  const parent = getDialogParent();
-  const partition = `kimix-monthly-quota-auth-${randomUUID()}`;
+  const parent = interactive ? getDialogParent() : null;
   const authWindow = new BrowserWindow({
     width: 1080,
     height: 760,
@@ -7296,11 +7298,11 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     minHeight: 620,
     title: "登录 Kimi 以获取月度额度",
     parent: parent ?? undefined,
-    modal: Boolean(parent),
+    modal: interactive && Boolean(parent),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
-      partition,
+      partition: KIMI_MONTHLY_QUOTA_PARTITION,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -7309,23 +7311,21 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
   kimiMonthlyQuotaAuthWindow = authWindow;
   const authSession = authWindow.webContents.session;
 
-  await new Promise<void>((resolve, reject) => {
+  const authTask = new Promise<void>((resolve, reject) => {
     let settled = false;
     let capturing = false;
     let searching = false;
+    let pageReady = false;
     let cookiePollTimer: NodeJS.Timeout | null = null;
-    const clearTemporarySession = () => {
-      void authSession.clearStorageData().catch(() => {});
-      void authSession.clearCache().catch(() => {});
-    };
+    let authTimeoutTimer: NodeJS.Timeout | null = null;
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       if (cookiePollTimer) clearInterval(cookiePollTimer);
+      if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
       authSession.cookies.removeListener("changed", handleCookieChanged);
       if (kimiMonthlyQuotaAuthWindow === authWindow) kimiMonthlyQuotaAuthWindow = null;
       if (!authWindow.isDestroyed()) authWindow.close();
-      clearTemporarySession();
       if (error) reject(error);
       else resolve();
     };
@@ -7345,29 +7345,31 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     };
     const findTokenCredential = async () => {
       if (settled || capturing || searching) return;
+      if (!interactive && !pageReady) return;
       searching = true;
       try {
+        if (!authWindow.isDestroyed() && isAllowedKimiWebAuthUrl(authWindow.webContents.getURL())) {
+          const storageCandidates = await authWindow.webContents.executeJavaScript(`(() => {
+            try {
+              return Object.fromEntries(Object.entries(localStorage)
+                .filter(([, value]) => typeof value === "string" && value.startsWith("eyJ") && value.length <= 16384)
+                .slice(0, 32));
+            } catch {
+              return {};
+            }
+          })()`, true);
+          const storageToken = selectKimiWebTokenCandidate(storageCandidates);
+          if (storageToken) {
+            await captureToken(storageToken);
+            return;
+          }
+        }
         const cookies = await authSession.cookies.get({ name: "kimi-auth" });
         const cookie = cookies.find((item) => {
           const domain = (item.domain ?? "").replace(/^\./, "").toLowerCase();
           return domain === "kimi.com" || domain.endsWith(".kimi.com");
         });
-        if (cookie?.value) {
-          await captureToken(cookie.value);
-          return;
-        }
-        if (authWindow.isDestroyed() || !isAllowedKimiWebAuthUrl(authWindow.webContents.getURL())) return;
-        const storageCandidates = await authWindow.webContents.executeJavaScript(`(() => {
-          try {
-            return Object.fromEntries(Object.entries(localStorage)
-              .filter(([, value]) => typeof value === "string" && value.startsWith("eyJ") && value.length <= 16384)
-              .slice(0, 32));
-          } catch {
-            return [];
-          }
-        })()`, true);
-        const storageToken = selectKimiWebTokenCandidate(storageCandidates);
-        if (storageToken) await captureToken(storageToken);
+        if (cookie?.value) await captureToken(cookie.value);
       } catch {
         // 登录窗口仍在时继续等待下一次 Cookie、页面存储事件或轮询，不因一次读取失败中断流程。
       } finally {
@@ -7391,7 +7393,10 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     };
 
     authSession.cookies.on("changed", handleCookieChanged);
-    authWindow.webContents.on("did-finish-load", () => void findTokenCredential());
+    authWindow.webContents.on("did-finish-load", () => {
+      pageReady = true;
+      void findTokenCredential();
+    });
     cookiePollTimer = setInterval(() => void findTokenCredential(), 750);
     authWindow.webContents.on("will-navigate", keepKimiNavigationInside);
     authWindow.webContents.on("will-redirect", keepKimiNavigationInside);
@@ -7401,7 +7406,7 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
       return { action: "deny" };
     });
     authWindow.once("ready-to-show", () => {
-      if (!authWindow.isDestroyed()) authWindow.show();
+      if (interactive && !authWindow.isDestroyed()) authWindow.show();
     });
     authWindow.once("closed", () => {
       if (!settled) finish(new Error("已取消自动获取 Kimi 网页 Token。"));
@@ -7409,7 +7414,16 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     authWindow.loadURL(KIMI_WEB_AUTH_URL).catch((error) => {
       finish(new Error(`无法打开 Kimi 登录页面：${error instanceof Error ? error.message : String(error)}`));
     });
+    if (!interactive) {
+      authTimeoutTimer = setTimeout(() => finish(new Error("后台 Kimi 会话未能自动更新网页凭证。")), options.timeoutMs ?? 6_000);
+    }
   });
+  kimiMonthlyQuotaAuthTask = authTask;
+  try {
+    await authTask;
+  } finally {
+    if (kimiMonthlyQuotaAuthTask === authTask) kimiMonthlyQuotaAuthTask = null;
+  }
 }
 
 ipcMain.handle("kimi-code:getMonthlyQuota", async () => {
@@ -7417,7 +7431,15 @@ ipcMain.handle("kimi-code:getMonthlyQuota", async () => {
     if (!settingsService.loadSettings().kimiMonthlyQuotaEnabled) {
       return { success: true, data: null };
     }
-    const token = readKimiMonthlyQuotaCredential();
+    let token = readKimiMonthlyQuotaCredential();
+    if (token) {
+      try {
+        await acquireKimiMonthlyQuotaCredential({ interactive: false, timeoutMs: 6_000 });
+        token = readKimiMonthlyQuotaCredential();
+      } catch {
+        // 后台会话尚未建立或已失效时，仍允许当前未过期 access token 完成本次查询。
+      }
+    }
     return {
       success: true,
       data: await fetchKimiMonthlyQuota(token ?? "", { expectedUserId: lastKimiCodeUsageUserId }),
@@ -7461,7 +7483,7 @@ ipcMain.handle("kimi-code:saveMonthlyQuotaCredential", async (_, request: unknow
 
 ipcMain.handle("kimi-code:acquireMonthlyQuotaCredential", async () => {
   try {
-    await acquireKimiMonthlyQuotaCredential();
+    await acquireKimiMonthlyQuotaCredential({ interactive: true });
     return { success: true, data: undefined };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -7471,6 +7493,11 @@ ipcMain.handle("kimi-code:acquireMonthlyQuotaCredential", async () => {
 ipcMain.handle("kimi-code:clearMonthlyQuotaCredential", async () => {
   try {
     fs.rmSync(kimiMonthlyQuotaCredentialPath(), { force: true });
+    const quotaSession = session.fromPartition(KIMI_MONTHLY_QUOTA_PARTITION);
+    await Promise.all([
+      quotaSession.clearStorageData(),
+      quotaSession.clearCache(),
+    ]);
     return { success: true, data: undefined };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };

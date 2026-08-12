@@ -12,11 +12,11 @@ describe("月度额度设置自动获取入口", () => {
     expect(settingsSource).toContain("手动配置（备用）");
   });
 
-  it("自动获取只在主进程读取 Cookie，并使用非持久登录分区", () => {
+  it("自动获取只在主进程读取凭证，并使用可续期的专用登录分区", () => {
     expect(mainSource).toContain('ipcMain.handle("kimi-code:acquireMonthlyQuotaCredential"');
     expect(mainSource).toContain('authSession.cookies.get({ name: "kimi-auth" })');
-    expect(mainSource).toContain("kimix-monthly-quota-auth-${randomUUID()}");
-    expect(mainSource).not.toContain('partition: "persist:kimix-monthly-quota-auth"');
+    expect(mainSource).toContain('KIMI_MONTHLY_QUOTA_PARTITION = "persist:kimix-monthly-quota-auth"');
+    expect(mainSource).toContain("quotaSession.clearStorageData()");
   });
 
   it("从会产生额度凭证的 Kimi Code 控制台发起登录并持续等待 Cookie", () => {
@@ -30,5 +30,14 @@ describe("月度额度设置自动获取入口", () => {
     expect(mainSource).toContain("webContents.executeJavaScript");
     expect(mainSource).toContain("Object.entries(localStorage)");
     expect(mainSource).toContain("selectKimiWebTokenCandidate(storageCandidates)");
+  });
+
+  it("额度查询前用隐藏窗口刷新短期访问凭证", () => {
+    expect(mainSource).toContain('acquireKimiMonthlyQuotaCredential({ interactive: false, timeoutMs: 6_000 })');
+    expect(mainSource).toContain("if (token) {");
+    expect(mainSource).toContain("if (!interactive && !pageReady) return");
+    expect(mainSource).toContain("if (interactive && !authWindow.isDestroyed()) authWindow.show()");
+    expect(settingsSource).toContain("查询额度时 Kimix 会在后台自动刷新短期凭证");
+    expect(settingsSource).toContain("清除 Token 会一并退出该专用会话");
   });
 });
