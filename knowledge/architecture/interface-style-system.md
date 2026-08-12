@@ -4,10 +4,14 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-12T10:45:00+08:00"
+timestamp: "2026-08-12T20:07:49+08:00"
 ---
 
 # Interface Style System
+
+## Quiet resting-state hierarchy
+
+Imported UI Style documents may customize interaction feedback, but they do not own the default emphasis of ubiquitous secondary actions. During canonicalization, `navigationItem`, `navigationAction`, `control`, `toggle`, `menuTrigger`, `menuItem`, and `roomChoice` inherit their `resting` treatment from the selected built-in `basedOn` document. Imported radius and `hover`/`active`/`selected` treatments remain effective. `primaryAction` and `compoundControl` are excluded because primary operations and structural compound controls may intentionally keep a visible resting plate. This normalization also applies to already persisted custom documents, so a loud imported resting state cannot make every ordinary button compete with hover or selected state.
 
 Kimix treats color themes and interface styles as orthogonal systems. A color theme owns surface, text, accent, semantic, and border colors. An interface style owns shape and texture: radius, shadow, edge treatment, and role-specific control depth. Selecting an interface style must not replace or reinterpret the active color palette.
 

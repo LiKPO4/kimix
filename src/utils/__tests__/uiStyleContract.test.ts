@@ -112,6 +112,30 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(deliberatelyFlat?.roles.compoundControl?.resting.elevation).toBe("none");
   });
 
+  it("导入风格的普通按钮静止态继承内置基线，仅悬停与选中保留自定义强调", () => {
+    const input = documentFixture();
+    const loudResting = { surface: "elevated", border: "strong", elevation: "control" } as const;
+    const loudHover = { surface: "hover", border: "strong", elevation: "control" } as const;
+    const loudSelected = { surface: "active", border: "strong", elevation: "field" } as const;
+    for (const roleId of ["navigationItem", "navigationAction", "control", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+      input.roles[roleId] = {
+        radius: "pill",
+        resting: loudResting,
+        hover: loudHover,
+        selected: loudSelected,
+      };
+    }
+    input.roles.primaryAction = { radius: "pill", resting: loudResting, hover: loudHover };
+
+    const normalized = canonicalizeCustomUiStyleDocument(input);
+    for (const roleId of ["navigationItem", "navigationAction", "control", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+      expect(normalized?.roles[roleId]?.resting, roleId).toEqual(flatTreatment);
+      expect(normalized?.roles[roleId]?.hover, roleId).toEqual(loudHover);
+      expect(normalized?.roles[roleId]?.selected, roleId).toEqual(loudSelected);
+    }
+    expect(normalized?.roles.primaryAction?.resting).toEqual(loudResting);
+  });
+
   it("四套内置风格本身就是完整且合法的同版契约", () => {
     for (const document of Object.values(BUILTIN_UI_STYLE_DOCUMENTS)) {
       const result = parseUiStyleDocument(document);
@@ -136,7 +160,8 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("未写角色由 basedOn 自动继承");
     expect(prompt).toContain("Composer 内层 textarea 永远无边框");
     expect(prompt).toContain("顶部 compoundControl 默认也应使用同类 elevation");
-    expect(prompt).toContain("toggle 必须分别考虑 resting、hover、active、selected");
+    expect(prompt).toContain("普通交互角色");
+    expect(prompt).toContain("只在悬停或选中时醒目");
     expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要仅在悬停、聚焦或按下时显示此材质");
     expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
     expect(prompt).toContain("内容承载角色按语义硬限制在 20–32px");

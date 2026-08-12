@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 优化：导入风格普通按钮静止态保持克制（v2.21.49）
+
+- 现场：自定义导入风格把 Composer 的 Swarm、Plan、思考以及大量普通按钮在未悬停、未选中时也绘制成带背景、边框和浮雕的高强调控件，页面到处都是同等醒目的按钮，状态辨识度反而下降；内置风格只在 hover/selected 时强调。
+- 根因：UI Style v1 允许导入文档覆盖普通交互角色的 `resting`，固定 CSS 消费层会忠实应用该材质。AI 生成的 Windows/Y2K 文档为 `control`、`toggle` 等 resting 配置了完整 plate/elevation，Kimix 没有状态层级治理。
+- 修正：自定义风格规范化时，`navigationItem`、`navigationAction`、`control`、`toggle`、`menuTrigger`、`menuItem`、`roomChoice` 的 resting 强制继承 `basedOn` 内置基线；导入文档的 radius、hover、active、selected 仍保留。`primaryAction` 和 `compoundControl` 不受影响，真正主操作与结构性复合控件仍可常驻强调。
+- 兼容：治理发生在运行时 canonicalize，既有已导入 JSON 无需重导；下次加载即自动收敛。AI 提示同步明确普通按钮只在悬停或选中时醒目。
+- 回归：新增七类普通交互角色 loud resting 被基线替换、hover/selected 保留、primaryAction resting 不被改写的契约测试。
+
 ## 2026-08-12 优化：月度额度使用持久网页会话按需续期（v2.21.48）
 
 - 诉求：网页 access token 有效期很短，不应要求用户频繁重新登录；希望内置浏览器保持登录，在查询额度时后台获取新凭证。
