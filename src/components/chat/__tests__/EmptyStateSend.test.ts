@@ -17,6 +17,7 @@ function stubWindowApi(defaultModel: string) {
   (window as unknown as { api: Record<string, unknown> }).api = {
     getKimiModelConfig: async () => ({ success: true, data: { defaultModel } }),
     createKimiCodeSession: async () => ({ success: true, data: { sessionId: "runtime-1" } }),
+    swarmKimiCode: vi.fn(async () => ({ success: true, data: {} })),
   };
 }
 
@@ -89,5 +90,51 @@ describe("EmptyState 推荐发送的模型携带", () => {
     expect(vi.mocked(sendKimiCodePromptWithRetry).mock.calls[0][0]).toMatchObject({
       model: "deepseek-chat",
     });
+  });
+
+  it("其他会话后台运行时，当前新会话的快捷任务仍可发送", async () => {
+    useAppStore.setState({ runningSessionId: "another-runtime" });
+    act(() => {
+      root.render(createElement(EmptyState));
+    });
+
+    const button = Array.from(container.querySelectorAll("button")).find((item) =>
+      item.textContent?.includes("快速全面了解一下当前的项目"),
+    );
+    expect(button).toBeTruthy();
+    expect(button).toBeInstanceOf(HTMLButtonElement);
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    await clickFirstSuggestion(container);
+    expect(sendKimiCodePromptWithRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("快捷任务首次创建 runtime 后应用本地保存的 Swarm 意图", async () => {
+    const draftSession = {
+      id: "draft-1",
+      engine: "kimi-code" as const,
+      model: "kimi/k3",
+      title: "新会话",
+      projectPath: "/tmp/proj",
+      createdAt: 1,
+      updatedAt: 1,
+      events: [],
+      isLoading: false,
+      swarmModeDesired: true,
+    };
+    useSessionStore.setState({ sessions: [draftSession] });
+    useAppStore.setState({ currentSession: draftSession, runningSessionId: null });
+    act(() => {
+      root.render(createElement(EmptyState));
+    });
+    await clickFirstSuggestion(container);
+
+    expect(window.api.swarmKimiCode).toHaveBeenCalledWith({
+      sessionId: "runtime-1",
+      enabled: true,
+      trigger: "manual",
+    });
+    const updated = useSessionStore.getState().sessions[0];
+    expect(updated.swarmMode).toBe(true);
+    expect(updated.swarmModeDesired).toBeUndefined();
   });
 });

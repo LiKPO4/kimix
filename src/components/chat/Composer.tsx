@@ -724,7 +724,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   );
   const shouldShowStopButton = activeSession?.collaboration ? roomStopTargets.length > 0 : isCurrentSessionRunning;
   const canUseComposer = Boolean(currentSession || currentProject) && !isCurrentSessionHandoff && !roomReadOnly;
-  const canTogglePlanMode = canUseComposer && hasUniqueMutationOwner;
+  // 新会话尚未绑定 runtime/Agent 时，下一轮配置仍应可编辑；只有已存在但归属不唯一的
+  // Agent 房间需要锁定，避免把配置误写到错误成员。
+  const canConfigureNextTurn = canUseComposer && (!activeSession || hasUniqueMutationOwner);
+  const canTogglePlanMode = canConfigureNextTurn;
 
   useEffect(() => () => {
     writeComposerDraft(composerDraftKey, {
@@ -2434,6 +2437,40 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       }
       return true;
     }
+    if (!latestActiveSession || (owner && !owner.runtimeSessionId)) {
+      const localSession = latestActiveSession ?? await ensureSession();
+      if (!localSession) return false;
+      let localOwner: RoomMutationOwner;
+      try {
+        localOwner = resolveRoomMutationOwner(
+          localSession,
+          localSession.collaboration?.defaultRecipientIds,
+          permissionMode,
+        );
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: error instanceof Error ? error.message : String(error),
+        }));
+        return false;
+      }
+      updateSession(localSession.id, (session) => ({
+        ...updateRoomMutationOwner(session, localOwner.roomAgentId, (agent) => ({
+          ...agent,
+          swarmModeDesired: pendingSwarmModeValue(localOwner.sessionView, enabled),
+        }), permissionMode),
+        updatedAt: Date.now(),
+      }));
+      syncCurrentSessionFromStore(localSession.id);
+      void persistLocalConversationState();
+      const message = `Swarm 模式将在首次发消息时${enabled ? "开启" : "保持关闭"}。`;
+      if (feedback === "status") await appendStatusMessage(message, localOwner.roomAgentId);
+      else {
+        window.dispatchEvent(new CustomEvent("kimix:toast", {
+          detail: `${localOwner.displayName}：${message}`,
+        }));
+      }
+      return true;
+    }
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
     const res = await window.api.swarmKimiCode({
@@ -3983,6 +4020,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const handleSetPermissionMode = async (mode: PermissionMode) => {
     const traceId = genId();
     const owner = activeMutationOwner;
+    if (!activeSession) {
+      setShowPermissionMenu(false);
+      setPermissionMode(mode);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "权限模式将在首次发消息时生效。",
+      }));
+      return;
+    }
     if (!owner) {
       setShowPermissionMenu(false);
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
@@ -4091,8 +4136,16 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
 
   const handleTogglePlanMode = async () => {
     if (!canTogglePlanMode) return;
+    if (!activeSession) {
+      const next = !defaultPlanMode;
+      setDefaultPlanMode(next);
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: `Plan 模式已${next ? "开启" : "关闭"}，将在首次发消息时生效。`,
+      }));
+      return;
+    }
     const owner = activeMutationOwner;
-    if (!activeSession || !owner) {
+    if (!owner) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
       return;
     }
@@ -4925,7 +4978,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                         </div>
                         <button
                           type="button"
-                          disabled={!canUseComposer || !hasUniqueMutationOwner}
+                          disabled={!canConfigureNextTurn}
                           onClick={() => {
                             setShowAddMenu(false);
                             void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" });
@@ -4954,11 +5007,11 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
               style={{ flex: "0 0 116px", width: 116 }}
             >
               <button
-                disabled={!canUseComposer || !hasUniqueMutationOwner}
+                disabled={!canConfigureNextTurn}
                 onClick={() => setShowPermissionMenu((v) => !v)}
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{ width: "100%", maxWidth: "100%", height: 32, minHeight: 32, gap: 6, paddingLeft: 12, paddingRight: 12 }}
-                title={!hasUniqueMutationOwner
+                title={activeSession && !hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
                     ? `${activeMutationOwner?.displayName ?? "Agent"} 运行中切换将从下一轮生效`
@@ -5015,10 +5068,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
           </div>
 
           <div className="kimix-composer-toolbar-secondary flex shrink-0 items-center" style={{ gap: 4 }}>
-            {activeSession && (
+            {(activeSession || currentProject) && (
               <button
                 type="button"
-                disabled={!canUseComposer || !hasUniqueMutationOwner}
+                disabled={!canConfigureNextTurn}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
                 className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -5063,7 +5116,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             </button>
             <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
               <button
-                disabled={!canUseComposer || !hasUniqueMutationOwner}
+                disabled={!canConfigureNextTurn}
                 onClick={toggleThinkingMenu}
                 className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
                 style={{

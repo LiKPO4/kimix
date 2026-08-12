@@ -504,6 +504,19 @@ describe("UI_STYLES", () => {
   });
 });
 
+describe("Composer 新会话配置能力", () => {
+  it("未建立 runtime 时仍允许配置下一轮，Swarm 只保存本地意图", () => {
+    const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+
+    expect(composer).toContain("const canConfigureNextTurn = canUseComposer && (!activeSession || hasUniqueMutationOwner);");
+    expect(composer).toContain("{(activeSession || currentProject) && (");
+    expect(composer.match(/disabled=\{!canConfigureNextTurn\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(composer).toContain("Swarm 模式将在首次发消息时");
+    expect(composer).toContain("权限模式将在首次发消息时生效。");
+    expect(composer).toContain("将在首次发消息时生效。");
+  });
+});
+
 describe("applyUiStyle", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute(UI_STYLE_ATTRIBUTE);

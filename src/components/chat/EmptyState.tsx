@@ -161,6 +161,8 @@ export function EmptyState() {
       id: crypto.randomUUID(),
       engine: "kimi-code",
       model: pendingModel ?? await getDefaultKimiModel(),
+      permissionMode,
+      planMode: defaultPlanMode,
       title: "新会话",
       projectPath: project.path,
       createdAt: Date.now(),
@@ -179,12 +181,11 @@ export function EmptyState() {
     let optimisticEventIds: string[] = [];
     try {
       if (suggestionLockRef.current) return;
-      if (runningSessionId) return;
       suggestionLockRef.current = true;
       setPendingSuggestion(text);
 
       targetSession = await ensureSession();
-      if (!targetSession || useAppStore.getState().runningSessionId) return;
+      if (!targetSession) return;
 
       if (project) {
         const nextSaved = Array.from(new Set([text, ...savedSuggestions])).slice(0, 4);
@@ -270,6 +271,27 @@ export function EmptyState() {
         };
         setCurrentSession(targetSession);
         updateLinkStatus("消息发送中", "info");
+        if (targetSession.swarmModeDesired !== undefined) {
+          const desiredSwarmMode = targetSession.swarmModeDesired;
+          const swarmRes = await window.api.swarmKimiCode({
+            sessionId: runtimeSessionId,
+            enabled: desiredSwarmMode,
+            trigger: "manual",
+          });
+          if (!swarmRes.success) throw new Error(`应用 Swarm 模式失败：${swarmRes.error}`);
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            swarmMode: desiredSwarmMode,
+            swarmModeDesired: undefined,
+            updatedAt: Date.now(),
+          }));
+          targetSession = {
+            ...targetSession,
+            swarmMode: desiredSwarmMode,
+            swarmModeDesired: undefined,
+          };
+          setCurrentSession(targetSession);
+        }
       } else {
         updateLinkStatus("消息发送中", "info");
       }
@@ -337,7 +359,13 @@ export function EmptyState() {
   }
 
   const titleProjectName = displayProjectName(project, "当前项目");
-  const isSending = Boolean(runningSessionId || pendingSuggestion);
+  const isSending = Boolean(pendingSuggestion || (
+    currentSession && (
+      runningSessionId === currentSession.id ||
+      runningSessionId === currentSession.runtimeSessionId ||
+      runningSessionId === currentSession.officialSessionId
+    )
+  ));
 
   return (
     <div className="kimix-content-x flex h-full w-full items-center justify-center">
