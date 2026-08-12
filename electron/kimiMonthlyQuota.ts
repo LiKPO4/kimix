@@ -2,7 +2,7 @@ import type { KimiMonthlyQuotaInfo, UsagePeriod } from "./types/ipc";
 
 export const KIMI_MONTHLY_QUOTA_URL =
   "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStats";
-export const KIMI_WEB_AUTH_URL = "https://www.kimi.com/";
+export const KIMI_WEB_AUTH_URL = "https://www.kimi.com/code/console";
 
 type JwtPayload = {
   exp?: unknown;

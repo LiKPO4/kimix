@@ -18,4 +18,11 @@ describe("月度额度设置自动获取入口", () => {
     expect(mainSource).toContain("kimix-monthly-quota-auth-${randomUUID()}");
     expect(mainSource).not.toContain('partition: "persist:kimix-monthly-quota-auth"');
   });
+
+  it("从会产生额度凭证的 Kimi Code 控制台发起登录并持续等待 Cookie", () => {
+    const quotaSource = readFileSync(resolve(process.cwd(), "electron/kimiMonthlyQuota.ts"), "utf8");
+    expect(quotaSource).toContain('KIMI_WEB_AUTH_URL = "https://www.kimi.com/code/console"');
+    expect(mainSource).toContain("cookiePollTimer = setInterval(() => void findTokenCookie(), 750)");
+    expect(mainSource).toContain("if (cookiePollTimer) clearInterval(cookiePollTimer)");
+  });
 });

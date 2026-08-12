@@ -7312,6 +7312,7 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     let capturing = false;
+    let cookiePollTimer: NodeJS.Timeout | null = null;
     const clearTemporarySession = () => {
       void authSession.clearStorageData().catch(() => {});
       void authSession.clearCache().catch(() => {});
@@ -7319,6 +7320,7 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
+      if (cookiePollTimer) clearInterval(cookiePollTimer);
       authSession.cookies.removeListener("changed", handleCookieChanged);
       if (kimiMonthlyQuotaAuthWindow === authWindow) kimiMonthlyQuotaAuthWindow = null;
       if (!authWindow.isDestroyed()) authWindow.close();
@@ -7342,12 +7344,16 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
     };
     const findTokenCookie = async () => {
       if (settled || capturing) return;
-      const cookies = await authSession.cookies.get({ name: "kimi-auth" });
-      const cookie = cookies.find((item) => {
-        const domain = (item.domain ?? "").replace(/^\./, "").toLowerCase();
-        return domain === "kimi.com" || domain.endsWith(".kimi.com");
-      });
-      if (cookie?.value) await captureToken(cookie.value);
+      try {
+        const cookies = await authSession.cookies.get({ name: "kimi-auth" });
+        const cookie = cookies.find((item) => {
+          const domain = (item.domain ?? "").replace(/^\./, "").toLowerCase();
+          return domain === "kimi.com" || domain.endsWith(".kimi.com");
+        });
+        if (cookie?.value) await captureToken(cookie.value);
+      } catch {
+        // 登录窗口仍在时继续等待下一次 Cookie 事件或轮询，不因一次读取失败中断流程。
+      }
     };
     function handleCookieChanged(
       _event: Electron.Event,
@@ -7367,6 +7373,7 @@ async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
 
     authSession.cookies.on("changed", handleCookieChanged);
     authWindow.webContents.on("did-finish-load", () => void findTokenCookie());
+    cookiePollTimer = setInterval(() => void findTokenCookie(), 750);
     authWindow.webContents.on("will-navigate", keepKimiNavigationInside);
     authWindow.webContents.on("will-redirect", keepKimiNavigationInside);
     authWindow.webContents.setWindowOpenHandler(({ url }) => {
