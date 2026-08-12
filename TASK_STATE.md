@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：无差异提示可正常展开与收起（v2.21.39）
+
+- 现场：文件变更行点击预览后显示“未找到可确认属于本轮的差异”，但箭头仍朝右、操作仍显示“预览”，再次点击无法收起提示。
+- 根因：错误提示由 `previewErrors` 无条件渲染，而箭头、按钮文字和点击切换只把结构化 diff 或已加载 patch 视为展开内容；无差异分支未写入 `expandedDiffs`。
+- 修正：无差异与加载错误提示统一纳入文件预览展开状态；提示出现时箭头朝下、操作显示“收起”并暴露 `aria-expanded=true`，再次点击隐藏提示并恢复收起态。
+- 回归：`ChangeCard.test.ts` 新增 unavailable preview 的展开/收起闭环；全量 176 文件 / 1917 项、typecheck、knowledge validate 和生产构建通过。
+
 ## 2026-08-11 修复：单 Agent 残留态发送路径真正降级为普通会话（v2.21.32）
 
 - 现场：v2.21.31 的 hasMultipleRoomAgents 入口门禁让“单 Agent 残留态”（collaboration 存在但 active Agent 只剩 primary，如加过 Agent 又全部移出）改走普通发送路径，但该路径只写 session.events；projectCollaborationTimeline 在有 collaboration 时只从 collaboration.messages + agentEvents 投影、忽略 session.events，回流时 replaceRoomAgentEvents 又经 mirrorPrimaryAgentToLegacySession 用 agentEvents[primary] 整体替换 session.events，导致新发 userEvent 在聊天时间线不可见、回流后被覆盖丢失（临时 vitest 复现：发送后时间线无该事件，回流后 session.events 不含该事件）。

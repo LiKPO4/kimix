@@ -106,4 +106,54 @@ describe("ChangeCard", () => {
     expect(container.textContent).toContain("修改后");
     await act(async () => root.unmount());
   });
+
+  it("treats an unavailable preview message as an expanded and collapsible row", async () => {
+    const event: Extract<TimelineEvent, { type: "change_summary" }> = {
+      id: "change-unavailable",
+      type: "change_summary",
+      timestamp: 100,
+      projectPath: project.path,
+      files: [{ path: ".reasonix/desktop-topic-title-sources.json", additions: 4, deletions: 0 }],
+      additions: 4,
+      deletions: 0,
+    };
+    const session: Session = {
+      id: "session-unavailable",
+      engine: "kimi-code",
+      title: "test",
+      projectPath: project.path,
+      createdAt: 1,
+      updatedAt: 1,
+      events: [event],
+    };
+    useAppStore.setState({ currentProject: project, currentSession: session });
+    useSessionStore.setState({ sessions: [session] });
+    Object.defineProperty(window, "api", {
+      configurable: true,
+      value: {
+        getChangePreview: vi.fn().mockResolvedValue({
+          success: true,
+          data: { source: "unavailable", patch: "" },
+        }),
+      },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(createElement(ChangeCard, { event })));
+    const previewButton = () => Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "预览" || button.textContent?.trim() === "收起");
+    await act(async () => previewButton()?.click());
+
+    expect(container.textContent).toContain("未找到可确认属于本轮的差异。");
+    expect(previewButton()?.textContent?.trim()).toBe("收起");
+    expect(previewButton()?.getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => previewButton()?.click());
+    expect(container.textContent).not.toContain("未找到可确认属于本轮的差异。");
+    expect(previewButton()?.textContent?.trim()).toBe("预览");
+    expect(previewButton()?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => root.unmount());
+  });
 });

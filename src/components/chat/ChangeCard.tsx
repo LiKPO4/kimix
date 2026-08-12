@@ -344,7 +344,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
 
   const toggleFilePreview = async (file: ChangeRow, hasStructuredDiff: boolean) => {
     const key = normalizePath(file.path, projectPath);
-    if (hasStructuredDiff || loadedPreviews[key]) {
+    if (hasStructuredDiff || loadedPreviews[key] || previewErrors[key]) {
       setExpandedDiffs((state) => ({ ...state, [key]: !state[key] }));
       return;
     }
@@ -362,6 +362,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
       const preview = response.data;
       if (preview.source === "unavailable" || !preview.patch) {
         setPreviewErrors((state) => ({ ...state, [key]: "未找到可确认属于本轮的差异。" }));
+        setExpandedDiffs((state) => ({ ...state, [key]: true }));
         return;
       }
       const previewSource: "commit" | "workspace" = preview.source;
@@ -414,10 +415,12 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     const newText = change?.newText ?? diffEvent?.newText;
     const hasStructuredDiff = oldText !== undefined || newText !== undefined;
     const loadedPreview = loadedPreviews[key];
-    const diffExpanded = Boolean(expandedDiffs[key]) && (hasStructuredDiff || Boolean(loadedPreview));
+    const previewError = previewErrors[key];
+    const previewExpanded = Boolean(expandedDiffs[key]) && (
+      hasStructuredDiff || Boolean(loadedPreview) || Boolean(previewError)
+    );
     const diffLines = hasStructuredDiff ? buildLineDiff(oldText, newText) : [];
     const loading = Boolean(previewLoading[key]);
-    const previewError = previewErrors[key];
     return (
       <div key={file.path} className="border-b border-border-subtle last:border-b-0">
         <div
@@ -435,10 +438,11 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             className="kimix-muted-action flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors"
             style={{ gap: 8, padding: "6px 8px" }}
             title={`预览 ${file.path} 的本轮变更`}
+            aria-expanded={previewExpanded}
           >
             {loading
               ? <Loader2 size={14} className="shrink-0 animate-spin text-text-muted" />
-              : diffExpanded
+              : previewExpanded
                 ? <ChevronDown size={14} className="shrink-0 text-text-muted" />
                 : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
             <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">{formatPathForDisplay(file.path, projectPath)}</span>
@@ -455,10 +459,11 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
             disabled={loading}
+            aria-expanded={previewExpanded}
             className="kimix-muted-action justify-self-end rounded-md text-[12.5px] leading-5 text-text-muted transition-colors disabled:opacity-50"
             style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
           >
-            {loading ? "加载中" : diffExpanded ? "收起" : "预览"}
+            {loading ? "加载中" : previewExpanded ? "收起" : "预览"}
           </button>
           <button
             type="button"
@@ -472,7 +477,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             <RotateCcw size={13} />
           </button>
         </div>
-        {hasStructuredDiff && diffExpanded && (
+        {hasStructuredDiff && previewExpanded && (
           <div
             data-change-preview-surface="structured"
             className="grid border-t border-border-subtle bg-surface-elevated md:grid-cols-2"
@@ -491,7 +496,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             </div>
           </div>
         )}
-        {!hasStructuredDiff && loadedPreview && diffExpanded && (
+        {!hasStructuredDiff && loadedPreview && previewExpanded && (
           <div
             data-change-preview-surface="patch"
             className="border-t border-border-subtle bg-surface-elevated"
@@ -505,7 +510,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             </div>
           </div>
         )}
-        {previewError && (
+        {previewError && previewExpanded && (
           <div className="text-[12.5px] leading-5 text-text-muted" style={{ padding: "0 22px 12px 40px" }}>
             {previewError}
           </div>
