@@ -462,6 +462,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [monthlyQuotaStorageAvailable, setMonthlyQuotaStorageAvailable] = useState(true);
   const [monthlyQuotaLoading, setMonthlyQuotaLoading] = useState(true);
   const [monthlyQuotaSaving, setMonthlyQuotaSaving] = useState(false);
+  const [monthlyQuotaAcquiring, setMonthlyQuotaAcquiring] = useState(false);
   const [monthlyQuotaMessage, setMonthlyQuotaMessage] = useState("");
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
@@ -1105,6 +1106,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setMonthlyQuotaToken("");
     await refreshMonthlyQuotaSettings();
     window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
+  };
+
+  const acquireMonthlyQuotaToken = async () => {
+    setMonthlyQuotaAcquiring(true);
+    setMonthlyQuotaMessage("请在新窗口中登录 Kimi；识别到登录凭证后窗口会自动关闭。");
+    try {
+      const result = await window.api.acquireKimiMonthlyQuotaCredential();
+      if (!result.success) {
+        setMonthlyQuotaMessage(result.error);
+        return;
+      }
+      await refreshMonthlyQuotaSettings();
+      window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
+    } catch (error) {
+      setMonthlyQuotaMessage(`自动获取失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setMonthlyQuotaAcquiring(false);
+    }
   };
 
   const clearMonthlyQuotaToken = async () => {
@@ -2376,10 +2395,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <KeyRound size={16} className="mt-0.5 shrink-0 text-text-muted" />
                         <div className="min-w-0 flex-1">
                           <div className="text-[13.5px] font-medium text-[var(--kimix-panel-text)]">
-                            {monthlyQuotaConfigured ? "网页 Token 已配置" : "配置 Kimi 网页 Token"}
+                            {monthlyQuotaConfigured ? "网页 Token 已配置" : "登录 Kimi 自动获取"}
                           </div>
                           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
-                            登录 kimi.com 后，在开发者工具的 Application → Cookies 中复制 <code>kimi-auth</code> 的值；也可直接粘贴完整 <code>kimi-auth=...</code>。
+                            打开一次性 Kimi 登录窗口；登录成功后 Kimix 会自动读取凭证、加密保存并关闭窗口。
                           </div>
                           {monthlyQuotaTokenExpiresAt && (
                             <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
@@ -2388,11 +2407,27 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           )}
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => void acquireMonthlyQuotaToken()}
+                        disabled={monthlyQuotaSaving || monthlyQuotaAcquiring || !monthlyQuotaStorageAvailable}
+                        className="kimix-icon-text-button bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{ marginTop: 14 }}
+                      >
+                        {monthlyQuotaAcquiring ? <RefreshCw size={14} className="kimix-spin" /> : <LogIn size={14} />}
+                        <span>{monthlyQuotaAcquiring ? "等待登录" : monthlyQuotaConfigured ? "重新登录并自动更新" : "打开 Kimi 并自动获取"}</span>
+                      </button>
+                      <div className="text-[12px] font-medium leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 16 }}>
+                        手动配置（备用）
+                      </div>
+                      <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 6 }}>
+                        也可以从 kimi.com 的 <code>kimi-auth</code> Cookie 中复制值，或直接粘贴完整 <code>kimi-auth=...</code>。
+                      </div>
                       <input
                         type="password"
                         value={monthlyQuotaToken}
                         onChange={(event) => setMonthlyQuotaToken(event.target.value)}
-                        disabled={monthlyQuotaSaving || !monthlyQuotaStorageAvailable}
+                        disabled={monthlyQuotaSaving || monthlyQuotaAcquiring || !monthlyQuotaStorageAvailable}
                         placeholder={monthlyQuotaConfigured ? "粘贴新 Token 可覆盖现有配置" : "粘贴 kimi-auth Cookie 值或 JWT"}
                         autoComplete="off"
                         spellCheck={false}
@@ -2403,7 +2438,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <button
                           type="button"
                           onClick={() => void saveMonthlyQuotaToken()}
-                          disabled={monthlyQuotaSaving || !monthlyQuotaStorageAvailable || !monthlyQuotaToken.trim()}
+                          disabled={monthlyQuotaSaving || monthlyQuotaAcquiring || !monthlyQuotaStorageAvailable || !monthlyQuotaToken.trim()}
                           className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <KeyRound size={14} />
@@ -2413,7 +2448,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <button
                             type="button"
                             onClick={() => void clearMonthlyQuotaToken()}
-                            disabled={monthlyQuotaSaving}
+                            disabled={monthlyQuotaSaving || monthlyQuotaAcquiring}
                             className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:opacity-50"
                           >
                             <Trash2 size={14} />

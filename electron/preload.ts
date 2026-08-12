@@ -381,6 +381,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:getMonthlyQuotaCredentialStatus"),
   saveKimiMonthlyQuotaCredential: (req: SaveKimiMonthlyQuotaCredentialRequest): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi-code:saveMonthlyQuotaCredential", req),
+  acquireKimiMonthlyQuotaCredential: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("kimi-code:acquireMonthlyQuotaCredential"),
   clearKimiMonthlyQuotaCredential: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi-code:clearMonthlyQuotaCredential"),
   getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>

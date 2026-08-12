@@ -3,6 +3,7 @@ import {
   KIMI_MONTHLY_QUOTA_URL,
   fetchKimiMonthlyQuota,
   inspectKimiWebToken,
+  isAllowedKimiWebAuthUrl,
   normalizeKimiWebToken,
   parseKimiMonthlyQuotaPayload,
 } from "../kimiMonthlyQuota";
@@ -22,6 +23,13 @@ describe("Kimi 月度额度", () => {
     expect(normalizeKimiWebToken(`Bearer ${token}`)).toBe(token);
     expect(normalizeKimiWebToken(`other=1; kimi-auth=${encodeURIComponent(token)}; theme=light`)).toBe(token);
     expect(inspectKimiWebToken(token)).toMatchObject({ valid: true, subject: "user-1", expired: false });
+  });
+
+  it("临时登录窗口只允许 Kimi HTTPS 页面", () => {
+    expect(isAllowedKimiWebAuthUrl("https://www.kimi.com/")).toBe(true);
+    expect(isAllowedKimiWebAuthUrl("https://auth.kimi.com/callback")).toBe(true);
+    expect(isAllowedKimiWebAuthUrl("http://www.kimi.com/")).toBe(false);
+    expect(isAllowedKimiWebAuthUrl("https://kimi.com.example.test/")).toBe(false);
   });
 
   it("把月度与赠送额度占比归一为套餐小窗使用的周期", () => {

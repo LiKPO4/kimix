@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 优化：月度额度凭证支持登录后自动获取（v2.21.43）
+
+- 诉求：不再要求用户打开开发者工具手动寻找 `kimi-auth`，设置中提供一键进入可自动抓取凭证的登录流程。
+- 边界：系统浏览器 Cookie 对 Kimix 不可读，因此使用主进程创建的一次性内置 Kimi 登录窗口；窗口采用唯一非持久 partition，只允许 HTTPS kimi.com 及子域留在窗口中。
+- 实现：用户点击“打开 Kimi 并自动获取”后完成网页登录；主进程监听 `kimi-auth` Cookie，校验 JWT、写入 `safeStorage`，清空临时浏览器会话并自动关闭。关闭窗口视为取消，手动粘贴仍作为备用入口。
+- 回归：URL 白名单测试覆盖 Kimi 主域/子域、HTTP 和伪装域；全量 178 文件 / 1926 项测试、双 tsconfig typecheck、knowledge validate 和生产构建通过。
+
 ## 2026-08-12 功能：套餐小窗增加月度与赠送额度查询（v2.21.42）
 
 - 参考实现：`kimi-code-dashboard` 使用 kimi.com 网页 JWT 调用 MembershipService `GetSubscriptionStats`，与 Kimi Code Coding OAuth 属于不同认证域；返回 `subscriptionBalance` 与 `giftBalances` 的已用比例和到期时间。

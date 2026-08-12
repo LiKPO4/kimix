@@ -531,6 +531,7 @@ function installBrowserPreviewApi() {
       data: { configured: false, expired: false, storageAvailable: false },
     }),
     saveKimiMonthlyQuotaCredential: (): Promise<VoidResponse> => fail("保存 Kimi 网页 Token"),
+    acquireKimiMonthlyQuotaCredential: (): Promise<VoidResponse> => fail("自动获取 Kimi 网页 Token"),
     clearKimiMonthlyQuotaCredential: (): Promise<VoidResponse> => fail("清除 Kimi 网页 Token"),
     getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
       Promise.resolve({ success: true, data: null }),

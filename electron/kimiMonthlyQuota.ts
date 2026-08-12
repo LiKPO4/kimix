@@ -2,6 +2,7 @@ import type { KimiMonthlyQuotaInfo, UsagePeriod } from "./types/ipc";
 
 export const KIMI_MONTHLY_QUOTA_URL =
   "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStats";
+export const KIMI_WEB_AUTH_URL = "https://www.kimi.com/";
 
 type JwtPayload = {
   exp?: unknown;
@@ -54,6 +55,16 @@ export function normalizeKimiWebToken(value: string): string {
     return decodeURIComponent(cookieMatch[1]).trim();
   } catch {
     return cookieMatch[1].trim();
+  }
+}
+
+export function isAllowedKimiWebAuthUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (hostname === "kimi.com" || hostname.endsWith(".kimi.com"));
+  } catch {
+    return false;
   }
 }
 

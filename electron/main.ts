@@ -18,7 +18,7 @@ import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
-import { fetchKimiMonthlyQuota, inspectKimiWebToken, normalizeKimiWebToken } from "./kimiMonthlyQuota";
+import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KIMI_WEB_AUTH_URL, normalizeKimiWebToken } from "./kimiMonthlyQuota";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -7280,6 +7280,112 @@ function writeKimiMonthlyQuotaCredential(token: string): void {
   }
 }
 
+let kimiMonthlyQuotaAuthWindow: BrowserWindow | null = null;
+
+async function acquireKimiMonthlyQuotaCredential(): Promise<void> {
+  if (kimiMonthlyQuotaAuthWindow && !kimiMonthlyQuotaAuthWindow.isDestroyed()) {
+    activateWindow(kimiMonthlyQuotaAuthWindow);
+    throw new Error("Kimi 登录窗口已经打开，请在该窗口中完成登录。");
+  }
+  const parent = getDialogParent();
+  const partition = `kimix-monthly-quota-auth-${randomUUID()}`;
+  const authWindow = new BrowserWindow({
+    width: 1080,
+    height: 760,
+    minWidth: 860,
+    minHeight: 620,
+    title: "登录 Kimi 以获取月度额度",
+    parent: parent ?? undefined,
+    modal: Boolean(parent),
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      partition,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  kimiMonthlyQuotaAuthWindow = authWindow;
+  const authSession = authWindow.webContents.session;
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let capturing = false;
+    const clearTemporarySession = () => {
+      void authSession.clearStorageData().catch(() => {});
+      void authSession.clearCache().catch(() => {});
+    };
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      authSession.cookies.removeListener("changed", handleCookieChanged);
+      if (kimiMonthlyQuotaAuthWindow === authWindow) kimiMonthlyQuotaAuthWindow = null;
+      if (!authWindow.isDestroyed()) authWindow.close();
+      clearTemporarySession();
+      if (error) reject(error);
+      else resolve();
+    };
+    const captureToken = async (value: string) => {
+      if (settled || capturing) return;
+      capturing = true;
+      try {
+        const token = normalizeKimiWebToken(value);
+        const tokenInfo = inspectKimiWebToken(token);
+        if (!tokenInfo.valid) throw new Error("Kimi 登录成功，但获取到的网页 Token 格式无效。");
+        if (tokenInfo.expired) throw new Error("Kimi 登录成功，但获取到的网页 Token 已过期。");
+        writeKimiMonthlyQuotaCredential(token);
+        finish();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    const findTokenCookie = async () => {
+      if (settled || capturing) return;
+      const cookies = await authSession.cookies.get({ name: "kimi-auth" });
+      const cookie = cookies.find((item) => {
+        const domain = (item.domain ?? "").replace(/^\./, "").toLowerCase();
+        return domain === "kimi.com" || domain.endsWith(".kimi.com");
+      });
+      if (cookie?.value) await captureToken(cookie.value);
+    };
+    function handleCookieChanged(
+      _event: Electron.Event,
+      cookie: Electron.Cookie,
+      _cause: string,
+      removed: boolean,
+    ) {
+      if (removed || cookie.name !== "kimi-auth") return;
+      const domain = (cookie.domain ?? "").replace(/^\./, "").toLowerCase();
+      if (domain === "kimi.com" || domain.endsWith(".kimi.com")) void captureToken(cookie.value);
+    }
+    const keepKimiNavigationInside = (event: Electron.Event, url: string) => {
+      if (isAllowedKimiWebAuthUrl(url)) return;
+      event.preventDefault();
+      if (/^https?:/i.test(url)) void shell.openExternal(url).catch(() => {});
+    };
+
+    authSession.cookies.on("changed", handleCookieChanged);
+    authWindow.webContents.on("did-finish-load", () => void findTokenCookie());
+    authWindow.webContents.on("will-navigate", keepKimiNavigationInside);
+    authWindow.webContents.on("will-redirect", keepKimiNavigationInside);
+    authWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (isAllowedKimiWebAuthUrl(url)) void authWindow.loadURL(url);
+      else if (/^https?:/i.test(url)) void shell.openExternal(url).catch(() => {});
+      return { action: "deny" };
+    });
+    authWindow.once("ready-to-show", () => {
+      if (!authWindow.isDestroyed()) authWindow.show();
+    });
+    authWindow.once("closed", () => {
+      if (!settled) finish(new Error("已取消自动获取 Kimi 网页 Token。"));
+    });
+    authWindow.loadURL(KIMI_WEB_AUTH_URL).catch((error) => {
+      finish(new Error(`无法打开 Kimi 登录页面：${error instanceof Error ? error.message : String(error)}`));
+    });
+  });
+}
+
 ipcMain.handle("kimi-code:getMonthlyQuota", async () => {
   try {
     if (!settingsService.loadSettings().kimiMonthlyQuotaEnabled) {
@@ -7321,6 +7427,15 @@ ipcMain.handle("kimi-code:saveMonthlyQuotaCredential", async (_, request: unknow
     if (!tokenInfo.valid) throw new Error("Token 格式无效，请粘贴 kimi-auth Cookie 值或网页登录 JWT。");
     if (tokenInfo.expired) throw new Error("Token 已过期，请从 kimi.com 重新获取。");
     writeKimiMonthlyQuotaCredential(token);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("kimi-code:acquireMonthlyQuotaCredential", async () => {
+  try {
+    await acquireKimiMonthlyQuotaCredential();
     return { success: true, data: undefined };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
