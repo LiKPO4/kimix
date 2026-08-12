@@ -2,7 +2,7 @@ import type { KimiMonthlyQuotaInfo, UsagePeriod } from "./types/ipc";
 
 export const KIMI_MONTHLY_QUOTA_URL =
   "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStats";
-export const KIMI_WEB_AUTH_URL = "https://www.kimi.com/code/console";
+export const KIMI_WEB_QUOTA_URL = "https://www.kimi.com/membership/subscription?tab=quota";
 
 type JwtPayload = {
   app_id?: unknown;
@@ -157,7 +157,7 @@ export async function fetchKimiMonthlyQuota(
     return { ...base, available: false, message: "网页登录 Token 格式无效，请重新配置。" };
   }
   if (tokenInfo.expired) {
-    return { ...base, available: false, message: "网页登录 Token 已过期，请重新配置。" };
+    return { ...base, available: false, credentialRejected: true, message: "网页登录 Token 已过期，请重新配置。" };
   }
   if (options.expectedUserId && tokenInfo.subject && tokenInfo.subject !== options.expectedUserId) {
     return { ...base, available: false, accountMismatch: true, message: "网页 Token 与当前 Kimi Code 登录账号不一致。" };
@@ -168,20 +168,8 @@ export async function fetchKimiMonthlyQuota(
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        Cookie: `kimi-auth=${token}`,
         "Content-Type": "application/json",
-        Origin: "https://www.kimi.com",
-        Referer: KIMI_WEB_AUTH_URL,
-        Accept: "*/*",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
         "connect-protocol-version": "1",
-        "x-language": "zh-CN",
-        "x-msh-platform": "web",
-        "r-timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
-        ...(tokenInfo.deviceId ? { "x-msh-device-id": tokenInfo.deviceId } : {}),
-        ...(tokenInfo.sessionId ? { "x-msh-session-id": tokenInfo.sessionId } : {}),
-        ...(tokenInfo.subject ? { "x-traffic-id": tokenInfo.subject } : {}),
       },
       body: "{}",
       signal: AbortSignal.timeout(options.timeoutMs ?? 8_000),
@@ -190,13 +178,14 @@ export async function fetchKimiMonthlyQuota(
       const message = response.status === 401
         ? "Kimi 会员接口拒绝了当前网页登录凭证（HTTP 401），请重新自动获取。"
         : `月度额度查询失败（HTTP ${response.status}）。`;
-      return { ...base, available: false, message };
+      return { ...base, available: false, credentialRejected: response.status === 401, message };
     }
     const parsed = parseKimiMonthlyQuotaPayload(await response.json());
     const available = Boolean(parsed.subscription?.available || parsed.gifts.some((gift) => gift.available));
     return {
       ...base,
       ...parsed,
+      credentialAccepted: true,
       available,
       message: available ? undefined : "会员统计接口未返回可展示的月度额度。",
     };

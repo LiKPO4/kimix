@@ -305,7 +305,7 @@ function MonthlyQuotaSection({
       )}
       {quota?.tokenExpiresAt && (
         <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 10 }}>
-          网页 Token 将于 {new Date(quota.tokenExpiresAt).toLocaleDateString()} 到期
+          网页 Token 的 JWT 声明到期日：{new Date(quota.tokenExpiresAt).toLocaleDateString()}
         </div>
       )}
     </section>

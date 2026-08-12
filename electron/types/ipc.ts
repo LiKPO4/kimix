@@ -1116,6 +1116,10 @@ export type KimiMonthlyQuotaInfo = {
   enabled: true;
   configured: boolean;
   available: boolean;
+  /** 会员接口已接受该凭证；区别于仅通过本地 JWT exp 检查。 */
+  credentialAccepted?: boolean;
+  /** 会员接口明确以 401 拒绝，允许主进程触发持久网页会话续期。 */
+  credentialRejected?: boolean;
   tokenExpiresAt?: number;
   accountMismatch?: boolean;
   subscription?: UsagePeriod;

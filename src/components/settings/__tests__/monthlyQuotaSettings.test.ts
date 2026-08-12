@@ -21,9 +21,11 @@ describe("月度额度设置自动获取入口", () => {
 
   it("从会产生额度凭证的 Kimi Code 控制台发起登录并持续等待 Cookie", () => {
     const quotaSource = readFileSync(resolve(process.cwd(), "electron/kimiMonthlyQuota.ts"), "utf8");
-    expect(quotaSource).toContain('KIMI_WEB_AUTH_URL = "https://www.kimi.com/code/console"');
+    expect(quotaSource).toContain('KIMI_WEB_QUOTA_URL = "https://www.kimi.com/membership/subscription?tab=quota"');
     expect(mainSource).toContain("cookiePollTimer = setInterval(() => void findTokenCredential(), 750)");
     expect(mainSource).toContain("if (cookiePollTimer) clearInterval(cookiePollTimer)");
+    expect(mainSource).toContain("authSession.webRequest.onBeforeSendHeaders");
+    expect(mainSource).toContain('urls: ["https://www.kimi.com/apiv2/*"]');
   });
 
   it("Cookie 缺失时从 Kimi 页面 localStorage 捕获有效 JWT", () => {
@@ -33,8 +35,9 @@ describe("月度额度设置自动获取入口", () => {
   });
 
   it("额度查询前用隐藏窗口刷新短期访问凭证", () => {
-    expect(mainSource).toContain('acquireKimiMonthlyQuotaCredential({ interactive: false, timeoutMs: 6_000 })');
-    expect(mainSource).toContain("if (token) {");
+    expect(mainSource).toContain("timeoutMs: 12_000");
+    expect(mainSource).toContain("if (quota.credentialRejected || !token)");
+    expect(mainSource).toContain("if (!verified.credentialAccepted)");
     expect(mainSource).toContain("if (!interactive && !pageReady) return");
     expect(mainSource).toContain("if (interactive && !authWindow.isDestroyed()) authWindow.show()");
     expect(settingsSource).toContain("查询额度时 Kimix 会在后台自动刷新短期凭证");

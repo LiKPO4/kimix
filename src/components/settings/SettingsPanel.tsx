@@ -2402,7 +2402,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </div>
                           {monthlyQuotaTokenExpiresAt && (
                             <div className="kimix-tabular-nums text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
-                              当前访问凭证到期：{new Date(monthlyQuotaTokenExpiresAt).toLocaleString()}（到期前会按需自动更新）
+                              JWT 声明到期：{new Date(monthlyQuotaTokenExpiresAt).toLocaleString()}（实际有效性以会员接口验真；失效时按需自动更新）
                             </div>
                           )}
                         </div>
@@ -2465,7 +2465,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   >
                     {monthlyQuotaLoading ? "正在读取月度额度配置..." : monthlyQuotaMessage}
                     <div className="text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
-                      访问凭证副本经系统安全存储加密；专用网页会话会在本机保留 Kimi 登录数据，用于后台续期。清除 Token 会一并退出该专用会话。
+                      访问凭证副本经系统安全存储加密；专用网页会话会在本机保留 Kimi 登录数据，并从额度页实际请求中获取、验真和续期凭证。清除 Token 会一并退出该专用会话。
                     </div>
                   </div>
                 </div>

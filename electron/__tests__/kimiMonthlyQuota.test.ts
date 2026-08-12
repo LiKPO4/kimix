@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   KIMI_MONTHLY_QUOTA_URL,
+  KIMI_WEB_QUOTA_URL,
   fetchKimiMonthlyQuota,
   inspectKimiWebToken,
   isAllowedKimiWebAuthUrl,
@@ -27,6 +28,7 @@ describe("Kimi 月度额度", () => {
   });
 
   it("临时登录窗口只允许 Kimi HTTPS 页面", () => {
+    expect(KIMI_WEB_QUOTA_URL).toBe("https://www.kimi.com/membership/subscription?tab=quota");
     expect(isAllowedKimiWebAuthUrl("https://www.kimi.com/")).toBe(true);
     expect(isAllowedKimiWebAuthUrl("https://auth.kimi.com/callback")).toBe(true);
     expect(isAllowedKimiWebAuthUrl("http://www.kimi.com/")).toBe(false);
@@ -76,29 +78,29 @@ describe("Kimi 月度额度", () => {
     const token = jwt({ device_id: "device-1", ssid: "session-1", sub: "user-1", exp: 4_102_444_800 });
     const result = await fetchKimiMonthlyQuota(token);
     expect(result).toMatchObject({ available: true, subscription: { percent: 42 } });
+    expect(result).toMatchObject({ credentialAccepted: true });
+    expect(result.credentialRejected).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(KIMI_MONTHLY_QUOTA_URL, expect.objectContaining({
       method: "POST",
       body: "{}",
       headers: expect.objectContaining({
         Authorization: `Bearer ${token}`,
-        Cookie: `kimi-auth=${token}`,
-        Origin: "https://www.kimi.com",
-        Referer: "https://www.kimi.com/code/console",
-        "User-Agent": expect.stringContaining("Mozilla/5.0"),
         "connect-protocol-version": "1",
-        "x-language": "zh-CN",
-        "x-msh-platform": "web",
-        "x-msh-device-id": "device-1",
-        "x-msh-session-id": "session-1",
-        "x-traffic-id": "user-1",
       }),
     }));
+    const request = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1];
+    expect(request.headers).toEqual({
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "connect-protocol-version": "1",
+    });
   });
 
   it("有效期尚未到时把 401 识别为接口拒绝而不是已过期", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
     const result = await fetchKimiMonthlyQuota(jwt({ app_id: "kimi", sub: "user-1", exp: 4_102_444_800 }));
+    expect(result).toMatchObject({ credentialRejected: true });
     expect(result.message).toContain("接口拒绝");
     expect(result.message).not.toContain("已过期");
   });

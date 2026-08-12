@@ -18,7 +18,7 @@ import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
-import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KIMI_WEB_AUTH_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
+import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KIMI_WEB_QUOTA_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -7307,7 +7307,7 @@ let kimiMonthlyQuotaAuthWindow: BrowserWindow | null = null;
 let kimiMonthlyQuotaAuthTask: Promise<void> | null = null;
 const KIMI_MONTHLY_QUOTA_PARTITION = "persist:kimix-monthly-quota-auth";
 
-async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolean; timeoutMs?: number } = {}): Promise<void> {
+async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolean; timeoutMs?: number; expectedUserId?: string } = {}): Promise<void> {
   const interactive = options.interactive !== false;
   if (kimiMonthlyQuotaAuthWindow && !kimiMonthlyQuotaAuthWindow.isDestroyed()) {
     if (interactive) activateWindow(kimiMonthlyQuotaAuthWindow);
@@ -7339,6 +7339,7 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
     let capturing = false;
     let searching = false;
     let pageReady = false;
+    const rejectedTokens = new Set<string>();
     let cookiePollTimer: NodeJS.Timeout | null = null;
     let authTimeoutTimer: NodeJS.Timeout | null = null;
     const finish = (error?: Error) => {
@@ -7347,23 +7348,38 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
       if (cookiePollTimer) clearInterval(cookiePollTimer);
       if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
       authSession.cookies.removeListener("changed", handleCookieChanged);
+      authSession.webRequest.onBeforeSendHeaders(null);
       if (kimiMonthlyQuotaAuthWindow === authWindow) kimiMonthlyQuotaAuthWindow = null;
       if (!authWindow.isDestroyed()) authWindow.close();
       if (error) reject(error);
       else resolve();
     };
-    const captureToken = async (value: string) => {
-      if (settled || capturing) return;
+    const captureToken = async (value: string): Promise<boolean> => {
+      if (settled || capturing) return false;
       capturing = true;
       try {
         const token = normalizeKimiWebToken(value);
+        if (rejectedTokens.has(token)) return false;
         const tokenInfo = inspectKimiWebToken(token);
         if (!tokenInfo.valid) throw new Error("Kimi 登录成功，但获取到的网页 Token 格式无效。");
-        if (tokenInfo.expired) throw new Error("Kimi 登录成功，但获取到的网页 Token 已过期。");
+        if (tokenInfo.expired) {
+          rejectedTokens.add(token);
+          return false;
+        }
+        const verified = await fetchKimiMonthlyQuota(token, { expectedUserId: options.expectedUserId });
+        if (verified.accountMismatch) throw new Error(verified.message ?? "网页账号与 Kimi Code 登录账号不一致。");
+        if (!verified.credentialAccepted) {
+          if (verified.credentialRejected) rejectedTokens.add(token);
+          return false;
+        }
         writeKimiMonthlyQuotaCredential(token);
         finish();
+        return true;
       } catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)));
+        return false;
+      } finally {
+        capturing = false;
       }
     };
     const findTokenCredential = async () => {
@@ -7383,8 +7399,7 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
           })()`, true);
           const storageToken = selectKimiWebTokenCandidate(storageCandidates);
           if (storageToken) {
-            await captureToken(storageToken);
-            return;
+            if (await captureToken(storageToken)) return;
           }
         }
         const cookies = await authSession.cookies.get({ name: "kimi-auth" });
@@ -7409,6 +7424,20 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
       const domain = (cookie.domain ?? "").replace(/^\./, "").toLowerCase();
       if (domain === "kimi.com" || domain.endsWith(".kimi.com")) void captureToken(cookie.value);
     }
+    const handleKimiRequestHeaders = (
+      details: Electron.OnBeforeSendHeadersListenerDetails,
+      callback: (beforeSendResponse: Electron.BeforeSendResponse) => void,
+    ) => {
+      const requestHeaders = details.requestHeaders;
+      callback({ requestHeaders });
+      const authorizationEntry = Object.entries(requestHeaders).find(([name]) => name.toLowerCase() === "authorization");
+      const authorization = Array.isArray(authorizationEntry?.[1])
+        ? authorizationEntry[1][0]
+        : authorizationEntry?.[1];
+      if (typeof authorization === "string" && /^Bearer\s+/i.test(authorization)) {
+        void captureToken(authorization);
+      }
+    };
     const keepKimiNavigationInside = (event: Electron.Event, url: string) => {
       if (isAllowedKimiWebAuthUrl(url)) return;
       event.preventDefault();
@@ -7416,6 +7445,12 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
     };
 
     authSession.cookies.on("changed", handleCookieChanged);
+    // 会员额度页真正发出的请求头是最可信的网页 access token 来源；localStorage/Cookie
+    // 仅作兼容兜底。使用独立持久分区，因此不会截获 Kimix 主窗口或 Kimi Code 流量。
+    authSession.webRequest.onBeforeSendHeaders(
+      { urls: ["https://www.kimi.com/apiv2/*"] },
+      handleKimiRequestHeaders,
+    );
     authWindow.webContents.on("did-finish-load", () => {
       pageReady = true;
       void findTokenCredential();
@@ -7434,7 +7469,7 @@ async function acquireKimiMonthlyQuotaCredential(options: { interactive?: boolea
     authWindow.once("closed", () => {
       if (!settled) finish(new Error("已取消自动获取 Kimi 网页 Token。"));
     });
-    authWindow.loadURL(KIMI_WEB_AUTH_URL).catch((error) => {
+    authWindow.loadURL(KIMI_WEB_QUOTA_URL).catch((error) => {
       finish(new Error(`无法打开 Kimi 登录页面：${error instanceof Error ? error.message : String(error)}`));
     });
     if (!interactive) {
@@ -7455,17 +7490,23 @@ ipcMain.handle("kimi-code:getMonthlyQuota", async () => {
       return { success: true, data: null };
     }
     let token = readKimiMonthlyQuotaCredential();
-    if (token) {
+    let quota = await fetchKimiMonthlyQuota(token ?? "", { expectedUserId: lastKimiCodeUsageUserId });
+    if (quota.credentialRejected || !token) {
       try {
-        await acquireKimiMonthlyQuotaCredential({ interactive: false, timeoutMs: 6_000 });
+        await acquireKimiMonthlyQuotaCredential({
+          interactive: false,
+          timeoutMs: 12_000,
+          expectedUserId: lastKimiCodeUsageUserId,
+        });
         token = readKimiMonthlyQuotaCredential();
+        quota = await fetchKimiMonthlyQuota(token ?? "", { expectedUserId: lastKimiCodeUsageUserId });
       } catch {
-        // 后台会话尚未建立或已失效时，仍允许当前未过期 access token 完成本次查询。
+        // 持久网页会话也已失效时保留原始错误，由 UI 引导用户重新登录。
       }
     }
     return {
       success: true,
-      data: await fetchKimiMonthlyQuota(token ?? "", { expectedUserId: lastKimiCodeUsageUserId }),
+      data: quota,
     };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -7497,6 +7538,8 @@ ipcMain.handle("kimi-code:saveMonthlyQuotaCredential", async (_, request: unknow
     const tokenInfo = inspectKimiWebToken(token);
     if (!tokenInfo.valid) throw new Error("Token 格式无效，请粘贴 kimi-auth Cookie 值或网页登录 JWT。");
     if (tokenInfo.expired) throw new Error("Token 已过期，请从 kimi.com 重新获取。");
+    const verified = await fetchKimiMonthlyQuota(token, { expectedUserId: lastKimiCodeUsageUserId });
+    if (!verified.credentialAccepted) throw new Error(verified.message ?? "Kimi 会员接口未接受该网页 Token。");
     writeKimiMonthlyQuotaCredential(token);
     return { success: true, data: undefined };
   } catch (error) {
