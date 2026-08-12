@@ -91,7 +91,7 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(parseUiStyleDocument(unknownRole).success).toBe(false);
   });
 
-  it("完整复合按钮遗漏 elevation 时继承普通控件材质，但透明扁平按钮保持 none", () => {
+  it("复合按钮静止态保持基线克制，悬停遗漏 elevation 时继承普通控件材质", () => {
     const input = documentFixture();
     input.roles.control = {
       radius: "medium",
@@ -104,7 +104,7 @@ describe("uiStyleDocumentV1Schema", () => {
       hover: { surface: "hover", border: "default", elevation: "none" },
     };
     const harmonized = canonicalizeCustomUiStyleDocument(input);
-    expect(harmonized?.roles.compoundControl?.resting.elevation).toBe("control");
+    expect(harmonized?.roles.compoundControl?.resting).toEqual(flatTreatment);
     expect(harmonized?.roles.compoundControl?.hover?.elevation).toBe("control");
 
     input.roles.compoundControl.resting = { surface: "transparent", border: "none", elevation: "none" };
@@ -112,12 +112,27 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(deliberatelyFlat?.roles.compoundControl?.resting.elevation).toBe("none");
   });
 
+  it("基于怀旧风格导入时，复合按钮静止态继承普通控件而非内置浮雕复合板", () => {
+    const input = documentFixture();
+    input.basedOn = "nostalgia";
+    input.roles.compoundControl = {
+      radius: "pill",
+      resting: { surface: "elevated", border: "strong", elevation: "control" },
+      hover: { surface: "hover", border: "strong", elevation: "control" },
+    };
+
+    const normalized = canonicalizeCustomUiStyleDocument(input);
+    expect(normalized?.roles.compoundControl?.resting).toEqual(flatTreatment);
+    expect(normalized?.roles.compoundControl?.radius).toBe("pill");
+    expect(normalized?.roles.compoundControl?.hover).toEqual(input.roles.compoundControl.hover);
+  });
+
   it("导入风格的普通按钮静止态继承内置基线，仅悬停与选中保留自定义强调", () => {
     const input = documentFixture();
     const loudResting = { surface: "elevated", border: "strong", elevation: "control" } as const;
     const loudHover = { surface: "hover", border: "strong", elevation: "control" } as const;
     const loudSelected = { surface: "active", border: "strong", elevation: "field" } as const;
-    for (const roleId of ["navigationItem", "navigationAction", "control", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+    for (const roleId of ["navigationItem", "navigationAction", "control", "compoundControl", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
       input.roles[roleId] = {
         radius: "pill",
         resting: loudResting,
@@ -128,7 +143,7 @@ describe("uiStyleDocumentV1Schema", () => {
     input.roles.primaryAction = { radius: "pill", resting: loudResting, hover: loudHover };
 
     const normalized = canonicalizeCustomUiStyleDocument(input);
-    for (const roleId of ["navigationItem", "navigationAction", "control", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+    for (const roleId of ["navigationItem", "navigationAction", "control", "compoundControl", "toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
       expect(normalized?.roles[roleId]?.resting, roleId).toEqual(flatTreatment);
       expect(normalized?.roles[roleId]?.hover, roleId).toEqual(loudHover);
       expect(normalized?.roles[roleId]?.selected, roleId).toEqual(loudSelected);
@@ -159,9 +174,9 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("只有当当前环境确实没有文件写入能力时");
     expect(prompt).toContain("未写角色由 basedOn 自动继承");
     expect(prompt).toContain("Composer 内层 textarea 永远无边框");
-    expect(prompt).toContain("顶部 compoundControl 默认也应使用同类 elevation");
+    expect(prompt).toContain("顶部 compoundControl 的 resting");
     expect(prompt).toContain("普通交互角色");
-    expect(prompt).toContain("只在悬停或选中时醒目");
+    expect(prompt).toContain("只在悬停、展开或选中时醒目");
     expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要仅在悬停、聚焦或按下时显示此材质");
     expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
     expect(prompt).toContain("内容承载角色按语义硬限制在 20–32px");

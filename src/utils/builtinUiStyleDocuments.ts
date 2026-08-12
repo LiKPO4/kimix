@@ -186,6 +186,7 @@ const QUIET_RESTING_ROLE_IDS = [
   "navigationItem",
   "navigationAction",
   "control",
+  "compoundControl",
   "toggle",
   "menuTrigger",
   "menuItem",
@@ -198,9 +199,12 @@ function harmonizeQuietActionResting(
 ): Record<UiStyleRoleId, UiStyleRole> {
   const normalized = { ...roles };
   for (const roleId of QUIET_RESTING_ROLE_IDS) {
+    const baseResting = roleId === "compoundControl"
+      ? baseRoles.control.resting
+      : baseRoles[roleId].resting;
     normalized[roleId] = {
       ...roles[roleId],
-      resting: { ...baseRoles[roleId].resting },
+      resting: { ...baseResting },
     };
   }
   return normalized;
@@ -257,8 +261,8 @@ export function buildUiStyleAiPrompt() {
     "7. 角色触点目录：",
     ...UI_STYLE_ROLE_IDS.map((roleId) => `- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`),
     "8. Composer 内层 textarea 永远无边框、无背景、无阴影；输入区质感只能配置 composer 外壳，禁止试图通过 field 制造第二层边界。",
-    "9. 如果普通 control 使用 raised/floating 材质，顶部 compoundControl 默认也应使用同类 elevation；只有参考图明确把分段按钮设计为扁平时才设为 none。",
-    "10. 普通交互角色（navigationItem/navigationAction/control/toggle/menuTrigger/menuItem/roomChoice）的 resting 由 basedOn 保持克制，导入时会自动忽略这些角色自定义的高强调 resting；请重点设计 hover、active、selected，确保 Swarm/Plan 等按钮只在悬停或选中时醒目。",
+    "9. 顶部 compoundControl 的 resting 与普通次级按钮一样保持克制；hover/active 若使用 raised/floating 材质，应与普通 control 的交互层次一致。",
+    "10. 普通交互角色（navigationItem/navigationAction/control/compoundControl/toggle/menuTrigger/menuItem/roomChoice）的 resting 由 basedOn 保持克制，导入时会自动忽略这些角色自定义的高强调 resting；请重点设计 hover、active、selected，确保顶部启动/打开、Swarm/Plan 等按钮只在悬停、展开或选中时醒目。",
     "11. radius 引用只能是 small、medium、large、card、panel、shell、pill。pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface 等紧凑单行控件；正文气泡、模态框、Composer、卡片、弹层和侧栏禁止使用 pill。Kimix 还会把内容承载角色按语义硬限制在 20–32px，避免文字侵入圆角。",
     "12. surface 只能是 transparent、ground、base、elevated、hover、active。",
     "13. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",
