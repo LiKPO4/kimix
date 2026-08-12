@@ -151,6 +151,41 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(normalized?.roles.primaryAction?.resting).toEqual(loudResting);
   });
 
+  it("开启与菜单选中态继承复古基线深度，且保留导入的表面与边框", () => {
+    const input = documentFixture();
+    input.basedOn = "nostalgia";
+    const flatSelected = { surface: "active", border: "subtle", elevation: "none" } as const;
+    for (const roleId of ["toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+      input.roles[roleId] = {
+        radius: "pill",
+        resting: { surface: "transparent", border: "none", elevation: "none" },
+        selected: flatSelected,
+      };
+    }
+
+    const normalized = canonicalizeCustomUiStyleDocument(input);
+    for (const roleId of ["toggle", "menuTrigger", "menuItem", "roomChoice"] as const) {
+      expect(normalized?.roles[roleId]?.resting, roleId).toEqual(flatTreatment);
+      expect(normalized?.roles[roleId]?.selected, roleId).toEqual({ ...flatSelected, elevation: "field" });
+      expect(normalized?.roles[roleId]?.radius, roleId).toBe("pill");
+    }
+  });
+
+  it("导入角色未写 selected 时继承复古基线选中态，而不是退回安静 resting", () => {
+    const input = documentFixture();
+    input.basedOn = "nostalgia";
+    input.roles.toggle = {
+      radius: "pill",
+      resting: { surface: "base", border: "subtle", elevation: "none" },
+      hover: { surface: "hover", border: "subtle", elevation: "control" },
+    };
+
+    const normalized = canonicalizeCustomUiStyleDocument(input);
+    expect(normalized?.roles.toggle?.resting).toEqual(flatTreatment);
+    expect(normalized?.roles.toggle?.selected).toEqual(BUILTIN_UI_STYLE_DOCUMENTS.nostalgia.roles.toggle?.selected);
+    expect(normalized?.roles.toggle?.selected?.elevation).toBe("field");
+  });
+
   it("四套内置风格本身就是完整且合法的同版契约", () => {
     for (const document of Object.values(BUILTIN_UI_STYLE_DOCUMENTS)) {
       const result = parseUiStyleDocument(document);
@@ -176,6 +211,8 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("Composer 内层 textarea 永远无边框");
     expect(prompt).toContain("顶部 compoundControl 的 resting");
     expect(prompt).toContain("普通交互角色");
+    expect(prompt).toContain("非透明 selected 必须保持立体 elevation");
+    expect(prompt).toContain("复古与怀旧通常为按下内凹");
     expect(prompt).toContain("只在悬停、展开或选中时醒目");
     expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要仅在悬停、聚焦或按下时显示此材质");
     expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
@@ -239,6 +276,7 @@ describe("自定义风格 CSS 角色消费契约", () => {
     expect(css).toMatch(/\.kimix-composer-input,[\s\S]*?\.kimix-composer-input:focus-visible\s*\{[^}]*border:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;[^}]*box-shadow:\s*none\s*!important;/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-split-control[\s\S]*?:hover[\s\S]*?--ui-role-compound-control-hover-shadow/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\][\s\S]*?\.kimix-state-button[\s\S]*?:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)[\s\S]*?--ui-role-toggle-hover-shadow/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-control-button\[aria-expanded="true"\]\s*\{[^}]*--ui-role-menu-trigger-selected-border[^}]*--ui-role-menu-trigger-selected-background[^}]*--ui-role-menu-trigger-selected-shadow[^}]*\}/s);
     const interactiveStateCoverage = {
       "navigation-item": ["resting", "hover", "active", "selected"],
       "navigation-action": ["resting", "hover", "active"],

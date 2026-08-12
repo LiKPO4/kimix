@@ -4,7 +4,7 @@ title: Interface Style System
 description: Defines the boundary between color themes and interface styles and assigns visual treatment by component role.
 resource: https://github.com/LiKPO4/kimix/tree/master/src
 tags: [architecture, ui, theme, style, css]
-timestamp: "2026-08-12T20:12:06+08:00"
+timestamp: "2026-08-12T21:08:06+08:00"
 ---
 
 # Interface Style System
@@ -12,6 +12,8 @@ timestamp: "2026-08-12T20:12:06+08:00"
 ## Quiet resting-state hierarchy
 
 Imported UI Style documents may customize interaction feedback, but they do not own the default emphasis of ubiquitous secondary actions. During canonicalization, `navigationItem`, `navigationAction`, `control`, `toggle`, `menuTrigger`, `menuItem`, and `roomChoice` inherit their `resting` treatment from the matching role in the selected built-in `basedOn` document. `compoundControl` instead inherits that built-in document's ordinary `control.resting`: this keeps the top Start/Open split controls quiet even when `basedOn: nostalgia` gives its built-in compound plate permanent relief. Their plate becomes prominent on hover or while a menu is expanded, not merely because they are structurally compound. Imported radius and `hover`/`active`/`selected` treatments remain effective. `primaryAction` is excluded because a true primary operation may intentionally keep a visible resting plate. This normalization also applies to already persisted custom documents, so a loud imported resting state cannot make every ordinary button compete with hover or selected state.
+
+Quiet resting does not mean flat state feedback. `toggle`, `menuTrigger`, `menuItem`, and `roomChoice` inherit the complete corresponding `basedOn` selected treatment when an import omits `selected`; they never fall back to the newly quiet resting state. If an import provides a non-transparent selected treatment but leaves its depth at `none`, canonicalization inherits only the corresponding role's `selected`, then `active`, then `resting` elevation from `basedOn`, while preserving the imported surface, border, and radius. This follows the existing Retro/Nostalgia language: hover is raised feedback, while an enabled or chosen state is normally held down/inset. An explicit non-none imported elevation remains authoritative. `aria-pressed`, `aria-checked`, and `aria-selected` consume these selected treatments. Composer popover triggers that are structurally ordinary `.kimix-control-button` controls also map `aria-expanded=true` to `menuTrigger.selected`, so an open menu stays visually distinct until it closes.
 
 Kimix treats color themes and interface styles as orthogonal systems. A color theme owns surface, text, accent, semantic, and border colors. An interface style owns shape and texture: radius, shadow, edge treatment, and role-specific control depth. Selecting an interface style must not replace or reinterpret the active color palette.
 

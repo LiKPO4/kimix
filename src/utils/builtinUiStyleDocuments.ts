@@ -210,6 +210,35 @@ function harmonizeQuietActionResting(
   return normalized;
 }
 
+const EMPHASIZED_SELECTED_ROLE_IDS = [
+  "toggle",
+  "menuTrigger",
+  "menuItem",
+  "roomChoice",
+] as const satisfies readonly UiStyleRoleId[];
+
+function harmonizeSelectedActionElevation(
+  roles: Record<UiStyleRoleId, UiStyleRole>,
+  baseRoles: Record<UiStyleRoleId, UiStyleRole>,
+): Record<UiStyleRoleId, UiStyleRole> {
+  const normalized = { ...roles };
+  for (const roleId of EMPHASIZED_SELECTED_ROLE_IDS) {
+    const role = roles[roleId];
+    const baseSelected = baseRoles[roleId].selected ?? baseRoles[roleId].active ?? baseRoles[roleId].resting;
+    if (!role.selected) {
+      normalized[roleId] = { ...role, selected: { ...baseSelected } };
+      continue;
+    }
+    const selectedTreatment = role.selected;
+    if (selectedTreatment.surface === "transparent" || selectedTreatment.elevation !== "none") continue;
+    normalized[roleId] = {
+      ...role,
+      selected: { ...selectedTreatment, elevation: baseSelected.elevation },
+    };
+  }
+  return normalized;
+}
+
 export function canonicalizeCustomUiStyleDocument(value: unknown): UiStyleDocumentV1 | null {
   const parsed = parseUiStyleDocument(value);
   if (!parsed.success) return null;
@@ -217,9 +246,10 @@ export function canonicalizeCustomUiStyleDocument(value: unknown): UiStyleDocume
   const baseRoles = base.roles as Record<UiStyleRoleId, UiStyleRole>;
   const mergedRoles = { ...baseRoles, ...parsed.data.roles } as Record<UiStyleRoleId, UiStyleRole>;
   const harmonizedRoles = harmonizeCompoundControlElevation(mergedRoles);
+  const quietRoles = harmonizeQuietActionResting(harmonizedRoles, baseRoles);
   return {
     ...parsed.data,
-    roles: harmonizeQuietActionResting(harmonizedRoles, baseRoles),
+    roles: harmonizeSelectedActionElevation(quietRoles, baseRoles),
   };
 }
 
@@ -262,7 +292,7 @@ export function buildUiStyleAiPrompt() {
     ...UI_STYLE_ROLE_IDS.map((roleId) => `- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`),
     "8. Composer 内层 textarea 永远无边框、无背景、无阴影；输入区质感只能配置 composer 外壳，禁止试图通过 field 制造第二层边界。",
     "9. 顶部 compoundControl 的 resting 与普通次级按钮一样保持克制；hover/active 若使用 raised/floating 材质，应与普通 control 的交互层次一致。",
-    "10. 普通交互角色（navigationItem/navigationAction/control/compoundControl/toggle/menuTrigger/menuItem/roomChoice）的 resting 由 basedOn 保持克制，导入时会自动忽略这些角色自定义的高强调 resting；请重点设计 hover、active、selected，确保顶部启动/打开、Swarm/Plan 等按钮只在悬停、展开或选中时醒目。",
+    "10. 普通交互角色（navigationItem/navigationAction/control/compoundControl/toggle/menuTrigger/menuItem/roomChoice）的 resting 由 basedOn 保持克制，导入时会自动忽略这些角色自定义的高强调 resting；toggle/menuTrigger/menuItem/roomChoice 的非透明 selected 必须保持立体 elevation，缺失时继承 basedOn 对应角色的 selected/active 深度（复古与怀旧通常为按下内凹）。请重点设计 hover、active、selected，确保顶部启动/打开、Swarm/Plan 等按钮只在悬停、展开或选中时醒目。",
     "11. radius 引用只能是 small、medium、large、card、panel、shell、pill。pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface 等紧凑单行控件；正文气泡、模态框、Composer、卡片、弹层和侧栏禁止使用 pill。Kimix 还会把内容承载角色按语义硬限制在 20–32px，避免文字侵入圆角。",
     "12. surface 只能是 transparent、ground、base、elevated、hover、active。",
     "13. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-12 修复：开启、选中和菜单展开态恢复持续立体强调（v2.21.51）
+
+- 现场：普通按钮静止态收敛后，Swarm/Plan 开启态、菜单选中项及部分已展开菜单触发器可能缺少持续浮雕，状态与未选中项辨识不足。
+- 根因：v2.21.50 只规定 quiet resting，没有规定 selected 的材质深度下限；导入 JSON 可为 `menuItem.selected` 等配置非透明表面但 `elevation: none`。部分 Composer 下拉触发器使用 `.kimix-control-button[aria-expanded]`，也未显式消费菜单 selected 契约。
+- 修正：参照内置复古/怀旧状态语义，`toggle`、`menuTrigger`、`menuItem`、`roomChoice` 未写 selected 时完整继承 `basedOn` 对应选中态；已写非透明 selected 但无 elevation 时继承其 selected/active 深度（复古/怀旧为按下内凹），并保留导入表面、边框与圆角。普通 control 的 `aria-expanded=true` 显式消费 menuTrigger selected 材质。
+- 回归：新增 selected depth 契约与 Composer 普通控件菜单展开 CSS 映射测试。
+
 ## 2026-08-12 修复：顶部启动与打开分段按钮漏出静止态治理（v2.21.50）
 
 - 现场：v2.21.49 已收敛 Composer 与普通按钮，但顶部启动、打开项目两组分段按钮仍常驻浮雕背景。

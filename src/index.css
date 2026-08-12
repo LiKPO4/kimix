@@ -4436,6 +4436,15 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-menu-trigger-selected-shadow);
 }
 
+/* Popover triggers implemented as ordinary controls still own a persistent
+   menu-open state; map aria-expanded to the same selected menu material. */
+:root[data-ui-style-contract="v1"] .kimix-control-button[aria-expanded="true"] {
+  border: var(--ui-role-menu-trigger-selected-border);
+  border-radius: var(--ui-role-menu-trigger-radius);
+  background: var(--ui-role-menu-trigger-selected-background);
+  box-shadow: var(--ui-role-menu-trigger-selected-shadow);
+}
+
 :root[data-ui-style-contract="v1"] :where(.kimix-menu-item, .kimix-inspector-list-item):hover:not(:disabled):not([aria-disabled="true"]) {
   border: var(--ui-role-menu-item-hover-border);
   background: var(--ui-role-menu-item-hover-background);
