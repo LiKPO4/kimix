@@ -17,6 +17,126 @@ type FetchMonthlyQuotaOptions = {
   timeoutMs?: number;
 };
 
+export type KimiCredentialCandidateSource = "storage" | "cookie" | "request";
+
+type KimiCredentialCandidate = {
+  source: KimiCredentialCandidateSource;
+  value: string;
+};
+
+const KIMI_CREDENTIAL_SOURCE_PRIORITY: Record<KimiCredentialCandidateSource, number> = {
+  storage: 0,
+  cookie: 1,
+  request: 2,
+};
+
+export class KimiCredentialCandidateQueue {
+  private activeValue: string | null = null;
+  private pending: KimiCredentialCandidate[] = [];
+  private processing = false;
+  private stopped = false;
+
+  constructor(private readonly verify: (value: string) => Promise<boolean>) {}
+
+  enqueue(value: string, source: KimiCredentialCandidateSource): void {
+    if (this.stopped || !value.trim()) return;
+    const normalized = normalizeKimiWebToken(value);
+    if (!normalized || normalized === this.activeValue) return;
+    const existing = this.pending.find((candidate) => normalizeKimiWebToken(candidate.value) === normalized);
+    if (existing) {
+      if (KIMI_CREDENTIAL_SOURCE_PRIORITY[source] > KIMI_CREDENTIAL_SOURCE_PRIORITY[existing.source]) {
+        existing.source = source;
+        existing.value = value;
+        this.sortPending();
+      }
+      return;
+    }
+    this.pending.push({ source, value });
+    this.sortPending();
+    void this.drain();
+  }
+
+  stop(): void {
+    this.stopped = true;
+    this.pending = [];
+  }
+
+  private sortPending(): void {
+    this.pending.sort((left, right) => (
+      KIMI_CREDENTIAL_SOURCE_PRIORITY[right.source] - KIMI_CREDENTIAL_SOURCE_PRIORITY[left.source]
+    ));
+  }
+
+  private async drain(): Promise<void> {
+    if (this.processing || this.stopped) return;
+    this.processing = true;
+    try {
+      while (!this.stopped) {
+        const candidate = this.pending.shift();
+        if (!candidate) return;
+        this.activeValue = normalizeKimiWebToken(candidate.value);
+        if (await this.verify(candidate.value)) {
+          this.stop();
+          return;
+        }
+        this.activeValue = null;
+      }
+    } finally {
+      this.activeValue = null;
+      this.processing = false;
+      if (!this.stopped && this.pending.length > 0) void this.drain();
+    }
+  }
+}
+
+export type KimiCredentialAuthTaskOptions = {
+  interactive?: boolean;
+  expectedUserId?: string;
+};
+
+type KimiCredentialAuthTask = {
+  cancel: () => void;
+  promise: Promise<void>;
+};
+
+export class KimiCredentialAuthTaskCoordinator {
+  private active: (KimiCredentialAuthTask & { key: string }) | null = null;
+
+  async run(
+    options: KimiCredentialAuthTaskOptions,
+    start: () => KimiCredentialAuthTask,
+    onReuse?: () => void,
+  ): Promise<void> {
+    const interactive = options.interactive !== false;
+    const expectedUserId = options.expectedUserId?.trim() || "";
+    const key = `${interactive ? "interactive" : "background"}:${expectedUserId}`;
+    const current = this.active;
+    if (current) {
+      if (current.key === key) {
+        onReuse?.();
+        return current.promise;
+      }
+      if (!interactive) throw new Error("已有其他 Kimi 网页认证任务正在进行，后台刷新已跳过。");
+      current.cancel();
+      try {
+        await current.promise;
+      } catch {
+        // 交互登录明确接管时，旧后台任务的取消错误只返回给旧调用方。
+      }
+      return this.run(options, start);
+    }
+
+    const task = start();
+    const active = { ...task, key };
+    this.active = active;
+    try {
+      await task.promise;
+    } finally {
+      if (this.active === active) this.active = null;
+    }
+  }
+}
+
 function recordOf(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>

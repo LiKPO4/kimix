@@ -6506,3 +6506,65 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 关键文件：`electron/kimiCodeServerClient.ts`、`src/utils/__tests__/kimiCodeServerClient.test.ts`、`src/utils/kimiHistoryCache.ts`、`docs/issue-assistant-header-and-tool-history-snapshot.md`。
 - 下一步：提交本轮；由用户使用 v2.16.60 复验首轮短回复与展开命令完整性。
 
+---
+
+> 本批次收纳范围：2026-08-01（v2.20.99–v2.20.107，共 8 条）。
+> 归档时间：2026-08-12；仅搬运、内容未改写。
+
+## 2026-08-01 调整：现代用户气泡降低表面色权重（v2.20.107）
+
+- 用户实机反馈 v2.20.106 气泡过深，短消息呈现为突出的灰色按钮，而非 Codex 参考中的轻灰输入层。
+- 修复：浅色模式 `surface-active` 权重从 82% 降至 48%，深色模式从 86% 降至 62%；继续保持主题派生、无描边和无阴影，仅降低与画布的明度差。
+- 实机验收：Windows v2.20.107 当前灰白主题下，短消息气泡已由中灰按钮感降为接近画布的轻灰层，同时仍可辨识作者输入。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22107/01-modern-user-bubble-light.jpg`。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-vNJGB5--.css`、JS `assets/index-DsfKRyLG.js`）、OKF strict/audit 校验（13 concepts、386 links）通过。
+
+## 2026-08-01 优化：现代用户输入气泡与画布拉开明度（v2.20.106）
+
+- 根因：Modern 将主工作画布提亮为 96% `surface-elevated`，用户气泡仍直接使用 `surface-elevated`，两者在浅色主题下几乎同为白色，作者输入层级消失。
+- 修复：新增仅属于 Modern 的用户气泡呈现 token，由当前颜色主题的 `surface-active` 与 `surface-elevated` 混合；浅色 82% active、深色 86% active，并保持无描边、无阴影。默认、复古和颜色主题源 token 均不改变。
+- 实机验收：Windows v2.20.106 当前暖纸主题下，用户气泡已与亮色画布形成稳定的浅灰层级，文字对比清晰且没有卡片化描边/投影。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22106/01-modern-user-bubble.jpg`。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BA0QW722.css`、JS `assets/index-BUkj_FYD.js`）、OKF strict/audit 校验（13 concepts、385 links）通过。
+
+## 2026-08-01 修复：未发送 Composer 草稿跨工作区持久保留（v2.20.105）
+
+- 根因：`AppShell` 在设置、插件等工作区与聊天工作区之间条件挂载，进入设置会卸载 `Composer`；正文和附件此前都只存在组件本地 state，重新挂载必然从空值开始。
+- 修复：新增会话级草稿边界，已有会话使用 `session:<id>`，尚未创建新会话时使用 `project:<id>:new`；每次正文变化同步写入内存与 `localStorage`，附件保留内存副本，工作区卸载只刷新、不清空。`Composer` 按会话/项目身份 remount，切换会话不会串草稿；只有明确发送或清空才删除对应草稿。
+- 实机验收：Windows v2.20.105 输入唯一未发送正文 `草稿保护验收-20260801-2107：切换设置后必须逐字保留`，打开设置再返回、杀死旧进程并重启开发应用后均逐字保留。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-draft-audit-22105/01-draft-restored.jpg`、`02-draft-restored-after-app-restart.jpg`。
+- 持久边界：正文可跨设置、工作区、renderer/app 重启恢复；附件可跨设置和会话往返恢复，但大附件未写入同步存储，完整进程重启后的附件持久化仍需独立 IndexedDB 方案。
+- 验证：草稿定向 6 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CO_RFeGP.css`、JS `assets/index-Bj0urN8U.js`）、OKF strict/audit 校验（13 concepts、384 links）通过。
+
+## 2026-08-01 优化：现代内容圆角覆盖与轻量表格（v2.20.104）
+
+- 根因一：Modern 已有 control/card/panel/shell 四级圆角，但设置分组、连接卡、模型行、插件项及完整模型面板没有按语义角色登记，仍回退到旧的 `radius-sm/md`，导致设置页大圆角只覆盖部分容器。
+- 修复一：成组选择容器统一使用 16px segment 圆角，单层内容卡统一使用 14px card 圆角，完整子区域面板统一使用 18px panel 圆角；控件 10px 与主壳 20px 保持不变，颜色、布局、默认和复古风格不受影响。
+- 根因二：Markdown 表格把硬编码米灰外框、单元格四边框、灰表头与斑马纹叠在一起；Modern 即使圆角化，仍像旧式数据网格，且深灰偶数行压过正文层级。
+- 修复二：Markdown 表格暴露 frame/table/head/cell 语义角色；仅 Modern 移除卡片外框、竖线、表头底色与斑马纹，改为主题 `border-subtle` 派生的浅横线，首末列与正文边缘对齐。默认/复古保留既有网格表现。
+- 实机验收：Windows 直接操作 v2.20.104，模型与供应商、外观、对话与权限、对话表格四个状态均无裁切、反向嵌套或深色斑马纹。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-style-audit-22104/01-models.png` 至 `04-modern-table.png`，详细结论见 `design-qa.md`。
+- 验证：定向 Markdown/UI/设置样式 3 文件 22 项、全量 153 文件 1462 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CO_RFeGP.css`、JS `assets/index-CehvMEy_.js`）、OKF strict/audit 校验（12 concepts、380 links）通过。
+
+## 2026-08-01 修正：现代分隔线目标与空态建议槽位（v2.20.102）
+
+- 纠错一：v2.20.100 误把用户所指分割线理解成会话标题栏底边并将其移除；实际目标是启动和打开两个 split button 主动作/下拉动作之间的竖线。现恢复标题栏原有结构横线，新增 `--ui-compound-divider-shadow` 角色 token，Modern 设为 `none`，默认与复古继续保留内部语义分隔。
+- 根因二：空态先铺项目级历史建议，再追加最新继续和固定建议，最后直接截前五条；两个历史“接着上次”与一个动态“继续”因此同时出现，并把固定的“快速全面了解一下当前的项目”挤出列表。
+- 修复二：空态改成固定槽位优先级——项目概览始终第一，最新上下文规范化成唯一一条 `继续：…`，所有历史继续被过滤，其余位置再按历史非继续建议与默认建议补足；没有最新消息时也只将第一条历史继续规范化保留。
+- 验证：空态与 UI 风格定向 2 文件 16 项、全量 153 文件 1462 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-ClPEf-oq.css`、JS `assets/index-DKUd3t13.js`）、OKF strict/audit 校验（12 concepts、379 links）通过。
+
+## 2026-08-01 修复：空态建议图标兼容历史文案（v2.20.101）
+
+- 根因：空态建议由项目级 `localStorage` 跨版本保留，但图标分配只按四条当前内置文案做整句精确匹配；历史建议、截断的最近对话和轻微改写全部未命中，统一回退成 Sparkles，截图中的前四条因此看起来完全相同。
+- 修复：新增稳定的语义图标解析，内置文案继续走精确映射，历史/动态建议再按继续上下文、风险审查、待办整理、问题分析和项目概览识别；不清空用户已保存的建议，也不退回与内容无关的按位置轮换。
+- 验证：截图中的真实文案已加入 2 项定向单测；全量 153 文件 1460 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-C-QE97_z.css`、JS `assets/index-CifO4X5r.js`）、OKF strict/audit 校验（12 concepts、377 links）通过。
+
+## 2026-08-01 优化：现代会话工具栏移除无语义分割线（v2.20.100）
+
+- 根因：`SessionToolbar` 自带 `border-b`，Modern 又将其着色为 `--ui-section-divider-color`；v2.20.99 已让标题栏和对话画布共用同一亮面后，这条整宽横线不再表达独立滚动、尺寸调整或内容归属，只会把连续工作区硬切成两块。
+- 修复：仅在 Modern 下为 `.kimix-app-shell-toolbar` 关闭底边；没有修改全局分隔色 token，因此默认/复古壳层，以及菜单、列表和复合按钮内部真正承担分组作用的局部分隔仍保持原样。
+- 实机验收：Windows 直接操作 v2.20.100 空白对话页，确认标题栏与画布连续、整宽横线消失，外层壳边框和右侧按钮组边界完整。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22100/01-modern-toolbar.png`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-C-QE97_z.css`、JS `assets/index-D_VKKddI.js`）、OKF strict/audit 校验（12 concepts、377 links）通过。
+
+## 2026-08-01 优化：现代模式亮面工作画布（v2.20.99）
+
+- 根因：Modern 虽已建立 Codex 式圆角和壳层，但主内容、工具栏、Footer、设置与插件工作区仍直接使用颜色主题的 `surface-base`；暖纸等主题在大面积铺开时压平了侧栏与画布的明度差，整体看起来灰蒙。
+- 修复：新增 `--kimix-modern-workspace-background` 呈现 token，浅色模式以 96% `surface-elevated` + 4% `surface-base` 生成接近白色但仍带主题底色的工作画布，深色模式使用 78%/22% 保持相对提亮；聊天主壳、工具栏、Footer、设置、插件与 Hooks 统一消费该 token，侧栏、选中态、强调色和所有颜色主题源 token 不变。
+- 实机验收：Windows 直接操作 v2.20.99，对照 Codex 参考检查空白对话主界面、外观设置和插件工作区；主画布明显提亮，外围主题色与卡片层级仍可辨，无漂白或边界消失。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22099/01-modern-main.png`、`02-modern-settings.png`、`03-modern-plugins.png`。
+- 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BIpNiJJT.css`、JS `assets/index-D1OODTQw.js`）、OKF strict/audit 校验（12 concepts、376 links）通过。

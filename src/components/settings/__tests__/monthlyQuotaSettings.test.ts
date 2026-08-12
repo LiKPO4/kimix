@@ -38,6 +38,8 @@ describe("月度额度设置自动获取入口", () => {
     expect(mainSource).toContain("timeoutMs: 12_000");
     expect(mainSource).toContain("if (quota.credentialRejected || !token)");
     expect(mainSource).toContain("if (!verified.credentialAccepted)");
+    expect(mainSource).toContain("expectedUserId = inspectKimiWebToken(kimiCodeToken).subject");
+    expect(mainSource).toContain("new KimiCredentialCandidateQueue(verifyToken)");
     expect(mainSource).toContain("if (!interactive && !pageReady) return");
     expect(mainSource).toContain("if (interactive && !authWindow.isDestroyed()) authWindow.show()");
     expect(settingsSource).toContain("查询额度时 Kimix 会在后台自动刷新短期凭证");

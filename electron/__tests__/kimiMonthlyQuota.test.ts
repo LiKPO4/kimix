@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   KIMI_MONTHLY_QUOTA_URL,
   KIMI_WEB_QUOTA_URL,
+  KimiCredentialAuthTaskCoordinator,
+  KimiCredentialCandidateQueue,
   fetchKimiMonthlyQuota,
   inspectKimiWebToken,
   isAllowedKimiWebAuthUrl,
@@ -20,6 +22,49 @@ afterEach(() => {
 });
 
 describe("Kimi 月度额度", () => {
+  it("旧候选验真期间保留新请求 Bearer，并在当前验真后优先处理", async () => {
+    let releaseOld: (() => void) | undefined;
+    const oldPending = new Promise<void>((resolve) => { releaseOld = resolve; });
+    const verified: string[] = [];
+    const queue = new KimiCredentialCandidateQueue(async (value) => {
+      verified.push(value);
+      if (value === "old-storage-token") await oldPending;
+      return value === "fresh-request-token";
+    });
+
+    queue.enqueue("old-storage-token", "storage");
+    await vi.waitFor(() => expect(verified).toEqual(["old-storage-token"]));
+    queue.enqueue("fallback-cookie-token", "cookie");
+    queue.enqueue("fresh-request-token", "request");
+    releaseOld?.();
+
+    await vi.waitFor(() => expect(verified).toEqual(["old-storage-token", "fresh-request-token"]));
+  });
+
+  it("只复用同账号同模式认证任务，并允许交互登录接管后台任务", async () => {
+    const coordinator = new KimiCredentialAuthTaskCoordinator();
+    let releaseBackground: (() => void) | undefined;
+    const backgroundPending = new Promise<void>((resolve) => { releaseBackground = resolve; });
+    const cancelBackground = vi.fn(() => releaseBackground?.());
+    const startBackground = vi.fn(() => ({ promise: backgroundPending, cancel: cancelBackground }));
+    const onReuse = vi.fn();
+    const first = coordinator.run({ interactive: false, expectedUserId: "user-1" }, startBackground);
+    const reused = coordinator.run({ interactive: false, expectedUserId: "user-1" }, startBackground, onReuse);
+    expect(startBackground).toHaveBeenCalledTimes(1);
+    expect(onReuse).toHaveBeenCalledTimes(1);
+
+    await expect(coordinator.run(
+      { interactive: false, expectedUserId: "user-2" },
+      () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
+    )).rejects.toThrow("后台刷新已跳过");
+
+    const startInteractive = vi.fn(() => ({ promise: Promise.resolve(), cancel: vi.fn() }));
+    await coordinator.run({ interactive: true, expectedUserId: "user-1" }, startInteractive);
+    await Promise.all([first, reused]);
+    expect(cancelBackground).toHaveBeenCalledTimes(1);
+    expect(startInteractive).toHaveBeenCalledTimes(1);
+  });
+
   it("兼容 Bearer、Cookie 字符串和 URL 编码的 kimi-auth 值", () => {
     const token = jwt({ sub: "user-1", exp: 4_102_444_800 });
     expect(normalizeKimiWebToken(`Bearer ${token}`)).toBe(token);
