@@ -6,6 +6,8 @@ import type {
   AppSettings,
   GetKimiAuthStatusResponse,
   CheckKimiCliResponse,
+  GitBashStatusResponse,
+  GitBashInstallResponse,
   CheckKimiCliUpdateResponse,
   CheckUpdateResponse,
   GitInfoResponse,
@@ -243,6 +245,11 @@ function installBrowserPreviewApi() {
         message: unsupported("检测 Kimi Code"),
       },
     }),
+    getGitBashStatus: (): Promise<GitBashStatusResponse> => Promise.resolve({
+      success: true,
+      data: { required: false, available: false, message: unsupported("检测 Git Bash") },
+    }),
+    installGitBash: (): Promise<GitBashInstallResponse> => fail("安装 Git for Windows"),
     getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> => Promise.resolve({
       success: true,
       data: {

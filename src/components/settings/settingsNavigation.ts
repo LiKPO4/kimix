@@ -209,6 +209,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     keywords: ["CLI", "路径", "安装", "检查"],
   },
   {
+    id: "git-bash",
+    label: "Git Bash 运行环境",
+    description: "检测 Windows 上的 Git Bash，缺失时可一键安装 Git for Windows",
+    pageId: "account",
+    sectionId: "connection",
+    keywords: ["git", "bash", "shell", "命令行", "运行环境"],
+  },
+  {
     id: "auth",
     label: "Kimi 登录",
     description: "登录或退出 Kimi Code 账户",

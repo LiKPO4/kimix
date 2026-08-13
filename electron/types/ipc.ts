@@ -364,6 +364,30 @@ export type CheckKimiCliRequest = {
   verify?: boolean;
 };
 
+export type GitBashStatus = {
+  /** Windows 上官方运行时强制依赖 Git Bash；其它平台为 false。 */
+  required: boolean;
+  available: boolean;
+  path?: string;
+  message: string;
+};
+
+export type GitBashStatusResponse = {
+  success: true;
+  data: GitBashStatus;
+} | {
+  success: false;
+  error: string;
+};
+
+export type GitBashInstallResponse = {
+  success: true;
+  data: { path: string; message: string };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiAuthStatus = {
   available: boolean;
   path?: string;

@@ -5,6 +5,7 @@ import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, 
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
+import { GIT_FOR_WINDOWS_DOWNLOAD_URL } from "@/utils/gitBash";
 import { PREVIEW_READABLE_TEXT_EXTENSIONS, normalizePreviewExtensions, isPreviewReadableExtension } from "@/utils/previewExtensions";
 import { useSessionStore } from "@/stores/sessionStore";
 import { getPrimaryRoomAgent, getRoomAgent, getRoomAgentRuntimeId } from "@/utils/collaborationRooms";
@@ -27,7 +28,7 @@ import {
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
-import type { KimiCodeArchivedSessionSummary, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { GitBashStatus, KimiCodeArchivedSessionSummary, KimiModelConfigSummary } from "@electron/types/ipc";
 import {
   archivedTimeMs,
   archivedWorkspaceOptions,
@@ -452,6 +453,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [migrationMessage, setMigrationMessage] = useState("");
   const [freezeExpanded, setFreezeExpanded] = useState(false);
   const [filePreviewExtensionDraft, setFilePreviewExtensionDraft] = useState(filePreviewExtensions.join(", "));
+  const [gitBashStatus, setGitBashStatus] = useState<GitBashStatus | null>(null);
+  const [gitBashBusy, setGitBashBusy] = useState(false);
+  const refreshGitBash = async () => {
+    const res = await window.api.getGitBashStatus();
+    if (res.success) setGitBashStatus(res.data);
+  };
+  const installGitBashFromSettings = async () => {
+    if (gitBashBusy) return;
+    setGitBashBusy(true);
+    const res = await window.api.installGitBash();
+    setGitBashBusy(false);
+    if (!res.success) {
+      setGitBashStatus({ required: true, available: false, message: res.error });
+      return;
+    }
+    setGitBashStatus({ required: true, available: true, path: res.data.path, message: res.data.message });
+  };
+  useEffect(() => {
+    if (isWindows()) void refreshGitBash();
+    // 仅在进入设置页时检测一次；安装或修复后用卡片上的「重新检测」刷新。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
   const [authLoading, setAuthLoading] = useState(!settingsStatusCache.auth);
   const [authBusyAction, setAuthBusyAction] = useState<"login" | "logout" | null>(null);
@@ -2285,6 +2308,60 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </div>
                 </div>
+                {isWindows() && gitBashStatus && (
+                  <div className={`kimix-settings-connection ${gitBashStatus.available ? "is-verified" : "is-missing"}`} style={{ marginTop: 10 }}>
+                    <div className="kimix-settings-connection-inner">
+                      {gitBashBusy ? (
+                        <RefreshCw size={18} className="kimix-spin mt-0.5 shrink-0 text-text-muted" />
+                      ) : gitBashStatus.available ? (
+                        <SelectionIndicator selected />
+                      ) : (
+                        <AlertCircle size={18} className="mt-0.5 shrink-0 text-accent-warning" />
+                      )}
+                      <div className="kimix-settings-connection-copy">
+                        <div className="kimix-settings-connection-label">
+                          {gitBashBusy ? "正在安装 Git for Windows" : gitBashStatus.available ? "Git Bash 运行环境正常" : "缺少 Git Bash 运行环境"}
+                        </div>
+                        <div className="kimix-settings-connection-detail">{gitBashStatus.message}</div>
+                        <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 10 }}>
+                          {!gitBashStatus.available && !gitBashBusy && (
+                            <button
+                              type="button"
+                              onClick={() => void installGitBashFromSettings()}
+                              className="kimix-icon-text-button is-compact bg-accent-primary text-text-inverse hover:bg-accent-primary-dark"
+                              style={{ minHeight: 32 }}
+                            >
+                              <Terminal size={14} />
+                              <span>一键安装</span>
+                            </button>
+                          )}
+                          {!gitBashStatus.available && !gitBashBusy && (
+                            <button
+                              type="button"
+                              onClick={() => void window.api.openExternal(GIT_FOR_WINDOWS_DOWNLOAD_URL)}
+                              className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light"
+                              style={{ minHeight: 32 }}
+                            >
+                              <Download size={14} />
+                              <span>官网下载</span>
+                            </button>
+                          )}
+                          {!gitBashBusy && (
+                            <button
+                              type="button"
+                              onClick={() => void refreshGitBash()}
+                              className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+                              style={{ minHeight: 32 }}
+                            >
+                              <RefreshCw size={14} />
+                              <span>重新检测</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="kimix-settings-section" {...settingsSectionProps("auth", 1, authSettingsRef)}>

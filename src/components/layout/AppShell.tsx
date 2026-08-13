@@ -21,7 +21,10 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { selectSessionById } from "@/stores/selectors";
 import type { Session, WorkspaceView } from "@/types/ui";
-import type { DownloadUpdateProgress, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
+import type { DownloadUpdateProgress, GitBashStatus, KimiCliUpdateInfo, KimiCodeBackgroundTaskInfo, LongTaskDetail, LongTaskSummary, PreviewFileInfo } from "@electron/types/ipc";
+import { isWindows } from "@/utils/platform";
+import { isGitBashMissingError } from "@/utils/gitBash";
+import { SETTINGS_FOCUS_SECTION_EVENT } from "@/components/settings/settingsNavigation";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { hasRunningBackgroundBashTask, isBackgroundTaskTerminalStatus, pruneHiddenTaskKeysWhenEmpty, splitBackgroundTasksByKind } from "@/utils/backgroundTasks";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
@@ -359,6 +362,10 @@ export function AppShell() {
   });
   const [kimiOnboardingDismissed, setKimiOnboardingDismissed] = useState(false);
   const [kimiInstallBusy, setKimiInstallBusy] = useState(false);
+  const [gitBashHelpOpen, setGitBashHelpOpen] = useState(false);
+  const [gitBashStatus, setGitBashStatus] = useState<GitBashStatus | null>(null);
+  const [gitBashInstallBusy, setGitBashInstallBusy] = useState(false);
+  const gitBashDismissedForRef = useRef<string | null>(null);
   const [sessionPlanState, setSessionPlanState] = useState<SessionPlanState>({
     loading: false,
     path: null,
@@ -422,6 +429,50 @@ export function AppShell() {
     window.addEventListener("pointerup", stopResize);
     window.addEventListener("pointercancel", stopResize);
   }, [rightPanelWidth]);
+
+  const refreshGitBashStatus = async () => {
+    const res = await window.api.getGitBashStatus();
+    if (res.success) {
+      setGitBashStatus(res.data);
+      return;
+    }
+    setGitBashStatus({ required: true, available: false, message: res.error });
+  };
+
+  const installGitBashFromHelp = async () => {
+    if (gitBashInstallBusy) return;
+    setGitBashInstallBusy(true);
+    setGitBashStatus((state) => ({
+      required: state?.required ?? true,
+      available: false,
+      message: "正在一键安装 Git for Windows，可能需要 1-2 分钟",
+    }));
+    const res = await window.api.installGitBash();
+    setGitBashInstallBusy(false);
+    if (!res.success) {
+      setGitBashStatus({ required: true, available: false, message: res.error });
+      return;
+    }
+    setGitBashStatus({ required: true, available: true, path: res.data.path, message: res.data.message });
+  };
+
+  // 官方运行时报「Git Bash 缺失」时自动弹出引导：同一条错误只弹一次，重试失败产生新错误时会再次提醒。
+  const latestGitBashErrorId = useMemo(() => {
+    if (!isWindows()) return null;
+    const events = currentSession?.events;
+    if (!events?.length) return null;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      const event = events[index];
+      if (event.type === "error" && isGitBashMissingError(event.message)) return event.id;
+    }
+    return null;
+  }, [currentSession?.events]);
+
+  useEffect(() => {
+    if (!latestGitBashErrorId || gitBashDismissedForRef.current === latestGitBashErrorId) return;
+    setGitBashHelpOpen(true);
+    void refreshGitBashStatus();
+  }, [latestGitBashErrorId]);
 
   const checkKimiForOnboarding = async () => {
     setKimiOnboarding((state) => ({ ...state, loading: true, message: "正在检测 Kimi Code" }));
@@ -2178,6 +2229,22 @@ ${isFinalStep
           setWorkspaceView("settings");
           window.setTimeout(() => {
             window.dispatchEvent(new CustomEvent("kimix:focus-auth-settings"));
+          }, 80);
+        }}
+        showGitBashHelp={gitBashHelpOpen}
+        gitBashMessage={gitBashStatus?.message ?? "正在检测 Git Bash"}
+        gitBashInstallBusy={gitBashInstallBusy}
+        gitBashInstalled={Boolean(gitBashStatus?.available)}
+        onGitBashDismiss={() => {
+          gitBashDismissedForRef.current = latestGitBashErrorId;
+          setGitBashHelpOpen(false);
+        }}
+        onGitBashInstall={() => void installGitBashFromHelp()}
+        onGitBashCheck={() => void refreshGitBashStatus()}
+        onGitBashOpenSettings={() => {
+          setWorkspaceView("settings");
+          window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent(SETTINGS_FOCUS_SECTION_EVENT, { detail: { sectionId: "connection" } }));
           }, 80);
         }}
         copyToClipboard={copyToClipboard}

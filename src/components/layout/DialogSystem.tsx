@@ -19,6 +19,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { isWindows } from "@/utils/platform";
+import { GIT_FOR_WINDOWS_DOWNLOAD_URL, GIT_INSTALL_COMMAND } from "@/utils/gitBash";
 
 type HelpDialog = "about" | "updates" | "shortcuts" | "info";
 type KimiCodeInstallPhase = NonNullable<DownloadUpdateProgress["phase"]>;
@@ -189,6 +190,149 @@ function KimiOnboardingDialog({
               type="button"
               onClick={() => void onCheck()}
               className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light"
+              style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+            >
+              <RefreshCw size={14} />
+              <span>重新检测</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface GitBashHelpDialogProps {
+  show: boolean;
+  message: string;
+  installBusy: boolean;
+  installed: boolean;
+  onDismiss: () => void;
+  onInstall: () => void;
+  onCheck: () => void;
+  onOpenSettings: () => void;
+  copyToClipboard: (text: string, toast: string) => void;
+}
+
+// 复用 Kimi Code 初始配置引导的结构：Windows 缺少 Git Bash 时对话必失败，给出同款引导弹窗。
+function GitBashHelpDialog({
+  show,
+  message,
+  installBusy,
+  installed,
+  onDismiss,
+  onInstall,
+  onCheck,
+  onOpenSettings,
+  copyToClipboard,
+}: GitBashHelpDialogProps) {
+  const presence = usePresence(show || installBusy);
+  const dialogRef = useDialogFocus<HTMLDivElement>(show || installBusy);
+  if (!presence.mounted) return null;
+  return (
+    <div className={`kimix-onboarding-overlay kimix-presence-overlay fixed inset-0 z-[118] flex items-center justify-center ${presence.visible ? "is-visible" : ""}`} style={{ padding: 24 }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Git Bash 配置引导"
+        className={`kimix-onboarding-card kimix-presence-content w-full max-w-[560px] ${presence.visible ? "is-visible" : ""}`}
+        style={{ padding: "22px 24px" }}
+      >
+        <div className="flex items-start justify-between" style={{ gap: 16 }}>
+          <div className="flex min-w-0 items-start" style={{ gap: 14 }}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary-light text-accent-primary">
+              <SquareTerminal size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[18px] font-semibold leading-7 text-text-primary">缺少 Git Bash 运行环境</div>
+              <div className="mt-1 text-[14px] leading-6 text-text-secondary">
+                Kimi Code 在 Windows 上通过 <span className="font-medium text-text-primary">Git Bash</span> 执行命令。当前电脑没有检测到 Git for Windows，模型配置正确也会对话失败。
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="kimix-modal-close-button shrink-0"
+            aria-label="稍后处理"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl bg-surface-base" style={{ padding: "16px 16px 18px" }}>
+          <div className="text-[13px] font-medium leading-5 text-text-secondary">推荐步骤</div>
+          <div className="mt-2 grid gap-2 text-[13.5px] leading-6 text-text-secondary">
+            <div>1. 点击"一键安装"，通过 winget 自动安装 Git for Windows（期间可能弹出系统授权确认）。</div>
+            <div>2. 安装完成后回到 Kimix，<span className="font-medium text-text-primary">新建会话</span>即可正常对话，模型配置无需改动。</div>
+            <div>3. 如果一键安装不可用，点击"打开官网下载"手动安装，一路保持默认选项即可。</div>
+          </div>
+          <div className="mt-4 rounded-lg bg-surface-elevated font-mono text-[12.5px] leading-5 text-text-primary" style={{ padding: "12px 12px" }}>
+            {GIT_INSTALL_COMMAND}
+          </div>
+          <div className="mt-2 text-[12.5px] leading-5 text-text-muted">
+            检测结果：{message}
+          </div>
+          {installBusy && (
+            <div className="mt-3 flex items-center text-[12.5px] leading-5 text-text-muted" style={{ gap: 8 }}>
+              <RefreshCw size={13} className="kimix-spin shrink-0" />
+              <span>正在通过 winget 下载并安装 Git for Windows，可能需要 1-2 分钟，请不要关闭本窗口。</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between" style={{ gap: 12, marginTop: 24 }}>
+          <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
+            {!installed && (
+              <button
+                type="button"
+                onClick={() => void onInstall()}
+                disabled={installBusy}
+                className="kimix-icon-text-button is-compact bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+              >
+                {installBusy ? <RefreshCw size={14} className="kimix-spin" /> : <SquareTerminal size={14} />}
+                <span>{installBusy ? "安装中" : "一键安装"}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void window.api.openExternal(GIT_FOR_WINDOWS_DOWNLOAD_URL)}
+              className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light"
+              style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+            >
+              <ExternalLink size={14} />
+              <span>打开官网下载</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyToClipboard(GIT_INSTALL_COMMAND, "已复制安装命令")}
+              className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+              style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+            >
+              <Copy size={14} />
+              <span>复制安装命令</span>
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => {
+                onDismiss();
+                onOpenSettings();
+              }}
+              className="kimix-icon-text-button is-compact text-text-secondary hover:bg-surface-hover"
+              style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+            >
+              <Monitor size={14} />
+              <span>打开设置</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void onCheck()}
+              disabled={installBusy}
+              className="kimix-icon-text-button is-compact text-accent-primary hover:bg-accent-primary-light disabled:opacity-65"
               style={{ minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
             >
               <RefreshCw size={14} />
@@ -601,6 +745,16 @@ interface DialogSystemProps {
   onKimiOpenSettings: () => void;
   copyToClipboard: (text: string, toast: string) => void;
 
+  // Git Bash help
+  showGitBashHelp: boolean;
+  gitBashMessage: string;
+  gitBashInstallBusy: boolean;
+  gitBashInstalled: boolean;
+  onGitBashDismiss: () => void;
+  onGitBashInstall: () => void;
+  onGitBashCheck: () => void;
+  onGitBashOpenSettings: () => void;
+
   // Launch command
   launchCommandOpen: boolean;
   launchCommandDraft: string;
@@ -708,6 +862,17 @@ export function DialogSystem(props: DialogSystemProps) {
         onInstall={props.onKimiInstall}
         onCheck={props.onKimiCheck}
         onOpenSettings={props.onKimiOpenSettings}
+        copyToClipboard={props.copyToClipboard}
+      />
+      <GitBashHelpDialog
+        show={props.showGitBashHelp}
+        message={props.gitBashMessage}
+        installBusy={props.gitBashInstallBusy}
+        installed={props.gitBashInstalled}
+        onDismiss={props.onGitBashDismiss}
+        onInstall={props.onGitBashInstall}
+        onCheck={props.onGitBashCheck}
+        onOpenSettings={props.onGitBashOpenSettings}
         copyToClipboard={props.copyToClipboard}
       />
       <LaunchCommandDialog

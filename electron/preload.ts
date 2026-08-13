@@ -20,6 +20,8 @@ import type {
   StartSessionResponse,
   CheckKimiCliRequest,
   CheckKimiCliResponse,
+  GitBashStatusResponse,
+  GitBashInstallResponse,
   GetKimiAuthStatusResponse,
   GetKimiModelConfigResponse,
   InstallKimiCliResponse,
@@ -338,6 +340,10 @@ const api = {
     ipcRenderer.invoke("kimi:checkCliUpdate"),
   updateKimiCli: (): Promise<UpdateKimiCliResponse> =>
     ipcRenderer.invoke("kimi:updateCli"),
+  getGitBashStatus: (): Promise<GitBashStatusResponse> =>
+    ipcRenderer.invoke("kimi:gitBashStatus"),
+  installGitBash: (): Promise<GitBashInstallResponse> =>
+    ipcRenderer.invoke("kimi:installGitBash"),
   listKimiCodeSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi-code:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>

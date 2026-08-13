@@ -382,6 +382,65 @@ async function installKimiCli() {
   return { path: kimiPath, output: version, message: "Kimi Code 安装完成" };
 }
 
+// 与官方运行时（SDK locateWindowsGitBash）保持同一套探测口径：
+// KIMI_SHELL_PATH → PATH 中的 git.exe 推导 → 常见默认安装目录。
+// 不用 `where bash`，避免把 WSL 的 bash.exe 误报为可用。
+async function probeGitBashWindows(): Promise<string | null> {
+  const envShell = process.env.KIMI_SHELL_PATH?.trim();
+  if (envShell && fs.existsSync(envShell)) return envShell;
+  const gitExe = await checkCommand("git");
+  if (gitExe) {
+    const gitDir = path.dirname(gitExe);
+    const derived = [
+      path.join(gitDir, "bash.exe"),
+      path.join(gitDir, "..", "bin", "bash.exe"),
+      path.join(gitDir, "..", "usr", "bin", "bash.exe"),
+    ];
+    const hit = derived.find((candidate) => fs.existsSync(candidate));
+    if (hit) return hit;
+  }
+  const candidates = [
+    path.join(process.env.ProgramFiles ?? "C:\Program Files", "Git", "bin", "bash.exe"),
+    path.join(process.env.ProgramFiles ?? "C:\Program Files", "Git", "usr", "bin", "bash.exe"),
+    path.join(process.env["ProgramFiles(x86)"] ?? "C:\Program Files (x86)", "Git", "bin", "bash.exe"),
+    path.join(process.env["ProgramFiles(x86)"] ?? "C:\Program Files (x86)", "Git", "usr", "bin", "bash.exe"),
+    path.join(os.homedir(), "AppData", "Local", "Programs", "Git", "bin", "bash.exe"),
+    path.join(os.homedir(), "AppData", "Local", "Programs", "Git", "usr", "bin", "bash.exe"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+async function getGitBashStatus() {
+  if (process.platform !== "win32") {
+    const shellPath = await resolveCommand("bash");
+    return {
+      required: false,
+      available: Boolean(shellPath),
+      path: shellPath ?? undefined,
+      message: "当前平台使用系统 shell，无需 Git Bash。",
+    };
+  }
+  const bashPath = await probeGitBashWindows();
+  return {
+    required: true,
+    available: Boolean(bashPath),
+    path: bashPath ?? undefined,
+    message: bashPath
+      ? `已找到 Git Bash：${bashPath}`
+      : "未找到 Git Bash。Windows 上 Kimi Code 通过 Git Bash 执行命令，安装 Git for Windows 后即可正常对话。",
+  };
+}
+
+async function installGitForWindows() {
+  if (process.platform !== "win32") throw new Error("当前平台无需安装 Git for Windows");
+  const wingetPath = await resolveCommand("winget");
+  if (!wingetPath) throw new Error("未找到 winget，无法一键安装。请点击「打开官网下载」手动安装 Git for Windows。");
+  await runLongCommand(wingetPath, ["install", "--id", "Git.Git", "-e", "--source", "winget", "--accept-source-agreements", "--accept-package-agreements", "--silent"]);
+  const bashPath = await probeGitBashWindows();
+  if (!bashPath) throw new Error("安装命令已执行完成，但仍未找到 Git Bash。请完全退出并重新打开 Kimix，或从官网手动安装。");
+  return { path: bashPath, message: "Git for Windows 安装完成，新建会话即可正常对话" };
+}
+
 async function installKimiCodeWindows(): Promise<{ binaryPath: string; output: string }> {
   const latestBuffer = await downloadBufferWithProgress(`${KIMI_CODE_INSTALL_BASE_URL}/latest`, "script", "正在获取最新版本");
   const version = latestBuffer.toString("utf8").trim();
@@ -5543,6 +5602,22 @@ ipcMain.handle("kimi:installCli", async () => {
   try {
     const result = await installKimiCli();
     return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:gitBashStatus", async () => {
+  try {
+    return { success: true, data: await getGitBashStatus() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:installGitBash", async () => {
+  try {
+    return { success: true, data: await installGitForWindows() };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
