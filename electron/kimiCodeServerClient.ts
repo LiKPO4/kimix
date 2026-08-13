@@ -518,6 +518,7 @@ export function toServerConfigPatch(patch: Record<string, unknown>): Record<stri
     defaultModel: "default_model",
     defaultThinking: "default_thinking",
     secondaryModel: "secondary_model",
+    extraSkillDirs: "extra_skill_dirs",
   };
   const providerKeys: Record<string, string> = {
     apiKey: "api_key",

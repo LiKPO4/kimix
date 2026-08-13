@@ -450,6 +450,7 @@ export type KimiCodeConfig = {
     effort?: string;
   };
   defaultThinking?: boolean;
+  extraSkillDirs?: string[];
   raw?: unknown;
 };
 

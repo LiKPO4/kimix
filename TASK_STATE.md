@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-13 功能：通过官方 extra_skill_dirs 接入外部 Skill（v2.21.60）
+
+- 目标：实现类似 Codex 的外部 Skill 来源接入，但不恢复 Kimix 私有扫描、单项勾选或目录复制。
+- 实现：运行时 Skills 页面新增“官方附加 Skill 目录”，选择/添加/移除均读写 Kimi Code `config.toml` 的 `extra_skill_dirs`；配置适配明确映射 `extraSkillDirs -> extra_skill_dirs`。移除只撤销登记，不删除原目录。
+- 官方语义：附加目录与用户、项目、Plugin、内置 Skill 一并由 Kimi Code 发现；不会像 `skillDirs/--skills-dir` 那样替换默认 user/project 来源。同名优先级继续由官方注册表决定。
+- 实测：在隔离 Kimi Home、工作目录 `D:\WORKS\LuaProjects\LuaSource_超级投资大亨` 下登记 `C:\Users\Administrator\.eggitor\codex\fs\skills`，官方 `session.listSkills()` 返回 `eggy-fs-design`，路径为 Eggitor 原始 `SKILL.md`，来源为 `extra`；同时用户级 `.agents/skills` 和内置 Skill 仍存在。
+
 ## 2026-08-13 功能：升级 Kimi Code 0.35 并接通 Skill 附件（v2.21.59）
 
 - 上游：vendored Kimi Code 从 `0.34.0` / Node SDK `0.15.3` 升级到官方 `0.35.0` / Node SDK `0.16.0`，来源提交 `f6ee44e4`；仅保留既有 MCP 启动超时 overlay。

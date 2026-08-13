@@ -6144,6 +6144,56 @@ ipcMain.handle("kimi-code:getConfigDiagnostics", async () => {
   }
 });
 
+ipcMain.handle("kimi-code:getExtraSkillDirs", async () => {
+  try {
+    const config = await kimiCodeHost.getConfig({ reload: true });
+    return { success: true, data: Array.isArray(config.extraSkillDirs) ? config.extraSkillDirs : [] };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:setExtraSkillDirs", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { dirs?: unknown } : {};
+    if (!Array.isArray(req.dirs)) return { success: false, error: "Invalid Skill directories" };
+    const dirs: string[] = [];
+    const seen = new Set<string>();
+    for (const value of req.dirs) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const resolved = path.resolve(value.trim());
+      if (!path.isAbsolute(value.trim())) return { success: false, error: `Skill 目录必须是绝对路径：${value}` };
+      const stat = fs.existsSync(resolved) ? fs.statSync(resolved) : null;
+      if (stat && !stat.isDirectory()) return { success: false, error: `Skill 路径不是目录：${resolved}` };
+      const key = process.platform === "win32" ? resolved.toLowerCase() : resolved;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dirs.push(resolved);
+    }
+    const updated = await kimiCodeHost.setConfig({ extraSkillDirs: dirs });
+    return { success: true, data: Array.isArray(updated.extraSkillDirs) ? updated.extraSkillDirs : dirs };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:chooseSkillDirectory", async () => {
+  try {
+    const result = await showOpenDialog({
+      title: "选择 Kimi Code 附加 Skill 目录",
+      properties: ["openDirectory"],
+    });
+    return {
+      success: true,
+      data: result.canceled || result.filePaths.length === 0
+        ? { canceled: true }
+        : { canceled: false, path: path.resolve(result.filePaths[0]) },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:getManagedUsage", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

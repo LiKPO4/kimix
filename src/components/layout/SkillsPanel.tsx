@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, Cable, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Store } from "lucide-react";
+import { Activity, Cable, ExternalLink, FolderPlus, LayoutGrid, Plus, RefreshCw, Sparkles, Store, Trash2 } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import type { KimiCodeCapabilityStatus, KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
@@ -34,6 +34,9 @@ export function SkillsPanel({
   const [installingPlugin, setInstallingPlugin] = useState(false);
   const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
   const [sdkSkills, setSdkSkills] = useState<KimiCodeSkillSummary[]>([]);
+  const [extraSkillDirs, setExtraSkillDirs] = useState<string[]>([]);
+  const [extraSkillDirInput, setExtraSkillDirInput] = useState("");
+  const [savingExtraSkillDirs, setSavingExtraSkillDirs] = useState(false);
   const [configDiagnostics, setConfigDiagnostics] = useState<KimiCodeConfigDiagnostics>({ warnings: [] });
   const [sdkPluginRefreshing, setSdkPluginRefreshing] = useState(false);
   const [sdkPluginToggling, setSdkPluginToggling] = useState<string | null>(null);
@@ -91,6 +94,11 @@ export function SkillsPanel({
   useEffect(() => {
     let cancelled = false;
     void refreshSdkPlugins(undefined, () => cancelled);
+    void window.api.getKimiCodeExtraSkillDirs().then((res) => {
+      if (cancelled) return;
+      if (res.success) setExtraSkillDirs(asArray(res.data));
+      else setMessage(`读取官方附加 Skill 目录失败：${res.error}`);
+    });
     return () => {
       cancelled = true;
     };
@@ -233,6 +241,46 @@ export function SkillsPanel({
   const openPluginDocs = async () => {
     const res = await window.api.openExternal(OFFICIAL_PLUGIN_DOCS_URL);
     if (!res.success) setMessage(`打开插件文档失败：${res.error}`);
+  };
+
+  const saveExtraSkillDirs = async (dirs: string[], successMessage: string) => {
+    if (savingExtraSkillDirs) return false;
+    setSavingExtraSkillDirs(true);
+    const res = await window.api.setKimiCodeExtraSkillDirs({ dirs });
+    setSavingExtraSkillDirs(false);
+    if (!res.success) {
+      setMessage(`保存官方附加 Skill 目录失败：${res.error}`);
+      return false;
+    }
+    setExtraSkillDirs(asArray(res.data));
+    setMessage(`${successMessage}。官方注册表会重新发现；已有会话未更新时请新建会话。`);
+    await refreshSdkPlugins();
+    return true;
+  };
+
+  const addExtraSkillDir = async () => {
+    const value = extraSkillDirInput.trim();
+    if (!value) {
+      setMessage("请输入或选择一个 Skill 根目录");
+      return;
+    }
+    const exists = extraSkillDirs.some((dir) => dir.toLowerCase() === value.toLowerCase());
+    if (exists) {
+      setMessage("该 Skill 目录已经登记");
+      return;
+    }
+    if (await saveExtraSkillDirs([...extraSkillDirs, value], "已登记官方附加 Skill 目录")) {
+      setExtraSkillDirInput("");
+    }
+  };
+
+  const chooseExtraSkillDir = async () => {
+    const res = await window.api.chooseKimiCodeSkillDirectory();
+    if (!res.success) {
+      setMessage(`选择 Skill 目录失败：${res.error}`);
+      return;
+    }
+    if (!res.data.canceled && res.data.path) setExtraSkillDirInput(res.data.path);
   };
 
   const capabilityStateMeta = (capability: KimiCodeCapabilityStatus) => {
@@ -497,6 +545,67 @@ export function SkillsPanel({
 
             {skillsSubTab === "runtime" && (
               <div className="flex min-w-0 flex-col" style={{ gap: 14 }}>
+                <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
+                  <div className="font-medium text-[var(--kimix-panel-text)]">官方附加 Skill 目录</div>
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
+                    写入 Kimi Code 的 <code>extra_skill_dirs</code>。它会在用户、项目和 Plugin Skills 之外追加发现源，不会替换默认目录，也不会复制文件。
+                  </div>
+                  <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10, marginTop: 12 }}>
+                    <input
+                      value={extraSkillDirInput}
+                      onChange={(event) => setExtraSkillDirInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !savingExtraSkillDirs) void addExtraSkillDir();
+                      }}
+                      placeholder="例如 C:\\Users\\Administrator\\.eggitor\\codex\\fs\\skills"
+                      className="h-9 min-w-0 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
+                      style={{ paddingLeft: 12, paddingRight: 12 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void chooseExtraSkillDir()}
+                      disabled={savingExtraSkillDirs}
+                      className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:opacity-50"
+                    >
+                      <FolderPlus size={14} />
+                      <span>选择目录</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void addExtraSkillDir()}
+                      disabled={savingExtraSkillDirs || !extraSkillDirInput.trim()}
+                      className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:opacity-50"
+                    >
+                      <Plus size={14} />
+                      <span>{savingExtraSkillDirs ? "保存中" : "添加"}</span>
+                    </button>
+                  </div>
+                  {extraSkillDirs.length > 0 ? (
+                    <div className="flex flex-col" style={{ gap: 8, marginTop: 12 }}>
+                      {extraSkillDirs.map((dir) => (
+                        <div key={dir} className="grid items-center rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "9px 12px" }}>
+                          <div className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={dir}>{dir}</div>
+                          <button
+                            type="button"
+                            onClick={() => void saveExtraSkillDirs(extraSkillDirs.filter((item) => item !== dir), "已移除官方附加 Skill 目录")}
+                            disabled={savingExtraSkillDirs}
+                            className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:opacity-50"
+                            aria-label={`移除 ${dir}`}
+                            title="移除目录登记，不删除原文件"
+                          >
+                            <Trash2 size={14} />
+                            <span>移除</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 10 }}>
+                      尚未登记附加目录；Kimi Code 仍会自动发现用户和当前项目的官方 Skill 目录。
+                    </div>
+                  )}
+                </div>
+
                 <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
                   <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10 }}>
                     <div className="min-w-0 font-medium text-[var(--kimix-panel-text)]">官方运行时插件</div>

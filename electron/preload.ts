@@ -146,6 +146,9 @@ import type {
   KimiCodeCapabilityResponse,
   KimiCodeInstallCapabilityRequest,
   KimiCodeConfigDiagnosticsResponse,
+  KimiCodeExtraSkillDirsResponse,
+  KimiCodeSetExtraSkillDirsRequest,
+  KimiCodeChooseSkillDirectoryResponse,
   KimiCodeManagedUsageRequest,
   KimiCodeManagedUsageResponse,
   KimiCodeMcpServerRequest,
@@ -439,6 +442,12 @@ const api = {
     ipcRenderer.invoke("kimi-code:getUsage", req),
   getKimiCodeConfigDiagnostics: (): Promise<KimiCodeConfigDiagnosticsResponse> =>
     ipcRenderer.invoke("kimi-code:getConfigDiagnostics"),
+  getKimiCodeExtraSkillDirs: (): Promise<KimiCodeExtraSkillDirsResponse> =>
+    ipcRenderer.invoke("kimi-code:getExtraSkillDirs"),
+  setKimiCodeExtraSkillDirs: (req: KimiCodeSetExtraSkillDirsRequest): Promise<KimiCodeExtraSkillDirsResponse> =>
+    ipcRenderer.invoke("kimi-code:setExtraSkillDirs", req),
+  chooseKimiCodeSkillDirectory: (): Promise<KimiCodeChooseSkillDirectoryResponse> =>
+    ipcRenderer.invoke("kimi-code:chooseSkillDirectory"),
   getKimiCodeManagedUsage: (req?: KimiCodeManagedUsageRequest): Promise<KimiCodeManagedUsageResponse> =>
     ipcRenderer.invoke("kimi-code:getManagedUsage", req),
   listKimiCodeMcpServers: (req: KimiCodeSessionRequest): Promise<KimiCodeListMcpServersResponse> =>

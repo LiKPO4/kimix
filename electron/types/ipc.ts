@@ -2250,6 +2250,26 @@ export type KimiCodeConfigDiagnosticsResponse = {
   error: string;
 };
 
+export type KimiCodeExtraSkillDirsResponse = {
+  success: true;
+  data: string[];
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeSetExtraSkillDirsRequest = {
+  dirs: string[];
+};
+
+export type KimiCodeChooseSkillDirectoryResponse = {
+  success: true;
+  data: { path?: string; canceled: boolean };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeManagedUsageResponse = {
   success: true;
   data: unknown;
