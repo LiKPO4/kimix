@@ -575,18 +575,27 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setSecondaryPoolNewAlias("");
     setSecondaryPoolNewHint("");
   };
+  const secondaryPoolLoadedRef = useRef(false);
+  const secondaryPoolResaveRef = useRef(false);
   const refreshSecondaryModelPool = async () => {
     const res = await window.api.getKimiCodeSecondaryModelPool();
     if (!res.success) {
       setSecondaryPoolMessage(`读取子 Agent 模型池失败：${res.error}`);
       return;
     }
-    setSecondaryPoolDefault(res.data?.defaultModel ?? "");
+    const entries = res.data?.entries ?? [];
+    const defaultModel = res.data?.defaultModel ?? "";
+    // 归一化：有池条目时默认模型必须是池内别名（官方校验规则），外部手改配置也能安全载入。
+    setSecondaryPoolDefault(entries.length > 0 && !entries.some((entry) => entry.alias === defaultModel) ? entries[0].alias : defaultModel);
     setSecondaryPoolForce(res.data?.force ?? false);
-    setSecondaryPoolEntries(res.data?.entries ?? []);
+    setSecondaryPoolEntries(entries);
+    secondaryPoolLoadedRef.current = true;
   };
   const saveSecondaryModelPool = async () => {
-    if (secondaryPoolBusy) return;
+    if (secondaryPoolBusy) {
+      secondaryPoolResaveRef.current = true;
+      return;
+    }
     setSecondaryPoolBusy(true);
     const res = await window.api.saveKimiCodeSecondaryModelPool({
       defaultModel: secondaryPoolDefault || null,
@@ -600,12 +609,26 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setSecondaryPoolMessage(res.data.message);
+    if (secondaryPoolResaveRef.current) {
+      secondaryPoolResaveRef.current = false;
+      void saveSecondaryModelPool();
+    }
   };
   useEffect(() => {
     void refreshSecondaryModelPool();
     // 进入设置页时读取一次；保存后由返回消息确认，不自动重读。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 编辑即保存：任一池状态变化后防抖写入；加载完成前不触发。
+  useEffect(() => {
+    if (!secondaryPoolLoadedRef.current) return;
+    const timer = window.setTimeout(() => {
+      void saveSecondaryModelPool();
+    }, 600);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondaryPoolDefault, secondaryPoolForce, secondaryPoolEntries]);
 
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
@@ -2865,15 +2888,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <span>子 Agent 模型池</span>
                   </div>
                   <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => void saveSecondaryModelPool()}
-                      disabled={secondaryPoolBusy}
-                      className="kimix-settings-check-button"
-                    >
-                      <Check size={15} className={secondaryPoolBusy ? "kimix-spin" : ""} />
-                      <span>{secondaryPoolBusy ? "保存中" : "保存"}</span>
-                    </button>
+                    <span className="flex items-center text-[12px] leading-5 text-text-muted" style={{ gap: 6 }}>
+                      {secondaryPoolBusy && <RefreshCw size={13} className="kimix-spin" />}
+                      <span>{secondaryPoolBusy ? "保存中" : "改动自动保存"}</span>
+                    </span>
                     {settingsDragHandle("secondaryModel", "子 Agent 模型池")}
                   </div>
                 </div>
@@ -2936,7 +2954,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             className="kimix-settings-input h-9 min-w-0 rounded-lg text-[13px] outline-none"
                             style={{ paddingLeft: 10, paddingRight: 10 }}
                           >
-                            <option value="">跟随主 Agent（不配置）</option>
+                            {secondaryPoolEntries.length === 0 && <option value="">跟随主 Agent（不配置）</option>}
                             {secondaryPoolDefaultOptions.map((alias) => (
                               <option key={alias} value={alias}>{alias}</option>
                             ))}
