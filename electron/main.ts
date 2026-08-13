@@ -1761,6 +1761,115 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
   };
 }
 
+type SecondaryModelPoolDraft = {
+  defaultModel: string | null;
+  force: boolean;
+  defaultEffort: string | null;
+  entries: { alias: string; hint: string }[];
+};
+
+// 官方 0.36 的子 Agent 模型池（[secondary_model] default_model / force + [secondary_model.models]）。
+// 旧单模型键 model 作为 fallback default 继续读取（官方同一语义）。
+function readSecondaryModelPoolFromToml(raw: string): SecondaryModelPoolDraft | null {
+  const body = readTomlSectionBody(raw, "secondary_model");
+  const modelsBody = readTomlSectionBody(raw, "secondary_model.models");
+  if (!body && !modelsBody) return null;
+  const legacyModel = body ? readTomlString(body, "model") : null;
+  const defaultEffort = body ? readTomlString(body, "default_effort") : null;
+  const explicitDefault = body ? readTomlString(body, "default_model") : null;
+  const force = body ? readTomlBoolean(body, "force") === true : false;
+  const entries: { alias: string; hint: string }[] = [];
+  if (modelsBody) {
+    for (const line of modelsBody.split(/\r?\n/)) {
+      const match = line.match(/^\s*(?:"((?:\\.|[^"])*)"|([A-Za-z0-9_./:-]+))\s*=\s*"((?:\\.|[^"])*)"\s*(?:#.*)?$/);
+      if (match) entries.push({ alias: unescapeTomlString(match[1] ?? match[2]), hint: unescapeTomlString(match[3]) });
+    }
+  }
+  const defaultModel = explicitDefault ?? legacyModel ?? null;
+  if (!defaultModel && !force && !defaultEffort && entries.length === 0) return null;
+  return { defaultModel, force, defaultEffort: defaultEffort ?? null, entries };
+}
+
+function removeSecondaryModelPoolSections(raw: string) {
+  let next = removeTomlSection(raw, "secondary_model.models");
+  next = removeTomlSection(next, "secondary_model");
+  next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
+  return next.replace(/\n{3,}/g, "\n\n");
+}
+
+function applySecondaryModelPoolToml(raw: string, pool: SecondaryModelPoolDraft) {
+  const next = removeSecondaryModelPoolSections(raw);
+  if (!pool.defaultModel && !pool.force && !pool.defaultEffort && pool.entries.length === 0) return next;
+  const newline = next.includes("\r\n") ? "\r\n" : "\n";
+  const lines: string[] = ["[secondary_model]"];
+  if (pool.defaultModel) lines.push(`default_model = "${escapeTomlString(pool.defaultModel)}"`);
+  if (pool.defaultEffort) lines.push(`default_effort = "${escapeTomlString(pool.defaultEffort)}"`);
+  if (pool.force) lines.push("force = true");
+  if (pool.entries.length > 0) {
+    lines.push("", "[secondary_model.models]");
+    for (const entry of pool.entries) {
+      lines.push(`${toTomlTableKey(entry.alias)} = "${escapeTomlString(entry.hint)}"`);
+    }
+  }
+  const base = next.trimEnd();
+  return `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
+}
+
+// 级联清理（对齐官方 cascadeSubagentModelPool 语义）：删除模型/Provider 后，
+// 池内悬空条目过滤；有效默认模型悬空时整节清除，避免 0.36 起所有会话 create/resume/fork 校验失败。
+function pruneSecondaryModelPoolForRemovedAliases(raw: string, remainingAliases: Set<string>) {
+  const pool = readSecondaryModelPoolFromToml(raw);
+  if (!pool) return raw;
+  const defaultDangling = Boolean(pool.defaultModel && !remainingAliases.has(pool.defaultModel));
+  const keptEntries = pool.entries.filter((entry) => remainingAliases.has(entry.alias));
+  if (!defaultDangling && keptEntries.length === pool.entries.length) return raw;
+  if (defaultDangling) return removeSecondaryModelPoolSections(raw);
+  return applySecondaryModelPoolToml(raw, { ...pool, entries: keptEntries });
+}
+
+async function saveKimiSecondaryModelPool(input: unknown) {
+  const config = z.object({
+    defaultModel: z.string().trim().max(160).nullish(),
+    force: z.boolean().optional(),
+    entries: z.array(z.object({
+      alias: z.string().trim().min(1).max(160),
+      hint: z.string().trim().max(200),
+    })).max(24).optional(),
+  }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+  const current = readSecondaryModelPoolFromToml(raw);
+  const defaultModel = config.defaultModel?.trim() ? config.defaultModel.trim() : null;
+  const force = config.force === true;
+  if (force && !defaultModel) throw new Error("锁定模式需要先选择默认模型。");
+  const entries = (config.entries ?? []).filter((entry) => entry.alias);
+  if (force && entries.length > 0) throw new Error("锁定模式（force）不能与模型池条目同时配置，请二选一。");
+  const knownAliases = new Set(readKimiModelConfig().models.map((model) => model.alias));
+  if (defaultModel && !knownAliases.has(defaultModel)) throw new Error(`默认模型 ${defaultModel} 不在已配置模型列表中。`);
+  const dropped: string[] = [];
+  const keptEntries = entries.filter((entry) => {
+    if (knownAliases.has(entry.alias)) return true;
+    dropped.push(entry.alias);
+    return false;
+  });
+  let next = applySecondaryModelPoolToml(raw, {
+    defaultModel,
+    force,
+    defaultEffort: current?.defaultEffort ?? null,
+    entries: keptEntries,
+  });
+  // 与旧单模型写法一致：配置存在时持久化实验开关，保证外部启动的 kimi web 同样生效。
+  if (defaultModel) next = setTomlSectionValue(next, "experimental", "secondary-model", "true");
+  backupFileIfExists(configPath);
+  fs.writeFileSync(configPath, next, "utf-8");
+  const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+  const droppedNote = dropped.length > 0 ? `；已过滤未配置的别名：${dropped.join("、")}` : "";
+  return {
+    message: `已保存子 Agent 模型池（需要 Kimi Code 0.36.0+ 生效）${droppedNote}${buildConfigReloadSuffix(reloadResult)}`,
+  };
+}
+
 function saveOpenAiProviderConfig(input: unknown) {
   const config = SaveOpenAiProviderConfigSchema.parse(input);
   ensureKimiCodeMigratedConfig();
@@ -1941,6 +2050,7 @@ function removeKimiModelConfig(input: unknown) {
     const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
     next = setTopLevelTomlString(next, "default_model", fallback);
   }
+  next = pruneSecondaryModelPoolForRemovedAliases(next, new Set(remainingModels.map((model) => model.alias)));
   fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
   return readKimiModelConfig();
 }
@@ -1976,6 +2086,7 @@ function removeKimiProviderConfig(input: unknown) {
     const fallback = remainingModels.find((model) => model.alias === fallbackDefault)?.alias ?? remainingModels[0]?.alias ?? fallbackDefault;
     next = setTopLevelTomlString(next, "default_model", fallback);
   }
+  next = pruneSecondaryModelPoolForRemovedAliases(next, new Set(remainingModels.map((model) => model.alias)));
   fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
   return readKimiModelConfig();
 }
@@ -5454,6 +5565,25 @@ ipcMain.handle("kimi-code:probeThinkingEfforts", async (_, request: unknown) => 
 ipcMain.handle("kimi:saveSecondaryModel", async (_, request: unknown) => {
   try {
     return { success: true, data: await saveKimiSecondaryModelConfig(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:getSecondaryModelPool", async () => {
+  try {
+    ensureKimiCodeMigratedConfig();
+    const configPath = getKimiPaths().config;
+    const raw = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+    return { success: true, data: readSecondaryModelPoolFromToml(raw) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:saveSecondaryModelPool", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await saveKimiSecondaryModelPool(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

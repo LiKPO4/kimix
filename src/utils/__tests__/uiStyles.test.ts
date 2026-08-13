@@ -333,7 +333,7 @@ describe("UI_STYLES", () => {
     expect(longTaskInspector).toContain("kimix-inspector-drag-handle");
     expect(longTaskInspector).toContain("kimix-inspector-action");
     expect(longTaskInspector).toContain("kimix-inspector-list-item");
-    expect(longTaskInspector.match(/kimix-inspector-field/g)).toHaveLength(4);
+    expect(longTaskInspector.match(/kimix-inspector-field/g)).toHaveLength(5);
     expect(css).toMatch(/\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-inspector-action\s*\{[^}]*background-color:\s*var\(--surface-base\);/s);
     expect(css).toMatch(/\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-inspector-list-item[\s\S]*?\{[^}]*background-color:\s*var\(--surface-base\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-longtask-inspector\s+\.kimix-section-card\s+\.kimix-icon-text-button[\s\S]*?\{[^}]*border:\s*1px solid transparent;[^}]*border-radius:\s*var\(--kimix-modern-control-radius\);[^}]*box-shadow:\s*none;/s);

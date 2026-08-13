@@ -22,6 +22,9 @@ import type {
   CheckKimiCliResponse,
   GitBashStatusResponse,
   KimiCodeServerStatusResponse,
+  KimiCodeSecondaryModelPoolResponse,
+  KimiCodeSaveSecondaryModelPoolRequest,
+  KimiCodeSaveSecondaryModelPoolResponse,
   GitBashInstallResponse,
   GetKimiAuthStatusResponse,
   GetKimiModelConfigResponse,
@@ -349,6 +352,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:serverHostStatus"),
   retryKimiCodeServer: (): Promise<KimiCodeServerStatusResponse> =>
     ipcRenderer.invoke("kimi-code:retryServerHost"),
+  getKimiCodeSecondaryModelPool: (): Promise<KimiCodeSecondaryModelPoolResponse> =>
+    ipcRenderer.invoke("kimi:getSecondaryModelPool"),
+  saveKimiCodeSecondaryModelPool: (req: KimiCodeSaveSecondaryModelPoolRequest): Promise<KimiCodeSaveSecondaryModelPoolResponse> =>
+    ipcRenderer.invoke("kimi:saveSecondaryModelPool", req),
   listKimiCodeSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi-code:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>

@@ -9,6 +9,7 @@ export type SettingsSectionId =
   | "experiment"
   | "identity"
   | "model"
+  | "secondaryModel"
   | "theme"
   | "uiStyle"
   | "display"
@@ -78,7 +79,7 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     group: "Kimi Code",
     label: "模型与供应商",
     description: "管理默认模型、Provider、连接凭据和思考能力。",
-    sections: ["model"],
+    sections: ["model", "secondaryModel"],
   },
   {
     id: "experiments",
@@ -231,6 +232,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     pageId: "account",
     sectionId: "monthlyQuota",
     keywords: ["月度", "额度", "赠送", "token", "cookie", "kimi-auth", "会员"],
+  },
+  {
+    id: "secondary-model-pool",
+    label: "子 Agent 模型池",
+    description: "配置子 Agent 与 Swarm 派发时的备选模型池、默认模型与锁定模式",
+    pageId: "models",
+    sectionId: "secondaryModel",
+    keywords: ["子代理", "子 Agent", "swarm", "辅助模型", "secondary", "模型池"],
   },
   {
     id: "models",

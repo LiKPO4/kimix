@@ -8,6 +8,8 @@ import type {
   CheckKimiCliResponse,
   GitBashStatusResponse,
   KimiCodeServerStatusResponse,
+  KimiCodeSecondaryModelPoolResponse,
+  KimiCodeSaveSecondaryModelPoolResponse,
   GitBashInstallResponse,
   CheckKimiCliUpdateResponse,
   CheckUpdateResponse,
@@ -256,6 +258,8 @@ function installBrowserPreviewApi() {
       data: { enabled: false, state: "disabled", routing: "sdk", endpoint: "", managed: false, error: unsupported("检测 Kimi Server") },
     }),
     retryKimiCodeServer: (): Promise<KimiCodeServerStatusResponse> => fail("连接 Kimi Server"),
+    getKimiCodeSecondaryModelPool: (): Promise<KimiCodeSecondaryModelPoolResponse> => Promise.resolve({ success: true, data: null }),
+    saveKimiCodeSecondaryModelPool: (): Promise<KimiCodeSaveSecondaryModelPoolResponse> => fail("保存子 Agent 模型池"),
     getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> => Promise.resolve({
       success: true,
       data: {

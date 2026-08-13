@@ -364,6 +364,41 @@ export type CheckKimiCliRequest = {
   verify?: boolean;
 };
 
+export type KimiCodeSecondaryModelPoolEntry = {
+  alias: string;
+  hint: string;
+};
+
+export type KimiCodeSecondaryModelPool = {
+  defaultModel: string | null;
+  force: boolean;
+  /** 旧 recipe 的档位字段，池形态下保留透传。 */
+  defaultEffort: string | null;
+  entries: KimiCodeSecondaryModelPoolEntry[];
+};
+
+export type KimiCodeSecondaryModelPoolResponse = {
+  success: true;
+  data: KimiCodeSecondaryModelPool | null;
+} | {
+  success: false;
+  error: string;
+};
+
+export type KimiCodeSaveSecondaryModelPoolRequest = {
+  defaultModel?: string | null;
+  force?: boolean;
+  entries?: KimiCodeSecondaryModelPoolEntry[];
+};
+
+export type KimiCodeSaveSecondaryModelPoolResponse = {
+  success: true;
+  data: { message: string };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeServerStatusInfo = {
   enabled: boolean;
   state: "disabled" | "starting" | "attached" | "managed" | "fallback" | "stopped";
