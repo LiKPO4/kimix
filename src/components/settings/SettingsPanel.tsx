@@ -2991,6 +2991,23 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             ))}
                           </select>
                         </div>
+                        {secondaryPoolNewAlias && (
+                          <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                            <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">思考强度</div>
+                            <select
+                              value={secondaryPoolEffortOf(secondaryPoolNewAlias)}
+                              onChange={(event) => void changeSecondaryPoolEffort(secondaryPoolNewAlias, event.target.value)}
+                              disabled={secondaryPoolEffortBusy}
+                              className="kimix-settings-input h-9 min-w-0 rounded-lg text-[13px] outline-none disabled:opacity-55"
+                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                            >
+                              <option value="">模型默认</option>
+                              {secondaryPoolEffortOptionsFor(secondaryPoolNewAlias).map((effort) => (
+                                <option key={effort} value={effort}>{effort}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 14, marginBottom: 7 }}>选择提示（展示给主 Agent，可多行）</div>
                         <textarea
                           value={secondaryPoolNewHint}
