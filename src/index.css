@@ -1835,6 +1835,13 @@ body::before {
   border-radius: var(--radius-sm);
 }
 
+/* 搜索框/字段外壳（.kimix-settings-search、field 类容器）已由外壳的 focus-within 拥有焦点边界，
+   内部透明 input 再吃全局描边会形成与外框圆角/风格不一致的「内框」，统一抑制。 */
+.kimix-settings-search input:focus-visible,
+.kimix-settings-input > input:focus-visible {
+  outline: none;
+}
+
 /* ── Runtime Error ── */
 
 #kimix-runtime-error {
