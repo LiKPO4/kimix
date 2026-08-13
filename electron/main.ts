@@ -8236,9 +8236,13 @@ ipcMain.handle("kimi-code:activateSkill", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
     const name = typeof req.name === "string" ? req.name.trim() : "";
     const args = typeof req.args === "string" && req.args.trim() ? req.args.trim() : undefined;
+    const images = Array.isArray(req.images) ? req.images as { name: string; dataUrl: string }[] : [];
+    const videos = Array.isArray(req.videos) ? req.videos as { name: string; dataUrl?: string; fileId?: string }[] : [];
+    const files = Array.isArray(req.files) ? req.files as { name: string; filePath?: string; fileId?: string; mediaType?: string; size?: number }[] : [];
     if (!sessionId) return { success: false, error: "Missing sessionId" };
     if (!name) return { success: false, error: "Missing skill name" };
-    await kimiCodeHost.activateSkill(sessionId, name, args);
+    const attachmentParts = toKimiCodePromptInput("", images, videos, files);
+    await kimiCodeHost.activateSkill(sessionId, name, args, typeof attachmentParts === "string" ? [] : attachmentParts);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

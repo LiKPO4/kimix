@@ -2668,13 +2668,19 @@ export async function installCapability(id: string): Promise<KimiCodeCapabilityS
   }
 }
 
-export async function activateSkill(sessionId: string, name: string, args?: string): Promise<void> {
+export async function activateSkill(
+  sessionId: string,
+  name: string,
+  args?: string,
+  attachments: KimiCodePromptPart[] = [],
+): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
-    await getServerClient().activateSkill(sessionId, name, args);
+    await getServerClient().activateSkill(sessionId, name, args, attachments);
     return;
   }
   const managed = getManagedSession(sessionId);
+  if (attachments.length > 0) throw new Error("当前 SDK 兼容链路尚不支持 Skill 附件，请等待 Kimi Server 恢复后重试。");
   if (!managed.session.activateSkill) throw new Error("当前兼容链路不支持激活 Skill。");
   await managed.session.activateSkill(name, args);
 }

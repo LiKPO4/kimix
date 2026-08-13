@@ -74597,6 +74597,18 @@ function describeInactiveToolPattern$1(issue2) {
 function isKnownBuiltinToolName(name) {
   return KNOWN_BUILTIN_TOOL_NAMES.has(name);
 }
+function sessionLocalBuiltinProfiles() {
+  const cloned = new Map(Object.entries(DEFAULT_AGENT_PROFILES).map(([name, profile]) => [name, {
+    ...profile,
+    tools: [...profile.tools],
+    disallowedTools: profile.disallowedTools === void 0 ? void 0 : [...profile.disallowedTools]
+  }]));
+  for (const profile of cloned.values()) {
+    if (profile.subagents === void 0) continue;
+    profile.subagents = Object.fromEntries(Object.entries(profile.subagents).map(([name, target]) => [name, cloned.get(name) ?? target]));
+  }
+  return cloned;
+}
 function composePluginSections(sections) {
   const parts = [];
   const skipped = [];
@@ -90586,6 +90598,8 @@ async function driveAsyncEffect(iterable) {
   return (reason) => runDisposersReverse(disposers, reason);
 }
 function disposableLabel(d) {
+  const debugLabel = d.debugLabel;
+  if (typeof debugLabel === "string" && debugLabel.length > 0) return debugLabel;
   return `disposable:${d.constructor?.name ?? "anonymous"}`;
 }
 function trackDisposable(x3) {
@@ -91722,9 +91736,9 @@ function registerScopedService(scope, id, ctor, activation = 0, domain2 = "unkno
     activation
   });
 }
-function buildCollection(extra) {
+function buildCollection(seeds) {
   const collection2 = new ServiceCollection();
-  if (extra) for (const [id, value] of extra) collection2.set(id, value);
+  if (seeds) for (const [id, value] of seeds) collection2.set(id, value);
   return collection2;
 }
 function provideScopeServices(instantiation, kind, collection2) {
@@ -91740,12 +91754,12 @@ function provideScopeServices(instantiation, kind, collection2) {
   instantiation.provideAll(entries2);
 }
 function createScopedChildHandle(parent, kind, id, options2 = {}) {
-  const collection2 = buildCollection(options2.extra);
+  const collection2 = buildCollection(options2.seeds);
   const child = parent.createChild(collection2);
   child.debugLabel = id;
   try {
     watchScopeUnits(child, kind);
-    options2.assemble?.(child);
+    options2.configureContainer?.(child);
     provideScopeServices(child, kind, collection2);
   } catch (error48) {
     child.dispose();
@@ -92392,7 +92406,7 @@ function bootstrapSeed(input) {
 }
 function bootstrap(input, extraSeeds = []) {
   const options2 = resolveBootstrapOptions(input);
-  return { app: createAppScope({ extra: [
+  return { app: createAppScope({ seeds: [
     ...bootstrapSeed(input),
     ...storageSeed(options2),
     ...skillSeed(),
@@ -93056,7 +93070,7 @@ async function locateWindowsGitBash(deps) {
     checked.push(candidate);
     if (await deps.isFile(candidate)) return candidate;
   }
-  throw new Error(`Git Bash was not found on this Windows host. Install Git for Windows from https://gitforwindows.org/ or set KIMI_SHELL_PATH to a bash.exe. Checked: ${checked.join(", ")}.`);
+  throw new ProbeShellNotFoundError("Git Bash was not found on this Windows host. Install Git for Windows from https://gitforwindows.org/ or set KIMI_SHELL_PATH to a bash.exe.", checked);
 }
 async function readGitExecPath(deps, gitExe) {
   if (deps.platform === "win32" && !isAbsoluteWindowsPath(gitExe)) return void 0;
@@ -95406,6 +95420,9 @@ function isSessionSummaryShape(value) {
   if (value === null || typeof value !== "object") return false;
   const summary = value;
   return typeof summary["id"] === "string" && typeof summary["workspaceId"] === "string" && typeof summary["createdAt"] === "number" && typeof summary["updatedAt"] === "number" && typeof summary["archived"] === "boolean";
+}
+async function drainSessionIndexMirror() {
+  await Promise.all(pendingDrains);
 }
 async function drainSessionMetadataWrites() {
   await Promise.all(pendingWrites);
@@ -101920,6 +101937,25 @@ function writesOnlyPlanFile(context, planFilePath) {
 function planModeWriteDeniedMessage(planFilePath) {
   return `Plan mode is active. You may only write to the current plan file: ${planFilePath ?? "(no plan file selected yet)"}. Call ExitPlanMode to exit plan mode before editing other files.`;
 }
+function collectEventEntries(entries2, out, base) {
+  for (const entry of entries2) {
+    if (isEventSubscriptionLabel(entry.label)) out.push({
+      ...base,
+      label: entry.label,
+      kind: entry.kind
+    });
+    if (entry.children !== void 0) collectEventEntries(entry.children, out, base);
+  }
+}
+function isEventSubscriptionLabel(label) {
+  return label.startsWith("on:") || label === "disposable:EventSubscription";
+}
+function isBusCountSource(value) {
+  return typeof value === "object" && value !== null && typeof value.listenerCounts === "function";
+}
+function isGlobalCountSource(value) {
+  return typeof value === "object" && value !== null && typeof value.listenerCount === "number";
+}
 function goalForModel(goal) {
   const { goalId: _goalId, ...rest } = goal;
   return rest;
@@ -103451,6 +103487,9 @@ function sortKeysDeep(value) {
   if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).toSorted(([a], [b2]) => a.localeCompare(b2)).map(([key2, nested]) => [key2, sortKeysDeep(nested)]));
   return value;
 }
+function sessionEphemeralMcpServersSeed(servers) {
+  return [[ISessionEphemeralMcpServers, servers]];
+}
 async function runAgentTurn(target, request, options2) {
   options2.signal.throwIfAborted();
   const promptService = target.accessor.get(IAgentPromptService);
@@ -103837,12 +103876,8 @@ function followWorkspaceHandlers(accessor, follow) {
   }));
   return store;
 }
-function assembleSessionSeedAdapters(container, sessionMcpHandle) {
+function installSessionSeedAdapters(container) {
   for (const recipe of SESSION_SEED_ADAPTERS) {
-    if (recipe === SessionMcpHandleAdapter && sessionMcpHandle !== void 0) {
-      container.provide(ISessionMcpHandle, sessionMcpHandle);
-      continue;
-    }
     const adapter2 = container.fiberHost.constructService(recipe, void 0);
     container.anchorKernelEntry(() => {
       adapter2.dispose?.();
@@ -105499,116 +105534,6 @@ function encodeBatchOps(ops) {
   }
   return body;
 }
-function readExactSync(fd, buf, pos) {
-  let got = 0;
-  while (got < buf.length) {
-    const r2 = fsSync.readSync(fd, buf, got, buf.length - got, pos + got);
-    if (r2 === 0) throw new Error("codec: short read past EOF");
-    got += r2;
-  }
-}
-function readFrameRefAt(fd, pos, size) {
-  if (size - pos < 22) return null;
-  const header = Buffer.allocUnsafe(22);
-  readExactSync(fd, header, pos);
-  if (header[0] !== MAGIC[0] || header[1] !== MAGIC[1]) return null;
-  const type2 = header.readUInt8(2);
-  const keyLen = header.readUInt16LE(4);
-  const valLen = header.readUInt32LE(6);
-  const metaLen = header.readUInt32LE(10);
-  if (keyLen > 65535) return null;
-  const frameLen = 22 + keyLen + valLen + metaLen + 4;
-  if (frameLen < 26) return null;
-  if (size - pos < frameLen) return null;
-  let crc = 0;
-  let crcPos = pos + 2;
-  let crcLeft = frameLen - 4 - 2;
-  while (crcLeft > 0) {
-    const len = Math.min(CRC_CHUNK, crcLeft);
-    const buf = Buffer.allocUnsafe(len);
-    readExactSync(fd, buf, crcPos);
-    crc = crc32(buf, crc);
-    crcPos += len;
-    crcLeft -= len;
-  }
-  const storedCrcBuf = Buffer.allocUnsafe(4);
-  readExactSync(fd, storedCrcBuf, pos + frameLen - 4);
-  if (storedCrcBuf.readUInt32LE(0) !== crc) return null;
-  const keyStart = pos + 22;
-  const valueOff = keyStart + keyLen;
-  const metaStart = valueOff + valLen;
-  const key2 = Buffer.allocUnsafe(keyLen);
-  if (keyLen) readExactSync(fd, key2, keyStart);
-  let meta3 = null;
-  if (metaLen) {
-    meta3 = Buffer.allocUnsafe(metaLen);
-    readExactSync(fd, meta3, metaStart);
-  }
-  return {
-    type: type2,
-    key: key2,
-    meta: meta3,
-    expireAt: Number(header.readBigInt64LE(14)),
-    frameOff: pos,
-    valueOff,
-    valLen,
-    frameLen
-  };
-}
-function findMagicSync(fd, start, size) {
-  const buf = Buffer.allocUnsafe(MAGIC_SCAN_CHUNK);
-  let pos = start;
-  while (pos < size) {
-    const len = Math.min(MAGIC_SCAN_CHUNK, size - pos);
-    const n = fsSync.readSync(fd, buf, 0, len, pos);
-    if (n === 0) return -1;
-    const idx = buf.subarray(0, n).indexOf(MAGIC);
-    if (idx >= 0) return pos + idx;
-    if (n < MAGIC.length) break;
-    pos += n - (MAGIC.length - 1);
-  }
-  return -1;
-}
-function scanFrameRefsFd(fd, { onCorrupt = "resync", startOffset = 0, maxResyncCandidates = DEFAULT_RESYNC_CANDIDATE_BUDGET } = {}) {
-  const size = fsSync.fstatSync(fd).size;
-  const frames = [];
-  const corruptRanges = [];
-  let pos = startOffset;
-  let resyncCandidates = 0;
-  while (pos < size) {
-    const r2 = readFrameRefAt(fd, pos, size);
-    if (r2) {
-      frames.push(r2);
-      pos += r2.frameLen;
-      continue;
-    }
-    if (onCorrupt === "strict") {
-      corruptRanges.push([pos, size]);
-      break;
-    }
-    const badStart = pos;
-    let resume = -1;
-    let scan2 = pos + 1;
-    while (scan2 < size - 1) {
-      scan2 = findMagicSync(fd, scan2, size);
-      if (scan2 === -1) break;
-      if (resyncCandidates++ >= maxResyncCandidates) break;
-      if (readFrameRefAt(fd, scan2, size)) {
-        resume = scan2;
-        break;
-      }
-      scan2++;
-    }
-    corruptRanges.push([badStart, resume === -1 ? size : resume]);
-    if (resume === -1) break;
-    pos = resume;
-  }
-  return {
-    frames,
-    corruptRanges,
-    eofOffset: pos
-  };
-}
 function scanAbortError() {
   const err = /* @__PURE__ */ new Error("frame scan aborted");
   err.name = "AbortError";
@@ -105760,7 +105685,7 @@ async function scanFrameRefsFdAsync(fd, { onCorrupt = "resync", startOffset = 0,
     if (sinceYield >= SCAN_YIELD_BYTES) {
       sinceYield = 0;
       throwIfAborted2();
-      await yieldToLoop$2();
+      await yieldToLoop$3();
     }
   };
   throwIfAborted2();
@@ -106115,12 +106040,22 @@ function* frameToOps(f4, file2, fd, valueMode, onCorruptBatch) {
     };
   }
 }
+function walApplySlicer() {
+  let ops = 0;
+  let sliceStart = performance.now();
+  return () => {
+    if (++ops < 512 && performance.now() - sliceStart < 8) return false;
+    ops = 0;
+    sliceStart = performance.now();
+    return true;
+  };
+}
 async function applyFrames(frames, file2, fd, store, valueMode, onCorruptBatch) {
-  let applied = 0;
-  for (const f4 of frames) {
-    for (const op of frameToOps(f4, file2, fd, valueMode, onCorruptBatch)) if (op.type === 1) store.setRef(op.key, op.ref, op.expireAt, op.dt);
+  const slice = walApplySlicer();
+  for (const f4 of frames) for (const op of frameToOps(f4, file2, fd, valueMode, onCorruptBatch)) {
+    if (op.type === 1) store.setRef(op.key, op.ref, op.expireAt, op.dt);
     else if (op.type === 2) store.del(op.key);
-    if (++applied % APPLY_YIELD_FRAMES === 0) await yieldToLoop$1();
+    if (slice()) await yieldToLoop$2();
   }
 }
 function statIdentity(p2) {
@@ -106144,7 +106079,7 @@ function sameGeneration(scanned, after2, sizeFloor) {
 function resetStore(store) {
   for (const k of store.map.keys()) store.del(k);
 }
-async function recover({ dir, store, mode = "resync", truncate: truncate2 = true, valueMode = "memory", maxGenerationRetries = 4, attachValueReader, signal }) {
+async function recover({ dir, store, mode = "resync", truncate: truncate2 = true, valueMode = "memory", maxGenerationRetries = 4, attachValueReader, signal, timings }) {
   const snapPath = path.join(dir, SNAPSHOT_FILE);
   const walPath = path.join(dir, WAL_FILE);
   let delay = GENERATION_RETRY_BASE_MS;
@@ -106158,7 +106093,8 @@ async function recover({ dir, store, mode = "resync", truncate: truncate2 = true
         mode,
         truncate: truncate2,
         valueMode,
-        signal
+        signal,
+        timings
       });
     } catch (e2) {
       if (e2.name === "AbortError") resetStore(store);
@@ -106174,7 +106110,7 @@ async function recover({ dir, store, mode = "resync", truncate: truncate2 = true
     delay *= 2;
   }
 }
-async function recoverPass({ snapPath, walPath, store, mode, truncate: truncate2, valueMode, signal }) {
+async function recoverPass({ snapPath, walPath, store, mode, truncate: truncate2, valueMode, signal, timings }) {
   let corruptBatches = 0;
   const countCorruptBatch = () => {
     corruptBatches++;
@@ -106193,11 +106129,15 @@ async function recoverPass({ snapPath, walPath, store, mode, truncate: truncate2
         size: st2.size
       };
       snapshotBytes = st2.size;
+      const snapScanT0 = performance.now();
       const r2 = await scanFrameRefsFdAsync(fd, {
         onCorrupt: mode,
         signal
       });
+      if (timings) timings.walScanMs += performance.now() - snapScanT0;
+      const snapApplyT0 = performance.now();
       await applyFrames(r2.frames, "snapshot", fd, store, valueMode, countCorruptBatch);
+      if (timings) timings.walApplyMs += performance.now() - snapApplyT0;
       snapshotFrames = r2.frames.length;
       snapshotCorrupt = r2.corruptRanges;
     } finally {
@@ -106222,11 +106162,15 @@ async function recoverPass({ snapPath, walPath, store, mode, truncate: truncate2
       };
       walSizeFloor = st2.size;
       walBytes = st2.size;
+      const walScanT0 = performance.now();
       const r2 = await scanFrameRefsFdAsync(fd, {
         onCorrupt: mode,
         signal
       });
+      if (timings) timings.walScanMs += performance.now() - walScanT0;
+      const walApplyT0 = performance.now();
       await applyFrames(r2.frames, "wal", fd, store, valueMode, countCorruptBatch);
+      if (timings) timings.walApplyMs += performance.now() - walApplyT0;
       walFrames = r2.frames.length;
       walCorrupt = r2.corruptRanges;
       walScanEnd = r2.eofOffset;
@@ -106277,7 +106221,7 @@ async function recoverPass({ snapPath, walPath, store, mode, truncate: truncate2
     }
   };
 }
-function catchUpWal(walPath, offset, anchor, apply) {
+async function catchUpWalAsync(walPath, offset, anchor, apply) {
   let fd;
   try {
     fd = fsSync.openSync(walPath, "r");
@@ -106290,7 +106234,7 @@ function catchUpWal(walPath, offset, anchor, apply) {
     if (st2.dev !== anchor.dev || st2.ino !== anchor.ino) return null;
     const size = st2.size;
     if (offset < 0 || offset > size) return null;
-    const r2 = scanFrameRefsFd(fd, {
+    const r2 = await scanFrameRefsFdAsync(fd, {
       onCorrupt: "strict",
       startOffset: offset
     });
@@ -106303,7 +106247,8 @@ function catchUpWal(walPath, offset, anchor, apply) {
         appliedFrames: 0
       };
     }
-    for (const f4 of r2.frames) apply(f4, fd);
+    const slice = walApplySlicer();
+    for (const f4 of r2.frames) await apply(f4, fd, slice);
     return {
       offset: r2.eofOffset,
       appliedFrames: r2.frames.length
@@ -106376,7 +106321,7 @@ async function writeSnapshot(store, tmpPath, opts = {}) {
     batchBytes += frame.length;
     count++;
     if (batchBytes >= FLUSH_BYTES$3) await flushBatch();
-    if (count % yieldEvery === 0) await yieldToLoop();
+    if (count % yieldEvery === 0) await yieldToLoop$1();
   };
   try {
     const memRecs = [];
@@ -106435,7 +106380,7 @@ async function writeSnapshot(store, tmpPath, opts = {}) {
             await writeRecord(rec.key, value, rec.expireAt, rec.dt);
           }
           i2 = j2;
-          await yieldToLoop();
+          await yieldToLoop$1();
         }
       }
     }
@@ -106832,7 +106777,7 @@ async function feedBuild(b2, entries2) {
       if (docsSinceYield >= BUILD_YIELD_DOCS || tokensSinceYield >= BUILD_YIELD_TOKENS) {
         docsSinceYield = 0;
         tokensSinceYield = 0;
-        await yieldToLoop$1();
+        await yieldToLoop$2();
       }
     }
   } catch (e2) {
@@ -106855,7 +106800,7 @@ async function exportImageStateAsync(s4, opts = {}) {
   const sliceEvery = opts.sliceEvery ?? 65536;
   let n = 0;
   const tick = async () => {
-    if (++n % sliceEvery === 0) await yieldToLoop$1();
+    if (++n % sliceEvery === 0) await yieldToLoop$2();
   };
   const dict = /* @__PURE__ */ new Map();
   for (const [t2, e2] of s4.postings) {
@@ -106917,6 +106862,66 @@ function attachImage(s4, args) {
   for (const id of args.removed) s4.removed.add(id);
   s4.clearCache();
   s4.N = args.liveCount;
+  s4.basePending = false;
+  s4.baseEpoch++;
+}
+async function attachImageAsync(s4, args, opts = {}) {
+  const sliceEvery = opts.sliceEvery ?? 32768;
+  let n = 0;
+  const tick = async () => {
+    if (++n % sliceEvery === 0) await yieldToLoop$2();
+  };
+  s4.close();
+  s4.memBase = null;
+  const postings = /* @__PURE__ */ new Map();
+  for (const e2 of args.dictEntries) {
+    postings.set(e2.term, {
+      off: e2.off,
+      len: e2.len,
+      df: e2.df
+    });
+    await tick();
+  }
+  s4.postings = postings;
+  s4.pf = PostingsFile.open(args.postingsPath);
+  const keys2 = args.docs.keys;
+  const docLen = /* @__PURE__ */ new Map();
+  for (let i2 = 0; i2 < keys2.length; i2++) {
+    const len = args.docs.docLens[i2];
+    if (len !== void 0) docLen.set(i2, len);
+    await tick();
+  }
+  const keyToId = /* @__PURE__ */ new Map();
+  for (let i2 = 0; i2 < keys2.length; i2++) {
+    const k = keys2[i2];
+    if (k !== void 0) keyToId.set(k, i2);
+    await tick();
+  }
+  s4.docLen = docLen;
+  s4.keys = keys2;
+  s4.keyToId = keyToId;
+  s4.delta.clear();
+  s4.deltaDocs.clear();
+  s4.deltaCount = 0;
+  for (const d of args.docs.delta) {
+    const m3 = /* @__PURE__ */ new Map();
+    s4.delta.set(d.term, m3);
+    for (const doc of d.docs) {
+      m3.set(doc.docID, doc.freq);
+      s4.deltaCount++;
+      let set3 = s4.deltaDocs.get(doc.docID);
+      if (!set3) s4.deltaDocs.set(doc.docID, set3 = /* @__PURE__ */ new Set());
+      set3.add(d.term);
+      await tick();
+    }
+  }
+  s4.removed.clear();
+  for (const id of args.docs.removed) {
+    s4.removed.add(id);
+    await tick();
+  }
+  s4.clearCache();
+  s4.N = args.docs.liveCount;
   s4.basePending = false;
   s4.baseEpoch++;
 }
@@ -107135,32 +107140,6 @@ async function copyIfExists(dir, name, destDir) {
 function* filterKeys(keys2, pred) {
   for (const k of keys2) if (pred(k)) yield k;
 }
-async function readGenerationFile(path2, magic, version2) {
-  let buf;
-  try {
-    buf = await fs.readFile(path2);
-  } catch (e2) {
-    throw new GenerationCorruptError(`generation file unreadable: ${e2.code ?? String(e2)}`);
-  }
-  return parseGenerationBuffer(buf, magic, version2);
-}
-function parseGenerationBuffer(buf, magic, version2) {
-  if (buf.length < 12) throw new GenerationCorruptError("generation file too short");
-  for (let i2 = 0; i2 < 4; i2++) if (buf.readUInt8(i2) !== magic.charCodeAt(i2)) throw new GenerationCorruptError(`bad magic (want ${magic})`);
-  if (buf.readUInt32LE(4) !== version2) throw new GenerationCorruptError(`unsupported file version (want ${version2})`);
-  const stored = buf.readUInt32LE(buf.length - 4);
-  if (stored !== crc32(buf.subarray(0, buf.length - 4))) throw new GenerationCorruptError("generation file crc mismatch");
-  return {
-    payload: new ByteReader(buf.subarray(8, buf.length - 4)),
-    bytes: buf.length,
-    crc32: stored
-  };
-}
-async function readGenerationFileChecked(path2, magic, version2, expected) {
-  const f4 = await readGenerationFile(path2, magic, version2);
-  if (f4.bytes !== expected.bytes || f4.crc32 !== expected.crc32) throw new GenerationCorruptError("generation file does not match manifest record");
-  return f4.payload;
-}
 async function readGenerationFileCheckedAsync(path2, magic, version2, expected) {
   let buf;
   try {
@@ -107182,23 +107161,25 @@ async function readGenerationFileCheckedAsync(path2, magic, version2, expected) 
   if (buf.length !== expected.bytes || stored !== expected.crc32) throw new GenerationCorruptError("generation file does not match manifest record");
   return new ByteReader(buf.subarray(8, buf.length - 4));
 }
-function verifyFileIntegritySync(path2, expected) {
-  const fd = fsSync.openSync(path2, "r");
+async function verifyFileIntegrityAsync(path2, expected) {
+  const fh = await fs.open(path2, "r");
   try {
-    const st2 = fsSync.fstatSync(fd);
+    const st2 = await fh.stat();
     if (st2.size !== expected.bytes) throw new GenerationCorruptError("file size does not match manifest record");
     let crc = 0;
-    const buf = Buffer.allocUnsafe(65536);
+    const buf = Buffer.allocUnsafe(Math.min(VERIFY_CHUNK_BYTES, Math.max(st2.size, 1)));
     let pos = 0;
     while (pos < st2.size) {
-      const n = fsSync.readSync(fd, buf, 0, Math.min(buf.length, st2.size - pos), pos);
-      if (n === 0) throw new GenerationCorruptError("file shrank during integrity check");
-      crc = crc32(buf.subarray(0, n), crc);
-      pos += n;
+      const { bytesRead } = await fh.read(buf, 0, Math.min(buf.length, st2.size - pos), pos);
+      if (bytesRead === 0) throw new GenerationCorruptError("file shrank during integrity check");
+      crc = crc32(buf.subarray(0, bytesRead), crc);
+      pos += bytesRead;
+      await yieldToLoop();
     }
     if (crc >>> 0 !== expected.crc32) throw new GenerationCorruptError("file crc does not match manifest record");
   } finally {
-    fsSync.closeSync(fd);
+    await fh.close().catch(() => {
+    });
   }
 }
 function dtMetaBytes(dt2) {
@@ -107361,9 +107342,13 @@ async function writeSecondaryIndexImage(path2, indexes) {
     throw e2;
   }
 }
-function readSecondaryIndexImage(r2) {
+async function readSecondaryIndexImageAsync(r2, yieldEvery = 32768) {
   const count = r2.u32();
   const out = [];
+  let n = 0;
+  const tick = async () => {
+    if (++n % yieldEvery === 0) await yieldToLoop();
+  };
   for (let i2 = 0; i2 < count; i2++) {
     const name = r2.text();
     const field = r2.text();
@@ -107380,7 +107365,10 @@ function readSecondaryIndexImage(r2) {
         const scalarKey2 = r2.text();
         const pkCount = r2.u64();
         const pks = [];
-        for (let p2 = 0; p2 < pkCount; p2++) pks.push(r2.key());
+        for (let p2 = 0; p2 < pkCount; p2++) {
+          pks.push(r2.key());
+          await tick();
+        }
         equality.push({
           scalarKey: scalarKey2,
           pks
@@ -107388,11 +107376,14 @@ function readSecondaryIndexImage(r2) {
       }
     } else {
       range = [];
-      const n = r2.u64();
-      for (let j2 = 0; j2 < n; j2++) range.push({
-        value: r2.f64(),
-        pk: r2.key()
-      });
+      const m3 = r2.u64();
+      for (let j2 = 0; j2 < m3; j2++) {
+        range.push({
+          value: r2.f64(),
+          pk: r2.key()
+        });
+        await tick();
+      }
     }
     out.push({
       name,
@@ -107457,9 +107448,13 @@ async function writeCompoundIndexImage(path2, indexes) {
     throw e2;
   }
 }
-function readCompoundIndexImage(r2) {
+async function readCompoundIndexImageAsync(r2, yieldEvery = 32768) {
   const count = r2.u32();
   const out = [];
+  let n = 0;
+  const tick = async () => {
+    if (++n % yieldEvery === 0) await yieldToLoop();
+  };
   for (let i2 = 0; i2 < count; i2++) {
     const name = r2.text();
     const groupBy = r2.text();
@@ -107471,14 +107466,15 @@ function readCompoundIndexImage(r2) {
     const groups = [];
     for (let g2 = 0; g2 < groupCount; g2++) {
       const group = readGroupValue(r2);
-      const n = r2.u64();
+      const m3 = r2.u64();
       const entries2 = [];
-      for (let j2 = 0; j2 < n; j2++) {
+      for (let j2 = 0; j2 < m3; j2++) {
         const order = orderType === "string" ? r2.text() : r2.f64();
         entries2.push({
           order,
           pk: r2.key()
         });
+        await tick();
       }
       groups.push({
         group,
@@ -107510,16 +107506,6 @@ async function writeTextDictionaryImage(path2, entries2) {
     await w2.abort();
     throw e2;
   }
-}
-function readTextDictionaryImage(r2) {
-  const out = [];
-  while (!r2.done) out.push({
-    term: r2.term(),
-    off: r2.u64(),
-    len: r2.u32(),
-    df: r2.u32()
-  });
-  return out;
 }
 async function readTextDictionaryImageAsync(r2, yieldEvery = 65536) {
   const out = [];
@@ -107572,11 +107558,15 @@ async function writeTextDocsImage(path2, image) {
     throw e2;
   }
 }
-function readTextDocsImage(r2) {
+async function readTextDocsImageAsync(r2, yieldEvery = 32768) {
   const docCount = r2.u64();
   const liveCount = r2.u64();
   const removedCount = r2.u64();
   const deltaCount = r2.u64();
+  let n = 0;
+  const tick = async () => {
+    if (++n % yieldEvery === 0) await yieldToLoop();
+  };
   const keys2 = [];
   const docLens = [];
   for (let i2 = 0; i2 < docCount; i2++) {
@@ -107589,18 +107579,25 @@ function readTextDocsImage(r2) {
       const len = r2.u32();
       docLens.push(len === 0 ? void 0 : len);
     } else throw new GenerationCorruptError(`text docs image: unknown presence tag ${present}`);
+    await tick();
   }
   const removed = [];
-  for (let i2 = 0; i2 < removedCount; i2++) removed.push(r2.u32());
+  for (let i2 = 0; i2 < removedCount; i2++) {
+    removed.push(r2.u32());
+    await tick();
+  }
   const delta = [];
   for (let i2 = 0; i2 < deltaCount; i2++) {
     const term = r2.term();
-    const n = r2.u64();
+    const m3 = r2.u64();
     const docs = [];
-    for (let j2 = 0; j2 < n; j2++) docs.push({
-      docID: r2.u32(),
-      freq: r2.u32()
-    });
+    for (let j2 = 0; j2 < m3; j2++) {
+      docs.push({
+        docID: r2.u32(),
+        freq: r2.u32()
+      });
+      await tick();
+    }
     delta.push({
       term,
       docs
@@ -108422,6 +108419,7 @@ function startInline(spec, opts, reason) {
   };
 }
 async function openMiniDb(db, opts, hooks) {
+  const openT0 = performance.now();
   if (!opts || !opts.dir) throw new TypeError("MiniDb.open: opts.dir is required");
   db.dir = opts.dir;
   db.walPath = path.join(db.dir, WAL_FILE);
@@ -108471,6 +108469,13 @@ async function openMiniDb(db, opts, hooks) {
       db.readOnly = true;
       db.lock = null;
     } else throw new LockError(`database is locked by another process: ${db.dir}`);
+    else {
+      const heldToken = db.lock.heldToken;
+      if (heldToken !== void 0) try {
+        opts.onLockAcquired?.({ token: heldToken });
+      } catch {
+      }
+    }
   }
   if (!db.readOnly) {
     for (const tmp of STALE_TMP_FILES) await fs.rm(path.join(db.dir, tmp), { force: true });
@@ -108504,13 +108509,19 @@ async function openMiniDb(db, opts, hooks) {
     let generationLoaded = false;
     if (db.indexGenerationsEnabled) generationLoaded = await hooks.tryLoadGeneration(opts.recovery ?? "resync");
     if (!generationLoaded) {
+      db.lifecycle.transition("full-rebuild");
       const recT0 = performance.now();
+      const scanApply = {
+        walScanMs: 0,
+        walApplyMs: 0
+      };
       db.recoveryInfo = await recover({
         dir: db.dir,
         store: db.store,
         mode: opts.recovery ?? "resync",
         truncate: !db.readOnly,
         valueMode: db.valueMode,
+        timings: scanApply,
         attachValueReader: db.valueMode === "disk" ? (anchors) => {
           const reader = new ValueReader(db.dir);
           let ids;
@@ -108530,11 +108541,14 @@ async function openMiniDb(db, opts, hooks) {
         } : void 0
       });
       db.stats.recoveryDurationMs += performance.now() - recT0;
+      db.lifecycle.time("walScanMs", scanApply.walScanMs);
+      db.lifecycle.time("walApplyMs", scanApply.walApplyMs);
       db.stats.recoveryBytes += db.recoveryInfo.snapshotBytes + db.recoveryInfo.walBytes;
       db.stats.recoveryFrames += db.recoveryInfo.snapshotFrames + db.recoveryInfo.walFrames;
       if (db.recoveryInfo.truncatedWal) await db.wal.refreshSize();
       hooks.seedAccessFromStore();
       await hooks.rebuildAllIndexes();
+      db.lifecycle.time("fullRecoveryMs", performance.now() - recT0);
     }
     if (!db.readOnly && db.autoCompact && shouldCompact(db)) hooks.submitCompaction().catch(() => {
     });
@@ -108546,6 +108560,8 @@ async function openMiniDb(db, opts, hooks) {
       if (!generationLoaded && db.size > 0 || stale) hooks.buildGeneration("open").catch(() => {
       });
     }
+    db.lifecycle.time("openMs", performance.now() - openT0);
+    db.lifecycle.finishOpen();
   } catch (err) {
     if (db.compacting && db._compactDone) await db._compactDone.catch(() => {
     });
@@ -108823,6 +108839,9 @@ function indexName(collection2, name) {
 }
 function isRebuildable(error48) {
   return error48 instanceof SyntaxError || error48.name === "CorruptFrameError";
+}
+async function drainQueryStoreDisposals() {
+  await Promise.all(pendingDisposals);
 }
 function classifySearchError(error48) {
   const name = error48 instanceof Error ? error48.name : "";
@@ -110037,7 +110056,7 @@ function buildContextCompactionShape(history, input, estimate = defaultTokenEsti
     ...selection.tail
   ];
   const contextSummary = input.contextSummary ?? input.summary;
-  const tokensAfter = input.tokensAfter ?? (input.summaryOutputTokens ?? estimate.text(contextSummary)) + estimate.messages(keptMessages);
+  const tokensAfter = input.tokensAfter ?? (input.requestOverheadTokens ?? 0) + (input.summaryOutputTokens ?? estimate.text(contextSummary)) + estimate.messages(keptMessages);
   const keptUserMessageCount = input.keptUserMessageCount ?? selection.head.length + selection.tail.length;
   const keptHeadUserMessageCount = input.keptHeadUserMessageCount ?? (selection.elided ? selection.head.length : void 0);
   return {
@@ -113327,7 +113346,7 @@ function applyCatalogProvider(config2, options2) {
   };
   return { defaultModel };
 }
-var import_yazl, __filename12, __dirname12, __create2, __defProp3, __getOwnPropDesc2, __getOwnPropNames2, __getProtoOf2, __hasOwnProp2, __esmMin, __commonJSMin, __exportAll, __copyProps2, __toESM2, __require2, _lazyMatch, _match, zeptomatch, _DRIVE_LETTER_START_RE, _UNC_REGEX, _IS_ABSOLUTE_RE, _DRIVE_LETTER_RE, _ROOT_FOLDER_RE, _EXTNAME_RE, _PATH_ROOT_RE, normalize2, join$1, resolve$2, isAbsolute$1, toNamespacedPath, extname$1, relative$1, dirname$3, format$1, basename$1, parse$8, matchesGlob, _path, delimiter, _platforms, mix2, posix$3, win32$1, ErrorCodes, KIMI_ERROR_INFO, KimiError, UNKNOWN_CAPABILITY_MARKER$1, UNKNOWN_CAPABILITY$1, ChatProviderError$1, APIConnectionError$4, APITimeoutError$1, APIStatusError$1, APIContextOverflowError$1, APIRequestTooLargeError$1, APIProviderRateLimitError$1, APIProviderQuotaExhaustedError$1, APIEmptyResponseError$1, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS$1, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS$1, MEDIA_TYPE_FIELD_PATTERN$1, NETWORK_RE$3, TIMEOUT_RE$3, CONTEXT_OVERFLOW_MESSAGE_PATTERNS$1, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS$1, REQUEST_TOO_LARGE_MESSAGE_PATTERNS$1, THINKING_EFFORT_CONFIG_DOCS_URL$1, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS$1, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS$1, STRUCTURAL_REQUEST_MESSAGE_PATTERNS$1, uuid4$2, castToError$2, AnthropicError, APIError$2, APIUserAbortError$2, APIConnectionError$3, APIConnectionTimeoutError$2, BadRequestError$2, AuthenticationError$2, PermissionDeniedError$2, NotFoundError$2, ConflictError$2, UnprocessableEntityError$2, RateLimitError$2, InternalServerError$2, startsWithSchemeRegexp$2, isAbsoluteURL$2, isArray$2, isReadonlyArray$2, validatePositiveInteger$2, safeJSON$2, sleep$7, VERSION$2, isRunningInBrowser$1, getPlatformProperties$1, normalizeArch$1, normalizePlatform$1, _platformHeaders$1, getPlatformHeaders$1, FallbackEncoder$2, default_format$1, default_formatter$1, formatters$1, has$1, hex_table$1, limit$1, encode$12, array_prefix_generators$1, push_to_array$1, toISOString$1, defaults$1, sentinel$1, GRANT_TYPE_JWT_BEARER, GRANT_TYPE_REFRESH_TOKEN, TOKEN_ENDPOINT, OAUTH_API_BETA_HEADER, FEDERATION_BETA_HEADER, MAX_TOKEN_RESPONSE_BYTES, MAX_ERROR_BODY_CHARS, SAFE_ERROR_KEYS, WorkloadIdentityError, TokenCache, readEnv$2, encodeUTF8_$2, decodeUTF8_$2, levelNumbers$2, parseLogLevel$2, noopLogger$2, cachedLoggers$2, formatRequestDetails$2, PROFILE_NAME_PATTERN, loadConfigWithSource, getCredentialsPath, getRootConfigPath, supportsLocalConfigFiles, getActiveProfileName, _LineDecoder_buffer$1, _LineDecoder_carriageReturnIndex$1, LineDecoder$2, _Stream_client$1, Stream$6, SSEDecoder$2, _APIPromise_client$1, APIPromise$2, _AbstractPage_client$1, AbstractPage$1, PagePromise$1, Page$1, PageCursor, checkFileSupport$2, isAsyncIterable$3, multipartFormRequestOptions$1, supportsFormDataMap$1, createForm$1, isNamedBlob$1, addFormValue$1, isBlobLike$2, isFileLike$2, isResponseLike$2, APIResource$2, brand_privateNullableHeaders$2, buildHeaders$2, EMPTY$5, createPathTagFunction$2, path$15, Environments, SDK_HELPER_SYMBOL, Files$4, Models$3, UserProfiles, require_timing_safe_equal, require_base64, require_sha256, import_dist$1, Webhooks$1, Versions$2, Agents, Memories, MemoryVersions, MemoryStores, JSONLDecoder, Batches$3, MODEL_NONSTREAMING_TOKENS, tokenize$1, strip, unstrip, generate$2, partialParse$1, _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY$1, BetaMessageStream, ToolError, DEFAULT_SUMMARY_PROMPT, _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner, DEPRECATED_MODELS$1, MODELS_TO_WARN_WITH_THINKING_ENABLED$1, Messages$3, Events$1, Resources, Events, Threads$2, Sessions$2, Versions$1, Skills$1, Credentials, Vaults, Beta$1, Completions$2, _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY, MessageStream, Batches$2, Messages$2, DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Models$2, _BaseAnthropic_instances, _a$4, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic, BUDGET_THINKING_EFFORTS$1, ADAPTIVE_MAX_EFFORTS$1, LATEST_OPUS_THINKING_EFFORTS$1, BUDGET_PROFILE$1, OPUS_45_PROFILE$1, ADAPTIVE_MAX_PROFILE$1, LATEST_OPUS_PROFILE$1, ALWAYS_ADAPTIVE_PROFILE$1, ALWAYS_ADAPTIVE_MAX_PROFILE$1, FAMILY_FIRST_RE$1, VERSION_FIRST_RE$1, BARE_FAMILY_RE$1, CLAUDE_FAMILY_WORD_RE$1, EMPTY_TOOL_CALL_ID$1, TOOL_CALL_ID_SAFE_CHARS$1, INTERLEAVED_THINKING_BETA$2, CONTEXT_MANAGEMENT_BETA$1, CLEAR_THINKING_EDIT$1, ANTHROPIC_TOOL_CALL_ID_POLICY$1, CEILING_BY_FAMILY_VERSION$1, FALLBACK_MAX_TOKENS$1, CACHE_CONTROL$1, CACHEABLE_TYPES$1, OMITTED_MEDIA_PLACEHOLDER$1, SUPPORTED_B64_MEDIA_TYPES$1, SUPPORTED_B64_VIDEO_TYPES$1, AnthropicStreamedMessage$1, AnthropicChatProvider$1, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS$1, OPENAI_VISION_TOOL_PREFIXES$1, CLAUDE_VISION_TOOL_PREFIXES$1, CLAUDE_THINKING_VISION_TOOL_PREFIXES$1, GEMINI_CATALOGUED_PREFIXES$1, OPENAI_REASONING_CAPABILITY$1, OPENAI_VISION_TOOL_CAPABILITY$1, OPENAI_TEXT_TOOL_CAPABILITY$1, ANTHROPIC_VISION_TOOL_CAPABILITY$1, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY$1, GEMINI_MULTIMODAL_TOOL_CAPABILITY$1, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY$1, OPENAI_LEGACY_CAPABILITY_CATALOG, OPENAI_RESPONSES_CAPABILITY_CATALOG, ANTHROPIC_CAPABILITY_CATALOG, require_retry_operation$1, require_retry$5, require_retry$4, require_p_retry, require_extend, require_package$1, require_util$9, require_common$1, require_retry$3, require_interceptor, require_gaxios, require_src$3, require_bignumber, require_stringify$1, require_parse$5, require_json_bigint, require_gcp_residency, require_colours, require_logging_utils, require_src$2, require_src$1, require_base64_js, require_shared$1, require_crypto$2, require_crypto$1, require_crypto, require_safe_buffer, require_param_bytes_for_alg, require_ecdsa_sig_formatter, require_util$8, require_package, require_shared, require_authclient, require_loginticket, require_oauth2client, require_computeclient, require_idtokenclient, require_envDetect, require_data_stream, require_buffer_equal_constant_time, require_jwa, require_tostring, require_sign_stream, require_verify_stream, require_jws, require_jwsSign, require_getToken, require_errorWithCode, require_getCredentials, require_tokenHandler, require_revokeToken, require_googleToken, require_jwtaccess, require_jwtclient, require_refreshclient, require_impersonated, require_oauth2common, require_stscredentials, require_baseexternalclient, require_filesubjecttokensupplier, require_urlsubjecttokensupplier, require_certificatesubjecttokensupplier, require_identitypoolclient, require_awsrequestsigner, require_defaultawssecuritycredentialssupplier, require_awsclient, require_executable_response, require_pluggable_auth_handler, require_pluggable_auth_client, require_externalclient, require_externalAccountAuthorizedUserClient, require_googleauth, require_iam, require_downscopedclient, require_passthrough, require_src3, require_constants$9, require_buffer_util, require_limiter, require_permessage_deflate$1, require_validation$3, require_receiver$1, require_sender$1, require_event_target, require_extension, require_websocket$1, require_stream, require_subprotocol, require_websocket_server, import_p_retry, import_src3, import_websocket, _defaultBaseGeminiUrl, _defaultBaseVertexUrl, BaseModule, Language, Outcome, FunctionResponseScheduling, Type, Environment, AuthType, HttpElementLocation, ApiSpec, PhishBlockThreshold, Behavior, DynamicRetrievalConfigMode, FunctionCallingConfigMode, ThinkingLevel, PersonGeneration, ProminentPeople, HarmCategory, HarmBlockMethod, HarmBlockThreshold, FinishReason, HarmProbability, HarmSeverity, UrlRetrievalStatus, BlockedReason, TrafficType, Modality, ModelStage, MediaResolution, TuningMode, AdapterSize, JobState, TuningJobState, AggregationMetric, PairwiseChoice, TuningTask, DocumentState, PartMediaResolutionLevel, ToolType, ResourceScope, ServiceTier, FeatureSelectionPreference, EmbeddingApiType, SafetyFilterLevel, ImagePromptLanguage, MaskReferenceMode, ControlReferenceType, SubjectReferenceType, EditMode, SegmentMode, VideoGenerationReferenceType, VideoGenerationMaskMode, VideoCompressionQuality, TuningMethod, FileState, FileSource, TurnCompleteReason, MediaModality, VadSignalType, VoiceActivityType, StartSensitivity, EndSensitivity, ActivityHandling, TurnCoverage, Scale, MusicGenerationMode, LiveMusicPlaybackControl, HttpResponse, GenerateContentResponse, EmbedContentResponse, GenerateImagesResponse, EditImageResponse, UpscaleImageResponse, RecontextImageResponse, SegmentImageResponse, ListModelsResponse, DeleteModelResponse, CountTokensResponse, ComputeTokensResponse, GenerateVideosOperation, ListTuningJobsResponse, CancelTuningJobResponse, DeleteCachedContentResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, UploadToFileSearchStoreResumableResponse, ImportFileOperation, ListFilesResponse, CreateFileResponse, DeleteFileResponse, RegisterFilesResponse, ListBatchJobsResponse, LiveServerMessage, LiveMusicServerMessage, UploadToFileSearchStoreOperation, PagedItem, Pager, Batches$1, Caches, Chats, Chat$1, ApiError, Files$3, CONTENT_TYPE_HEADER, SERVER_TIMEOUT_HEADER, USER_AGENT_HEADER, GOOGLE_API_CLIENT_HEADER, LIBRARY_LABEL, VERTEX_AI_API_DEFAULT_VERSION, GOOGLE_AI_API_DEFAULT_VERSION, DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_HTTP_STATUS_CODES, ApiClient, MCP_LABEL, hasMcpToolUsageFromMcpToTool, McpCallableTool, LiveMusic, LiveMusicSession, FUNCTION_RESPONSE_REQUIRES_ID, Live, defaultLiveSendClientContentParamerters, Session$2, DEFAULT_MAX_REMOTE_CALLS, Models$1, Operations, Tokens, Documents, FileSearchStores, uuid4Internal, uuid4$1, castToError$1, GeminiNextGenAPIClientError, APIError$1, APIUserAbortError$1, APIConnectionError$2, APIConnectionTimeoutError$1, BadRequestError$1, AuthenticationError$1, PermissionDeniedError$1, NotFoundError$1, ConflictError$1, UnprocessableEntityError$1, RateLimitError$1, InternalServerError$1, startsWithSchemeRegexp$1, isAbsoluteURL$1, isArrayInternal, isReadonlyArray$1, validatePositiveInteger$1, safeJSON$1, sleep$1$1, FallbackEncoder$1, VERSION$1, checkFileSupport$1, isAsyncIterable$2, isBlobLike$1, isFileLike$1, isResponseLike$1, APIResource$1, EMPTY$4, createPathTagFunction$1, path$11, BaseInteractions, Interactions, encodeUTF8_$1, decodeUTF8_$1, LineDecoder$1, levelNumbers$1, parseLogLevel$1, noopLogger$1, cachedLoggers$1, formatRequestDetails$1, Stream$2, SSEDecoder$1, APIPromise$1, brand_privateNullableHeaders$1, buildHeaders$1, readEnv$1, _a$3, BaseGeminiNextGenAPIClient, GeminiNextGenAPIClient, GOOGLE_API_KEY_HEADER, REQUIRED_VERTEX_AI_SCOPE, NodeAuth, NodeDownloader, NodeWebSocketFactory, NodeWebSocket, Tunings, MAX_CHUNK_SIZE, MAX_RETRY_COUNT, INITIAL_RETRY_DELAY_MS, DELAY_MULTIPLIER, X_GOOG_UPLOAD_STATUS_HEADER_FIELD, NodeUploader, NodeFiles, LANGUAGE_LABEL_PREFIX, GoogleGenAI, GoogleGenAIStreamedMessage$1, NETWORK_RE$2, TIMEOUT_RE$2, GoogleGenAIChatProvider$1, TYPE_COMPLETION_SKIP_KEYS$1, CHILD_SCHEMA_SLOTS$1, OBJECT_STRUCTURE_KEYS$1, ARRAY_STRUCTURE_KEYS$1, STRING_STRUCTURE_KEYS$1, NUMERIC_STRUCTURE_KEYS$1, uuid42, castToError, OpenAIError, APIError, APIUserAbortError, APIConnectionError$1, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError, LengthFinishReasonError, ContentFilterFinishReasonError, InvalidWebhookSignatureError, OAuthError$2, SubjectTokenProviderError, startsWithSchemeRegexp, isAbsoluteURL, isArray$1, isReadonlyArray, validatePositiveInteger, safeJSON, sleep$5, VERSION, isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders, FallbackEncoder, default_format, default_formatter, formatters, has, hex_table, limit, encode4, array_prefix_generators, push_to_array, toISOString, defaults, sentinel, encodeUTF8_, decodeUTF8_, _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder, levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails, _Stream_client, Stream$1, SSEDecoder, _APIPromise_client, APIPromise, _AbstractPage_client, AbstractPage, PagePromise, Page, CursorPage, ConversationCursorPage, SUBJECT_TOKEN_TYPES, TOKEN_EXCHANGE_GRANT_TYPE, WorkloadIdentityAuth, checkFileSupport, isAsyncIterable$1, maybeMultipartFormRequestOptions, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, isUploadable, hasUploadableValue, addFormValue, isBlobLike, isFileLike, isResponseLike, APIResource, EMPTY$3, createPathTagFunction, path$10, Messages$1, isAssistantMessage, isToolMessage, _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_handleError, EventStream, _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult, DEFAULT_MAX_CHAT_COMPLETIONS, AbstractChatCompletionRunner, ChatCompletionRunner, STR, NUM, ARR, OBJ, NULL, BOOL, NAN, INFINITY, MINUS_INFINITY, INF, SPECIAL, ATOM, COLLECTION, Allow, PartialJSON, MalformedJSON, _parseJSON, partialParse, _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_getAutoParseableResponseFormat, _ChatCompletionStream_accumulateChatCompletion, ChatCompletionStream, ChatCompletionStreamingRunner, Completions$1, Chat, brand_privateNullableHeaders, buildHeaders, Speech, Transcriptions, Translations, Audio, Batches, Assistants, Sessions$1, TranscriptionSessions, Realtime$1, Sessions, Threads$1, ChatKit, Messages, Steps, toFloat32Array, readEnv, _AssistantStream_instances, _a$2, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun, AssistantStream, Runs$1, Threads, Beta, Completions, Content$2, Files$2, Containers, Items, Conversations, Embeddings, OutputItems, Runs, Evals, Files$1, Methods, Graders$1, Alpha, Permissions, Checkpoints$1, Checkpoints, Jobs, FineTuning, GraderModels, Graders, Images, Models, Moderations, Calls, ClientSecrets, Realtime, _ResponseStream_instances, _ResponseStream_params, _ResponseStream_currentResponseSnapshot, _ResponseStream_finalResponse, _ResponseStream_beginRequest, _ResponseStream_addEvent, _ResponseStream_endRequest, _ResponseStream_accumulateResponse, ResponseStream, InputItems, InputTokens, Responses, Content$1, Content, Versions, Skills, Parts, Uploads, allSettledWithThrow, FileBatches, Files, VectorStores, Videos, _Webhooks_instances, _Webhooks_validateSecret, _Webhooks_getRequiredHeader, Webhooks, _OpenAI_instances, _a$1, _OpenAI_encoder, _OpenAI_baseURLOverridden, WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER, OpenAI, KIMI_QUOTA_EXHAUSTED_ERROR_CODES$1, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS$1, TOOL_RESULT_MEDIA_PROMPT$1, TOOL_RESULT_MEDIA_PLACEHOLDER$1, KimiFiles$1, MIME_TO_EXT$1, EXT_TO_MIME$3, KNOWN_REASONING_KEYS$1, DEFAULT_REASONING_KEY$1, ReasoningKeyDialect$1, KIMI_TOOL_CALL_ID_POLICY, KimiStreamedMessage, KimiChatProvider, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING$1, OPENAI_CHAT_TOOL_CALL_ID_POLICY$1, OMITTED_AUDIO_PLACEHOLDER$3, OMITTED_VIDEO_PLACEHOLDER$3, OpenAILegacyStreamedMessage$1, OpenAILegacyChatProvider$1, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY$1, EMBEDDED_STATUS_CODE_RE$1, OMITTED_AUDIO_PLACEHOLDER$2, OMITTED_VIDEO_PLACEHOLDER$2, OpenAIResponsesStreamedMessage$1, OpenAIResponsesChatProvider$1, KNOWN_WIRE_TYPES$1, defaultHandler$1, currentHandler$1, HOOK_EVENT_TYPES$1, require_constants$8, require_utils$3, require_scan, require_parse$4, require_picomatch$1, import_picomatch, ProviderTypeSchema$1, OAuthRefSchema$2, StringRecordSchema$3, ProviderConfigSchema$1, ModelAliasBaseSchema, ModelAliasOverrideSchema, ModelAliasSchema, SecondaryModelConfigSchema$1, ThinkingConfigSchema$1, PermissionModeSchema, PermissionRuleDecisionSchema$1, PermissionRuleScopeSchema$1, PermissionRuleSchema$1, PermissionConfigSchema$1, LoopControlSchema$1, BackgroundConfigSchema, SubagentConfigSchema$1, McpTimeoutMsSchema$1, McpConfigSchema, ImageConfigSchema$1, ModelCatalogConfigSchema$1, ExperimentalConfigSchema$1, HookDefSchema$1, MoonshotServiceConfigSchema$1, ServicesConfigSchema$1, McpServerCommonFields$1, McpServerStdioConfigSchema$1, McpServerHttpConfigSchema$1, McpServerSseConfigSchema$1, McpServerConfigDiscriminatedSchema$1, McpServerConfigSchema$1, KimiConfigSchema, ProviderConfigPatchSchema, ModelAliasPatchSchema, ThinkingConfigPatchSchema, PermissionConfigPatchSchema, LoopControlPatchSchema, BackgroundConfigPatchSchema, SubagentConfigPatchSchema, SecondaryModelConfigPatchSchema, McpConfigPatchSchema, ImageConfigPatchSchema, ModelCatalogConfigPatchSchema, ExperimentalConfigPatchSchema, MoonshotServiceConfigPatchSchema, ServicesConfigPatchSchema, KimiConfigPatchSchema, TRUE_BOOLEAN_ENV_VALUES$1, FALSE_BOOLEAN_ENV_VALUES$1, ENV_MODEL_PROVIDER_KEY$1, ENV_MODEL_ALIAS_KEY$1, ALLOWED_TYPES, DEFAULT_BASE_URL, DEFAULT_MAX_CONTEXT_SIZE$1, DEFAULT_CAPABILITIES$1, SECONDARY_DERIVED_MODEL_ALIAS, SECONDARY_MODEL_ENV$1, SECONDARY_MODEL_EFFORT_ENV$1, DEFAULT_CONFIG_FILE_TEXT, ENTRY_KEYED_SECTIONS, MIGRATIONS_FILE$1, THINKING_EFFORT_MAX_TO_HIGH$1, S_IFMT$5, S_IFDIR$3, WorkspaceLocalTomlSchema, CTX_VALUE_MAX_CHARS$1, STACK_MAX_BYTES$1, ENTRY_MAX_BYTES$1, REDACTED_KEYS$1, SAFE_KEY_RE$1, ELLIPSIS$1, TRUNCATED_TAIL$1, REDACTED$1, RAW_SECRET_PATTERNS$1, LEVEL_LABEL$1, ANSI_LEVEL$1, ANSI_RESET$1, PENDING_MAX$1, STDERR_NOTICE_INTERVAL_MS$1, AsyncSerialQueue$1, RotatingFileSink, LOG_LEVEL_RANK, ROOT_SYMBOL, SESSION_LOG_ID, LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, MAIN_LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, nextSessionLogId, RootLoggerImpl, LoggerImpl, log, common, exception, snippet, TYPE_CONSTRUCTOR_OPTIONS, YAML_NODE_KINDS, type$2, failsafe, _null4, bool, int2, YAML_FLOAT_PATTERN, SCIENTIFIC_WITHOUT_DOT, float, core, YAML_DATE_REGEXP, YAML_TIMESTAMP_REGEXP, timestamp, merge2, BASE64_MAP, binary, _hasOwnProperty$3, _toString$2, omap, _toString$1, pairs, _hasOwnProperty$2, set2, _default3, _hasOwnProperty$1, CONTEXT_FLOW_IN, CONTEXT_FLOW_OUT, CONTEXT_BLOCK_IN, CONTEXT_BLOCK_OUT, CHOMPING_CLIP, CHOMPING_STRIP, CHOMPING_KEEP, PATTERN_NON_PRINTABLE, PATTERN_NON_ASCII_LINE_BREAKS, PATTERN_FLOW_INDICATORS, PATTERN_TAG_HANDLE, PATTERN_TAG_URI, simpleEscapeCheck, simpleEscapeMap, i2, directiveHandlers, loader, _toString, _hasOwnProperty, CHAR_BOM, CHAR_TAB, CHAR_LINE_FEED, CHAR_CARRIAGE_RETURN, CHAR_SPACE, CHAR_EXCLAMATION, CHAR_DOUBLE_QUOTE, CHAR_SHARP, CHAR_PERCENT, CHAR_AMPERSAND, CHAR_SINGLE_QUOTE, CHAR_ASTERISK, CHAR_COMMA, CHAR_MINUS, CHAR_COLON, CHAR_EQUALS, CHAR_GREATER_THAN, CHAR_QUESTION, CHAR_COMMERCIAL_AT, CHAR_LEFT_SQUARE_BRACKET, CHAR_RIGHT_SQUARE_BRACKET, CHAR_GRAVE_ACCENT, CHAR_LEFT_CURLY_BRACKET, CHAR_VERTICAL_LINE, CHAR_RIGHT_CURLY_BRACKET, ESCAPE_SEQUENCES, DEPRECATED_BOOLEANS_SYNTAX, DEPRECATED_BASE60_SYNTAX, QUOTING_TYPE_SINGLE, QUOTING_TYPE_DOUBLE, STYLE_PLAIN, STYLE_SINGLE, STYLE_LITERAL, STYLE_FOLDED, STYLE_DOUBLE, dumper, load$2, require_isArguments, require_implementation$2, require_object_keys, require_es_define_property, require_syntax, require_type, require_gOPD, require_gopd, require_define_data_property, require_has_property_descriptors, require_define_properties, require_es_object_atoms, require_es_errors, require_eval, require_range, require_ref$1, require_uri$1, require_abs, require_floor$1, require_max, require_min, require_pow, require_round, require_isNaN, require_sign, require_shams$1, require_has_symbols, require_Reflect_getPrototypeOf, require_Object_getPrototypeOf, require_implementation$1, require_function_bind, require_functionCall, require_functionApply, require_reflectApply, require_actualApply, require_call_bind_apply_helpers, require_get, require_get_proto, require_hasown, require_get_intrinsic, require_set_function_length, require_applyBind, require_call_bind, require_call_bound, require_isFinite, require_isInteger, require_toString, require_StringIndexOf, require_StringPad, require_UnicodeEscape, require_floor, require_math_intrinsics, require_helpers$2, require_modulo, require_isCodePoint, require_UTF16EncodeCodePoint, require_isLeadingSurrogate, require_isTrailingSurrogate, require_is_callable, require_for_each, require_shams, require_is_regex, require_safe_regex_test, require_EncodeForRegExpEscape, require_UTF16SurrogatePairToCodePoint, require_CodePointAt, require_StringToCodePoints, require_callBound, require_implementation, require_polyfill, require_shim, import_regexp_escape, FrontmatterError$1, SkillParseError$1, UnsupportedSkillTypeError$1, FENCE$2, METADATA_ALIASES$1, FLAG_DEFINITIONS, FlagResolver, IMAGE_MIME_BY_SUFFIX$1, VIDEO_MIME_BY_SUFFIX$1, TEXT_MIME_BY_SUFFIX$1, NON_TEXT_SUFFIXES$1, ASF_HEADER$1, FTYP_IMAGE_BRANDS$1, FTYP_VIDEO_BRANDS$1, MODEL_ACCEPTED_IMAGE_MIMES$1, ACCEPTED_FORMATS_TEXT$1, UNSUPPORTED_IMAGE_FORMATS$1, BASE64_SNIFF_CHARS$1, decoderReady$1, MAX_IMAGE_EDGE_PX, MAX_IMAGE_EDGE_ENV, IMAGE_BYTE_BUDGET, READ_IMAGE_BYTE_BUDGET_ENV, JPEG_QUALITY_STEPS$1, FALLBACK_EDGES_PX$1, PNG_RESCALE_FLOOR_PX$1, MAX_DECODE_PIXELS$1, MAX_IMAGE_DECODE_BYTES$1, RECODABLE_MIME$1, CAPTION_OPENING$1, CAPTION_PATTERN$1, ImageLimits, RawSubagentProfileSchema, AgentModelPreferenceSchema, RawAgentProfileSchema, AGENTS_MD_RECOMMENDED_MAX_BYTES$1, S_IFMT$4, S_IFREG$2, require_lib$1, require_raw, require_asap, require_a_sync_waterfall, require_lexer, require_object, require_nodes, require_parser2, require_transformer, require_runtime, require_compiler, require_filters, require_loader, require_precompiled_loader, require_readdirp, require_handler, require_chokidar, require_node_loaders, require_loaders, require_tests, require_globals, require_express_app, require_environment, require_precompile_global, require_precompile, require_jinja_compat, env, WINDOWS_NOTES$1, ADDITIONAL_DIRS_SECTION_PROSE$1, SKILLS_SECTION_PROSE$1, agent_default$2, coder_default, explore_default, init_default$1, PROFILE_SOURCES, DEFAULT_INIT_PROMPT$1, DEFAULT_AGENT_PROFILES, AgentProfileSnapshotSchema, AgentProfileCatalogSnapshotSchema, AgentFileParseError$1, AGENT_NAME_PATTERN$1, USER_BRAND_DIRS$3, USER_GENERIC_DIRS$3, PROJECT_BRAND_DIRS$3, PROJECT_GENERIC_DIRS$3, MAX_AGENT_SCAN_DEPTH$1, MAX_SKIP_WARNINGS$1, PROMPT_VARIABLE$1, SYSTEM_MD_FILENAME$1, MCP_NAME_PREFIX$2, MCP_NAME_SEPARATOR$1, MAX_QUALIFIED_LENGTH$1, GLOB_MAGIC$1, SOURCE_PRIORITY, DEFAULT_AGENT_PROFILE_NAME$1, KNOWN_BUILTIN_TOOL_NAMES, SessionAgentProfileCatalog, PLUGIN_SECTIONS_MAX_BYTES$1, noopTelemetryClient, NEVER$1, MAX_TIMER_DELAY_MS$2, VALID_TASK_ID$1, BackgroundTaskPersistence, TERMINAL_STATUSES$1, AgentBackgroundTask, STREAM_DRAIN_GRACE_MS$1, ProcessBackgroundTask, QuestionBackgroundTask$1, MAX_RUNNING_TASKS_ENV$1, MAX_OUTPUT_BYTES$3, NOTIFICATION_FALLBACK_PREVIEW_BYTES$1, MAX_TASK_OUTPUT_BYTES$1, SIGTERM_GRACE_MS$3, USER_INTERRUPT_REASON$1, _ALPHABET, BackgroundManager, DYNAMIC_TOOL_SCHEMA_VARIANT$1, LOADABLE_TOOLS_TRIGGER$1, TOOLS_ADDED_BLOCK$1, TOOLS_REMOVED_BLOCK$1, UserCancellationError$1, BASE_DELAY_MS$1, MAX_DELAY_MS$1, RETRY_FACTOR$1, JITTER_FACTOR$1, LLMRequestTraceState, todo_list_default$1, TODO_LIST_TOOL_NAME$1, TODO_STORE_KEY, TODO_LIST_WRITE_REMINDER, TodoItemSchema$1, TodoListInputSchema$1, TodoListTool$1, messageTokenEstimateCache$1, MEDIA_TOKEN_ESTIMATE$1, MIN_FLOOR$1, DEFAULT_UNKNOWN_CONTEXT_FALLBACK$1, compaction_instruction_default$1, DEFAULT_COMPACTION_CONFIG$1, DefaultCompactionStrategy$1, COMPACTION_SUMMARY_PREFIX$1, COMPACT_USER_MESSAGE_MAX_TOKENS$1, COMPACT_USER_MESSAGE_HEAD_TOKENS$1, COMPACTION_ELISION_VARIANT$1, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS$1, OVERFLOW_CONTEXT_SAFETY_RATIO$1, OVERFLOW_STATUS_RECOVERY_RATIO$1, CompactionTruncatedError$1, FullCompaction, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS$1, COMPACTION_OVERFLOW_SHRINK_RATIOS$1, MEDIA_PART_MARKERS, DEFAULT_CONFIG, MicroCompaction, systemMonoNowMs$1, SYSTEM_CLOCKS$1, MAX_CLOCK_FILE_BYTES$1, CRON_ID_REGEX$2, ID_REGEX, MAX_ID_ATTEMPTS$1, SessionCronStore, import_retry, MINUTE_RANGE$1, HOUR_RANGE$1, DOM_RANGE$1, MONTH_RANGE$1, DOW_RANGE$1, MS_PER_MINUTE$3, DIGIT_ONLY$1, MONTH_NAMES$1, DAY_NAMES$1, DEFAULT_CRON_JITTER_CONFIG$1, MS_PER_DAY$3, MS_PER_MINUTE$2, DEFAULT_POLL_INTERVAL_MS$1, MAX_COALESCE_ITERATIONS$1, CRON_SCHEDULED$1, CRON_FIRED$1, CRON_MISSED$1, CRON_DELETED$1, STALE_THRESHOLD_MS$1, CronManager, KEEP_OFF_VALUES$1, ConfigState, TOOL_ERROR_STATUS$1, TOOL_EMPTY_STATUS$1, TOOL_EMPTY_ERROR_STATUS$1, TOOL_OUTPUT_EMPTY_TEXT$1, SYNTHETIC_TOOL_RESULT_TEXT, MEDIA_DEGRADED_PLACEHOLDERS$1, MEDIA_STRIPPED_PLACEHOLDERS$1, MEDIA_CONTAINER_KEY_CACHE$1, USER_PROMPT_ORIGIN$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$2, IMPORT_CONTEXT_GUIDANCE$1, ContextMemory, MAX_GOAL_OBJECTIVE_LENGTH$1, MAX_GOAL_COMPLETION_CRITERION_LENGTH$1, GOAL_CANCELLED_REMINDER$1, GOAL_FORK_CLEARED_REMINDER$1, GoalMode, DEFAULT_TIMEOUT_SECONDS$1, KILL_GRACE_MS$1, OptionalStringSchema$1, HookSpecificOutputSchema$1, HookJsonOutputSchema$1, DEFAULT_HOOK_TIMEOUT_SECONDS$1, HookEngine, SENSITIVE_BASENAMES$1, SENSITIVE_PATH_SUFFIXES$1, ENV_PREFIX$1, ENV_EXEMPTIONS$1, SENSITIVE_BASENAME_PREFIXES$1, PUBLIC_KEY_BASENAMES$1, SENSITIVE_DOT_VARIANT_SUFFIXES$1, SENSITIVE_DOT_VARIANT_SUFFIX_SET$1, DEFAULT_WORKSPACE_ACCESS_POLICY$1, PathSecurityError$1, DEFAULT_PATH_CLASS$1, GLOB_LITERAL_SPECIAL$1, task_list_default$1, TaskListInputSchema$1, TaskListTool$1, DynamicInjector, GoalInjector, AUTO_MODE_ENTER_REMINDER, AUTO_MODE_EXIT_REMINDER, PermissionModeInjector, PluginSessionStartInjector, PLAN_MODE_DEDUP_MIN_TURNS$1, PLAN_MODE_FULL_REFRESH_TURNS$1, PlanModeInjector, TODO_LIST_REMINDER_VARIANT$1, TODO_LIST_REMINDER_TURNS_SINCE_WRITE$1, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS$1, TodoListReminderInjector, ToolsDiffInjector, ACTIVE_BACKGROUND_TASK_GUIDANCE$1, InjectionManager, AgentSwarmExclusiveDenyPermissionPolicy, AutoModeApprovePermissionPolicy, AutoModeAskUserQuestionDenyPermissionPolicy, DEFAULT_APPROVE_TOOLS$1, DefaultToolApprovePermissionPolicy, ExitPlanModeReviewAskPermissionPolicy, FallbackAskPermissionPolicy, S_IFMT$3, S_IFDIR$2, S_IFREG$1, SensitiveFileAccessAskPermissionPolicy, GitControlPathAccessAskPermissionPolicy, GitCwdWriteApprovePermissionPolicy, GoalStartReviewAskPermissionPolicy, PlanModeGuardDenyPermissionPolicy, PlanModeToolApprovePermissionPolicy, PreToolCallHookPermissionPolicy, SessionApprovalHistoryPermissionPolicy, SwarmModeAgentSwarmApprovePermissionPolicy, USER_CONFIGURED_SCOPES$1, UserConfiguredPermissionPolicy, UserConfiguredDenyPermissionPolicy, UserConfiguredAllowPermissionPolicy, UserConfiguredAskPermissionPolicy, YoloModeApprovePermissionPolicy, PermissionManager, HERO_NAMES$1, MAX_ATTEMPTS$1, PlanMode, migrateV1_0ToV1_1$1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN$1, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS$1, migrateV1_1ToV1_2$1, migrateV1_2ToV1_3$1, migrateV1_3ToV1_4$1, MIGRATIONS$1, InMemoryAgentRecordPersistence, FileSystemAgentRecordPersistence, DEFAULT_THRESHOLD$1, DEFAULT_MAX_CACHE_SIZE$1, BLOBREF_PROTOCOL$2, DATA_URI_HEADER_RE$1, MISSING_MEDIA_PLACEHOLDER$2, BlobStore, AgentRecords, UNDO_BOUNDARY_RECORD_TYPES, ReplayBuilder, check_kimi_code_docs_default$1, PSEUDO_PATH$11, parsed$11, CHECK_KIMI_CODE_DOCS_SKILL$1, custom_theme_default$1, PSEUDO_PATH$10, parsed$10, CUSTOM_THEME_SKILL$1, import_from_cc_codex_default$1, PSEUDO_PATH$9, parsed$9, IMPORT_FROM_CC_CODEX_SKILL$1, mcp_config_default$1, PSEUDO_PATH$8, parsed$8, MCP_CONFIG_SKILL$1, SKILL_default$5, SKILL_default$4, SKILL_default$3, SUB_SKILL_PARENT$1, SUB_SKILL_REVIEW$1, SUB_SKILL_CONSOLIDATE$1, update_config_default$1, PSEUDO_PATH$7, parsed$7, UPDATE_CONFIG_SKILL$1, write_goal_default$1, PSEUDO_PATH$6, parsed$6, WRITE_GOAL_SKILL$1, USER_BRAND_DIRS$2, USER_GENERIC_DIRS$2, PROJECT_BRAND_DIRS$2, PROJECT_GENERIC_DIRS$2, MAX_SKILL_SCAN_DEPTH$1, LISTING_DESC_MAX$1, SessionSkillRegistry, SOURCE_GROUPS$1, graphemeSegmenter$1, SkillManager, enter_reminder_default$1, exit_reminder_default$1, SwarmMode, ToolAccesses$1, require_code$1, require_scope, require_codegen, require_util$7, require_names, require_errors$1, require_boolSchema, require_rules, require_applicability, require_dataType, require_defaults, require_code, require_keyword, require_subschema, require_fast_deep_equal, require_json_schema_traverse, require_resolve, require_validate, require_validation_error, require_ref_error, require_compile, require_data, require_utils$2, require_schemes, require_fast_uri, require_uri, require_core$3, require_id, require_ref, require_core$2, require_limitNumber, require_multipleOf, require_ucs2length, require_limitLength, require_pattern, require_limitProperties, require_required, require_limitItems, require_equal, require_uniqueItems, require_const, require_enum, require_validation$2, require_additionalItems, require_items, require_prefixItems, require_items2020, require_contains, require_dependencies, require_propertyNames, require_additionalProperties, require_properties, require_patternProperties, require_not, require_anyOf, require_oneOf, require_allOf, require_if, require_thenElse, require_applicator$2, require_format$2, require_format$1, require_metadata, require_draft7, require_types$1, require_discriminator, require_json_schema_draft_07, require_ajv, require_dynamicAnchor, require_dynamicRef, require_recursiveAnchor, require_recursiveRef, require_dynamic, require_dependentRequired, require_dependentSchemas, require_limitContains, require_next, require_unevaluatedProperties, require_unevaluatedItems, require_unevaluated$1, require_schema$1, require_applicator$1, require_content$1, require_core$1, require_format, require_meta_data$1, require_validation$1, require_json_schema_2019_09, require__2019, require_draft2020, require_schema, require_applicator, require_unevaluated, require_content, require_core, require_format_annotation, require_meta_data, require_validation, require_json_schema_2020_12, require__2020, require_formats, require_limit, require_dist3, import_ajv, import__2019, import__2020, import_dist, DRAFT_07_AJV$1, DRAFT_2019_AJV$1, DRAFT_2020_AJV$1, DRAFT_2019_KEYWORDS$1, DRAFT_2020_KEYWORDS$1, ToolScheduler$1, GRACE_TIMEOUT_MS, TOOL_OUTPUT_EMPTY$1, TOOL_OUTPUT_NON_TEXT$1, UNEXECUTED_TOOL_CALL_OUTPUT, validators$1, ErrorCode$1, cursorQuerySchema, pageResponseSchema, ISO_8601_REGEX$1, isoDateTimeSchema$1, ENCODING, ENCODING_LEN, RANDOM_LEN, TIME_MAX, ULIDErrorCode, ULIDError, ToolInputDisplaySchema, messageRoleSchema, textContentSchema, toolUseContentSchema, toolResultContentSchema, imageSourceSchema, imageContentSchema, videoContentSchema, fileContentSchema, thinkingContentSchema, messageContentSchema, messageSchema, promptThinkingSchema, promptPermissionModeSchema, promptStatusSchema, promptItemSchema, workspaceIdSchema, workspaceSchema$1, sessionUsageSchema, permissionRuleMatcherSchema, permissionRuleSchema, sessionAgentConfigSchema, sessionAgentConfigPartialSchema, sessionMetadataSchema, sessionPendingInteractionSchema, sessionSchema, providerConfigResponseSchema, configResponseSchema, modelCatalogItemSchema$2, providerCatalogStatusSchema$2, providerCatalogItemSchema$2, providerRefreshChangeSchema$1, providerRefreshFailureSchema$1, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE, tokenUsageSchema$1, finishReasonSchema, usageStatusSchema$1, permissionModeSchema$1, skillSourceSchema, userPromptOriginSchema, skillActivationOriginSchema, pluginCommandOriginSchema, injectionOriginSchema, shellCommandOriginSchema, compactionSummaryOriginSchema, systemTriggerOriginSchema, taskLifecycleStatusSchema$1, taskOriginSchema, backgroundTaskOriginSchema, cronJobOriginSchema, cronMissedOriginSchema, hookResultOriginSchema, retryOriginSchema, promptOriginSchema, goalStatusSchema, goalActorSchema, goalBudgetReportSchema, goalSnapshotSchema, goalChangeStatsSchema, goalChangeKindSchema, goalChangeSchema, kimiErrorCodeSchema, kimiErrorPayloadSchema, kimiErrorPayloadObjectSchema, taskInfoBaseSchema, processTaskInfoSchema, agentTaskInfoSchema$1, questionTaskInfoSchema, taskInfoSchema, compactionResultSchema, toolUpdateSchema, turnEndReasonSchema$1, agentPhaseSchema, agentStatusUpdatedEventSchema$1, sessionMetaUpdatedEventSchema, sessionCreatedEventSchema, workspaceCreatedEventSchema, workspaceUpdatedEventSchema, workspaceDeletedEventSchema, sessionWorkChangedEventSchema, sessionStatusChangedEventSchema, modelCatalogChangedEventSchema, goalUpdatedEventSchema, skillActivatedEventSchema, pluginCommandActivatedEventSchema, errorEventSchema$1, warningEventSchema$1, turnStartedEventSchema$1, turnEndedEventSchema$1, turnStepStartedEventSchema, turnStepCompletedEventSchema, turnStepRetryingEventSchema, turnStepInterruptedEventSchema, assistantDeltaEventSchema$1, hookResultEventSchema, thinkingDeltaEventSchema$1, toolCallDeltaEventSchema$1, toolCallStartedEventSchema$1, toolProgressEventSchema$1, shellOutputEventSchema, shellStartedEventSchema, shellCompletedEventSchema, toolResultEventSchema$1, subagentSpawnedEventSchema, subagentStartedEventSchema, subagentSuspendedEventSchema, subagentCompletedEventSchema, subagentFailedEventSchema, compactionStartedEventSchema$1, compactionBlockedEventSchema$1, compactionCancelledEventSchema$1, compactionCompletedEventSchema$1, taskStartedEventSchema, taskTerminatedEventSchema, backgroundTaskStartedEventSchema, backgroundTaskTerminatedEventSchema, cronFiredEventSchema, promptSubmittedEventSchema, promptCompletedEventSchema$1, promptAbortedEventSchema$1, promptSteeredEventSchema, toolListUpdatedReasonSchema, toolListUpdatedEventSchema, mcpServerStatusPayloadSchema, mcpServerStatusEventSchema, eventSchema, sessionCursorSchema, cursorsBySessionSchema, wsEventEnvelopeSchema, wsAckEnvelopeSchema, serverHelloPayloadSchema, serverHelloMessageSchema, agentFilterSchema, clientHelloPayloadSchema, clientHelloMessageSchema, clientHelloAckMessageSchema, watchFsConfigSchema, subscribePayloadSchema, subscribeMessageSchema, subscribeAckPayloadSchema, subscribeAckMessageSchema, unsubscribePayloadSchema, unsubscribeMessageSchema, unsubscribeAckMessageSchema, watchFsAddPayloadSchema, watchFsAddMessageSchema, watchFsRemovePayloadSchema, watchFsRemoveMessageSchema, watchFsAckMessageSchema, abortPayloadSchema, abortMessageSchema, abortAckMessageSchema, terminalAttachPayloadSchema, terminalAttachMessageSchema, terminalAttachAckMessageSchema, terminalDetachPayloadSchema, terminalDetachMessageSchema, terminalDetachAckMessageSchema, terminalInputPayloadSchema, terminalInputMessageSchema, terminalInputAckMessageSchema, terminalResizePayloadSchema, terminalResizeMessageSchema, terminalResizeAckMessageSchema, terminalClosePayloadSchema, terminalCloseMessageSchema, terminalCloseAckMessageSchema, pingPayloadSchema, pingMessageSchema, pongPayloadSchema, pongMessageSchema, resyncRequiredPayloadSchema, resyncRequiredMessageSchema, wsErrorPayloadSchema, wsErrorMessageSchema, terminalOutputPayloadSchema, terminalExitPayloadSchema, clientControlOperations, serverSystemOperations, approvalDecisionSchema, approvalScopeSchema, approvalRequestSchema$1, questionOptionSchema$1, questionItemSchema$1, questionRequestSchema$1, questionAnswerSchema, questionAnswerMethodSchema, toolSourceSchema, toolDescriptorSchema, mcpServerStatusSchema, mcpServerTransportSchema, mcpServerSchema, skillDescriptorSchema, taskKindSchema, taskStatusSchema, taskSchema, fsKindSchema$1, fsGitStatusSchema$1, fsEntrySchema$1, fsSearchHitSchema$1, fsGrepMatchSchema$1, fsGrepFileHitSchema$1, fsChangeKindSchema, fsChangeActionSchema, fsChangeEntrySchema, fsListSortSchema$1, fsReadEncodingRequestSchema$1, fsReadEncodingResponseSchema$1, fsOpenInAppIdSchema, fsListManyPartialErrorSchema$1, fsPullRequestSchema$1, metaCapabilitiesSchema, managedProviderStatusSchema$1, managedProviderSummarySchema$1, oauthFlowStatusEnum, oauthFlowStartPendingSchema, oauthFlowStartAuthenticatedSchema, booleanQueryParam, MAX_SESSION_EXPORT_WEB_LOG_BYTES, sessionStatusResponseSchema, sessionWarningSchema, inFlightToolCallSchema, inFlightTurnSchema, snapshotSubagentSchema, fsBrowseEntrySchema$2, activateSkillAttachmentSchema, relativeCwdSchema$1, terminalStatusSchema$1, terminalSchema$1, connectionSchema, keySchema, SUCCESS_HTML$1, ERROR_HTML$1, JsonFileStore, TOKENS_SUFFIX$1, CLIENT_SUFFIX$1, DISCOVERY_SUFFIX$1, PASSIVE_REDIRECT_URI$1, McpOAuthClientProvider$1, crypto$4, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, RELATED_TASK_META_KEY, AssertObjectSchema, ProgressTokenSchema, CursorSchema, TaskMetadataSchema, RelatedTaskMetadataSchema, RequestMetaSchema, BaseRequestParamsSchema, TaskAugmentedRequestParamsSchema, isTaskAugmentedRequestParams, RequestSchema, NotificationsParamsSchema, NotificationSchema, ResultSchema, RequestIdSchema, JSONRPCRequestSchema, isJSONRPCRequest, JSONRPCNotificationSchema, isJSONRPCNotification, JSONRPCResultResponseSchema, isJSONRPCResultResponse, ErrorCode, JSONRPCErrorResponseSchema, isJSONRPCErrorResponse, JSONRPCMessageSchema, EmptyResultSchema, CancelledNotificationParamsSchema, CancelledNotificationSchema, IconSchema, IconsSchema, BaseMetadataSchema, ImplementationSchema, FormElicitationCapabilitySchema, ElicitationCapabilitySchema, ClientTasksCapabilitySchema, ServerTasksCapabilitySchema, ClientCapabilitiesSchema, InitializeRequestParamsSchema, InitializeRequestSchema, ServerCapabilitiesSchema, InitializeResultSchema, InitializedNotificationSchema, isInitializedNotification, PingRequestSchema, ProgressSchema, ProgressNotificationParamsSchema, ProgressNotificationSchema, PaginatedRequestParamsSchema, PaginatedRequestSchema, PaginatedResultSchema, TaskStatusSchema, TaskSchema, CreateTaskResultSchema, TaskStatusNotificationParamsSchema, TaskStatusNotificationSchema, GetTaskRequestSchema, GetTaskResultSchema, GetTaskPayloadRequestSchema, ListTasksRequestSchema, ListTasksResultSchema, CancelTaskRequestSchema, CancelTaskResultSchema, ResourceContentsSchema, TextResourceContentsSchema, Base64Schema, BlobResourceContentsSchema, RoleSchema, AnnotationsSchema, ResourceSchema, ResourceTemplateSchema, ListResourcesRequestSchema, ListResourcesResultSchema, ListResourceTemplatesRequestSchema, ListResourceTemplatesResultSchema, ResourceRequestParamsSchema, ReadResourceRequestParamsSchema, ReadResourceRequestSchema, ReadResourceResultSchema, ResourceListChangedNotificationSchema, SubscribeRequestParamsSchema, SubscribeRequestSchema, UnsubscribeRequestParamsSchema, UnsubscribeRequestSchema, ResourceUpdatedNotificationParamsSchema, ResourceUpdatedNotificationSchema, PromptArgumentSchema, PromptSchema, ListPromptsRequestSchema, ListPromptsResultSchema, GetPromptRequestParamsSchema, GetPromptRequestSchema, TextContentSchema, ImageContentSchema, AudioContentSchema, ToolUseContentSchema, EmbeddedResourceSchema, ResourceLinkSchema, ContentBlockSchema, PromptMessageSchema, GetPromptResultSchema, PromptListChangedNotificationSchema, ToolAnnotationsSchema, ToolExecutionSchema, ToolSchema, ListToolsRequestSchema, ListToolsResultSchema, CallToolResultSchema, CallToolRequestParamsSchema, CallToolRequestSchema, ToolListChangedNotificationSchema, ListChangedOptionsBaseSchema, LoggingLevelSchema, SetLevelRequestParamsSchema, SetLevelRequestSchema, LoggingMessageNotificationParamsSchema, LoggingMessageNotificationSchema, ModelHintSchema, ModelPreferencesSchema, ToolChoiceSchema, ToolResultContentSchema, SamplingContentSchema, SamplingMessageContentBlockSchema, SamplingMessageSchema, CreateMessageRequestParamsSchema, CreateMessageRequestSchema, CreateMessageResultSchema, CreateMessageResultWithToolsSchema, BooleanSchemaSchema, StringSchemaSchema, NumberSchemaSchema, UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema, LegacyTitledEnumSchemaSchema, SingleSelectEnumSchemaSchema, UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema, MultiSelectEnumSchemaSchema, EnumSchemaSchema, PrimitiveSchemaDefinitionSchema, ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema, ElicitRequestParamsSchema, ElicitRequestSchema, ElicitationCompleteNotificationParamsSchema, ElicitationCompleteNotificationSchema, ElicitResultSchema, ResourceTemplateReferenceSchema, PromptReferenceSchema, CompleteRequestParamsSchema, CompleteRequestSchema, CompleteResultSchema, RootSchema, ListRootsRequestSchema, ListRootsResultSchema, RootsListChangedNotificationSchema, McpError, UrlElicitationRequiredError, SafeUrlSchema, OAuthProtectedResourceMetadataSchema, OAuthMetadataSchema, OpenIdProviderMetadataSchema, OpenIdProviderDiscoveryMetadataSchema, OAuthTokensSchema, OAuthErrorResponseSchema, OptionalSafeUrlSchema, OAuthClientMetadataSchema, OAuthClientInformationSchema, OAuthClientInformationFullSchema, OAuthError$1, InvalidRequestError, InvalidClientError, InvalidGrantError, UnauthorizedClientError, UnsupportedGrantTypeError, InvalidScopeError, AccessDeniedError, ServerError, TemporarilyUnavailableError, UnsupportedResponseTypeError, UnsupportedTokenTypeError, InvalidTokenError, MethodNotAllowedError, TooManyRequestsError, InvalidClientMetadataError, InsufficientScopeError, InvalidTargetError, OAUTH_ERRORS, UnauthorizedError, AUTHORIZATION_CODE_RESPONSE_TYPE, AUTHORIZATION_CODE_CHALLENGE_METHOD, McpOAuthService$1, AlreadyAuthorizedError$1, DEFAULT_AUTH_TIMEOUT_MS$1, AUTH_TOOL_TOOL_NAME$1, DESCRIPTION_TEMPLATE$1, DEFAULT_MAX_TOTAL_BYTES$1, MIME_EXTENSION$1, MCP_MAX_OUTPUT_CHARS$1, MCP_OUTPUT_TRUNCATED_TEXT$1, MCP_MAX_BINARY_PART_BYTES$1, MCP_MAX_BINARY_PART_CHARS$1, DenyAllPermissionPolicy, GIT_TIMEOUT_MS$1, MAX_DIRTY_FILES$1, MAX_COMMIT_LINE_LENGTH$1, ALLOWED_HOSTS$1, INITIAL_LAUNCH_LIMIT$1, INITIAL_LAUNCH_INTERVAL_MS$1, RATE_LIMIT_RETRY_BASE_MS$1, RATE_LIMIT_RETRY_FACTOR$1, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$1, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$1, RATE_LIMIT_SUSPENDED_REASON$1, AGENT_SWARM_MAX_CONCURRENCY_ENV$1, SubagentBatch, summary_continuation_default$1, DEFAULT_SUBAGENT_TIMEOUT_MS$1, SUBAGENT_TIMEOUT_ENV$1, SUMMARY_MIN_LENGTH, SUMMARY_CONTINUATION_ATTEMPTS, HOOK_TEXT_PREVIEW_LENGTH, SUBAGENT_MAX_TOKENS_ERROR$1, TOOL_CALL_DISABLED_MESSAGE$1, SUBAGENT_PROMPT_ORIGIN, SIDE_QUESTION_SYSTEM_REMINDER$1, SessionSubagentHost, LlmRequestLogger, task_output_default$1, OUTPUT_PREVIEW_BYTES$1, PAGING_HINT_LINES$1, TaskOutputInputSchema$1, TaskOutputTool$1, task_stop_default$1, TaskStopInputSchema$1, TaskStopTool$1, cron_create_default$1, MAX_PROMPT_BYTES$1, ONE_SHOT_MAX_FUTURE_MS$1, CronCreateInputSchema$1, CronCreateTool$1, cron_delete_default$1, ID_PATTERN$1, CronDeleteInputSchema$1, CronDeleteTool$1, cron_list_default$1, CronListInputSchema$1, MS_PER_DAY$2, PROMPT_PREVIEW_BYTES$1, CronListTool$1, agent_background_disabled_default$1, agent_background_enabled_default$1, agent_default$1, AgentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE$1, AGENT_TOOL_PARAMETERS, AGENT_TOOL_PARAMETERS_NO_MODEL, AgentTool, USER_INTERRUPTED_SUBAGENT_MESSAGE$1, agent_swarm_default$1, DEFAULT_SUBAGENT_TYPE$1, PROMPT_TEMPLATE_PLACEHOLDER$1, MAX_AGENT_SWARM_SUBAGENTS$1, AGENT_SWARM_PARAMETERS$1, AGENT_SWARM_PARAMETERS_NO_MODEL$1, AgentSwarmTool$1, ask_user_default$1, QuestionOptionSchema$1, QuestionItemSchema$1, QUESTION_UNIQUENESS_MESSAGE$1, AskUserQuestionInputBaseSchema$1, AskUserQuestionInputSchemaWithBackground$1, QUESTION_DISMISSED_MESSAGE$1, QUESTION_UNSUPPORTED_FAILURE_MESSAGE$1, AskUserQuestionTool$1, skill_tool_default, NestedSkillTooDeepError$1, SkillToolInputSchema$1, SkillTool$1, edit_default$1, EditInputSchema$1, EditTool$1, kr, vr, Os, Br, Pr, zr, q, j, rt, Le, jt, Ne, Ts, Ae, xs, z$2, Mt, b, Qt, Bt, _, A2, g, yi, De, L, w, Ri, bi, Ls, _i, Z2, gi, Ie, Jt, yt, C, te, Ur, Hr, Wr, Gr, Ce, Oi, Zr, Yr, D, Vr, ot, H, ee, m2, xi, J, Li, Ii, Ci, se, Fe, Ut, Ht, Ni, Pt, ht, U, nt, Y2, zt, Ai, Q, ie, Di, ke, Rt, ve, bt, _t, Me, tt, Wt, $r, As, Ds, Is, Cs, Fs, Xr, re, K, jr, M, Qr, vs, Jr, ki, Ot, Gt, vi, ne, Be, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ms, en, sn, Bs, rn, nn, Ps, zs, oe, hn, he, Ke, F2, an, Tt, Pi, ln, at, cn, fn, dn, lt, un, mn, pn, zi, En, xt, ct, Sn, yn, Rn, f3, Yt, Lt, gn, Zi, Yi, On, B, Nt, et, Ui, Us, V, ae, ft, Hs, p, it, dt, Hi, At, y2, Ve, $e, Wi, Ws, Gs, le, Gi, Xe, Kt, ut, qe, Dt, je, Qe, Zs, Tn, st, mt, Nn, Ki, An, Dn, It, Vi, Cn, Ys, ce, Je, $i, Fn, kn, Xi, Ks, Js, vn, Xs, qs, js, ji, Qs, fe, ti, Qi, ei, Ji, ts, es, is$2, pt, ii, ss, qi, X, de, si, ri, Mn, ni, ue, di, tr, oi, me, W, Ct, Ft, pe$1, rs, G, ns, hi, er, as, ls, ai, li, ir, os$1, ci, rr, hs, Et, kt, Un, Hn, or, hr, Wn, Gn, fr, dr, ar, ur, mr, pr, Kn, Vn, $n, lr, cs, fs$7, ui, Xn, ds, qn, us, we, wt, Qn, Er, ms, wr, Jn, Sr, ps, yr, $t, Rr, eo, io, Ei, _r, gr, ys, Or, Rs, P$1, bs, _s, Si, Tr, xr, ye, Lr, Nr, Es, St, O, wi, Ar, Xt, ws, Ss, gs, Re, be, _e, ge, Oe, no, oo, ho, Dr, qt, Se, Te, ao, lo, co, fo, uo, mo, po, Eo, vt, So, require_pend, require_fd_slicer, require_buffer_crc32, import_yauzl, RG_VERSION$1, RG_BASE_URL$1, DOWNLOAD_TIMEOUT_MS$1, RG_ARCHIVE_SHA256$1, downloadPromise$1, DEFAULT_TIMEOUT_MS$2, MAX_OUTPUT_BYTES$2, VCS_DIRECTORIES_TO_EXCLUDE$2, SENSITIVE_GLOBS_TO_EXCLUDE$2, glob_default$1, GlobInputSchema$1, WINDOWS_PATH_HINT$1, S_IFMT$2, S_IFDIR$1, GlobTool$1, DEFAULT_MAX_CHARS$1, DEFAULT_MAX_LINE_LENGTH$1, TRUNCATION_MARKER$1, TRUNCATION_MESSAGE$1, ToolResultBuilder$1, grep_default$1, GrepInputSchema$1, RG_MAX_COLUMNS$1, DEFAULT_HEAD_LIMIT$1, MTIME_STAT_CONCURRENCY$1, CONTENT_LINE_RE$1, GrepTool$1, GrepAbortedError$1, read_default$1, MAX_LINES$1, MAX_LINE_LENGTH$1, MAX_BYTES$1, S_IFMT$1, S_IFREG, PositiveLineOffsetSchema$1, TailLineOffsetSchema$1, ReadInputSchema$1, READ_DESCRIPTION$1, ReadTool$1, read_media_default$1, MAX_MEDIA_MEGABYTES$1, ReadMediaFileInputSchema$1, ReadMediaFileTool$1, write_default$1, S_IFMT, S_IFDIR, WriteInputSchema$1, WriteTool$1, create_goal_default$1, CreateGoalToolInputSchema$1, CreateGoalTool$1, get_goal_default$1, GetGoalToolInputSchema$1, GetGoalTool$1, set_goal_budget_default$1, MIN_REASONABLE_TIME_BUDGET_MS$1, MAX_REASONABLE_TIME_BUDGET_MS$1, SetGoalBudgetToolInputSchema$1, SetGoalBudgetTool$1, update_goal_default$1, UpdateGoalToolInputSchema$1, UpdateGoalTool$1, enter_plan_mode_default$1, EnterPlanModeInputSchema$1, EnterPlanModeTool$1, exit_plan_mode_default$1, RESERVED_OPTION_LABELS$1, ExitPlanModeOptionSchema$1, ExitPlanModeInputSchema$1, ExitPlanModeTool$1, SELECT_TOOLS_TOOL_NAME$1, SelectToolsInputSchema$1, DESCRIPTION$1, SelectToolsTool$1, bash_default$1, MS_PER_SECOND$1, DEFAULT_TIMEOUT_S$1, MAX_TIMEOUT_S$1, DEFAULT_BACKGROUND_TIMEOUT_S$1, MAX_BACKGROUND_TIMEOUT_S$1, USER_INTERRUPT_REASON, BashInputSchema$1, SHELL_TIMEOUT_VARS$1, BashTool$1, WINDOWS_NUL_REDIRECT$1, fetch_url_default$1, HttpFetchError$1, FetchURLInputSchema$1, FetchURLTool$1, web_search_default$1, WebSearchInputSchema$1, WebSearchTool$1, SHELL_FOREGROUND_TIMEOUT_S$1, ToolManager, REMINDER_TEXT_1$1, REMINDER_TEXT_3$1, REPEAT_REMINDER_1_START$1, REPEAT_REMINDER_2_START$1, REPEAT_REMINDER_3_START$1, REPEAT_FORCE_STOP_STREAK$1, DEDUP_PLACEHOLDER_RESULT, ToolCallDeduplicator, TOOL_RESULT_MAX_CHARS$1, TOOL_RESULT_PREVIEW_CHARS$1, LLM_NOT_SET_MESSAGE$1, GOAL_CONTINUATION_ORIGIN$1, GOAL_RATE_LIMIT_PAUSE_REASON$1, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX$1, GOAL_PROVIDER_AUTH_PAUSE_PREFIX$1, GOAL_PROVIDER_API_PAUSE_PREFIX$1, GOAL_MODEL_CONFIG_PAUSE_PREFIX$1, GOAL_RUNTIME_PAUSE_PREFIX$1, GOAL_PROVIDER_FILTERED_PAUSE_REASON$1, GOAL_CONTINUATION_PROMPT$1, GOAL_STEP_CAP_CONTINUATION_PROMPT$1, TurnFlow, MAX_STEPS_PER_TURN_ENV, MAX_RETRIES_PER_STEP_ENV, KosongLLM, UsageRecorder, LlmRequestRecorder, Agent$4, Protocol, AjvJsonSchemaValidator, ExperimentalClientTasks, Client, ParseError, EventSourceParserStream, DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS, StreamableHTTPError, StreamableHTTPClientTransport, KIMI_MCP_CLIENT_VERSION$1, HttpMcpClient$1, ErrorEvent, __typeError, __accessCheck, __privateGet, __privateAdd, __privateSet, __privateMethod, _readyState, _url2, _redirectUrl, _withCredentials, _fetch, _reconnectInterval, _reconnectTimer, _lastEventId, _controller, _parser, _onError, _onMessage, _onOpen, _EventSource_instances, connect_fn, _onFetchResponse, _onFetchError, getRequestOptions_fn, _onEvent, _onRetryChange, failConnection_fn, scheduleReconnect_fn, _reconnect, EventSource, SseError, SSEClientTransport, SseMcpClient$1, require_symbols, require_timers, require_errors, require_constants$7, require_tree, require_util$6, require_stats, require_diagnostics, require_request$1, require_wrap_handler, require_dispatcher, require_unwrap_handler, require_dispatcher_base, require_connect, require_utils$1, require_constants$6, require_llhttp_wasm, require_llhttp_simd_wasm, require_constants$5, require_global$1, require_encoding, require_infra, require_data_url, require_runtime_features, require_webidl, require_util$5, require_formdata, require_formdata_parser, require_promise, require_body, require_client_h1, require_client_h2, require_client, require_fixed_queue, require_pool_base, require_pool, require_balanced_pool, require_round_robin_pool, require_agent, require_socks5_utils, require_socks5_client, require_socks5_proxy_agent, require_proxy_agent, require_env_http_proxy_agent, require_retry_handler, require_retry_agent, require_h2c_client, require_readable, require_api_request, require_abort_signal, require_api_stream, require_api_pipeline, require_api_upgrade, require_api_connect, require_api, require_mock_errors, require_mock_symbols, require_mock_utils, require_mock_interceptor, require_mock_client, require_mock_call_history, require_mock_pool, require_pending_interceptors_formatter, require_mock_agent, require_snapshot_utils, require_snapshot_recorder, require_snapshot_agent, require_global, require_decorator_handler, require_redirect_handler, require_redirect, require_response_error, require_retry$2, require_dump, require_dns, require_cache$2, require_date2, require_cache_handler, require_memory_cache_store, require_cache_revalidation_handler, require_cache$1, require_decompress, require_deduplication_handler, require_deduplicate, require_sqlite_cache_store, require_headers, require_response, require_request, require_subresource_integrity, require_fetch, require_util$4, require_cache, require_cachestorage, require_constants$4, require_util$3, require_parse$3, require_cookies, require_events, require_constants$3, require_util$2, require_frame, require_connection, require_permessage_deflate, require_receiver, require_sender, require_websocket, require_websocketerror, require_websocketstream, require_util$1, require_eventsource_stream, require_eventsource, require_undici, require_utils2, require_smartbuffer, require_constants$2, require_util, require_address_error, require_common3, require_constants$12, require_ipv4, require_constants2, require_helpers$1, require_regular_expressions, require_ipv6, require_ip_address, require_helpers2, require_receivebuffer, require_socksclient, require_build, import_undici, import_build, LOOPBACK_NO_PROXY$1, SOCKS_SCHEMES$1, defaultMakeHttpAgent, defaultMakeSocksAgent, defaultInstallProxyDeps, require_windows, require_mode, require_isexe, require_which, require_path_key, require_resolveCommand, require_escape, require_shebang_regex, require_shebang_command, require_readShebang, require_parse$2, require_enoent, import_cross_spawn, ReadBuffer, DEFAULT_INHERITED_ENV_VARS, StdioClientTransport, STDERR_BUFFER_CAPACITY$1, StdioMcpClient$1, BoundedTail$1, DEFAULT_STARTUP_TIMEOUT_MS$1, MCP_STARTUP_TIMEOUT_ENV$1, MCP_TOOL_TIMEOUT_ENV$1, McpConnectionManager$1, GlobalMcpConfigStore$1, McpJsonFileSchema$1, MAX_WORKDIR_SLUG_LENGTH$1, WORKDIR_KEY_PREFIX$1, HASH_LENGTH$1, WIN_SHAPED$1, appendQueues, MAX_TITLE_LENGTH$1, MAX_LAST_PROMPT_LENGTH$1, SessionSummaryStateSchema, FORKED_SESSION_DROPPED_FILES, SessionStore, BACKGROUND_KEEP_ALIVE_ON_EXIT_ENV, ACTIVE_TURN_CLOSE_TIMEOUT_MS, Session$1, PLUGIN_NAME_REGEX$1, KIMI_PLUGIN_ROOT_PATH$1, KIMI_PLUGIN_DIR_PATH$1, PLUGIN_SYSTEM_PROMPT_MAX_BYTES$1, UNSUPPORTED_RUNTIME_FIELDS$1, INSTALLED_REL$1, EMPTY$2, SHA_RE$1, KIMI_NODE_FALLBACK_SUBCOMMAND$1, PluginManager$1, require_Readability, require_Readability_readerable, import_readability, CHANGED, CLASS_LIST, CUSTOM_ELEMENTS, CONTENT, DATASET, DOCTYPE, DOM_PARSER, END, EVENT_TARGET, GLOBALS, IMAGE, MIME, MUTATION_OBSERVER, NEXT, OWNER_ELEMENT, PREV, PRIVATE, SHEET, START, STYLE, UPGRADE, VALUE, _a2, decodeMap, fromCodePoint, htmlDecodeTree, xmlDecodeTree, BinTrieFlags, CharCodes$1, TO_LOWER_BIT, EntityDecoderState, DecodingMode, EntityDecoder, CharCodes, State, QuoteType, Sequences, Tokenizer, formTags, pTag, tableSectionTags, ddtTags, rtpTags, openImpliesClose, voidElements$1, foreignContextElements, htmlIntegrationElements, reNameEnd, Parser$2, esm_exports$2, ElementType, Root, Text$3, Directive, Comment$3, Script, Style, Tag, CDATA$1, Doctype, Node$5, DataNode, Text$2, Comment$2, ProcessingInstruction, NodeWithChildren, CDATA, Document$2, Element$2, defaultOpts, DomHandler, xmlReplacer, xmlCodeMap, getCodePoint, escapeAttribute$1, escapeText, elementNames, attributeNames, unencodedElements, singleTag, foreignModeIntegrationPoints, foreignElements, Checks, DocumentPosition, MEDIA_KEYS_STRING, MEDIA_KEYS_INT, esm_exports$1, esm_exports, parseFeedDefaultOptions, BLOCK_ELEMENTS, SVG_NAMESPACE, assign, create$1, defineProperties, entries, getOwnPropertyDescriptors, keys, setPrototypeOf, $String, getEnd, ignoreCase, knownAdjacent, knownBoundaries, knownSegment, knownSiblings, localCase, setAdjacent, htmlToFragment, shadowRoots, reactive, Classes, customElements, attributeChangedCallback$1, createTrigger, triggerConnected, connectedCallback, triggerDisconnected, disconnectedCallback, CustomElementRegistry, Parser$1, append, attribute, parseFromString, htmlClasses, registerHTMLClass, loopSegment, attrAsJSON, characterDataAsJSON, nonElementAsJSON, documentTypeAsJSON, elementAsJSON, createRecord, queueAttribute, attributeChangedCallback, moCallback, MutationObserverClass, emptyAttributes, setAttribute, removeAttribute, booleanAttribute, numericAttribute, stringAttribute, wm, DOMEventTarget, NodeList, getParentNodeCount, Node$4, replace, ca, esca, pe, escape$1, QUOTE, Attr$1, isConnected, parentElement, previousSibling, nextSibling, nextElementSibling, previousElementSibling, asFragment, before, after, replaceWith, remove, CharacterData$1, CDATASection$1, Comment$1, require_boolbase, require_types, require_parse$1, require_stringify, require_commonjs, import_boolbase, import_commonjs, procedure, attributes, reChars, caseInsensitiveAttributes, attributeRules, whitespace, ZERO, NINE, filters, pseudos, aliases, PLACEHOLDER_ELEMENT, is$1, subselects, DESCENDANT_TOKEN, FLEXIBLE_DESCENDANT_TOKEN, SCOPE_TOKEN, defaultEquals, defaultOptions$1, compile, isArray, isTag, existsOne, getAttributeValue, getChildren, getName, getParent, getSiblings, getText, hasAttrib, removeSubsets, findAll, findOne, adapter, prepareMatch, matches$1, Text$1, isNode, insert, ParentNode, NonElementParentNode, DocumentFragment$1, DocumentType$1, getInnerHtml, setInnerHtml, esm_default, refs$1, key, prop, handler$2, DOMStringMap, add2, addTokens, update, DOMTokenList, refs, getKeys, updateKeys, handler$1, CSSStyleDeclaration, prototype, BUBBLING_PHASE, AT_TARGET, CAPTURING_PHASE, NONE, GlobalEvent, NamedNodeMap, ShadowRoot$1, attributesHandler, create, isVoid, Element$1, classNames, handler, SVGElement$1, illegalConstructor, Facades, Level0, level0, HTMLElement, tagName$17, HTMLTemplateElement, HTMLHtmlElement, toString3, TextElement, tagName$16, HTMLScriptElement, HTMLFrameElement, tagName$15, HTMLIFrameElement, HTMLObjectElement, HTMLHeadElement, HTMLBodyElement, require_StyleSheet, require_CSSRule, require_CSSStyleRule, require_CSSStyleSheet, require_MediaList, require_CSSImportRule, require_CSSGroupingRule, require_CSSConditionRule, require_CSSMediaRule, require_CSSSupportsRule, require_CSSFontFaceRule, require_CSSHostRule, require_CSSKeyframeRule, require_CSSKeyframesRule, require_CSSValue, require_CSSValueExpression, require_MatcherList, require_CSSDocumentRule, require_parse, require_CSSStyleDeclaration, require_clone$1, import_lib, tagName$14, HTMLStyleElement, HTMLTimeElement, HTMLFieldSetElement, HTMLEmbedElement, HTMLHRElement, HTMLProgressElement, HTMLParagraphElement, HTMLTableElement, HTMLFrameSetElement, HTMLLIElement, HTMLBaseElement, HTMLDataListElement, tagName$13, HTMLInputElement, HTMLParamElement, HTMLMediaElement, HTMLAudioElement, tagName$12, HTMLHeadingElement, HTMLDirectoryElement, HTMLQuoteElement, require_canvas_shim, createCanvas, tagName$11, HTMLCanvasElement, HTMLLegendElement, tagName$10, HTMLOptionElement, HTMLSpanElement, HTMLMeterElement, HTMLVideoElement, HTMLTableCellElement, tagName$9, HTMLTitleElement, HTMLOutputElement, HTMLTableRowElement, HTMLDataElement, HTMLMenuElement, tagName$8, HTMLSelectElement, HTMLBRElement, tagName$7, HTMLButtonElement, HTMLMapElement, HTMLOptGroupElement, HTMLDListElement, tagName$6, HTMLTextAreaElement, HTMLFontElement, HTMLDivElement, tagName$5, HTMLLinkElement, tagName$4, HTMLSlotElement, HTMLFormElement, tagName$3, HTMLImageElement, HTMLPreElement, HTMLUListElement, tagName$2, HTMLMetaElement, HTMLPictureElement, HTMLAreaElement, HTMLOListElement, HTMLTableCaptionElement, tagName$1, HTMLAnchorElement, HTMLLabelElement, HTMLUnknownElement, HTMLModElement, HTMLDetailsElement, tagName, HTMLSourceElement, HTMLTrackElement, HTMLMarqueeElement, HTMLClasses, voidElements, Mime, CustomEvent, InputEvent, ImageClass, deleteContents, Range, isOK, TreeWalker, query, globalExports, window$1, Document$1, createHTMLElement, HTMLDocument, SVGDocument, XMLDocument, DOMParser, parse$3, parseHTML$2, parseHTML$1, DEFAULT_USER_AGENT$1, DEFAULT_MAX_BYTES$1, MAX_REDIRECT_HOPS$1, REDIRECT_STATUSES$1, PRIVATE_ADDRESS_BLOCKLIST$1, LocalFetchURLProvider$1, MoonshotFetchURLProvider$1, MoonshotWebSearchProvider$1, WIRE_PROTOCOL_VERSION$1, SESSION_LOG_REL$1, GLOBAL_LOG_REL$1, OAuthError, OAuthUnauthorizedError, OAuthConnectionError, DeviceCodeTimeoutError, RetryableRefreshError, FileTokenStorage, DIRECT_ERROR_KEYS, NESTED_ERROR_KEYS, RETRYABLE_STATUSES, DEFAULT_HTTP_TIMEOUT_MS, require_polyfills, require_legacy_streams, require_clone, require_graceful_fs, require_retry_operation, require_retry$1, require_retry, require_signals, require_signal_exit, require_mtime_precision, require_lockfile, require_adapter, import_proper_lockfile, MIN_REFRESH_THRESHOLD_SECONDS, REFRESH_THRESHOLD_RATIO, DEFAULT_DEVICE_CODE_TIMEOUT_MS, defaultSleep, OAuthManager, KIMI_CODE_CUSTOM_HEADERS_ENV, KIMI_CODE_FLOW_CONFIG, DEFAULT_KIMI_CODE_BASE_URL, FIXED_POINT_CENTS, MANAGED_KIMI_MODEL_FIELDS, CUSTOM_REGISTRY_MODEL_FIELDS, KIMI_CODE_PLATFORM_ID, KIMI_CODE_PROVIDER_NAME$1, KIMI_CODE_OAUTH_KEY, KIMI_CODE_SCOPED_OAUTH_KEY_PREFIX, ManagedKimiCodeModelsAuthError, SHARED_DEFAULT_BASE_URLS, managedUserInfoPhoneSchema, managedUserInfoSchema, managedUserInfoOkSchema, managedUserInfoErrorSchema, OPEN_PLATFORMS, OpenPlatformApiError, CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT, CUSTOM_REGISTRY_DEFAULT_CAPABILITIES, ALLOWED_PROVIDER_TYPES, CustomRegistryApiError, KimiOAuthToolkit, ProviderManager, SessionAPIImpl, WORKSPACE_REGISTRY_FILE, WORKSPACE_REGISTRY_VERSION, KaosError, KaosFileExistsError, KaosShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS$1, MINGW_PREFIX_SET$1, detectedEnvironment, BufferedReadable$1, LOGIN_SHELL_ENV_TIMEOUT_MS$1, appliedLoginShellPath$1, isWindows$2, READ_CHUNK_SIZE$1, LocalProcess, LocalKaos, KIMI_CODE_PROVIDER_NAME, KIMI_CODE_BASE_URL_ENV$1, KIMI_CODE_OAUTH_HOST_ENV$1, KIMI_OAUTH_HOST_ENV$1, WEB_SEARCH_BASE_URL_ENV$1, WEB_SEARCH_API_KEY_ENV$1, WEB_FETCH_BASE_URL_ENV$1, WEB_FETCH_API_KEY_ENV$1, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS$1, KimiCore, _util$1, IInstantiationService$1, SyncDescriptor$1, disposableTracker$1, FunctionDisposable$1, DisposableStore$1, Disposable$1, ReferenceCollection, DisposableMap, _registry, Emitter$1, Event$2, BridgeClientAPI, ICoreProcessService, ServicesManagedAuthFacade, IApprovalService, IEnvironmentService, IEventService$1, ILogService$1, IQuestionService, WorkspaceNotFoundError, WorkspaceRootNotFoundError, IWorkspaceRegistry, _CoreProcessService, CoreProcessService, EventService$1, DEFAULT_MAX_UPLOAD_BYTES, FileNotFoundError, FileTooLargeError, IFileStore, FileStore, FsPathNotFoundError, FsIsDirectoryError, FsIsBinaryError, FsTooLargeError, FsTooManyResultsError, FsAlreadyExistsError, IFsService, import_ignore, ISessionService, SessionUndoUnavailableError, SessionNotFoundError, FsPathEscapesError, FS_READ_MAX_BYTES$1, FS_BINARY_SAMPLE_BYTES$1, FS_BINARY_NONPRINTABLE_FRACTION$1, HIDDEN_NAME_RE$1, MACOS_NOISE$1, FsService, EXT_TO_MIME$2, EXT_TO_LANGUAGE$1, FsGrepTimeoutError, IFsSearchService, SEARCH_HARD_CAP$1, GREP_TIMEOUT_MS$1, WALK_MAX_DEPTH$1, FsSearchService, FsGitUnavailableError, IFsGitService, DIFF_MAX_BYTES$1, PR_SPAWN_TIMEOUT_MS$1, PULL_REQUEST_TTL_MS$1, FsGitService, FsWatchLimitError, EntryTypes, defaultOptions, RECURSIVE_ERROR_CODE, NORMAL_FLOW_ERRORS, ALL_TYPES, DIR_TYPES, FILE_TYPES, isNormalFlowError, wantBigintFsStats, emptyFn, normalizeFilter, ReaddirpStream, STR_DATA, STR_CLOSE, EMPTY_FN, pl, isWindows$1, isMacos, isLinux, isFreeBSD, isIBMi, EVENTS, EV, THROTTLE_MODE_WATCH, statMethods, KEY_LISTENERS, KEY_ERR, KEY_RAW, HANDLER_KEYS, binaryExtensions, isBinaryPath, foreach, addAndConvert, clearItem, delFromSet, isEmptySet, FsWatchInstances, fsWatchBroadcast, setFsWatchListener, FsWatchFileInstances, setFsWatchFileListener, NodeFsHandler, SLASH, SLASH_SLASH, ONE_DOT, TWO_DOTS, STRING_TYPE, BACK_SLASH_RE, DOUBLE_SLASH_RE, DOT_RE, REPLACER_RE, isMatcherObject, unifyPaths, toUnix, normalizePathToUnix, normalizeIgnored, getAbsolutePath, EMPTY_SET, DirEntry, STAT_METHOD_F, STAT_METHOD_L, WatchHelper, FSWatcher, DEFAULT_DEBOUNCE_MS$1, DEFAULT_MAX_CHANGES_PER_WINDOW$1, DEFAULT_MAX_PATHS_PER_CONNECTION, PathReferenceCollection, SessionEntry, FsWatcherService, WorkspaceRegistryService, WorkspaceFsNotAbsoluteError, WorkspaceFsNotFoundError, WorkspaceFsPermissionError, IWorkspaceFsService$1, WorkspaceFsService$1, IAuthSummaryService$1, AuthProvisioningRequiredError$1, AuthTokenMissingError$1, AuthModelNotResolvedError$1, MANAGED_PROVIDER_NAME$1, AuthSummaryService$1, IOAuthService$1, _OAuthService, FlowState, TERMINAL_RETENTION_MS$1, OAuthService$1, IModelCatalogService, ProviderNotFoundError, ModelNotFoundError, _ModelCatalogService, ModelCatalogService, noopEventService, IConfigService$1, ConfigService$1, IMessageService, MessageNotFoundError, IPromptService, PromptNotFoundError, PromptAlreadyCompletedError, DEFAULT_PAGE_SIZE$1, MAX_PAGE_SIZE$1, DEFAULT_UNDO_MESSAGE_PAGE_SIZE, MAX_UNDO_MESSAGE_PAGE_SIZE, CHILD_SESSION_KIND$1, SessionService, BLOBREF_PROTOCOL$1, MISSING_MEDIA_PLACEHOLDER$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$1, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAIN_AGENT_ID$10, TRANSCRIPT_CACHE_LIMIT, MessageService, MAIN_AGENT_ID$9, DISPATCH_LOG_CAP, PromptService, IToolService, MAIN_AGENT_ID$8, ToolService, IMcpService, McpServerNotFoundError, McpService, ISkillService, SkillNotFoundError, SkillNotActivatableError, MAIN_AGENT_ID$7, SkillService, TERMINAL_WIRE_STATUSES, ITaskService$1, TaskNotFoundError, TaskAlreadyFinishedError, MAIN_AGENT_ID$6, DEFAULT_TASK_OUTPUT_PREVIEW_BYTES, TaskService$1, ITerminalService, TerminalNotFoundError, DEFAULT_COLS$1, DEFAULT_ROWS$1, DEFAULT_MAX_BUFFERED_FRAMES$1, TerminalService, NodePtyTerminalBackend, MAIN_AGENT_ID$5, Session, KimiHarness, DEFAULT_SESSION_STARTED_UI_MODE, KimiAuthFacade, MAIN_AGENT_ID$4, SDKRpcClientBase, ClientAPI, SDKRpcClient, MAX_WORKDIR_SLUG_LENGTH, WORKDIR_KEY_PREFIX, HASH_LENGTH, WIN_SHAPED, _util, SERVICE_IDENTIFIER_MARK, IInstantiationService, IConfigRegistry, IConfigService, defaultHandler, currentHandler, LedgerDisposedError, Ledger, disposableTracker, FunctionDisposable, DisposableStore, Disposable, MutableDisposable, Node$1, LinkedList, Emitter, AsyncEmitter, Event$1, _collectionTokens, _collectionTokenSet, CollectionStore, CollectionViewImpl, ConfigSectionContribution, _contributions, StringRecordSchema$2, McpTimeoutMsSchema, McpServerCommonFields, McpServerStdioConfigSchema, McpServerHttpConfigSchema, McpServerSseConfigSchema, McpServerConfigDiscriminatedSchema, McpServerConfigSchema, McpSectionSchema, MCP_STARTUP_TIMEOUT_ENV, MCP_TOOL_TIMEOUT_ENV, mcpEnvBindings, DEFAULT_IDENTITY_SLUG, IAgentIdentity, registeredCodes, retryableCodes, infoOverrides, CoreErrors, AgentLifecycleErrors, AuthErrors, TaskErrors, BugIndicatingError, Error2, CONFIG_INVALID_ERROR_CODE, PROVIDER_API_ERROR_CODE, PROVIDER_FILTERED_ERROR_CODE, PROVIDER_RATE_LIMIT_ERROR_CODE, PROVIDER_AUTH_ERROR_CODE, PROVIDER_CONNECTION_ERROR_CODE, PROVIDER_OVERLOADED_ERROR_CODE, CONTEXT_OVERFLOW_ERROR_CODE, ChatProviderError, APIConnectionError, VideoUploadUnsupportedError, APITimeoutError, APIStatusError, APIContextOverflowError, APIRequestTooLargeError, APIProviderRateLimitError, APIProviderQuotaExhaustedError, APIProviderOverloadedError, APIEmptyResponseError, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS, MEDIA_TYPE_FIELD_PATTERN, NETWORK_RE$1, TIMEOUT_RE$1, CONTEXT_OVERFLOW_MESSAGE_PATTERNS, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS, PROVIDER_OVERLOAD_MESSAGE_PATTERNS, REQUEST_TOO_LARGE_MESSAGE_PATTERNS, THINKING_EFFORT_CONFIG_DOCS_URL, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS, STRUCTURAL_REQUEST_MESSAGE_PATTERNS, ProtocolErrors, ConfigErrors, CapabilityErrors, CronErrors, DebugErrors, ISO_8601_REGEX, isoDateTimeSchema, IFileService, FileErrors, FileError, FsErrors, FullCompactionErrors, GoalErrors, LoopErrors, McpErrors, ModelCatalogErrors, OsFsErrors, HostFsError, REASONS$1, IHostProcessService, OsProcessErrors, HostProcessErrorCode, HostProcessError, PluginErrors, ProfileErrors, PromptErrors, ModelsDevImportErrors, SessionExportErrors, SessionErrors, SkillErrors, StorageErrors, StorageError, REASONS, IFileSystemStorageService, TerminalErrors, UsageErrors, WebErrors, WireErrors, WireError, WorkspaceErrors, MAX_CAUSE_DEPTH, toKimiErrorPayload$1, ErrorCodes$1, UserCancellationError, KIMI_MCP_CLIENT_VERSION, MCP_LIVENESS_PROBE_TIMEOUT_MS, HttpMcpClient, SseMcpClient, LOOPBACK_NO_PROXY, SOCKS_SCHEMES, STDERR_BUFFER_CAPACITY, StdioMcpClient, BoundedTail, DEFAULT_STARTUP_TIMEOUT_MS, defaultLog, McpConnectionManager, SUCCESS_HTML, ERROR_HTML, TOKENS_SUFFIX, CLIENT_SUFFIX, DISCOVERY_SUFFIX, PASSIVE_REDIRECT_URI, McpOAuthClientProvider, McpOAuthService, AlreadyAuthorizedError, SyncDescriptor, PairIndex, DependencyGraph, CyclicDependencyError, CascadeConflictError, DEFAULT_ABORT_WAIT_MS, DEFAULT_RESOLVE_TIMEOUT_MS, DEFAULT_HISTORY_CAPACITY, CascadeTree, CascadeEngine, FiberProtocolError, ServiceRecipeError, _constructionStack, SERVICE_MARK, _eventResolver, FiberRuntime, BasicFiberHandle, PendingFiberHandle, _scopeUnitsTokens, Node, Graph, ServiceCollection, Trace, InstantiationService, _scopeTopology, _scopedRegistry, Scope, IAtomicDocumentStore, IAtomicTomlDocumentStore, IMcpOAuthStore, CREDENTIALS_SCOPE, McpOAuthStoreAdapter, ProtocolSchema, IProtocolAdapterRegistry, PROVIDERS_SECTION, DEFAULT_PROVIDER_SECTION, ENV_MODEL_PROVIDER_KEY, ProviderTypeSchema, OAuthRefSchema$1, ModelSourceSchema, StringRecordSchema$1, ProviderConfigSchema, ProvidersSectionSchema, providersEnvBindings, stripProvidersEnv, providersFromToml, providersToToml, MODELS_SECTION, DEFAULT_MODEL_SECTION, ModelBaseSchema, ModelOverrideSchema, ModelRecordSchema, ModelsSectionSchema, modelsFromToml, modelsToToml, THINKING_SECTION, ThinkingConfigSchema, thinkingEnvBindings, stripThinkingEnv, SECONDARY_MODEL_SECTION, SECONDARY_MODEL_ENV, SECONDARY_MODEL_EFFORT_ENV, SecondaryModelConfigSchema, secondaryModelEnvBindings, _overlays, SECONDARY_DERIVED_MODEL_ID, contributedFlags, IFlagRegistry, SECONDARY_MODEL_FLAG_ID, SUBAGENT_SECTION, SubagentConfigSchema, DEFAULT_SUBAGENT_TIMEOUT_MS, SUBAGENT_TIMEOUT_ENV, subagentEnvBindings, stripSubagentEnv, ADVERTISED_CAPABILITY_FLAGS, WATCH_DEBOUNCE_MS$5, FileStorageService, ILogService, LEVEL_ORDER, FrontmatterError, FENCE$1, SkillParseError, UnsupportedSkillTypeError, FENCE, METADATA_ALIASES, FileSkillDiscovery, ISkillDiscovery, IBootstrapOptions, IBootstrapService, McpJsonFileSchema, Service, ILogOptions, CTX_VALUE_MAX_CHARS, STACK_MAX_BYTES, ENTRY_MAX_BYTES, REDACTED_KEYS, SAFE_KEY_RE, ELLIPSIS, TRUNCATED_TAIL, REDACTED, RAW_SECRET_PATTERNS, LEVEL_LABEL, ANSI_LEVEL, ANSI_RESET, PENDING_MAX, STDERR_NOTICE_INTERVAL_MS, AsyncSerialQueue, RotatingFileWriter, FileLogWriter, BoundLogger, AppLogService, IWireService, BLOBREF_PROTOCOL, IAgentBlobService, IAgentScopeContext, IEventBus, OrderedHookSlot, AppendLogCorruptedError, IAppendLogStore, migrateV1_0ToV1_1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS, migrateV1_1ToV1_2, migrateV1_2ToV1_3, migrateV1_3ToV1_4, migrateV1_4ToV1_5, MIGRATIONS, AGENT_WIRE_RECORD_KEY, DuplicateOpError, OP_REGISTRY, MODEL_CROSS_REDUCERS, MODEL_REGISTRY, CHECKPOINTED_MODELS, WireModelContribution, MAX_DRAIN, CycleError, WireService, StateRegistry, ISessionContext, ISessionStateService, sessionLogRootLevelKey, SessionLogService, nullTelemetryAppender, ITelemetryService, TelemetryService, TelemetryContextView, IAgentTelemetryContextService, AgentTelemetryContextService, BootstrapService, IHostClock, IHostEnvironment, IHostFileSystem, IHostFsWatchService, relativeCwdSchema, terminalStatusSchema, IHostTerminalService, HostClockService, GIT_EXEC_PATH_TIMEOUT_MS, MINGW_PREFIX_SET, cachedProbe, LOGIN_SHELL_ENV_TIMEOUT_MS, appliedLoginShellPath, HostEnvironmentService, READ_CHUNK_SIZE, HostFileSystem, DEFAULT_IGNORED, NATIVE_RETRY_BASE_MS, NATIVE_RETRY_MAX_MS, NODE_HOST_FS_WATCH_RUNTIME, HostFsWatchHandle, SignalWatchHandle, HostFsWatchService, BufferedReadable, isWindows, HostProcess, HostProcessService, HostTerminalService, ToolAccesses, MCP_NAME_PREFIX$1, MAX_BACKGROUND_TIMEOUT_S, BashInputSchema, IBashTool, VALID_TASK_ID, TASKS_SCOPE, OUTPUT_LOG_KEY, JSON_SUFFIX$1, textEncoder$4, textDecoder$4, AgentTaskPersistence, IAgentTaskService, TRUE_BOOLEAN_ENV_VALUES, FALSE_BOOLEAN_ENV_VALUES, TASK_SECTION, LEGACY_BACKGROUND_SECTION, PrintBackgroundModeSchema, AgentTaskConfigSchema, KEEP_ALIVE_ON_EXIT_ENV, MAX_RUNNING_TASKS_ENV, taskEnvBindings, stripTaskEnv, ISessionProcessRunner, IAgentToolPolicyService, DEFAULT_MAX_CHARS, DEFAULT_MAX_LINE_LENGTH, TRUNCATION_MARKER, TRUNCATION_MESSAGE, ToolResultBuilder, AgentToolContribution, _agentToolContributions, SENSITIVE_BASENAMES, SENSITIVE_PATH_SUFFIXES, ENV_PREFIX, ENV_EXEMPTIONS, SENSITIVE_BASENAME_PREFIXES, PUBLIC_KEY_BASENAMES, SENSITIVE_DOT_VARIANT_SUFFIXES, SENSITIVE_DOT_VARIANT_SUFFIX_SET, DEFAULT_WORKSPACE_ACCESS_POLICY, PathSecurityError, DEFAULT_PATH_CLASS, GLOB_LITERAL_SPECIAL, PROMPT_VARIABLE, bash_default, STREAM_DRAIN_GRACE_MS, ProcessTask, MS_PER_SECOND, SHELL_TIMEOUT_VARS, BashTool, WINDOWS_NUL_REDIRECT, GlobInputSchema, WINDOWS_PATH_HINT, IGlobTool, RG_VERSION, RG_BASE_URL, DOWNLOAD_TIMEOUT_MS, RG_ARCHIVE_SHA256, downloadPromise, DEFAULT_TIMEOUT_MS$1, MAX_OUTPUT_BYTES$1, ISessionSkillCatalog, ISessionWorkspaceContext, glob_default, VCS_DIRECTORIES_TO_EXCLUDE$1, SENSITIVE_GLOBS_TO_EXCLUDE$1, GlobTool, GrepInputSchema, IGrepTool, grep_default, RG_MAX_COLUMNS, DEFAULT_HEAD_LIMIT, MTIME_STAT_CONCURRENCY, VCS_DIRECTORIES_TO_EXCLUDE, SENSITIVE_GLOBS_TO_EXCLUDE, CONTENT_LINE_RE, GrepTool, GrepAbortedError, MAX_LINES, MAX_LINE_LENGTH, MAX_BYTES, TRANSCODE_MAX_BYTES, PositiveLineOffsetSchema, TailLineOffsetSchema, ReadInputSchema, IReadTool, IMAGE_MIME_BY_SUFFIX, VIDEO_MIME_BY_SUFFIX, TEXT_MIME_BY_SUFFIX, NON_TEXT_SUFFIXES, ASF_HEADER, FTYP_IMAGE_BRANDS, FTYP_VIDEO_BRANDS, MIN_ZERO_BYTES_FOR_UTF16, UTF16BE_BOM, UTF16LE_BOM, UTF8_BOM, read_default, READ_DESCRIPTION, ReadTool, WriteInputSchema, IWriteTool, write_default, WriteTool, DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_BUFFERED_FRAMES, ISessionTerminalService, SessionTerminalService, TERMINAL_TASK_STATES, TaskCancelledError, ITaskService, RunHandle, DeferHandle, TaskService2, EventBusService, IEventService, EventService, IAppStateService, AppStateService, IWorkspaceStateService, WorkspaceStateService, SessionStateService, IAgentStateService, AgentStateService, UNKNOWN_CAPABILITY, PARENT_SESSION_ID_KEY, CHILD_SESSION_KIND_KEY, CHILD_SESSION_KIND, ISessionIndex, ISessionIndexMirror, MAX_TIMER_DELAY_MS$1, IntervalTimer, TimeoutTimer, EXPERIMENTAL_SECTION, ExperimentalConfigSchema, experimentalFromToml, experimentalToToml, IFlagService, IQueryStore, SESSION_INDEX_MANIFEST, PARENT_INDEX_NAME, META_SCOPE, META_KEY$1, WRITE_CHUNK, SCAN_CONCURRENCY, SessionIndexProjector, READ_MODEL_FLAG$1, RECONCILE_INTERVAL_MS, DEGRADED_RETRY_MS, TIE_REPAIR_LIMIT, UNBOUNDED, FileSessionIndex, READ_MODEL_FLAG, FLUSH_INTERVAL_MS, FLUSH_BATCH_SIZE, MAX_PENDING, MAX_CONSECUTIVE_FAILURES, pendingDrains, SessionIndexMirror, ISessionMetadata, META_KEY, pendingWrites, sessionMetadataDataKey, SessionMetadata, ISessionActivityView, IAgentActivityView, MAIN_AGENT_ID$3, IAgentLifecycleService, ISessionInteractionService, sessionActivityFoldsKey, sessionActivityCurrentKey, SessionActivityView, ISessionOutcomeMirror, SessionOutcomeMirror, ISessionToolPolicy, sessionToolPolicyStateKey, STATE_KEY, SessionToolPolicyService, MIGRATIONS_FILE, THINKING_EFFORT_MAX_TO_HIGH, CONFIG_SCOPE$1, CONFIG_SCOPE, ConfigRegistry, ConfigService2, IProviderService, NO_ABORT$1, ProviderService, providerDefinitions, protocolBases, CONFIG_DEFAULT_HEADERS_TRAIT, ProtocolAdapterRegistry, BUILTIN_PRODUCT_SKILLS_SECTION, BuiltinProductSkillsConfigSchema, builtinProductSkillsEnvBindings, stripBuiltinProductSkillsEnv, IDENTITY_SECTION, IdentityConfigSchema, IDENTITY_NAME_ENV, IDENTITY_SLUG_ENV, identityEnvBindings, AgentIdentityService, ENV_MODEL_ALIAS_KEY, DEFAULT_MAX_CONTEXT_SIZE, DEFAULT_CAPABILITIES, kimiModelEnvOverlay, MIN_FLOOR, DEFAULT_UNKNOWN_CONTEXT_FALLBACK, IHostRequestHeaders, IModelService, NO_ABORT, ModelService, KEEP_OFF_VALUES, BUDGET_THINKING_EFFORTS, ADAPTIVE_MAX_EFFORTS, LATEST_OPUS_THINKING_EFFORTS, BUDGET_PROFILE, OPUS_45_PROFILE, ADAPTIVE_MAX_PROFILE, LATEST_OPUS_PROFILE, ALWAYS_ADAPTIVE_PROFILE, ALWAYS_ADAPTIVE_MAX_PROFILE, FAMILY_FIRST_RE, VERSION_FIRST_RE, BARE_FAMILY_RE, CLAUDE_FAMILY_WORD_RE, StaticAuthProvider, modelCatalogItemSchema$1, providerCatalogStatusSchema$1, IModelCatalog, TRACE, ResolutionTraceCollector, SECRET_KEY_RE, PROVIDER_OPTION_FIELD, CAPABILITY_KEYS, IModelOAuthTokens, AsyncEventQueue, ModelRequesterImpl, ModelCatalog, IKosongConfigService, BASE_DELAY_MS, MAX_DELAY_MS, RETRY_FACTOR, JITTER_FACTOR, PERSIST_MAX_ATTEMPTS, KosongConfigService, IOAuthService, IOAuthToolkit, IAuthSummaryService, AuthProvisioningRequiredError, AuthTokenMissingError, AuthModelNotResolvedError, ModelOAuthTokenAdapter, HostRequestHeadersAdapter, providerRefreshChangeSchema, providerRefreshFailureSchema, IProviderDiscoveryService, EMPTY_EXCLUSION, ProviderDiscoveryService, PROVIDER_ID_PATTERN, IModelsDevImportService, KNOWN_WIRE_TYPES, BUILT_IN_MODELS_DEV_JSON, MODELS_DEV_URL, CACHE_TTL_MS, UPSTREAM_FETCH_TIMEOUT_MS, cache, inFlight, builtInMemo, fetchImpl, nowImpl, codes, ModelsDevImportService, EMPTY_TOOL_CALL_ID, TOOL_CALL_ID_SAFE_CHARS, INTERLEAVED_THINKING_BETA$1, CONTEXT_MANAGEMENT_BETA, CLEAR_THINKING_EDIT, ANTHROPIC_TOOL_CALL_ID_POLICY, CEILING_BY_FAMILY_VERSION, FALLBACK_MAX_TOKENS, CACHE_CONTROL, CACHEABLE_TYPES, OMITTED_MEDIA_PLACEHOLDER, SUPPORTED_B64_MEDIA_TYPES, SUPPORTED_B64_VIDEO_TYPES, AnthropicStreamedMessage, AnthropicChatProvider, CLAUDE_VISION_TOOL_PREFIXES, CLAUDE_THINKING_VISION_TOOL_PREFIXES, ANTHROPIC_VISION_TOOL_CAPABILITY, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY, GoogleGenAIStreamedMessage, NETWORK_RE, TIMEOUT_RE, GoogleGenAIChatProvider, GEMINI_CATALOGUED_PREFIXES, GEMINI_MULTIMODAL_TOOL_CAPABILITY, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY, TOOL_RESULT_MEDIA_PROMPT, TOOL_RESULT_MEDIA_PLACEHOLDER, OPENAI_REASONING_CAPABILITY, OPENAI_VISION_TOOL_CAPABILITY, OPENAI_TEXT_TOOL_CAPABILITY, OPENAI_VISION_TOOL_PREFIXES, KNOWN_REASONING_KEYS, DEFAULT_REASONING_KEY, ReasoningKeyDialect, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING, OPENAI_CHAT_TOOL_CALL_ID_POLICY, OMITTED_AUDIO_PLACEHOLDER$1, OMITTED_VIDEO_PLACEHOLDER$1, OpenAILegacyStreamedMessage, OpenAILegacyChatProvider, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY, EMBEDDED_STATUS_CODE_RE, OMITTED_AUDIO_PLACEHOLDER, OMITTED_VIDEO_PLACEHOLDER, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS, OpenAIResponsesStreamedMessage, OpenAIResponsesChatProvider, KIMI_QUOTA_EXHAUSTED_ERROR_CODES, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS, KimiFiles, MIME_TO_EXT, EXT_TO_MIME$1, TYPE_COMPLETION_SKIP_KEYS, CHILD_SCHEMA_SLOTS, OBJECT_STRUCTURE_KEYS, ARRAY_STRUCTURE_KEYS, STRING_STRUCTURE_KEYS, NUMERIC_STRUCTURE_KEYS, KIMI_API_KEY_ENV, KIMI_BASE_URL_ENV, KIMI_DEFAULT_BASE_URL, INTERLEAVED_THINKING_BETA, filesByContext, kimiOpenAITrait, kimiAnthropicTrait, kimiEndpoint, DEFAULT_AGENT_PROFILE_NAME, AgentProfileContribution, AGENT_PROFILE_SOURCE_PRIORITY, IAgentProfileRegistry, AgentProfileRegistryService, BUILTIN_AGENT_PROFILE_SOURCE_ID, IBuiltinAgentProfileLoader, _profileContributions, BuiltinAgentProfileLoaderService, BuiltinAgentProfileContributionUnit, system_default, TASK_AGENT_ROLE_PREFIX, WINDOWS_NOTES, ADDITIONAL_DIRS_SECTION_PROSE, SKILLS_SECTION_PROSE, PLUGIN_SECTIONS_PROSE, AgentFileParseError, AGENT_NAME_PATTERN, IUserAgentProfileLoader, LOCAL_OS_BACKEND_ID, LOCAL_PERSISTENCE_BACKEND_ID, IWorkspaceContext, MAX_AGENT_SCAN_DEPTH, MAX_SKIP_WARNINGS, AgentProfileLoaderBase, USER_BRAND_DIRS$1, USER_GENERIC_DIRS$1, PROJECT_BRAND_DIRS$1, PROJECT_GENERIC_DIRS$1, SYSTEM_MD_FILENAME, UserAgentProfileLoaderService, PLUGIN_NAME_REGEX, HOOK_EVENT_TYPES, HOOKS_SECTION, HookDefSchema, HooksConfigSchema, hooksFromToml, hooksToToml, KIMI_PLUGIN_ROOT_PATH, KIMI_PLUGIN_DIR_PATH, PLUGIN_SYSTEM_PROMPT_MAX_BYTES, UNSUPPORTED_RUNTIME_FIELDS, INSTALLED_REL, EMPTY$1, SHA_RE, PluginManager, KIMI_NODE_FALLBACK_SUBCOMMAND, IPluginService, KIMI_CODE_BASE_URL_ENV, KIMI_CODE_OAUTH_HOST_ENV, KIMI_OAUTH_HOST_ENV, PluginService, ICapabilityService, DOWNLOAD_IDLE_TIMEOUT_MS, MAC_PLUGIN, WINDOWS_PLUGIN, APP_ZIP_URL, WINDOWS_SETUP_URL, APP_BUNDLE, LAUNCHD_LABEL, COMMAND_TIMEOUT_MS, PERMISSIONS_TIMEOUT_MS, DETECT_PROBE_TIMEOUT_MS, WINDOWS_INSTALLER_PROBE_TIMEOUT_MS, WINDOWS_INSTALL_TIMEOUT_MS, DEFAULT_WINDOWS_SYSTEM_ROOT, DEFAULT_WINDOWS_PROGRAM_FILES, WINDOWS_INSTALLER_PROBE_SCRIPT, WINDOWS_DOCTOR_SCRIPT, PLUGIN_ID, PLUGIN_ZIP_URL, BINARY_CDN_BASE, DEFAULT_DAEMON_BASE_URL, STATUS_TIMEOUT_MS, START_TIMEOUT_MS, START_POLL_INTERVAL_MS, START_POLL_ATTEMPTS, IDLE_PROGRESS, CapabilityService, IFeatureManager, FeatureManagerService, CommandContribution, Feature, IFeatureAssemblyService, _featureRecipes, FeatureAssemblyService, IAgentCommandService, AgentCommandService, IDebugLedgerService, IDebugGraphService, DI_UNIT_CHANGED_EVENT, IDebugCascadeService, DebugLedgerService, DebugGraphService, DebugCascadeService, IPluginAgentProfileLoader, PluginAgentProfileLoaderService, NestedSkillTooDeepError, SkillToolInputSchema, ISkillTool, IAgentSkillService, skill_default, _SkillTool, SkillTool, IAgentPromptService, skillActivate, AgentSkillService, LISTING_DESC_MAX, InMemorySkillCatalog, SOURCE_GROUPS, graphemeSegmenter, InMemorySkillDiscovery, SKILL_SOURCE_PRIORITY, PLUGIN_SKILL_SOURCE_ID, BUILTIN_SKILL_SOURCE_ID, USER_BRAND_DIRS, USER_GENERIC_DIRS, PROJECT_BRAND_DIRS, PROJECT_GENERIC_DIRS, check_kimi_code_docs_default, PSEUDO_PATH$5, parsed$5, CHECK_KIMI_CODE_DOCS_SKILL, custom_theme_default, PSEUDO_PATH$4, parsed$4, CUSTOM_THEME_SKILL, import_from_cc_codex_default, PSEUDO_PATH$3, parsed$3, IMPORT_FROM_CC_CODEX_SKILL, mcp_config_default, PSEUDO_PATH$2, parsed$2, MCP_CONFIG_SKILL, SKILL_default$2, SKILL_default$1, SKILL_default, SUB_SKILL_PARENT, SUB_SKILL_REVIEW, SUB_SKILL_CONSOLIDATE, update_config_default, PSEUDO_PATH$1, parsed$1, UPDATE_CONFIG_SKILL, write_goal_default, PSEUDO_PATH, parsed, BUILTIN_SKILLS, IBuiltinSkillSource, BuiltinSkillSource, IUserFileSkillSource, UserFileSkillSource, ISessionSkillCatalogData, skillCatalogContributionsKey, skillCatalogMergedKey, SessionSkillCatalogService, ISessionAgentProfileCatalog, ISessionAgentProfileCatalogSeed, SessionAgentProfileCatalogService, ISessionInstructionsProvider, ISessionWorkspaceInfo, IWorkspaceDirs, IProjectLocalConfigService, WATCH_DEBOUNCE_MS$4, workspaceDirsFileDirsKey, workspaceDirsEphemeralDirsKey, WorkspaceDirsService, IWorkspaceSkillCatalog, IExplicitFileSkillSource, ExplicitFileSkillSource, IExtraFileSkillSource, ExtraFileSkillSource, IPluginSkillSource, PluginSkillSource, WORKSPACE_ROOT_SKILL_SOURCE_ID, WATCH_DEBOUNCE_MS$3, IWorkspaceRootSkillSource, WorkspaceRootSkillSource, workspaceSkillCatalogContributionsKey, workspaceSkillCatalogMergedKey, WorkspaceSkillCatalogService, IWorkspaceAgentProfileLoader, WATCH_DEBOUNCE_MS$2, WorkspaceAgentProfileLoaderService, IExtraAgentProfileLoader, ExtraAgentProfileLoaderService, IExplicitAgentProfileLoader, ExplicitAgentProfileLoaderService, IWorkspaceInstructionsService, AGENTS_MD_RECOMMENDED_MAX_BYTES, AGENTS_MD_PLAIN_NAMES, WATCH_DEBOUNCE_MS$1, workspaceInstructionsCurrentKey, WorkspaceInstructionsService, IAgentPermissionGate, IAgentPermissionModeService, IAgentPermissionPolicyService, IAgentPermissionRulesService, IAgentToolApprovalService, IAgentToolExecutorService, AgentPermissionGate, BeforeToolExecuteEventImpl, BeforeToolExecuteEmitter, ISessionApprovalService, AgentToolApprovalService, FlagRegistryService, FlagService, LoopError, IAgentLoopService, TurnModel, turnInputShape, promptTurn, steerTurn, cancelTurn, endTurn, IAgentFullCompactionService, USER_PROMPT_ORIGIN, FULL_COMPACTION_BACKGROUND_ID, activityViewLifecycleKey, activityViewTurnKey, activityViewLastTurnKey, activityViewBackgroundKey, activityViewCurrentKey, AgentActivityView, MutableTurn, PLAN_TOOLS, PLAN_ROLE, EnterPlanModeInputSchema, IEnterPlanModeTool, IAgentPlanService, enter_plan_mode_default, EnterPlanModeTool, RESERVED_OPTION_LABELS, ExitPlanModeOptionSchema, ExitPlanModeInputSchema, IExitPlanModeTool, exit_plan_mode_default, ExitPlanModeTool, PlanModel, planModeEnter, planModeCancel, planModeExit, planRevision, HERO_NAMES, MAX_ATTEMPTS, IAgentContextMemoryService, IAgentContextInjectorService, plan_mode_exit_reminder_default, plan_mode_full_reminder_default, plan_mode_inline_full_reminder_default, plan_mode_inline_reentry_reminder_default, plan_mode_inline_sparse_reminder_default, plan_mode_reentry_reminder_default, plan_mode_sparse_reminder_default, PLAN_MODE_DEDUP_MIN_TURNS, PLAN_MODE_FULL_REFRESH_TURNS, PLAN_MODE_INJECTION_VARIANT, planWasActiveKey, PlanModeInjection, IBlobStore, ExitPlanModeReview, AgentPlanService, PlanFeature, CreateGoalToolInputSchema, ICreateGoalTool, IAgentGoalService, create_goal_default, CreateGoalTool, GetGoalToolInputSchema, IGetGoalTool, get_goal_default, GetGoalTool, SetGoalBudgetToolInputSchema, ISetGoalBudgetTool, set_goal_budget_default, MIN_REASONABLE_TIME_BUDGET_MS, MAX_REASONABLE_TIME_BUDGET_MS, SetGoalBudgetTool, UpdateGoalToolInputSchema, IUpdateGoalTool, update_goal_default, UpdateGoalTool, IGoalDeadlineScheduler, GoalDeadlineSchedulerService, goal_active_reminder_default, goal_blocked_reminder_default, goal_paused_reminder_default, GoalInjection, BUDGET_GUIDANCE_NEARING, BUDGET_GUIDANCE_WITHIN, LOOP_CONTROL_SECTION, LOOP_MAX_STEPS_PER_TURN_ENV, LOOP_MAX_ATTEMPTS_PER_STEP_ENV, LOOP_MAX_RETRIES_PER_STEP_ENV, LoopControlSchema, loopControlEnvBindings, stripLoopControlEnv, loopControlToToml, StepRequest, MessageStepRequest, ContinuationStepRequest, IAgentSystemReminderService, IAgentUsageService, GoalModel, GoalStatusSchema, GoalActorSchema, GoalBudgetLimitsSchema, createGoal, updateGoal, clearGoal, MAX_GOAL_OBJECTIVE_LENGTH, MAX_GOAL_COMPLETION_CRITERION_LENGTH, GOAL_CANCELLED_REMINDER, GOAL_FORK_CLEARED_REMINDER, GOAL_FORK_CLEARED_REMINDER_NAME, GOAL_CONTINUATION_ORIGIN, GOAL_RATE_LIMIT_PAUSE_REASON, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX, GOAL_PROVIDER_AUTH_PAUSE_PREFIX, GOAL_PROVIDER_API_PAUSE_PREFIX, GOAL_MODEL_CONFIG_PAUSE_PREFIX, GOAL_RUNTIME_PAUSE_PREFIX, GOAL_CONTINUATION_FAILURE_PAUSE_PREFIX, GOAL_PROVIDER_FILTERED_PAUSE_REASON, GOAL_BUDGET_BLOCK_PREFIX, LLM_NOT_SET_MESSAGE, GOAL_BUDGET_STOP_REMINDER_NAME, GOAL_BUDGET_STOP_REMINDER, GOAL_BUDGET_TOOLS_REJECTED_MESSAGE, GOAL_STALE_TOOL_RESULT, GOAL_CONTINUATION_PROMPT, GOAL_STEP_CAP_CONTINUATION_PROMPT, GoalForkNoticeModel, goalLiveTurnIdKey, goalGoalDrivenTurnsKey, goalCountedGoalTurnsKey, goalGoalStarterTurnsKey, goalGoalOutcomeToolResultTurnsKey, goalGoalOutcomeContinuationTurnsKey, goalBudgetGraceTurnsKey, goalPendingContinuationGoalsKey, goalGoalTurnTargetsKey, goalExhaustedTurnBudgetGoalsKey, goalLiveWallClockStartedAtKey, goalResumeContinuationKey, AgentGoalService, PROMPT_TEMPLATE_PLACEHOLDER, AgentSwarmToolInputSchema, IAgentSwarmTool, ISessionSwarmService, ProfileError, IAgentProfileService, IAgentSwarmService, agent_swarm_default, DEFAULT_SUBAGENT_TYPE, AGENT_SWARM_PARAMETERS, AGENT_SWARM_PARAMETERS_NO_MODEL, AgentSwarmTool, enter_reminder_default, exit_reminder_default, SwarmModel, swarmEnter, swarmExit, AgentSwarmService, UsageModel, recordUsage, usageCurrentTurnIdKey, usageCurrentTurnKey, AgentUsageService, IAgentToolDedupeService, REMINDER_TEXT_1, REMINDER_TEXT_3, REPEAT_REMINDER_1_START, REPEAT_REMINDER_2_START, REPEAT_REMINDER_3_START, REPEAT_FORCE_STOP_STREAK, DEDUPE_PLACEHOLDER_RESULT, toolDedupeStepCallsKey, toolDedupeOriginalCallIndexKey, toolDedupeSyntheticCallIdsKey, toolDedupeCallKeyByCallIdKey, toolDedupeConsecutiveKeyKey, toolDedupeConsecutiveCountKey, toolDedupeActiveTurnIdKey, toolDedupeActiveStepKey, AgentToolDedupeService, IAgentAgentsMdReminderService, IBashParserService, ProfileModel, profileBind, configUpdate, ActiveToolsModel, setActiveTools, resetActiveTools, LISTING_COMMANDS, TRANSPARENT_WRAPPERS, LS_ARG_TAKING_OPTIONS, TREE_LIKE_ARG_TAKING_OPTIONS, FIND_GLOBAL_OPTIONS, UNSAFE_OPERAND, AGENTS_MD_BASENAMES, BASH_PARSE_OPTIONS, agentsMdReminderKnownKey, agentsMdReminderCwdKey, agentsMdReminderSeededKey, AgentAgentsMdReminderService, SelectToolsInputSchema, ISelectToolsTool, SELECT_TOOLS_TOOL_NAME, IAgentToolSelectService, DESCRIPTION, SelectToolsTool, DYNAMIC_TOOL_SCHEMA_VARIANT, LOADABLE_TOOLS_TRIGGER, TOOLS_ADDED_BLOCK, TOOLS_REMOVED_BLOCK, IAgentToolRegistryService, toolSelectPendingLoadedKey, AgentToolSelectService, IAgentToolSelectAnnouncementsService, toolSelectNeedsBoundaryInjectionKey, AgentToolSelectAnnouncementsService, TOOLS_SECTION, GLOB_MAGIC, ISessionToolPolicyGate, AgentToolPolicyService, PRINT_WAIT_CEILING_S_DEFAULT, TaskListInputSchema, ITaskListTool, task_list_default, TaskListTool, TaskOutputInputSchema, ITaskOutputTool, TERMINAL_STATUSES, task_output_default, OUTPUT_PREVIEW_BYTES, PAGING_HINT_LINES, TaskOutputTool, TaskStopInputSchema, ITaskStopTool, task_stop_default, TaskStopTool, TaskModel, taskStartedSchema, taskTerminatedSchema, taskStarted, taskTerminated, IAgentConversationUndoParticipantRegistry, AgentConversationUndoParticipantRegistry, TaskNotificationDeliveryModel, MAX_OUTPUT_BYTES, TERMINAL_OUTPUT_TAIL_BYTES, MAX_TASK_OUTPUT_BYTES, SIGTERM_GRACE_MS, TASK_ID_ALPHABET, SESSION_CLOSED_REASON, NOTIFICATION_FALLBACK_PREVIEW_BYTES, ACTIVE_BACKGROUND_TASK_INJECTION_VARIANT, ACTIVE_BACKGROUND_TASK_GUIDANCE, TaskNotificationStepRequest, taskGhostsKey, taskScheduledNotificationKeysKey, taskDeliveredNotificationKeysKey, taskActiveTaskReminderPendingKey, AgentTaskService, CRON_SECTION, DEFAULT_CRON_CONFIG, cronConfigSchema, on, cronEnvBindings, stripCronEnv, CRON_SESSION_TAG, ICronTaskPersistence, CRON_ID_REGEX$1, JSON_SUFFIX, CronTaskPersistenceService, MINUTE_RANGE, HOUR_RANGE, DOM_RANGE, MONTH_RANGE, DOW_RANGE, MS_PER_MINUTE$1, DIGIT_ONLY, MONTH_NAMES, DAY_NAMES, DEFAULT_CRON_JITTER_CONFIG, MS_PER_DAY$1, MS_PER_MINUTE, systemMonoNowMs, SYSTEM_CLOCKS, MAX_CLOCK_FILE_BYTES, ISessionCronService, MAX_PROMPT_BYTES, CronCreateInputSchema, ICronCreateTool, CronListInputSchema, ICronListTool, CronDeleteInputSchema, ICronDeleteTool, CronModel, cronAdd, cronDelete, cronCursor, CRON_SCHEDULED, CRON_FIRED, CRON_MISSED, CRON_DELETED, cronTasksKey, cronParsedCacheKey, cronLastSeenAtKey, cronSeededFromStoreKey, cronInFlightKey, cronStartedKey, STALE_THRESHOLD_MS, DEFAULT_POLL_INTERVAL_MS, MAX_COALESCE_ITERATIONS, CRON_ID_REGEX, MAX_ID_ATTEMPTS, SessionCronServiceImpl, cron_create_default, ONE_SHOT_MAX_FUTURE_MS, CronCreateTool, cron_list_default, MS_PER_DAY, PROMPT_PREVIEW_BYTES, CronListTool, cron_delete_default, ID_PATTERN, CronDeleteTool, GIT_TIMEOUT_MS, MAX_DIRTY_FILES, MAX_COMMIT_LINE_LENGTH, ALLOWED_HOSTS, explore_overlay_default, summary_continuation_default, AGENT_TOOLS, CODER_TOOLS, EXPLORE_TOOLS, CODER_ROLE, DEFAULT_SUMMARY_POLICY, DEFAULT_PERMISSION_MODE_SECTION, PermissionModeModel, PermissionModeConfiguredModel, setMode, IAgentToolActivationService, nextAgentId, AgentLifecycleService, ISessionMcpHandle, IWorkspaceMcpConfigService, IWorkspaceTrust, WATCH_DEBOUNCE_MS, WorkspaceMcpConfigService, IWorkspaceMcpService, MergedMcpConnectionView, WorkspaceMcpService, ISessionSubagentService, AGENT_RUN_PROMPT_ORIGIN, SUBAGENT_MAX_TOKENS_ERROR, SessionSubagentService, SECONDARY_MODEL_INVALID_WARNING_CODE, SECONDARY_MODEL_EFFORT_WARNING_CODE, ISessionSecondaryModelWarningService, SessionSecondaryModelWarningService, SubagentTask, IAgentTokenCountingService, DEFAULT_PROFILE_NAME, SubagentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE, RESUME_WITH_TYPE_UNAVAILABLE, USER_INTERRUPTED_SUBAGENT_MESSAGE, SUBAGENT_STOPPED_MESSAGE, ISubagentTool, IAgentUserToolService, agent_background_disabled_default, agent_background_enabled_default, agent_default, SUBAGENT_TOOL_PARAMETERS, SUBAGENT_TOOL_PARAMETERS_NO_MODEL, SubagentTool, IWorkspaceLifecycleService, IWorkspaceService, ISessionLifecycleService, WorkspaceLifecycleService, IWorkspaceToolPolicy, SessionSkillCatalogDataAdapter, SessionInstructionsProviderAdapter, SessionMcpHandleAdapter, SessionWorkspaceInfoAdapter, SessionToolPolicyGateAdapter, SESSION_SEED_ADAPTERS, ISessionLifecycleHooks, SessionLifecycleService, ISessionExternalHooksService, IExternalHooksRunnerService, HEARTBEAT_INTERVAL_MS, SessionExternalHooksService, ISessionExportService, WIRE_FILENAME, SESSION_LOG_REL, GLOBAL_LOG_REL, WEB_LOG_REL, DESKTOP_LOG_REL, SessionExportService, ISessionLegacyService, SessionLegacyService, InteractionModel, interactionRequest, interactionResolved, RECENTLY_RESOLVED_TTL_MS, RECENTLY_RESOLVED_MAX, MAIN_AGENT_ID$2, interactionPendingKey, interactionRecentlyResolvedKey, interactionNextIdKey, SessionInteractionService, SessionApprovalService, ISessionQuestionService, SessionQuestionService, QuestionOptionSchema, QuestionItemSchema, QUESTION_UNIQUENESS_MESSAGE, AskUserQuestionInputBaseSchema, AskUserQuestionInputSchemaWithBackground, IAskUserQuestionTool, ask_user_default, QuestionBackgroundTask, QUESTION_DISMISSED_MESSAGE, QUESTION_UNSUPPORTED_FAILURE_MESSAGE, AskUserQuestionTool, IRestGateway, IWSGateway, RestGateway, WSGateway, workspaceContextWorkDirKey, workspaceContextAdditionalDirsKey, SessionWorkspaceContextService, SESSION_INDEX_KEY, textDecoder$3, IWorkspacePersistence, WorkspaceService, WORKSPACE_CATALOG_VERSION, WORKSPACE_CATALOG_SCOPE, WORKSPACE_CATALOG_KEY, FileWorkspacePersistence, IWorkspaceAliases, WorkspaceAliasesService, IWorkspaceSessions, WorkspaceSessionsService, fsGitStatusSchema, fsPullRequestSchema, IGitService, DIFF_MAX_BYTES, PR_SPAWN_TIMEOUT_MS, PULL_REQUEST_TTL_MS, GitService, SyntaxNodeBuilder, Aborted, ParseBudget, SPECIAL_VARIABLE_CHARS, FILE_REDIRECT_OPERATORS, DECLARATION_COMMAND_KEYWORDS, UNSET_COMMAND_KEYWORDS, RESERVED_WORDS, EXPRESSION_PRECEDENCE, EXPRESSION_OPERATORS, SCAN_TICK_INTERVAL$1, MAX_SCAN_DEPTH, CONTROL_OPERATORS, REDIRECT_OPERATORS, CASE_ENABLING_WORDS, Lexer, FILE_REDIRECT_OP_SET, DECLARATION_COMMAND_SET, UNSET_COMMAND_SET, RESERVED_WORD_SET, NUMBER_RE, ASSIGNMENT_RE, ASSIGNMENT_SPLIT_RE, SUBSCRIPT_ASSIGNMENT_RE, IDENTIFIER_RE, FUNCTION_NAME_RE, BRACE_EXPRESSION_RE, PAREN_TEST_RE, STOP_THEN, STOP_DO, STOP_DONE, STOP_IF_BODY, STOP_FI, STOP_CLOSE_BRACE, STOP_ESAC, CASE_TERMINATION_OPS, SCAN_TICK_INTERVAL, PREC_TERNARY, PREC_TEST, PREC_UNARY, PREC_PREFIX, PREC_POSTFIX, Parser, BashParserService, SessionProcessRunner, WorkspaceProcessRunnerService, fsKindSchema, fsEntrySchema, fsSearchHitSchema, fsGrepMatchSchema, fsGrepFileHitSchema, fsListSortSchema, fsReadEncodingRequestSchema, fsReadEncodingResponseSchema, fsListManyPartialErrorSchema, IWorkspaceFsService, FS_BINARY_SAMPLE_BYTES, FS_BINARY_NONPRINTABLE_FRACTION, EXT_TO_MIME, EXT_TO_LANGUAGE, IWorkspaceGitService, FsWireErrorCode, SEARCH_HARD_CAP, GREP_TIMEOUT_MS, WALK_MAX_DEPTH, FS_READ_MAX_BYTES, HIDDEN_NAME_RE, MACOS_NOISE, WorkspaceFsService2, RgJsonAccumulator, IWorkspaceFsWatchService, DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_CHANGES_PER_WINDOW, WorkspaceFsWatchService, WorkspaceFsWatchSubscription, WorkspaceGitService, NoopSessionToolPolicyGate, WorkspaceToolPolicyService, TRUST_SCOPE, workspaceTrustTrustedKey, WorkspaceTrustService, fsBrowseEntrySchema$1, HostFolderNotAbsoluteError, HostFolderNotFoundError, HostFolderPermissionError, IHostFolderBrowser, HostFolderBrowser, textEncoder$3, AppendLogStore, textEncoder$2, textDecoder$2, jsonDocumentCodec, tomlDocumentCodec, AtomicDocumentStoreBase, JsonAtomicDocumentStore, TomlAtomicDocumentStore, BlobStoreService, ProjectLocalTomlSchema, FileProjectLocalConfigService, MAX_LEVEL, P, cmpNumber, cmpString, SkipNode, SkipList, toKStr$1, fromKStr$1, DISK_REF_BYTES, MinHeap, Store, OpTracker, POLICIES, WAL, ValueReader, POLY, TABLE, MAGIC, EMPTY, SUB_HEADER, CRC_CHUNK, MAGIC_SCAN_CHUNK, DEFAULT_RESYNC_CANDIDATE_BUDGET, ASYNC_SCAN_WINDOW, SCAN_YIELD_BYTES, yieldToLoop$2, SNAPSHOT_FILE, WAL_FILE, SECONDARY_INDEXES_FILE, COMPOUND_INDEXES_FILE, TEXT_INDEXES_FILE, SIDECAR_FILES, POSTINGS_PATTERN, GENERATIONS_DIR, CURRENT_FILE, MANIFEST_FILE, STORE_IMAGE_FILE, DT_INDEX_FILE, SECONDARY_INDEX_FILE, COMPOUND_INDEX_FILE, GEN_SNAPSHOT_FILE, GEN_ID_PATTERN, GEN_TMP_PATTERN, FINGERPRINT_FILES, STALE_TMP_FILES, STALE_POSTINGS_TMP_PATTERN, LATIN, CJK, MAX_TERM_CHARS, MAX_TERM_BYTES, yieldToLoop$1, APPLY_YIELD_FRAMES, RecoveryGenerationChurnError, GENERATION_RETRY_BASE_MS, sleep$3, sleep$2, yieldToLoop, FLUSH_BYTES$3, DEFAULT_READ_CONCURRENCY, DEFAULT_SLICE_BYTES, COPY_CHUNK, SMALL_DELTA, rotateReplace, MAX_PRECOPY_PASSES, CONVERGE_RATIO, UniqueViolationError, IndexManager, DtIndex, HEADER_LEN, CRC_LEN, FLUSH_BYTES$2, PostingsFile, EMPTY_MAP, TopK, BUILD_YIELD_DOCS, BUILD_YIELD_TOKENS, StagedBuild, TextIndexBuildingError, TextIndex, CompoundIndexManager, CODECS, sidecarTmpSeq, LockError, HELD, sidecarSeq, nextSidecarSeq, exitHooked, TAKEOVER_SETTLE_BASE_MS, TAKEOVER_SETTLE_MAX_MS, LockFile, MaintenanceBackpressureError, MaintenanceClosedError, MaintenanceCancelledError, HISTORY_LIMIT, MaintenanceScheduler, WorkerSlots, defaultWorkerSlots, MemoryGuard, backupTmpSeq, QueryEngine, GenerationCorruptError, ByteWriter, ByteReader, FLUSH_BYTES$1, GenFileWriter, STORE_MAGIC, TAG_INLINE, TAG_SNAPSHOT_LOC, TAG_WAL_LOC, DT_MAGIC, DT_VERSION, SECONDARY_MAGIC, SECONDARY_VERSION, COMPOUND_MAGIC, COMPOUND_VERSION, GTAG_NUMBER, GTAG_STRING, GTAG_FALSE, GTAG_TRUE, GTAG_NULL, TEXT_DICT_MAGIC, TEXT_DICT_VERSION, TEXT_DOCS_MAGIC, TEXT_DOCS_VERSION, HASH_MASK, TextRegistry, configuredEntry, PROGRESS_DOCS, FLUSH_BYTES, AGG_ENTRY_BYTES, AGG_TERM_BYTES, SegmentReader, RawPostingsWriter, BASE_DOCS_MAGIC, WorkerTextBuildError, DEFAULT_ABORT_POLL_MS, DEFAULT_MAX_OLD_SPACE_MB, GenerationLoader, GenerationBuildAborted, GenerationBuilder, WalGroupTracker, WritePath, IndexAdmin, ReadPath, MiniDb, Coordinator, ShardHandle, CLUSTER_META_FILE, CLUSTER_INDEX_FILE, SHARD_DIR_PREFIX, ShardLockPool, Router, META_VERSION, DEFAULT_SHARD_COUNT, Topology, ClusterDb, SEP, CHECKPOINT_COLLECTION, STORE_SUBDIR, SHARD_COUNT, LOCK_ACQUIRE_TIMEOUT_MS, DROP_BATCH_SIZE, pendingDisposals, MiniDbQueryStore, MiniDbQuery, WebSearchInputSchema, IWebSearchTool, IWebSearchProviderService, web_search_default, WebSearchTool, TERMINAL_RETENTION_MS, DEFAULT_DEVICE_EXPIRES_IN_SEC, SERVICES_SECTION$1, OAuthService2, AuthSummaryService2, OAuthToolkitService, SERVICES_SECTION, StringRecordSchema, OAuthRefSchema, MoonshotServiceConfigSchema, ServicesConfigSchema, WEB_SEARCH_BASE_URL_ENV, WEB_SEARCH_API_KEY_ENV, WEB_FETCH_BASE_URL_ENV, WEB_FETCH_API_KEY_ENV, nonBlankEnv, moonshotSearchEnvBindings, moonshotFetchEnvBindings, servicesEnvBindings, servicesCredentialEnvOverlay, stripMoonshotSearchEnv, stripMoonshotFetchEnv, stripServicesEnv, servicesFromToml, servicesToToml, MoonshotWebSearchProvider, WebSearchProviderService, managedProviderStatusSchema, managedProviderSummarySchema, IAuthLegacyService, MANAGED_PROVIDER_NAME, AuthLegacyService, BLOB_SCOPE, INDEX_SCOPE, INDEX_KEY, FILE_ID_REGEX, textEncoder$1, textDecoder$1, FileServiceImpl, MODEL_ACCEPTED_IMAGE_MIMES, ACCEPTED_FORMATS_TEXT, UNSUPPORTED_IMAGE_FORMATS, BASE64_SNIFF_CHARS, decoderReady, configuredMaxImageEdgePx, IMAGE_BYTE_BUDGET$1, configuredReadImageByteBudget, JPEG_QUALITY_STEPS, FALLBACK_EDGES_PX, PNG_RESCALE_FLOOR_PX, MAX_DECODE_PIXELS, MAX_IMAGE_DECODE_BYTES, RECODABLE_MIME, CAPTION_OPENING, CAPTION_PATTERN, DEFAULT_MAX_TOTAL_BYTES, MIME_EXTENSION, IFileEditService, EditService, TextModel, FileEditService, EditInputSchema, IEditTool, edit_default, EditTool, DEFAULT_TIMEOUT_SECONDS, KILL_GRACE_MS, OptionalStringSchema, HookSpecificOutputSchema, HookJsonOutputSchema, DEFAULT_HOOK_TIMEOUT_SECONDS, ExternalHooksRunnerService, FetchURLInputSchema, IFetchURLTool, HttpFetchError, IWebFetchService, fetch_url_default, FetchURLTool, parseHTML, DEFAULT_USER_AGENT, DEFAULT_MAX_BYTES, MAX_REDIRECT_HOPS, REDIRECT_STATUSES, LocalFetchURLProvider, PRIVATE_ADDRESS_BLOCKLIST, MoonshotFetchURLProvider, WebFetchService, ByteLruCache, DEFAULT_THRESHOLD, DEFAULT_MAX_CACHE_SIZE, DATA_URI_HEADER_RE, AgentBlobServiceImpl, TokenCountingModel, sizeSchema, tokenCountingMeasured, tokenCountingTruncated, tokenCountingRebased, messageTokenEstimateCache, MEDIA_TOKEN_ESTIMATE, COMPACTION_SUMMARY_PREFIX, COMPACT_USER_MESSAGE_MAX_TOKENS, COMPACT_USER_MESSAGE_HEAD_TOKENS, COMPACTION_ELISION_VARIANT, defaultTokenEstimate, TOOL_INTERRUPTED_ON_RESUME_OUTPUT, foldCtxMap, ContextModel, contextMessageSchema, loopRecordedEventSchema, contextAppendMessage, contextAppendLoopEvent, contextClear, contextCompactionBaseShape, contextApplyCompactionSchema, contextApplyCompaction, contextUndo, AgentContextMemoryService, AgentSystemReminderService, IAgentDateChangeService, DATE_CHANGE_INJECTION_VARIANT, dateChangeSeedKey, AgentDateChangeService, IAgentContextProjectorService, TOOL_ERROR_STATUS, TOOL_EMPTY_STATUS, TOOL_EMPTY_ERROR_STATUS, TOOL_OUTPUT_EMPTY_TEXT, contextProjectorLastRepairSignatureKey, AgentContextProjectorService, MEDIA_DEGRADED_PLACEHOLDERS, MEDIA_STRIPPED_PLACEHOLDERS, MEDIA_CONTAINER_KEY_CACHE, TOOL_INTERRUPTED_TEXT, TOOL_RESULT_SLOT, TOKEN_COUNTING_SECTION, TOKEN_COUNTING_STRATEGY_ENV, TOKEN_COUNTING_STRATEGIES, TokenCountingConfigSchema, tokenCountingEnvBindings, ZERO_ANCHOR, AgentTokenCountingService, contextInjectorIsNewTurnKey, AgentContextInjectorService, IAgentPluginService, SESSION_START_INJECTION_VARIANT, PLUGIN_CHANGE_INJECTION_VARIANT, PLUGIN_CHANGE_VERBS, MAIN_AGENT_ID$1, AgentPluginService, IAgentExternalHooksService, externalHooksStopHookContinuationUsedKey, AgentExternalHooksService, DEFAULT_COMPACTION_CONFIG, RuntimeCompactionStrategy, DefaultCompactionStrategy, IAgentLLMRequesterService, ISessionTodoService, TODO_LIST_TOOL_NAME, compaction_instruction_default, CompactionModel, fullCompactionBegin, fullCompactionCancel, fullCompactionComplete, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS, OVERFLOW_CONTEXT_SAFETY_RATIO, OVERFLOW_STATUS_RECOVERY_RATIO, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS, COMPACTION_OVERFLOW_SHRINK_RATIOS, EMPTY_TOOL_PARAMETERS$1, CompactionTruncatedError, fullCompactionCompactionCountInTurnKey, fullCompactionObservedMaxContextTokensByModelKey, fullCompactionLastCompactedTokenCountKey, fullCompactionConsecutiveOverflowCompactionsKey, fullCompactionActiveTurnIdKey, AgentFullCompactionService, IAgentVideoResolverService, LlmRequestTraceModel, llmToolEntrySchema, llmToolsSnapshot, llmRequest, EMPTY_TOOL_PARAMETERS, noopOnPart, llmRequesterLastConfigLogSignatureKey, llmRequesterTurnConfigsKey, llmRequesterMediaDegradedTurnsKey, llmRequesterMediaStrippedTurnsKey, llmRequesterEmittedThinkingEffortWarningsKey, AgentLLMRequesterService, MutableLLMRequestTrace, StepRequestQueue, loopNextReservedTurnIdKey, loopLastRequestTraceIdKey, loopDisposingKey, AgentLoopService, IAgentLoopContinuationService, AgentLoopContinuationService, IAgentInterruptionReminderService, InterruptionReminderModel, interruptionReminderRecorded, INTERRUPTION_REMINDER_VARIANT, INTERRUPTION_REMINDER, AgentInterruptionReminderService, IAgentMcpService, MCP_NAME_PREFIX, MCP_NAME_SEPARATOR, MAX_QUALIFIED_LENGTH, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE$1, DEFAULT_AUTH_TIMEOUT_MS, AUTH_TOOL_TOOL_NAME, DESCRIPTION_TEMPLATE, MCP_MAX_OUTPUT_CHARS, MCP_OUTPUT_TRUNCATED_TEXT, MCP_MAX_BINARY_PART_BYTES, MCP_MAX_BINARY_PART_CHARS, McpDiscoveryModel, mcpToolCollisionSchema, mcpToolsDiscovered, mcpMcpToolsByServerKey, mcpDiscoveryWritesReadyKey, AgentMcpService, IAgentMediaToolsRegistrar, ReadMediaFileInputSchema, read_media_default, ReadMediaFileTool, mediaRegisteredKeyKey, AgentMediaToolsRegistrar, KIMI_FILE_SCHEME, PATH_QUERY, CACHE_SCOPE, PROVIDER_ID_RE, VIDEO_UNAVAILABLE_TEXT, textEncoder, textDecoder, mediaResolvedKey, AgentVideoResolverService, IMAGE_SECTION, IMAGE_MAX_EDGE_ENV, IMAGE_READ_BYTE_BUDGET_ENV, ImageConfigSchema, imageEnvBindings, IImageConfigBridge, ImageConfigBridge, permission_mode_auto_enter_reminder_default, permission_mode_auto_exit_reminder_default, PERMISSION_MODE_INJECTION_VARIANT, permissionModeLastModeKey, PermissionModeInjection, AgentPermissionModeService, AutoModeApprovePermissionPolicyService, AutoModeAskUserQuestionDenyPermissionPolicyService, DEFAULT_APPROVE_TOOLS, DefaultToolApprovePermissionPolicyService, FallbackAskPermissionPolicyService, GitControlPathAccessAskPermissionPolicyService, GitCwdWriteApprovePermissionPolicyService, SensitiveFileAccessAskPermissionPolicyService, parsePermissionPattern, SessionApprovalHistoryPermissionPolicyService, USER_CONFIGURED_SCOPES, UserConfiguredAllowPermissionPolicyService, UserConfiguredAskPermissionPolicyService, UserConfiguredDenyPermissionPolicyService, YoloModeApprovePermissionPolicyService, AgentPermissionPolicyService, PERMISSION_SECTION, PermissionRuleDecisionSchema, PermissionRuleScopeSchema, PermissionRuleSchema, PermissionConfigSchema, permissionFromToml, permissionToToml, PermissionRulesModel, addPermissionRules, recordApprovalResult, AgentPermissionRulesService, PLUGIN_SECTIONS_MAX_BYTES, profileActiveToolNamesOverlayKey, profileAgentsMdWarningKey, profileEmittedThinkingEffortWarningsKey, profileEmittedToolPatternWarningsKey, profileEmittedPluginBudgetWarningsKey, AgentProfileService, UserMessageStepRequest, PromptStepRequest, SteerStepRequest, RetryStepRequest, promptLaunchingKey, AgentPromptService, IAgentConversationUndoService, MAX_TITLE_LENGTH, MAX_LAST_PROMPT_LENGTH, AgentConversationUndoService, IAgentShellCommandService, SHELL_FOREGROUND_TIMEOUT_S, shellCommandTasksKey, AgentShellCommandService, IAgentRPCService, AgentRPCService, IAgentStepRetryService, stepRetryLastFailedDriverIdKey, stepRetryFailedAttemptsKey, AgentStepRetryService, SIDE_QUESTION_SYSTEM_REMINDER, ISessionBtwService, SessionBtwService, ISessionInitService, DEFAULT_INIT_PROMPT, INIT_PROFILE_NAME, INIT_PARENT_TOOL_CALL_ID, INIT_DESCRIPTION, SessionInitService, INITIAL_LAUNCH_LIMIT, INITIAL_LAUNCH_INTERVAL_MS, RATE_LIMIT_RETRY_BASE_MS, RATE_LIMIT_RETRY_FACTOR, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS, RATE_LIMIT_SUSPENDED_REASON, AGENT_SWARM_MAX_CONCURRENCY_ENV, AgentRunBatch, RESUMED_PROFILE_FALLBACK, SessionSwarmService, TODO_LIST_REMINDER_VARIANT, TODO_LIST_REMINDER_TURNS_SINCE_WRITE, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS, TodoModel, todoSet, MAIN_AGENT_ID, SessionTodoService, TodoItemSchema, TodoListInputSchema, ITodoListTool, todo_list_default, todo_list_write_reminder_default, TodoListTool, DRAFT_07_AJV, DRAFT_2019_AJV, DRAFT_2020_AJV, DRAFT_2019_KEYWORDS, DRAFT_2020_KEYWORDS, IAgentToolResultTruncationService, ToolScheduler, ABORT_GRACE_MS, TOOL_OUTPUT_EMPTY, TOOL_OUTPUT_NON_TEXT, validators, toolExecutorToolCallDupTypesKey, toolExecutorDupTypeTurnIdKey, AgentToolExecutorService, TOOL_RESULT_MAX_CHARS, TOOL_RESULT_PREVIEW_CHARS, encoder, ToolResultTruncationService, AgentToolActivationService, IBuiltinToolAssemblyService, BuiltinToolAssemblyService, AgentToolRegistryService, UserToolModel, registerUserTool, unregisterUserTool, AgentUserToolService, turnPhaseSchema, approvalRefSchema, toolCallRefSchema, activityRetryStateSchema, activityTurnStateSchema, turnEndReasonSchema, activityLastTurnStateSchema, backgroundRefSchema, activityViewLifecycleSchema, agentActivityStateSchema, agentActivityViewContract, pageOf, maybe, noResult, stringDeltaSchema, textPartSchema, imageUrlPartSchema, videoUrlPartSchema, promptPartSchema, emptyPayloadSchema, promptPayloadSchema, steerPayloadSchema, activateSkillPayloadSchema, promptLaunchResultSchema, cancelPayloadSchema, runShellCommandPayloadSchema, shellCommandResultSchema, setModelResultSchema, permissionModeSchema, setPermissionPayloadSchema, tokenUsageSchema, usageStatusSchema, agentContextDataSchema, agentCommandInfoSchema, runCommandPayloadSchema, planDataSchema, taskLifecycleStatusSchema, taskInfoBaseFields, agentTaskInfoSchema, agentRpcContract, agentShellCommandContract, agentProfileContract, agentUsageContract, agentPlanContract, mcpServerEntrySchema, agentMcpContract, fullCompactionInputSchema, agentFullCompactionContract, agentTaskContract, oAuthFlowStatusSchema, oAuthFlowStartSchema, oAuthFlowSnapshotSchema, oAuthLoginCancelResponseSchema, oAuthLogoutResponseSchema, authStatusSchema, refreshOAuthProviderModelsResponseSchema, authContract, authSummaryContract, capabilityStepSchema, capabilityInstallProgressSchema, capabilityStatusSchema, capabilitiesContract, modelCatalogItemSchema, providerCatalogStatusSchema, providerCatalogItemSchema, setDefaultModelResponseSchema, generateInputSchema, generateParamsSchema, generateEventSchema, catalogContract, refreshProviderModelsOptionsSchema, refreshProviderModelsResponseSchema, providerDiscoveryContract, configTargetSchema, configInspectValueSchema, configDiagnosticSchema, configContract, stringRead, envContract, experimentalFeatureStateSchema, flagsContract, fsBrowseEntrySchema, fsBrowseResponseSchema, fsHomeResponseSchema, hostFsContract, protocolSchema, oAuthRefSchema$1, modelBaseSchema, modelOverrideSchema, modelConfigSchema, modelsContract, stringRecordSchema$1, mcpTimeoutMsSchema, mcpServerCommonFields, mcpServerConfigSchema, pluginDiagnosticSchema, pluginAuthorSchema, pluginSessionStartSchema, pluginInterfaceSchema, hookDefSchema, pluginCommandEntrySchema, pluginManifestKindSchema, pluginSourceSchema, pluginStateSchema, pluginGithubRefSchema, pluginManifestSchema, pluginMcpServerInfoSchema, pluginGithubMetadataSchema, pluginSummarySchema, pluginInfoSchema, reloadSummarySchema$1, pluginUpdateStatusSchema, pluginCommandDefSchema, installPluginInputSchema, setPluginEnabledInputSchema, setPluginMcpServerEnabledInputSchema, removePluginInputSchema, getPluginInfoInputSchema, pluginsContract, providerTypeSchema, oAuthRefSchema, stringRecordSchema, modelSourceSchema, providerConfigSchema, providersContract, sessionSummarySchema, sessionListQuerySchema, sessionCountQuerySchema, sessionsContract, workspaceSchema, workspaceUpdateSchema, workspacesContract, approvalRequestSchema, approvalResponseSchema, sessionApprovalContract, interactionKindSchema, interactionOriginSchema, interactionSchema, interactionResolutionSchema, sessionInteractionContract, createSessionOptionsSchema, resumeSessionOptionsSchema, forkSessionOptionsSchema, createChildSessionOptionsSchema, handleWireSchema, workspaceRefSchema, workspaceLifecycleContract, sessionLifecycleContract, agentMetaSchema, sessionMetaSchema, sessionMetaPatchSchema, sessionMetaKeySchema, sessionMetadataChangedEventSchema, sessionMetadataContract, questionOptionSchema, questionItemSchema, questionAnswersSchema, questionResponseSchema, questionResultSchema, questionRequestSchema, sessionQuestionContract, skillSummarySchema, sessionSkillCatalogContract, globalContract, configChangedSchema, reloadSummarySchema, sessionMetaUpdatedSchema, catalogChangedSchema, globalEvents, sessionEvents, turnStartedEventSchema, turnEndedEventSchema, assistantDeltaEventSchema, thinkingDeltaEventSchema, toolCallStartedEventSchema, toolCallDeltaEventSchema, toolProgressEventSchema, toolResultEventSchema, promptCompletedEventSchema, promptAbortedEventSchema, compactionStartedEventSchema, compactionBlockedEventSchema, compactionCancelledEventSchema, compactionCompletedEventSchema, permissionApprovalRequestedEventSchema, permissionApprovalResolvedEventSchema, errorEventSchema, warningEventSchema, agentStatusUpdatedEventSchema, agentEvents, KlientValidationError, EventHub, ENV_SCALAR_PROPERTIES, RPCError, NOT_FOUND$1, serviceTokens, REQUEST_INVALID, NOT_FOUND, MemoryChannel, KIMI_CONFIG_DOMAINS, DROPPED_DOMAIN_EVENT_TYPES, RENAMED_DOMAIN_EVENT_TYPES, IMPORT_CONTEXT_GUIDANCE, EMPTY_FOLD, ReadOnlyAgentRecordPersistence, GlobalMcpConfigStore, SessionEventWiring, MAX_TIMER_DELAY_MS, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS, SDKRpcClientV2, KimiConfigCoreRpcImpl, KimiConfigRpcClient, KimiForCodingProvider, DEFAULT_CATALOG_URL, CatalogFetchError;
+var import_yazl, __filename12, __dirname12, __create2, __defProp3, __getOwnPropDesc2, __getOwnPropNames2, __getProtoOf2, __hasOwnProp2, __esmMin, __commonJSMin, __exportAll, __copyProps2, __toESM2, __require2, _lazyMatch, _match, zeptomatch, _DRIVE_LETTER_START_RE, _UNC_REGEX, _IS_ABSOLUTE_RE, _DRIVE_LETTER_RE, _ROOT_FOLDER_RE, _EXTNAME_RE, _PATH_ROOT_RE, normalize2, join$1, resolve$2, isAbsolute$1, toNamespacedPath, extname$1, relative$1, dirname$3, format$1, basename$1, parse$8, matchesGlob, _path, delimiter, _platforms, mix2, posix$3, win32$1, ErrorCodes, KIMI_ERROR_INFO, KimiError, UNKNOWN_CAPABILITY_MARKER$1, UNKNOWN_CAPABILITY$1, ChatProviderError$1, APIConnectionError$4, APITimeoutError$1, APIStatusError$1, APIContextOverflowError$1, APIRequestTooLargeError$1, APIProviderRateLimitError$1, APIProviderQuotaExhaustedError$1, APIEmptyResponseError$1, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS$1, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS$1, MEDIA_TYPE_FIELD_PATTERN$1, NETWORK_RE$3, TIMEOUT_RE$3, CONTEXT_OVERFLOW_MESSAGE_PATTERNS$1, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS$1, REQUEST_TOO_LARGE_MESSAGE_PATTERNS$1, THINKING_EFFORT_CONFIG_DOCS_URL$1, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS$1, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS$1, STRUCTURAL_REQUEST_MESSAGE_PATTERNS$1, uuid4$2, castToError$2, AnthropicError, APIError$2, APIUserAbortError$2, APIConnectionError$3, APIConnectionTimeoutError$2, BadRequestError$2, AuthenticationError$2, PermissionDeniedError$2, NotFoundError$2, ConflictError$2, UnprocessableEntityError$2, RateLimitError$2, InternalServerError$2, startsWithSchemeRegexp$2, isAbsoluteURL$2, isArray$2, isReadonlyArray$2, validatePositiveInteger$2, safeJSON$2, sleep$7, VERSION$2, isRunningInBrowser$1, getPlatformProperties$1, normalizeArch$1, normalizePlatform$1, _platformHeaders$1, getPlatformHeaders$1, FallbackEncoder$2, default_format$1, default_formatter$1, formatters$1, has$1, hex_table$1, limit$1, encode$12, array_prefix_generators$1, push_to_array$1, toISOString$1, defaults$1, sentinel$1, GRANT_TYPE_JWT_BEARER, GRANT_TYPE_REFRESH_TOKEN, TOKEN_ENDPOINT, OAUTH_API_BETA_HEADER, FEDERATION_BETA_HEADER, MAX_TOKEN_RESPONSE_BYTES, MAX_ERROR_BODY_CHARS, SAFE_ERROR_KEYS, WorkloadIdentityError, TokenCache, readEnv$2, encodeUTF8_$2, decodeUTF8_$2, levelNumbers$2, parseLogLevel$2, noopLogger$2, cachedLoggers$2, formatRequestDetails$2, PROFILE_NAME_PATTERN, loadConfigWithSource, getCredentialsPath, getRootConfigPath, supportsLocalConfigFiles, getActiveProfileName, _LineDecoder_buffer$1, _LineDecoder_carriageReturnIndex$1, LineDecoder$2, _Stream_client$1, Stream$6, SSEDecoder$2, _APIPromise_client$1, APIPromise$2, _AbstractPage_client$1, AbstractPage$1, PagePromise$1, Page$1, PageCursor, checkFileSupport$2, isAsyncIterable$3, multipartFormRequestOptions$1, supportsFormDataMap$1, createForm$1, isNamedBlob$1, addFormValue$1, isBlobLike$2, isFileLike$2, isResponseLike$2, APIResource$2, brand_privateNullableHeaders$2, buildHeaders$2, EMPTY$5, createPathTagFunction$2, path$15, Environments, SDK_HELPER_SYMBOL, Files$4, Models$3, UserProfiles, require_timing_safe_equal, require_base64, require_sha256, import_dist$1, Webhooks$1, Versions$2, Agents, Memories, MemoryVersions, MemoryStores, JSONLDecoder, Batches$3, MODEL_NONSTREAMING_TOKENS, tokenize$1, strip, unstrip, generate$2, partialParse$1, _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY$1, BetaMessageStream, ToolError, DEFAULT_SUMMARY_PROMPT, _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner, DEPRECATED_MODELS$1, MODELS_TO_WARN_WITH_THINKING_ENABLED$1, Messages$3, Events$1, Resources, Events, Threads$2, Sessions$2, Versions$1, Skills$1, Credentials, Vaults, Beta$1, Completions$2, _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY, MessageStream, Batches$2, Messages$2, DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Models$2, _BaseAnthropic_instances, _a$4, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic, BUDGET_THINKING_EFFORTS$1, ADAPTIVE_MAX_EFFORTS$1, LATEST_OPUS_THINKING_EFFORTS$1, BUDGET_PROFILE$1, OPUS_45_PROFILE$1, ADAPTIVE_MAX_PROFILE$1, LATEST_OPUS_PROFILE$1, ALWAYS_ADAPTIVE_PROFILE$1, ALWAYS_ADAPTIVE_MAX_PROFILE$1, FAMILY_FIRST_RE$1, VERSION_FIRST_RE$1, BARE_FAMILY_RE$1, CLAUDE_FAMILY_WORD_RE$1, EMPTY_TOOL_CALL_ID$1, TOOL_CALL_ID_SAFE_CHARS$1, INTERLEAVED_THINKING_BETA$2, CONTEXT_MANAGEMENT_BETA$1, CLEAR_THINKING_EDIT$1, ANTHROPIC_TOOL_CALL_ID_POLICY$1, CEILING_BY_FAMILY_VERSION$1, FALLBACK_MAX_TOKENS$1, CACHE_CONTROL$1, CACHEABLE_TYPES$1, OMITTED_MEDIA_PLACEHOLDER$1, SUPPORTED_B64_MEDIA_TYPES$1, SUPPORTED_B64_VIDEO_TYPES$1, AnthropicStreamedMessage$1, AnthropicChatProvider$1, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS$1, OPENAI_VISION_TOOL_PREFIXES$1, CLAUDE_VISION_TOOL_PREFIXES$1, CLAUDE_THINKING_VISION_TOOL_PREFIXES$1, GEMINI_CATALOGUED_PREFIXES$1, OPENAI_REASONING_CAPABILITY$1, OPENAI_VISION_TOOL_CAPABILITY$1, OPENAI_TEXT_TOOL_CAPABILITY$1, ANTHROPIC_VISION_TOOL_CAPABILITY$1, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY$1, GEMINI_MULTIMODAL_TOOL_CAPABILITY$1, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY$1, OPENAI_LEGACY_CAPABILITY_CATALOG, OPENAI_RESPONSES_CAPABILITY_CATALOG, ANTHROPIC_CAPABILITY_CATALOG, require_retry_operation$1, require_retry$5, require_retry$4, require_p_retry, require_extend, require_package$1, require_util$9, require_common$1, require_retry$3, require_interceptor, require_gaxios, require_src$3, require_bignumber, require_stringify$1, require_parse$5, require_json_bigint, require_gcp_residency, require_colours, require_logging_utils, require_src$2, require_src$1, require_base64_js, require_shared$1, require_crypto$2, require_crypto$1, require_crypto, require_safe_buffer, require_param_bytes_for_alg, require_ecdsa_sig_formatter, require_util$8, require_package, require_shared, require_authclient, require_loginticket, require_oauth2client, require_computeclient, require_idtokenclient, require_envDetect, require_data_stream, require_buffer_equal_constant_time, require_jwa, require_tostring, require_sign_stream, require_verify_stream, require_jws, require_jwsSign, require_getToken, require_errorWithCode, require_getCredentials, require_tokenHandler, require_revokeToken, require_googleToken, require_jwtaccess, require_jwtclient, require_refreshclient, require_impersonated, require_oauth2common, require_stscredentials, require_baseexternalclient, require_filesubjecttokensupplier, require_urlsubjecttokensupplier, require_certificatesubjecttokensupplier, require_identitypoolclient, require_awsrequestsigner, require_defaultawssecuritycredentialssupplier, require_awsclient, require_executable_response, require_pluggable_auth_handler, require_pluggable_auth_client, require_externalclient, require_externalAccountAuthorizedUserClient, require_googleauth, require_iam, require_downscopedclient, require_passthrough, require_src3, require_constants$9, require_buffer_util, require_limiter, require_permessage_deflate$1, require_validation$3, require_receiver$1, require_sender$1, require_event_target, require_extension, require_websocket$1, require_stream, require_subprotocol, require_websocket_server, import_p_retry, import_src3, import_websocket, _defaultBaseGeminiUrl, _defaultBaseVertexUrl, BaseModule, Language, Outcome, FunctionResponseScheduling, Type, Environment, AuthType, HttpElementLocation, ApiSpec, PhishBlockThreshold, Behavior, DynamicRetrievalConfigMode, FunctionCallingConfigMode, ThinkingLevel, PersonGeneration, ProminentPeople, HarmCategory, HarmBlockMethod, HarmBlockThreshold, FinishReason, HarmProbability, HarmSeverity, UrlRetrievalStatus, BlockedReason, TrafficType, Modality, ModelStage, MediaResolution, TuningMode, AdapterSize, JobState, TuningJobState, AggregationMetric, PairwiseChoice, TuningTask, DocumentState, PartMediaResolutionLevel, ToolType, ResourceScope, ServiceTier, FeatureSelectionPreference, EmbeddingApiType, SafetyFilterLevel, ImagePromptLanguage, MaskReferenceMode, ControlReferenceType, SubjectReferenceType, EditMode, SegmentMode, VideoGenerationReferenceType, VideoGenerationMaskMode, VideoCompressionQuality, TuningMethod, FileState, FileSource, TurnCompleteReason, MediaModality, VadSignalType, VoiceActivityType, StartSensitivity, EndSensitivity, ActivityHandling, TurnCoverage, Scale, MusicGenerationMode, LiveMusicPlaybackControl, HttpResponse, GenerateContentResponse, EmbedContentResponse, GenerateImagesResponse, EditImageResponse, UpscaleImageResponse, RecontextImageResponse, SegmentImageResponse, ListModelsResponse, DeleteModelResponse, CountTokensResponse, ComputeTokensResponse, GenerateVideosOperation, ListTuningJobsResponse, CancelTuningJobResponse, DeleteCachedContentResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, UploadToFileSearchStoreResumableResponse, ImportFileOperation, ListFilesResponse, CreateFileResponse, DeleteFileResponse, RegisterFilesResponse, ListBatchJobsResponse, LiveServerMessage, LiveMusicServerMessage, UploadToFileSearchStoreOperation, PagedItem, Pager, Batches$1, Caches, Chats, Chat$1, ApiError, Files$3, CONTENT_TYPE_HEADER, SERVER_TIMEOUT_HEADER, USER_AGENT_HEADER, GOOGLE_API_CLIENT_HEADER, LIBRARY_LABEL, VERTEX_AI_API_DEFAULT_VERSION, GOOGLE_AI_API_DEFAULT_VERSION, DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_HTTP_STATUS_CODES, ApiClient, MCP_LABEL, hasMcpToolUsageFromMcpToTool, McpCallableTool, LiveMusic, LiveMusicSession, FUNCTION_RESPONSE_REQUIRES_ID, Live, defaultLiveSendClientContentParamerters, Session$2, DEFAULT_MAX_REMOTE_CALLS, Models$1, Operations, Tokens, Documents, FileSearchStores, uuid4Internal, uuid4$1, castToError$1, GeminiNextGenAPIClientError, APIError$1, APIUserAbortError$1, APIConnectionError$2, APIConnectionTimeoutError$1, BadRequestError$1, AuthenticationError$1, PermissionDeniedError$1, NotFoundError$1, ConflictError$1, UnprocessableEntityError$1, RateLimitError$1, InternalServerError$1, startsWithSchemeRegexp$1, isAbsoluteURL$1, isArrayInternal, isReadonlyArray$1, validatePositiveInteger$1, safeJSON$1, sleep$1$1, FallbackEncoder$1, VERSION$1, checkFileSupport$1, isAsyncIterable$2, isBlobLike$1, isFileLike$1, isResponseLike$1, APIResource$1, EMPTY$4, createPathTagFunction$1, path$11, BaseInteractions, Interactions, encodeUTF8_$1, decodeUTF8_$1, LineDecoder$1, levelNumbers$1, parseLogLevel$1, noopLogger$1, cachedLoggers$1, formatRequestDetails$1, Stream$2, SSEDecoder$1, APIPromise$1, brand_privateNullableHeaders$1, buildHeaders$1, readEnv$1, _a$3, BaseGeminiNextGenAPIClient, GeminiNextGenAPIClient, GOOGLE_API_KEY_HEADER, REQUIRED_VERTEX_AI_SCOPE, NodeAuth, NodeDownloader, NodeWebSocketFactory, NodeWebSocket, Tunings, MAX_CHUNK_SIZE, MAX_RETRY_COUNT, INITIAL_RETRY_DELAY_MS, DELAY_MULTIPLIER, X_GOOG_UPLOAD_STATUS_HEADER_FIELD, NodeUploader, NodeFiles, LANGUAGE_LABEL_PREFIX, GoogleGenAI, GoogleGenAIStreamedMessage$1, NETWORK_RE$2, TIMEOUT_RE$2, GoogleGenAIChatProvider$1, TYPE_COMPLETION_SKIP_KEYS$1, CHILD_SCHEMA_SLOTS$1, OBJECT_STRUCTURE_KEYS$1, ARRAY_STRUCTURE_KEYS$1, STRING_STRUCTURE_KEYS$1, NUMERIC_STRUCTURE_KEYS$1, uuid42, castToError, OpenAIError, APIError, APIUserAbortError, APIConnectionError$1, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError, LengthFinishReasonError, ContentFilterFinishReasonError, InvalidWebhookSignatureError, OAuthError$2, SubjectTokenProviderError, startsWithSchemeRegexp, isAbsoluteURL, isArray$1, isReadonlyArray, validatePositiveInteger, safeJSON, sleep$5, VERSION, isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders, FallbackEncoder, default_format, default_formatter, formatters, has, hex_table, limit, encode4, array_prefix_generators, push_to_array, toISOString, defaults, sentinel, encodeUTF8_, decodeUTF8_, _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder, levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails, _Stream_client, Stream$1, SSEDecoder, _APIPromise_client, APIPromise, _AbstractPage_client, AbstractPage, PagePromise, Page, CursorPage, ConversationCursorPage, SUBJECT_TOKEN_TYPES, TOKEN_EXCHANGE_GRANT_TYPE, WorkloadIdentityAuth, checkFileSupport, isAsyncIterable$1, maybeMultipartFormRequestOptions, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, isUploadable, hasUploadableValue, addFormValue, isBlobLike, isFileLike, isResponseLike, APIResource, EMPTY$3, createPathTagFunction, path$10, Messages$1, isAssistantMessage, isToolMessage, _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_handleError, EventStream, _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult, DEFAULT_MAX_CHAT_COMPLETIONS, AbstractChatCompletionRunner, ChatCompletionRunner, STR, NUM, ARR, OBJ, NULL, BOOL, NAN, INFINITY, MINUS_INFINITY, INF, SPECIAL, ATOM, COLLECTION, Allow, PartialJSON, MalformedJSON, _parseJSON, partialParse, _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_getAutoParseableResponseFormat, _ChatCompletionStream_accumulateChatCompletion, ChatCompletionStream, ChatCompletionStreamingRunner, Completions$1, Chat, brand_privateNullableHeaders, buildHeaders, Speech, Transcriptions, Translations, Audio, Batches, Assistants, Sessions$1, TranscriptionSessions, Realtime$1, Sessions, Threads$1, ChatKit, Messages, Steps, toFloat32Array, readEnv, _AssistantStream_instances, _a$2, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun, AssistantStream, Runs$1, Threads, Beta, Completions, Content$2, Files$2, Containers, Items, Conversations, Embeddings, OutputItems, Runs, Evals, Files$1, Methods, Graders$1, Alpha, Permissions, Checkpoints$1, Checkpoints, Jobs, FineTuning, GraderModels, Graders, Images, Models, Moderations, Calls, ClientSecrets, Realtime, _ResponseStream_instances, _ResponseStream_params, _ResponseStream_currentResponseSnapshot, _ResponseStream_finalResponse, _ResponseStream_beginRequest, _ResponseStream_addEvent, _ResponseStream_endRequest, _ResponseStream_accumulateResponse, ResponseStream, InputItems, InputTokens, Responses, Content$1, Content, Versions, Skills, Parts, Uploads, allSettledWithThrow, FileBatches, Files, VectorStores, Videos, _Webhooks_instances, _Webhooks_validateSecret, _Webhooks_getRequiredHeader, Webhooks, _OpenAI_instances, _a$1, _OpenAI_encoder, _OpenAI_baseURLOverridden, WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER, OpenAI, KIMI_QUOTA_EXHAUSTED_ERROR_CODES$1, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS$1, TOOL_RESULT_MEDIA_PROMPT$1, TOOL_RESULT_MEDIA_PLACEHOLDER$1, KimiFiles$1, MIME_TO_EXT$1, EXT_TO_MIME$3, KNOWN_REASONING_KEYS$1, DEFAULT_REASONING_KEY$1, ReasoningKeyDialect$1, KIMI_TOOL_CALL_ID_POLICY, KimiStreamedMessage, KimiChatProvider, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING$1, OPENAI_CHAT_TOOL_CALL_ID_POLICY$1, OMITTED_AUDIO_PLACEHOLDER$3, OMITTED_VIDEO_PLACEHOLDER$3, OpenAILegacyStreamedMessage$1, OpenAILegacyChatProvider$1, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY$1, EMBEDDED_STATUS_CODE_RE$1, OMITTED_AUDIO_PLACEHOLDER$2, OMITTED_VIDEO_PLACEHOLDER$2, OpenAIResponsesStreamedMessage$1, OpenAIResponsesChatProvider$1, KNOWN_WIRE_TYPES$1, defaultHandler$1, currentHandler$1, HOOK_EVENT_TYPES$1, require_constants$8, require_utils$3, require_scan, require_parse$4, require_picomatch$1, import_picomatch, ProviderTypeSchema$1, OAuthRefSchema$2, StringRecordSchema$3, ProviderConfigSchema$1, ModelAliasBaseSchema, ModelAliasOverrideSchema, ModelAliasSchema, SecondaryModelConfigSchema$1, ThinkingConfigSchema$1, PermissionModeSchema, PermissionRuleDecisionSchema$1, PermissionRuleScopeSchema$1, PermissionRuleSchema$1, PermissionConfigSchema$1, LoopControlSchema$1, BackgroundConfigSchema, SubagentConfigSchema$1, McpTimeoutMsSchema$1, McpConfigSchema, ImageConfigSchema$1, ModelCatalogConfigSchema$1, ExperimentalConfigSchema$1, HookDefSchema$1, MoonshotServiceConfigSchema$1, ServicesConfigSchema$1, McpServerCommonFields$1, McpServerStdioConfigSchema$1, McpServerHttpConfigSchema$1, McpServerSseConfigSchema$1, McpServerConfigDiscriminatedSchema$1, McpServerConfigSchema$1, KimiConfigSchema, ProviderConfigPatchSchema, ModelAliasPatchSchema, ThinkingConfigPatchSchema, PermissionConfigPatchSchema, LoopControlPatchSchema, BackgroundConfigPatchSchema, SubagentConfigPatchSchema, SecondaryModelConfigPatchSchema, McpConfigPatchSchema, ImageConfigPatchSchema, ModelCatalogConfigPatchSchema, ExperimentalConfigPatchSchema, MoonshotServiceConfigPatchSchema, ServicesConfigPatchSchema, KimiConfigPatchSchema, TRUE_BOOLEAN_ENV_VALUES$1, FALSE_BOOLEAN_ENV_VALUES$1, ENV_MODEL_PROVIDER_KEY$1, ENV_MODEL_ALIAS_KEY$1, ALLOWED_TYPES, DEFAULT_BASE_URL, DEFAULT_MAX_CONTEXT_SIZE$1, DEFAULT_CAPABILITIES$1, SECONDARY_DERIVED_MODEL_ALIAS, SECONDARY_MODEL_ENV$1, SECONDARY_MODEL_EFFORT_ENV$1, DEFAULT_CONFIG_FILE_TEXT, ENTRY_KEYED_SECTIONS, MIGRATIONS_FILE$1, THINKING_EFFORT_MAX_TO_HIGH$1, S_IFMT$5, S_IFDIR$3, WorkspaceLocalTomlSchema, CTX_VALUE_MAX_CHARS$1, STACK_MAX_BYTES$1, ENTRY_MAX_BYTES$1, REDACTED_KEYS$1, SAFE_KEY_RE$1, ELLIPSIS$1, TRUNCATED_TAIL$1, REDACTED$1, RAW_SECRET_PATTERNS$1, LEVEL_LABEL$1, ANSI_LEVEL$1, ANSI_RESET$1, PENDING_MAX$1, STDERR_NOTICE_INTERVAL_MS$1, AsyncSerialQueue$1, RotatingFileSink, LOG_LEVEL_RANK, ROOT_SYMBOL, SESSION_LOG_ID, LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, MAIN_LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, nextSessionLogId, RootLoggerImpl, LoggerImpl, log, common, exception, snippet, TYPE_CONSTRUCTOR_OPTIONS, YAML_NODE_KINDS, type$2, failsafe, _null4, bool, int2, YAML_FLOAT_PATTERN, SCIENTIFIC_WITHOUT_DOT, float, core, YAML_DATE_REGEXP, YAML_TIMESTAMP_REGEXP, timestamp, merge2, BASE64_MAP, binary, _hasOwnProperty$3, _toString$2, omap, _toString$1, pairs, _hasOwnProperty$2, set2, _default3, _hasOwnProperty$1, CONTEXT_FLOW_IN, CONTEXT_FLOW_OUT, CONTEXT_BLOCK_IN, CONTEXT_BLOCK_OUT, CHOMPING_CLIP, CHOMPING_STRIP, CHOMPING_KEEP, PATTERN_NON_PRINTABLE, PATTERN_NON_ASCII_LINE_BREAKS, PATTERN_FLOW_INDICATORS, PATTERN_TAG_HANDLE, PATTERN_TAG_URI, simpleEscapeCheck, simpleEscapeMap, i2, directiveHandlers, loader, _toString, _hasOwnProperty, CHAR_BOM, CHAR_TAB, CHAR_LINE_FEED, CHAR_CARRIAGE_RETURN, CHAR_SPACE, CHAR_EXCLAMATION, CHAR_DOUBLE_QUOTE, CHAR_SHARP, CHAR_PERCENT, CHAR_AMPERSAND, CHAR_SINGLE_QUOTE, CHAR_ASTERISK, CHAR_COMMA, CHAR_MINUS, CHAR_COLON, CHAR_EQUALS, CHAR_GREATER_THAN, CHAR_QUESTION, CHAR_COMMERCIAL_AT, CHAR_LEFT_SQUARE_BRACKET, CHAR_RIGHT_SQUARE_BRACKET, CHAR_GRAVE_ACCENT, CHAR_LEFT_CURLY_BRACKET, CHAR_VERTICAL_LINE, CHAR_RIGHT_CURLY_BRACKET, ESCAPE_SEQUENCES, DEPRECATED_BOOLEANS_SYNTAX, DEPRECATED_BASE60_SYNTAX, QUOTING_TYPE_SINGLE, QUOTING_TYPE_DOUBLE, STYLE_PLAIN, STYLE_SINGLE, STYLE_LITERAL, STYLE_FOLDED, STYLE_DOUBLE, dumper, load$2, require_isArguments, require_implementation$2, require_object_keys, require_es_define_property, require_syntax, require_type, require_gOPD, require_gopd, require_define_data_property, require_has_property_descriptors, require_define_properties, require_es_object_atoms, require_es_errors, require_eval, require_range, require_ref$1, require_uri$1, require_abs, require_floor$1, require_max, require_min, require_pow, require_round, require_isNaN, require_sign, require_shams$1, require_has_symbols, require_Reflect_getPrototypeOf, require_Object_getPrototypeOf, require_implementation$1, require_function_bind, require_functionCall, require_functionApply, require_reflectApply, require_actualApply, require_call_bind_apply_helpers, require_get, require_get_proto, require_hasown, require_get_intrinsic, require_set_function_length, require_applyBind, require_call_bind, require_call_bound, require_isFinite, require_isInteger, require_toString, require_StringIndexOf, require_StringPad, require_UnicodeEscape, require_floor, require_math_intrinsics, require_helpers$2, require_modulo, require_isCodePoint, require_UTF16EncodeCodePoint, require_isLeadingSurrogate, require_isTrailingSurrogate, require_is_callable, require_for_each, require_shams, require_is_regex, require_safe_regex_test, require_EncodeForRegExpEscape, require_UTF16SurrogatePairToCodePoint, require_CodePointAt, require_StringToCodePoints, require_callBound, require_implementation, require_polyfill, require_shim, import_regexp_escape, FrontmatterError$1, SkillParseError$1, UnsupportedSkillTypeError$1, FENCE$2, METADATA_ALIASES$1, FLAG_DEFINITIONS, FlagResolver, IMAGE_MIME_BY_SUFFIX$1, VIDEO_MIME_BY_SUFFIX$1, TEXT_MIME_BY_SUFFIX$1, NON_TEXT_SUFFIXES$1, ASF_HEADER$1, FTYP_IMAGE_BRANDS$1, FTYP_VIDEO_BRANDS$1, MODEL_ACCEPTED_IMAGE_MIMES$1, ACCEPTED_FORMATS_TEXT$1, UNSUPPORTED_IMAGE_FORMATS$1, BASE64_SNIFF_CHARS$1, decoderReady$1, MAX_IMAGE_EDGE_PX, MAX_IMAGE_EDGE_ENV, IMAGE_BYTE_BUDGET, READ_IMAGE_BYTE_BUDGET_ENV, JPEG_QUALITY_STEPS$1, FALLBACK_EDGES_PX$1, PNG_RESCALE_FLOOR_PX$1, MAX_DECODE_PIXELS$1, MAX_IMAGE_DECODE_BYTES$1, RECODABLE_MIME$1, CAPTION_OPENING$1, CAPTION_PATTERN$1, ImageLimits, RawSubagentProfileSchema, AgentModelPreferenceSchema, RawAgentProfileSchema, AGENTS_MD_RECOMMENDED_MAX_BYTES$1, S_IFMT$4, S_IFREG$2, require_lib$1, require_raw, require_asap, require_a_sync_waterfall, require_lexer, require_object, require_nodes, require_parser2, require_transformer, require_runtime, require_compiler, require_filters, require_loader, require_precompiled_loader, require_readdirp, require_handler, require_chokidar, require_node_loaders, require_loaders, require_tests, require_globals, require_express_app, require_environment, require_precompile_global, require_precompile, require_jinja_compat, env, WINDOWS_NOTES$1, ADDITIONAL_DIRS_SECTION_PROSE$1, SKILLS_SECTION_PROSE$1, agent_default$2, coder_default, explore_default, init_default$1, PROFILE_SOURCES, DEFAULT_INIT_PROMPT$1, DEFAULT_AGENT_PROFILES, AgentProfileSnapshotSchema, AgentProfileCatalogSnapshotSchema, AgentFileParseError$1, AGENT_NAME_PATTERN$1, USER_BRAND_DIRS$3, USER_GENERIC_DIRS$3, PROJECT_BRAND_DIRS$3, PROJECT_GENERIC_DIRS$3, MAX_AGENT_SCAN_DEPTH$1, MAX_SKIP_WARNINGS$1, PROMPT_VARIABLE$1, SYSTEM_MD_FILENAME$1, MCP_NAME_PREFIX$2, MCP_NAME_SEPARATOR$1, MAX_QUALIFIED_LENGTH$1, GLOB_MAGIC$1, SOURCE_PRIORITY, DEFAULT_AGENT_PROFILE_NAME$1, KNOWN_BUILTIN_TOOL_NAMES, SessionAgentProfileCatalog, PLUGIN_SECTIONS_MAX_BYTES$1, noopTelemetryClient, NEVER$1, MAX_TIMER_DELAY_MS$2, VALID_TASK_ID$1, BackgroundTaskPersistence, TERMINAL_STATUSES$1, AgentBackgroundTask, STREAM_DRAIN_GRACE_MS$1, ProcessBackgroundTask, QuestionBackgroundTask$1, MAX_RUNNING_TASKS_ENV$1, MAX_OUTPUT_BYTES$3, NOTIFICATION_FALLBACK_PREVIEW_BYTES$1, MAX_TASK_OUTPUT_BYTES$1, SIGTERM_GRACE_MS$3, USER_INTERRUPT_REASON$1, _ALPHABET, BackgroundManager, DYNAMIC_TOOL_SCHEMA_VARIANT$1, LOADABLE_TOOLS_TRIGGER$1, TOOLS_ADDED_BLOCK$1, TOOLS_REMOVED_BLOCK$1, UserCancellationError$1, BASE_DELAY_MS$1, MAX_DELAY_MS$1, RETRY_FACTOR$1, JITTER_FACTOR$1, LLMRequestTraceState, todo_list_default$1, TODO_LIST_TOOL_NAME$1, TODO_STORE_KEY, TODO_LIST_WRITE_REMINDER, TodoItemSchema$1, TodoListInputSchema$1, TodoListTool$1, messageTokenEstimateCache$1, MEDIA_TOKEN_ESTIMATE$1, MIN_FLOOR$1, DEFAULT_UNKNOWN_CONTEXT_FALLBACK$1, compaction_instruction_default$1, DEFAULT_COMPACTION_CONFIG$1, DefaultCompactionStrategy$1, COMPACTION_SUMMARY_PREFIX$1, COMPACT_USER_MESSAGE_MAX_TOKENS$1, COMPACT_USER_MESSAGE_HEAD_TOKENS$1, COMPACTION_ELISION_VARIANT$1, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS$1, OVERFLOW_CONTEXT_SAFETY_RATIO$1, OVERFLOW_STATUS_RECOVERY_RATIO$1, CompactionTruncatedError$1, FullCompaction, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS$1, COMPACTION_OVERFLOW_SHRINK_RATIOS$1, MEDIA_PART_MARKERS, DEFAULT_CONFIG, MicroCompaction, systemMonoNowMs$1, SYSTEM_CLOCKS$1, MAX_CLOCK_FILE_BYTES$1, CRON_ID_REGEX$2, ID_REGEX, MAX_ID_ATTEMPTS$1, SessionCronStore, import_retry, MINUTE_RANGE$1, HOUR_RANGE$1, DOM_RANGE$1, MONTH_RANGE$1, DOW_RANGE$1, MS_PER_MINUTE$3, DIGIT_ONLY$1, MONTH_NAMES$1, DAY_NAMES$1, DEFAULT_CRON_JITTER_CONFIG$1, MS_PER_DAY$3, MS_PER_MINUTE$2, DEFAULT_POLL_INTERVAL_MS$1, MAX_COALESCE_ITERATIONS$1, CRON_SCHEDULED$1, CRON_FIRED$1, CRON_MISSED$1, CRON_DELETED$1, STALE_THRESHOLD_MS$1, CronManager, KEEP_OFF_VALUES$1, ConfigState, TOOL_ERROR_STATUS$1, TOOL_EMPTY_STATUS$1, TOOL_EMPTY_ERROR_STATUS$1, TOOL_OUTPUT_EMPTY_TEXT$1, SYNTHETIC_TOOL_RESULT_TEXT, MEDIA_DEGRADED_PLACEHOLDERS$1, MEDIA_STRIPPED_PLACEHOLDERS$1, MEDIA_CONTAINER_KEY_CACHE$1, USER_PROMPT_ORIGIN$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$2, IMPORT_CONTEXT_GUIDANCE$1, ContextMemory, MAX_GOAL_OBJECTIVE_LENGTH$1, MAX_GOAL_COMPLETION_CRITERION_LENGTH$1, GOAL_CANCELLED_REMINDER$1, GOAL_FORK_CLEARED_REMINDER$1, GoalMode, DEFAULT_TIMEOUT_SECONDS$1, KILL_GRACE_MS$1, OptionalStringSchema$1, HookSpecificOutputSchema$1, HookJsonOutputSchema$1, DEFAULT_HOOK_TIMEOUT_SECONDS$1, HookEngine, SENSITIVE_BASENAMES$1, SENSITIVE_PATH_SUFFIXES$1, ENV_PREFIX$1, ENV_EXEMPTIONS$1, SENSITIVE_BASENAME_PREFIXES$1, PUBLIC_KEY_BASENAMES$1, SENSITIVE_DOT_VARIANT_SUFFIXES$1, SENSITIVE_DOT_VARIANT_SUFFIX_SET$1, DEFAULT_WORKSPACE_ACCESS_POLICY$1, PathSecurityError$1, DEFAULT_PATH_CLASS$1, GLOB_LITERAL_SPECIAL$1, task_list_default$1, TaskListInputSchema$1, TaskListTool$1, DynamicInjector, GoalInjector, AUTO_MODE_ENTER_REMINDER, AUTO_MODE_EXIT_REMINDER, PermissionModeInjector, PluginSessionStartInjector, PLAN_MODE_DEDUP_MIN_TURNS$1, PLAN_MODE_FULL_REFRESH_TURNS$1, PlanModeInjector, TODO_LIST_REMINDER_VARIANT$1, TODO_LIST_REMINDER_TURNS_SINCE_WRITE$1, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS$1, TodoListReminderInjector, ToolsDiffInjector, ACTIVE_BACKGROUND_TASK_GUIDANCE$1, InjectionManager, AgentSwarmExclusiveDenyPermissionPolicy, AutoModeApprovePermissionPolicy, AutoModeAskUserQuestionDenyPermissionPolicy, DEFAULT_APPROVE_TOOLS$1, DefaultToolApprovePermissionPolicy, ExitPlanModeReviewAskPermissionPolicy, FallbackAskPermissionPolicy, S_IFMT$3, S_IFDIR$2, S_IFREG$1, SensitiveFileAccessAskPermissionPolicy, GitControlPathAccessAskPermissionPolicy, GitCwdWriteApprovePermissionPolicy, GoalStartReviewAskPermissionPolicy, PlanModeGuardDenyPermissionPolicy, PlanModeToolApprovePermissionPolicy, PreToolCallHookPermissionPolicy, SessionApprovalHistoryPermissionPolicy, SwarmModeAgentSwarmApprovePermissionPolicy, USER_CONFIGURED_SCOPES$1, UserConfiguredPermissionPolicy, UserConfiguredDenyPermissionPolicy, UserConfiguredAllowPermissionPolicy, UserConfiguredAskPermissionPolicy, YoloModeApprovePermissionPolicy, PermissionManager, HERO_NAMES$1, MAX_ATTEMPTS$1, PlanMode, migrateV1_0ToV1_1$1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN$1, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS$1, migrateV1_1ToV1_2$1, migrateV1_2ToV1_3$1, migrateV1_3ToV1_4$1, MIGRATIONS$1, InMemoryAgentRecordPersistence, FileSystemAgentRecordPersistence, DEFAULT_THRESHOLD$1, DEFAULT_MAX_CACHE_SIZE$1, BLOBREF_PROTOCOL$2, DATA_URI_HEADER_RE$1, MISSING_MEDIA_PLACEHOLDER$2, BlobStore, AgentRecords, UNDO_BOUNDARY_RECORD_TYPES, ReplayBuilder, check_kimi_code_docs_default$1, PSEUDO_PATH$11, parsed$11, CHECK_KIMI_CODE_DOCS_SKILL$1, custom_theme_default$1, PSEUDO_PATH$10, parsed$10, CUSTOM_THEME_SKILL$1, import_from_cc_codex_default$1, PSEUDO_PATH$9, parsed$9, IMPORT_FROM_CC_CODEX_SKILL$1, mcp_config_default$1, PSEUDO_PATH$8, parsed$8, MCP_CONFIG_SKILL$1, SKILL_default$5, SKILL_default$4, SKILL_default$3, SUB_SKILL_PARENT$1, SUB_SKILL_REVIEW$1, SUB_SKILL_CONSOLIDATE$1, update_config_default$1, PSEUDO_PATH$7, parsed$7, UPDATE_CONFIG_SKILL$1, write_goal_default$1, PSEUDO_PATH$6, parsed$6, WRITE_GOAL_SKILL$1, USER_BRAND_DIRS$2, USER_GENERIC_DIRS$2, PROJECT_BRAND_DIRS$2, PROJECT_GENERIC_DIRS$2, MAX_SKILL_SCAN_DEPTH$1, LISTING_DESC_MAX$1, SessionSkillRegistry, SOURCE_GROUPS$1, graphemeSegmenter$1, SkillManager, enter_reminder_default$1, exit_reminder_default$1, SwarmMode, ToolAccesses$1, require_code$1, require_scope, require_codegen, require_util$7, require_names, require_errors$1, require_boolSchema, require_rules, require_applicability, require_dataType, require_defaults, require_code, require_keyword, require_subschema, require_fast_deep_equal, require_json_schema_traverse, require_resolve, require_validate, require_validation_error, require_ref_error, require_compile, require_data, require_utils$2, require_schemes, require_fast_uri, require_uri, require_core$3, require_id, require_ref, require_core$2, require_limitNumber, require_multipleOf, require_ucs2length, require_limitLength, require_pattern, require_limitProperties, require_required, require_limitItems, require_equal, require_uniqueItems, require_const, require_enum, require_validation$2, require_additionalItems, require_items, require_prefixItems, require_items2020, require_contains, require_dependencies, require_propertyNames, require_additionalProperties, require_properties, require_patternProperties, require_not, require_anyOf, require_oneOf, require_allOf, require_if, require_thenElse, require_applicator$2, require_format$2, require_format$1, require_metadata, require_draft7, require_types$1, require_discriminator, require_json_schema_draft_07, require_ajv, require_dynamicAnchor, require_dynamicRef, require_recursiveAnchor, require_recursiveRef, require_dynamic, require_dependentRequired, require_dependentSchemas, require_limitContains, require_next, require_unevaluatedProperties, require_unevaluatedItems, require_unevaluated$1, require_schema$1, require_applicator$1, require_content$1, require_core$1, require_format, require_meta_data$1, require_validation$1, require_json_schema_2019_09, require__2019, require_draft2020, require_schema, require_applicator, require_unevaluated, require_content, require_core, require_format_annotation, require_meta_data, require_validation, require_json_schema_2020_12, require__2020, require_formats, require_limit, require_dist3, import_ajv, import__2019, import__2020, import_dist, DRAFT_07_AJV$1, DRAFT_2019_AJV$1, DRAFT_2020_AJV$1, DRAFT_2019_KEYWORDS$1, DRAFT_2020_KEYWORDS$1, ToolScheduler$1, GRACE_TIMEOUT_MS, TOOL_OUTPUT_EMPTY$1, TOOL_OUTPUT_NON_TEXT$1, UNEXECUTED_TOOL_CALL_OUTPUT, validators$1, ErrorCode$1, cursorQuerySchema, pageResponseSchema, ISO_8601_REGEX$1, isoDateTimeSchema$1, ENCODING, ENCODING_LEN, RANDOM_LEN, TIME_MAX, ULIDErrorCode, ULIDError, ToolInputDisplaySchema, messageRoleSchema, textContentSchema, toolUseContentSchema, toolResultContentSchema, imageSourceSchema, imageContentSchema, videoContentSchema, fileContentSchema, thinkingContentSchema, messageContentSchema, messageSchema, promptThinkingSchema, promptPermissionModeSchema, promptStatusSchema, promptItemSchema, workspaceIdSchema, workspaceSchema$1, sessionUsageSchema, permissionRuleMatcherSchema, permissionRuleSchema, sessionAgentConfigSchema, sessionAgentConfigPartialSchema, sessionMetadataSchema, sessionPendingInteractionSchema, sessionSchema, providerConfigResponseSchema, configResponseSchema, modelCatalogItemSchema$2, providerCatalogStatusSchema$2, providerCatalogItemSchema$2, providerRefreshChangeSchema$1, providerRefreshFailureSchema$1, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE, tokenUsageSchema$1, finishReasonSchema, usageStatusSchema$1, permissionModeSchema$1, skillSourceSchema, userPromptOriginSchema, skillActivationOriginSchema, pluginCommandOriginSchema, injectionOriginSchema, shellCommandOriginSchema, compactionSummaryOriginSchema, systemTriggerOriginSchema, taskLifecycleStatusSchema$1, taskOriginSchema, backgroundTaskOriginSchema, cronJobOriginSchema, cronMissedOriginSchema, hookResultOriginSchema, retryOriginSchema, promptOriginSchema, goalStatusSchema, goalActorSchema, goalBudgetReportSchema, goalSnapshotSchema, goalChangeStatsSchema, goalChangeKindSchema, goalChangeSchema, kimiErrorCodeSchema, kimiErrorPayloadSchema, kimiErrorPayloadObjectSchema, taskInfoBaseSchema, processTaskInfoSchema, agentTaskInfoSchema$1, questionTaskInfoSchema, taskInfoSchema, compactionResultSchema, toolUpdateSchema, turnEndReasonSchema$1, agentPhaseSchema, agentStatusUpdatedEventSchema$1, sessionMetaUpdatedEventSchema, sessionCreatedEventSchema, workspaceCreatedEventSchema, workspaceUpdatedEventSchema, workspaceDeletedEventSchema, sessionWorkChangedEventSchema, sessionStatusChangedEventSchema, modelCatalogChangedEventSchema, goalUpdatedEventSchema, skillActivatedEventSchema, pluginCommandActivatedEventSchema, errorEventSchema$1, warningEventSchema$1, turnStartedEventSchema$1, turnEndedEventSchema$1, turnStepStartedEventSchema, turnStepCompletedEventSchema, turnStepRetryingEventSchema, turnStepInterruptedEventSchema, assistantDeltaEventSchema$1, hookResultEventSchema, thinkingDeltaEventSchema$1, toolCallDeltaEventSchema$1, toolCallStartedEventSchema$1, toolProgressEventSchema$1, shellOutputEventSchema, shellStartedEventSchema, shellCompletedEventSchema, toolResultEventSchema$1, subagentSpawnedEventSchema, subagentStartedEventSchema, subagentSuspendedEventSchema, subagentCompletedEventSchema, subagentFailedEventSchema, compactionStartedEventSchema$1, compactionBlockedEventSchema$1, compactionCancelledEventSchema$1, compactionCompletedEventSchema$1, taskStartedEventSchema, taskTerminatedEventSchema, backgroundTaskStartedEventSchema, backgroundTaskTerminatedEventSchema, cronFiredEventSchema, promptSubmittedEventSchema, promptCompletedEventSchema$1, promptAbortedEventSchema$1, promptSteeredEventSchema, toolListUpdatedReasonSchema, toolListUpdatedEventSchema, mcpServerStatusPayloadSchema, mcpServerStatusEventSchema, eventSchema, sessionCursorSchema, cursorsBySessionSchema, wsEventEnvelopeSchema, wsAckEnvelopeSchema, serverHelloPayloadSchema, serverHelloMessageSchema, agentFilterSchema, clientHelloPayloadSchema, clientHelloMessageSchema, clientHelloAckMessageSchema, watchFsConfigSchema, subscribePayloadSchema, subscribeMessageSchema, subscribeAckPayloadSchema, subscribeAckMessageSchema, unsubscribePayloadSchema, unsubscribeMessageSchema, unsubscribeAckMessageSchema, watchFsAddPayloadSchema, watchFsAddMessageSchema, watchFsRemovePayloadSchema, watchFsRemoveMessageSchema, watchFsAckMessageSchema, abortPayloadSchema, abortMessageSchema, abortAckMessageSchema, terminalAttachPayloadSchema, terminalAttachMessageSchema, terminalAttachAckMessageSchema, terminalDetachPayloadSchema, terminalDetachMessageSchema, terminalDetachAckMessageSchema, terminalInputPayloadSchema, terminalInputMessageSchema, terminalInputAckMessageSchema, terminalResizePayloadSchema, terminalResizeMessageSchema, terminalResizeAckMessageSchema, terminalClosePayloadSchema, terminalCloseMessageSchema, terminalCloseAckMessageSchema, pingPayloadSchema, pingMessageSchema, pongPayloadSchema, pongMessageSchema, resyncRequiredPayloadSchema, resyncRequiredMessageSchema, wsErrorPayloadSchema, wsErrorMessageSchema, terminalOutputPayloadSchema, terminalExitPayloadSchema, clientControlOperations, serverSystemOperations, approvalDecisionSchema, approvalScopeSchema, approvalRequestSchema$1, questionOptionSchema$1, questionItemSchema$1, questionRequestSchema$1, questionAnswerSchema, questionAnswerMethodSchema, toolSourceSchema, toolDescriptorSchema, mcpServerStatusSchema, mcpServerTransportSchema, mcpServerSchema, skillDescriptorSchema, taskKindSchema, taskStatusSchema, taskSchema, fsKindSchema$1, fsGitStatusSchema$1, fsEntrySchema$1, fsSearchHitSchema$1, fsGrepMatchSchema$1, fsGrepFileHitSchema$1, fsChangeKindSchema, fsChangeActionSchema, fsChangeEntrySchema, fsListSortSchema$1, fsReadEncodingRequestSchema$1, fsReadEncodingResponseSchema$1, fsOpenInAppIdSchema, fsListManyPartialErrorSchema$1, fsPullRequestSchema$1, metaCapabilitiesSchema, managedProviderStatusSchema$1, managedProviderSummarySchema$1, oauthFlowStatusEnum, oauthFlowStartPendingSchema, oauthFlowStartAuthenticatedSchema, booleanQueryParam, MAX_SESSION_EXPORT_WEB_LOG_BYTES, sessionStatusResponseSchema, sessionWarningSchema, inFlightToolCallSchema, inFlightTurnSchema, snapshotSubagentSchema, fsBrowseEntrySchema$2, activateSkillAttachmentSchema, relativeCwdSchema$1, terminalStatusSchema$1, terminalSchema$1, connectionSchema, keySchema, SUCCESS_HTML$1, ERROR_HTML$1, JsonFileStore, TOKENS_SUFFIX$1, CLIENT_SUFFIX$1, DISCOVERY_SUFFIX$1, PASSIVE_REDIRECT_URI$1, McpOAuthClientProvider$1, crypto$4, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, RELATED_TASK_META_KEY, AssertObjectSchema, ProgressTokenSchema, CursorSchema, TaskMetadataSchema, RelatedTaskMetadataSchema, RequestMetaSchema, BaseRequestParamsSchema, TaskAugmentedRequestParamsSchema, isTaskAugmentedRequestParams, RequestSchema, NotificationsParamsSchema, NotificationSchema, ResultSchema, RequestIdSchema, JSONRPCRequestSchema, isJSONRPCRequest, JSONRPCNotificationSchema, isJSONRPCNotification, JSONRPCResultResponseSchema, isJSONRPCResultResponse, ErrorCode, JSONRPCErrorResponseSchema, isJSONRPCErrorResponse, JSONRPCMessageSchema, EmptyResultSchema, CancelledNotificationParamsSchema, CancelledNotificationSchema, IconSchema, IconsSchema, BaseMetadataSchema, ImplementationSchema, FormElicitationCapabilitySchema, ElicitationCapabilitySchema, ClientTasksCapabilitySchema, ServerTasksCapabilitySchema, ClientCapabilitiesSchema, InitializeRequestParamsSchema, InitializeRequestSchema, ServerCapabilitiesSchema, InitializeResultSchema, InitializedNotificationSchema, isInitializedNotification, PingRequestSchema, ProgressSchema, ProgressNotificationParamsSchema, ProgressNotificationSchema, PaginatedRequestParamsSchema, PaginatedRequestSchema, PaginatedResultSchema, TaskStatusSchema, TaskSchema, CreateTaskResultSchema, TaskStatusNotificationParamsSchema, TaskStatusNotificationSchema, GetTaskRequestSchema, GetTaskResultSchema, GetTaskPayloadRequestSchema, ListTasksRequestSchema, ListTasksResultSchema, CancelTaskRequestSchema, CancelTaskResultSchema, ResourceContentsSchema, TextResourceContentsSchema, Base64Schema, BlobResourceContentsSchema, RoleSchema, AnnotationsSchema, ResourceSchema, ResourceTemplateSchema, ListResourcesRequestSchema, ListResourcesResultSchema, ListResourceTemplatesRequestSchema, ListResourceTemplatesResultSchema, ResourceRequestParamsSchema, ReadResourceRequestParamsSchema, ReadResourceRequestSchema, ReadResourceResultSchema, ResourceListChangedNotificationSchema, SubscribeRequestParamsSchema, SubscribeRequestSchema, UnsubscribeRequestParamsSchema, UnsubscribeRequestSchema, ResourceUpdatedNotificationParamsSchema, ResourceUpdatedNotificationSchema, PromptArgumentSchema, PromptSchema, ListPromptsRequestSchema, ListPromptsResultSchema, GetPromptRequestParamsSchema, GetPromptRequestSchema, TextContentSchema, ImageContentSchema, AudioContentSchema, ToolUseContentSchema, EmbeddedResourceSchema, ResourceLinkSchema, ContentBlockSchema, PromptMessageSchema, GetPromptResultSchema, PromptListChangedNotificationSchema, ToolAnnotationsSchema, ToolExecutionSchema, ToolSchema, ListToolsRequestSchema, ListToolsResultSchema, CallToolResultSchema, CallToolRequestParamsSchema, CallToolRequestSchema, ToolListChangedNotificationSchema, ListChangedOptionsBaseSchema, LoggingLevelSchema, SetLevelRequestParamsSchema, SetLevelRequestSchema, LoggingMessageNotificationParamsSchema, LoggingMessageNotificationSchema, ModelHintSchema, ModelPreferencesSchema, ToolChoiceSchema, ToolResultContentSchema, SamplingContentSchema, SamplingMessageContentBlockSchema, SamplingMessageSchema, CreateMessageRequestParamsSchema, CreateMessageRequestSchema, CreateMessageResultSchema, CreateMessageResultWithToolsSchema, BooleanSchemaSchema, StringSchemaSchema, NumberSchemaSchema, UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema, LegacyTitledEnumSchemaSchema, SingleSelectEnumSchemaSchema, UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema, MultiSelectEnumSchemaSchema, EnumSchemaSchema, PrimitiveSchemaDefinitionSchema, ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema, ElicitRequestParamsSchema, ElicitRequestSchema, ElicitationCompleteNotificationParamsSchema, ElicitationCompleteNotificationSchema, ElicitResultSchema, ResourceTemplateReferenceSchema, PromptReferenceSchema, CompleteRequestParamsSchema, CompleteRequestSchema, CompleteResultSchema, RootSchema, ListRootsRequestSchema, ListRootsResultSchema, RootsListChangedNotificationSchema, McpError, UrlElicitationRequiredError, SafeUrlSchema, OAuthProtectedResourceMetadataSchema, OAuthMetadataSchema, OpenIdProviderMetadataSchema, OpenIdProviderDiscoveryMetadataSchema, OAuthTokensSchema, OAuthErrorResponseSchema, OptionalSafeUrlSchema, OAuthClientMetadataSchema, OAuthClientInformationSchema, OAuthClientInformationFullSchema, OAuthError$1, InvalidRequestError, InvalidClientError, InvalidGrantError, UnauthorizedClientError, UnsupportedGrantTypeError, InvalidScopeError, AccessDeniedError, ServerError, TemporarilyUnavailableError, UnsupportedResponseTypeError, UnsupportedTokenTypeError, InvalidTokenError, MethodNotAllowedError, TooManyRequestsError, InvalidClientMetadataError, InsufficientScopeError, InvalidTargetError, OAUTH_ERRORS, UnauthorizedError, AUTHORIZATION_CODE_RESPONSE_TYPE, AUTHORIZATION_CODE_CHALLENGE_METHOD, McpOAuthService$1, AlreadyAuthorizedError$1, DEFAULT_AUTH_TIMEOUT_MS$1, AUTH_TOOL_TOOL_NAME$1, DESCRIPTION_TEMPLATE$1, DEFAULT_MAX_TOTAL_BYTES$1, MIME_EXTENSION$1, MCP_MAX_OUTPUT_CHARS$1, MCP_OUTPUT_TRUNCATED_TEXT$1, MCP_MAX_BINARY_PART_BYTES$1, MCP_MAX_BINARY_PART_CHARS$1, DenyAllPermissionPolicy, GIT_TIMEOUT_MS$1, MAX_DIRTY_FILES$1, MAX_COMMIT_LINE_LENGTH$1, ALLOWED_HOSTS$1, INITIAL_LAUNCH_LIMIT$1, INITIAL_LAUNCH_INTERVAL_MS$1, RATE_LIMIT_RETRY_BASE_MS$1, RATE_LIMIT_RETRY_FACTOR$1, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$1, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$1, RATE_LIMIT_SUSPENDED_REASON$1, AGENT_SWARM_MAX_CONCURRENCY_ENV$1, SubagentBatch, summary_continuation_default$1, DEFAULT_SUBAGENT_TIMEOUT_MS$1, SUBAGENT_TIMEOUT_ENV$1, SUMMARY_MIN_LENGTH, SUMMARY_CONTINUATION_ATTEMPTS, HOOK_TEXT_PREVIEW_LENGTH, SUBAGENT_MAX_TOKENS_ERROR$1, TOOL_CALL_DISABLED_MESSAGE$1, SUBAGENT_PROMPT_ORIGIN, SIDE_QUESTION_SYSTEM_REMINDER$1, SessionSubagentHost, LlmRequestLogger, task_output_default$1, OUTPUT_PREVIEW_BYTES$1, PAGING_HINT_LINES$1, TaskOutputInputSchema$1, TaskOutputTool$1, task_stop_default$1, TaskStopInputSchema$1, TaskStopTool$1, cron_create_default$1, MAX_PROMPT_BYTES$1, ONE_SHOT_MAX_FUTURE_MS$1, CronCreateInputSchema$1, CronCreateTool$1, cron_delete_default$1, ID_PATTERN$1, CronDeleteInputSchema$1, CronDeleteTool$1, cron_list_default$1, CronListInputSchema$1, MS_PER_DAY$2, PROMPT_PREVIEW_BYTES$1, CronListTool$1, agent_background_disabled_default$1, agent_background_enabled_default$1, agent_default$1, AgentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE$1, AGENT_TOOL_PARAMETERS, AGENT_TOOL_PARAMETERS_NO_MODEL, AgentTool, USER_INTERRUPTED_SUBAGENT_MESSAGE$1, agent_swarm_default$1, DEFAULT_SUBAGENT_TYPE$1, PROMPT_TEMPLATE_PLACEHOLDER$1, MAX_AGENT_SWARM_SUBAGENTS$1, AGENT_SWARM_PARAMETERS$1, AGENT_SWARM_PARAMETERS_NO_MODEL$1, AgentSwarmTool$1, ask_user_default$1, QuestionOptionSchema$1, QuestionItemSchema$1, QUESTION_UNIQUENESS_MESSAGE$1, AskUserQuestionInputBaseSchema$1, AskUserQuestionInputSchemaWithBackground$1, QUESTION_DISMISSED_MESSAGE$1, QUESTION_UNSUPPORTED_FAILURE_MESSAGE$1, AskUserQuestionTool$1, skill_tool_default, NestedSkillTooDeepError$1, SkillToolInputSchema$1, SkillTool$1, edit_default$1, EditInputSchema$1, EditTool$1, kr, vr, Os, Br, Pr, zr, q, j, rt, Le, jt, Ne, Ts, Ae, xs, z$2, Mt, b, Qt, Bt, _, A2, g, yi, De, L, w, Ri, bi, Ls, _i, Z2, gi, Ie, Jt, yt, C, te, Ur, Hr, Wr, Gr, Ce, Oi, Zr, Yr, D, Vr, ot, H, ee, m2, xi, J, Li, Ii, Ci, se, Fe, Ut, Ht, Ni, Pt, ht, U, nt, Y2, zt, Ai, Q, ie, Di, ke, Rt, ve, bt, _t, Me, tt, Wt, $r, As, Ds, Is, Cs, Fs, Xr, re, K, jr, M, Qr, vs, Jr, ki, Ot, Gt, vi, ne, Be, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ms, en, sn, Bs, rn, nn, Ps, zs, oe, hn, he, Ke, F2, an, Tt, Pi, ln, at, cn, fn, dn, lt, un, mn, pn, zi, En, xt, ct, Sn, yn, Rn, f3, Yt, Lt, gn, Zi, Yi, On, B, Nt, et, Ui, Us, V, ae, ft, Hs, p, it, dt, Hi, At, y2, Ve, $e, Wi, Ws, Gs, le, Gi, Xe, Kt, ut, qe, Dt, je, Qe, Zs, Tn, st, mt, Nn, Ki, An, Dn, It, Vi, Cn, Ys, ce, Je, $i, Fn, kn, Xi, Ks, Js, vn, Xs, qs, js, ji, Qs, fe, ti, Qi, ei, Ji, ts, es, is$2, pt, ii, ss, qi, X, de, si, ri, Mn, ni, ue, di, tr, oi, me, W, Ct, Ft, pe$1, rs, G, ns, hi, er, as, ls, ai, li, ir, os$1, ci, rr, hs, Et, kt, Un, Hn, or, hr, Wn, Gn, fr, dr, ar, ur, mr, pr, Kn, Vn, $n, lr, cs, fs$7, ui, Xn, ds, qn, us, we, wt, Qn, Er, ms, wr, Jn, Sr, ps, yr, $t, Rr, eo, io, Ei, _r, gr, ys, Or, Rs, P$1, bs, _s, Si, Tr, xr, ye, Lr, Nr, Es, St, O, wi, Ar, Xt, ws, Ss, gs, Re, be, _e, ge, Oe, no, oo, ho, Dr, qt, Se, Te, ao, lo, co, fo, uo, mo, po, Eo, vt, So, require_pend, require_fd_slicer, require_buffer_crc32, import_yauzl, RG_VERSION$1, RG_BASE_URL$1, DOWNLOAD_TIMEOUT_MS$1, RG_ARCHIVE_SHA256$1, downloadPromise$1, DEFAULT_TIMEOUT_MS$2, MAX_OUTPUT_BYTES$2, VCS_DIRECTORIES_TO_EXCLUDE$2, SENSITIVE_GLOBS_TO_EXCLUDE$2, glob_default$1, GlobInputSchema$1, WINDOWS_PATH_HINT$1, S_IFMT$2, S_IFDIR$1, GlobTool$1, DEFAULT_MAX_CHARS$1, DEFAULT_MAX_LINE_LENGTH$1, TRUNCATION_MARKER$1, TRUNCATION_MESSAGE$1, ToolResultBuilder$1, grep_default$1, GrepInputSchema$1, RG_MAX_COLUMNS$1, DEFAULT_HEAD_LIMIT$1, MTIME_STAT_CONCURRENCY$1, CONTENT_LINE_RE$1, GrepTool$1, GrepAbortedError$1, read_default$1, MAX_LINES$1, MAX_LINE_LENGTH$1, MAX_BYTES$1, S_IFMT$1, S_IFREG, PositiveLineOffsetSchema$1, TailLineOffsetSchema$1, ReadInputSchema$1, READ_DESCRIPTION$1, ReadTool$1, read_media_default$1, MAX_MEDIA_MEGABYTES$1, ReadMediaFileInputSchema$1, ReadMediaFileTool$1, write_default$1, S_IFMT, S_IFDIR, WriteInputSchema$1, WriteTool$1, create_goal_default$1, CreateGoalToolInputSchema$1, CreateGoalTool$1, get_goal_default$1, GetGoalToolInputSchema$1, GetGoalTool$1, set_goal_budget_default$1, MIN_REASONABLE_TIME_BUDGET_MS$1, MAX_REASONABLE_TIME_BUDGET_MS$1, SetGoalBudgetToolInputSchema$1, SetGoalBudgetTool$1, update_goal_default$1, UpdateGoalToolInputSchema$1, UpdateGoalTool$1, enter_plan_mode_default$1, EnterPlanModeInputSchema$1, EnterPlanModeTool$1, exit_plan_mode_default$1, RESERVED_OPTION_LABELS$1, ExitPlanModeOptionSchema$1, ExitPlanModeInputSchema$1, ExitPlanModeTool$1, SELECT_TOOLS_TOOL_NAME$1, SelectToolsInputSchema$1, DESCRIPTION$1, SelectToolsTool$1, bash_default$1, MS_PER_SECOND$1, DEFAULT_TIMEOUT_S$1, MAX_TIMEOUT_S$1, DEFAULT_BACKGROUND_TIMEOUT_S$1, MAX_BACKGROUND_TIMEOUT_S$1, USER_INTERRUPT_REASON, BashInputSchema$1, SHELL_TIMEOUT_VARS$1, BashTool$1, WINDOWS_NUL_REDIRECT$1, fetch_url_default$1, HttpFetchError$1, FetchURLInputSchema$1, FetchURLTool$1, web_search_default$1, WebSearchInputSchema$1, WebSearchTool$1, SHELL_FOREGROUND_TIMEOUT_S$1, ToolManager, REMINDER_TEXT_1$1, REMINDER_TEXT_3$1, REPEAT_REMINDER_1_START$1, REPEAT_REMINDER_2_START$1, REPEAT_REMINDER_3_START$1, REPEAT_FORCE_STOP_STREAK$1, DEDUP_PLACEHOLDER_RESULT, ToolCallDeduplicator, TOOL_RESULT_MAX_CHARS$1, TOOL_RESULT_PREVIEW_CHARS$1, LLM_NOT_SET_MESSAGE$1, GOAL_CONTINUATION_ORIGIN$1, GOAL_RATE_LIMIT_PAUSE_REASON$1, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX$1, GOAL_PROVIDER_AUTH_PAUSE_PREFIX$1, GOAL_PROVIDER_API_PAUSE_PREFIX$1, GOAL_MODEL_CONFIG_PAUSE_PREFIX$1, GOAL_RUNTIME_PAUSE_PREFIX$1, GOAL_PROVIDER_FILTERED_PAUSE_REASON$1, GOAL_CONTINUATION_PROMPT$1, GOAL_STEP_CAP_CONTINUATION_PROMPT$1, TurnFlow, MAX_STEPS_PER_TURN_ENV, MAX_RETRIES_PER_STEP_ENV, KosongLLM, UsageRecorder, LlmRequestRecorder, Agent$4, Protocol, AjvJsonSchemaValidator, ExperimentalClientTasks, Client, ParseError, EventSourceParserStream, DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS, StreamableHTTPError, StreamableHTTPClientTransport, KIMI_MCP_CLIENT_VERSION$1, HttpMcpClient$1, ErrorEvent, __typeError, __accessCheck, __privateGet, __privateAdd, __privateSet, __privateMethod, _readyState, _url2, _redirectUrl, _withCredentials, _fetch, _reconnectInterval, _reconnectTimer, _lastEventId, _controller, _parser, _onError, _onMessage, _onOpen, _EventSource_instances, connect_fn, _onFetchResponse, _onFetchError, getRequestOptions_fn, _onEvent, _onRetryChange, failConnection_fn, scheduleReconnect_fn, _reconnect, EventSource, SseError, SSEClientTransport, SseMcpClient$1, require_symbols, require_timers, require_errors, require_constants$7, require_tree, require_util$6, require_stats, require_diagnostics, require_request$1, require_wrap_handler, require_dispatcher, require_unwrap_handler, require_dispatcher_base, require_connect, require_utils$1, require_constants$6, require_llhttp_wasm, require_llhttp_simd_wasm, require_constants$5, require_global$1, require_encoding, require_infra, require_data_url, require_runtime_features, require_webidl, require_util$5, require_formdata, require_formdata_parser, require_promise, require_body, require_client_h1, require_client_h2, require_client, require_fixed_queue, require_pool_base, require_pool, require_balanced_pool, require_round_robin_pool, require_agent, require_socks5_utils, require_socks5_client, require_socks5_proxy_agent, require_proxy_agent, require_env_http_proxy_agent, require_retry_handler, require_retry_agent, require_h2c_client, require_readable, require_api_request, require_abort_signal, require_api_stream, require_api_pipeline, require_api_upgrade, require_api_connect, require_api, require_mock_errors, require_mock_symbols, require_mock_utils, require_mock_interceptor, require_mock_client, require_mock_call_history, require_mock_pool, require_pending_interceptors_formatter, require_mock_agent, require_snapshot_utils, require_snapshot_recorder, require_snapshot_agent, require_global, require_decorator_handler, require_redirect_handler, require_redirect, require_response_error, require_retry$2, require_dump, require_dns, require_cache$2, require_date2, require_cache_handler, require_memory_cache_store, require_cache_revalidation_handler, require_cache$1, require_decompress, require_deduplication_handler, require_deduplicate, require_sqlite_cache_store, require_headers, require_response, require_request, require_subresource_integrity, require_fetch, require_util$4, require_cache, require_cachestorage, require_constants$4, require_util$3, require_parse$3, require_cookies, require_events, require_constants$3, require_util$2, require_frame, require_connection, require_permessage_deflate, require_receiver, require_sender, require_websocket, require_websocketerror, require_websocketstream, require_util$1, require_eventsource_stream, require_eventsource, require_undici, require_utils2, require_smartbuffer, require_constants$2, require_util, require_address_error, require_common3, require_constants$12, require_ipv4, require_constants2, require_helpers$1, require_regular_expressions, require_ipv6, require_ip_address, require_helpers2, require_receivebuffer, require_socksclient, require_build, import_undici, import_build, LOOPBACK_NO_PROXY$1, SOCKS_SCHEMES$1, defaultMakeHttpAgent, defaultMakeSocksAgent, defaultInstallProxyDeps, require_windows, require_mode, require_isexe, require_which, require_path_key, require_resolveCommand, require_escape, require_shebang_regex, require_shebang_command, require_readShebang, require_parse$2, require_enoent, import_cross_spawn, ReadBuffer, DEFAULT_INHERITED_ENV_VARS, StdioClientTransport, STDERR_BUFFER_CAPACITY$1, StdioMcpClient$1, BoundedTail$1, DEFAULT_STARTUP_TIMEOUT_MS$1, MCP_STARTUP_TIMEOUT_ENV$1, MCP_TOOL_TIMEOUT_ENV$1, McpConnectionManager$1, GlobalMcpConfigStore$1, McpJsonFileSchema$1, MAX_WORKDIR_SLUG_LENGTH$1, WORKDIR_KEY_PREFIX$1, HASH_LENGTH$1, WIN_SHAPED$1, appendQueues, MAX_TITLE_LENGTH$1, MAX_LAST_PROMPT_LENGTH$1, SessionSummaryStateSchema, FORKED_SESSION_DROPPED_FILES, SessionStore, BACKGROUND_KEEP_ALIVE_ON_EXIT_ENV, ACTIVE_TURN_CLOSE_TIMEOUT_MS, Session$1, PLUGIN_NAME_REGEX$1, KIMI_PLUGIN_ROOT_PATH$1, KIMI_PLUGIN_DIR_PATH$1, PLUGIN_SYSTEM_PROMPT_MAX_BYTES$1, UNSUPPORTED_RUNTIME_FIELDS$1, INSTALLED_REL$1, EMPTY$2, SHA_RE$1, KIMI_NODE_FALLBACK_SUBCOMMAND$1, PluginManager$1, require_Readability, require_Readability_readerable, import_readability, CHANGED, CLASS_LIST, CUSTOM_ELEMENTS, CONTENT, DATASET, DOCTYPE, DOM_PARSER, END, EVENT_TARGET, GLOBALS, IMAGE, MIME, MUTATION_OBSERVER, NEXT, OWNER_ELEMENT, PREV, PRIVATE, SHEET, START, STYLE, UPGRADE, VALUE, _a2, decodeMap, fromCodePoint, htmlDecodeTree, xmlDecodeTree, BinTrieFlags, CharCodes$1, TO_LOWER_BIT, EntityDecoderState, DecodingMode, EntityDecoder, CharCodes, State, QuoteType, Sequences, Tokenizer, formTags, pTag, tableSectionTags, ddtTags, rtpTags, openImpliesClose, voidElements$1, foreignContextElements, htmlIntegrationElements, reNameEnd, Parser$2, esm_exports$2, ElementType, Root, Text$3, Directive, Comment$3, Script, Style, Tag, CDATA$1, Doctype, Node$5, DataNode, Text$2, Comment$2, ProcessingInstruction, NodeWithChildren, CDATA, Document$2, Element$2, defaultOpts, DomHandler, xmlReplacer, xmlCodeMap, getCodePoint, escapeAttribute$1, escapeText, elementNames, attributeNames, unencodedElements, singleTag, foreignModeIntegrationPoints, foreignElements, Checks, DocumentPosition, MEDIA_KEYS_STRING, MEDIA_KEYS_INT, esm_exports$1, esm_exports, parseFeedDefaultOptions, BLOCK_ELEMENTS, SVG_NAMESPACE, assign, create$1, defineProperties, entries, getOwnPropertyDescriptors, keys, setPrototypeOf, $String, getEnd, ignoreCase, knownAdjacent, knownBoundaries, knownSegment, knownSiblings, localCase, setAdjacent, htmlToFragment, shadowRoots, reactive, Classes, customElements, attributeChangedCallback$1, createTrigger, triggerConnected, connectedCallback, triggerDisconnected, disconnectedCallback, CustomElementRegistry, Parser$1, append, attribute, parseFromString, htmlClasses, registerHTMLClass, loopSegment, attrAsJSON, characterDataAsJSON, nonElementAsJSON, documentTypeAsJSON, elementAsJSON, createRecord, queueAttribute, attributeChangedCallback, moCallback, MutationObserverClass, emptyAttributes, setAttribute, removeAttribute, booleanAttribute, numericAttribute, stringAttribute, wm, DOMEventTarget, NodeList, getParentNodeCount, Node$4, replace, ca, esca, pe, escape$1, QUOTE, Attr$1, isConnected, parentElement, previousSibling, nextSibling, nextElementSibling, previousElementSibling, asFragment, before, after, replaceWith, remove, CharacterData$1, CDATASection$1, Comment$1, require_boolbase, require_types, require_parse$1, require_stringify, require_commonjs, import_boolbase, import_commonjs, procedure, attributes, reChars, caseInsensitiveAttributes, attributeRules, whitespace, ZERO, NINE, filters, pseudos, aliases, PLACEHOLDER_ELEMENT, is$1, subselects, DESCENDANT_TOKEN, FLEXIBLE_DESCENDANT_TOKEN, SCOPE_TOKEN, defaultEquals, defaultOptions$1, compile, isArray, isTag, existsOne, getAttributeValue, getChildren, getName, getParent, getSiblings, getText, hasAttrib, removeSubsets, findAll, findOne, adapter, prepareMatch, matches$1, Text$1, isNode, insert, ParentNode, NonElementParentNode, DocumentFragment$1, DocumentType$1, getInnerHtml, setInnerHtml, esm_default, refs$1, key, prop, handler$2, DOMStringMap, add2, addTokens, update, DOMTokenList, refs, getKeys, updateKeys, handler$1, CSSStyleDeclaration, prototype, BUBBLING_PHASE, AT_TARGET, CAPTURING_PHASE, NONE, GlobalEvent, NamedNodeMap, ShadowRoot$1, attributesHandler, create, isVoid, Element$1, classNames, handler, SVGElement$1, illegalConstructor, Facades, Level0, level0, HTMLElement, tagName$17, HTMLTemplateElement, HTMLHtmlElement, toString3, TextElement, tagName$16, HTMLScriptElement, HTMLFrameElement, tagName$15, HTMLIFrameElement, HTMLObjectElement, HTMLHeadElement, HTMLBodyElement, require_StyleSheet, require_CSSRule, require_CSSStyleRule, require_CSSStyleSheet, require_MediaList, require_CSSImportRule, require_CSSGroupingRule, require_CSSConditionRule, require_CSSMediaRule, require_CSSSupportsRule, require_CSSFontFaceRule, require_CSSHostRule, require_CSSKeyframeRule, require_CSSKeyframesRule, require_CSSValue, require_CSSValueExpression, require_MatcherList, require_CSSDocumentRule, require_parse, require_CSSStyleDeclaration, require_clone$1, import_lib, tagName$14, HTMLStyleElement, HTMLTimeElement, HTMLFieldSetElement, HTMLEmbedElement, HTMLHRElement, HTMLProgressElement, HTMLParagraphElement, HTMLTableElement, HTMLFrameSetElement, HTMLLIElement, HTMLBaseElement, HTMLDataListElement, tagName$13, HTMLInputElement, HTMLParamElement, HTMLMediaElement, HTMLAudioElement, tagName$12, HTMLHeadingElement, HTMLDirectoryElement, HTMLQuoteElement, require_canvas_shim, createCanvas, tagName$11, HTMLCanvasElement, HTMLLegendElement, tagName$10, HTMLOptionElement, HTMLSpanElement, HTMLMeterElement, HTMLVideoElement, HTMLTableCellElement, tagName$9, HTMLTitleElement, HTMLOutputElement, HTMLTableRowElement, HTMLDataElement, HTMLMenuElement, tagName$8, HTMLSelectElement, HTMLBRElement, tagName$7, HTMLButtonElement, HTMLMapElement, HTMLOptGroupElement, HTMLDListElement, tagName$6, HTMLTextAreaElement, HTMLFontElement, HTMLDivElement, tagName$5, HTMLLinkElement, tagName$4, HTMLSlotElement, HTMLFormElement, tagName$3, HTMLImageElement, HTMLPreElement, HTMLUListElement, tagName$2, HTMLMetaElement, HTMLPictureElement, HTMLAreaElement, HTMLOListElement, HTMLTableCaptionElement, tagName$1, HTMLAnchorElement, HTMLLabelElement, HTMLUnknownElement, HTMLModElement, HTMLDetailsElement, tagName, HTMLSourceElement, HTMLTrackElement, HTMLMarqueeElement, HTMLClasses, voidElements, Mime, CustomEvent, InputEvent, ImageClass, deleteContents, Range, isOK, TreeWalker, query, globalExports, window$1, Document$1, createHTMLElement, HTMLDocument, SVGDocument, XMLDocument, DOMParser, parse$3, parseHTML$2, parseHTML$1, DEFAULT_USER_AGENT$1, DEFAULT_MAX_BYTES$1, MAX_REDIRECT_HOPS$1, REDIRECT_STATUSES$1, PRIVATE_ADDRESS_BLOCKLIST$1, LocalFetchURLProvider$1, MoonshotFetchURLProvider$1, MoonshotWebSearchProvider$1, WIRE_PROTOCOL_VERSION$1, SESSION_LOG_REL$1, GLOBAL_LOG_REL$1, OAuthError, OAuthUnauthorizedError, OAuthConnectionError, DeviceCodeTimeoutError, RetryableRefreshError, FileTokenStorage, DIRECT_ERROR_KEYS, NESTED_ERROR_KEYS, RETRYABLE_STATUSES, DEFAULT_HTTP_TIMEOUT_MS, require_polyfills, require_legacy_streams, require_clone, require_graceful_fs, require_retry_operation, require_retry$1, require_retry, require_signals, require_signal_exit, require_mtime_precision, require_lockfile, require_adapter, import_proper_lockfile, MIN_REFRESH_THRESHOLD_SECONDS, REFRESH_THRESHOLD_RATIO, DEFAULT_DEVICE_CODE_TIMEOUT_MS, defaultSleep, OAuthManager, KIMI_CODE_CUSTOM_HEADERS_ENV, KIMI_CODE_FLOW_CONFIG, DEFAULT_KIMI_CODE_BASE_URL, FIXED_POINT_CENTS, MANAGED_KIMI_MODEL_FIELDS, CUSTOM_REGISTRY_MODEL_FIELDS, KIMI_CODE_PLATFORM_ID, KIMI_CODE_PROVIDER_NAME$1, KIMI_CODE_OAUTH_KEY, KIMI_CODE_SCOPED_OAUTH_KEY_PREFIX, ManagedKimiCodeModelsAuthError, SHARED_DEFAULT_BASE_URLS, managedUserInfoPhoneSchema, managedUserInfoSchema, managedUserInfoOkSchema, managedUserInfoErrorSchema, OPEN_PLATFORMS, OpenPlatformApiError, CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT, CUSTOM_REGISTRY_DEFAULT_CAPABILITIES, ALLOWED_PROVIDER_TYPES, CustomRegistryApiError, KimiOAuthToolkit, ProviderManager, SessionAPIImpl, WORKSPACE_REGISTRY_FILE, WORKSPACE_REGISTRY_VERSION, KaosError, KaosFileExistsError, KaosShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS$1, MINGW_PREFIX_SET$1, detectedEnvironment, BufferedReadable$1, LOGIN_SHELL_ENV_TIMEOUT_MS$1, appliedLoginShellPath$1, isWindows$2, READ_CHUNK_SIZE$1, LocalProcess, LocalKaos, KIMI_CODE_PROVIDER_NAME, KIMI_CODE_BASE_URL_ENV$1, KIMI_CODE_OAUTH_HOST_ENV$1, KIMI_OAUTH_HOST_ENV$1, WEB_SEARCH_BASE_URL_ENV$1, WEB_SEARCH_API_KEY_ENV$1, WEB_FETCH_BASE_URL_ENV$1, WEB_FETCH_API_KEY_ENV$1, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS$1, KimiCore, _util$1, IInstantiationService$1, SyncDescriptor$1, disposableTracker$1, FunctionDisposable$1, DisposableStore$1, Disposable$1, ReferenceCollection, DisposableMap, _registry, Emitter$1, Event$2, BridgeClientAPI, ICoreProcessService, ServicesManagedAuthFacade, IApprovalService, IEnvironmentService, IEventService$1, ILogService$1, IQuestionService, WorkspaceNotFoundError, WorkspaceRootNotFoundError, IWorkspaceRegistry, _CoreProcessService, CoreProcessService, EventService$1, DEFAULT_MAX_UPLOAD_BYTES, FileNotFoundError, FileTooLargeError, IFileStore, FileStore, FsPathNotFoundError, FsIsDirectoryError, FsIsBinaryError, FsTooLargeError, FsTooManyResultsError, FsAlreadyExistsError, IFsService, import_ignore, ISessionService, SessionUndoUnavailableError, SessionNotFoundError, FsPathEscapesError, FS_READ_MAX_BYTES$1, FS_BINARY_SAMPLE_BYTES$1, FS_BINARY_NONPRINTABLE_FRACTION$1, HIDDEN_NAME_RE$1, MACOS_NOISE$1, FsService, EXT_TO_MIME$2, EXT_TO_LANGUAGE$1, FsGrepTimeoutError, IFsSearchService, SEARCH_HARD_CAP$1, GREP_TIMEOUT_MS$1, WALK_MAX_DEPTH$1, FsSearchService, FsGitUnavailableError, IFsGitService, DIFF_MAX_BYTES$1, PR_SPAWN_TIMEOUT_MS$1, PULL_REQUEST_TTL_MS$1, FsGitService, FsWatchLimitError, EntryTypes, defaultOptions, RECURSIVE_ERROR_CODE, NORMAL_FLOW_ERRORS, ALL_TYPES, DIR_TYPES, FILE_TYPES, isNormalFlowError, wantBigintFsStats, emptyFn, normalizeFilter, ReaddirpStream, STR_DATA, STR_CLOSE, EMPTY_FN, pl, isWindows$1, isMacos, isLinux, isFreeBSD, isIBMi, EVENTS, EV, THROTTLE_MODE_WATCH, statMethods, KEY_LISTENERS, KEY_ERR, KEY_RAW, HANDLER_KEYS, binaryExtensions, isBinaryPath, foreach, addAndConvert, clearItem, delFromSet, isEmptySet, FsWatchInstances, fsWatchBroadcast, setFsWatchListener, FsWatchFileInstances, setFsWatchFileListener, NodeFsHandler, SLASH, SLASH_SLASH, ONE_DOT, TWO_DOTS, STRING_TYPE, BACK_SLASH_RE, DOUBLE_SLASH_RE, DOT_RE, REPLACER_RE, isMatcherObject, unifyPaths, toUnix, normalizePathToUnix, normalizeIgnored, getAbsolutePath, EMPTY_SET, DirEntry, STAT_METHOD_F, STAT_METHOD_L, WatchHelper, FSWatcher, DEFAULT_DEBOUNCE_MS$1, DEFAULT_MAX_CHANGES_PER_WINDOW$1, DEFAULT_MAX_PATHS_PER_CONNECTION, PathReferenceCollection, SessionEntry, FsWatcherService, WorkspaceRegistryService, WorkspaceFsNotAbsoluteError, WorkspaceFsNotFoundError, WorkspaceFsPermissionError, IWorkspaceFsService$1, WorkspaceFsService$1, IAuthSummaryService$1, AuthProvisioningRequiredError$1, AuthTokenMissingError$1, AuthModelNotResolvedError$1, MANAGED_PROVIDER_NAME$1, AuthSummaryService$1, IOAuthService$1, _OAuthService, FlowState, TERMINAL_RETENTION_MS$1, OAuthService$1, IModelCatalogService, ProviderNotFoundError, ModelNotFoundError, _ModelCatalogService, ModelCatalogService, noopEventService, IConfigService$1, ConfigService$1, IMessageService, MessageNotFoundError, IPromptService, PromptNotFoundError, PromptAlreadyCompletedError, DEFAULT_PAGE_SIZE$1, MAX_PAGE_SIZE$1, DEFAULT_UNDO_MESSAGE_PAGE_SIZE, MAX_UNDO_MESSAGE_PAGE_SIZE, CHILD_SESSION_KIND$1, SessionService, BLOBREF_PROTOCOL$1, MISSING_MEDIA_PLACEHOLDER$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$1, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAIN_AGENT_ID$10, TRANSCRIPT_CACHE_LIMIT, MessageService, MAIN_AGENT_ID$9, DISPATCH_LOG_CAP, PromptService, IToolService, MAIN_AGENT_ID$8, ToolService, IMcpService, McpServerNotFoundError, McpService, ISkillService, SkillNotFoundError, SkillNotActivatableError, MAIN_AGENT_ID$7, SkillService, TERMINAL_WIRE_STATUSES, ITaskService$1, TaskNotFoundError, TaskAlreadyFinishedError, MAIN_AGENT_ID$6, DEFAULT_TASK_OUTPUT_PREVIEW_BYTES, TaskService$1, ITerminalService, TerminalNotFoundError, DEFAULT_COLS$1, DEFAULT_ROWS$1, DEFAULT_MAX_BUFFERED_FRAMES$1, TerminalService, NodePtyTerminalBackend, MAIN_AGENT_ID$5, Session, KimiHarness, DEFAULT_SESSION_STARTED_UI_MODE, KimiAuthFacade, MAIN_AGENT_ID$4, SDKRpcClientBase, ClientAPI, SDKRpcClient, MAX_WORKDIR_SLUG_LENGTH, WORKDIR_KEY_PREFIX, HASH_LENGTH, WIN_SHAPED, _util, SERVICE_IDENTIFIER_MARK, IInstantiationService, IConfigRegistry, IConfigService, defaultHandler, currentHandler, LedgerDisposedError, Ledger, disposableTracker, FunctionDisposable, DisposableStore, Disposable, MutableDisposable, Node$1, LinkedList, EventSubscription, Emitter, AsyncEmitter, Event$1, _collectionTokens, _collectionTokenSet, CollectionStore, CollectionViewImpl, ConfigSectionContribution, _contributions, StringRecordSchema$2, McpTimeoutMsSchema, McpServerCommonFields, McpServerStdioConfigSchema, McpServerHttpConfigSchema, McpServerSseConfigSchema, McpServerConfigDiscriminatedSchema, McpServerConfigSchema, McpSectionSchema, MCP_STARTUP_TIMEOUT_ENV, MCP_TOOL_TIMEOUT_ENV, mcpEnvBindings, DEFAULT_IDENTITY_SLUG, IAgentIdentity, registeredCodes, retryableCodes, infoOverrides, CoreErrors, AgentLifecycleErrors, AuthErrors, TaskErrors, BugIndicatingError, Error2, CONFIG_INVALID_ERROR_CODE, PROVIDER_API_ERROR_CODE, PROVIDER_FILTERED_ERROR_CODE, PROVIDER_RATE_LIMIT_ERROR_CODE, PROVIDER_AUTH_ERROR_CODE, PROVIDER_CONNECTION_ERROR_CODE, PROVIDER_OVERLOADED_ERROR_CODE, CONTEXT_OVERFLOW_ERROR_CODE, ChatProviderError, APIConnectionError, VideoUploadUnsupportedError, APITimeoutError, APIStatusError, APIContextOverflowError, APIRequestTooLargeError, APIProviderRateLimitError, APIProviderQuotaExhaustedError, APIProviderOverloadedError, APIEmptyResponseError, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS, MEDIA_TYPE_FIELD_PATTERN, NETWORK_RE$1, TIMEOUT_RE$1, CONTEXT_OVERFLOW_MESSAGE_PATTERNS, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS, PROVIDER_OVERLOAD_MESSAGE_PATTERNS, REQUEST_TOO_LARGE_MESSAGE_PATTERNS, THINKING_EFFORT_CONFIG_DOCS_URL, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS, STRUCTURAL_REQUEST_MESSAGE_PATTERNS, ProtocolErrors, ConfigErrors, CapabilityErrors, CronErrors, DebugErrors, ISO_8601_REGEX, isoDateTimeSchema, IFileService, FileErrors, FileError, FsErrors, FullCompactionErrors, GoalErrors, LoopErrors, McpErrors, ModelCatalogErrors, OsFsErrors, HostFsError, REASONS$1, IHostProcessService, OsProcessErrors, HostProcessErrorCode, HostProcessError, PluginErrors, ProfileErrors, PromptErrors, ModelsDevImportErrors, SessionExportErrors, SessionErrors, SkillErrors, StorageErrors, StorageError, REASONS, IFileSystemStorageService, TerminalErrors, UsageErrors, WebErrors, WireErrors, WireError, WorkspaceErrors, MAX_CAUSE_DEPTH, toKimiErrorPayload$1, ErrorCodes$1, UserCancellationError, KIMI_MCP_CLIENT_VERSION, MCP_LIVENESS_PROBE_TIMEOUT_MS, HttpMcpClient, SseMcpClient, LOOPBACK_NO_PROXY, SOCKS_SCHEMES, STDERR_BUFFER_CAPACITY, StdioMcpClient, BoundedTail, DEFAULT_STARTUP_TIMEOUT_MS, defaultLog, McpConnectionManager, SUCCESS_HTML, ERROR_HTML, TOKENS_SUFFIX, CLIENT_SUFFIX, DISCOVERY_SUFFIX, PASSIVE_REDIRECT_URI, McpOAuthClientProvider, McpOAuthService, AlreadyAuthorizedError, SyncDescriptor, PairIndex, DependencyGraph, CyclicDependencyError, CascadeConflictError, DEFAULT_ABORT_WAIT_MS, DEFAULT_RESOLVE_TIMEOUT_MS, DEFAULT_HISTORY_CAPACITY, CascadeTree, CascadeEngine, FiberProtocolError, ServiceRecipeError, _constructionStack, SERVICE_MARK, _eventResolver, FiberRuntime, BasicFiberHandle, PendingFiberHandle, _scopeUnitsTokens, Node, Graph, ServiceCollection, Trace, InstantiationService, _scopeTopology, _scopedRegistry, Scope, IAtomicDocumentStore, IAtomicTomlDocumentStore, IMcpOAuthStore, CREDENTIALS_SCOPE, McpOAuthStoreAdapter, ProtocolSchema, IProtocolAdapterRegistry, PROVIDERS_SECTION, DEFAULT_PROVIDER_SECTION, ENV_MODEL_PROVIDER_KEY, ProviderTypeSchema, OAuthRefSchema$1, ModelSourceSchema, StringRecordSchema$1, ProviderConfigSchema, ProvidersSectionSchema, providersEnvBindings, stripProvidersEnv, providersFromToml, providersToToml, MODELS_SECTION, DEFAULT_MODEL_SECTION, ModelBaseSchema, ModelOverrideSchema, ModelRecordSchema, ModelsSectionSchema, modelsFromToml, modelsToToml, THINKING_SECTION, ThinkingConfigSchema, thinkingEnvBindings, stripThinkingEnv, SECONDARY_MODEL_SECTION, SECONDARY_MODEL_ENV, SECONDARY_MODEL_EFFORT_ENV, SecondaryModelConfigSchema, secondaryModelEnvBindings, _overlays, SECONDARY_DERIVED_MODEL_ID, contributedFlags, IFlagRegistry, SECONDARY_MODEL_FLAG_ID, SUBAGENT_SECTION, SubagentConfigSchema, DEFAULT_SUBAGENT_TIMEOUT_MS, SUBAGENT_TIMEOUT_ENV, subagentEnvBindings, stripSubagentEnv, ADVERTISED_CAPABILITY_FLAGS, WATCH_DEBOUNCE_MS$5, FileStorageService, ILogService, LEVEL_ORDER, FrontmatterError, FENCE$1, SkillParseError, UnsupportedSkillTypeError, FENCE, METADATA_ALIASES, FileSkillDiscovery, ISkillDiscovery, IBootstrapOptions, IBootstrapService, McpJsonFileSchema, Service, ILogOptions, CTX_VALUE_MAX_CHARS, STACK_MAX_BYTES, ENTRY_MAX_BYTES, REDACTED_KEYS, SAFE_KEY_RE, ELLIPSIS, TRUNCATED_TAIL, REDACTED, RAW_SECRET_PATTERNS, LEVEL_LABEL, ANSI_LEVEL, ANSI_RESET, PENDING_MAX, STDERR_NOTICE_INTERVAL_MS, AsyncSerialQueue, RotatingFileWriter, FileLogWriter, BoundLogger, AppLogService, IWireService, BLOBREF_PROTOCOL, IAgentBlobService, IAgentScopeContext, IEventBus, OrderedHookSlot, AppendLogCorruptedError, IAppendLogStore, migrateV1_0ToV1_1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS, migrateV1_1ToV1_2, migrateV1_2ToV1_3, migrateV1_3ToV1_4, migrateV1_4ToV1_5, MIGRATIONS, AGENT_WIRE_RECORD_KEY, DuplicateOpError, OP_REGISTRY, MODEL_CROSS_REDUCERS, MODEL_REGISTRY, CHECKPOINTED_MODELS, WireModelContribution, MAX_DRAIN, CycleError, WireService, StateRegistry, ISessionContext, ISessionStateService, sessionLogRootLevelKey, SessionLogService, nullTelemetryAppender, ITelemetryService, TelemetryService, TelemetryContextView, IAgentTelemetryContextService, AgentTelemetryContextService, BootstrapService, IHostClock, IHostEnvironment, IHostFileSystem, IHostFsWatchService, relativeCwdSchema, terminalStatusSchema, IHostTerminalService, HostClockService, ProbeShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS, MINGW_PREFIX_SET, cachedProbe, LOGIN_SHELL_ENV_TIMEOUT_MS, appliedLoginShellPath, HostEnvironmentService, READ_CHUNK_SIZE, HostFileSystem, DEFAULT_IGNORED, NATIVE_RETRY_BASE_MS, NATIVE_RETRY_MAX_MS, NODE_HOST_FS_WATCH_RUNTIME, HostFsWatchHandle, SignalWatchHandle, HostFsWatchService, BufferedReadable, isWindows, HostProcess, HostProcessService, HostTerminalService, ToolAccesses, MCP_NAME_PREFIX$1, MAX_BACKGROUND_TIMEOUT_S, BashInputSchema, IBashTool, VALID_TASK_ID, TASKS_SCOPE, OUTPUT_LOG_KEY, JSON_SUFFIX$1, textEncoder$4, textDecoder$4, AgentTaskPersistence, IAgentTaskService, TRUE_BOOLEAN_ENV_VALUES, FALSE_BOOLEAN_ENV_VALUES, TASK_SECTION, LEGACY_BACKGROUND_SECTION, PrintBackgroundModeSchema, AgentTaskConfigSchema, KEEP_ALIVE_ON_EXIT_ENV, MAX_RUNNING_TASKS_ENV, taskEnvBindings, stripTaskEnv, ISessionProcessRunner, IAgentToolPolicyService, DEFAULT_MAX_CHARS, DEFAULT_MAX_LINE_LENGTH, TRUNCATION_MARKER, TRUNCATION_MESSAGE, ToolResultBuilder, AgentToolContribution, _agentToolContributions, SENSITIVE_BASENAMES, SENSITIVE_PATH_SUFFIXES, ENV_PREFIX, ENV_EXEMPTIONS, SENSITIVE_BASENAME_PREFIXES, PUBLIC_KEY_BASENAMES, SENSITIVE_DOT_VARIANT_SUFFIXES, SENSITIVE_DOT_VARIANT_SUFFIX_SET, DEFAULT_WORKSPACE_ACCESS_POLICY, PathSecurityError, DEFAULT_PATH_CLASS, GLOB_LITERAL_SPECIAL, PROMPT_VARIABLE, bash_default, STREAM_DRAIN_GRACE_MS, ProcessTask, MS_PER_SECOND, SHELL_TIMEOUT_VARS, BashTool, WINDOWS_NUL_REDIRECT, GlobInputSchema, WINDOWS_PATH_HINT, IGlobTool, RG_VERSION, RG_BASE_URL, DOWNLOAD_TIMEOUT_MS, RG_ARCHIVE_SHA256, downloadPromise, DEFAULT_TIMEOUT_MS$1, MAX_OUTPUT_BYTES$1, ISessionSkillCatalog, ISessionWorkspaceContext, glob_default, VCS_DIRECTORIES_TO_EXCLUDE$1, SENSITIVE_GLOBS_TO_EXCLUDE$1, GlobTool, GrepInputSchema, IGrepTool, grep_default, RG_MAX_COLUMNS, DEFAULT_HEAD_LIMIT, MTIME_STAT_CONCURRENCY, VCS_DIRECTORIES_TO_EXCLUDE, SENSITIVE_GLOBS_TO_EXCLUDE, CONTENT_LINE_RE, GrepTool, GrepAbortedError, MAX_LINES, MAX_LINE_LENGTH, MAX_BYTES, TRANSCODE_MAX_BYTES, PositiveLineOffsetSchema, TailLineOffsetSchema, ReadInputSchema, IReadTool, IMAGE_MIME_BY_SUFFIX, VIDEO_MIME_BY_SUFFIX, TEXT_MIME_BY_SUFFIX, NON_TEXT_SUFFIXES, ASF_HEADER, FTYP_IMAGE_BRANDS, FTYP_VIDEO_BRANDS, MIN_ZERO_BYTES_FOR_UTF16, UTF16BE_BOM, UTF16LE_BOM, UTF8_BOM, read_default, READ_DESCRIPTION, ReadTool, WriteInputSchema, IWriteTool, write_default, WriteTool, DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_BUFFERED_FRAMES, ISessionTerminalService, SessionTerminalService, TERMINAL_TASK_STATES, TaskCancelledError, ITaskService, RunHandle, DeferHandle, TaskService2, EventBusService, IEventService, EventService, IAppStateService, AppStateService, IWorkspaceStateService, WorkspaceStateService, SessionStateService, IAgentStateService, AgentStateService, UNKNOWN_CAPABILITY, PARENT_SESSION_ID_KEY, CHILD_SESSION_KIND_KEY, CHILD_SESSION_KIND, ISessionIndex, ISessionIndexMirror, MAX_TIMER_DELAY_MS$1, IntervalTimer, TimeoutTimer, EXPERIMENTAL_SECTION, ExperimentalConfigSchema, experimentalFromToml, experimentalToToml, IFlagService, IQueryStore, SESSION_INDEX_MANIFEST, PARENT_INDEX_NAME, META_SCOPE, META_KEY$1, WRITE_CHUNK, SCAN_CONCURRENCY, SHARED_SCAN_REUSE_MS, SessionIndexProjector, READ_MODEL_FLAG$1, RECONCILE_INTERVAL_MS, DEGRADED_RETRY_MS, TIE_REPAIR_LIMIT, UNBOUNDED, FileSessionIndex, READ_MODEL_FLAG, FLUSH_INTERVAL_MS, FLUSH_BATCH_SIZE, MAX_PENDING, MAX_CONSECUTIVE_FAILURES, pendingDrains, SessionIndexMirror, ISessionMetadata, META_KEY, pendingWrites, sessionMetadataDataKey, SessionMetadata, ISessionActivityView, IAgentActivityView, MAIN_AGENT_ID$3, IAgentLifecycleService, ISessionInteractionService, sessionActivityFoldsKey, sessionActivityCurrentKey, SessionActivityView, ISessionOutcomeMirror, SessionOutcomeMirror, ISessionToolPolicy, sessionToolPolicyStateKey, STATE_KEY, SessionToolPolicyService, MIGRATIONS_FILE, THINKING_EFFORT_MAX_TO_HIGH, CONFIG_SCOPE$1, CONFIG_SCOPE, ConfigRegistry, ConfigService2, IProviderService, NO_ABORT$1, ProviderService, providerDefinitions, protocolBases, CONFIG_DEFAULT_HEADERS_TRAIT, ProtocolAdapterRegistry, BUILTIN_PRODUCT_SKILLS_SECTION, BuiltinProductSkillsConfigSchema, builtinProductSkillsEnvBindings, stripBuiltinProductSkillsEnv, IDENTITY_SECTION, IdentityConfigSchema, IDENTITY_NAME_ENV, IDENTITY_SLUG_ENV, identityEnvBindings, AgentIdentityService, ENV_MODEL_ALIAS_KEY, DEFAULT_MAX_CONTEXT_SIZE, DEFAULT_CAPABILITIES, kimiModelEnvOverlay, MIN_FLOOR, DEFAULT_UNKNOWN_CONTEXT_FALLBACK, IHostRequestHeaders, IModelService, NO_ABORT, ModelService, KEEP_OFF_VALUES, BUDGET_THINKING_EFFORTS, ADAPTIVE_MAX_EFFORTS, LATEST_OPUS_THINKING_EFFORTS, BUDGET_PROFILE, OPUS_45_PROFILE, ADAPTIVE_MAX_PROFILE, LATEST_OPUS_PROFILE, ALWAYS_ADAPTIVE_PROFILE, ALWAYS_ADAPTIVE_MAX_PROFILE, FAMILY_FIRST_RE, VERSION_FIRST_RE, BARE_FAMILY_RE, CLAUDE_FAMILY_WORD_RE, StaticAuthProvider, modelCatalogItemSchema$1, providerCatalogStatusSchema$1, IModelCatalog, TRACE, ResolutionTraceCollector, SECRET_KEY_RE, PROVIDER_OPTION_FIELD, CAPABILITY_KEYS, IModelOAuthTokens, AsyncEventQueue, ModelRequesterImpl, ModelCatalog, IKosongConfigService, BASE_DELAY_MS, MAX_DELAY_MS, RETRY_FACTOR, JITTER_FACTOR, PERSIST_MAX_ATTEMPTS, KosongConfigService, IOAuthService, IOAuthToolkit, IAuthSummaryService, AuthProvisioningRequiredError, AuthTokenMissingError, AuthModelNotResolvedError, ModelOAuthTokenAdapter, HostRequestHeadersAdapter, providerRefreshChangeSchema, providerRefreshFailureSchema, IProviderDiscoveryService, EMPTY_EXCLUSION, ProviderDiscoveryService, PROVIDER_ID_PATTERN, IModelsDevImportService, KNOWN_WIRE_TYPES, BUILT_IN_MODELS_DEV_JSON, MODELS_DEV_URL, CACHE_TTL_MS, UPSTREAM_FETCH_TIMEOUT_MS, cache, inFlight, builtInMemo, fetchImpl, nowImpl, codes, ModelsDevImportService, EMPTY_TOOL_CALL_ID, TOOL_CALL_ID_SAFE_CHARS, INTERLEAVED_THINKING_BETA$1, CONTEXT_MANAGEMENT_BETA, CLEAR_THINKING_EDIT, ANTHROPIC_TOOL_CALL_ID_POLICY, CEILING_BY_FAMILY_VERSION, FALLBACK_MAX_TOKENS, CACHE_CONTROL, CACHEABLE_TYPES, OMITTED_MEDIA_PLACEHOLDER, SUPPORTED_B64_MEDIA_TYPES, SUPPORTED_B64_VIDEO_TYPES, AnthropicStreamedMessage, AnthropicChatProvider, CLAUDE_VISION_TOOL_PREFIXES, CLAUDE_THINKING_VISION_TOOL_PREFIXES, ANTHROPIC_VISION_TOOL_CAPABILITY, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY, GoogleGenAIStreamedMessage, NETWORK_RE, TIMEOUT_RE, GoogleGenAIChatProvider, GEMINI_CATALOGUED_PREFIXES, GEMINI_MULTIMODAL_TOOL_CAPABILITY, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY, TOOL_RESULT_MEDIA_PROMPT, TOOL_RESULT_MEDIA_PLACEHOLDER, OPENAI_REASONING_CAPABILITY, OPENAI_VISION_TOOL_CAPABILITY, OPENAI_TEXT_TOOL_CAPABILITY, OPENAI_VISION_TOOL_PREFIXES, KNOWN_REASONING_KEYS, DEFAULT_REASONING_KEY, ReasoningKeyDialect, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING, OPENAI_CHAT_TOOL_CALL_ID_POLICY, OMITTED_AUDIO_PLACEHOLDER$1, OMITTED_VIDEO_PLACEHOLDER$1, OpenAILegacyStreamedMessage, OpenAILegacyChatProvider, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY, EMBEDDED_STATUS_CODE_RE, OMITTED_AUDIO_PLACEHOLDER, OMITTED_VIDEO_PLACEHOLDER, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS, OpenAIResponsesStreamedMessage, OpenAIResponsesChatProvider, KIMI_QUOTA_EXHAUSTED_ERROR_CODES, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS, KimiFiles, MIME_TO_EXT, EXT_TO_MIME$1, TYPE_COMPLETION_SKIP_KEYS, CHILD_SCHEMA_SLOTS, OBJECT_STRUCTURE_KEYS, ARRAY_STRUCTURE_KEYS, STRING_STRUCTURE_KEYS, NUMERIC_STRUCTURE_KEYS, KIMI_API_KEY_ENV, KIMI_BASE_URL_ENV, KIMI_DEFAULT_BASE_URL, INTERLEAVED_THINKING_BETA, filesByContext, kimiOpenAITrait, kimiAnthropicTrait, kimiEndpoint, DEFAULT_AGENT_PROFILE_NAME, AgentProfileContribution, AGENT_PROFILE_SOURCE_PRIORITY, IAgentProfileRegistry, AgentProfileRegistryService, BUILTIN_AGENT_PROFILE_SOURCE_ID, IBuiltinAgentProfileLoader, _profileContributions, BuiltinAgentProfileLoaderService, BuiltinAgentProfileContributionUnit, system_default, TASK_AGENT_ROLE_PREFIX, WINDOWS_NOTES, ADDITIONAL_DIRS_SECTION_PROSE, SKILLS_SECTION_PROSE, PLUGIN_SECTIONS_PROSE, AgentFileParseError, AGENT_NAME_PATTERN, IUserAgentProfileLoader, LOCAL_OS_BACKEND_ID, LOCAL_PERSISTENCE_BACKEND_ID, IWorkspaceContext, MAX_AGENT_SCAN_DEPTH, MAX_SKIP_WARNINGS, AgentProfileLoaderBase, USER_BRAND_DIRS$1, USER_GENERIC_DIRS$1, PROJECT_BRAND_DIRS$1, PROJECT_GENERIC_DIRS$1, SYSTEM_MD_FILENAME, UserAgentProfileLoaderService, PLUGIN_NAME_REGEX, HOOK_EVENT_TYPES, HOOKS_SECTION, HookDefSchema, HooksConfigSchema, hooksFromToml, hooksToToml, KIMI_PLUGIN_ROOT_PATH, KIMI_PLUGIN_DIR_PATH, PLUGIN_SYSTEM_PROMPT_MAX_BYTES, UNSUPPORTED_RUNTIME_FIELDS, INSTALLED_REL, EMPTY$1, SHA_RE, PluginManager, KIMI_NODE_FALLBACK_SUBCOMMAND, IPluginService, KIMI_CODE_BASE_URL_ENV, KIMI_CODE_OAUTH_HOST_ENV, KIMI_OAUTH_HOST_ENV, PluginService, ICapabilityService, DOWNLOAD_IDLE_TIMEOUT_MS, MAC_PLUGIN, WINDOWS_PLUGIN, APP_ZIP_URL, WINDOWS_SETUP_URL, APP_BUNDLE, LAUNCHD_LABEL, COMMAND_TIMEOUT_MS, PERMISSIONS_TIMEOUT_MS, DETECT_PROBE_TIMEOUT_MS, WINDOWS_INSTALLER_PROBE_TIMEOUT_MS, WINDOWS_INSTALL_TIMEOUT_MS, DEFAULT_WINDOWS_SYSTEM_ROOT, DEFAULT_WINDOWS_PROGRAM_FILES, WINDOWS_INSTALLER_PROBE_SCRIPT, WINDOWS_DOCTOR_SCRIPT, PLUGIN_ID, PLUGIN_ZIP_URL, BINARY_CDN_BASE, DEFAULT_DAEMON_BASE_URL, STATUS_TIMEOUT_MS, START_TIMEOUT_MS, START_POLL_INTERVAL_MS, START_POLL_ATTEMPTS, IDLE_PROGRESS, CapabilityService, IFeatureManager, FeatureManagerService, CommandContribution, Feature, IFeatureAssemblyService, _featureRecipes, FeatureAssemblyService, IAgentCommandService, AgentCommandService, IDebugLedgerService, IDebugGraphService, DI_UNIT_CHANGED_EVENT, IDebugCascadeService, DebugLedgerService, DebugGraphService, DebugCascadeService, IPluginAgentProfileLoader, PluginAgentProfileLoaderService, NestedSkillTooDeepError, SkillToolInputSchema, ISkillTool, IAgentSkillService, skill_default, _SkillTool, SkillTool, IAgentPromptService, skillActivate, AgentSkillService, LISTING_DESC_MAX, InMemorySkillCatalog, SOURCE_GROUPS, graphemeSegmenter, InMemorySkillDiscovery, SKILL_SOURCE_PRIORITY, PLUGIN_SKILL_SOURCE_ID, BUILTIN_SKILL_SOURCE_ID, USER_BRAND_DIRS, USER_GENERIC_DIRS, PROJECT_BRAND_DIRS, PROJECT_GENERIC_DIRS, check_kimi_code_docs_default, PSEUDO_PATH$5, parsed$5, CHECK_KIMI_CODE_DOCS_SKILL, custom_theme_default, PSEUDO_PATH$4, parsed$4, CUSTOM_THEME_SKILL, import_from_cc_codex_default, PSEUDO_PATH$3, parsed$3, IMPORT_FROM_CC_CODEX_SKILL, mcp_config_default, PSEUDO_PATH$2, parsed$2, MCP_CONFIG_SKILL, SKILL_default$2, SKILL_default$1, SKILL_default, SUB_SKILL_PARENT, SUB_SKILL_REVIEW, SUB_SKILL_CONSOLIDATE, update_config_default, PSEUDO_PATH$1, parsed$1, UPDATE_CONFIG_SKILL, write_goal_default, PSEUDO_PATH, parsed, BUILTIN_SKILLS, IBuiltinSkillSource, BuiltinSkillSource, IUserFileSkillSource, UserFileSkillSource, ISessionSkillCatalogData, skillCatalogContributionsKey, skillCatalogMergedKey, SessionSkillCatalogService, ISessionAgentProfileCatalog, ISessionAgentProfileCatalogSeed, SessionAgentProfileCatalogService, ISessionInstructionsProvider, ISessionWorkspaceInfo, IWorkspaceDirs, IProjectLocalConfigService, WATCH_DEBOUNCE_MS$4, workspaceDirsFileDirsKey, workspaceDirsEphemeralDirsKey, WorkspaceDirsService, IWorkspaceSkillCatalog, IExplicitFileSkillSource, ExplicitFileSkillSource, IExtraFileSkillSource, ExtraFileSkillSource, IPluginSkillSource, PluginSkillSource, WORKSPACE_ROOT_SKILL_SOURCE_ID, WATCH_DEBOUNCE_MS$3, IWorkspaceRootSkillSource, WorkspaceRootSkillSource, workspaceSkillCatalogContributionsKey, workspaceSkillCatalogMergedKey, WorkspaceSkillCatalogService, IWorkspaceAgentProfileLoader, WATCH_DEBOUNCE_MS$2, WorkspaceAgentProfileLoaderService, IExtraAgentProfileLoader, ExtraAgentProfileLoaderService, IExplicitAgentProfileLoader, ExplicitAgentProfileLoaderService, IWorkspaceInstructionsService, AGENTS_MD_RECOMMENDED_MAX_BYTES, AGENTS_MD_PLAIN_NAMES, WATCH_DEBOUNCE_MS$1, workspaceInstructionsCurrentKey, WorkspaceInstructionsService, IAgentPermissionGate, IAgentPermissionModeService, IAgentPermissionPolicyService, IAgentPermissionRulesService, IAgentToolApprovalService, IAgentToolExecutorService, AgentPermissionGate, BeforeToolExecuteEventImpl, BeforeToolExecuteEmitter, ISessionApprovalService, AgentToolApprovalService, FlagRegistryService, FlagService, LoopError, IAgentLoopService, TurnModel, turnInputShape, promptTurn, steerTurn, cancelTurn, endTurn, IAgentFullCompactionService, USER_PROMPT_ORIGIN, FULL_COMPACTION_BACKGROUND_ID, activityViewLifecycleKey, activityViewTurnKey, activityViewLastTurnKey, activityViewBackgroundKey, activityViewCurrentKey, AgentActivityView, MutableTurn, SIDE_QUESTION_SYSTEM_REMINDER, ISessionBtwService, IAgentSystemReminderService, SessionBtwService, BtwFeature, PLAN_TOOLS, PLAN_ROLE, EnterPlanModeInputSchema, IEnterPlanModeTool, IAgentPlanService, enter_plan_mode_default, EnterPlanModeTool, RESERVED_OPTION_LABELS, ExitPlanModeOptionSchema, ExitPlanModeInputSchema, IExitPlanModeTool, exit_plan_mode_default, ExitPlanModeTool, PlanModel, planModeEnter, planModeCancel, planModeExit, planRevision, HERO_NAMES, MAX_ATTEMPTS, IAgentContextMemoryService, IAgentContextInjectorService, plan_mode_exit_reminder_default, plan_mode_full_reminder_default, plan_mode_inline_full_reminder_default, plan_mode_inline_reentry_reminder_default, plan_mode_inline_sparse_reminder_default, plan_mode_reentry_reminder_default, plan_mode_sparse_reminder_default, PLAN_MODE_DEDUP_MIN_TURNS, PLAN_MODE_FULL_REFRESH_TURNS, PLAN_MODE_INJECTION_VARIANT, planWasActiveKey, PlanModeInjection, IBlobStore, ExitPlanModeReview, AgentPlanService, PlanFeature, IDebugEventsService, DebugEventsService, DebugEventsFeature, CreateGoalToolInputSchema, ICreateGoalTool, IAgentGoalService, create_goal_default, CreateGoalTool, GetGoalToolInputSchema, IGetGoalTool, get_goal_default, GetGoalTool, SetGoalBudgetToolInputSchema, ISetGoalBudgetTool, set_goal_budget_default, MIN_REASONABLE_TIME_BUDGET_MS, MAX_REASONABLE_TIME_BUDGET_MS, SetGoalBudgetTool, UpdateGoalToolInputSchema, IUpdateGoalTool, update_goal_default, UpdateGoalTool, IGoalDeadlineScheduler, GoalDeadlineSchedulerService, goal_active_reminder_default, goal_blocked_reminder_default, goal_paused_reminder_default, GoalInjection, BUDGET_GUIDANCE_NEARING, BUDGET_GUIDANCE_WITHIN, LOOP_CONTROL_SECTION, LOOP_MAX_STEPS_PER_TURN_ENV, LOOP_MAX_ATTEMPTS_PER_STEP_ENV, LOOP_MAX_RETRIES_PER_STEP_ENV, LoopControlSchema, loopControlEnvBindings, stripLoopControlEnv, loopControlToToml, StepRequest, MessageStepRequest, ContinuationStepRequest, IAgentUsageService, GoalModel, GoalStatusSchema, GoalActorSchema, GoalBudgetLimitsSchema, createGoal, updateGoal, clearGoal, MAX_GOAL_OBJECTIVE_LENGTH, MAX_GOAL_COMPLETION_CRITERION_LENGTH, GOAL_CANCELLED_REMINDER, GOAL_FORK_CLEARED_REMINDER, GOAL_FORK_CLEARED_REMINDER_NAME, GOAL_CONTINUATION_ORIGIN, GOAL_RATE_LIMIT_PAUSE_REASON, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX, GOAL_PROVIDER_AUTH_PAUSE_PREFIX, GOAL_PROVIDER_API_PAUSE_PREFIX, GOAL_MODEL_CONFIG_PAUSE_PREFIX, GOAL_RUNTIME_PAUSE_PREFIX, GOAL_CONTINUATION_FAILURE_PAUSE_PREFIX, GOAL_PROVIDER_FILTERED_PAUSE_REASON, GOAL_BUDGET_BLOCK_PREFIX, LLM_NOT_SET_MESSAGE, GOAL_BUDGET_STOP_REMINDER_NAME, GOAL_BUDGET_STOP_REMINDER, GOAL_BUDGET_TOOLS_REJECTED_MESSAGE, GOAL_STALE_TOOL_RESULT, GOAL_CONTINUATION_PROMPT, GOAL_STEP_CAP_CONTINUATION_PROMPT, GoalForkNoticeModel, goalLiveTurnIdKey, goalGoalDrivenTurnsKey, goalCountedGoalTurnsKey, goalGoalStarterTurnsKey, goalGoalOutcomeToolResultTurnsKey, goalGoalOutcomeContinuationTurnsKey, goalBudgetGraceTurnsKey, goalPendingContinuationGoalsKey, goalGoalTurnTargetsKey, goalExhaustedTurnBudgetGoalsKey, goalLiveWallClockStartedAtKey, goalResumeContinuationKey, AgentGoalService, PROMPT_TEMPLATE_PLACEHOLDER, AgentSwarmToolInputSchema, IAgentSwarmTool, ISessionSwarmService, ProfileError, IAgentProfileService, IAgentSwarmService, agent_swarm_default, DEFAULT_SUBAGENT_TYPE, AGENT_SWARM_PARAMETERS, AGENT_SWARM_PARAMETERS_NO_MODEL, AgentSwarmTool, enter_reminder_default, exit_reminder_default, SwarmModel, swarmEnter, swarmExit, AgentSwarmService, UsageModel, recordUsage, usageCurrentTurnIdKey, usageCurrentTurnKey, AgentUsageService, IAgentToolDedupeService, REMINDER_TEXT_1, REMINDER_TEXT_3, REPEAT_REMINDER_1_START, REPEAT_REMINDER_2_START, REPEAT_REMINDER_3_START, REPEAT_FORCE_STOP_STREAK, DEDUPE_PLACEHOLDER_RESULT, toolDedupeStepCallsKey, toolDedupeOriginalCallIndexKey, toolDedupeSyntheticCallIdsKey, toolDedupeCallKeyByCallIdKey, toolDedupeConsecutiveKeyKey, toolDedupeConsecutiveCountKey, toolDedupeActiveTurnIdKey, toolDedupeActiveStepKey, AgentToolDedupeService, IAgentAgentsMdReminderService, IBashParserService, ProfileModel, profileBind, configUpdate, ActiveToolsModel, setActiveTools, resetActiveTools, LISTING_COMMANDS, TRANSPARENT_WRAPPERS, LS_ARG_TAKING_OPTIONS, TREE_LIKE_ARG_TAKING_OPTIONS, FIND_GLOBAL_OPTIONS, UNSAFE_OPERAND, AGENTS_MD_BASENAMES, BASH_PARSE_OPTIONS, agentsMdReminderKnownKey, agentsMdReminderCwdKey, agentsMdReminderSeededKey, AgentAgentsMdReminderService, SelectToolsInputSchema, ISelectToolsTool, SELECT_TOOLS_TOOL_NAME, IAgentToolSelectService, DESCRIPTION, SelectToolsTool, DYNAMIC_TOOL_SCHEMA_VARIANT, LOADABLE_TOOLS_TRIGGER, TOOLS_ADDED_BLOCK, TOOLS_REMOVED_BLOCK, IAgentToolRegistryService, toolSelectPendingLoadedKey, AgentToolSelectService, IAgentToolSelectAnnouncementsService, toolSelectNeedsBoundaryInjectionKey, AgentToolSelectAnnouncementsService, TOOLS_SECTION, GLOB_MAGIC, ISessionToolPolicyGate, AgentToolPolicyService, PRINT_WAIT_CEILING_S_DEFAULT, TaskListInputSchema, ITaskListTool, task_list_default, TaskListTool, TaskOutputInputSchema, ITaskOutputTool, TERMINAL_STATUSES, task_output_default, OUTPUT_PREVIEW_BYTES, PAGING_HINT_LINES, TaskOutputTool, TaskStopInputSchema, ITaskStopTool, task_stop_default, TaskStopTool, TaskModel, taskStartedSchema, taskTerminatedSchema, taskStarted, taskTerminated, IAgentConversationUndoParticipantRegistry, AgentConversationUndoParticipantRegistry, TaskNotificationDeliveryModel, MAX_OUTPUT_BYTES, TERMINAL_OUTPUT_TAIL_BYTES, MAX_TASK_OUTPUT_BYTES, SIGTERM_GRACE_MS, TASK_ID_ALPHABET, SESSION_CLOSED_REASON, NOTIFICATION_FALLBACK_PREVIEW_BYTES, ACTIVE_BACKGROUND_TASK_INJECTION_VARIANT, ACTIVE_BACKGROUND_TASK_GUIDANCE, TaskNotificationStepRequest, taskGhostsKey, taskScheduledNotificationKeysKey, taskDeliveredNotificationKeysKey, taskActiveTaskReminderPendingKey, AgentTaskService, CRON_SECTION, DEFAULT_CRON_CONFIG, cronConfigSchema, on, cronEnvBindings, stripCronEnv, CRON_SESSION_TAG, ICronTaskPersistence, CRON_ID_REGEX$1, JSON_SUFFIX, CronTaskPersistenceService, MINUTE_RANGE, HOUR_RANGE, DOM_RANGE, MONTH_RANGE, DOW_RANGE, MS_PER_MINUTE$1, DIGIT_ONLY, MONTH_NAMES, DAY_NAMES, DEFAULT_CRON_JITTER_CONFIG, MS_PER_DAY$1, MS_PER_MINUTE, systemMonoNowMs, SYSTEM_CLOCKS, MAX_CLOCK_FILE_BYTES, ISessionCronService, MAX_PROMPT_BYTES, CronCreateInputSchema, ICronCreateTool, CronListInputSchema, ICronListTool, CronDeleteInputSchema, ICronDeleteTool, CronModel, cronAdd, cronDelete, cronCursor, CRON_SCHEDULED, CRON_FIRED, CRON_MISSED, CRON_DELETED, cronTasksKey, cronParsedCacheKey, cronLastSeenAtKey, cronSeededFromStoreKey, cronInFlightKey, cronStartedKey, STALE_THRESHOLD_MS, DEFAULT_POLL_INTERVAL_MS, MAX_COALESCE_ITERATIONS, CRON_ID_REGEX, MAX_ID_ATTEMPTS, SessionCronServiceImpl, cron_create_default, ONE_SHOT_MAX_FUTURE_MS, CronCreateTool, cron_list_default, MS_PER_DAY, PROMPT_PREVIEW_BYTES, CronListTool, cron_delete_default, ID_PATTERN, CronDeleteTool, GIT_TIMEOUT_MS, MAX_DIRTY_FILES, MAX_COMMIT_LINE_LENGTH, ALLOWED_HOSTS, explore_overlay_default, summary_continuation_default, AGENT_TOOLS, CODER_TOOLS, EXPLORE_TOOLS, CODER_ROLE, DEFAULT_SUMMARY_POLICY, DEFAULT_PERMISSION_MODE_SECTION, PermissionModeModel, PermissionModeConfiguredModel, setMode, IAgentToolActivationService, nextAgentId, AgentLifecycleService, ISessionMcpHandle, IWorkspaceMcpConfigService, IWorkspaceTrust, WATCH_DEBOUNCE_MS, WorkspaceMcpConfigService, IWorkspaceMcpService, ISessionEphemeralMcpServers, MergedMcpConnectionView, ISessionLifecycleService, WorkspaceMcpService, ISessionSubagentService, AGENT_RUN_PROMPT_ORIGIN, SUBAGENT_MAX_TOKENS_ERROR, SessionSubagentService, SECONDARY_MODEL_INVALID_WARNING_CODE, SECONDARY_MODEL_EFFORT_WARNING_CODE, ISessionSecondaryModelWarningService, SessionSecondaryModelWarningService, SubagentTask, IAgentTokenCountingService, DEFAULT_PROFILE_NAME, SubagentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE, RESUME_WITH_TYPE_UNAVAILABLE, USER_INTERRUPTED_SUBAGENT_MESSAGE, SUBAGENT_STOPPED_MESSAGE, ISubagentTool, IAgentUserToolService, agent_background_disabled_default, agent_background_enabled_default, agent_default, SUBAGENT_TOOL_PARAMETERS, SUBAGENT_TOOL_PARAMETERS_NO_MODEL, SubagentTool, IWorkspaceLifecycleService, IWorkspaceService, WorkspaceLifecycleService, IWorkspaceToolPolicy, SessionSkillCatalogDataAdapter, SessionInstructionsProviderAdapter, SessionMcpHandleAdapter, SessionWorkspaceInfoAdapter, SessionToolPolicyGateAdapter, SESSION_SEED_ADAPTERS, ISessionLifecycleHooks, SessionLifecycleService, ISessionExternalHooksService, IExternalHooksRunnerService, HEARTBEAT_INTERVAL_MS, SessionExternalHooksService, ISessionExportService, WIRE_FILENAME, SESSION_LOG_REL, GLOBAL_LOG_REL, WEB_LOG_REL, DESKTOP_LOG_REL, SessionExportService, ISessionLegacyService, SessionLegacyService, InteractionModel, interactionRequest, interactionResolved, RECENTLY_RESOLVED_TTL_MS, RECENTLY_RESOLVED_MAX, MAIN_AGENT_ID$2, interactionPendingKey, interactionRecentlyResolvedKey, interactionNextIdKey, SessionInteractionService, SessionApprovalService, ISessionQuestionService, SessionQuestionService, QuestionOptionSchema, QuestionItemSchema, QUESTION_UNIQUENESS_MESSAGE, AskUserQuestionInputBaseSchema, AskUserQuestionInputSchemaWithBackground, IAskUserQuestionTool, ask_user_default, QuestionBackgroundTask, QUESTION_DISMISSED_MESSAGE, QUESTION_UNSUPPORTED_FAILURE_MESSAGE, AskUserQuestionTool, IRestGateway, IWSGateway, RestGateway, WSGateway, workspaceContextWorkDirKey, workspaceContextAdditionalDirsKey, SessionWorkspaceContextService, SESSION_INDEX_KEY, textDecoder$3, IWorkspacePersistence, WorkspaceService, WORKSPACE_CATALOG_VERSION, WORKSPACE_CATALOG_SCOPE, WORKSPACE_CATALOG_KEY, FileWorkspacePersistence, IWorkspaceAliases, WorkspaceAliasesService, IWorkspaceSessions, WorkspaceSessionsService, fsGitStatusSchema, fsPullRequestSchema, IGitService, DIFF_MAX_BYTES, PR_SPAWN_TIMEOUT_MS, PULL_REQUEST_TTL_MS, GitService, SyntaxNodeBuilder, Aborted, ParseBudget, SPECIAL_VARIABLE_CHARS, FILE_REDIRECT_OPERATORS, DECLARATION_COMMAND_KEYWORDS, UNSET_COMMAND_KEYWORDS, RESERVED_WORDS, EXPRESSION_PRECEDENCE, EXPRESSION_OPERATORS, SCAN_TICK_INTERVAL$1, MAX_SCAN_DEPTH, CONTROL_OPERATORS, REDIRECT_OPERATORS, CASE_ENABLING_WORDS, Lexer, FILE_REDIRECT_OP_SET, DECLARATION_COMMAND_SET, UNSET_COMMAND_SET, RESERVED_WORD_SET, NUMBER_RE, ASSIGNMENT_RE, ASSIGNMENT_SPLIT_RE, SUBSCRIPT_ASSIGNMENT_RE, IDENTIFIER_RE, FUNCTION_NAME_RE, BRACE_EXPRESSION_RE, PAREN_TEST_RE, STOP_THEN, STOP_DO, STOP_DONE, STOP_IF_BODY, STOP_FI, STOP_CLOSE_BRACE, STOP_ESAC, CASE_TERMINATION_OPS, SCAN_TICK_INTERVAL, PREC_TERNARY, PREC_TEST, PREC_UNARY, PREC_PREFIX, PREC_POSTFIX, Parser, BashParserService, SessionProcessRunner, WorkspaceProcessRunnerService, fsKindSchema, fsEntrySchema, fsSearchHitSchema, fsGrepMatchSchema, fsGrepFileHitSchema, fsListSortSchema, fsReadEncodingRequestSchema, fsReadEncodingResponseSchema, fsListManyPartialErrorSchema, IWorkspaceFsService, FS_BINARY_SAMPLE_BYTES, FS_BINARY_NONPRINTABLE_FRACTION, EXT_TO_MIME, EXT_TO_LANGUAGE, IWorkspaceGitService, FsWireErrorCode, SEARCH_HARD_CAP, GREP_TIMEOUT_MS, WALK_MAX_DEPTH, FS_READ_MAX_BYTES, HIDDEN_NAME_RE, MACOS_NOISE, WorkspaceFsService2, RgJsonAccumulator, IWorkspaceFsWatchService, DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_CHANGES_PER_WINDOW, WorkspaceFsWatchService, WorkspaceFsWatchSubscription, WorkspaceGitService, NoopSessionToolPolicyGate, WorkspaceToolPolicyService, TRUST_SCOPE, workspaceTrustTrustedKey, WorkspaceTrustService, fsBrowseEntrySchema$1, HostFolderNotAbsoluteError, HostFolderNotFoundError, HostFolderPermissionError, IHostFolderBrowser, HostFolderBrowser, textEncoder$3, AppendLogStore, textEncoder$2, textDecoder$2, jsonDocumentCodec, tomlDocumentCodec, AtomicDocumentStoreBase, JsonAtomicDocumentStore, TomlAtomicDocumentStore, BlobStoreService, ProjectLocalTomlSchema, FileProjectLocalConfigService, MAX_LEVEL, P, cmpNumber, cmpString, SkipNode, SkipList, toKStr$1, fromKStr$1, DISK_REF_BYTES, MinHeap, Store, OpTracker, POLICIES, WAL, ValueReader, POLY, TABLE, MAGIC, EMPTY, SUB_HEADER, CRC_CHUNK, DEFAULT_RESYNC_CANDIDATE_BUDGET, ASYNC_SCAN_WINDOW, SCAN_YIELD_BYTES, yieldToLoop$3, SNAPSHOT_FILE, WAL_FILE, SECONDARY_INDEXES_FILE, COMPOUND_INDEXES_FILE, TEXT_INDEXES_FILE, SIDECAR_FILES, POSTINGS_PATTERN, GENERATIONS_DIR, CURRENT_FILE, MANIFEST_FILE, STORE_IMAGE_FILE, DT_INDEX_FILE, SECONDARY_INDEX_FILE, COMPOUND_INDEX_FILE, GEN_SNAPSHOT_FILE, GEN_ID_PATTERN, GEN_TMP_PATTERN, FINGERPRINT_FILES, STALE_TMP_FILES, STALE_POSTINGS_TMP_PATTERN, LATIN, CJK, MAX_TERM_CHARS, MAX_TERM_BYTES, yieldToLoop$2, RecoveryGenerationChurnError, GENERATION_RETRY_BASE_MS, sleep$3, sleep$2, yieldToLoop$1, FLUSH_BYTES$3, DEFAULT_READ_CONCURRENCY, DEFAULT_SLICE_BYTES, COPY_CHUNK, SMALL_DELTA, rotateReplace, MAX_PRECOPY_PASSES, CONVERGE_RATIO, UniqueViolationError, IndexManager, DtIndex, HEADER_LEN, CRC_LEN, FLUSH_BYTES$2, PostingsFile, EMPTY_MAP, TopK, BUILD_YIELD_DOCS, BUILD_YIELD_TOKENS, StagedBuild, TextIndexBuildingError, TextIndex, CompoundIndexManager, CODECS, sidecarTmpSeq, LockError, HELD, sidecarSeq, nextSidecarSeq, exitHooked, TAKEOVER_SETTLE_BASE_MS, TAKEOVER_SETTLE_MAX_MS, LockFile, MaintenanceBackpressureError, MaintenanceClosedError, MaintenanceCancelledError, HISTORY_LIMIT, MaintenanceScheduler, WorkerSlots, defaultWorkerSlots, TEXT_BUILD_SLOT_WAIT_MS, MemoryGuard, backupTmpSeq, QueryEngine, GenerationCorruptError, ByteWriter, ByteReader, FLUSH_BYTES$1, GenFileWriter, yieldToLoop, VERIFY_CHUNK_BYTES, STORE_MAGIC, TAG_INLINE, TAG_SNAPSHOT_LOC, TAG_WAL_LOC, DT_MAGIC, DT_VERSION, SECONDARY_MAGIC, SECONDARY_VERSION, COMPOUND_MAGIC, COMPOUND_VERSION, GTAG_NUMBER, GTAG_STRING, GTAG_FALSE, GTAG_TRUE, GTAG_NULL, TEXT_DICT_MAGIC, TEXT_DICT_VERSION, TEXT_DOCS_MAGIC, TEXT_DOCS_VERSION, HASH_MASK, TextRegistry, configuredEntry, PROGRESS_DOCS, FLUSH_BYTES, AGG_ENTRY_BYTES, AGG_TERM_BYTES, SegmentReader, RawPostingsWriter, BASE_DOCS_MAGIC, WorkerTextBuildError, DEFAULT_ABORT_POLL_MS, DEFAULT_MAX_OLD_SPACE_MB, STORE_IMAGE_RECORDS_PER_SLICE, GenerationLoader, GenerationBuildAborted, GenerationBuilder, WalGroupTracker, WritePath, IndexAdmin, ReadPath, LifecycleTracker, MiniDb, Coordinator, ShardHandle, CLUSTER_META_FILE, CLUSTER_INDEX_FILE, SHARD_DIR_PREFIX, ShardLockPool, Router, META_VERSION, DEFAULT_SHARD_COUNT, Topology, ClusterDb, SEP, CHECKPOINT_COLLECTION, STORE_SUBDIR, SHARD_COUNT, LOCK_ACQUIRE_TIMEOUT_MS, DROP_BATCH_SIZE, pendingDisposals, MiniDbQueryStore, MiniDbQuery, WebSearchInputSchema, IWebSearchTool, IWebSearchProviderService, web_search_default, WebSearchTool, TERMINAL_RETENTION_MS, DEFAULT_DEVICE_EXPIRES_IN_SEC, SERVICES_SECTION$1, OAuthService2, AuthSummaryService2, OAuthToolkitService, SERVICES_SECTION, StringRecordSchema, OAuthRefSchema, MoonshotServiceConfigSchema, ServicesConfigSchema, WEB_SEARCH_BASE_URL_ENV, WEB_SEARCH_API_KEY_ENV, WEB_FETCH_BASE_URL_ENV, WEB_FETCH_API_KEY_ENV, nonBlankEnv, moonshotSearchEnvBindings, moonshotFetchEnvBindings, servicesEnvBindings, servicesCredentialEnvOverlay, stripMoonshotSearchEnv, stripMoonshotFetchEnv, stripServicesEnv, servicesFromToml, servicesToToml, MoonshotWebSearchProvider, WebSearchProviderService, managedProviderStatusSchema, managedProviderSummarySchema, IAuthLegacyService, MANAGED_PROVIDER_NAME, AuthLegacyService, BLOB_SCOPE, INDEX_SCOPE, INDEX_KEY, FILE_ID_REGEX, textEncoder$1, textDecoder$1, FileServiceImpl, MODEL_ACCEPTED_IMAGE_MIMES, ACCEPTED_FORMATS_TEXT, UNSUPPORTED_IMAGE_FORMATS, BASE64_SNIFF_CHARS, decoderReady, configuredMaxImageEdgePx, IMAGE_BYTE_BUDGET$1, configuredReadImageByteBudget, JPEG_QUALITY_STEPS, FALLBACK_EDGES_PX, PNG_RESCALE_FLOOR_PX, MAX_DECODE_PIXELS, MAX_IMAGE_DECODE_BYTES, RECODABLE_MIME, CAPTION_OPENING, CAPTION_PATTERN, DEFAULT_MAX_TOTAL_BYTES, MIME_EXTENSION, IFileEditService, EditService, TextModel, FileEditService, EditInputSchema, IEditTool, edit_default, EditTool, DEFAULT_TIMEOUT_SECONDS, KILL_GRACE_MS, OptionalStringSchema, HookSpecificOutputSchema, HookJsonOutputSchema, DEFAULT_HOOK_TIMEOUT_SECONDS, ExternalHooksRunnerService, FetchURLInputSchema, IFetchURLTool, HttpFetchError, IWebFetchService, fetch_url_default, FetchURLTool, parseHTML, DEFAULT_USER_AGENT, DEFAULT_MAX_BYTES, MAX_REDIRECT_HOPS, REDIRECT_STATUSES, LocalFetchURLProvider, PRIVATE_ADDRESS_BLOCKLIST, MoonshotFetchURLProvider, WebFetchService, ByteLruCache, DEFAULT_THRESHOLD, DEFAULT_MAX_CACHE_SIZE, DATA_URI_HEADER_RE, AgentBlobServiceImpl, TokenCountingModel, sizeSchema, tokenCountingMeasured, tokenCountingTruncated, tokenCountingRebased, messageTokenEstimateCache, MEDIA_TOKEN_ESTIMATE, COMPACTION_SUMMARY_PREFIX, COMPACT_USER_MESSAGE_MAX_TOKENS, COMPACT_USER_MESSAGE_HEAD_TOKENS, COMPACTION_ELISION_VARIANT, defaultTokenEstimate, TOOL_INTERRUPTED_ON_RESUME_OUTPUT, foldCtxMap, ContextModel, contextMessageSchema, loopRecordedEventSchema, contextAppendMessage, contextAppendLoopEvent, contextClear, contextCompactionBaseShape, contextApplyCompactionSchema, contextApplyCompaction, contextUndo, AgentContextMemoryService, AgentSystemReminderService, IAgentDateChangeService, DATE_CHANGE_INJECTION_VARIANT, dateChangeSeedKey, AgentDateChangeService, IAgentContextProjectorService, TOOL_ERROR_STATUS, TOOL_EMPTY_STATUS, TOOL_EMPTY_ERROR_STATUS, TOOL_OUTPUT_EMPTY_TEXT, contextProjectorLastRepairSignatureKey, AgentContextProjectorService, MEDIA_DEGRADED_PLACEHOLDERS, MEDIA_STRIPPED_PLACEHOLDERS, MEDIA_CONTAINER_KEY_CACHE, TOOL_INTERRUPTED_TEXT, TOOL_RESULT_SLOT, TOKEN_COUNTING_SECTION, TOKEN_COUNTING_STRATEGY_ENV, TOKEN_COUNTING_STRATEGIES, TokenCountingConfigSchema, tokenCountingEnvBindings, ZERO_ANCHOR, AgentTokenCountingService, contextInjectorIsNewTurnKey, AgentContextInjectorService, IAgentPluginService, SESSION_START_INJECTION_VARIANT, PLUGIN_CHANGE_INJECTION_VARIANT, PLUGIN_CHANGE_VERBS, MAIN_AGENT_ID$1, AgentPluginService, IAgentExternalHooksService, externalHooksStopHookContinuationUsedKey, AgentExternalHooksService, DEFAULT_COMPACTION_CONFIG, RuntimeCompactionStrategy, DefaultCompactionStrategy, IAgentLLMRequesterService, ISessionTodoService, TODO_LIST_TOOL_NAME, compaction_instruction_default, CompactionModel, fullCompactionBegin, fullCompactionCancel, fullCompactionComplete, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS, OVERFLOW_CONTEXT_SAFETY_RATIO, OVERFLOW_STATUS_RECOVERY_RATIO, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS, COMPACTION_OVERFLOW_SHRINK_RATIOS, EMPTY_TOOL_PARAMETERS$1, CompactionTruncatedError, fullCompactionCompactionCountInTurnKey, fullCompactionObservedMaxContextTokensByModelKey, fullCompactionLastCompactedTokenCountKey, fullCompactionConsecutiveOverflowCompactionsKey, fullCompactionActiveTurnIdKey, AgentFullCompactionService, IAgentVideoResolverService, LlmRequestTraceModel, llmToolEntrySchema, llmToolsSnapshot, llmRequest, EMPTY_TOOL_PARAMETERS, noopOnPart, llmRequesterLastConfigLogSignatureKey, llmRequesterTurnConfigsKey, llmRequesterMediaDegradedTurnsKey, llmRequesterMediaStrippedTurnsKey, llmRequesterEmittedThinkingEffortWarningsKey, AgentLLMRequesterService, MutableLLMRequestTrace, StepRequestQueue, loopNextReservedTurnIdKey, loopLastRequestTraceIdKey, loopDisposingKey, AgentLoopService, IAgentLoopContinuationService, AgentLoopContinuationService, IAgentInterruptionReminderService, InterruptionReminderModel, interruptionReminderRecorded, INTERRUPTION_REMINDER_VARIANT, INTERRUPTION_REMINDER, AgentInterruptionReminderService, IAgentMcpService, MCP_NAME_PREFIX, MCP_NAME_SEPARATOR, MAX_QUALIFIED_LENGTH, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE$1, DEFAULT_AUTH_TIMEOUT_MS, AUTH_TOOL_TOOL_NAME, DESCRIPTION_TEMPLATE, MCP_MAX_OUTPUT_CHARS, MCP_OUTPUT_TRUNCATED_TEXT, MCP_MAX_BINARY_PART_BYTES, MCP_MAX_BINARY_PART_CHARS, McpDiscoveryModel, mcpToolCollisionSchema, mcpToolsDiscovered, mcpMcpToolsByServerKey, mcpDiscoveryWritesReadyKey, AgentMcpService, IAgentMediaToolsRegistrar, ReadMediaFileInputSchema, read_media_default, ReadMediaFileTool, mediaRegisteredKeyKey, AgentMediaToolsRegistrar, KIMI_FILE_SCHEME, PATH_QUERY, CACHE_SCOPE, PROVIDER_ID_RE, VIDEO_UNAVAILABLE_TEXT, textEncoder, textDecoder, mediaResolvedKey, AgentVideoResolverService, IMAGE_SECTION, IMAGE_MAX_EDGE_ENV, IMAGE_READ_BYTE_BUDGET_ENV, ImageConfigSchema, imageEnvBindings, IImageConfigBridge, ImageConfigBridge, permission_mode_auto_enter_reminder_default, permission_mode_auto_exit_reminder_default, PERMISSION_MODE_INJECTION_VARIANT, permissionModeLastModeKey, PermissionModeInjection, AgentPermissionModeService, AutoModeApprovePermissionPolicyService, AutoModeAskUserQuestionDenyPermissionPolicyService, DEFAULT_APPROVE_TOOLS, DefaultToolApprovePermissionPolicyService, FallbackAskPermissionPolicyService, GitControlPathAccessAskPermissionPolicyService, GitCwdWriteApprovePermissionPolicyService, SensitiveFileAccessAskPermissionPolicyService, parsePermissionPattern, SessionApprovalHistoryPermissionPolicyService, USER_CONFIGURED_SCOPES, UserConfiguredAllowPermissionPolicyService, UserConfiguredAskPermissionPolicyService, UserConfiguredDenyPermissionPolicyService, YoloModeApprovePermissionPolicyService, AgentPermissionPolicyService, PERMISSION_SECTION, PermissionRuleDecisionSchema, PermissionRuleScopeSchema, PermissionRuleSchema, PermissionConfigSchema, permissionFromToml, permissionToToml, PermissionRulesModel, addPermissionRules, recordApprovalResult, AgentPermissionRulesService, PLUGIN_SECTIONS_MAX_BYTES, profileActiveToolNamesOverlayKey, profileAgentsMdWarningKey, profileEmittedThinkingEffortWarningsKey, profileEmittedToolPatternWarningsKey, profileEmittedPluginBudgetWarningsKey, AgentProfileService, UserMessageStepRequest, PromptStepRequest, SteerStepRequest, RetryStepRequest, promptLaunchingKey, AgentPromptService, IAgentConversationUndoService, MAX_TITLE_LENGTH, MAX_LAST_PROMPT_LENGTH, AgentConversationUndoService, IAgentShellCommandService, SHELL_FOREGROUND_TIMEOUT_S, shellCommandTasksKey, AgentShellCommandService, IAgentRPCService, AgentRPCService, IAgentStepRetryService, stepRetryLastFailedDriverIdKey, stepRetryFailedAttemptsKey, AgentStepRetryService, ISessionInitService, DEFAULT_INIT_PROMPT, INIT_PROFILE_NAME, INIT_PARENT_TOOL_CALL_ID, INIT_DESCRIPTION, SessionInitService, INITIAL_LAUNCH_LIMIT, INITIAL_LAUNCH_INTERVAL_MS, RATE_LIMIT_RETRY_BASE_MS, RATE_LIMIT_RETRY_FACTOR, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS, RATE_LIMIT_SUSPENDED_REASON, AGENT_SWARM_MAX_CONCURRENCY_ENV, AgentRunBatch, RESUMED_PROFILE_FALLBACK, SessionSwarmService, TODO_LIST_REMINDER_VARIANT, TODO_LIST_REMINDER_TURNS_SINCE_WRITE, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS, TodoModel, todoSet, MAIN_AGENT_ID, SessionTodoService, TodoItemSchema, TodoListInputSchema, ITodoListTool, todo_list_default, todo_list_write_reminder_default, TodoListTool, DRAFT_07_AJV, DRAFT_2019_AJV, DRAFT_2020_AJV, DRAFT_2019_KEYWORDS, DRAFT_2020_KEYWORDS, IAgentToolResultTruncationService, ToolScheduler, ABORT_GRACE_MS, TOOL_OUTPUT_EMPTY, TOOL_OUTPUT_NON_TEXT, validators, toolExecutorToolCallDupTypesKey, toolExecutorDupTypeTurnIdKey, AgentToolExecutorService, TOOL_RESULT_MAX_CHARS, TOOL_RESULT_PREVIEW_CHARS, encoder, ToolResultTruncationService, AgentToolActivationService, IBuiltinToolAssemblyService, BuiltinToolAssemblyService, AgentToolRegistryService, UserToolModel, registerUserTool, unregisterUserTool, AgentUserToolService, turnPhaseSchema, approvalRefSchema, toolCallRefSchema, activityRetryStateSchema, activityTurnStateSchema, turnEndReasonSchema, activityLastTurnStateSchema, backgroundRefSchema, activityViewLifecycleSchema, agentActivityStateSchema, agentActivityViewContract, pageOf, maybe, noResult, stringDeltaSchema, textPartSchema, imageUrlPartSchema, videoUrlPartSchema, promptPartSchema, emptyPayloadSchema, promptPayloadSchema, steerPayloadSchema, activateSkillPayloadSchema, promptLaunchResultSchema, cancelPayloadSchema, runShellCommandPayloadSchema, shellCommandResultSchema, setModelResultSchema, permissionModeSchema, setPermissionPayloadSchema, tokenUsageSchema, usageStatusSchema, agentContextDataSchema, agentCommandInfoSchema, runCommandPayloadSchema, planDataSchema, taskLifecycleStatusSchema, taskInfoBaseFields, agentTaskInfoSchema, agentRpcContract, agentShellCommandContract, agentProfileContract, agentUsageContract, agentPlanContract, mcpServerEntrySchema, agentMcpContract, fullCompactionInputSchema, agentFullCompactionContract, agentTaskContract, oAuthFlowStatusSchema, oAuthFlowStartSchema, oAuthFlowSnapshotSchema, oAuthLoginCancelResponseSchema, oAuthLogoutResponseSchema, authStatusSchema, refreshOAuthProviderModelsResponseSchema, authContract, authSummaryContract, capabilityStepSchema, capabilityInstallProgressSchema, capabilityStatusSchema, capabilitiesContract, modelCatalogItemSchema, providerCatalogStatusSchema, providerCatalogItemSchema, setDefaultModelResponseSchema, generateInputSchema, generateParamsSchema, generateEventSchema, catalogContract, refreshProviderModelsOptionsSchema, refreshProviderModelsResponseSchema, providerDiscoveryContract, configTargetSchema, configInspectValueSchema, configDiagnosticSchema, configContract, stringRead, envContract, experimentalFeatureStateSchema, flagsContract, fsBrowseEntrySchema, fsBrowseResponseSchema, fsHomeResponseSchema, hostFsContract, protocolSchema, oAuthRefSchema$1, modelBaseSchema, modelOverrideSchema, modelConfigSchema, modelsContract, stringRecordSchema$1, mcpTimeoutMsSchema, mcpServerCommonFields, mcpServerConfigSchema, pluginDiagnosticSchema, pluginAuthorSchema, pluginSessionStartSchema, pluginInterfaceSchema, hookDefSchema, pluginCommandEntrySchema, pluginManifestKindSchema, pluginSourceSchema, pluginStateSchema, pluginGithubRefSchema, pluginManifestSchema, pluginMcpServerInfoSchema, pluginGithubMetadataSchema, pluginSummarySchema, pluginInfoSchema, reloadSummarySchema$1, pluginUpdateStatusSchema, pluginCommandDefSchema, installPluginInputSchema, setPluginEnabledInputSchema, setPluginMcpServerEnabledInputSchema, removePluginInputSchema, getPluginInfoInputSchema, pluginsContract, providerTypeSchema, oAuthRefSchema, stringRecordSchema, modelSourceSchema, providerConfigSchema, providersContract, sessionSummarySchema, sessionListQuerySchema, sessionCountQuerySchema, sessionsContract, workspaceSchema, workspaceUpdateSchema, workspacesContract, approvalRequestSchema, approvalResponseSchema, sessionApprovalContract, interactionKindSchema, interactionOriginSchema, interactionSchema, interactionResolutionSchema, sessionInteractionContract, createSessionOptionsSchema, resumeSessionOptionsSchema, forkSessionOptionsSchema, createChildSessionOptionsSchema, handleWireSchema, workspaceRefSchema, workspaceLifecycleContract, sessionLifecycleContract, agentMetaSchema, sessionMetaSchema, sessionMetaPatchSchema, sessionMetaKeySchema, sessionMetadataChangedEventSchema, sessionMetadataContract, questionOptionSchema, questionItemSchema, questionAnswersSchema, questionResponseSchema, questionResultSchema, questionRequestSchema, sessionQuestionContract, skillSummarySchema, sessionSkillCatalogContract, globalContract, configChangedSchema, reloadSummarySchema, sessionMetaUpdatedSchema, catalogChangedSchema, globalEvents, sessionEvents, turnStartedEventSchema, turnEndedEventSchema, assistantDeltaEventSchema, thinkingDeltaEventSchema, toolCallStartedEventSchema, toolCallDeltaEventSchema, toolProgressEventSchema, toolResultEventSchema, promptCompletedEventSchema, promptAbortedEventSchema, compactionStartedEventSchema, compactionBlockedEventSchema, compactionCancelledEventSchema, compactionCompletedEventSchema, permissionApprovalRequestedEventSchema, permissionApprovalResolvedEventSchema, errorEventSchema, warningEventSchema, agentStatusUpdatedEventSchema, agentEvents, KlientValidationError, EventHub, ENV_SCALAR_PROPERTIES, RPCError, NOT_FOUND$1, serviceTokens, REQUEST_INVALID, NOT_FOUND, MemoryChannel, KIMI_CONFIG_DOMAINS, DROPPED_DOMAIN_EVENT_TYPES, RENAMED_DOMAIN_EVENT_TYPES, IMPORT_CONTEXT_GUIDANCE, EMPTY_FOLD, ReadOnlyAgentRecordPersistence, GlobalMcpConfigStore, SessionEventWiring, MAX_TIMER_DELAY_MS, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS, SDKRpcClientV2, KimiConfigCoreRpcImpl, KimiConfigRpcClient, KimiForCodingProvider, DEFAULT_CATALOG_URL, CatalogFetchError;
 var init_index = __esm({
   ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/index.mjs"() {
     init_zod();
@@ -157082,7 +157101,7 @@ ${underline}`);
     ADDITIONAL_DIRS_SECTION_PROSE$1 = "The following directories have been added to the workspace. You can read, write, search, and glob files in these directories as part of your workspace scope.";
     SKILLS_SECTION_PROSE$1 = 'Skills are reusable, composable capabilities that enhance your abilities. Each skill is either a self-contained directory with a `SKILL.md` file or a standalone `.md` file that contains instructions, examples, and/or reference material.\n\nIdentify the skills relevant to your current task and read the skill file for its instructions; only read further skill details when needed, to conserve the context window.\n\n## Available skills\n\nSkills are grouped by scope (`Project`, `User`, `Extra`, `Built-in`) so you can tell where each came from. When the user refers to "the skill in this project" or "the user-scope skill", use the scope heading to disambiguate. When multiple scopes define a skill with the same name, the more specific scope takes precedence: **Project overrides User overrides Extra overrides Built-in**.';
     agent_default$2 = "name: agent\ndescription: Default Kimi Code agent\n\nsystemPromptPath: ./system.md\npromptVars:\n  roleAdditional: ''\n\ntools:\n  - Read\n  - Write\n  - Edit\n  - Grep\n  - Glob\n  - Bash\n  - TaskList\n  - TaskOutput\n  - TaskStop\n  - CronCreate\n  - CronList\n  - CronDelete\n  - ReadMediaFile\n  - TodoList\n  - Skill\n  - WebSearch\n  - Agent\n  - AgentSwarm\n  - FetchURL\n  - AskUserQuestion\n  - EnterPlanMode\n  - ExitPlanMode\n  - CreateGoal\n  - GetGoal\n  - SetGoalBudget\n  - UpdateGoal\n  - mcp__*\n\nsubagents:\n  coder:\n    description: General software engineering agent \u2014 the only subagent type with file-editing tools; use it for any delegated task that must modify code.\n  explore:\n    description: Fast codebase exploration with prompt-enforced read-only behavior.\n  plan:\n    description: Read-only implementation planning and architecture design.\n";
-    coder_default = "extends: agent\nname: coder\npromptVars:\n  roleAdditional: |\n    You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.\n\n    Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. A final message of only a sentence or two is treated as too brief and sent back to you for expansion, costing an extra turn.\nwhenToUse: |\n  Use this agent for non-trivial software engineering work that may require reading files, editing code, running commands, and returning a compact but technically complete summary to the parent agent.\ntools:\n  - Agent\n  - AgentSwarm\n  - Bash\n  - CronCreate\n  - CronDelete\n  - CronList\n  - Edit\n  - EnterPlanMode\n  - ExitPlanMode\n  - Glob\n  - Grep\n  - Read\n  - ReadMediaFile\n  - Skill\n  - TaskList\n  - TaskOutput\n  - TaskStop\n  - TodoList\n  - WebSearch\n  - FetchURL\n  - Write\n  - mcp__*\n";
+    coder_default = "extends: agent\nname: coder\npromptVars:\n  roleAdditional: |\n    You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.\n\n    Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. A final message of only a sentence or two is treated as too brief and sent back to you for expansion, costing an extra turn.\nwhenToUse: |\n  Use this agent for non-trivial software engineering work that may require reading files, editing code, running commands, and returning a compact but technically complete summary to the parent agent.\ntools:\n  - Bash\n  - CronCreate\n  - CronDelete\n  - CronList\n  - Edit\n  - EnterPlanMode\n  - ExitPlanMode\n  - Glob\n  - Grep\n  - Read\n  - ReadMediaFile\n  - Skill\n  - TaskList\n  - TaskOutput\n  - TaskStop\n  - TodoList\n  - WebSearch\n  - FetchURL\n  - Write\n  - mcp__*\n";
     explore_default = 'extends: agent\nname: explore\npromptVars:\n  roleAdditional: |\n    You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.\n\n    You are a codebase exploration specialist. Your role is EXCLUSIVELY to search, read, and analyze existing code and resources. You do NOT have access to file editing tools.\n\n    Your strengths:\n    - Rapidly finding files using glob patterns\n    - Searching code and text with powerful regex patterns\n    - Reading and analyzing file contents\n    - Running read-only shell commands (git log, git diff, ls, find, etc.)\n\n    Guidelines:\n    - Use Glob for broad file pattern matching. Prefer patterns with a literal anchor (extension or subdirectory); pure wildcards like `*` or `**/*` are allowed but usually truncate at the match cap.\n    - Use Grep for searching file contents with regex\n    - Use Read when you know the specific file path\n    - Use Bash ONLY for read-only operations (ls, git status, git log, git diff, find)\n    - NEVER use Bash for any file creation or modification commands\n    - Use WebSearch or FetchURL when a question needs external context (library documentation, error messages, upstream APIs); the local codebase remains your primary domain\n    - Adapt your search depth based on the thoroughness level specified by the caller\n    - Wherever possible, spawn multiple parallel tool calls for grepping and reading files to maximize speed\n\n    If the prompt includes a <git-context> block, use it to orient yourself about the repository state before starting your investigation.\n\n    You are meant to be a fast agent. Complete the search request efficiently and report your findings clearly in a structured format.\nwhenToUse: |\n  Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (e.g. "src/**/*.yaml"), search code for keywords (e.g. "database connection"), or answer questions about the codebase (e.g. "how does the auth module work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "thorough" for comprehensive analysis across multiple locations and naming conventions. Use this agent for any read-only exploration that will clearly require more than 3 search queries. Prefer launching multiple explore agents concurrently when investigating independent questions.\ntools:\n  - Bash\n  - Read\n  - ReadMediaFile\n  - Glob\n  - Grep\n  - WebSearch\n  - FetchURL\n';
     init_default$1 = "You are a software engineering expert with many years of programming experience. Please explore the current project directory to understand the project's architecture and main details.\n\nTask requirements:\n1. Analyze the project structure and identify key configuration files (such as pyproject.toml, package.json, Cargo.toml, etc.).\n2. Understand the project's technology stack, build process and runtime architecture.\n3. Identify how the code is organized and main module divisions.\n4. Discover project-specific development conventions, testing strategies, and deployment processes.\n\nAfter the exploration, do a thorough summary of your findings and write it to the `AGENTS.md` file in the project root, replacing the file's previous content. If the file already exists, read it first and carry forward whatever is still accurate \u2014 the result should be one coherent, up-to-date file, not an append.\n\nFor your information, `AGENTS.md` is a file intended to be read by AI coding agents. Expect the reader of this file to know nothing about the project.\n\nYou should compose this file according to the actual project content. Do not make any assumptions or generalizations. Ensure the information is accurate and useful. You must use the natural language that is mainly used in the project's comments and documentation.\n\nPopular sections that people usually write in `AGENTS.md` are:\n\n- Project overview\n- Build and test commands\n- Code style guidelines\n- Testing instructions\n- Security considerations\n";
     PROFILE_SOURCES = {
@@ -157158,7 +157177,7 @@ ${underline}`);
       snapshotValue;
       constructor(options2) {
         this.options = options2;
-        this.merged = new Map(Object.entries(DEFAULT_AGENT_PROFILES));
+        this.merged = sessionLocalBuiltinProfiles();
         this.readyPromise = this.load();
         this.readyPromise.catch(() => void 0);
       }
@@ -157201,7 +157220,7 @@ ${underline}`);
         this.snapshotValue = this.snapshotFromEntries(winners, systemMd);
       }
       entriesFromSnapshot(restored, includeProfile = () => true) {
-        this.merged = new Map(Object.entries(DEFAULT_AGENT_PROFILES));
+        this.merged = sessionLocalBuiltinProfiles();
         const builtinDefault = this.getDefault();
         const systemMd = restored.systemPromptTemplate === void 0 ? void 0 : this.snapshotSystemDefinition(restored.systemPromptTemplate);
         const effectiveDefault = systemMd === void 0 ? builtinDefault : systemMdProfile(systemMd, builtinDefault);
@@ -226877,6 +226896,13 @@ ${fallbackText}` : fallbackText;
       async listGlobalMcpServers(_input) {
         return this.globalMcpConfig.list();
       }
+      async listGlobalMcpServerAuthStatuses(_input) {
+        const servers = await this.globalMcpConfig.list();
+        return Promise.all(servers.map(async (server) => ({
+          name: server.name,
+          authStatus: await this.globalMcpServerAuthState(server)
+        })));
+      }
       async addGlobalMcpServer({ server }) {
         return this.globalMcpConfig.add(server);
       }
@@ -226928,7 +226954,9 @@ ${fallbackText}` : fallbackText;
       }
       async testGlobalMcpServer({ name, cwd: cwd2 }) {
         const server = await this.globalMcpConfig.get(name);
-        const config2 = mcpConfigWithoutName$1(server);
+        return this.withGlobalMcpServerProbe(server, cwd2, (manager) => standaloneMcpTestResult$1(server.name, manager));
+      }
+      async withGlobalMcpServerProbe(server, cwd2, inspect) {
         const manager = new McpConnectionManager$1({
           stdioCwd: cwd2,
           oauthService: this.globalMcpOAuth,
@@ -226936,11 +226964,20 @@ ${fallbackText}` : fallbackText;
           defaultToolTimeoutMs: resolveMcpToolTimeoutMs(this.config.mcp?.toolTimeoutMs)
         });
         try {
-          await manager.connectAll({ [server.name]: config2 });
-          return standaloneMcpTestResult$1(server.name, manager);
+          await manager.connectAll({ [server.name]: mcpConfigWithoutName$1(server) });
+          return inspect(manager);
         } finally {
           await manager.shutdown();
         }
+      }
+      async globalMcpServerAuthState(server) {
+        if (server.transport === "stdio") return "not-applicable";
+        if (server.bearerTokenEnvVar !== void 0) return "bearer-token";
+        if (server.headers !== void 0 && server.auth !== "oauth") return "not-applicable";
+        if (server.transport !== "http" && server.auth !== "oauth") return "not-applicable";
+        if (this.globalMcpOAuth.hasTokens(server.name, server.url)) return "oauth-authorized";
+        if (server.auth === "oauth") return "oauth-required";
+        return this.withGlobalMcpServerProbe(server, void 0, (manager) => manager.get(server.name)?.status === "needs-auth" ? "oauth-required" : "not-applicable");
       }
       prompt({ sessionId, ...payload }) {
         return this.sessionApi(sessionId).prompt(payload);
@@ -233943,6 +233980,14 @@ ${fallbackText}` : fallbackText;
       async listSessions(options2 = {}) {
         return this.rpc.listSessions(options2);
       }
+      /**
+      * One keyset page of the session listing (`limit` / `before` in
+      * `ListSessionsOptions`). Paged on the v2 engine; the v1 engine serves the
+      * whole filtered set as a single terminal page.
+      */
+      async listSessionsPage(options2 = {}) {
+        return this.rpc.listSessionsPage(options2);
+      }
       /** Skills visible to a new session in `workDir`, without creating that session. */
       async listWorkspaceSkills(workDir) {
         return this.rpc.listWorkspaceSkills(workDir);
@@ -234054,6 +234099,9 @@ ${fallbackText}` : fallbackText;
       /** User-global MCP entries from `<KIMI_CODE_HOME>/mcp.json` only. */
       async listMcpServers() {
         return this.rpc.listGlobalMcpServers();
+      }
+      async listMcpServerAuthStatuses() {
+        return this.rpc.listGlobalMcpServerAuthStatuses();
       }
       async addMcpServer(server) {
         return this.rpc.addGlobalMcpServer(server);
@@ -234310,6 +234358,18 @@ ${fallbackText}` : fallbackText;
       async listSessions(input = {}) {
         return (await this.getRpc()).listSessions(input);
       }
+      /**
+      * One keyset page of the session listing (`limit` / `before` in
+      * `ListSessionsOptions`). The base implementation serves the whole filtered
+      * set as a single terminal page — the v1 engine has no paged listing;
+      * `SDKRpcClientV2` overrides this with real index paging.
+      */
+      async listSessionsPage(input = {}) {
+        return {
+          items: await this.listSessions(input),
+          nextCursor: void 0
+        };
+      }
       async listWorkspaceSkills(workDir) {
         return (await this.getRpc()).listWorkspaceSkills({ workDir });
       }
@@ -234377,6 +234437,9 @@ ${fallbackText}` : fallbackText;
       }
       async listGlobalMcpServers() {
         return (await this.getRpc()).listGlobalMcpServers({});
+      }
+      async listGlobalMcpServerAuthStatuses() {
+        return (await this.getRpc()).listGlobalMcpServerAuthStatuses({});
       }
       async addGlobalMcpServer(server) {
         return (await this.getRpc()).addGlobalMcpServer({ server });
@@ -235383,10 +235446,28 @@ ${fallbackText}` : fallbackText;
         }
       }
     };
+    EventSubscription = class {
+      _remove;
+      debugLabel;
+      _removed = false;
+      constructor(debugName, _remove) {
+        this._remove = _remove;
+        this.debugLabel = debugName === void 0 ? void 0 : `on:${debugName}`;
+      }
+      dispose() {
+        if (this._removed) return;
+        this._removed = true;
+        this._remove();
+      }
+    };
     Emitter = class {
+      debugName;
       _listeners;
       _disposed = false;
       _event;
+      constructor(debugName) {
+        this.debugName = debugName;
+      }
       get event() {
         this._event ??= (listener, thisArg, disposables) => {
           if (this._disposed) return Disposable.None;
@@ -235396,18 +235477,18 @@ ${fallbackText}` : fallbackText;
             thisArg
           };
           this._listeners.add(entry);
-          let removed = false;
-          const subscription = { dispose: () => {
-            if (removed) return;
-            removed = true;
+          const subscription = new EventSubscription(this.debugName, () => {
             if (this._disposed) return;
             this._listeners?.delete(entry);
-          } };
+          });
           if (disposables !== void 0) if (disposables instanceof DisposableStore) disposables.add(subscription);
           else disposables.push(subscription);
           return subscription;
         };
         return this._event;
+      }
+      get listenerCount() {
+        return this._listeners?.size ?? 0;
       }
       fire(value) {
         if (this._disposed || this._listeners === void 0) return;
@@ -236266,7 +236347,8 @@ ${fallbackText}` : fallbackText;
     registerErrorDomain(OsProcessErrors);
     HostProcessErrorCode = {
       SpawnFailed: OsProcessErrors.codes.OS_PROCESS_SPAWN_FAILED,
-      KillFailed: OsProcessErrors.codes.OS_PROCESS_KILL_FAILED
+      KillFailed: OsProcessErrors.codes.OS_PROCESS_KILL_FAILED,
+      ShellGitBashNotFound: OsProcessErrors.codes.SHELL_GIT_BASH_NOT_FOUND
     };
     HostProcessError = class extends Error2 {
       constructor(code, message, options2) {
@@ -239241,12 +239323,12 @@ ${graph.toString()}`;
       }
       static createApp(options2 = {}) {
         const kind = "app";
-        const collection2 = buildCollection(options2.extra);
+        const collection2 = buildCollection(options2.seeds);
         const instantiation = new InstantiationService(collection2, true);
         instantiation.debugLabel = options2.id ?? "app";
         try {
           watchScopeUnits(instantiation, kind);
-          options2.assemble?.(instantiation);
+          options2.configureContainer?.(instantiation);
           provideScopeServices(instantiation, kind, collection2);
         } catch (error48) {
           instantiation.dispose();
@@ -239265,12 +239347,12 @@ ${graph.toString()}`;
           if (parentIndex === -1 || childIndex === -1 || childIndex <= parentIndex) throw new Error(`child scope kind '${kind}' must be greater than parent kind '${this.kind}' in the declared scope topology`);
         }
         if (this.children.has(id)) throw new Error(`Scope '${this.id}' already has a child with id '${id}'`);
-        const collection2 = buildCollection(options2.extra);
+        const collection2 = buildCollection(options2.seeds);
         const childInstantiation = this.instantiation.createChild(collection2);
         childInstantiation.debugLabel = id;
         try {
           watchScopeUnits(childInstantiation, kind);
-          options2.assemble?.(childInstantiation);
+          options2.configureContainer?.(childInstantiation);
           provideScopeServices(childInstantiation, kind, collection2);
         } catch (error48) {
           childInstantiation.dispose();
@@ -240935,6 +241017,14 @@ ${graph.toString()}`;
       }
     };
     registerScopedService("app", IHostClock, HostClockService, 0, "hostClock");
+    ProbeShellNotFoundError = class extends Error {
+      checked;
+      constructor(message, checked) {
+        super(message);
+        this.name = "ProbeShellNotFoundError";
+        this.checked = checked;
+      }
+    };
     GIT_EXEC_PATH_TIMEOUT_MS = 5e3;
     MINGW_PREFIX_SET = /* @__PURE__ */ new Set([
       "mingw32",
@@ -240946,16 +241036,31 @@ ${graph.toString()}`;
     LOGIN_SHELL_ENV_TIMEOUT_MS = 5e3;
     HostEnvironmentService = class {
       _info;
+      _probeError;
       ready;
       constructor() {
         this.ready = Promise.all([probeHostEnvironmentFromNode().then((info) => {
           this._info = info;
         }), applyLoginShellPathFromNode()]).then(() => {
+        }).catch((error48) => {
+          const translated = this.toHostProcessError(error48);
+          this._probeError = translated;
+          throw translated;
+        });
+        this.ready.catch(() => {
         });
       }
       require(field) {
+        if (this._probeError !== void 0) throw this._probeError;
         if (this._info === void 0) throw new BugIndicatingError(`IHostEnvironment.${field} accessed before ready \u2014 await IHostEnvironment.ready first (composition root should do so before creating a Session scope).`);
         return this._info[field];
+      }
+      toHostProcessError(error48) {
+        if (error48 instanceof ProbeShellNotFoundError) return new HostProcessError(OsProcessErrors.codes.SHELL_GIT_BASH_NOT_FOUND, error48.message, {
+          details: { checkedPaths: error48.checked },
+          cause: error48
+        });
+        return error48 instanceof Error ? error48 : new Error(String(error48));
       }
       get osKind() {
         return this.require("osKind");
@@ -243572,18 +243677,26 @@ ${foregroundOutput}`,
     };
     registerScopedService("app", ITaskService, TaskService2, 0, "task");
     EventBusService = class extends Service {
-      allEmitter = this._register(new Emitter());
+      allEmitter = this._register(new Emitter("*"));
       perType = /* @__PURE__ */ new Map();
       publish(event) {
         this.allEmitter.fire(event);
         this.perType.get(event.type)?.fire(event);
+      }
+      listenerCounts() {
+        const perType = {};
+        for (const [type2, emitter] of this.perType) perType[String(type2)] = emitter.listenerCount;
+        return {
+          all: this.allEmitter.listenerCount,
+          perType
+        };
       }
       subscribe(typeOrHandler, handler2) {
         if (typeof typeOrHandler === "function") return this.allEmitter.event(typeOrHandler);
         const type2 = typeOrHandler;
         let emitter = this.perType.get(type2);
         if (emitter === void 0) {
-          emitter = this._register(new Emitter());
+          emitter = this._register(new Emitter(String(type2)));
           this.perType.set(type2, emitter);
         }
         return emitter.event(handler2);
@@ -243592,8 +243705,11 @@ ${foregroundOutput}`,
     registerScopedService("agent", IEventBus, EventBusService, 0, "event");
     IEventService = createDecorator("eventService");
     EventService = class extends Service {
-      emitter = this._register(new Emitter());
+      emitter = this._register(new Emitter("publish"));
       onDidPublish = this.emitter.event;
+      get listenerCount() {
+        return this.emitter.listenerCount;
+      }
       publish(event) {
         this.emitter.fire(event);
       }
@@ -243734,13 +243850,63 @@ ${foregroundOutput}`,
     META_KEY$1 = "state.json";
     WRITE_CHUNK = 500;
     SCAN_CONCURRENCY = 16;
+    SHARED_SCAN_REUSE_MS = 3e4;
     SessionIndexProjector = class {
       deps;
+      scanSlot;
       constructor(deps) {
         this.deps = deps;
       }
+      /**
+      * The projection's scan: joins a running shared scan, reuses one that
+      * settled within the reuse window, or starts a fresh one. The projection
+      * publishes a point-in-time derived model by design, so a just-finished
+      * snapshot is safe for it (the mirror queue and reconciliation heal the
+      * gap) — and this is what keeps a fast first read + kicked projection
+      * from scanning the directory tree twice.
+      */
+      sharedScan() {
+        const slot = this.scanSlot;
+        if (slot !== void 0 && (!slot.settled || Date.now() < slot.reusableUntil)) return slot.promise;
+        return this.startScan();
+      }
+      /**
+      * A fallback read's scan: joins a scan that is still in flight or starts a
+      * fresh one. A settled snapshot is NEVER served to a read — it could
+      * predate a session this process just created, breaking read-your-writes.
+      * Joining an in-flight scan is NOT the same freshness as enumerating here
+      * and now: the scan may have started (and passed a directory) before this
+      * call, so the caller folds the mirror's pending queue into the result —
+      * every pending entry is known to be durable on disk.
+      */
+      sharedScanForRead() {
+        const slot = this.scanSlot;
+        if (slot !== void 0 && !slot.settled) return slot.promise;
+        return this.startScan();
+      }
+      startScan() {
+        const slot = {
+          promise: this.scanAuthoritative(),
+          reusableUntil: Date.now() + SHARED_SCAN_REUSE_MS,
+          settled: false
+        };
+        const markSettled = () => {
+          slot.settled = true;
+        };
+        slot.promise.then(markSettled, markSettled);
+        this.scanSlot = slot;
+        return slot.promise;
+      }
       /** Scan the authoritative set into a fresh generation and publish it. */
       async project(generation) {
+        const scan2 = this.sharedScan();
+        try {
+          return await this.doProject(generation, scan2);
+        } finally {
+          if (this.scanSlot?.promise === scan2) this.scanSlot = void 0;
+        }
+      }
+      async doProject(generation, scan2) {
         const { queryStore, log: log2 } = this.deps;
         const collection2 = sessionCollection(generation);
         const counters = sessionCountersCollection(generation);
@@ -243751,7 +243917,7 @@ ${foregroundOutput}`,
           name: PARENT_INDEX_NAME,
           field: `custom.${PARENT_SESSION_ID_KEY}`
         });
-        const { summaries, counts } = await this.scanAuthoritative();
+        const { summaries, counts } = await scan2;
         await this.batchChunks(summaries.map((summary) => ({
           kind: "put",
           collection: collection2,
@@ -244047,11 +244213,14 @@ ${foregroundOutput}`,
       * Evict a deleted session's derived state so `get` / `listRecent` stop
       * answering for the id immediately: the authoritative directory is deleted
       * by the caller (`sessionLifecycle.delete`), and the next projection would
-      * drop the entry anyway — this closes the stale-read window in between. A
-      * summary still queued in the mirror heals at the next projection. With the
-      * read model off there is no derived state to evict.
+      * drop the entry anyway — this closes the stale-read window in between. The
+      * mirror queue is evicted first (waiting out an in-flight flush): reads
+      * fold the queue in for read-your-writes, and a late flush would otherwise
+      * resurrect the entry after the store delete. With the read model off
+      * there is no derived state to evict beyond the queue.
       */
       async remove(id) {
+        await this.mirror.evict(id);
         await this.withReadModel(async (generation) => {
           await this.queryStore.delete(sessionCollection(generation), id);
         }, () => Promise.resolve());
@@ -244252,16 +244421,7 @@ ${foregroundOutput}`,
           const items2 = summary !== void 0 && (!summary.archived || query2.includeArchived === true) ? [summary] : [];
           return { items: query2.limit !== void 0 ? items2.slice(0, query2.limit) : items2 };
         }
-        const workspaceIds = query2.workspaceIds ?? await listWorkspaceIds(this.storage, this.sessionsScope);
-        const collected = [];
-        for (const workspaceId of workspaceIds) for (const sessionId of await listSessionIds(this.storage, this.sessionsScope, workspaceId)) {
-          const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, sessionId);
-          if (summary === void 0) continue;
-          if (summary.archived && query2.includeArchived !== true) continue;
-          if (!summaryMatchesChildOf(summary, query2.childOf)) continue;
-          collected.push(summary);
-        }
-        const items = collected.toSorted(canonicalOrder);
+        const items = (await this.collectAuthoritative(query2.workspaceIds)).filter((summary) => (query2.includeArchived === true || !summary.archived) && summaryMatchesChildOf(summary, query2.childOf)).toSorted(canonicalOrder);
         let start = 0;
         let end = items.length;
         const cursorId = query2.before ?? query2.after;
@@ -244288,13 +244448,44 @@ ${foregroundOutput}`,
       }
       async countLegacy(query2) {
         let count = 0;
-        const workspaceIds = query2.workspaceIds ?? await listWorkspaceIds(this.storage, this.sessionsScope);
-        for (const workspaceId of workspaceIds) for (const sessionId of await listSessionIds(this.storage, this.sessionsScope, workspaceId)) {
-          const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, sessionId);
-          if (summary === void 0) continue;
-          if (query2.includeArchived === true || !summary.archived) count += 1;
-        }
+        for (const summary of await this.collectAuthoritative(query2.workspaceIds)) if (query2.includeArchived === true || !summary.archived) count += 1;
         return count;
+      }
+      /**
+      * Collect the authoritative summaries behind a legacy read. While the read
+      * model is enabled but not yet ready, the kicked initial projection is
+      * scanning the same authoritative set, so the read joins that in-flight
+      * scan (or drives the one the projection will reuse) instead of running a
+      * second full directory scan. Flag-off hosts and the degraded fallback
+      * keep the targeted per-workspace enumeration.
+      *
+      * Either way the mirror's pending queue is folded in by id (pending
+      * entries win): every queued summary was recorded only after its
+      * `state.json` is durable, and a scan/enumeration that started before the
+      * write may legitimately have passed the directory already — the fold is
+      * what keeps read-your-writes on this path too.
+      */
+      async collectAuthoritative(workspaceIds) {
+        let collected;
+        if (this.readModelEnabled() && (this.state === "uninitialized" || this.state === "preparing")) {
+          const { summaries } = await this.projector.sharedScanForRead();
+          collected = workspaceIds === void 0 ? summaries : summaries.filter((summary) => workspaceIds.includes(summary.workspaceId));
+        } else {
+          const ids = workspaceIds ?? await listWorkspaceIds(this.storage, this.sessionsScope);
+          collected = [];
+          for (const workspaceId of ids) for (const sessionId of await listSessionIds(this.storage, this.sessionsScope, workspaceId)) {
+            const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, sessionId);
+            if (summary !== void 0) collected.push(summary);
+          }
+        }
+        const pending = this.mirror.pending();
+        if (pending.length === 0) return collected;
+        const byId = new Map(collected.map((summary) => [summary.id, summary]));
+        for (const summary of pending) {
+          if (workspaceIds !== void 0 && !workspaceIds.includes(summary.workspaceId)) continue;
+          byId.set(summary.id, summary);
+        }
+        return [...byId.values()];
       }
       readModelEnabled() {
         return this.flags.enabled(READ_MODEL_FLAG$1);
@@ -244355,6 +244546,11 @@ ${foregroundOutput}`,
       }
       pending() {
         return [...this.pendingMap.values()];
+      }
+      async evict(id) {
+        this.pendingMap.delete(id);
+        await this.flushing;
+        this.pendingMap.delete(id);
       }
       async drain() {
         this.timer.cancel();
@@ -244538,18 +244734,25 @@ ${foregroundOutput}`,
         return run;
       }
       mirrorToReadModel() {
-        this.mirror.record(buildSessionSummary({
-          id: this.data.id,
-          workspaceId: this.ctx.workspaceId,
-          cwd: this.ctx.cwd,
-          title: this.data.title,
-          lastPrompt: this.data.lastPrompt,
-          createdAt: this.data.createdAt,
-          updatedAt: this.data.updatedAt,
-          archived: this.data.archived === true,
-          custom: this.data.custom,
-          lastTurnReason: this.data.lastTurnReason
-        }));
+        try {
+          this.mirror.record(buildSessionSummary({
+            id: this.data.id,
+            workspaceId: this.ctx.workspaceId,
+            cwd: this.ctx.cwd,
+            title: this.data.title,
+            lastPrompt: this.data.lastPrompt,
+            createdAt: this.data.createdAt,
+            updatedAt: this.data.updatedAt,
+            archived: this.data.archived === true,
+            custom: this.data.custom,
+            lastTurnReason: this.data.lastTurnReason
+          }));
+        } catch (error48) {
+          this.log.warn("session index mirror record failed; the read model heals by reconciliation", {
+            sessionId: this.ctx.sessionId,
+            error: error48 instanceof Error ? error48.message : String(error48)
+          });
+        }
       }
       async load() {
         const existing = await this.store.get(this.scope, META_KEY);
@@ -252174,6 +252377,49 @@ ${content}`;
       }
     };
     registerScopedService("agent", IAgentActivityView, AgentActivityView, 0, "activityView");
+    SIDE_QUESTION_SYSTEM_REMINDER = `
+This is a side-channel conversation with the user. You should answer user questions directly based on what you already know.
+
+IMPORTANT:
+- You are a separate, lightweight instance.
+- The main agent continues independently; do not reference being interrupted.
+- Do not call any tools. All tool calls are disabled and will be rejected.
+  Even though tool definitions are visible in this request, they exist only
+  for technical reasons (prompt cache). You must not use them.
+- Respond only with text based on what you already know from the conversation
+  and this side-channel conversation.
+- Follow-up turns may happen in this side-channel conversation.
+- If you do not know the answer, say so directly.
+`.trim();
+    ISessionBtwService = createDecorator("sessionBtwService");
+    IAgentSystemReminderService = createDecorator("agentSystemReminderService");
+    SessionBtwService = class SessionBtwService2 {
+      lifecycle;
+      constructor(lifecycle) {
+        this.lifecycle = lifecycle;
+      }
+      async start() {
+        const child = await this.lifecycle.fork("main");
+        child.accessor.get(IAgentSystemReminderService)?.appendSystemReminder(SIDE_QUESTION_SYSTEM_REMINDER, {
+          kind: "system_trigger",
+          name: "btw"
+        });
+        const reason = child.accessor.get(IAgentToolApprovalService)?.formatDenyMessage("Tool calls are disabled for side questions. Answer with text only.") ?? "Tool calls are disabled for side questions. Answer with text only.";
+        child.accessor.get(IAgentToolExecutorService)?.onBeforeExecuteTool((event) => {
+          event.veto(denyToolExecution(reason));
+        });
+        return child.id;
+      }
+    };
+    SessionBtwService = __decorate([__decorateParam(0, IAgentLifecycleService)], SessionBtwService);
+    BtwFeature = class extends Feature {
+      static name = "btw";
+      constructor() {
+        super();
+        this.contributeService("session", ISessionBtwService, SessionBtwService);
+      }
+    };
+    registerFeature(BtwFeature);
     PLAN_TOOLS = [
       "Read",
       "ReadMediaFile",
@@ -253007,6 +253253,56 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
       }
     };
     registerFeature(PlanFeature);
+    IDebugEventsService = createDecorator("debugEventsService");
+    DebugEventsService = class DebugEventsService2 {
+      root;
+      constructor(instantiation) {
+        this.root = instantiation;
+      }
+      subscriptions() {
+        const subscriptions = [];
+        const buses = [];
+        const seenUnits = /* @__PURE__ */ new Set();
+        const seenBuses = /* @__PURE__ */ new Set();
+        for (const info of walkScopeContainers(this.root)) {
+          for (const registration of info.container.servicesSnapshot()) {
+            const id = info.container.findIdentifier(registration.token);
+            if (id === void 0) continue;
+            const instance = info.container.fiberHost.materializedInstance(id);
+            if (typeof instance !== "object" || instance === null || seenUnits.has(instance)) continue;
+            seenUnits.add(instance);
+            if ("unitBook" in instance) collectEventEntries(instance.unitBook.entries(), subscriptions, {
+              scopePath: info.path,
+              unit: registration.token,
+              uid: registration.uid
+            });
+          }
+          const bus = info.container.fiberHost.materializedInstance(IEventBus);
+          if (isBusCountSource(bus) && !seenBuses.has(bus)) {
+            seenBuses.add(bus);
+            buses.push({
+              scopePath: info.path,
+              ...bus.listenerCounts()
+            });
+          }
+        }
+        const globalEvents2 = this.root.fiberHost.materializedInstance(IEventService);
+        return {
+          subscriptions,
+          buses,
+          globalListeners: isGlobalCountSource(globalEvents2) ? globalEvents2.listenerCount : void 0
+        };
+      }
+    };
+    DebugEventsService = __decorate([__decorateParam(0, IInstantiationService)], DebugEventsService);
+    DebugEventsFeature = class extends Feature {
+      static name = "debugEvents";
+      constructor() {
+        super();
+        this.contributeService("app", IDebugEventsService, DebugEventsService, { activation: 1 });
+      }
+    };
+    registerFeature(DebugEventsFeature);
     CreateGoalToolInputSchema = external_exports.object({
       objective: external_exports.string().min(1).describe("The objective to pursue. Must have a verifiable end state."),
       completionCriterion: external_exports.string().optional().describe("How to verify the goal is complete. Include when the user provides one."),
@@ -253353,7 +253649,6 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
         return [];
       }
     };
-    IAgentSystemReminderService = createDecorator("agentSystemReminderService");
     IAgentUsageService = createDecorator("agentUsageService");
     GoalModel = defineModel("goal", () => null);
     GoalStatusSchema = external_exports.enum([
@@ -257469,8 +257764,6 @@ ${records.join("\n---\n")}`,
       "mcp__*"
     ];
     CODER_TOOLS = [
-      "Agent",
-      "AgentSwarm",
       "Bash",
       "CronCreate",
       "CronDelete",
@@ -257630,7 +257923,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       async doCreate(agentId, opts) {
         const agentScope = this.ctx.scope(`agents/${agentId}`);
         const agentHomedir = join$1(this.bootstrap.homeDir, agentScope);
-        const handle = createScopedChildHandle(this.instantiation, "agent", agentId, { extra: [[IAgentScopeContext, makeAgentScopeContext({
+        const handle = createScopedChildHandle(this.instantiation, "agent", agentId, { seeds: [[IAgentScopeContext, makeAgentScopeContext({
           agentId,
           agentScope
         })], [ITelemetryService, this.telemetry.withContext({ agent_id: agentId })]] });
@@ -257891,6 +258184,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
     ], WorkspaceMcpConfigService);
     registerScopedService("workspace", IWorkspaceMcpConfigService, WorkspaceMcpConfigService, 0, "workspaceMcpConfig");
     IWorkspaceMcpService = createDecorator("workspaceMcpService");
+    ISessionEphemeralMcpServers = createDecorator("sessionEphemeralMcpServers");
     MergedMcpConnectionView = class {
       base;
       overlay;
@@ -257943,6 +258237,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         return this.overlayNames.has(name) ? this.overlay : this.base;
       }
     };
+    ISessionLifecycleService = createDecorator("sessionLifecycleService");
     WorkspaceMcpService = class WorkspaceMcpService2 extends Service {
       mcpConfig;
       log;
@@ -257954,7 +258249,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       ready;
       mutationTail = Promise.resolve();
       resolveClientName = () => this.identity.current().slug;
-      constructor(workspace, mcpConfig, oauthStore, log2, telemetry, identity) {
+      constructor(workspace, mcpConfig, oauthStore, log2, telemetry, identity, sessionLifecycle) {
         super();
         this.mcpConfig = mcpConfig;
         this.log = log2;
@@ -257975,6 +258270,15 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         this._register({ dispose: () => void this.manager.shutdown() });
         this._register(this.mcpConfig.onDidChange((change) => {
           this.scheduleApply(change);
+        }));
+        this._register(sessionLifecycle.onWillCreateSession((event) => {
+          const servers = event.readSeed(ISessionEphemeralMcpServers);
+          if (Object.keys(servers).length === 0) return;
+          const overlay2 = this.sessionOverlay(servers, { stdioCwd: event.readSeed(ISessionContext).cwd });
+          event.contributeSeed(ISessionMcpHandle, overlay2.handle);
+          event.onSessionDispose(() => {
+            overlay2.shutdown();
+          });
         }));
         this.ready = this.initialize().catch((error48) => {
           this.log.error("mcp initial load failed", { error: error48 });
@@ -258074,7 +258378,8 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       __decorateParam(2, IMcpOAuthStore),
       __decorateParam(3, ILogService),
       __decorateParam(4, ITelemetryService),
-      __decorateParam(5, IAgentIdentity)
+      __decorateParam(5, IAgentIdentity),
+      __decorateParam(6, ISessionLifecycleService)
     ], WorkspaceMcpService);
     registerScopedService("workspace", IWorkspaceMcpService, WorkspaceMcpService, 0, "workspaceMcp");
     ISessionSubagentService = createDecorator("sessionSubagentService");
@@ -258584,7 +258889,6 @@ ${modelLines}`;
     });
     IWorkspaceLifecycleService = createDecorator("workspaceLifecycleService");
     IWorkspaceService = createDecorator("workspaceService");
-    ISessionLifecycleService = createDecorator("sessionLifecycleService");
     WorkspaceLifecycleService = class WorkspaceLifecycleService2 extends Service {
       instantiation;
       bootstrap;
@@ -258640,7 +258944,7 @@ ${modelLines}`;
           persistenceBackendId: LOCAL_PERSISTENCE_BACKEND_ID
         };
         await this.hostEnv.ready;
-        const handle = createScopedChildHandle(this.instantiation, "workspace", workspaceId, { extra: workspaceContextSeed(ctx) });
+        const handle = createScopedChildHandle(this.instantiation, "workspace", workspaceId, { seeds: workspaceContextSeed(ctx) });
         this.live.set(workspaceId, handle);
         this._onDidMaterializeHandler.fire(handle);
         return handle;
@@ -258849,10 +259153,11 @@ ${modelLines}`;
       explicitAgentProfileLoader;
       userAgentProfileLoader;
       pluginAgentProfileLoader;
-      mcp;
       workspaceDirs;
       processRunner;
       sessions = /* @__PURE__ */ new Map();
+      _onWillCreateSession = this._register(new Emitter());
+      onWillCreateSession = this._onWillCreateSession.event;
       _onDidCreateSession = this._register(new Emitter());
       onDidCreateSession = this._onDidCreateSession.event;
       _onDidCloseSession = this._register(new Emitter());
@@ -258862,15 +259167,7 @@ ${modelLines}`;
       _onDidForkSession = this._register(new Emitter());
       onDidForkSession = this._onDidForkSession.event;
       resuming = /* @__PURE__ */ new Map();
-      /**
-      * Live per-session MCP overlays keyed by session id. The session handle's
-      * dispose removes its overlay here before shutting it down, so whatever
-      * remains at service teardown (the DI container disposes session scopes
-      * directly, bypassing the handle wrapper) is shut down from the
-      * service's own dispose instead — no overlay outlives the lifecycle.
-      */
-      liveOverlays = /* @__PURE__ */ new Map();
-      constructor(instantiation, workspaceContext, bootstrap2, config2, hostEnv, index, indexMirror, appendLogStore, docs, hostFs, cronStore, event, telemetry, workspaceAgentProfileLoader, extraAgentProfileLoader, explicitAgentProfileLoader, userAgentProfileLoader, pluginAgentProfileLoader, mcp, workspaceDirs, processRunner) {
+      constructor(instantiation, workspaceContext, bootstrap2, config2, hostEnv, index, indexMirror, appendLogStore, docs, hostFs, cronStore, event, telemetry, workspaceAgentProfileLoader, extraAgentProfileLoader, explicitAgentProfileLoader, userAgentProfileLoader, pluginAgentProfileLoader, workspaceDirs, processRunner) {
         super();
         this.instantiation = instantiation;
         this.workspaceContext = workspaceContext;
@@ -258890,13 +259187,8 @@ ${modelLines}`;
         this.explicitAgentProfileLoader = explicitAgentProfileLoader;
         this.userAgentProfileLoader = userAgentProfileLoader;
         this.pluginAgentProfileLoader = pluginAgentProfileLoader;
-        this.mcp = mcp;
         this.workspaceDirs = workspaceDirs;
         this.processRunner = processRunner;
-        this._register({ dispose: () => {
-          for (const overlay2 of this.liveOverlays.values()) overlay2.shutdown();
-          this.liveOverlays.clear();
-        } });
       }
       get workspaceId() {
         return this.workspaceContext.workspaceId;
@@ -258952,10 +259244,8 @@ ${modelLines}`;
         };
         const hooks = createHooks(["onDidCreateSession", "onWillCloseSession"]);
         await this.hostEnv.ready;
-        const mcpOverlay = opts.mcpServers !== void 0 && Object.keys(opts.mcpServers).length > 0 ? this.mcp.sessionOverlay(opts.mcpServers, { stdioCwd: opts.workDir }) : void 0;
-        if (mcpOverlay !== void 0) this.liveOverlays.set(opts.sessionId, mcpOverlay);
-        const scopeHandle = createScopedChildHandle(this.instantiation, "session", opts.sessionId, {
-          extra: [
+        const handle = createScopedChildHandle(this.instantiation, "session", opts.sessionId, {
+          seeds: [
             ...sessionContextSeed(ctx),
             ...sessionLifecycleHooksSeed(hooks),
             [ITelemetryService, this.telemetry.withContext({ sessionId: opts.sessionId })],
@@ -258963,17 +259253,23 @@ ${modelLines}`;
               _serviceBrand: void 0,
               workspaceKey: workspaceId
             }),
-            [ISessionProcessRunner, this.processRunner]
+            [ISessionProcessRunner, this.processRunner],
+            ...sessionEphemeralMcpServersSeed(opts.mcpServers ?? {})
           ],
-          assemble: (container) => assembleSessionSeedAdapters(container, mcpOverlay?.handle)
-        });
-        const handle = mcpOverlay === void 0 ? scopeHandle : {
-          ...scopeHandle,
-          dispose: () => {
-            if (this.liveOverlays.delete(opts.sessionId)) mcpOverlay.shutdown();
-            scopeHandle.dispose();
+          configureContainer: (container) => {
+            installSessionSeedAdapters(container);
+            this._onWillCreateSession.fire({
+              sessionId: opts.sessionId,
+              readSeed: (id) => container.invokeFunction((accessor) => accessor.get(id)),
+              contributeSeed: (id, value) => {
+                container.provide(id, value);
+              },
+              onSessionDispose: (dispose2) => {
+                container.anchorKernelEntry(dispose2, "sessionLifecycle:willCreateParticipant");
+              }
+            });
           }
-        };
+        });
         try {
           await handle.accessor.get(ISessionMetadata).ready;
           await handle.accessor.get(ISessionToolPolicy).ready;
@@ -259285,9 +259581,8 @@ ${modelLines}`;
       __decorateParam(15, IExplicitAgentProfileLoader),
       __decorateParam(16, IUserAgentProfileLoader),
       __decorateParam(17, IPluginAgentProfileLoader),
-      __decorateParam(18, IWorkspaceMcpService),
-      __decorateParam(19, IWorkspaceDirs),
-      __decorateParam(20, ISessionProcessRunner)
+      __decorateParam(18, IWorkspaceDirs),
+      __decorateParam(19, ISessionProcessRunner)
     ], SessionLifecycleService);
     registerScopedService("workspace", ISessionLifecycleService, SessionLifecycleService, 0, "sessionLifecycle");
     ISessionExternalHooksService = createDecorator("sessionExternalHooksService");
@@ -266243,7 +266538,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
       title: "minidb read model",
       description: "Use the minidb-backed IQueryStore as a derived read model for session indexing and wire replay.",
       env: "KIMI_CODE_EXPERIMENTAL_PERSISTENCE_MINIDB_READMODEL",
-      default: false,
+      default: true,
       surface: "core"
     });
     MAX_LEVEL = 32;
@@ -266309,6 +266604,59 @@ human_shell_hint: The pending question is also visible in /tasks.`
           index: -1
         });
         for (let i2 = 0; i2 < count; i2++) {
+          const node = nodes[i2];
+          for (let l = 0; l < node.level.length; l++) {
+            const pred = lastAt[l];
+            pred.node.level[l].forward = node;
+            pred.node.level[l].span = i2 - pred.index;
+            lastAt[l] = {
+              node,
+              index: i2
+            };
+          }
+          node.backward = i2 === 0 ? null : nodes[i2 - 1];
+        }
+        for (let l = 0; l < list.level; l++) {
+          const pred = lastAt[l];
+          pred.node.level[l].span = pred.index === -1 ? count : 0;
+        }
+        list.tail = nodes[count - 1];
+        list.length = count;
+        return list;
+      }
+      /** Sliced variant of bulkLoad (the open-time main-thread load paths):
+      *  builds the exact same balanced tower, but yields to the event loop every
+      *  `sliceEvery` source entries in the two O(N) passes (node creation,
+      *  level linking), so a large image load never runs as one synchronous
+      *  slice. */
+      static async bulkLoadAsync(entries2, opts = {}, slice = {}) {
+        const sliceEvery = slice.sliceEvery ?? 65536;
+        const yieldToLoop2 = () => new Promise((r2) => setImmediate(r2));
+        const list = new SkipList2(opts);
+        const n = entries2.length;
+        if (n === 0) return list;
+        const nodes = [];
+        for (let i2 = 0; i2 < n; i2++) {
+          if (i2 > 0 && i2 % sliceEvery === 0) await yieldToLoop2();
+          const e2 = entries2[i2];
+          if (nodes.length > 0) {
+            const prev = nodes[nodes.length - 1];
+            if (list.cmpK(prev.key, e2.key) === 0 && list.cmpV(prev.val, e2.val) === 0) continue;
+          }
+          let lvl = 1;
+          for (let m3 = i2 + 1; m3 % 4 === 0 && lvl < MAX_LEVEL; m3 = m3 / 4) lvl++;
+          nodes.push(new SkipNode(e2.key, e2.val, lvl));
+        }
+        const count = nodes.length;
+        list.level = 1;
+        for (const node of nodes) if (node.level.length > list.level) list.level = node.level.length;
+        const lastAt = [];
+        for (let l = 0; l < list.level; l++) lastAt.push({
+          node: list.header,
+          index: -1
+        });
+        for (let i2 = 0; i2 < count; i2++) {
+          if (i2 > 0 && i2 % sliceEvery === 0) await yieldToLoop2();
           const node = nodes[i2];
           for (let l = 0; l < node.level.length; l++) {
             const pred = lastAt[l];
@@ -266620,6 +266968,16 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  expiry backlog), making the next ticks aggressive until the storm drains
       *  — like Redis's aggressive expire cycle. */
       expireAggressive = false;
+      /** In-flight async bulk load (bulkLoadRefsAsync only — the sync bulk load
+      *  yields nothing, so no timer can fire mid-load there). Active expiry is
+      *  paused for the load's duration: a mid-load reap would delete the key
+      *  from the map (and from the about-to-be-replaced OLD ordered index, a
+      *  no-op) while the load still rebuilds `order` from its accumulated
+      *  entries — resurrecting the reaped key in the ordered index, where a
+      *  later re-set would duplicate it in ordered scans. Whatever elapsed
+      *  during the load is reaped by the first tick after it, which is exactly
+      *  the sync bulkLoadRefs behavior. */
+      bulkLoading = false;
       timer = null;
       onExpire;
       readValue;
@@ -266894,7 +267252,51 @@ human_shell_hint: The pending question is also visible in /tasks.`
         }
         this.order = SkipList.bulkLoad(orderEntries, { compareKey: cmpString });
       }
+      /** Sliced variant of bulkLoadRefs (the open-time main-thread path):
+      *  identical resulting state, but the per-record map insertions yield to
+      *  the event loop every `sliceEvery` records, so a large store image never
+      *  loads in one synchronous run. The final ordered-index bulk build is a
+      *  single O(N) pass over the sorted entries and is likewise sliced via
+      *  SkipList.bulkLoadAsync. Safe to yield mid-load: the store is not
+      *  published until open() returns, and active expiry is paused for the
+      *  load's duration (see `bulkLoading`) so a mid-load reap cannot diverge
+      *  the map from the not-yet-rebuilt ordered index. */
+      async bulkLoadRefsAsync(records, opts = {}) {
+        const sliceEvery = opts.sliceEvery ?? 8192;
+        const orderEntries = [];
+        this.bulkLoading = true;
+        try {
+          let n = 0;
+          for (const { kstr, ref: ref2, expireAt, dt: dt2, metaBytes } of records) {
+            const seq = ++this.seq;
+            this.map.set(kstr, {
+              ref: ref2,
+              expireAt: expireAt || 0,
+              seq,
+              dt: dt2
+            });
+            this.bytes += Buffer.byteLength(kstr, "binary") + this.refBytes(ref2) + (metaBytes ?? 0);
+            if (expireAt) {
+              this.expiring++;
+              this.heap.push({
+                t: expireAt,
+                k: kstr,
+                seq
+              });
+            }
+            orderEntries.push({
+              key: kstr,
+              val: kstr
+            });
+            if (++n % sliceEvery === 0) await new Promise((r2) => setImmediate(r2));
+          }
+          this.order = await SkipList.bulkLoadAsync(orderEntries, { compareKey: cmpString }, { sliceEvery });
+        } finally {
+          this.bulkLoading = false;
+        }
+      }
       activeExpire() {
+        if (this.bulkLoading) return;
         const now = Date.now();
         const deadline = now + (this.expireAggressive ? Math.max(this.expireTimeBudgetMs, 10) : this.expireTimeBudgetMs);
         let n = 0;
@@ -267485,11 +267887,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
     EMPTY = Buffer.alloc(0);
     SUB_HEADER = 19;
     CRC_CHUNK = 1 << 20;
-    MAGIC_SCAN_CHUNK = 1 << 20;
     DEFAULT_RESYNC_CANDIDATE_BUDGET = 65536;
     ASYNC_SCAN_WINDOW = 1 << 22;
     SCAN_YIELD_BYTES = 1 << 23;
-    yieldToLoop$2 = () => new Promise((r2) => setImmediate(r2));
+    yieldToLoop$3 = () => new Promise((r2) => setImmediate(r2));
     SNAPSHOT_FILE = "db.snapshot";
     WAL_FILE = "db.wal";
     SECONDARY_INDEXES_FILE = "db.indexes.json";
@@ -267527,8 +267928,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
     CJK = /[\u3400-\u9fff\u3040-\u30ff\uff00-\uffef]+/g;
     MAX_TERM_CHARS = 65535;
     MAX_TERM_BYTES = 65535;
-    yieldToLoop$1 = () => new Promise((r2) => setImmediate(r2));
-    APPLY_YIELD_FRAMES = 4096;
+    yieldToLoop$2 = () => new Promise((r2) => setImmediate(r2));
     RecoveryGenerationChurnError = class extends Error {
       attempts;
       code = "RECOVERY_GENERATION_CHURN";
@@ -267541,7 +267941,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
     GENERATION_RETRY_BASE_MS = 5;
     sleep$3 = (ms2) => new Promise((r2) => setTimeout(r2, ms2));
     sleep$2 = (ms2) => new Promise((r2) => setTimeout(r2, ms2));
-    yieldToLoop = () => new Promise((r2) => setImmediate(r2));
+    yieldToLoop$1 = () => new Promise((r2) => setImmediate(r2));
     FLUSH_BYTES$3 = 1 << 20;
     DEFAULT_READ_CONCURRENCY = 8;
     DEFAULT_SLICE_BYTES = 8 << 20;
@@ -267873,6 +268273,55 @@ human_shell_hint: The pending question is also visible in /tasks.`
               const arr = byPk.get(pk);
               if (arr) arr.push(v.scalarKey);
               else byPk.set(pk, [v.scalarKey]);
+            }
+          }
+          idx.map = map2;
+          idx.byPk = byPk;
+        } else throw new Error(`index "${image.name}" image payload missing`);
+      }
+      /** Sliced variant of loadImage (the open-time main-thread path): identical
+      *  resulting state, but the forward/reverse map construction yields to the
+      *  event loop every `sliceEvery` entries. The state swap itself (assigning
+      *  the freshly built containers) stays one synchronous segment, so a
+      *  mid-load yield can never expose a half-built index. Safe to yield while
+      *  building: the containers are detached until the swap, and the store is
+      *  not published until open() returns. */
+      async loadImageAsync(image, opts = {}) {
+        const sliceEvery = opts.sliceEvery ?? 32768;
+        const idx = this.indexes.get(image.name);
+        if (!idx) throw new Error(`no such index: ${image.name}`);
+        if (idx.type !== image.type) throw new Error(`index "${image.name}" image type mismatch`);
+        let n = 0;
+        const tick = async () => {
+          if (++n % sliceEvery === 0) await new Promise((r2) => setImmediate(r2));
+        };
+        if (idx.type === "range" && image.range) {
+          const list = await SkipList.bulkLoadAsync(image.range.map((e2) => ({
+            key: e2.value,
+            val: e2.pk
+          })), {
+            compareKey: cmpNumber,
+            compareVal: cmpString
+          }, { sliceEvery });
+          const byPk = /* @__PURE__ */ new Map();
+          for (const e2 of image.range) {
+            const arr = byPk.get(e2.pk);
+            if (arr) arr.push(e2.value);
+            else byPk.set(e2.pk, [e2.value]);
+            await tick();
+          }
+          idx.list = list;
+          idx.byPk = byPk;
+        } else if (idx.type === "equality" && image.equality) {
+          const map2 = /* @__PURE__ */ new Map();
+          const byPk = /* @__PURE__ */ new Map();
+          for (const v of image.equality) {
+            map2.set(v.scalarKey, new Set(v.pks));
+            for (const pk of v.pks) {
+              const arr = byPk.get(pk);
+              if (arr) arr.push(v.scalarKey);
+              else byPk.set(pk, [v.scalarKey]);
+              await tick();
             }
           }
           idx.map = map2;
@@ -268570,13 +269019,13 @@ human_shell_hint: The pending question is also visible in /tasks.`
         let n = 0;
         for (const [t2, e2] of dictEntries) {
           postings.set(t2, e2);
-          if (++n % sliceEvery === 0) await yieldToLoop$1();
+          if (++n % sliceEvery === 0) await yieldToLoop$2();
         }
         const keyToId = /* @__PURE__ */ new Map();
         for (let i2 = 0; i2 < keys2.length; i2++) {
           const k = keys2[i2];
           if (k !== void 0) keyToId.set(k, i2);
-          if (i2 % sliceEvery === sliceEvery - 1) await yieldToLoop$1();
+          if (i2 % sliceEvery === sliceEvery - 1) await yieldToLoop$2();
         }
         return {
           postings,
@@ -268988,6 +269437,14 @@ human_shell_hint: The pending question is also visible in /tasks.`
       attachImage(args) {
         attachImage(this, args);
       }
+      /** Sliced variant of attachImage (the open-time main-thread path):
+      *  identical resulting state, but every O(terms/docs) map construction is
+      *  built from the raw parsed images in slices with event-loop yields, so
+      *  attaching a large generation's base never stalls the loop for the whole
+      *  pass. */
+      async attachImageAsync(args, opts = {}) {
+        await attachImageAsync(this, args, opts);
+      }
       /** Stage-5 generation build: after the atomic publish rename, repoint the
       *  live base handle from the build's tmp directory to the published
       *  generation directory (same file, final name). On Windows an open handle
@@ -269256,6 +269713,39 @@ human_shell_hint: The pending question is also visible in /tasks.`
         entry.groups = groups;
         entry.byPk = byPk;
       }
+      /** Sliced variant of loadImage (the open-time main-thread path): identical
+      *  resulting state, but the group/byPk map construction yields to the
+      *  event loop every `sliceEvery` entries. The state swap itself stays one
+      *  synchronous segment (the containers are detached until then), and the
+      *  store is not published until open() returns, so a mid-load yield is
+      *  never observable. */
+      async loadImageAsync(image, opts = {}) {
+        const sliceEvery = opts.sliceEvery ?? 32768;
+        const entry = this.indexes.get(image.name);
+        if (!entry) throw new Error(`no such compound index: ${image.name}`);
+        const groups = /* @__PURE__ */ new Map();
+        const byPk = /* @__PURE__ */ new Map();
+        let n = 0;
+        for (const g2 of image.groups) {
+          const list = await SkipList.bulkLoadAsync(g2.entries.map((e2) => ({
+            key: e2.order,
+            val: e2.pk
+          })), {
+            compareKey: entry.cmp,
+            compareVal: cmpString
+          }, { sliceEvery });
+          groups.set(g2.group, list);
+          for (const e2 of g2.entries) {
+            byPk.set(e2.pk, {
+              group: g2.group,
+              order: e2.order
+            });
+            if (++n % sliceEvery === 0) await new Promise((r2) => setImmediate(r2));
+          }
+        }
+        entry.groups = groups;
+        entry.byPk = byPk;
+      }
     };
     CODECS = {
       buffer: {
@@ -269291,10 +269781,17 @@ human_shell_hint: The pending question is also visible in /tasks.`
     LockFile = class {
       path;
       held = false;
-      /** Identity of the current acquire() attempt: minted fresh per attempt,
+      /** Token of the current acquire attempt: minted fresh per attempt,
       *  carried by every file this instance publishes (lock/bid/watch), and the
       *  sole ownership criterion (`mine`). Null before the first acquire(). */
       token = null;
+      /** The held instance's ownership token (undefined unless currently held).
+      *  Lets a host supervising this database from another thread learn WHO
+      *  holds the lock file without parsing it — worker threads share the main
+      *  process pid, so the pid in the lock line cannot distinguish them. */
+      get heldToken() {
+        return this.held && this.token !== null ? this.token : void 0;
+      }
       /** Serializes acquire/renew/release (the shared promise-chain pattern of
       *  serialize.ts): each op's whole read-check-write completes before the next
       *  one starts, so a renew already in flight finishes before a release
@@ -269778,6 +270275,39 @@ human_shell_hint: The pending question is also visible in /tasks.`
           this.waiters.push(grant);
         });
       }
+      /** TUI-safe slot policy: queue for a slot up to `waitMs` (observing the
+      *  optional abort signal) instead of dropping a large worker-eligible
+      *  build onto the main thread the moment every slot is busy. Resolves null
+      *  on timeout — the caller decides whether its bounded inline core is an
+      *  acceptable last resort. Rejects MaintenanceCancelledError on abort. */
+      async acquireBounded(waitMs, signal) {
+        const immediate = this.tryAcquire();
+        if (immediate) return immediate;
+        if (signal?.aborted) throw new MaintenanceCancelledError("generation-build");
+        return new Promise((resolve3, reject) => {
+          const cleanup = () => {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", onAbort);
+            const i2 = this.waiters.indexOf(grant);
+            if (i2 >= 0) this.waiters.splice(i2, 1);
+          };
+          const timer = setTimeout(() => {
+            cleanup();
+            resolve3(null);
+          }, waitMs);
+          timer.unref?.();
+          const onAbort = () => {
+            cleanup();
+            reject(new MaintenanceCancelledError("generation-build"));
+          };
+          const grant = () => {
+            cleanup();
+            resolve3(() => this.release());
+          };
+          signal?.addEventListener("abort", onAbort, { once: true });
+          this.waiters.push(grant);
+        });
+      }
       release() {
         const next = this.waiters.shift();
         if (next) {
@@ -269788,6 +270318,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
       }
     };
     defaultWorkerSlots = new WorkerSlots(Math.max(1, Math.min(2, Math.floor(os.cpus().length / 2))));
+    TEXT_BUILD_SLOT_WAIT_MS = 3e4;
     MemoryGuard = class {
       deps;
       /** pk, insertion-ordered by last touch (Map/Set iteration order): front =
@@ -270506,6 +271037,8 @@ human_shell_hint: The pending question is also visible in /tasks.`
         });
       }
     };
+    yieldToLoop = () => new Promise((r2) => setImmediate(r2));
+    VERIFY_CHUNK_BYTES = 1 << 20;
     STORE_MAGIC = "MDGS";
     TAG_INLINE = 0;
     TAG_SNAPSHOT_LOC = 1;
@@ -270834,6 +271367,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
     };
     DEFAULT_ABORT_POLL_MS = 100;
     DEFAULT_MAX_OLD_SPACE_MB = 1024;
+    STORE_IMAGE_RECORDS_PER_SLICE = 8192;
     GenerationLoader = class {
       deps;
       setGenerationInfo;
@@ -270882,13 +271416,15 @@ human_shell_hint: The pending question is also visible in /tasks.`
           }
           this.deps.setValueReader(reader);
         }
+        const tStore = performance.now();
         const storeInfo = manifest.files[STORE_IMAGE_FILE];
         if (!storeInfo) throw new GenerationCorruptError("store image missing from manifest");
-        const storePayload = await readGenerationFileChecked(path.join(genDir, STORE_IMAGE_FILE), "MDGS", 4, storeInfo);
+        const storePayload = await readGenerationFileCheckedAsync(path.join(genDir, STORE_IMAGE_FILE), "MDGS", 4, storeInfo);
         const now = Date.now();
         const droppedExpired = [];
         const records = [];
         let imageCount = 0;
+        let parsed2 = 0;
         for (const rec of readStoreImage(storePayload)) {
           imageCount++;
           if (rec.expireAt && rec.expireAt <= now) {
@@ -270897,12 +271433,16 @@ human_shell_hint: The pending question is also visible in /tasks.`
           }
           if (this.deps.valueMode() === "memory" && rec.ref.kind !== "memory") throw new GenerationCorruptError("store image carries disk refs for a memory-mode open");
           records.push(rec);
+          if (++parsed2 % STORE_IMAGE_RECORDS_PER_SLICE === 0) await yieldToLoop$2();
         }
-        this.deps.store().bulkLoadRefs(records);
+        await this.deps.store().bulkLoadRefsAsync(records);
         if (manifest.counts && typeof manifest.counts.records === "number" && manifest.counts.records !== imageCount) throw new GenerationCorruptError(`store image record count mismatch (${imageCount} != ${manifest.counts.records})`);
+        this.deps.lifecycle.time("storeImageLoadMs", performance.now() - tStore);
+        const tNonText = performance.now();
         await this.loadDtImage(genDir, manifest);
         await this.loadSecondaryImages(genDir, manifest);
         await this.loadCompoundImages(genDir, manifest);
+        this.deps.lifecycle.time("nonTextImageLoadMs", performance.now() - tNonText);
         await this.loadTextImages(genDir, manifest);
         for (const k of droppedExpired) {
           this.deps.dt.del(k);
@@ -270910,6 +271450,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
           this.deps.compound.remove(k);
           for (const ti2 of this.deps.textRegistry.text.values()) ti2.remove(k);
         }
+        this.deps.lifecycle.transition("wal-catch-up");
         const replay = await this.replayWalDelta(cp2.walOffset, mode);
         const walAfter = await fs.stat(this.deps.walPath()).catch((e2) => {
           if (e2.code === "ENOENT") return null;
@@ -270965,35 +271506,41 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  candidate loaded (the caller runs the legacy full recovery). */
       async tryLoadGeneration(mode) {
         const t0 = performance.now();
-        const candidates = [];
+        const lifecycle = this.deps.lifecycle;
         try {
-          const current = await readCurrent(this.deps.dir());
-          if (current) candidates.push(current);
-          for (const g2 of await listGenerations(this.deps.dir())) if (!g2.tmp && g2.id !== current && candidates.length < 3) candidates.push(g2.id);
-        } catch (e2) {
-          this.deps.stats.generationLoadFallbacks++;
-          this.deps.stats.lastGenerationFallback = `list: ${e2.message}`;
+          const candidates = [];
+          try {
+            const current = await readCurrent(this.deps.dir());
+            if (current) candidates.push(current);
+            for (const g2 of await listGenerations(this.deps.dir())) if (!g2.tmp && g2.id !== current && candidates.length < 3) candidates.push(g2.id);
+          } catch (e2) {
+            this.deps.stats.generationLoadFallbacks++;
+            this.deps.stats.lastGenerationFallback = `list: ${e2.message}`;
+            return false;
+          }
+          for (const id of candidates) try {
+            lifecycle.transition("generation-load");
+            await this.loadOneGeneration(id, mode);
+            this.deps.stats.generationLoads++;
+            this.deps.stats.generationLoadDurationMs += performance.now() - t0;
+            return true;
+          } catch (e2) {
+            if (!(e2 instanceof GenerationCorruptError) && e2.code !== "ENOENT") throw e2;
+            this.deps.stats.generationLoadFallbacks++;
+            this.deps.stats.lastGenerationFallback = `${id}: ${e2.message}`;
+            this.resetAfterFailedGenerationLoad();
+          }
           return false;
+        } finally {
+          lifecycle.time("generationCandidateLoadMs", performance.now() - t0);
         }
-        for (const id of candidates) try {
-          await this.loadOneGeneration(id, mode);
-          this.deps.stats.generationLoads++;
-          this.deps.stats.generationLoadDurationMs += performance.now() - t0;
-          return true;
-        } catch (e2) {
-          if (!(e2 instanceof GenerationCorruptError) && e2.code !== "ENOENT") throw e2;
-          this.deps.stats.generationLoadFallbacks++;
-          this.deps.stats.lastGenerationFallback = `${id}: ${e2.message}`;
-          this.resetAfterFailedGenerationLoad();
-        }
-        return false;
       }
       /** Load the dt image; rebuild the (cheap, metadata-only) dt index from the
       *  loaded store when the image is absent/corrupt. */
       async loadDtImage(genDir, manifest) {
         const info = manifest.files[DT_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileChecked(path.join(genDir, DT_INDEX_FILE), "MDGD", 1, info);
+          const payload = await readGenerationFileCheckedAsync(path.join(genDir, DT_INDEX_FILE), "MDGD", 1, info);
           this.deps.dt.loadImage(readDtIndexImage(payload));
           return;
         } catch (e2) {
@@ -271010,22 +271557,23 @@ human_shell_hint: The pending question is also visible in /tasks.`
       }
       /** Load secondary-index images for definitions whose hash still matches;
       *  rebuild exactly the affected indexes otherwise (plan: only the affected
-      *  index is rebuilt, never the whole registry). */
+      *  index is rebuilt, never the whole registry). The payload verify, the
+      *  parse, and each image's map construction are event-loop sliced. */
       async loadSecondaryImages(genDir, manifest) {
         const live = this.deps.indexes.list();
         if (live.length === 0) return;
         let images = null;
         const info = manifest.files[SECONDARY_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileChecked(path.join(genDir, SECONDARY_INDEX_FILE), "MDSI", 1, info);
-          images = new Map(readSecondaryIndexImage(payload).map((i2) => [i2.name, i2]));
+          const payload = await readGenerationFileCheckedAsync(path.join(genDir, SECONDARY_INDEX_FILE), "MDSI", 1, info);
+          images = new Map((await readSecondaryIndexImageAsync(payload)).map((i2) => [i2.name, i2]));
         } catch (e2) {
           if (!(e2 instanceof GenerationCorruptError)) throw e2;
         }
         for (const def of live) {
           const image = images?.get(def.name);
           if (image && manifest.indexDefs.secondary[def.name] === indexDefHash(def)) try {
-            this.deps.indexes.loadImage(image);
+            await this.deps.indexes.loadImageAsync(image);
             continue;
           } catch {
           }
@@ -271039,22 +271587,23 @@ human_shell_hint: The pending question is also visible in /tasks.`
         for (const { key: key2, value } of this.deps.liveRecordsRaw()) if (this.deps.indexable(value)) fresh.add(toKStr(key2), value);
         this.deps.indexes.indexes.set(def.name, fresh.indexes.get(def.name));
       }
-      /** Load compound-index images (same per-index discipline as secondary). */
+      /** Load compound-index images (same per-index discipline — and the same
+      *  event-loop slicing — as secondary). */
       async loadCompoundImages(genDir, manifest) {
         const live = this.deps.compound.list();
         if (live.length === 0) return;
         let images = null;
         const info = manifest.files[COMPOUND_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileChecked(path.join(genDir, COMPOUND_INDEX_FILE), "MDCI", 1, info);
-          images = new Map(readCompoundIndexImage(payload).map((i2) => [i2.name, i2]));
+          const payload = await readGenerationFileCheckedAsync(path.join(genDir, COMPOUND_INDEX_FILE), "MDCI", 1, info);
+          images = new Map((await readCompoundIndexImageAsync(payload)).map((i2) => [i2.name, i2]));
         } catch (e2) {
           if (!(e2 instanceof GenerationCorruptError)) throw e2;
         }
         for (const def of live) {
           const image = images?.get(def.name);
           if (image && manifest.indexDefs.compound[def.name] === indexDefHash(def)) try {
-            this.deps.compound.loadImage(image);
+            await this.deps.compound.loadImageAsync(image);
             continue;
           } catch {
           }
@@ -271086,46 +271635,41 @@ human_shell_hint: The pending question is also visible in /tasks.`
           const postingsInfo = manifest.files[textPostingsFile(def.name)];
           let attached = false;
           if (dictInfo && docsInfo && postingsInfo && manifest.indexDefs.text[def.name] === indexDefHash(TextRegistry.canonicalTextDef(def))) try {
-            const dictPayload = await readGenerationFileChecked(path.join(genDir, textDictionaryFile(def.name)), "MDTD", 1, dictInfo);
-            const docsPayload = await readGenerationFileChecked(path.join(genDir, textDocsFile(def.name)), "MDTC", 1, docsInfo);
+            const tImage = performance.now();
+            const dictPayload = await readGenerationFileCheckedAsync(path.join(genDir, textDictionaryFile(def.name)), "MDTD", 1, dictInfo);
+            const docsPayload = await readGenerationFileCheckedAsync(path.join(genDir, textDocsFile(def.name)), "MDTC", 1, docsInfo);
             const postingsPath = path.join(genDir, textPostingsFile(def.name));
-            verifyFileIntegritySync(postingsPath, postingsInfo);
-            const dict = new Map(readTextDictionaryImage(dictPayload).map((e2) => [e2.term, {
-              off: e2.off,
-              len: e2.len,
-              df: e2.df
-            }]));
-            const docs = readTextDocsImage(docsPayload);
-            const docLens = /* @__PURE__ */ new Map();
-            for (let i2 = 0; i2 < docs.docLens.length; i2++) {
-              const len = docs.docLens[i2];
-              if (len !== void 0) docLens.set(i2, len);
-            }
-            ti2.attachImage({
+            const tCrc = performance.now();
+            await verifyFileIntegrityAsync(postingsPath, postingsInfo);
+            this.deps.lifecycle.time("postingsIntegrityCheckMs", performance.now() - tCrc);
+            const dictEntries = await readTextDictionaryImageAsync(dictPayload);
+            const docs = await readTextDocsImageAsync(docsPayload);
+            await ti2.attachImageAsync({
               postingsPath,
-              dict,
-              keys: docs.keys,
-              docLens,
-              liveCount: docs.liveCount,
-              removed: new Set(docs.removed),
-              delta: new Map(docs.delta.map((d) => [d.term, new Map(d.docs.map((x3) => [x3.docID, x3.freq]))]))
+              dictEntries,
+              docs
             });
             ti2.postingsFileInfo = {
               bytes: postingsInfo.bytes,
               crc32: postingsInfo.crc32
             };
+            this.deps.lifecycle.time("textImageLoadMs", performance.now() - tImage);
+            this.deps.lifecycle.noteTextIndexSource(def.name, "image");
             attached = true;
           } catch (e2) {
             if (!(e2 instanceof GenerationCorruptError) && e2.code !== "ENOENT") throw e2;
           }
           if (!attached) {
             this.deps.stats.generationIndexRebuilds++;
+            const tRebuild = performance.now();
             let hosted = null;
             try {
               hosted = await this.deps.boundedTextBuild(def.name, ti2, def, manifest.checkpoint);
             } catch {
             }
             if (hosted === null) await ti2.build(this.deps.textRecords());
+            this.deps.lifecycle.time("textRebuildMs", performance.now() - tRebuild);
+            this.deps.lifecycle.noteTextIndexSource(def.name, hosted ?? "staged");
           }
         }
       }
@@ -271136,16 +271680,22 @@ human_shell_hint: The pending question is also visible in /tasks.`
         const fd = fsSync.openSync(this.deps.walPath(), "r");
         try {
           const st2 = fsSync.fstatSync(fd);
+          const tScan = performance.now();
           const r2 = await scanFrameRefsFdAsync(fd, {
             onCorrupt: mode,
             startOffset
           });
+          this.deps.lifecycle.time("walScanMs", performance.now() - tScan);
+          const tApply = performance.now();
           let corruptBatches = 0;
           let appliedOps = 0;
+          const slice = walApplySlicer();
           for (const f4 of r2.frames) for (const op of frameToOps(f4, "wal", fd, this.deps.valueMode(), () => corruptBatches++)) {
             this.deps.applyRecoveredOp(op);
             appliedOps++;
+            if (slice()) await yieldToLoop$2();
           }
+          this.deps.lifecycle.time("walApplyMs", performance.now() - tApply);
           let truncatedWal = false;
           const last = r2.corruptRanges[r2.corruptRanges.length - 1];
           if (last && last[1] === st2.size && !this.deps.readOnly()) {
@@ -271242,9 +271792,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  thread verifies the worker's output (sanity + streaming crc) and swaps
       *  the live base in via commitRebase, and the stage-5 atomic publish stays
       *  the safety boundary — the worker only ever writes inside the tmp
-      *  generation directory. Custom-tokenizer indexes, small corpora, worker
-      *  slot pressure, and deployments without the worker file stay on the
-      *  in-thread staged build. */
+      *  generation directory. Custom-tokenizer indexes and small corpora stay
+      *  on the in-thread staged build; a deployment without the worker file —
+      *  or a worker-slot drought that outlasts the bounded queue wait — hosts
+      *  the SAME bounded core inline instead. */
       async runGenerationBuild(ctx) {
         const t0 = performance.now();
         const gens = generationsDir(this.deps.dir());
@@ -271362,7 +271913,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
               tokensSinceYield = 0;
               drainQueue();
               checkAlive();
-              await yieldToLoop$1();
+              await yieldToLoop$2();
             }
           }
           drainQueue();
@@ -271388,7 +271939,16 @@ human_shell_hint: The pending question is also visible in /tasks.`
               if (e2.code !== "ENOENT") throw e2;
             }
             const workerAvailable = textBuildWorkerAvailable();
-            workerSlotRelease = workerAvailable ? defaultWorkerSlots.tryAcquire() : null;
+            let inlineReason;
+            if (workerAvailable) {
+              try {
+                workerSlotRelease = await defaultWorkerSlots.acquireBounded(this.deps.textBuildSlotWaitMs(), aborter.signal);
+              } catch (e2) {
+                if (e2 instanceof MaintenanceCancelledError) throw new GenerationBuildAborted("worker slot wait cancelled");
+                throw e2;
+              }
+              if (workerSlotRelease === null) inlineReason = "slot-pressure";
+            } else inlineReason = "runtime-unavailable";
             const inline = workerSlotRelease === null;
             workerHandle = startWorkerTextBuild({
               snapshotPath: snapAnchor ? snapPath : null,
@@ -271411,7 +271971,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
               signal: aborter.signal,
               shouldAbort: () => gb.aborted || this.deps.wal() !== gb.wal || this.deps.state() !== "open",
               inline,
-              inlineReason: workerAvailable ? "slot-pressure" : "runtime-unavailable",
+              inlineReason,
               onFallback: (reason) => {
                 this.deps.stats.textWorkerFallbacks++;
                 this.deps.stats.lastTextWorkerFallback = reason;
@@ -272295,9 +272855,15 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  open-time recovery derives from it (frameToOps), plus the incremental
       *  derived-index maintenance applyOp performs on the write path — minus
       *  unique checks: the writer already validated, and intermediate frame
-      *  states must apply literally (LWW). */
-      applyRecoveredFrame(f4, fd) {
-        for (const op of frameToOps(f4, "wal", fd, this.deps.valueMode())) this.applyRecoveredOp(op);
+      *  states must apply literally (LWW). Cooperative: yields between primitive
+      *  ops when the caller's slicer (walApplySlicer budgets) fires — a BATCH
+      *  frame unrolls into thousands of ops, so per-op yielding is what bounds a
+      *  catch-up slice on the host's event loop. */
+      async applyRecoveredFrameAsync(f4, fd, slice) {
+        for (const op of frameToOps(f4, "wal", fd, this.deps.valueMode())) {
+          this.applyRecoveredOp(op);
+          if (slice()) await yieldToLoop$2();
+        }
       }
       applyRecoveredOp(op) {
         const pk = toKStr(op.key);
@@ -272436,7 +273002,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
           for (const rec of this.deps.store().rawRecords()) {
             if (++docsSinceYield >= 512) {
               docsSinceYield = 0;
-              await yieldToLoop$1();
+              await yieldToLoop$2();
             }
             dtB.add(rec.kstr, rec.dt);
             if (!needValues) continue;
@@ -272695,6 +273261,71 @@ human_shell_hint: The pending question is also visible in /tasks.`
         return out;
       }
     };
+    LifecycleTracker = class {
+      current = "no-generation";
+      transitions = ["no-generation"];
+      completedAt = null;
+      pending = /* @__PURE__ */ new Set();
+      textSources = /* @__PURE__ */ new Map();
+      phases = {
+        openMs: 0,
+        generationCandidateLoadMs: 0,
+        storeImageLoadMs: 0,
+        nonTextImageLoadMs: 0,
+        textImageLoadMs: 0,
+        postingsIntegrityCheckMs: 0,
+        walScanMs: 0,
+        walApplyMs: 0,
+        fullRecoveryMs: 0,
+        textRebuildMs: 0
+      };
+      get state() {
+        return this.current;
+      }
+      transition(next) {
+        if (next === this.current) return;
+        this.current = next;
+        this.transitions.push(next);
+      }
+      /** Add `ms` to one phase (phases accumulate across candidates/passes). */
+      time(phase, ms2) {
+        this.phases[phase] += ms2;
+      }
+      noteTextIndexSource(name, source) {
+        this.textSources.set(name, source);
+      }
+      /** A text index's base build was deferred to the background task: pending
+      *  from here until the build commits (finishOpen maps this to 'degraded'). */
+      markTextIndexPending(name) {
+        this.pending.add(name);
+        this.textSources.set(name, "deferred");
+      }
+      /** The deferred build for one index committed (source = its hosting mode);
+      *  the last pending clear flips a completed open back to 'ready'. A finally
+      *  failed build stays pending — the index keeps raising
+      *  TextIndexBuildingError, which IS the degraded state. */
+      clearTextIndexPending(name, source) {
+        this.pending.delete(name);
+        this.textSources.set(name, source);
+        if (this.pending.size === 0 && this.completedAt !== null && this.current === "degraded") this.transition("ready");
+      }
+      /** open() is about to return: servable ('ready') unless a deferred text
+      *  build is still pending ('degraded'). */
+      finishOpen() {
+        this.completedAt = Date.now();
+        this.transition(this.pending.size > 0 ? "degraded" : "ready");
+      }
+      snapshot() {
+        return {
+          state: this.current,
+          path: [...this.transitions],
+          openedAt: this.completedAt,
+          phases: { ...this.phases },
+          textIndexes: Object.fromEntries(this.textSources),
+          pendingTextIndexes: [...this.pending]
+        };
+      }
+    };
     MiniDb = class MiniDb2 {
       dir;
       walPath;
@@ -272735,6 +273366,12 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  offset as advanced by the last successful catch-up (recoveryInfo's scan
       *  endpoint anchors the first call). */
       walTail = null;
+      /** Catch-up serializer: the sliced async apply yields to the event loop, so
+      *  overlapping catch-ups would interleave op-by-op (the pre-async apply was
+      *  atomic per call by virtue of being synchronous). Chaining restores that
+      *  per-call atomicity; a caller queued behind another catch-up observes the
+      *  advanced watermark and no-ops or falls back to a full reopen. */
+      catchUpChain = Promise.resolve();
       readOnly = false;
       lock = null;
       compactThresholdBytes = 64 * 1024 * 1024;
@@ -272815,6 +273452,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
       textWorkerDisabled = false;
       /** Stage 6: worker aggregation memory budget. */
       textBuildMemoryBytes = 128 * 1024 * 1024;
+      /** TUI-safe worker-slot policy: how long a worker-eligible text build
+      *  queues for a process-wide slot before the bounded inline core is
+      *  allowed as the last resort (never the unbounded staged aggregation). */
+      textBuildSlotWaitMs = TEXT_BUILD_SLOT_WAIT_MS;
       /** Stage 6: maintenance I/O concurrency (snapshot grouped reads). */
       maintenanceIoConcurrency = 8;
       /** Defer the open-time full text rebuild (no-generation fallback) to a background
@@ -272858,6 +273499,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  this state the caller cannot assume a rejected write had no effect. */
       writeDisabled = null;
       stats = createMiniDbStats();
+      /** Per-open lifecycle telemetry (the open() state machine + per-phase
+      *  wall-clock timings): driven by lifecycle.ts and the generation loader,
+      *  read through lifecycleStatus(). */
+      lifecycle = new LifecycleTracker();
       /** The text-index registry facet (text-registry.ts): owns the live TextIndex
       *  map, the persisted definition list, and the staged-drop marks (declared
       *  after stats because the injected deps reference it; everything else is
@@ -272944,11 +273589,13 @@ human_shell_hint: The pending question is also visible in /tasks.`
           this.textWorkerDisabled = true;
         },
         textBuildMemoryBytes: () => this.textBuildMemoryBytes,
+        textBuildSlotWaitMs: () => this.textBuildSlotWaitMs,
         dt: this.dt,
         indexes: this.indexes,
         compound: this.compound,
         textRegistry: this.textRegistry,
         stats: this.stats,
+        lifecycle: this.lifecycle,
         decode: (b2) => this.decode(b2),
         indexable: (v) => this.indexable(v),
         liveRecords: () => this.liveRecords(),
@@ -273150,7 +273797,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
           if (this.store.size < 4096) continue;
           deferred2.add(name);
         }
+        const textRebuildMsBefore = this.stats.textRebuildDurationMs;
         await this.indexAdmin.rebuildAllIndexes({ skipTextIndex: (name) => deferred2.has(name) });
+        this.lifecycle.time("textRebuildMs", this.stats.textRebuildDurationMs - textRebuildMsBefore);
+        for (const name of this.text.keys()) if (!deferred2.has(name)) this.lifecycle.noteTextIndexSource(name, "staged");
         if (deferred2.size > 0) this.deferOpenTextBuilds([...deferred2]);
       }
       /** Arm the rebase queue on each deferred text index NOW and build its base
@@ -273179,6 +273829,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
             ti: ti2,
             def
           });
+          this.lifecycle.markTextIndexPending(name);
         }
         if (armed.length === 0) return;
         const pin = () => ({
@@ -273220,17 +273871,24 @@ human_shell_hint: The pending question is also visible in /tasks.`
             } : null;
             let checkpoint = pin();
             let committed = false;
+            let hostedMode = null;
+            const tBuild = performance.now();
             for (let attempt = 1; attempt <= 3 && !committed; attempt++) {
               if (attempt > 1) checkpoint = repin(ti2);
               try {
-                if (await this.boundedTextBuild(name, ti2, def, checkpoint, output, ctx.signal) === null) break;
+                const hosted = await this.boundedTextBuild(name, ti2, def, checkpoint, output, ctx.signal);
+                if (hosted === null) break;
                 committed = true;
+                hostedMode = hosted;
               } catch {
                 if (ctx.signal.aborted) return;
               }
             }
-            if (committed) this.stats.textDeferredBuilds++;
-            else {
+            this.lifecycle.time("textRebuildMs", performance.now() - tBuild);
+            if (committed && hostedMode !== null) {
+              this.stats.textDeferredBuilds++;
+              this.lifecycle.clearTextIndexPending(name, hostedMode);
+            } else {
               ti2.abortRebase();
               ti2.basePending = true;
               this.stats.textDeferredBuildErrors++;
@@ -273335,7 +273993,11 @@ human_shell_hint: The pending question is also visible in /tasks.`
           const dictionaryPath = path.join(artifactsDir, textDictionaryFile(name));
           const baseDocsPath = path.join(artifactsDir, `${textDocsFile(name)}.base`);
           const workerAvailable = textBuildWorkerAvailable();
-          slotRelease = workerAvailable ? defaultWorkerSlots.tryAcquire() : null;
+          let inlineReason;
+          if (workerAvailable) {
+            slotRelease = await defaultWorkerSlots.acquireBounded(this.textBuildSlotWaitMs, signal);
+            if (slotRelease === null) inlineReason = "slot-pressure";
+          } else inlineReason = "runtime-unavailable";
           const inline = slotRelease === null;
           const handle = startWorkerTextBuild({
             snapshotPath: snapIno !== 0 ? path.join(this.dir, SNAPSHOT_FILE) : null,
@@ -273357,7 +274019,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
           }, {
             shouldAbort: () => this.state !== "open" || signal?.aborted === true,
             inline,
-            inlineReason: workerAvailable ? "slot-pressure" : "runtime-unavailable",
+            inlineReason,
             signal,
             onFallback: (reason) => {
               this.stats.textWorkerFallbacks++;
@@ -273565,8 +274227,8 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  derived-index maintenance applyOp performs on the write path — minus
       *  unique checks: the writer already validated, and intermediate frame
       *  states must apply literally (LWW). */
-      applyRecoveredFrame(f4, fd) {
-        this.writePath.applyRecoveredFrame(f4, fd);
+      applyRecoveredFrameAsync(f4, fd, slice) {
+        return this.writePath.applyRecoveredFrameAsync(f4, fd, slice);
       }
       applyRecoveredOp(op) {
         this.writePath.applyRecoveredOp(op);
@@ -273749,8 +274411,20 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  rotated file and a shrunken one all return null, meaning: reopen from
       *  scratch. A partial/torn tail left by a writer mid-writev is NOT an
       *  error: the scan stops at the last fully-valid frame; call again later
-      *  and its CRC validates once the writev landed. */
+      *  and its CRC validates once the writev landed.
+      *
+      *  Cooperative: the scan runs through the windowed async scanner and the
+      *  apply yields between primitive ops on the walApplySlicer budgets, so a
+      *  replica that fell far behind does not block the host's event loop in
+      *  one synchronous scan+apply. Calls are serialized per instance (see
+      *  catchUpChain). */
       async catchUpFromWal(offset) {
+        this.ensureOpen();
+        const run = this.catchUpChain.then(() => this.doCatchUpFromWal(offset));
+        this.catchUpChain = run.then(() => void 0, () => void 0);
+        return run;
+      }
+      async doCatchUpFromWal(offset) {
         this.ensureOpen();
         const ri2 = this.recoveryInfo;
         const anchor = this.walTail ?? (ri2 && ri2.walIno ? {
@@ -273759,7 +274433,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
           size: ri2.walScanEnd
         } : null);
         if (!anchor || offset !== anchor.size) return null;
-        const res = catchUpWal(this.walPath, offset, anchor, (f4, fd) => this.applyRecoveredFrame(f4, fd));
+        const res = await catchUpWalAsync(this.walPath, offset, anchor, (f4, fd, slice) => this.applyRecoveredFrameAsync(f4, fd, slice));
         if (res) this.walTail = {
           dev: anchor.dev,
           ino: anchor.ino,
@@ -273777,6 +274451,15 @@ human_shell_hint: The pending question is also visible in /tasks.`
       *  internal scheduler — callers never see workers or file details. */
       maintenanceStatus() {
         return this.maintenance.status();
+      }
+      /** The last open()'s lifecycle read model: which path served the open
+      *  ('generation-load' + 'wal-catch-up' vs 'full-rebuild'), whether the
+      *  instance is 'ready' or still 'degraded' (a deferred text-index base
+      *  build in flight), the per-phase wall-clock timings, and how every text
+      *  index's base was served (generation image vs worker/inline/staged
+      *  rebuild). Diagnostics only — the cumulative counters stay in `stats`. */
+      lifecycleStatus() {
+        return this.lifecycle.snapshot();
       }
       async close() {
         return closeMiniDb(this, this.lifecycleHooks);
@@ -274874,6 +275557,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
         return this.dbPromise;
       }
       openFresh() {
+        this.log.info("minidb query-store opening", {
+          dir: this.dir,
+          shardCount: SHARD_COUNT
+        });
         return ClusterDb.open({
           dir: this.dir,
           shardCount: SHARD_COUNT,
@@ -274968,6 +275655,7 @@ human_shell_hint: The pending question is also visible in /tasks.`
         return new MiniDbQuery((op) => this.withDb(op), collection2);
       }
       async ensureIndex(collection2, def) {
+        if (def.kind === "text") throw new Error(`minidb query-store is a structural read model: text index "${def.name}" on collection "${collection2}" is rejected; full-text search lives in the kap-server search-index database`);
         const guard = `${collection2}:${def.kind}:${def.name}`;
         if (this.ensuredIndexes.has(guard)) return;
         const name = indexName(collection2, def.name);
@@ -274978,11 +275666,10 @@ human_shell_hint: The pending question is also visible in /tasks.`
               sparse: true,
               unique: def.unique
             });
-            else if (def.kind === "compound") await db.createCompoundIndex(name, {
+            else await db.createCompoundIndex(name, {
               groupBy: def.groupBy,
               orderBy: def.orderBy
             });
-            else await db.createTextIndex(name, { fields: def.fields });
           } catch (error48) {
             if (!(error48 instanceof Error) || !error48.message.includes("already exists")) throw error48;
           }
@@ -278358,7 +279045,7 @@ need in the conversation history.
         const history = this.context.get();
         if (history.length === 0) throw new Error2(ErrorCodes$1.COMPACTION_UNABLE, "No messages to compact in current history.");
         if (source === "manual" && this.loopService.status().state !== "idle") throw new Error2(ErrorCodes$1.COMPACTION_UNABLE, "Cannot compact while a turn is active. Wait for it to finish, then retry.");
-        return this.tokenCounting.estimateMessages(history);
+        return this.requestTokens(history);
       }
       createActiveCompaction(trigger, tokenCount, originTurnId) {
         const abortController = new AbortController();
@@ -278516,7 +279203,7 @@ need in the conversation history.
       async compactionRound(active, data) {
         const startedAt = Date.now();
         const originalHistory = [...this.context.get()];
-        const tokensBefore = this.tokenCounting.estimateMessages(originalHistory);
+        const tokensBefore = this.requestTokens(originalHistory);
         let retryCount = 0;
         let thinkingEffort = this.profile.data().thinkingLevel;
         try {
@@ -278596,6 +279283,7 @@ ${customInstruction}
             compactedCount: originalHistory.length,
             tokensBefore,
             summaryOutputTokens: attempt.usage?.output,
+            requestOverheadTokens: this.requestTokens([]),
             droppedCount: droppedCount === 0 ? void 0 : droppedCount
           });
           const properties = {
@@ -282990,14 +283678,24 @@ ${escapeXml$1(command)}
       }
       async steer(payload) {
         this.telemetry.track2("input_steer", { parts: payload.input.length });
+        if (this.scopeContext.agentId === "main") await this.updatePromptMetadata(promptMetadataTextFromPayload(payload));
         const queued = await this.promptService.enqueue({ message: {
           role: "user",
           content: [...payload.input],
           toolCalls: []
         } });
-        const [steered] = await this.promptService.steer([queued.id]);
-        const turn = await steered?.launched;
-        return turn === void 0 ? void 0 : { turn_id: turn.id };
+        if (queued.state !== "pending") {
+          const turn = await queued.launched;
+          return turn === void 0 ? void 0 : { turn_id: turn.id };
+        }
+        try {
+          const [steered] = await this.promptService.steer([queued.id]);
+          const turn = await steered?.launched;
+          return turn === void 0 ? void 0 : { turn_id: turn.id };
+        } catch (error48) {
+          if (isError2(error48) && error48.code === ErrorCodes$1.PROMPT_NOT_FOUND) return void 0;
+          throw error48;
+        }
       }
       cancel({ turnId }) {
         if (this.loop.status().state === "running") this.telemetry.track2("cancel", {
@@ -283196,41 +283894,6 @@ ${escapeXml$1(command)}
       __decorateParam(3, IAgentStateService)
     ], AgentStepRetryService);
     registerScopedService("agent", IAgentStepRetryService, AgentStepRetryService, 0, "stepRetry");
-    SIDE_QUESTION_SYSTEM_REMINDER = `
-This is a side-channel conversation with the user. You should answer user questions directly based on what you already know.
-
-IMPORTANT:
-- You are a separate, lightweight instance.
-- The main agent continues independently; do not reference being interrupted.
-- Do not call any tools. All tool calls are disabled and will be rejected.
-  Even though tool definitions are visible in this request, they exist only
-  for technical reasons (prompt cache). You must not use them.
-- Respond only with text based on what you already know from the conversation
-  and this side-channel conversation.
-- Follow-up turns may happen in this side-channel conversation.
-- If you do not know the answer, say so directly.
-`.trim();
-    ISessionBtwService = createDecorator("sessionBtwService");
-    SessionBtwService = class SessionBtwService2 {
-      lifecycle;
-      constructor(lifecycle) {
-        this.lifecycle = lifecycle;
-      }
-      async start() {
-        const child = await this.lifecycle.fork("main");
-        child.accessor.get(IAgentSystemReminderService)?.appendSystemReminder(SIDE_QUESTION_SYSTEM_REMINDER, {
-          kind: "system_trigger",
-          name: "btw"
-        });
-        const reason = child.accessor.get(IAgentToolApprovalService)?.formatDenyMessage("Tool calls are disabled for side questions. Answer with text only.") ?? "Tool calls are disabled for side questions. Answer with text only.";
-        child.accessor.get(IAgentToolExecutorService)?.onBeforeExecuteTool((event) => {
-          event.veto(denyToolExecution(reason));
-        });
-        return child.id;
-      }
-    };
-    SessionBtwService = __decorate([__decorateParam(0, IAgentLifecycleService)], SessionBtwService);
-    registerScopedService("session", ISessionBtwService, SessionBtwService, 0, "session-btw");
     ISessionInitService = createDecorator("sessionInitService");
     DEFAULT_INIT_PROMPT = "You are a software engineering expert with many years of programming experience. Please explore the current project directory to understand the project's architecture and main details.\n\nTask requirements:\n1. Analyze the project structure and identify key configuration files (such as pyproject.toml, package.json, Cargo.toml, etc.).\n2. Understand the project's technology stack, build process and runtime architecture.\n3. Identify how the code is organized and main module divisions.\n4. Discover project-specific development conventions, testing strategies, and deployment processes.\n\nAfter the exploration, do a thorough summary of your findings and write it to the `AGENTS.md` file in the project root, replacing the file's previous content. If the file already exists, read it first and carry forward whatever is still accurate \u2014 the result should be one coherent, up-to-date file, not an append.\n\nFor your information, `AGENTS.md` is a file intended to be read by AI coding agents. Expect the reader of this file to know nothing about the project.\n\nYou should compose this file according to the actual project content. Do not make any assumptions or generalizations. Ensure the information is accurate and useful. You must use the natural language that is mainly used in the project's comments and documentation.\n\nPopular sections that people usually write in `AGENTS.md` are:\n\n- Project overview\n- Build and test commands\n- Code style guidelines\n- Testing instructions\n- Security considerations\n";
     INIT_PROFILE_NAME = "coder";
@@ -287223,13 +287886,17 @@ ${todo_list_write_reminder_default.trim()}`
       }
       async ensureConfigFile() {
         await ensureConfigFile(this.configPath);
+        if (process.platform === "win32") await this.app.accessor.get(IHostEnvironment).ready;
       }
       async close() {
         for (const wiring of this.sessionWirings.values()) wiring.dispose();
         this.sessionWirings.clear();
         for (const subscription of this.appSubscriptions) subscription.dispose();
         await this.klient.close();
+        await this.app.accessor.get(ISessionIndexMirror).drain();
         this.app.dispose();
+        await drainSessionIndexMirror();
+        await drainQueryStoreDisposals();
       }
       /**
       * Forward engine telemetry to the host-supplied client. Without this the
@@ -287617,28 +288284,76 @@ ${todo_list_write_reminder_default.trim()}`
         return this.engineAccessor.get(IWorkspaceAliases).resolveAliasIds(match2.id);
       }
       async listSessions(input = {}) {
-        const workspaceIds = input.workDir === void 0 ? void 0 : await this.workspaceIdsFor(normalizeRequiredWorkDir("listSessions", input.workDir));
-        const page = await this.klient.global.sessions.list({
-          workspaceIds,
-          sessionId: input.sessionId
-        });
-        const bootstrapService = this.engineAccessor.get(IBootstrapService);
-        const workspacesById = new Map((await this.klient.global.workspaces.list()).map((workspace) => [workspace.id, workspace]));
-        const summaries = [];
-        for (const item of page.items) {
-          const workDir = item.cwd ?? workspacesById.get(item.workspaceId)?.root;
-          if (workDir === void 0) continue;
-          const liveHandle = getLiveSessionById(this.engineAccessor, item.id);
-          const effectiveItem = liveHandle === void 0 ? item : {
-            ...item,
-            lastTurnReason: liveHandle.accessor.get(ISessionActivityView).state().lastTurnReason
-          };
-          summaries.push(v2SummaryToSessionSummary(effectiveItem, {
-            workDir,
-            sessionDir: sessionDirOf(bootstrapService.homeDir, workspacePersistenceScope(bootstrapService.scope("sessions"), item.workspaceId), item.id)
-          }));
+        const all = [];
+        let before2;
+        for (; ; ) {
+          const page = await this.listSessionsPage({
+            workDir: input.workDir,
+            sessionId: input.sessionId,
+            before: before2
+          });
+          all.push(...page.items);
+          if (page.nextCursor === void 0) return all;
+          before2 = page.nextCursor;
         }
-        return summaries;
+      }
+      async listSessionsPage(input = {}) {
+        const workspaceIds = input.workDir === void 0 ? void 0 : await this.workspaceIdsFor(normalizeRequiredWorkDir("listSessions", input.workDir));
+        const workspacesById = new Map((await this.klient.global.workspaces.list()).map((workspace) => [workspace.id, workspace]));
+        const collected = [];
+        let before2 = input.before;
+        for (; ; ) {
+          const remaining = input.limit === void 0 ? void 0 : input.limit - collected.length;
+          if (remaining !== void 0 && remaining <= 0) break;
+          const page = await this.klient.global.sessions.list({
+            workspaceIds,
+            sessionId: input.sessionId,
+            limit: remaining,
+            before: before2
+          });
+          if (page.items.length === 0) return {
+            items: collected,
+            nextCursor: void 0
+          };
+          for (const item of page.items) {
+            const summary = this.mapIndexSummary(item, workspacesById);
+            if (summary !== void 0) collected.push(summary);
+          }
+          if (page.nextCursor === void 0) return {
+            items: collected,
+            nextCursor: void 0
+          };
+          before2 = page.nextCursor;
+          if (input.limit === void 0) return {
+            items: collected,
+            nextCursor: before2
+          };
+        }
+        return {
+          items: collected,
+          nextCursor: before2
+        };
+      }
+      /**
+      * Map one v2 index summary to the v1 wire shape, resolving the filesystem
+      * facts the index does not carry. Returns `undefined` when the session's
+      * workDir is unrecoverable (corrupt metadata, deleted workspace): such a
+      * session cannot be resumed on either engine, and v1's store never lists
+      * one in the first place.
+      */
+      mapIndexSummary(item, workspacesById) {
+        const workDir = item.cwd ?? workspacesById.get(item.workspaceId)?.root;
+        if (workDir === void 0) return void 0;
+        const liveHandle = getLiveSessionById(this.engineAccessor, item.id);
+        const effectiveItem = liveHandle === void 0 ? item : {
+          ...item,
+          lastTurnReason: liveHandle.accessor.get(ISessionActivityView).state().lastTurnReason
+        };
+        const bootstrapService = this.engineAccessor.get(IBootstrapService);
+        return v2SummaryToSessionSummary(effectiveItem, {
+          workDir,
+          sessionDir: sessionDirOf(bootstrapService.homeDir, workspacePersistenceScope(bootstrapService.scope("sessions"), item.workspaceId), item.id)
+        });
       }
       /**
       * v1 semantics: register the workDir as a workspace and create the session
@@ -288083,12 +288798,10 @@ ${todo_list_write_reminder_default.trim()}`
         });
       }
       /**
-      * Facade (`agentRPCService.steer`). Mid-turn steers match v1 (the input
-      * joins the running turn). The idle-session case diverges by design and is
-      * pinned in the parity tests: v1 launches a fresh turn off a steer and
-      * updates title/lastPrompt like a prompt; v2's enqueue launches the turn
-      * first, so the follow-up `steer()` finds nothing pending and rejects with
-      * `prompt.not_found` — and the v2 RPC path never touches the metadata.
+      * Facade (`agentRPCService.steer`). Matches v1 on both paths: mid-turn
+      * steers join the running turn, and an idle-session steer degrades to
+      * launching a fresh turn (the enqueue launches it directly) while
+      * title/lastPrompt are updated like a prompt's.
       */
       async steer(input) {
         await (await this.agentFacade(input.sessionId)).steer({ input: input.input });
@@ -288476,6 +289189,14 @@ ${todo_list_write_reminder_default.trim()}`
       async listGlobalMcpServers() {
         return this.globalMcpConfig.list();
       }
+      async listGlobalMcpServerAuthStatuses() {
+        const servers = await this.globalMcpConfig.list();
+        const oauth = new McpOAuthService({ store: createMcpOAuthStore(this.engineAccessor.get(IAtomicDocumentStore)) });
+        return Promise.all(servers.map(async (server) => ({
+          name: server.name,
+          authStatus: await this.globalMcpServerAuthState(server, oauth)
+        })));
+      }
       async addGlobalMcpServer(server) {
         return this.globalMcpConfig.add(server);
       }
@@ -288542,11 +289263,13 @@ ${todo_list_write_reminder_default.trim()}`
       */
       async testGlobalMcpServer(name, options2 = {}) {
         const server = await this.globalMcpConfig.get(name);
-        const config2 = mcpConfigWithoutName(server);
+        return this.withGlobalMcpServerProbe(server, options2.cwd, (manager) => standaloneMcpTestResult(server.name, manager));
+      }
+      async withGlobalMcpServerProbe(server, cwd2, inspect) {
         await this.configReady;
         const section = this.engineAccessor.get(IConfigService).get("mcp");
         const manager = new McpConnectionManager({
-          stdioCwd: options2.cwd,
+          stdioCwd: cwd2,
           oauthService: await this.globalMcpOAuthService(),
           resolveClientName: () => this.resolveMcpClientName(),
           resolveDefaultTimeouts: () => ({
@@ -288555,11 +289278,20 @@ ${todo_list_write_reminder_default.trim()}`
           })
         });
         try {
-          await manager.connectAll({ [server.name]: config2 });
-          return standaloneMcpTestResult(server.name, manager);
+          await manager.connectAll({ [server.name]: mcpConfigWithoutName(server) });
+          return inspect(manager);
         } finally {
           await manager.shutdown();
         }
+      }
+      async globalMcpServerAuthState(server, oauth) {
+        if (server.transport === "stdio") return "not-applicable";
+        if (server.bearerTokenEnvVar !== void 0) return "bearer-token";
+        if (server.headers !== void 0 && server.auth !== "oauth") return "not-applicable";
+        if (server.transport !== "http" && server.auth !== "oauth") return "not-applicable";
+        if (await oauth.hasTokens(server.name, server.url)) return "oauth-authorized";
+        if (server.auth === "oauth") return "oauth-required";
+        return this.withGlobalMcpServerProbe(server, void 0, (manager) => manager.get(server.name)?.status === "needs-auth" ? "oauth-required" : "not-applicable");
       }
       /**
       * Through the session scope (the seeded `ISessionMcpHandle.connectionManager`

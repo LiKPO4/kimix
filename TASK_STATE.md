@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-13 功能：升级 Kimi Code 0.35 并接通 Skill 附件（v2.21.59）
+
+- 上游：vendored Kimi Code 从 `0.34.0` / Node SDK `0.15.3` 升级到官方 `0.35.0` / Node SDK `0.16.0`，来源提交 `f6ee44e4`；仅保留既有 MCP 启动超时 overlay。
+- 补齐：官方 Server 的 Skill 激活已经支持图片、视频和文件附件，Kimix 现复用普通 prompt 的上传/物化协议将附件随 `/skill:` 同一轮发送，不再在 Composer 直接拒绝。
+- 兼容：官方 Node SDK 公共 `activateSkill(name,args)` 暂未开放附件参数；落到 SDK fallback 且带附件时明确失败，不拆成错误的第二个 prompt。无附件 Skill 仍正常走 Server/SDK 双路径。
+- 验证：vendor host prompt/steer/cancel smoke probe；Skill API、路由和事件定向 3 文件 137 项；Node/Renderer typecheck 通过。
+
 ## 2026-08-13 重构：Skill 加载回归 Kimi Code 官方注册表（v2.21.58）
 
 - 根因：Kimix 曾自行扫描多套 Skill 目录、维护勾选状态并复制到 `~/.kimix/enabled-skills`，但该目录未接入会话；显式 `/skill:` 找不到时还会复制到 Kimi 用户目录并通过 reload/透明 fork 刷新注册表，形成与官方发现和优先级并行的第二套体系。

@@ -1974,7 +1974,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     }, roomAgentId);
   };
 
-  const appendSlashUserMessage = async (command: string, roomAgentId?: string) => {
+  const appendSlashUserMessage = async (command: string, roomAgentId?: string, attachments: ImageAttachment[] = []) => {
     const targetSession = await ensureSession();
     if (!targetSession) return;
     const timestamp = Date.now();
@@ -1992,6 +1992,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       type: "user_message",
       timestamp,
       content: command,
+      ...(attachments.length > 0 ? { attachments: toUserAttachments(attachments) } : {}),
     }, roomAgentId);
     window.dispatchEvent(new CustomEvent("kimix:user-message-submitted", {
       detail: { sessionId: targetSession.id },
@@ -3228,6 +3229,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     skillName: string,
     args?: string,
     options: { reportFailure?: boolean } = {},
+    attachments: ImageAttachment[] = [],
   ) => {
     const reportFailure = options.reportFailure ?? true;
     const runtime = await ensureOfficialRuntimeForSession();
@@ -3253,6 +3255,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       sessionId: runtimeSessionId,
       name: officialSkill.name,
       args: args || undefined,
+      images: toPromptImages(attachments),
+      videos: toPromptVideos(attachments),
+      files: toPromptFiles(attachments),
     });
     if (activateRes.success) {
       const targetSession = useSessionStore.getState().sessions.find((session) => session.id === runtime.uiSessionId);
@@ -3410,18 +3415,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       const match = trimmed.match(slashCommandPattern);
       const skillName = match?.[1]?.slice("skill:".length) ?? "";
       const skillArgs = (match?.[2] ?? "").trim();
-      if (imagesToSend.length > 0) {
-        await appendStatusMessage(`/${slashName} 暂不接收图片附件，请先移除图片。`, slashRoomAgentId);
-        return;
-      }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       if (!hasActiveAssistantTurn && activeSession) {
         settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
-      await appendSlashUserMessage(trimmed, slashRoomAgentId);
-      await applySkillCommand(skillName, skillArgs || undefined);
+      await appendSlashUserMessage(trimmed, slashRoomAgentId, imagesToSend);
+      await applySkillCommand(skillName, skillArgs || undefined, {}, imagesToSend);
       return;
     }
     if (pluginCommand) {

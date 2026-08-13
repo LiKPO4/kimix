@@ -1879,6 +1879,15 @@ export type KimiCodePromptRequest = {
   model?: string;
 };
 
+export type KimiCodeActivateSkillRequest = {
+  sessionId: string;
+  name: string;
+  args?: string;
+  images?: { name: string; dataUrl: string }[];
+  videos?: { name: string; dataUrl?: string; fileId?: string; mediaType?: string }[];
+  files?: { name: string; filePath?: string; fileId?: string; mediaType?: string; size?: number }[];
+};
+
 export type KimiCodeFileRequest = {
   fileId: string;
 };

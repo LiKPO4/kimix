@@ -1559,7 +1559,9 @@ describe("KimiCodeServerClient protocol adapters", () => {
 
     const client = new KimiCodeServerClient("http://127.0.0.1:58627");
     await expect(client.listSkills("session/1")).resolves.toHaveLength(1);
-    await expect(client.activateSkill("session/1", "review", "src/app.ts")).resolves.toMatchObject({ activated: true });
+    await expect(client.activateSkill("session/1", "review", "src/app.ts", [
+      { type: "image_url", imageUrl: { url: "https://example.com/reference.png", id: "reference.png" } },
+    ])).resolves.toMatchObject({ activated: true });
     await expect(client.listMcpServers()).resolves.toHaveLength(1);
     await expect(client.listTools("session/1")).resolves.toHaveLength(1);
     await expect(client.listConnections()).resolves.toHaveLength(1);
@@ -1567,7 +1569,14 @@ describe("KimiCodeServerClient protocol adapters", () => {
 
     expect(calls).toEqual([
       { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1/skills", method: undefined, body: undefined },
-      { url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1/skills/review:activate", method: "POST", body: JSON.stringify({ args: "src/app.ts" }) },
+      {
+        url: "http://127.0.0.1:58627/api/v1/sessions/session%2F1/skills/review:activate",
+        method: "POST",
+        body: JSON.stringify({
+          args: "src/app.ts",
+          attachments: [{ type: "image", source: { kind: "url", url: "https://example.com/reference.png" } }],
+        }),
+      },
       { url: "http://127.0.0.1:58627/api/v1/mcp/servers", method: undefined, body: undefined },
       { url: "http://127.0.0.1:58627/api/v1/tools?session_id=session%2F1", method: undefined, body: undefined },
       { url: "http://127.0.0.1:58627/api/v1/connections", method: undefined, body: undefined },

@@ -1267,10 +1267,21 @@ export class KimiCodeServerClient {
     return result.skills;
   }
 
-  activateSkill(sessionId: string, skillName: string, args?: string): Promise<{ activated: true; skill_name: string }> {
+  async activateSkill(
+    sessionId: string,
+    skillName: string,
+    args?: string,
+    attachments: Parameters<typeof toServerPromptContent>[0] = [],
+  ): Promise<{ activated: true; skill_name: string }> {
+    const resolvedAttachments = Array.isArray(attachments) && attachments.length > 0
+      ? await toServerPromptContent(attachments, (file) => this.uploadFile(file))
+      : undefined;
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/skills/${encodeURIComponent(skillName)}:activate`, {
       method: "POST",
-      body: JSON.stringify(args ? { args } : {}),
+      body: JSON.stringify({
+        ...(args ? { args } : {}),
+        ...(resolvedAttachments ? { attachments: resolvedAttachments } : {}),
+      }),
     });
   }
 
