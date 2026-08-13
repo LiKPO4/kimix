@@ -399,6 +399,19 @@ export type KimiCodeSaveSecondaryModelPoolResponse = {
   error: string;
 };
 
+export type KimiCodeSetModelDefaultEffortRequest = {
+  alias: string;
+  effort?: string | null;
+};
+
+export type KimiCodeSetModelDefaultEffortResponse = {
+  success: true;
+  data: { message: string };
+} | {
+  success: false;
+  error: string;
+};
+
 export type KimiCodeServerStatusInfo = {
   enabled: boolean;
   state: "disabled" | "starting" | "attached" | "managed" | "fallback" | "stopped";

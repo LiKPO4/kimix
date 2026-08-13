@@ -1853,6 +1853,13 @@ async function saveKimiSecondaryModelPool(input: unknown) {
     dropped.push(entry.alias);
     return false;
   });
+  // 官方校验：配置了池条目时 default_model 必填且必须是池内别名（否则所有会话 create/resume/fork 失败）。
+  if (keptEntries.length > 0) {
+    if (!defaultModel) throw new Error("配置了池条目时必须选择默认模型，且默认模型必须是池条目之一。");
+    if (!keptEntries.some((entry) => entry.alias === defaultModel)) {
+      throw new Error(`默认模型 ${defaultModel} 不在池条目中；官方运行时会拒绝池外默认，请把默认模型改为池内别名。`);
+    }
+  }
   let next = applySecondaryModelPoolToml(raw, {
     defaultModel,
     force,
@@ -1867,6 +1874,37 @@ async function saveKimiSecondaryModelPool(input: unknown) {
   const droppedNote = dropped.length > 0 ? `；已过滤未配置的别名：${dropped.join("、")}` : "";
   return {
     message: `已保存子 Agent 模型池（需要 Kimi Code 0.36.0+ 生效）${droppedNote}${buildConfigReloadSuffix(reloadResult)}`,
+  };
+}
+
+// 子 Agent 池条目的思考强度 = 该模型别名自己的 default_effort（官方 v2 池绑定只取别名，
+// 思考档位由别名配置决定；仅 primary 继承主 Agent 档位）。
+async function setKimiModelDefaultEffort(input: unknown) {
+  const req = z.object({
+    alias: z.string().trim().min(1).max(160),
+    effort: z.string().trim().max(24).nullish(),
+  }).parse(input);
+  ensureKimiCodeMigratedConfig();
+  const configPath = getKimiPaths().config;
+  if (!fs.existsSync(configPath)) throw new Error("尚未找到 Kimi Code config.toml");
+  const raw = fs.readFileSync(configPath, "utf-8");
+  const model = readKimiModelConfig().models.find((item) => item.alias === req.alias);
+  if (!model) throw new Error(`模型别名 ${req.alias} 不存在，请先刷新模型配置`);
+  const effort = req.effort?.trim() ? req.effort.trim() : null;
+  if (effort && model.supportEfforts && model.supportEfforts.length > 0 && !model.supportEfforts.includes(effort)) {
+    throw new Error(`模型 ${req.alias} 不支持思考档位 ${effort}（支持：${model.supportEfforts.join(" / ")}）`);
+  }
+  const section = `models.${toTomlTableKey(req.alias)}`;
+  let next = effort
+    ? setTomlSectionValue(raw, section, "default_effort", `"${escapeTomlString(effort)}"`)
+    : removeTomlSectionValue(raw, section, "default_effort");
+  // overrides 表里的同名键会遮蔽主表，统一清掉，保持单一事实源。
+  next = removeTomlSectionValue(next, `${section}.overrides`, "default_effort");
+  backupFileIfExists(configPath);
+  fs.writeFileSync(configPath, next, "utf-8");
+  const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
+  return {
+    message: (effort ? `已将 ${req.alias} 的思考强度设为 ${effort}` : `已恢复 ${req.alias} 的思考强度为模型默认`) + buildConfigReloadSuffix(reloadResult),
   };
 }
 
@@ -5584,6 +5622,14 @@ ipcMain.handle("kimi:getSecondaryModelPool", async () => {
 ipcMain.handle("kimi:saveSecondaryModelPool", async (_, request: unknown) => {
   try {
     return { success: true, data: await saveKimiSecondaryModelPool(request) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi:setModelDefaultEffort", async (_, request: unknown) => {
+  try {
+    return { success: true, data: await setKimiModelDefaultEffort(request) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

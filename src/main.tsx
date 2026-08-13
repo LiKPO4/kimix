@@ -10,6 +10,7 @@ import type {
   KimiCodeServerStatusResponse,
   KimiCodeSecondaryModelPoolResponse,
   KimiCodeSaveSecondaryModelPoolResponse,
+  KimiCodeSetModelDefaultEffortResponse,
   GitBashInstallResponse,
   CheckKimiCliUpdateResponse,
   CheckUpdateResponse,
@@ -260,6 +261,7 @@ function installBrowserPreviewApi() {
     retryKimiCodeServer: (): Promise<KimiCodeServerStatusResponse> => fail("连接 Kimi Server"),
     getKimiCodeSecondaryModelPool: (): Promise<KimiCodeSecondaryModelPoolResponse> => Promise.resolve({ success: true, data: null }),
     saveKimiCodeSecondaryModelPool: (): Promise<KimiCodeSaveSecondaryModelPoolResponse> => fail("保存子 Agent 模型池"),
+    setKimiModelDefaultEffort: (): Promise<KimiCodeSetModelDefaultEffortResponse> => fail("保存思考强度"),
     getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> => Promise.resolve({
       success: true,
       data: {

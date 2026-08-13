@@ -527,6 +527,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [secondaryPoolNewAlias, setSecondaryPoolNewAlias] = useState("");
   const [secondaryPoolNewHint, setSecondaryPoolNewHint] = useState("");
   const [secondaryPoolBusy, setSecondaryPoolBusy] = useState(false);
+  const [secondaryPoolEffortBusy, setSecondaryPoolEffortBusy] = useState(false);
   const [secondaryPoolMessage, setSecondaryPoolMessage] = useState("");
   const secondaryPoolModelOptions = useMemo(
     () => (modelConfig?.models ?? []).map((model) => model.alias),
@@ -538,13 +539,38 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const updateSecondaryPoolEntryHint = (index: number, hint: string) => {
     setSecondaryPoolEntries((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, hint } : item)));
   };
+  // 官方规则：配置了池条目时默认模型必须是池内别名；无池条目时单独的默认模型构成隐式单条目池。
+  const secondaryPoolDefaultOptions = secondaryPoolEntries.length > 0
+    ? secondaryPoolEntries.map((entry) => entry.alias)
+    : secondaryPoolModelOptions;
+  const secondaryPoolEffortOptionsFor = (alias: string) => {
+    const efforts = modelConfig?.models.find((model) => model.alias === alias)?.supportEfforts;
+    return efforts && efforts.length > 0 ? efforts : ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+  };
+  const secondaryPoolEffortOf = (alias: string) => modelConfig?.models.find((model) => model.alias === alias)?.defaultEffort ?? "";
+  const changeSecondaryPoolEffort = async (alias: string, effort: string) => {
+    if (secondaryPoolEffortBusy) return;
+    setSecondaryPoolEffortBusy(true);
+    const res = await window.api.setKimiModelDefaultEffort({ alias, effort: effort || null });
+    setSecondaryPoolEffortBusy(false);
+    if (!res.success) {
+      setSecondaryPoolMessage(`思考强度保存失败：${res.error}`);
+      return;
+    }
+    setSecondaryPoolMessage(res.data.message);
+    void refreshModelConfig({ showLoading: false });
+  };
   const removeSecondaryPoolEntry = (index: number) => {
-    setSecondaryPoolEntries((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    const removed = secondaryPoolEntries[index];
+    const remaining = secondaryPoolEntries.filter((_, itemIndex) => itemIndex !== index);
+    setSecondaryPoolEntries(remaining);
+    if (removed && removed.alias === secondaryPoolDefault) setSecondaryPoolDefault(remaining[0]?.alias ?? "");
     setSecondaryPoolSelected("settings");
   };
   const addSecondaryPoolEntry = () => {
     if (!secondaryPoolNewAlias) return;
     setSecondaryPoolEntries((current) => [...current, { alias: secondaryPoolNewAlias, hint: secondaryPoolNewHint.trim() }]);
+    if (!secondaryPoolDefault) setSecondaryPoolDefault(secondaryPoolNewAlias);
     setSecondaryPoolSelected(secondaryPoolNewAlias);
     setSecondaryPoolNewAlias("");
     setSecondaryPoolNewHint("");
@@ -1597,7 +1623,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             <main className="kimix-settings-page">
               {variant === "workspace" && activeSettingsPageId === "models" && (
                 <div className="kimix-settings-page-toolbar">
-                  <div className="min-w-0 truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ marginRight: "auto" }}>模型配置</div>
+                  <div className="kimix-settings-section-title" style={{ marginRight: "auto" }}>
+                    <Terminal size={16} className="text-text-muted" />
+                    <span>模型配置</span>
+                  </div>
                   <div className="kimix-settings-page-actions">
                     <div className="kimix-settings-model-meta">
                       <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
@@ -2908,11 +2937,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             style={{ paddingLeft: 10, paddingRight: 10 }}
                           >
                             <option value="">跟随主 Agent（不配置）</option>
-                            {secondaryPoolModelOptions.map((alias) => (
+                            {secondaryPoolDefaultOptions.map((alias) => (
                               <option key={alias} value={alias}>{alias}</option>
                             ))}
                           </select>
                         </div>
+                        {secondaryPoolDefault && (
+                          <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                            <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">思考强度</div>
+                            <select
+                              value={secondaryPoolEffortOf(secondaryPoolDefault)}
+                              onChange={(event) => void changeSecondaryPoolEffort(secondaryPoolDefault, event.target.value)}
+                              disabled={secondaryPoolEffortBusy}
+                              className="kimix-settings-input h-9 min-w-0 rounded-lg text-[13px] outline-none disabled:opacity-55"
+                              style={{ paddingLeft: 10, paddingRight: 10 }}
+                            >
+                              <option value="">模型默认</option>
+                              {secondaryPoolEffortOptionsFor(secondaryPoolDefault).map((effort) => (
+                                <option key={effort} value={effort}>{effort}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <label className="flex items-center text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ gap: 8, marginTop: 14 }}>
                           <input
                             type="checkbox"
@@ -2924,7 +2970,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           <span>锁定模式：所有子 Agent 强制使用默认模型</span>
                         </label>
                         <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 10 }}>
-                          默认模型是主 Agent 未指定时的派发选择。锁定模式不能与池条目共存，开启后保存会清空池条目。
+                          默认模型是主 Agent 未指定时的派发选择；配置了池条目时，默认模型必须是池内条目（官方校验规则）。锁定模式不能与池条目共存，开启后保存会清空池条目。
                         </div>
                       </div>
                     )}
@@ -2990,6 +3036,22 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           className="kimix-settings-input min-h-[96px] w-full resize-y rounded-lg text-[13px] leading-6 outline-none"
                           style={{ padding: "10px 12px" }}
                         />
+                        <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                          <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">思考强度</div>
+                          <select
+                            value={secondaryPoolEffortOf(secondaryPoolSelectedEntry.alias)}
+                            onChange={(event) => void changeSecondaryPoolEffort(secondaryPoolSelectedEntry.alias, event.target.value)}
+                            disabled={secondaryPoolEffortBusy}
+                            className="kimix-settings-input h-9 min-w-0 rounded-lg text-[13px] outline-none disabled:opacity-55"
+                            style={{ paddingLeft: 10, paddingRight: 10 }}
+                          >
+                            <option value="">模型默认</option>
+                            {secondaryPoolEffortOptionsFor(secondaryPoolSelectedEntry.alias).map((effort) => (
+                              <option key={effort} value={effort}>{effort}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 8 }}>思考强度跟随模型别名自身配置，即改即存；只有 primary（主 Agent 模型）会继承主 Agent 的当前档位。</div>
                         <div className="flex justify-end" style={{ marginTop: 12 }}>
                           <button
                             type="button"

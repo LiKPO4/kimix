@@ -25,6 +25,8 @@ import type {
   KimiCodeSecondaryModelPoolResponse,
   KimiCodeSaveSecondaryModelPoolRequest,
   KimiCodeSaveSecondaryModelPoolResponse,
+  KimiCodeSetModelDefaultEffortRequest,
+  KimiCodeSetModelDefaultEffortResponse,
   GitBashInstallResponse,
   GetKimiAuthStatusResponse,
   GetKimiModelConfigResponse,
@@ -356,6 +358,8 @@ const api = {
     ipcRenderer.invoke("kimi:getSecondaryModelPool"),
   saveKimiCodeSecondaryModelPool: (req: KimiCodeSaveSecondaryModelPoolRequest): Promise<KimiCodeSaveSecondaryModelPoolResponse> =>
     ipcRenderer.invoke("kimi:saveSecondaryModelPool", req),
+  setKimiModelDefaultEffort: (req: KimiCodeSetModelDefaultEffortRequest): Promise<KimiCodeSetModelDefaultEffortResponse> =>
+    ipcRenderer.invoke("kimi:setModelDefaultEffort", req),
   listKimiCodeSlashCommands: (req: ListSlashCommandsRequest): Promise<ListSlashCommandsResponse> =>
     ipcRenderer.invoke("kimi-code:listSlashCommands", req),
   previewImportFromCcCodex: (req?: ImportCcCodexPreviewRequest): Promise<ImportCcCodexPreviewResponse> =>
