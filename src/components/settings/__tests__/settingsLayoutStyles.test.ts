@@ -47,7 +47,7 @@ describe("settings workspace scroll layout", () => {
 
   it("lets the model provider page consume the space above the pinned footer", () => {
     expect(settingsPanel).toContain(
-      'variant === "workspace" && activeSettingsPageId === "models" ? "is-models-page" : ""',
+      'variant === "workspace" && (activeSettingsPageId === "models" || activeSettingsPageId === "subagents") ? "is-models-page" : ""',
     );
     expect(css).toMatch(
       /\.kimix-settings-columns\.is-workspace\.is-models-page\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1 0 auto;/s,
@@ -57,6 +57,10 @@ describe("settings workspace scroll layout", () => {
     );
     expect(css).toMatch(
       /\.kimix-settings-columns\.is-workspace\.is-models-page \.kimix-model-provider-manager\s*\{[^}]*flex:\s*1;/s,
+    );
+    // 子代理页（模型池）复用同一拉满链
+    expect(css).toMatch(
+      /\.kimix-settings-columns\.is-workspace\.is-models-page\s+\.kimix-settings-section\[data-settings-page-id="subagents"\]\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;[^}]*flex-direction:\s*column;/s,
     );
   });
 
