@@ -28,7 +28,7 @@ import {
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
-import type { GitBashStatus, KimiCodeArchivedSessionSummary, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { GitBashStatus, KimiCodeArchivedSessionSummary, KimiCodeServerStatusInfo, KimiModelConfigSummary } from "@electron/types/ipc";
 import {
   archivedTimeMs,
   archivedWorkspaceOptions,
@@ -473,6 +473,29 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   useEffect(() => {
     if (isWindows()) void refreshGitBash();
     // 仅在进入设置页时检测一次；安装或修复后用卡片上的「重新检测」刷新。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [serverStatus, setServerStatus] = useState<KimiCodeServerStatusInfo | null>(null);
+  const [serverBusy, setServerBusy] = useState(false);
+  const refreshServerStatus = async () => {
+    const res = await window.api.getKimiCodeServerStatus();
+    if (res.success) setServerStatus(res.data);
+  };
+  const retryServerConnection = async () => {
+    if (serverBusy) return;
+    setServerBusy(true);
+    const res = await window.api.retryKimiCodeServer();
+    setServerBusy(false);
+    if (res.success) {
+      setServerStatus(res.data);
+      return;
+    }
+    setServerStatus((state) => state ? { ...state, error: res.error } : state);
+  };
+  useEffect(() => {
+    void refreshServerStatus();
+    // 进入设置页时读取一次；重试用卡片上的按钮触发。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [auth, setAuth] = useState<KimiAuthStatus | null>(settingsStatusCache.auth);
@@ -2308,6 +2331,52 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </div>
                 </div>
+                {serverStatus && serverStatus.enabled && (
+                  <div className={`kimix-settings-connection ${serverStatus.state === "managed" || serverStatus.state === "attached" ? "is-verified" : serverStatus.state === "starting" ? "is-found" : "is-missing"}`} style={{ marginTop: 10 }}>
+                    <div className="kimix-settings-connection-inner">
+                      {serverBusy || serverStatus.state === "starting" ? (
+                        <RefreshCw size={18} className="kimix-spin mt-0.5 shrink-0 text-text-muted" />
+                      ) : serverStatus.state === "managed" || serverStatus.state === "attached" ? (
+                        <SelectionIndicator selected />
+                      ) : (
+                        <AlertCircle size={18} className="mt-0.5 shrink-0 text-accent-warning" />
+                      )}
+                      <div className="kimix-settings-connection-copy">
+                        <div className="kimix-settings-connection-label">
+                          {serverBusy || serverStatus.state === "starting"
+                            ? "正在连接 Kimi Server"
+                            : serverStatus.state === "managed" || serverStatus.state === "attached"
+                              ? "Server 发送通道正常"
+                              : "Server 通道不可用，消息经 SDK 兜底发送"}
+                        </div>
+                        <div className="kimix-settings-connection-detail">
+                          {serverStatus.state === "managed" || serverStatus.state === "attached"
+                            ? `${serverStatus.endpoint}${serverStatus.serverVersion ? ` · Server ${serverStatus.serverVersion}` : ""}${serverStatus.managed ? " · Kimix 托管" : " · 外部实例"}`
+                            : "Server 是默认发送链路；不可用时 Kimix 会自动降级到 SDK 兼容链路，功能可用但部分能力受限。"}
+                        </div>
+                        {serverStatus.error && serverStatus.state !== "managed" && serverStatus.state !== "attached" && (
+                          <div className="mt-2 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-base font-mono text-[11.5px] leading-5 text-text-muted" style={{ maxHeight: 88, padding: "8px 10px" }}>
+                            {serverStatus.error}
+                          </div>
+                        )}
+                        {serverStatus.state !== "managed" && serverStatus.state !== "attached" && (
+                          <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 10 }}>
+                            <button
+                              type="button"
+                              onClick={() => void retryServerConnection()}
+                              disabled={serverBusy}
+                              className="kimix-icon-text-button is-compact bg-accent-primary text-text-inverse hover:bg-accent-primary-dark disabled:cursor-wait disabled:opacity-65"
+                              style={{ minHeight: 32 }}
+                            >
+                              <RefreshCw size={14} className={serverBusy ? "kimix-spin" : ""} />
+                              <span>{serverBusy ? "连接中" : "重试连接"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {isWindows() && gitBashStatus && (
                   <div className={`kimix-settings-connection ${gitBashStatus.available ? "is-verified" : "is-missing"}`} style={{ marginTop: 10 }}>
                     <div className="kimix-settings-connection-inner">

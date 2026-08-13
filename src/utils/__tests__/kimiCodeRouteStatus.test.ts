@@ -29,6 +29,11 @@ describe("kimiCodeRouteStatus", () => {
     expect(kimiCodeRouteStatus()).toBe("消息发送中");
   });
 
+  it("shows the server-unavailable reason on the plain sdk route when provided", () => {
+    expect(kimiCodeRouteStatus("sdk", "Kimi Server 状态：fallback")).toBe("经 SDK 发送中（Server 不可用：Kimi Server 状态：fallback）");
+    expect(kimiCodeRouteStatus("sdk", "连接超时", "sent")).toBe("经 SDK 发送（Server 不可用：连接超时）");
+  });
+
   it("drops the in-progress wording once the prompt is sent", () => {
     expect(kimiCodeRouteStatus("server", undefined, "sent")).toBe("经 Server 发送");
     expect(kimiCodeRouteStatus("sdk", undefined, "sent")).toBe("经 SDK 发送");

@@ -364,6 +364,24 @@ export type CheckKimiCliRequest = {
   verify?: boolean;
 };
 
+export type KimiCodeServerStatusInfo = {
+  enabled: boolean;
+  state: "disabled" | "starting" | "attached" | "managed" | "fallback" | "stopped";
+  routing: "sdk" | "server";
+  endpoint: string;
+  managed: boolean;
+  serverVersion?: string;
+  error?: string;
+};
+
+export type KimiCodeServerStatusResponse = {
+  success: true;
+  data: KimiCodeServerStatusInfo;
+} | {
+  success: false;
+  error: string;
+};
+
 export type GitBashStatus = {
   /** Windows 上官方运行时强制依赖 Git Bash；其它平台为 false。 */
   required: boolean;

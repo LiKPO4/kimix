@@ -7,6 +7,7 @@ import type {
   GetKimiAuthStatusResponse,
   CheckKimiCliResponse,
   GitBashStatusResponse,
+  KimiCodeServerStatusResponse,
   GitBashInstallResponse,
   CheckKimiCliUpdateResponse,
   CheckUpdateResponse,
@@ -250,6 +251,11 @@ function installBrowserPreviewApi() {
       data: { required: false, available: false, message: unsupported("检测 Git Bash") },
     }),
     installGitBash: (): Promise<GitBashInstallResponse> => fail("安装 Git for Windows"),
+    getKimiCodeServerStatus: (): Promise<KimiCodeServerStatusResponse> => Promise.resolve({
+      success: true,
+      data: { enabled: false, state: "disabled", routing: "sdk", endpoint: "", managed: false, error: unsupported("检测 Kimi Server") },
+    }),
+    retryKimiCodeServer: (): Promise<KimiCodeServerStatusResponse> => fail("连接 Kimi Server"),
     getKimiAuthStatus: (): Promise<GetKimiAuthStatusResponse> => Promise.resolve({
       success: true,
       data: {

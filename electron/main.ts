@@ -5607,6 +5607,37 @@ ipcMain.handle("kimi:installCli", async () => {
   }
 });
 
+function toKimiCodeServerStatusInfo() {
+  const status = kimiCodeServerHost.getStatus();
+  return {
+    enabled: status.enabled,
+    state: status.state,
+    routing: status.routing,
+    endpoint: status.endpoint,
+    managed: status.managed,
+    serverVersion: status.capabilities?.serverVersion,
+    error: status.error,
+  };
+}
+
+ipcMain.handle("kimi-code:serverHostStatus", () => {
+  try {
+    return { success: true, data: toKimiCodeServerStatusInfo() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// 手动重试：绕过自动恢复的退避计时，直接重新附着/拉起托管 Server。
+ipcMain.handle("kimi-code:retryServerHost", async () => {
+  try {
+    await kimiCodeServerHost.start();
+    return { success: true, data: toKimiCodeServerStatusInfo() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi:gitBashStatus", async () => {
   try {
     return { success: true, data: await getGitBashStatus() };

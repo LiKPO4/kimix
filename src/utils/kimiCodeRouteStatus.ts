@@ -7,9 +7,11 @@ const FALLBACK_REASON_MAX_LENGTH = 40;
 export function kimiCodeRouteStatus(route?: KimiCodePromptRoute, fallbackReason?: string, phase: "sending" | "sent" = "sending") {
   const sent = phase === "sent";
   if (route === "server") return sent ? "经 Server 发送" : "经 Server 发送中";
-  if (route === "sdk") return sent ? "经 SDK 发送" : "经 SDK 发送中";
-  if (route === "sdk-fallback") {
+  if (route === "sdk" || route === "sdk-fallback") {
     const reason = fallbackReason?.replace(/\s+/g, " ").trim();
+    // sdk-fallback 是显式降级，永远带提示；route=sdk（新建会话直走 SDK）只在
+    // 发送侧带回 Server 不可用原因时展示，不再只显示干巴巴的「经 SDK 发送」。
+    if (route === "sdk" && !reason) return sent ? "经 SDK 发送" : "经 SDK 发送中";
     const summary = reason
       ? `：${reason.length > FALLBACK_REASON_MAX_LENGTH ? `${reason.slice(0, FALLBACK_REASON_MAX_LENGTH - 1)}…` : reason}`
       : "";
