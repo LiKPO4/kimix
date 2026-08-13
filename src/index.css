@@ -3423,6 +3423,7 @@ button.bg-accent-primary:disabled:hover,
 /* 外壳包裹的透明 input：内容盒须高于光标（CJK 字体 ascent/descent 超过 20px 行高会被上下裁切）。 */
 .kimix-settings-input > input {
   height: 26px;
+  line-height: 20px;
 }
 
 .kimix-settings-search input::placeholder {
