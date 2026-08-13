@@ -4,7 +4,7 @@ title: Runtime Routing
 description: Kimix prefers the official Kimi Code Server session protocol and keeps the vendored Node SDK as a compatibility fallback.
 resource: https://github.com/LiKPO4/kimix/tree/master/electron
 tags: [architecture, kimi-code, server, sdk, fallback]
-timestamp: "2026-08-12T23:24:00+08:00"
+timestamp: "2026-08-13T12:00:00+08:00"
 ---
 
 # Runtime Routing
@@ -12,6 +12,8 @@ timestamp: "2026-08-12T23:24:00+08:00"
 Kimix has two supported Kimi Code integration paths. `KimiCodeServerHost` and `KimiCodeServerClient` expose official REST and WebSocket sessions when capability checks succeed. `KimiCodeHost` loads the self-contained vendored Node SDK and remains the fallback when Server startup, capability gates, or a session request fails.
 
 # Invariants
+
+0. Skill discovery has one authority: Kimi Code's official registry. Kimix may list and activate the registry through official Server/SDK contracts, but it must not maintain a parallel enabled-Skill directory, copy selected Skills into a private registry, or fork sessions to refresh discovery. User and project directories, plugins, precedence, and model invocation remain owned by Kimi Code. Legacy `skill-*` lineage may be read for historical compatibility, but no new lineage is produced. External Skill sources must use an additive official configuration surface such as `extra_skill_dirs`, never `skillDirs` replacement semantics or implicit copying.
 
 1. A visible Kimix session maps to an official Kimi Code runtime session identifier when one is available.
 2. Prompt, steer, cancel, approval, question, usage, Skill, MCP, session-tree, and diagnostic events come from official Server or SDK contracts rather than terminal-screen inference.

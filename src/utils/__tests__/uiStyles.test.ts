@@ -311,7 +311,6 @@ describe("UI_STYLES", () => {
     for (const role of [
       "kimix-longtask-inspector",
       "kimix-diff-panel",
-      "kimix-skill-card",
       "kimix-toast",
       "kimix-chat-navigation-preview",
       "kimix-model-provider-sidebar",

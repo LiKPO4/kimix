@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-13 重构：Skill 加载回归 Kimi Code 官方注册表（v2.21.58）
+
+- 根因：Kimix 曾自行扫描多套 Skill 目录、维护勾选状态并复制到 `~/.kimix/enabled-skills`，但该目录未接入会话；显式 `/skill:` 找不到时还会复制到 Kimi 用户目录并通过 reload/透明 fork 刷新注册表，形成与官方发现和优先级并行的第二套体系。
+- 修正：移除本地扫描、勾选、ZIP 导入、私有复制、自动迁移和新 `skill-*` fork 生产链路；补全与调用只使用官方 `listSkills` / `activateSkill`。设置页仅保留官方运行时 Skills 与官方 Plugin 商店。
+- 兼容：不自动删除 `~/.kimix/skills`、`~/.kimix/enabled-skills` 或已复制到 Kimi 用户目录的文件；旧 `skill-*` 会话关系继续只读解析，避免历史会话重复或正文回退失效。
+- 验证：Node/Renderer typecheck；官方 Skill API、斜杠路由、事件映射、旧会话兼容和 UI 风格定向 5 文件 207 项通过。
+
 ## 2026-08-13 优化：背景信息窗口模型区与推荐区边距对齐（v2.21.57）
 
 - 现场：背景信息窗口的模型名称、百分比、Token 说明和进度条比下方“推荐会话长度”左右各多缩进 16px，视觉上像向内缩了两圈。

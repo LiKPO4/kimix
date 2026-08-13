@@ -46,7 +46,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   kimiMonthlyQuotaEnabled: false,
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
-  enabledSkillNames: [],
   additionalWorkDirs: [],
   hookRules: [],
   hookRunLog: [],
@@ -103,6 +102,10 @@ export function loadSettings(): AppSettings {
       clarificationToolEnabled?: unknown;
     };
     const sanitizedRawSettings: Partial<AppSettings> & Record<string, unknown> = { ...rawSettings };
+    const hadLegacySkillSettings = Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "enabledSkillNames") ||
+      Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "enabledSkillsDir");
+    delete sanitizedRawSettings.enabledSkillNames;
+    delete sanitizedRawSettings.enabledSkillsDir;
     const hadLegacyClarificationSetting = Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "clarificationToolMode") ||
       Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "clarificationToolEnabled");
     delete sanitizedRawSettings.clarificationToolMode;
@@ -116,7 +119,7 @@ export function loadSettings(): AppSettings {
       fontSize: shouldMigrateLegacyFontSize ? 15 : sanitizedRawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
       fontSizeBaselineVersion: 1,
     };
-    if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting) {
+    if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting || hadLegacySkillSettings) {
       writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...sanitizedRawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));
     }
     const legacyKimiThemePalette = (sanitizedRawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;

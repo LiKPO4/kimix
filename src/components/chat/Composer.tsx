@@ -983,19 +983,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
 
     const loadSkills = async () => {
       const runtimeSessionId = currentSession ? getRuntimeSessionId(currentSession) : undefined;
-      if (runtimeSessionId) {
-        const officialRes = await window.api.listKimiCodeSkills({ sessionId: runtimeSessionId });
-        if (!cancelled && officialRes.success) {
-          officialRes.data.forEach((skill) => {
-            pushSkill("official", skill.name, skill.description, skill.source || "官方 Skill");
-          });
-        }
-      }
-
-      const localRes = await window.api.listSkills();
-      if (!cancelled && localRes.success) {
-        localRes.data.skills.forEach((skill) => {
-          pushSkill("local", skill.name, skill.description, skill.sourceLabel || skill.source);
+      const officialRes = await window.api.listKimiCodeSkills(runtimeSessionId ? { sessionId: runtimeSessionId } : {});
+      if (!cancelled && officialRes.success) {
+        officialRes.data.forEach((skill) => {
+          pushSkill("official", skill.name, skill.description, skill.source || "官方 Skill");
         });
       }
 
@@ -3236,13 +3227,12 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const applySkillCommand = async (
     skillName: string,
     args?: string,
-    options: { allowMigration?: boolean; reportFailure?: boolean } = {},
+    options: { reportFailure?: boolean } = {},
   ) => {
-    const allowMigration = options.allowMigration ?? true;
     const reportFailure = options.reportFailure ?? true;
     const runtime = await ensureOfficialRuntimeForSession();
     if (!runtime) return false;
-    let runtimeSessionId = runtime.runtimeSessionId;
+    const runtimeSessionId = runtime.runtimeSessionId;
     const normalizedName = skillName.trim().toLowerCase();
     const findOfficialSkill = async () => {
       const result = await window.api.listKimiCodeSkills({ sessionId: runtimeSessionId });
@@ -3251,51 +3241,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         : undefined;
     };
 
-    let officialSkill = await findOfficialSkill();
-    let migrated = false;
-    let reloaded = false;
-    if (!officialSkill && allowMigration) {
-      const prepareRes = await window.api.prepareKimiSkill({ name: skillName });
-      if (!prepareRes.success) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `调用 Skill 失败：${prepareRes.error}`, source: "ui" }, runtime.roomAgentId);
-        return false;
-      }
-      migrated = prepareRes.data.copied;
-      const syncedAt = Date.now();
-      const reloadRes = await window.api.reloadKimiCodeSession({ sessionId: runtimeSessionId });
-      if (reloadRes.success) {
-        reloaded = true;
-        updateSession(runtime.uiSessionId, (session) => updateRoomMutationOwner(session, runtime.roomAgentId, (agent) => ({
-          ...agent,
-          skillRegistrySyncedAt: syncedAt,
-        }), permissionMode));
-      } else {
-        const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
-          runtime.uiSessionId,
-          runtimeSessionId,
-          syncedAt,
-          runtime.roomAgentId,
-        );
-        if (!refreshedRuntimeSessionId) return false;
-        runtimeSessionId = refreshedRuntimeSessionId;
-      }
-      officialSkill = await findOfficialSkill();
-      if (!officialSkill && reloaded) {
-        const refreshedRuntimeSessionId = await forkRuntimeForSkillRegistry(
-          runtime.uiSessionId,
-          runtimeSessionId,
-          syncedAt,
-          runtime.roomAgentId,
-        );
-        if (!refreshedRuntimeSessionId) return false;
-        runtimeSessionId = refreshedRuntimeSessionId;
-        reloaded = false;
-        officialSkill = await findOfficialSkill();
-      }
-    }
+    const officialSkill = await findOfficialSkill();
     if (!officialSkill) {
       if (reportFailure) {
-        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Server 未识别 Skill：${skillName}。请新建会话后重试。`, source: "ui" }, runtime.roomAgentId);
+        await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Kimi Code 官方注册表未识别 Skill：${skillName}。请将其放入官方 Skill 目录并新建或刷新会话后重试。`, source: "ui" }, runtime.roomAgentId);
       }
       return false;
     }
@@ -3322,42 +3271,12 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         type: activateRes.success ? "status_update" : "error",
         timestamp: Date.now(),
         message: activateRes.success
-          ? `${migrated ? (reloaded ? "已迁移并刷新会话后" : "已迁移并") : "已"}调用官方 Skill：${officialSkill.name}`
+          ? `已调用官方 Skill：${officialSkill.name}`
           : `调用 Skill 失败：${activateRes.error}`,
         source: "ui",
       }, runtime.roomAgentId);
     }
     return activateRes.success;
-  };
-
-  const forkRuntimeForSkillRegistry = async (uiSessionId: string, runtimeSessionId: string, syncedAt: number, roomAgentId: string) => {
-    const targetSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    const forkRes = await window.api.forkKimiCodeSession({
-      sessionId: runtimeSessionId,
-      forkId: `skill-${crypto.randomUUID()}`,
-      title: targetSession?.title,
-    });
-    if (!forkRes.success) {
-      await appendLocalEvent({ id: genId(), type: "error", timestamp: Date.now(), message: `Skill 已安装，但会话刷新失败：${forkRes.error}`, source: "ui" }, roomAgentId);
-      return null;
-    }
-
-    const nextRuntimeSessionId = forkRes.data.sessionId;
-    updateSession(uiSessionId, (session) => ({
-      ...updateRoomMutationOwner(session, roomAgentId, (agent) => ({
-        ...agent,
-        runtimeSessionId: nextRuntimeSessionId,
-        officialSessionId: nextRuntimeSessionId,
-        skillForkParentSessionId: runtimeSessionId,
-        skillRegistrySyncedAt: syncedAt,
-      }), permissionMode),
-      engine: "kimi-code",
-      updatedAt: Date.now(),
-    }));
-    const refreshedSession = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
-    if (refreshedSession && useAppStore.getState().currentSession?.id === uiSessionId) setCurrentSession(refreshedSession);
-    await window.api.closeKimiCodeSession({ sessionId: runtimeSessionId }).catch(() => undefined);
-    return nextRuntimeSessionId;
   };
 
   const maybePromptCacheHint = async (session: Session | null | undefined, content: string, images: ImageAttachment[]): Promise<boolean> => {
@@ -3532,7 +3451,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         settlePendingClarifications(activeSession.id, slashRoomAgentId);
       }
       const activated = await applySkillCommand(slashName, slashArgs, {
-        allowMigration: false,
         reportFailure: false,
       });
       if (activated) {
@@ -3569,7 +3487,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     // 仅在无图片附件时尝试（Skill 激活不接收图片），未识别时静默按普通消息发送。
     if (slashRouting === "passthrough" && trimmed.startsWith("/") && imagesToSend.length === 0) {
       const skillActivated = await applySkillCommand(slashName, slashArgs, {
-        allowMigration: false,
         reportFailure: false,
       });
       if (skillActivated) {

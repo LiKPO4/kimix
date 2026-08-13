@@ -1,22 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, Cable, Check, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Store, Upload } from "lucide-react";
+import { Activity, Cable, ExternalLink, LayoutGrid, Plus, RefreshCw, Sparkles, Store } from "lucide-react";
 import { McpPanel } from "./McpPanel";
 import { useAppStore } from "@/stores/appStore";
 import type { KimiCodeCapabilityStatus, KimiCodeConfigDiagnostics, KimiCodePluginSummary, KimiCodeMarketplacePlugin, KimiCodeSkillSummary } from "@electron/types/ipc";
 
-type SkillInfo = {
-  id: string;
-  name: string;
-  description: string;
-  path: string;
-  source: string;
-  sourceLabel?: string;
-  trustLevel?: "kimi-official" | "curated" | "third-party" | "local";
-  enabled: boolean;
-};
-
 type PluginPanelTab = "skills" | "mcp";
-type SkillsSubTab = "local" | "store" | "runtime";
+type SkillsSubTab = "store" | "runtime";
 const OFFICIAL_PLUGIN_STORE_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#安装与管理-plugins";
 const OFFICIAL_PLUGIN_DOCS_URL = "https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html#plugin-manifest";
 
@@ -39,15 +28,8 @@ export function SkillsPanel({
 }) {
   const currentSession = useAppStore((s) => s.currentSession);
   const [localActiveTab, setLocalActiveTab] = useState<PluginPanelTab>(activeTab);
-  const [skillsSubTab, setSkillsSubTab] = useState<SkillsSubTab>("local");
-  const [skills, setSkills] = useState<SkillInfo[]>([]);
-  const [mergedDuplicates, setMergedDuplicates] = useState<{ name: string; keptPath: string; droppedPath: string }[]>([]);
-  const [enabledIds, setEnabledIds] = useState<string[]>([]);
-  const [enabledDir, setEnabledDir] = useState("");
-  const [scanErrors, setScanErrors] = useState<{ path: string; reason: string }[]>([]);
-  const [message, setMessage] = useState("正在扫描本地 Skills...");
-  const [saving, setSaving] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [skillsSubTab, setSkillsSubTab] = useState<SkillsSubTab>("runtime");
+  const [message, setMessage] = useState("正在读取官方运行时 Skills...");
   const [pluginUrl, setPluginUrl] = useState("");
   const [installingPlugin, setInstallingPlugin] = useState(false);
   const [sdkPlugins, setSdkPlugins] = useState<KimiCodePluginSummary[]>([]);
@@ -67,7 +49,6 @@ export function SkillsPanel({
   useEffect(() => () => {
     if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
   }, []);
-  const [dragActive, setDragActive] = useState(false);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
   const sdkRuntimeSessionId = currentSession?.engine === "kimi-code"
     ? currentSession.runtimeSessionId ?? currentSession.officialSessionId ?? undefined
@@ -206,82 +187,6 @@ export function SkillsPanel({
     onActiveTabChange?.(tab);
   };
 
-  const refreshSkills = async (nextMessage?: string) => {
-    setMessage("正在扫描本地 Skills...");
-    const res = await window.api.listSkills();
-    if (!res.success) {
-      setMessage(`扫描失败：${res.error}`);
-      return;
-    }
-    const nextSkills = asArray(res.data.skills);
-    const nextErrors = asArray(res.data.scanErrors);
-    setSkills(nextSkills);
-    setMergedDuplicates(asArray(res.data.mergedDuplicates));
-    setEnabledIds(asArray(res.data.enabledIds));
-    setEnabledDir(res.data.enabledDir);
-    setScanErrors(nextErrors);
-    const errorHint = nextErrors.length > 0 ? `（${nextErrors.length} 个文件扫描异常）` : "";
-    setMessage((nextMessage ?? (nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill")) + errorHint);
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    setMessage("正在扫描本地 Skills...");
-    void window.api.listSkills().then((res) => {
-      if (cancelled) return;
-      if (!res.success) {
-        setMessage(`扫描失败：${res.error}`);
-        return;
-      }
-      const nextSkills = asArray(res.data.skills);
-      const nextErrors = asArray(res.data.scanErrors);
-      setSkills(nextSkills);
-      setMergedDuplicates(asArray(res.data.mergedDuplicates));
-      setEnabledIds(asArray(res.data.enabledIds));
-      setEnabledDir(res.data.enabledDir);
-      setScanErrors(nextErrors);
-      const errorHint = nextErrors.length > 0 ? `（${nextErrors.length} 个文件扫描异常）` : "";
-      setMessage((nextSkills.length > 0 ? `已发现 ${nextSkills.length} 个本地 Skill` : "未发现本地 Skill") + errorHint);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const toggleSkill = async (id: string) => {
-    const next = enabledIds.includes(id)
-      ? enabledIds.filter((item) => item !== id)
-      : [...enabledIds, id];
-    setEnabledIds(next);
-    setSaving(true);
-    const res = await window.api.saveEnabledSkills({ ids: next });
-    setSaving(false);
-    if (!res.success) {
-      setEnabledIds(enabledIds); // 失败回滚乐观更新，避免 UI 与持久化不一致
-      setMessage(`保存失败：${res.error}`);
-      return;
-    }
-    setEnabledIds(res.data.enabledIds);
-    setEnabledDir(res.data.enabledDir);
-    setMessage(`已启用 ${res.data.enabledIds.length} 个 Skill。新会话将通过 --skills-dir 使用这些 Skill。`);
-  };
-
-  const importArchive = async (archivePath?: string) => {
-    setImporting(true);
-    setMessage("正在导入 Skill 压缩包...");
-    const res = await window.api.importSkillArchive(archivePath ? { archivePath } : undefined);
-    setImporting(false);
-    setDragActive(false);
-    if (!res.success) {
-      setMessage(`导入失败：${res.error}`);
-      return;
-    }
-    setSkills(asArray(res.data.skills));
-    const importedNames = asArray(res.data.imported).map((skill) => skill.name);
-    setMessage(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : "已取消导入");
-    void refreshSkills(importedNames.length > 0 ? `已导入 ${importedNames.join("、")}` : undefined);
-  };
-
   const installKimiPlugin = async () => {
     const url = pluginUrl.trim();
     if (!url) {
@@ -330,48 +235,6 @@ export function SkillsPanel({
     if (!res.success) setMessage(`打开插件文档失败：${res.error}`);
   };
 
-  const handleDragOver = (event: React.DragEvent) => {
-    event.preventDefault();
-    setDragActive(true);
-  };
-
-  const handleDragLeave = (event: React.DragEvent) => {
-    event.preventDefault();
-    setDragActive(false);
-  };
-
-  const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault();
-    const file = Array.from(event.dataTransfer.files).find((item) => item.name.toLowerCase().endsWith(".zip"));
-    const archivePath = file ? (file as unknown as { path?: string }).path : "";
-    if (!archivePath) {
-      setDragActive(false);
-      setMessage("请拖入本地 .zip Skill 压缩包");
-      return;
-    }
-    void importArchive(archivePath);
-  };
-
-  const shortDescription = (description: string) => {
-    const firstSentence = description.split(/(?<=[.!?。！？])\s+/)[0]?.trim() || description.trim();
-    return firstSentence.length > 96 ? `${firstSentence.slice(0, 96)}...` : firstSentence;
-  };
-
-  // 单个来源胶囊：文案用 sourceLabel，配色用 trustLevel，取代旧的双胶囊堆叠。
-  const sourceCapsuleMeta = (skill: SkillInfo) => {
-    const label = skill.sourceLabel ?? "本地 Skill";
-    switch (skill.trustLevel) {
-      case "kimi-official":
-        return { label, className: "bg-accent-primary text-white" };
-      case "curated":
-        return { label, className: "bg-accent-success-light text-accent-success" };
-      case "third-party":
-        return { label, className: "bg-accent-warning-light text-accent-warning" };
-      default:
-        return { label, className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
-    }
-  };
-
   const capabilityStateMeta = (capability: KimiCodeCapabilityStatus) => {
     if (!capability.supported || capability.state === "unsupported") {
       return { label: "不支持", className: "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]" };
@@ -401,50 +264,24 @@ export function SkillsPanel({
   const subSkillCount = sdkSkills.filter((skill) => skill.isSubSkill).length;
 
   const subTabs: { id: SkillsSubTab; label: string; icon: React.ReactNode }[] = [
-    { id: "local", label: "本地 Skills", icon: <Sparkles size={14} /> },
-    { id: "store", label: "插件商店", icon: <Store size={14} /> },
-    { id: "runtime", label: "运行时状态", icon: <Activity size={14} /> },
+    { id: "runtime", label: "运行时 Skills", icon: <Activity size={14} /> },
+    { id: "store", label: "官方插件商店", icon: <Store size={14} /> },
   ];
 
   return (
     <div className="kimix-workspace-page flex h-full min-h-0 flex-col">
-      <div
-        className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${dragActive ? "outline outline-2 outline-[var(--accent-blue)]" : ""}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {dragActive && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[color:var(--kimix-overlay-bg)]">
-            <div className="kimix-floating-panel flex items-center rounded-xl text-[15px]" style={{ gap: 10, padding: "14px 18px" }}>
-              <Upload size={17} />
-              <span>松开导入 Skill 压缩包</span>
-            </div>
-          </div>
-        )}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="kimix-workspace-header">
           <div className="kimix-workspace-header-copy">
             <div className="kimix-workspace-header-title">
               <LayoutGrid size={20} />
               <span>插件</span>
               <div className="kimix-workspace-header-subtitle">
-                管理 Kimix 扩展能力：Skills 负责本地能力包，MCP 负责外部工具服务。
+                管理官方扩展能力：Skills 由 Kimi Code 运行时发现和调用，MCP 负责外部工具服务。
               </div>
             </div>
           </div>
           <div className="kimix-workspace-header-actions">
-            {selectedTab === "skills" && skillsSubTab === "local" && (
-              <button
-                type="button"
-                onClick={() => void importArchive()}
-                disabled={importing}
-                className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
-                title="导入 Skill 压缩包"
-              >
-                <Plus size={15} />
-                <span>{importing ? "导入中" : "添加"}</span>
-              </button>
-            )}
             {onBackToChat && (
               <button
                 type="button"
@@ -466,7 +303,7 @@ export function SkillsPanel({
               className={`kimix-icon-text-button is-compact ${selectedTab === "skills" ? "bg-accent-primary text-white hover:bg-accent-primary-dark" : "kimix-muted-action"}`}
             >
               <Sparkles size={14} />
-              <span>Skills</span>
+              <span>官方 Skills</span>
             </button>
             <button
               type="button"
@@ -507,114 +344,7 @@ export function SkillsPanel({
                 className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
                 style={{ padding: "8px 14px", marginBottom: 14 }}
               >
-                {message}{saving ? "，正在保存..." : ""}
-              </div>
-            )}
-
-            {skillsSubTab === "local" && (
-              <div className="flex min-w-0 flex-col">
-                <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginBottom: 14 }}>
-                  勾选后全局启用 Skill；新建/恢复会话时通过官方 <code>--skills-dir</code> 传给 Kimi Code。
-                  {enabledDir && (
-                    <span className="text-[var(--kimix-panel-text-muted)]" title={enabledDir}>（启用目录：{enabledDir}）</span>
-                  )}
-                </div>
-                {mergedDuplicates.length > 0 && (
-                  <div
-                    className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
-                    style={{ padding: "8px 14px", marginBottom: 14 }}
-                    title={mergedDuplicates.map((item) => `${item.name}：保留 ${item.keptPath}，合并 ${item.droppedPath}`).join("\n")}
-                  >
-                    {mergedDuplicates.length} 个同名 Skill 已按来源合并展示（悬停查看明细）
-                  </div>
-                )}
-                {skills.length === 0 ? (
-                  <div className="kimix-soft-card rounded-xl text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "24px 22px" }}>
-                    未发现本地 Skill。可点击右上角「添加」导入 Skill 压缩包，或直接把 .zip 拖进本页面。
-                  </div>
-                ) : (
-                  <section className="grid min-w-0 items-start" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-                    {skills.map((skill) => (
-                      (() => {
-                        const source = sourceCapsuleMeta(skill);
-                        const officialPlugin = skill.trustLevel === "kimi-official" && skill.sourceLabel === "Kimi Plugin";
-                        const enabled = officialPlugin || enabledIds.includes(skill.id);
-                        return (
-                      <button
-                        key={skill.id}
-                        type="button"
-                        onClick={() => {
-                          if (!officialPlugin) void toggleSkill(skill.id);
-                        }}
-                        className={`kimix-skill-card w-full overflow-hidden rounded-xl border text-left hover:bg-[var(--kimix-panel-soft-bg)] ${enabled ? "border-[var(--accent-blue)]" : "border-[var(--kimix-panel-border-soft)] bg-surface-elevated"}`}
-                        style={{
-                          padding: "14px 18px",
-                          cursor: officialPlugin ? "default" : undefined,
-                          background: enabled
-                            ? "color-mix(in srgb, var(--accent-blue) 8%, var(--kimix-panel-bg))"
-                            : undefined,
-                        }}
-                      >
-                        <div className="grid min-h-0" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto", gap: 12 }}>
-                          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? "border-[var(--accent-blue)] bg-[var(--accent-blue)] text-white" : "border-[var(--kimix-selection-idle-border)] text-transparent"}`}>
-                            <Check size={13} />
-                          </span>
-                          <span className="flex min-h-0 min-w-0 flex-col">
-                            <span
-                              className="block min-w-0 text-[15px] font-semibold text-[var(--kimix-panel-text)]"
-                              style={{ lineHeight: "24px", minHeight: 24, overflowWrap: "anywhere" }}
-                              title={skill.name}
-                            >
-                              {skill.name}
-                            </span>
-                            <span className="mt-2 flex min-w-0 flex-wrap items-center" style={{ gap: 6 }}>
-                              <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${source.className}`} style={{ paddingLeft: 9, paddingRight: 9 }} title={skill.source}>
-                                {source.label}
-                              </span>
-                            </span>
-                            <span
-                              className="block text-[13px] text-[var(--kimix-panel-text-secondary)]"
-                              title={skill.description}
-                              style={{
-                                display: "-webkit-box",
-                                marginTop: 7,
-                                lineHeight: "20px",
-                                WebkitBoxOrient: "vertical",
-                                WebkitLineClamp: 3,
-                                maxHeight: 60,
-                                overflow: "hidden",
-                              }}
-                            >
-                              {shortDescription(skill.description)}
-                            </span>
-                            <span className="mt-auto block truncate text-[12px] text-[var(--kimix-panel-text-muted)]" style={{ paddingTop: 7 }} title={skill.path}>{skill.path}</span>
-                          </span>
-                          <span className={`h-6 shrink-0 rounded-full text-[12px] font-medium leading-6 ${enabled ? "bg-[var(--accent-blue)] text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ paddingLeft: 9, paddingRight: 9 }}>
-                            {officialPlugin ? "已安装" : enabled ? "已启用" : "未启用"}
-                          </span>
-                        </div>
-                      </button>
-                        );
-                      })()
-                    ))}
-                  </section>
-                )}
-                {scanErrors.length > 0 && (
-                  <div className="rounded-xl bg-accent-warning-light/40 text-[13px] leading-6" style={{ padding: "14px 16px", marginTop: 14 }}>
-                    <div className="font-medium text-accent-warning">{scanErrors.length} 个文件扫描异常</div>
-                    <div className="flex flex-col" style={{ gap: 8, marginTop: 10 }}>
-                      {scanErrors.slice(0, 5).map((error, index) => (
-                        <div key={`${index}:${error.path}`} className="rounded-md bg-surface-elevated text-[12px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "8px 10px" }} title={`${error.reason}: ${error.path}`}>
-                          <div className="truncate">{error.reason}</div>
-                          <div className="truncate text-[var(--kimix-panel-text-muted)]">{error.path}</div>
-                        </div>
-                      ))}
-                      {scanErrors.length > 5 && (
-                        <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">还有 {scanErrors.length - 5} 个异常文件未展示</div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {message}
               </div>
             )}
 
@@ -736,7 +466,7 @@ export function SkillsPanel({
                 </div>
 
                 <div className="kimix-soft-card rounded-xl" style={{ padding: "16px 18px" }}>
-                  <div className="font-medium text-[var(--kimix-panel-text)]">自定义安装</div>
+                  <div className="font-medium text-[var(--kimix-panel-text)]">安装官方 Plugin</div>
                   <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 4 }}>
                     输入官方支持的 GitHub / ZIP plugin URL，安装后会自动刷新列表。
                   </div>

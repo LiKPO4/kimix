@@ -102,14 +102,6 @@ import type {
   CheckRevertConflictsResponse,
   SearchProjectFilesRequest,
   SearchProjectFilesResponse,
-  ListSkillsResponse,
-  ImportSkillArchiveRequest,
-  ImportSkillArchiveResponse,
-  SaveEnabledSkillsRequest,
-  SaveEnabledSkillsResponse,
-  PrepareKimiSkillRequest,
-  PrepareKimiSkillResponse,
-  SyncKimiAgentSkillsResponse,
   OpenTerminalRequest,
   AppInfoResponse,
   CheckUpdateResponse,
@@ -269,16 +261,6 @@ const api = {
     ipcRenderer.invoke("project:openTerminal", req),
   searchProjectFiles: (req: SearchProjectFilesRequest): Promise<SearchProjectFilesResponse> =>
     ipcRenderer.invoke("project:searchFiles", req),
-  listSkills: (): Promise<ListSkillsResponse> =>
-    ipcRenderer.invoke("project:listSkills"),
-  saveEnabledSkills: (req: SaveEnabledSkillsRequest): Promise<SaveEnabledSkillsResponse> =>
-    ipcRenderer.invoke("project:saveEnabledSkills", req),
-  prepareKimiSkill: (req: PrepareKimiSkillRequest): Promise<PrepareKimiSkillResponse> =>
-    ipcRenderer.invoke("project:prepareKimiSkill", req),
-  syncKimiAgentSkills: (): Promise<SyncKimiAgentSkillsResponse> =>
-    ipcRenderer.invoke("project:syncKimiAgentSkills"),
-  importSkillArchive: (req?: ImportSkillArchiveRequest): Promise<ImportSkillArchiveResponse> =>
-    ipcRenderer.invoke("project:importSkillArchive", req),
   // Long tasks
   listLongTasks: (req: ListLongTasksRequest): Promise<ListLongTasksResponse> =>
     ipcRenderer.invoke("longTasks:list", req),

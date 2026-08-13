@@ -654,17 +654,13 @@
   box-shadow: none;
 }
 
-/* 侧栏外壳、Diff 面板、技能卡、Toast、导航预览、供应商侧栏补风格覆盖：
+/* 侧栏外壳、Diff 面板、Toast、导航预览、供应商侧栏补风格覆盖：
    Modern 统一 hairline 边界和角色圆角；阴影沿用对应档位 token。 */
 [data-ui-style="modern"] .kimix-longtask-inspector,
 [data-ui-style="modern"] .kimix-diff-panel {
   border-color: var(--border-subtle) !important;
   border-radius: var(--kimix-modern-panel-radius) !important;
   box-shadow: var(--shadow-hover);
-}
-
-[data-ui-style="modern"] .kimix-skill-card {
-  border-radius: var(--kimix-modern-card-radius);
 }
 
 [data-ui-style="modern"] .kimix-toast {
@@ -1086,22 +1082,11 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 35%, transparent), var(--kimix-retro-button-hover-shadow);
 }
 
-/* 与 Modern 对应的游离角色：Retro 统一小圆角和 panel/floating 阴影。
-   技能卡的启用态边框是 accent 语义色，只接管圆角与阴影，不覆盖边框色。 */
+/* 与 Modern 对应的游离角色：Retro 统一小圆角和 panel/floating 阴影。 */
 [data-ui-style="retro"] .kimix-longtask-inspector,
 [data-ui-style="retro"] .kimix-diff-panel {
   border-color: var(--border-default) !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: var(--kimix-retro-panel-shadow);
-}
-
-[data-ui-style="retro"] .kimix-skill-card {
-  border-radius: var(--radius-md);
-  box-shadow: var(--kimix-retro-panel-shadow);
-}
-
-/* 基础 hover 的同特异性阴影会洗掉静止浮雕，这里恢复 Platinum 面板浮雕。 */
-[data-ui-style="retro"] .kimix-skill-card:hover {
   box-shadow: var(--kimix-retro-panel-shadow);
 }
 
@@ -1575,16 +1560,6 @@
 [data-ui-style="nostalgia"] .kimix-diff-panel {
   border-color: var(--border-default) !important;
   border-radius: 0 !important;
-  box-shadow: var(--kimix-nostalgia-raised-shadow);
-}
-
-[data-ui-style="nostalgia"] .kimix-skill-card {
-  border-radius: 0;
-  box-shadow: var(--kimix-nostalgia-raised-shadow);
-}
-
-/* 基础 hover 会把浮雕洗成 none，这里恢复 Win98 凸起浮雕。 */
-[data-ui-style="nostalgia"] .kimix-skill-card:hover {
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
@@ -4292,7 +4267,6 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
-  .kimix-skill-card,
   .kimix-plugin-list-item,
   .kimix-model-row,
   .kimix-runtime-error-card
@@ -4306,7 +4280,6 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
-  .kimix-skill-card,
   .kimix-plugin-list-item,
   .kimix-model-row,
   .kimix-runtime-error-card
@@ -4319,7 +4292,6 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
-  .kimix-skill-card,
   .kimix-plugin-list-item,
   .kimix-model-row,
   .kimix-runtime-error-card
@@ -4332,7 +4304,6 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-theme,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
-  .kimix-skill-card,
   .kimix-plugin-list-item,
   .kimix-model-row,
   .kimix-runtime-error-card
@@ -5603,21 +5574,6 @@ button.bg-accent-primary:disabled:hover,
 }
 
 .kimix-plugin-status-pill:active:not(:disabled) {
-  scale: 0.96;
-}
-
-.kimix-skill-card {
-  transition: background-color var(--duration-base) var(--ease-hover),
-              border-color var(--duration-base) var(--ease-hover),
-              box-shadow var(--duration-base) var(--ease-hover),
-              scale var(--duration-fast) var(--ease-hover);
-}
-
-.kimix-skill-card:hover {
-  box-shadow: var(--shadow-hover);
-}
-
-.kimix-skill-card:active:not(:disabled) {
   scale: 0.96;
 }
 

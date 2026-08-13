@@ -178,7 +178,6 @@ export type StartSessionRequest = {
   yoloMode?: boolean;
   autoMode?: boolean;
   planMode?: boolean;
-  skillsDir?: string;
   agentFile?: string;
   additionalWorkDirs?: string[];
 }
@@ -1313,62 +1312,6 @@ export type SearchProjectFilesResponse = {
   error: string;
 };
 
-export type SkillInfo = {
-  id: string;
-  name: string;
-  description: string;
-  path: string;
-  source: string;
-  sourceLabel?: string;
-  trustLevel?: "kimi-official" | "curated" | "third-party" | "local";
-  enabled: boolean;
-};
-
-export type ListSkillsResponse = {
-  success: true;
-  data: {
-    skills: SkillInfo[];
-    scanErrors: { path: string; reason: string }[];
-    mergedDuplicates: { name: string; keptPath: string; droppedPath: string }[];
-    enabledIds: string[];
-    enabledDir: string;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type SaveEnabledSkillsRequest = {
-  ids: string[];
-};
-
-export type SaveEnabledSkillsResponse = {
-  success: true;
-  data: {
-    enabledIds: string[];
-    enabledDir: string;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type PrepareKimiSkillRequest = {
-  name: string;
-};
-
-export type PrepareKimiSkillResponse = {
-  success: true;
-  data: {
-    name: string;
-    path: string;
-    copied: boolean;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
 export type KimiThemeSourceDeleteRequest = {
   path: string;
 }
@@ -1393,34 +1336,6 @@ export type UiStyleImportResponse = {
     document: UiStyleDocumentV1 | null;
     path: string;
     canceled: boolean;
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type SyncKimiAgentSkillsResponse = {
-  success: true;
-  data: {
-    names: string[];
-    copiedNames: string[];
-    latestModifiedAt: number;
-    warnings: string[];
-  };
-} | {
-  success: false;
-  error: string;
-};
-
-export type ImportSkillArchiveRequest = {
-  archivePath?: string;
-};
-
-export type ImportSkillArchiveResponse = {
-  success: true;
-  data: {
-    imported: SkillInfo[];
-    skills: SkillInfo[];
   };
 } | {
   success: false;
@@ -1631,8 +1546,6 @@ export type AppSettings = {
   selectedLaunchCommand?: string;
   autoReadAgentsMd: boolean;
   autoShowGitStatus: boolean;
-  enabledSkillNames: string[];
-  enabledSkillsDir?: string;
   additionalWorkDirs?: string[];
   hookRules?: HookRule[];
   hookRunLog?: HookRunLogEntry[];
