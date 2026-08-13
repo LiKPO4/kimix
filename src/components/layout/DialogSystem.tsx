@@ -241,7 +241,7 @@ function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchC
         <textarea
           value={draft}
           onChange={(event) => onChange(event.target.value)}
-          className="mt-5 min-h-[96px] w-full resize-y rounded-xl border border-border-default bg-surface-elevated text-[14px] leading-6 text-text-primary outline-none focus:border-accent-primary-soft"
+          className="kimix-settings-input mt-5 min-h-[96px] w-full resize-y rounded-xl text-[14px] leading-6 outline-none"
           style={{ padding: "12px 14px" }}
           placeholder="例如：pnpm dev"
           autoFocus

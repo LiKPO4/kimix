@@ -1339,8 +1339,8 @@
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 /* Win98 焦点提示：1px 点线 outline（不占尺寸），边框加深作浮雕反馈。 */
-[data-ui-style="nostalgia"] .kimix-settings-input:focus,
-[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-field:focus {
+[data-ui-style="nostalgia"] .kimix-settings-input:is(:focus, :focus-within),
+[data-ui-style="nostalgia"] .kimix-longtask-inspector .kimix-inspector-field:is(:focus, :focus-within) {
   border-color: var(--border-strong);
   outline: 1px dotted var(--accent-primary);
   outline-offset: 1px;
@@ -4239,7 +4239,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-input,
   .kimix-settings-color-value,
   .kimix-inspector-field
-):focus,
+):is(:focus, :focus-within),
 :root[data-ui-style-contract="v1"] .kimix-settings-search:focus-within {
   border: var(--ui-role-field-focus-border);
   background: var(--ui-role-field-focus-background);
@@ -5126,7 +5126,7 @@ button.bg-accent-primary:disabled:hover,
   color: var(--text-placeholder);
 }
 
-.kimix-settings-input:focus {
+.kimix-settings-input:is(:focus, :focus-within) {
   border-color: var(--accent-primary);
   outline: none;
 }

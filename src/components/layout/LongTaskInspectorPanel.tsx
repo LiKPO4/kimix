@@ -2493,7 +2493,7 @@ export function LongTaskInspectorPanel({
                 onChange={(event) => setGitCommitMessage(event.target.value)}
                 disabled={!projectPathForGit || gitBusy !== null}
                 placeholder="输入本次提交说明"
-                className="h-10 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
+                className="kimix-inspector-field h-10 w-full min-w-0 rounded-lg border border-border-subtle bg-surface-elevated text-[13px] text-text-primary outline-none placeholder:text-text-muted focus:border-accent-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ marginTop: 10, paddingLeft: 12, paddingRight: 12 }}
               />
               {gitError && <div className="rounded-lg bg-red-50 text-[12.5px] leading-5 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px" }}>{gitError}</div>}

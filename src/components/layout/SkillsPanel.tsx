@@ -552,7 +552,7 @@ export function SkillsPanel({
                         if (event.key === "Enter" && !installingPlugin) void installKimiPlugin();
                       }}
                       placeholder="https://github.com/owner/repo 或 https://.../plugin.zip"
-                      className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
+                      className="kimix-settings-input h-9 min-w-0 flex-1 rounded-lg text-[13px] outline-none"
                       style={{ paddingLeft: 12, paddingRight: 12 }}
                     />
                     <button
@@ -584,7 +584,7 @@ export function SkillsPanel({
                         if (event.key === "Enter" && !savingExtraSkillDirs) void addExtraSkillDir();
                       }}
                       placeholder="例如 C:\\Users\\Administrator\\.eggitor\\codex\\fs\\skills"
-                      className="h-9 min-w-0 rounded-lg border border-[var(--kimix-panel-border-soft)] bg-surface-elevated text-[13px] text-[var(--kimix-panel-text)] outline-none focus:border-[var(--accent-blue)]"
+                      className="kimix-settings-input h-9 min-w-0 rounded-lg text-[13px] outline-none"
                       style={{ paddingLeft: 12, paddingRight: 12 }}
                     />
                     <button
