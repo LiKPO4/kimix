@@ -14,8 +14,8 @@ Official Kimi Code 0.36.0 (PR #2700) replaces the experimental single secondary 
 
 - `[secondary_model]` owns the pool. `default_model` picks the spawn model when the caller passes none; a pool-less `default_model` forms an implicit single-entry pool.
 - `[secondary_model.models]` maps `[models]` alias ids to selection hints (description text) rendered into the Agent/AgentSwarm tool `model` parameter description, so the main agent picks per spawn.
-- `force = true` removes the per-spawn choice entirely: the tools stop advertising `model`, every spawn binds `default_model`, and explicit choices (including `primary`) are rejected. Requires `default_model` and forbids a `models` table.
-- `primary` is a reserved alias for the caller's own model; only it inherits the caller's thinking level. Pool entries can be per-alias thinking variants via `default_effort` overrides.
+- `force = true` removes the per-spawn choice entirely: the tools stop advertising `model`, every spawn binds `default_model`, and explicit choices (including `primary`) are rejected. Requires `default_model` and forbids a `models` table. When a `models` table exists, `default_model` is required and MUST be a pool key — a pool-less or out-of-pool default fails validation for every session lifecycle.
+- `primary` is a reserved alias for the caller's own model; only it inherits the caller's thinking level. A pool-bound spawn carries NO thinking level from the pool — v2 `resolveSubagentBinding` returns only the alias, so the subagent's effort comes from that alias's own `default_effort` in `[models.<alias>]`. Kimix exposes this as a per-entry thinking select in the pool editor (v2.21.69, `kimi:setModelDefaultEffort`), which is the same mechanism the official web UI's combined model·effort picker uses.
 - Gated by the `secondary-model` experiment (`KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1` or the master flag). With the flag off, pool keys stay inert and spawns inherit the caller's model. The v1 engine ignores the keys at runtime but round-trips them in config.
 
 ## Runtime Mechanics
