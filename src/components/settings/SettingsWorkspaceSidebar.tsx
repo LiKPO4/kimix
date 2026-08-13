@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle,
   Archive,
+  Bot,
   ArrowLeft,
   MessageSquare,
   Search,
@@ -32,6 +33,7 @@ export function SettingsPageIcon({ pageId, size = 16 }: { pageId: SettingsPageId
   if (pageId === "conversation") return <MessageSquare size={size} />;
   if (pageId === "account") return <ShieldCheck size={size} />;
   if (pageId === "models") return <Terminal size={size} />;
+  if (pageId === "subagents") return <Bot size={size} />;
   if (pageId === "experiments") return <Zap size={size} />;
   if (pageId === "data") return <Archive size={size} />;
   if (pageId === "diagnostics") return <AlertCircle size={size} />;
