@@ -273,8 +273,7 @@ export function ContextRing() {
             {contextUsages.map((usage) => (
               <div
                 key={usage.agentId}
-                className="kimix-inset-section"
-                style={{ padding: "10px 16px" }}
+                style={{ padding: "10px 0" }}
               >
                 <div
                   style={{
