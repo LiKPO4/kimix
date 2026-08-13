@@ -424,11 +424,11 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
     return (
       <div key={file.path} className="border-b border-border-subtle last:border-b-0">
         <div
-          className="grid min-h-11 items-center"
+          className="grid min-h-9 items-center"
           style={{
             gridTemplateColumns: "minmax(0, 1fr) auto auto 72px",
-            paddingLeft: 18,
-            paddingRight: 18,
+            paddingLeft: 16,
+            paddingRight: 16,
             columnGap: 10,
           }}
         >
@@ -436,7 +436,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
             className="kimix-muted-action flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors"
-            style={{ gap: 8, padding: "6px 8px" }}
+            style={{ gap: 8, padding: "4px 8px" }}
             title={`预览 ${file.path} 的本轮变更`}
             aria-expanded={previewExpanded}
           >
@@ -525,9 +525,9 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
         className="grid items-center border-b border-border-subtle"
         style={{
           gridTemplateColumns: "minmax(0, 1fr) auto",
-          minHeight: 44,
-          paddingLeft: 18,
-          paddingRight: 18,
+          minHeight: 38,
+          paddingLeft: 16,
+          paddingRight: 16,
           columnGap: 14,
           backgroundColor: headerToggleActive ? "var(--surface-hover)" : "transparent",
           transition: "background-color var(--duration-base) var(--ease-hover)",
@@ -573,7 +573,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="kimix-muted-action kimix-row-action flex min-h-10 w-full items-center border-b border-border-subtle text-left text-[13.5px] text-text-secondary transition-colors hover:border-b-transparent"
+            className="kimix-muted-action kimix-row-action flex min-h-8 w-full items-center border-b border-border-subtle text-left text-[13px] text-text-secondary transition-colors hover:border-b-transparent"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronDown size={14} />
@@ -584,7 +584,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="kimix-muted-action kimix-row-action flex min-h-10 w-full items-center text-left text-[13.5px] text-text-secondary transition-colors"
+            className="kimix-muted-action kimix-row-action flex min-h-8 w-full items-center text-left text-[13px] text-text-secondary transition-colors"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronUp size={14} />
