@@ -29,7 +29,7 @@ Official Kimi Code 0.36.0 (PR #2700) replaces the experimental single secondary 
 ## Kimix Integration Notes
 
 - Kimix already injects `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1` for managed Servers and wires the pre-pool single secondary model (`saveKimiSecondaryModel`). Since v2.21.66 the settings Subagents page carries a pool editor (default model, force lock, alias+hint entries) writing `[secondary_model]` directly; provider/model deletion in Kimix applies the official cascade semantics (filter dangling entries, drop the section when its effective default dangles) so a broken pool can never block every session lifecycle.
-- Requires the vendored SDK bump to the 0.36.0 tag; the bump also picks up the strict-OpenAI-compatible interrupted-thinking 400 fix (#2819) and the plugin-root Markdown skill misidentification fix (#2847).
+- The vendored SDK moved to the 0.36.0 tag in v2.21.68 (`b6144f94`, node-sdk 0.17.0, probe-verified), so the pool is live; the same bump picked up the strict-OpenAI-compatible interrupted-thinking 400 fix (#2819) and the plugin-root Markdown skill misidentification fix (#2847).
 
 # Sources
 
