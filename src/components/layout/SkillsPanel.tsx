@@ -146,24 +146,50 @@ export function SkillsPanel({
       if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
       setInstallingCapabilityId(capability.id);
       setMessage(`正在安装 ${capability.displayName}...`);
-      // 安装可能下载托管运行时，期间轮询进度（install.step/percent）。
-      // interval 存 ref 并随卸载统一清理，避免切走插件页后继续轮询。
-      installPollRef.current = window.setInterval(() => {
-        void refreshCapabilities();
-      }, 2000);
+      // 官方 installCapability 是“点火即返回”：RPC 立即 resolve，安装在后台继续，
+      // 进度（install.step/percent）只能靠轮询 listCapabilities 拿到。
+      // 所以不能在 RPC 返回后收尾，要轮询到 install.running 变 false 为止。
       const res = await window.api.installKimiCodeCapability({ id: capability.id });
-      if (installPollRef.current !== null) {
-        window.clearInterval(installPollRef.current);
-        installPollRef.current = null;
-      }
-      setInstallingCapabilityId(null);
       if (!res.success) {
+        setInstallingCapabilityId(null);
         setMessage(`${capability.displayName} 安装失败：${res.error}`);
         await refreshCapabilities();
         return;
       }
-      setMessage(`${capability.displayName} 安装完成`);
-      await refreshCapabilities();
+      const finalStatus = await new Promise<KimiCodeCapabilityStatus | null>((resolve) => {
+        let settled = false;
+        let polls = 0;
+        const finish = (status: KimiCodeCapabilityStatus | null) => {
+          if (settled) return;
+          settled = true;
+          if (installPollRef.current !== null) {
+            window.clearInterval(installPollRef.current);
+            installPollRef.current = null;
+          }
+          resolve(status);
+        };
+        // interval 存 ref 并随卸载统一清理，避免切走插件页后继续轮询。
+        // 上限 300 次（约 10 分钟），防止状态异常时无限轮询。
+        installPollRef.current = window.setInterval(() => {
+          polls += 1;
+          if (polls > 300) {
+            finish(null);
+            return;
+          }
+          void refreshCapabilities().then((list) => {
+            const current = list.find((item) => item.id === capability.id);
+            if (current && !current.install.running) finish(current);
+          });
+        }, 2000);
+      });
+      setInstallingCapabilityId(null);
+      if (finalStatus?.install.error) {
+        setMessage(`${capability.displayName} 安装失败：${finalStatus.install.error}`);
+      } else if (finalStatus) {
+        setMessage(`${capability.displayName} 安装完成`);
+      } else {
+        setMessage(`${capability.displayName} 安装状态确认超时，请稍后刷新查看。`);
+      }
       // 安装会接线官方插件，运行时状态一并刷新。
       void refreshSdkPlugins();
     } finally {
