@@ -3642,6 +3642,20 @@ button.bg-accent-primary:disabled:hover,
   flex: 1;
 }
 
+/* 子代理页复用模型页的主从拉满布局：分区建立纵向 flex 链，管理器填满剩余高度。 */
+.kimix-settings-columns.is-workspace.is-models-page
+  .kimix-settings-section[data-settings-page-id="subagents"] {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.kimix-settings-columns.is-workspace.is-models-page
+  .kimix-settings-section[data-settings-page-id="subagents"] .kimix-model-provider-manager {
+  flex: 1;
+}
+
 .kimix-settings-columns.is-workspace .kimix-settings-col {
   display: contents;
 }

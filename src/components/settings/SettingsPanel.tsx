@@ -1597,6 +1597,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
             <main className="kimix-settings-page">
               {variant === "workspace" && activeSettingsPageId === "models" && (
                 <div className="kimix-settings-page-toolbar">
+                  <div className="min-w-0 truncate text-[15px] font-semibold text-[var(--kimix-panel-text)]" style={{ marginRight: "auto" }}>模型配置</div>
                   <div className="kimix-settings-page-actions">
                     <div className="kimix-settings-model-meta">
                       <span title={modelConfig?.defaultModel ?? "未设置默认模型"}>
@@ -1628,7 +1629,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
               <div
                 className={`kimix-settings-columns ${variant === "workspace" ? "is-workspace" : ""} ${
-                  variant === "workspace" && activeSettingsPageId === "models" ? "is-models-page" : ""
+                  variant === "workspace" && (activeSettingsPageId === "models" || activeSettingsPageId === "subagents") ? "is-models-page" : ""
                 }`}
               >
             <div className="kimix-settings-col">
@@ -2880,9 +2881,6 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           {entry.alias === secondaryPoolDefault && <span className="text-[11px] text-text-muted">默认</span>}
                         </button>
                       ))}
-                      {secondaryPoolEntries.length === 0 && (
-                        <div className="text-[12px] leading-5 text-text-muted" style={{ paddingLeft: 8, paddingRight: 8 }}>尚未添加池条目</div>
-                      )}
                     </div>
                     <button
                       type="button"
