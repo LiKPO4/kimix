@@ -30,6 +30,7 @@ Kimix distinguishes ordinary MCP configuration from MCP servers bundled inside a
 
 * Kimi Computer Use (`kimi-cu`) and Kimi WebBridge (`kimi-webbridge`) are NOT marketplace plugins: the official `marketplace.json` carries only kimi-datasource / superpowers / vercel-plugin. Capabilities are client-injected built-in entries exposed by the v2 engine's capability service (`harness.listCapabilities` / `installCapability`); v1 has no capability surface and Kimix degrades to an empty list plus an explicit unsupported error on install.
 * A capability bundles a binary runtime plus agent wiring and reports layered readiness (`not_installed` / `partial` / `ready` / `unsupported`) with per-step states; `partial` means install can be resumed, and install progress (`install.step` / `percent`) is polled while `install.running`.
+* Official `installCapability` is fire-and-forget: the RPC resolves immediately after kicking off a background install, so callers must keep polling `listCapabilities` until `install.running` flips to `false` (v2.21.60 treated RPC return as completion, which froze the UI on a stale "installing" state with no step/percent).
 * Kimix surfaces them in the plugin store page through `kimi-code:listCapabilities` / `kimi-code:installCapability` IPC, and refreshes the SDK plugin state after install because installation wires a managed plugin.
 
 # Local Skill Scan
