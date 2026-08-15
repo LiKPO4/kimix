@@ -570,7 +570,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const addSecondaryPoolEntry = () => {
     if (!secondaryPoolNewAlias) return;
     setSecondaryPoolEntries((current) => [...current, { alias: secondaryPoolNewAlias, hint: secondaryPoolNewHint.trim() }]);
-    if (!secondaryPoolDefault) setSecondaryPoolDefault(secondaryPoolNewAlias);
+    if (!secondaryPoolEntries.some((entry) => entry.alias === secondaryPoolDefault)) setSecondaryPoolDefault(secondaryPoolNewAlias);
     setSecondaryPoolSelected(secondaryPoolNewAlias);
     setSecondaryPoolNewAlias("");
     setSecondaryPoolNewHint("");
@@ -3063,15 +3063,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             </button>
                           )}
                         </div>
-                        <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 14, marginBottom: 7 }}>选择提示（展示给主 Agent，可多行）</div>
-                        <textarea
-                          value={secondaryPoolSelectedEntry.hint}
-                          onChange={(event) => updateSecondaryPoolEntryHint(secondaryPoolSelectedIndex, event.target.value)}
-                          placeholder="例如：快速探索与代码搜索，响应快、成本低，适合粗活"
-                          className="kimix-settings-input min-h-[96px] w-full resize-y rounded-lg text-[13px] leading-6 outline-none"
-                          style={{ padding: "10px 12px" }}
-                        />
-                        <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 12 }}>
+                        <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 14 }}>
                           <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">思考强度</div>
                           <select
                             value={secondaryPoolEffortOf(secondaryPoolSelectedEntry.alias)}
@@ -3087,6 +3079,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                           </select>
                         </div>
                         <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 8 }}>思考强度跟随模型别名自身配置，即改即存；只有 primary（主 Agent 模型）会继承主 Agent 的当前档位。</div>
+                        <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 14, marginBottom: 7 }}>选择提示（展示给主 Agent，可多行）</div>
+                        <textarea
+                          value={secondaryPoolSelectedEntry.hint}
+                          onChange={(event) => updateSecondaryPoolEntryHint(secondaryPoolSelectedIndex, event.target.value)}
+                          placeholder="例如：快速探索与代码搜索，响应快、成本低，适合粗活"
+                          className="kimix-settings-input min-h-[96px] w-full resize-y rounded-lg text-[13px] leading-6 outline-none"
+                          style={{ padding: "10px 12px" }}
+                        />
                         <div className="flex justify-end" style={{ marginTop: 12 }}>
                           <button
                             type="button"
