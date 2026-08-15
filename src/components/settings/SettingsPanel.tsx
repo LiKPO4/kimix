@@ -2495,7 +2495,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             {serverStatus.error}
                           </div>
                         )}
-                        {serverStatus.state !== "managed" && serverStatus.state !== "attached" && (
+                        {serverStatus.state !== "managed" && serverStatus.state !== "attached" && serverStatus.state !== "starting" && (
                           <div className="flex flex-wrap items-center" style={{ gap: 8, marginTop: 10 }}>
                             <button
                               type="button"

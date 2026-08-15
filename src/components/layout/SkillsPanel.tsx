@@ -499,7 +499,7 @@ export function SkillsPanel({
                                 <button
                                   type="button"
                                   onClick={() => void installCapability(capability)}
-                                  disabled={Boolean(installingCapabilityId)}
+                                  disabled={Boolean(installingCapabilityId) || busy}
                                   className="kimix-style-exempt kimix-plugin-status-pill shrink-0 bg-accent-primary text-[12px] leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {busy ? "安装中" : capability.state === "partial" || capability.install.error ? "继续安装" : "安装"}

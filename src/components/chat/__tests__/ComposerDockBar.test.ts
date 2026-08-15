@@ -95,7 +95,7 @@ describe("ComposerDockBar", () => {
     expect(labels[0]).toContain("(2)");
     expect(labels[1]).toContain("子 Agent");
     expect(labels[1]).toContain("(1)");
-    expect(labels[2]).toContain("待办");
+    expect(labels[2]).toContain("当前进度");
     expect(labels[2]).toContain("(1/3)");
     expect(labels[3]).toContain("队列");
     expect(labels[3]).toContain("(3)");

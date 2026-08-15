@@ -230,7 +230,7 @@ function GitBashHelpDialog({
   const dialogRef = useDialogFocus<HTMLDivElement>(show || installBusy);
   if (!presence.mounted) return null;
   return (
-    <div className={`kimix-onboarding-overlay kimix-presence-overlay fixed inset-0 z-[118] flex items-center justify-center ${presence.visible ? "is-visible" : ""}`} style={{ padding: 24 }}>
+    <div className={`kimix-onboarding-overlay kimix-presence-overlay fixed inset-0 z-[119] flex items-center justify-center ${presence.visible ? "is-visible" : ""}`} style={{ padding: 24 }}>
       <div
         ref={dialogRef}
         role="dialog"
