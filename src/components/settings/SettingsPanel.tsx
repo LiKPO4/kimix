@@ -3078,7 +3078,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     )}
                     {secondaryPoolSelectedEntry && !secondaryPoolForce && (
                       <div>
-                        <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                        <div className="flex items-center justify-between" style={{ gap: 12, minHeight: 32 }}>
                           <div className="min-w-0 truncate text-[14.5px] font-medium leading-6 text-[var(--kimix-panel-text)]" title={secondaryPoolSelectedEntry.alias}>{secondaryPoolSelectedEntry.alias}</div>
                           {secondaryPoolSelectedEntry.alias !== secondaryPoolDefault && (
                             <button
