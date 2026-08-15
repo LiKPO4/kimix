@@ -315,7 +315,7 @@ export function EmptyState() {
         })(),
       });
       if (!sendRes.success) throw new Error(sendRes.error);
-      updateLinkStatus(kimiCodeRouteStatus(sendRes.data.route), "success");
+      updateLinkStatus(kimiCodeRouteStatus(sendRes.data.route, sendRes.data.fallbackReason), "success");
     } catch (err) {
       console.error("Send failed:", err);
       const message = err instanceof Error ? err.message : String(err);

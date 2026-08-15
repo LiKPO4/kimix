@@ -71,3 +71,16 @@ describe("vendored Kimi Code 0.34", () => {
     expect(mapper).toContain('case "removed":');
   });
 });
+
+describe("vendored Kimi Code 0.36", () => {
+  it("保留子代理模型池与二级模型强制排除能力", () => {
+    expect(bundle).toContain("cascadeSubagentModelPool");
+    expect(bundle).toContain("SECONDARY_MODEL_FORCE_EXCLUDES_MODELS");
+  });
+
+  it("MCP 兜底超时已由 Kimix 补丁接管，不残留精确 DEFAULT_STARTUP_TIMEOUT_MS = 3e4; 声明", () => {
+    expect(bundle).toContain("KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS");
+    // v1 引擎经 esbuild 重命名的 DEFAULT_STARTUP_TIMEOUT_MS$1 = 3e4 允许存在，这里只断言 v2 引擎被改写前的精确声明不残留
+    expect(bundle).not.toContain("DEFAULT_STARTUP_TIMEOUT_MS = 3e4;");
+  });
+});

@@ -436,7 +436,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
             className="kimix-muted-action flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors"
-            style={{ gap: 8, padding: "4px 8px" }}
+            style={{ gap: 8, padding: "6px 8px" }}
             title={`预览 ${file.path} 的本轮变更`}
             aria-expanded={previewExpanded}
           >
@@ -542,7 +542,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           onBlur={() => setHeaderToggleActive(false)}
           disabled={!canExpand}
           className="kimix-style-exempt flex min-w-0 items-center text-[14px] leading-5 text-text-primary disabled:cursor-default"
-          style={{ gap: 8, height: 30, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
+          style={{ gap: 8, height: 32, paddingLeft: canExpand ? 4 : 0, paddingRight: 8 }}
           aria-expanded={canExpand ? expanded : undefined}
         >
           {canExpand && (expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />)}
@@ -560,7 +560,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           onClick={() => void handleRevert(files)}
           disabled={!projectPath || reverting || files.length === 0}
           className="kimix-muted-action flex shrink-0 items-center justify-self-end rounded-md text-[12.5px] text-text-muted transition-colors disabled:cursor-not-allowed disabled:opacity-45"
-          style={{ gap: 6, height: 30, paddingLeft: 12, paddingRight: 12, minWidth: 92 }}
+          style={{ gap: 6, height: 32, paddingLeft: 12, paddingRight: 12, minWidth: 92 }}
           title="撤销全部文件"
         >
           <span>{reverting ? "撤销中" : "全部撤销"}</span>

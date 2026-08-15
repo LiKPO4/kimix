@@ -106,7 +106,7 @@ export const FileCard = memo(function FileCard({ event, filePath, fileType }: Fi
               onClick={() => setIsOpen((prev) => !prev)}
               disabled={!project || !path}
               title="选择打开方式"
-              className="kimix-style-exempt kimix-split-control-part flex h-8 w-7 items-center justify-center text-text-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45"
+              className="kimix-style-exempt kimix-split-control-part flex h-8 w-8 items-center justify-center text-text-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45"
             >
               <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? "rotate-180 text-text-primary" : ""}`} />
             </button>

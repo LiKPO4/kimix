@@ -46,6 +46,20 @@ import {
   publishStartupBootstrap,
   registerStartupBootstrapPublisher,
 } from "./startupBootstrap";
+import {
+  applySecondaryModelPoolToml,
+  escapeTomlString,
+  pruneSecondaryModelPoolForRemovedAliases,
+  readSecondaryModelPoolFromToml,
+  readTomlBoolean,
+  readTomlSectionBody,
+  readTomlString,
+  removeTomlSection,
+  removeTomlSectionValue,
+  toTomlTableKey,
+  unescapeTomlString,
+  validateSecondaryModelPoolDraft,
+} from "./secondaryModelPoolToml";
 import * as longTaskService from "./longTaskService";
 import { UpdateLongTaskStateSchema } from "./longTaskSchemas";
 import {
@@ -1203,20 +1217,6 @@ async function getKimiAuthStatus() {
   };
 }
 
-function unescapeTomlString(value: string) {
-  return value.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-}
-
-function escapeTomlString(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-}
-
-function readTomlString(sectionText: string, key: string) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*"((?:\\\\.|[^"])*)"`, "m"));
-  return match ? unescapeTomlString(match[1]) : null;
-}
-
 function readTomlInteger(sectionText: string, key: string) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*([0-9]+)\\s*$`, "m"));
@@ -1236,10 +1236,6 @@ function removeKimixManagedModelBlock(raw: string) {
 
 function listTomlSectionNames(raw: string) {
   return Array.from(raw.matchAll(/^\s*\[([^\]]+)\]\s*$/gm)).map((match) => match[1].trim());
-}
-
-function toTomlTableKey(name: string) {
-  return /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapeTomlString(name)}"`;
 }
 
 function setTopLevelTomlString(raw: string, key: string, value: string) {
@@ -1264,15 +1260,6 @@ function isDeepSeekModelConfig(summary: ReturnType<typeof readKimiModelConfig>, 
   return `${alias} ${model?.provider ?? ""} ${model?.model ?? ""} ${provider?.baseUrl ?? ""}`.toLowerCase().includes("deepseek");
 }
 
-function readTomlSectionBody(raw: string, sectionName: string) {
-  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
-  const matches = Array.from(raw.matchAll(sectionPattern));
-  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
-  if (matchIndex < 0) return null;
-  const match = matches[matchIndex];
-  return raw.slice((match.index ?? 0) + match[0].length, matches[matchIndex + 1]?.index ?? raw.length);
-}
-
 function readSecondaryModelFromToml(raw: string): { model: string | null; defaultEffort: string | null } | null {
   const body = readTomlSectionBody(raw, "secondary_model");
   if (!body) return null;
@@ -1282,53 +1269,11 @@ function readSecondaryModelFromToml(raw: string): { model: string | null; defaul
   return { model: model ?? null, defaultEffort: defaultEffort ?? null };
 }
 
-function removeTomlSection(raw: string, sectionName: string) {
-  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
-  const matches = Array.from(raw.matchAll(sectionPattern));
-  // Remove ALL matching sections, not just the first, so duplicate writes do
-  // not accumulate.
-  const targetIndexes: number[] = [];
-  matches.forEach((match, index) => {
-    if (match[1].trim() === sectionName) targetIndexes.push(index);
-  });
-  if (targetIndexes.length === 0) return raw;
-  let result = raw;
-  // Process from last to first so indexes stay valid.
-  for (let i = targetIndexes.length - 1; i >= 0; i--) {
-    const matchIndex = targetIndexes[i];
-    const start = matches[matchIndex].index ?? 0;
-    const end = matches[matchIndex + 1]?.index ?? result.length;
-    const before = result.slice(0, start).trimEnd();
-    const after = result.slice(end).trimStart();
-    result = `${before}${before && after ? "\n\n" : ""}${after}`;
-  }
-  return result;
-}
-
-function readTomlBoolean(sectionText: string, key: string) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*(true|false)\\s*$`, "mi"));
-  return match ? match[1].toLowerCase() === "true" : null;
-}
-
 function readTomlStringArray(sectionText: string, key: string) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = sectionText.match(new RegExp(`^\\s*${escaped}\\s*=\\s*\\[([^\\]]*)\\]\\s*$`, "m"));
   if (!match) return null;
   return Array.from(match[1].matchAll(/"((?:\\.|[^"])*)"/g)).map((item) => unescapeTomlString(item[1]));
-}
-
-function removeTomlSectionValue(raw: string, sectionName: string, key: string) {
-  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
-  const matches = Array.from(raw.matchAll(sectionPattern));
-  const matchIndex = matches.findIndex((match) => match[1].trim() === sectionName);
-  if (matchIndex < 0) return raw;
-  const start = (matches[matchIndex].index ?? 0) + matches[matchIndex][0].length;
-  const end = matches[matchIndex + 1]?.index ?? raw.length;
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const linePattern = new RegExp(`\\n[ \\t]*${escaped}[ \\t]*=[^\\n]*`, "g");
-  const body = raw.slice(start, end);
-  return raw.slice(0, start) + body.replace(linePattern, "") + raw.slice(end);
 }
 
 function setTomlSectionValue(raw: string, sectionName: string, key: string, valueLiteral: string) {
@@ -1761,72 +1706,6 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
   };
 }
 
-type SecondaryModelPoolDraft = {
-  defaultModel: string | null;
-  force: boolean;
-  defaultEffort: string | null;
-  entries: { alias: string; hint: string }[];
-};
-
-// 官方 0.36 的子 Agent 模型池（[secondary_model] default_model / force + [secondary_model.models]）。
-// 旧单模型键 model 作为 fallback default 继续读取（官方同一语义）。
-function readSecondaryModelPoolFromToml(raw: string): SecondaryModelPoolDraft | null {
-  const body = readTomlSectionBody(raw, "secondary_model");
-  const modelsBody = readTomlSectionBody(raw, "secondary_model.models");
-  if (!body && !modelsBody) return null;
-  const legacyModel = body ? readTomlString(body, "model") : null;
-  const defaultEffort = body ? readTomlString(body, "default_effort") : null;
-  const explicitDefault = body ? readTomlString(body, "default_model") : null;
-  const force = body ? readTomlBoolean(body, "force") === true : false;
-  const entries: { alias: string; hint: string }[] = [];
-  if (modelsBody) {
-    for (const line of modelsBody.split(/\r?\n/)) {
-      const match = line.match(/^\s*(?:"((?:\\.|[^"])*)"|([A-Za-z0-9_./:-]+))\s*=\s*"((?:\\.|[^"])*)"\s*(?:#.*)?$/);
-      if (match) entries.push({ alias: unescapeTomlString(match[1] ?? match[2]), hint: unescapeTomlString(match[3]) });
-    }
-  }
-  const defaultModel = explicitDefault ?? legacyModel ?? null;
-  if (!defaultModel && !force && !defaultEffort && entries.length === 0) return null;
-  return { defaultModel, force, defaultEffort: defaultEffort ?? null, entries };
-}
-
-function removeSecondaryModelPoolSections(raw: string) {
-  let next = removeTomlSection(raw, "secondary_model.models");
-  next = removeTomlSection(next, "secondary_model");
-  next = next.replace(/^\s*\[secondary_model\][^\n]*$/gm, "");
-  return next.replace(/\n{3,}/g, "\n\n");
-}
-
-function applySecondaryModelPoolToml(raw: string, pool: SecondaryModelPoolDraft) {
-  const next = removeSecondaryModelPoolSections(raw);
-  if (!pool.defaultModel && !pool.force && !pool.defaultEffort && pool.entries.length === 0) return next;
-  const newline = next.includes("\r\n") ? "\r\n" : "\n";
-  const lines: string[] = ["[secondary_model]"];
-  if (pool.defaultModel) lines.push(`default_model = "${escapeTomlString(pool.defaultModel)}"`);
-  if (pool.defaultEffort) lines.push(`default_effort = "${escapeTomlString(pool.defaultEffort)}"`);
-  if (pool.force) lines.push("force = true");
-  if (pool.entries.length > 0) {
-    lines.push("", "[secondary_model.models]");
-    for (const entry of pool.entries) {
-      lines.push(`${toTomlTableKey(entry.alias)} = "${escapeTomlString(entry.hint)}"`);
-    }
-  }
-  const base = next.trimEnd();
-  return `${base}${base ? `${newline}${newline}` : ""}${lines.join(newline)}${newline}`;
-}
-
-// 级联清理（对齐官方 cascadeSubagentModelPool 语义）：删除模型/Provider 后，
-// 池内悬空条目过滤；有效默认模型悬空时整节清除，避免 0.36 起所有会话 create/resume/fork 校验失败。
-function pruneSecondaryModelPoolForRemovedAliases(raw: string, remainingAliases: Set<string>) {
-  const pool = readSecondaryModelPoolFromToml(raw);
-  if (!pool) return raw;
-  const defaultDangling = Boolean(pool.defaultModel && !remainingAliases.has(pool.defaultModel));
-  const keptEntries = pool.entries.filter((entry) => remainingAliases.has(entry.alias));
-  if (!defaultDangling && keptEntries.length === pool.entries.length) return raw;
-  if (defaultDangling) return removeSecondaryModelPoolSections(raw);
-  return applySecondaryModelPoolToml(raw, { ...pool, entries: keptEntries });
-}
-
 async function saveKimiSecondaryModelPool(input: unknown) {
   const config = z.object({
     defaultModel: z.string().trim().max(160).nullish(),
@@ -1845,29 +1724,31 @@ async function saveKimiSecondaryModelPool(input: unknown) {
   if (force && !defaultModel) throw new Error("锁定模式需要先选择默认模型。");
   const entries = (config.entries ?? []).filter((entry) => entry.alias);
   if (force && entries.length > 0) throw new Error("锁定模式（force）不能与模型池条目同时配置，请二选一。");
+  // primary 是官方保留别名；默认模型与池条目均拒绝，并按 alias 去重（保留首个）。
+  const { defaultModel: poolDefaultModel, entries: poolEntries } = validateSecondaryModelPoolDraft({ defaultModel, entries });
   const knownAliases = new Set(readKimiModelConfig().models.map((model) => model.alias));
-  if (defaultModel && !knownAliases.has(defaultModel)) throw new Error(`默认模型 ${defaultModel} 不在已配置模型列表中。`);
+  if (poolDefaultModel && !knownAliases.has(poolDefaultModel)) throw new Error(`默认模型 ${poolDefaultModel} 不在已配置模型列表中。`);
   const dropped: string[] = [];
-  const keptEntries = entries.filter((entry) => {
+  const keptEntries = poolEntries.filter((entry) => {
     if (knownAliases.has(entry.alias)) return true;
     dropped.push(entry.alias);
     return false;
   });
   // 官方校验：配置了池条目时 default_model 必填且必须是池内别名（否则所有会话 create/resume/fork 失败）。
   if (keptEntries.length > 0) {
-    if (!defaultModel) throw new Error("配置了池条目时必须选择默认模型，且默认模型必须是池条目之一。");
-    if (!keptEntries.some((entry) => entry.alias === defaultModel)) {
-      throw new Error(`默认模型 ${defaultModel} 不在池条目中；官方运行时会拒绝池外默认，请把默认模型改为池内别名。`);
+    if (!poolDefaultModel) throw new Error("配置了池条目时必须选择默认模型，且默认模型必须是池条目之一。");
+    if (!keptEntries.some((entry) => entry.alias === poolDefaultModel)) {
+      throw new Error(`默认模型 ${poolDefaultModel} 不在池条目中；官方运行时会拒绝池外默认，请把默认模型改为池内别名。`);
     }
   }
   let next = applySecondaryModelPoolToml(raw, {
-    defaultModel,
+    defaultModel: poolDefaultModel,
     force,
     defaultEffort: current?.defaultEffort ?? null,
     entries: keptEntries,
   });
   // 与旧单模型写法一致：配置存在时持久化实验开关，保证外部启动的 kimi web 同样生效。
-  if (defaultModel) next = setTomlSectionValue(next, "experimental", "secondary-model", "true");
+  if (poolDefaultModel) next = setTomlSectionValue(next, "experimental", "secondary-model", "true");
   backupFileIfExists(configPath);
   fs.writeFileSync(configPath, next, "utf-8");
   const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();

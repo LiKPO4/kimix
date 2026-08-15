@@ -1397,7 +1397,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             };
           }
           window.dispatchEvent(new CustomEvent("kimix:toast", {
-            detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route, undefined, "sent")}`,
+            detail: `${agent.displayName} · ${kimiCodeRouteStatus(response.data.route, response.data.fallbackReason, "sent")}`,
           }));
           return { success: true as const };
         },
@@ -1884,7 +1884,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             writePrimaryPromptActivity(status, kimiCodeSessionId);
           }
         }
-        updateLinkStatus(kimiCodeRouteStatus(res.data.route, undefined, "sent"), "success");
+        updateLinkStatus(kimiCodeRouteStatus(res.data.route, res.data.fallbackReason, "sent"), "success");
         // 乐观插入的用户消息此前只靠 900ms 防抖落盘，发送成功后立即显式落盘，缩小崩溃丢失窗口。
         void persistLocalConversationState();
         return true;

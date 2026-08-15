@@ -39,6 +39,8 @@ Servers that declare `startupTimeoutMs` keep their own value. The fallback can b
 overridden with `KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS`. The vendor script applies
 this patch after every regeneration and fails loudly if the upstream marker changes.
 
+This overlay only patches the agent-core-v2 engine's `McpConnectionManager`; the v1 fallback engine (`KIMIX_SDK_ENGINE=v1`) keeps the upstream 30s fallback and remains overridable via the upstream `KIMI_MCP_STARTUP_TIMEOUT_MS`.
+
 Kimi Code `0.31.0` brings Markdown custom Agents and secondary-model routing to the
 legacy Node SDK path, and adds plugin-contributed Agents and system prompts to both
 engines. Kimix therefore vendors the clean official tag instead of carrying the

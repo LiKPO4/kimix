@@ -84,6 +84,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "monthlyQuota",
   "experiment",
   "model",
+  "secondaryModel",
   "theme",
   "uiStyle",
   "display",
@@ -523,7 +524,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [secondaryPoolDefault, setSecondaryPoolDefault] = useState("");
   const [secondaryPoolForce, setSecondaryPoolForce] = useState(false);
   const [secondaryPoolEntries, setSecondaryPoolEntries] = useState<KimiCodeSecondaryModelPoolEntry[]>([]);
-  const [secondaryPoolSelected, setSecondaryPoolSelected] = useState("settings");
+  const [secondaryPoolSelected, setSecondaryPoolSelected] = useState("__settings__");
   const [secondaryPoolNewAlias, setSecondaryPoolNewAlias] = useState("");
   const [secondaryPoolNewHint, setSecondaryPoolNewHint] = useState("");
   const [secondaryPoolBusy, setSecondaryPoolBusy] = useState(false);
@@ -565,17 +566,26 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     const remaining = secondaryPoolEntries.filter((_, itemIndex) => itemIndex !== index);
     setSecondaryPoolEntries(remaining);
     if (removed && removed.alias === secondaryPoolDefault) setSecondaryPoolDefault(remaining[0]?.alias ?? "");
-    setSecondaryPoolSelected("settings");
+    setSecondaryPoolSelected("__settings__");
   };
   const addSecondaryPoolEntry = () => {
     if (!secondaryPoolNewAlias) return;
-    setSecondaryPoolEntries((current) => [...current, { alias: secondaryPoolNewAlias, hint: secondaryPoolNewHint.trim() }]);
-    if (!secondaryPoolEntries.some((entry) => entry.alias === secondaryPoolDefault)) setSecondaryPoolDefault(secondaryPoolNewAlias);
+    setSecondaryPoolEntries((current) => {
+      const next = [...current];
+      // 默认模型不在池内时先并入（旧默认在前），再追加新条目；default 为空才顺位新条目为默认。
+      if (secondaryPoolDefault && !next.some((entry) => entry.alias === secondaryPoolDefault) && secondaryPoolDefault !== secondaryPoolNewAlias) {
+        next.unshift({ alias: secondaryPoolDefault, hint: "" });
+      }
+      next.push({ alias: secondaryPoolNewAlias, hint: secondaryPoolNewHint.trim() });
+      return next;
+    });
+    if (!secondaryPoolDefault) setSecondaryPoolDefault(secondaryPoolNewAlias);
     setSecondaryPoolSelected(secondaryPoolNewAlias);
     setSecondaryPoolNewAlias("");
     setSecondaryPoolNewHint("");
   };
   const secondaryPoolLoadedRef = useRef(false);
+  const skipNextAutoSaveRef = useRef(false);
   const secondaryPoolResaveRef = useRef(false);
   const refreshSecondaryModelPool = async () => {
     const res = await window.api.getKimiCodeSecondaryModelPool();
@@ -590,6 +600,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setSecondaryPoolForce(res.data?.force ?? false);
     setSecondaryPoolEntries(entries);
     secondaryPoolLoadedRef.current = true;
+    skipNextAutoSaveRef.current = true;
   };
   const saveSecondaryModelPool = async () => {
     if (secondaryPoolBusy) {
@@ -606,6 +617,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setSecondaryPoolBusy(false);
     if (!res.success) {
       setSecondaryPoolMessage(`保存失败：${res.error}`);
+      if (secondaryPoolResaveRef.current) {
+        secondaryPoolResaveRef.current = false;
+        void saveSecondaryModelPool();
+      }
       return;
     }
     setSecondaryPoolMessage(res.data.message);
@@ -623,6 +638,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   // 编辑即保存：任一池状态变化后防抖写入；加载完成前不触发。
   useEffect(() => {
     if (!secondaryPoolLoadedRef.current) return;
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
+      return;
+    }
     const timer = window.setTimeout(() => {
       void saveSecondaryModelPool();
     }, 600);
@@ -2895,55 +2914,61 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     {settingsDragHandle("secondaryModel", "子 Agent 模型池")}
                   </div>
                 </div>
-                <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginBottom: 12 }}>
+                <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginBottom: 14 }}>
                   主 Agent 派生子 Agent / Swarm 时参考池内提示挑选模型；提示文案会展示给主 Agent 辅助选择。实验功能，需要 Kimi Code 0.36.0+，由 Kimix 自动开启实验开关。
                 </div>
                 <div className="kimix-model-provider-manager" style={{ minHeight: 300 }}>
-                  <aside className="kimix-model-provider-sidebar" style={{ padding: 14 }}>
+                  <aside className="kimix-model-provider-sidebar" style={{ padding: 14, overflowY: "auto" }}>
                     <div className="flex flex-col" style={{ gap: 8 }}>
                       <button
                         type="button"
-                        aria-pressed={secondaryPoolSelected === "settings"}
-                        onClick={() => setSecondaryPoolSelected("settings")}
-                        className={`kimix-model-provider-item ${secondaryPoolSelected === "settings" ? "is-active" : ""}`}
+                        aria-pressed={secondaryPoolSelected === "__settings__"}
+                        onClick={() => setSecondaryPoolSelected("__settings__")}
+                        className={`kimix-model-provider-item ${secondaryPoolSelected === "__settings__" ? "is-active" : ""}`}
                         style={{ padding: "10px 12px" }}
                       >
                         <Settings size={15} />
                         <span className="min-w-0 flex-1 truncate">池设置</span>
                       </button>
                     </div>
-                    <div className="kimix-settings-permission-desc" style={{ marginTop: 14, paddingLeft: 8, paddingRight: 8 }}>池条目{secondaryPoolEntries.length > 0 ? `（${secondaryPoolEntries.length}）` : ""}</div>
-                    <div className="flex flex-col" style={{ gap: 8, marginTop: 8 }}>
-                      {secondaryPoolEntries.map((entry) => (
+                    {secondaryPoolForce ? (
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 14, paddingLeft: 8, paddingRight: 8 }}>锁定模式下池条目不保存</div>
+                    ) : (
+                      <>
+                        <div className="kimix-settings-permission-desc" style={{ marginTop: 14, paddingLeft: 8, paddingRight: 8 }}>池条目{secondaryPoolEntries.length > 0 ? `（${secondaryPoolEntries.length}）` : ""}</div>
+                        <div className="flex flex-col" style={{ gap: 8, marginTop: 8 }}>
+                          {secondaryPoolEntries.map((entry) => (
+                            <button
+                              key={entry.alias}
+                              type="button"
+                              aria-pressed={secondaryPoolSelected === entry.alias}
+                              onClick={() => setSecondaryPoolSelected(entry.alias)}
+                              className={`kimix-model-provider-item ${secondaryPoolSelected === entry.alias ? "is-active" : ""}`}
+                              style={{ padding: "10px 12px" }}
+                            >
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${entry.alias === secondaryPoolDefault ? "bg-accent-success" : "bg-surface-hover"}`} />
+                              <span className="min-w-0 flex-1 truncate">{entry.alias}</span>
+                              {entry.alias === secondaryPoolDefault && <span className="text-[11px] text-text-muted">默认</span>}
+                            </button>
+                          ))}
+                        </div>
                         <button
-                          key={entry.alias}
                           type="button"
-                          aria-pressed={secondaryPoolSelected === entry.alias}
-                          onClick={() => setSecondaryPoolSelected(entry.alias)}
-                          className={`kimix-model-provider-item ${secondaryPoolSelected === entry.alias ? "is-active" : ""}`}
-                          style={{ padding: "10px 12px" }}
+                          onClick={() => {
+                            setSecondaryPoolNewAlias("");
+                            setSecondaryPoolNewHint("");
+                            setSecondaryPoolSelected("__new__");
+                          }}
+                          className={`kimix-icon-text-button w-full justify-start text-text-secondary hover:bg-surface-hover ${secondaryPoolSelected === "__new__" ? "bg-surface-hover" : ""}`}
+                          style={{ marginTop: 14 }}
                         >
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${entry.alias === secondaryPoolDefault ? "bg-accent-success" : "bg-surface-hover"}`} />
-                          <span className="min-w-0 flex-1 truncate">{entry.alias}</span>
-                          {entry.alias === secondaryPoolDefault && <span className="text-[11px] text-text-muted">默认</span>}
+                          <span>添加条目</span>
                         </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSecondaryPoolNewAlias("");
-                        setSecondaryPoolNewHint("");
-                        setSecondaryPoolSelected("__new__");
-                      }}
-                      className={`kimix-icon-text-button w-full justify-start text-text-secondary hover:bg-surface-hover ${secondaryPoolSelected === "__new__" ? "bg-surface-hover" : ""}`}
-                      style={{ marginTop: 14 }}
-                    >
-                      <span>添加条目</span>
-                    </button>
+                      </>
+                    )}
                   </aside>
                   <div className="min-w-0" style={{ padding: "18px 20px" }}>
-                    {secondaryPoolSelected === "settings" && (
+                    {secondaryPoolSelected === "__settings__" && (
                       <div>
                         <div className="text-[14.5px] font-medium leading-6 text-[var(--kimix-panel-text)]">池设置</div>
                         <div className="grid items-center" style={{ gridTemplateColumns: "96px minmax(0, 1fr)", gap: 10, marginTop: 14 }}>
@@ -3048,7 +3073,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         </div>
                       </div>
                     )}
-                    {secondaryPoolSelectedEntry && (
+                    {secondaryPoolSelectedEntry && secondaryPoolForce && (
+                      <div className="text-[13px] leading-5 text-[var(--kimix-panel-text-secondary)]">锁定模式下池条目不保存</div>
+                    )}
+                    {secondaryPoolSelectedEntry && !secondaryPoolForce && (
                       <div>
                         <div className="flex items-center justify-between" style={{ gap: 12 }}>
                           <div className="min-w-0 truncate text-[14.5px] font-medium leading-6 text-[var(--kimix-panel-text)]" title={secondaryPoolSelectedEntry.alias}>{secondaryPoolSelectedEntry.alias}</div>

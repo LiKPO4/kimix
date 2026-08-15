@@ -45,11 +45,13 @@ export function SkillsPanel({
   const [capabilities, setCapabilities] = useState<KimiCodeCapabilityStatus[]>([]);
   const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false);
   const [installingCapabilityId, setInstallingCapabilityId] = useState<string | null>(null);
+  const mountedRef = useRef(true);
   const installPollRef = useRef<number | null>(null);
   const installCapabilityLockRef = useRef(false);
   const installMarketplacePluginLockRef = useRef(false);
   // 安装轮询必须随卸载清理：切走插件页后 interval 不得继续每 2s 轮询 IPC。
   useEffect(() => () => {
+    mountedRef.current = false;
     if (installPollRef.current !== null) window.clearInterval(installPollRef.current);
   }, []);
   const selectedTab = onActiveTabChange ? activeTab : localActiveTab;
@@ -150,8 +152,9 @@ export function SkillsPanel({
       // 进度（install.step/percent）只能靠轮询 listCapabilities 拿到。
       // 所以不能在 RPC 返回后收尾，要轮询到 install.running 变 false 为止。
       const res = await window.api.installKimiCodeCapability({ id: capability.id });
+      // 组件已卸载：不再创建轮询、不再刷新列表，收尾交给 finally。
+      if (!mountedRef.current) return;
       if (!res.success) {
-        setInstallingCapabilityId(null);
         setMessage(`${capability.displayName} 安装失败：${res.error}`);
         await refreshCapabilities();
         return;
@@ -172,28 +175,44 @@ export function SkillsPanel({
         // 上限 300 次（约 10 分钟），防止状态异常时无限轮询。
         installPollRef.current = window.setInterval(() => {
           polls += 1;
+          // 组件已卸载：立即停掉轮询，收尾交给 finally。
+          if (!mountedRef.current) {
+            finish(null);
+            return;
+          }
           if (polls > 300) {
             finish(null);
             return;
           }
           void refreshCapabilities().then((list) => {
+            if (!mountedRef.current) return;
             const current = list.find((item) => item.id === capability.id);
             if (current && !current.install.running) finish(current);
           });
         }, 2000);
       });
-      setInstallingCapabilityId(null);
+      if (!mountedRef.current) return;
+      // 安装完成/失败/超时消息作为 nextMessage 传给 refreshSdkPlugins，
+      // 避免被其收尾的无参刷新覆盖；运行时插件列表也一并刷新。
       if (finalStatus?.install.error) {
-        setMessage(`${capability.displayName} 安装失败：${finalStatus.install.error}`);
+        void refreshSdkPlugins(`${capability.displayName} 安装失败：${finalStatus.install.error}`);
       } else if (finalStatus) {
-        setMessage(`${capability.displayName} 安装完成`);
+        void refreshSdkPlugins(`${capability.displayName} 安装完成`);
       } else {
-        setMessage(`${capability.displayName} 安装状态确认超时，请稍后刷新查看。`);
+        void refreshSdkPlugins(`${capability.displayName} 安装状态确认超时，请稍后刷新查看。`);
       }
-      // 安装会接线官方插件，运行时状态一并刷新。
-      void refreshSdkPlugins();
+    } catch (error) {
+      // IPC reject 等异常：给出可见失败反馈，状态清理统一由 finally 完成。
+      const reason = error instanceof Error ? error.message : String(error);
+      setMessage(`安装 ${capability.displayName} 失败：${reason}`);
     } finally {
+      // 无论 IPC reject、组件卸载还是正常结束，都保证安装状态不残留、轮询被清理。
       installCapabilityLockRef.current = false;
+      if (installPollRef.current !== null) {
+        window.clearInterval(installPollRef.current);
+        installPollRef.current = null;
+      }
+      setInstallingCapabilityId(null);
     }
   };
 
@@ -290,14 +309,30 @@ export function SkillsPanel({
       setMessage("请输入或选择一个 Skill 根目录");
       return;
     }
-    const exists = extraSkillDirs.some((dir) => dir.toLowerCase() === value.toLowerCase());
+    // 写之前重读最新登记列表作为 base，避免基于挂载时的快照覆盖外部改动；读失败才回退当前 state。
+    let base = extraSkillDirs;
+    const readRes = await window.api.getKimiCodeExtraSkillDirs();
+    if (readRes.success) base = asArray(readRes.data);
+    const exists = base.some((dir) => dir.toLowerCase() === value.toLowerCase());
     if (exists) {
       setMessage("该 Skill 目录已经登记");
       return;
     }
-    if (await saveExtraSkillDirs([...extraSkillDirs, value], "已登记官方附加 Skill 目录")) {
+    if (await saveExtraSkillDirs([...base, value], "已登记官方附加 Skill 目录")) {
       setExtraSkillDirInput("");
     }
+  };
+
+  const removeExtraSkillDir = async (dir: string) => {
+    // 写之前重读最新登记列表作为 base，避免基于挂载时的快照覆盖外部改动；读失败才回退当前 state。
+    let base = extraSkillDirs;
+    const readRes = await window.api.getKimiCodeExtraSkillDirs();
+    if (readRes.success) base = asArray(readRes.data);
+    if (!base.includes(dir)) {
+      setMessage("该 Skill 目录已不在登记列表中");
+      return;
+    }
+    await saveExtraSkillDirs(base.filter((item) => item !== dir), "已移除官方附加 Skill 目录");
   };
 
   const chooseExtraSkillDir = async () => {
@@ -613,7 +648,7 @@ export function SkillsPanel({
                           <div className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={dir}>{dir}</div>
                           <button
                             type="button"
-                            onClick={() => void saveExtraSkillDirs(extraSkillDirs.filter((item) => item !== dir), "已移除官方附加 Skill 目录")}
+                            onClick={() => void removeExtraSkillDir(dir)}
                             disabled={savingExtraSkillDirs}
                             className="kimix-icon-text-button kimix-muted-action is-compact shrink-0 disabled:opacity-50"
                             aria-label={`移除 ${dir}`}

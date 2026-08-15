@@ -386,7 +386,7 @@ function LaunchCommandDialog({ open, draft, onChange, onClose, onSave }: LaunchC
           value={draft}
           onChange={(event) => onChange(event.target.value)}
           className="kimix-settings-input mt-5 min-h-[96px] w-full resize-y rounded-xl text-[14px] leading-6 outline-none"
-          style={{ padding: "12px 14px" }}
+          style={{ padding: "12px 14px", borderRadius: 12 }}
           placeholder="例如：pnpm dev"
           autoFocus
         />

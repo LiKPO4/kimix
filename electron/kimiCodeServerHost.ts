@@ -398,6 +398,7 @@ export class KimiCodeServerHost {
   async start(): Promise<KimiCodeServerHostStatus> {
     if (!this.status.enabled) return this.getStatus();
     if (this.status.state === "attached" || this.status.state === "managed") return this.getStatus();
+    if (this.status.state === "starting") return this.getStatus();
     this.status = { ...this.status, state: "starting", error: undefined };
     this.stderr = "";
 

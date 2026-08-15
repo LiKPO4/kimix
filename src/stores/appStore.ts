@@ -23,6 +23,7 @@ const SETTINGS_PAGE_IDS = new Set<SettingsPageId>([
   "experiments",
   "data",
   "diagnostics",
+  "subagents",
 ]);
 
 function readActiveSettingsPage(): SettingsPageId {
