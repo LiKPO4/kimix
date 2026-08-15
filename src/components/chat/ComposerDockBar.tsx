@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ClipboardList, ListOrdered, PanelRightClose, Pause, Play, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
+import { List, ListChecks, ListOrdered, PanelRightClose, Pause, PenLine, Play, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
 import type { OfficialGoalSnapshot, TodoItem } from "@/types/ui";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
-import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
+import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone, isBackgroundTaskTerminalStatus } from "@/utils/backgroundTasks";
 import { TodoListItems, todoCounts } from "./TodoPanel";
 
 /**
@@ -13,7 +13,7 @@ import { TodoListItems, todoCounts } from "./TodoPanel";
  * 替代原 TodoPanel 卡片与排队消息浮动面板（重量级实心卡，遮挡聊天内容）。
  */
 
-export type ComposerDockPanelId = "bash" | "subagent" | "todo" | "queue" | "goal";
+export type ComposerDockPanelId = "bash" | "subagent" | "todo" | "queue" | "goal" | "plan";
 
 type ComposerDockBarProps = {
   bashTasks: KimiCodeBackgroundTaskInfo[];
@@ -26,6 +26,10 @@ type ComposerDockBarProps = {
   queueBody: ReactNode;
   /** 官方 Goal 快照；null 或终态（完成/取消）时不显示目标胶囊。 */
   goal?: OfficialGoalSnapshot | null;
+  /** Plan 模式开关；开启或已有计划内容时显示计划胶囊（对齐官方 dock 的 plan chip）。 */
+  planMode?: boolean;
+  planContent?: string | null;
+  planPath?: string | null;
   onPauseGoal?: () => void | Promise<void>;
   onResumeGoal?: () => void | Promise<void>;
   onCancelGoal?: () => void | Promise<void>;
@@ -160,6 +164,9 @@ export function ComposerDockBar({
   queueCount,
   queueBody,
   goal,
+  planMode,
+  planContent,
+  planPath,
   onPauseGoal,
   onResumeGoal,
   onCancelGoal,
@@ -173,13 +180,18 @@ export function ComposerDockBar({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const { doneCount } = todoCounts(todoItems);
-  const capsules: { id: ComposerDockPanelId; label: string; count: string; icon: ReactNode }[] = [];
+  const runningOf = (tasks: KimiCodeBackgroundTaskInfo[]) => tasks.filter((task) => !isBackgroundTaskTerminalStatus(task.status)).length;
+  const capsules: { id: ComposerDockPanelId; label: string; count: string; running: number; icon: ReactNode }[] = [];
   const goalVisible = Boolean(goal && !isTerminalGoalStatus(goal.status));
-  if (goalVisible && goal) capsules.push({ id: "goal", label: "目标", count: goalCapsuleStatusLabel(goal.status), icon: <Target size={13} /> });
-  if (bashTasks.length > 0) capsules.push({ id: "bash", label: "后台 Bash", count: String(bashTasks.length), icon: <SquareTerminal size={13} /> });
-  if (subagentTasks.length > 0) capsules.push({ id: "subagent", label: "子 Agent", count: String(subagentTasks.length), icon: <Users size={13} /> });
-  if (todoItems.length > 0) capsules.push({ id: "todo", label: "待办", count: `${doneCount}/${todoItems.length}`, icon: <ClipboardList size={13} /> });
-  if (queueCount > 0) capsules.push({ id: "queue", label: "队列", count: String(queueCount), icon: <ListOrdered size={13} /> });
+  const planVisible = Boolean(planMode) || Boolean(planContent && planContent.trim());
+  if (goalVisible && goal) capsules.push({ id: "goal", label: "目标", count: goalCapsuleStatusLabel(goal.status), running: 0, icon: <Target size={13} /> });
+  // 对齐官方 0.36 dock：planMode 或已捕获计划文件时显示计划胶囊。
+  if (planVisible) capsules.push({ id: "plan", label: "计划", count: "", running: 0, icon: <PenLine size={13} /> });
+  if (bashTasks.length > 0) capsules.push({ id: "bash", label: "后台 Bash", count: String(bashTasks.length), running: runningOf(bashTasks), icon: <SquareTerminal size={13} /> });
+  if (subagentTasks.length > 0) capsules.push({ id: "subagent", label: "子 Agent", count: String(subagentTasks.length), running: runningOf(subagentTasks), icon: <Users size={13} /> });
+  // 对齐官方文案：待办胶囊叫「当前进度 done/total」，全部完成时换 check-list 图标。
+  if (todoItems.length > 0) capsules.push({ id: "todo", label: "当前进度", count: `${doneCount}/${todoItems.length}`, running: 0, icon: doneCount >= todoItems.length ? <ListChecks size={13} /> : <List size={13} /> });
+  if (queueCount > 0) capsules.push({ id: "queue", label: "队列", count: String(queueCount), running: 0, icon: <ListOrdered size={13} /> });
 
   // 数据清空自动关闭对应面板（官方 watch(hasDockWork) 同款语义）。
   useEffect(() => {
@@ -188,7 +200,8 @@ export function ComposerDockBar({
     if (openPanel === "todo" && todoItems.length === 0) setOpenPanel(null);
     if (openPanel === "queue" && queueCount === 0) setOpenPanel(null);
     if (openPanel === "goal" && !goalVisible) setOpenPanel(null);
-  }, [openPanel, bashTasks.length, subagentTasks.length, todoItems.length, queueCount, goalVisible]);
+    if (openPanel === "plan" && !planVisible) setOpenPanel(null);
+  }, [openPanel, bashTasks.length, subagentTasks.length, todoItems.length, queueCount, goalVisible, planVisible]);
 
   // 点面板/胶囊行以外任意处关闭（capture 阶段，面板内部交互不触发）。
   useEffect(() => {
@@ -225,6 +238,21 @@ export function ComposerDockBar({
       title: `队列 · ${queueCount} 条消息正在排队`,
       body: queueBody,
       onHide: onHideQueue,
+    },
+    plan: {
+      title: "计划",
+      body: (
+        <div className="flex flex-col" style={{ gap: 8, paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 10 }}>
+          {planPath ? (
+            <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" title={planPath}>{planPath}</div>
+          ) : null}
+          {planContent && planContent.trim() ? (
+            <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{planContent}</div>
+          ) : (
+            <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">Plan 模式已开启，等待生成计划文件。</div>
+          )}
+        </div>
+      ),
     },
     goal: {
       title: `目标 · ${goal ? goalCapsuleStatusLabel(goal.status) : ""}`,
@@ -302,7 +330,13 @@ export function ComposerDockBar({
           >
             {capsule.icon}
             <span>{capsule.label}</span>
-            <span className="kimix-dock-capsule-count">({capsule.count})</span>
+            {capsule.running > 0 && (
+              <span className="flex items-center text-accent-primary" style={{ gap: 4 }}>
+                <RefreshCw size={11} className="animate-spin" />
+                {capsule.running}
+              </span>
+            )}
+            {capsule.count && <span className="kimix-dock-capsule-count">({capsule.count})</span>}
           </button>
         ))}
       </div>

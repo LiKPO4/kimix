@@ -2107,6 +2107,7 @@ ${isFinalStep
                     bashTasks={bashTasks}
                     subagentTasks={subagentTasks}
                     officialGoal={mutationSessionView?.officialGoal}
+                    sessionPlanState={sessionPlanState}
                     onPauseOfficialGoal={pauseOfficialGoal}
                     onResumeOfficialGoal={resumeOfficialGoal}
                     onCancelOfficialGoal={cancelOfficialGoal}

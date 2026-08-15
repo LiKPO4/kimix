@@ -496,9 +496,9 @@ type ComposerProps = {
   onResumeOfficialGoal?: () => void | Promise<void>;
   onCancelOfficialGoal?: () => void | Promise<void>;
   onRefreshOfficialGoal?: () => void | Promise<void>;
+  sessionPlanState?: { loading: boolean; path: string | null; content: string; updatedAt: number | null; error: string | null; message?: string; } | null;
 };
-
-export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal }: ComposerProps = {}) {
+export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal, sessionPlanState }: ComposerProps = {}) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
@@ -4509,6 +4509,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         queueCount={pendingHidden ? 0 : pendingMessages.length}
         queueBody={queueListBody}
         goal={officialGoal?.goal ?? null}
+        planMode={mutationPlanMode}
+        planContent={sessionPlanState?.content ?? null}
+        planPath={sessionPlanState?.path ?? null}
         onPauseGoal={onPauseOfficialGoal}
         onResumeGoal={onResumeOfficialGoal}
         onCancelGoal={onCancelOfficialGoal}
