@@ -18,6 +18,7 @@ describe("settingsNavigation", () => {
     expect(getSettingsPageForSection("palette")).toBe("appearance");
     expect(getSettingsPageForSection("uiStyle")).toBe("appearance");
     expect(getSettingsPageForSection("display")).toBe("appearance");
+    expect(getSettingsPageForSection("thinkingTranslation")).toBe("conversation");
   });
 
   it("未知页面安全回退到常规", () => {
@@ -32,6 +33,7 @@ describe("settingsNavigation", () => {
     expect(searchSettings("界面字号").map((item) => item.id)).toEqual(["display"]);
     expect(searchSettings("复古").map((item) => item.id)).toEqual(["ui-style"]);
     expect(searchSettings("kimi-auth").map((item) => item.id)).toEqual(["monthly-quota"]);
+    expect(searchSettings("离线").map((item) => item.id)).toContain("thinking-translation");
     expect(searchSettings("上下文").map((item) => item.id)).toEqual(expect.arrayContaining(["new-session", "tool-select"]));
     expect(searchSettings("   ")).toEqual([]);
   });

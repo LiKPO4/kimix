@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-16 功能：思考翻译支持免账号本地模型与互斥提供方（v2.21.81）
+
+- 设置页将翻译能力从“过程展示方式”拆成独立“思考翻译”分区，提供“不启用翻译 / 本地轻量翻译 / Microsoft 云端翻译”三个互斥状态；译文显示和 1～5 秒频率由两种提供方共用。
+- 本地方案采用 `Xenova/opus-mt-en-zh` q8 量化模型，实际缓存约 119.5 MB；用户可在设置中下载并启用、查看下载进度或删除。下载后推理不需要账号、Key 或网络，质量目标为快速可读而非高精度。
+- CPU 推理在 Electron `utilityProcess` 中运行，避免阻塞主进程和 Renderer；模型缓存位于 `userData/thinking-translation-models/opus-mt-en-zh`，完成标记控制离线可用状态，删除操作限制在模型根目录内。
+- 旧版 `thinkingTranslationEnabled=true` 自动迁移为 `provider=azure`；翻译 store 将提供方纳入请求和缓存复用边界，切换本地/云端时不会混合旧译文，本地单块限制为 900 字符以适配 Marian 上下文和实时延迟。
+- 新增 `@huggingface/transformers@3.8.1` 与 ONNX Runtime 构建许可；回滚时可删除依赖、worker/manager、IPC 与本地设置区，并将 provider 迁移回布尔开关。模型文件不打进安装包，只由用户按需下载和删除。
+
 ## 2026-08-16 优化：翻译凭据增加官方入口并扩展更新频率（v2.21.80）
 
 - 设置页在 Microsoft Translator 凭据标题右侧增加“获取 Key”入口，打开 Microsoft Learn 官方 Translator 资源创建与认证密钥说明。

@@ -8,14 +8,16 @@ export default defineConfig({
     build: {
       outDir: 'out/main',
       lib: {
-        entry: 'electron/main.ts',
+        entry: {
+          index: 'electron/main.ts',
+          localThinkingTranslatorWorker: 'electron/localThinkingTranslatorWorker.ts',
+        },
         formats: ['cjs'],
-        fileName: () => 'index',
       },
       rollupOptions: {
-        external: ['electron', /^node:/],
+        external: ['electron', /^node:/, '@huggingface/transformers'],
         output: {
-          entryFileNames: 'index.cjs',
+          entryFileNames: '[name].cjs',
         },
       },
     },

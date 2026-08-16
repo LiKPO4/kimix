@@ -13,6 +13,7 @@ type HookProps = {
   sourceText: string;
   final?: boolean;
   intervalMs?: number;
+  provider?: "local" | "azure";
 };
 
 describe("thinkingTranslationStore", () => {
@@ -26,6 +27,7 @@ describe("thinkingTranslationStore", () => {
       key: props.translationKey ?? "draft:session-1:turn-1",
       sourceText: props.sourceText,
       enabled: true,
+      provider: props.provider ?? "azure",
       intervalMs: props.intervalMs ?? 2500,
       final: props.final,
     });
@@ -177,5 +179,17 @@ describe("thinkingTranslationStore", () => {
     await act(async () => vi.runOnlyPendingTimersAsync());
     expect(translateThinking).toHaveBeenCalledTimes(1);
     expect(latest.translatedText).toBe("译:Shared sentence.");
+  });
+
+  it("切换互斥翻译提供方时清空旧译文并把新请求路由到选中提供方", async () => {
+    await render({ sourceText: "Provider sentence.", final: true, provider: "azure" });
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    expect(translateThinking).toHaveBeenCalledTimes(1);
+    expect(translateThinking.mock.calls[0][0].provider).toBe("azure");
+
+    await render({ sourceText: "Provider sentence.", final: true, provider: "local" });
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    expect(translateThinking).toHaveBeenCalledTimes(2);
+    expect(translateThinking.mock.calls[1][0].provider).toBe("local");
   });
 });

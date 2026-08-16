@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
@@ -177,7 +177,7 @@ export interface AppStore extends AppState {
   setNotificationShowContent: (enabled: boolean) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setCollapseProcessWhileRunning: (enabled: boolean) => void;
-  setThinkingTranslationEnabled: (enabled: boolean) => void;
+  setThinkingTranslationProvider: (provider: ThinkingTranslationProvider) => void;
   setThinkingTranslationIntervalMs: (intervalMs: number) => void;
   setThinkingTranslationDisplayMode: (mode: ThinkingTranslationDisplayMode) => void;
   setPendingNewSessionModel: (model: string | null) => void;
@@ -243,7 +243,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   notificationShowContent: false,
   processDisplayMode: readProcessDisplayMode(),
   collapseProcessWhileRunning: readCollapseProcessWhileRunning(),
-  thinkingTranslationEnabled: false,
+  thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,
   thinkingTranslationDisplayMode: "translated",
   pendingNewSessionModel: readPendingNewSessionModel(),
@@ -363,7 +363,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
     writeActiveSettingsPage(pageId);
     set({ activeSettingsPageId: pageId });
   },
-  setThinkingTranslationEnabled: (enabled) => set({ thinkingTranslationEnabled: enabled }),
+  setThinkingTranslationProvider: (provider) => set({ thinkingTranslationProvider: provider }),
   setThinkingTranslationIntervalMs: (intervalMs) => set({
     thinkingTranslationIntervalMs: Math.max(1000, Math.min(5000, Math.round(intervalMs))),
   }),

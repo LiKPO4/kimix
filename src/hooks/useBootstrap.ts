@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset, ThinkingTranslationDisplayMode } from "@/types/ui";
+import type { Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
@@ -25,7 +25,7 @@ interface BootstrapSetters {
   setSessionRecommendationTurnLimit: (v: number) => void;
   setVoiceShortcut: (v: string) => void;
   setNotificationMode: (v: NotificationMode) => void;
-  setThinkingTranslationEnabled: (v: boolean) => void;
+  setThinkingTranslationProvider: (v: ThinkingTranslationProvider) => void;
   setThinkingTranslationIntervalMs: (v: number) => void;
   setThinkingTranslationDisplayMode: (v: ThinkingTranslationDisplayMode) => void;
   setFilePreviewExtensions: (v: string[]) => void;
@@ -69,7 +69,7 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setVoiceShortcut(res.data.voiceShortcut);
           setters.setNotificationMode(res.data.notificationMode);
           setters.setFilePreviewExtensions(res.data.filePreviewExtensions ?? ["md", "txt"]);
-          setters.setThinkingTranslationEnabled(res.data.thinkingTranslationEnabled ?? false);
+          setters.setThinkingTranslationProvider(res.data.thinkingTranslationProvider ?? (res.data.thinkingTranslationEnabled ? "azure" : "off"));
           setters.setThinkingTranslationIntervalMs(res.data.thinkingTranslationIntervalMs ?? 2500);
           setters.setThinkingTranslationDisplayMode(res.data.thinkingTranslationDisplayMode ?? "translated");
         } else {

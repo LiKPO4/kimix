@@ -125,6 +125,18 @@ describe("settings workspace scroll layout", () => {
     expect(settingsPanel).toContain("[1000, 2000, 2500, 3000, 4000, 5000]");
   });
 
+  it("将思考翻译拆成独立分区，并提供关闭、本地模型和云端服务三个互斥选项", () => {
+    const processStart = settingsPanel.indexOf('settingsSectionProps("processDisplay", 7)');
+    const translationStart = settingsPanel.indexOf('settingsSectionProps("thinkingTranslation", 8)');
+    const filePreviewStart = settingsPanel.indexOf('settingsSectionProps("filePreview", 8)');
+    expect(translationStart).toBeGreaterThan(processStart);
+    expect(filePreviewStart).toBeGreaterThan(translationStart);
+    expect(settingsPanel.slice(translationStart, filePreviewStart)).toContain("不启用翻译");
+    expect(settingsPanel.slice(translationStart, filePreviewStart)).toContain("本地轻量翻译");
+    expect(settingsPanel.slice(translationStart, filePreviewStart)).toContain("Microsoft 云端翻译");
+    expect(settingsPanel.slice(translationStart, filePreviewStart)).toContain("下载并启用");
+  });
+
   it("keeps UI style, display preferences, and palette in separate appearance sections", () => {
     const themeStart = settingsPanel.indexOf('settingsSectionProps("theme", 3)');
     const styleStart = settingsPanel.indexOf('settingsSectionProps("uiStyle", 4)');

@@ -1252,9 +1252,33 @@ export type SaveThinkingTranslationCredentialRequest = {
   endpoint?: string;
 };
 
+export type ThinkingTranslationProvider = "off" | "local" | "azure";
+
 export type ThinkingTranslationRequest = {
   text: string;
   requestId?: string;
+  provider: Exclude<ThinkingTranslationProvider, "off">;
+};
+
+export type LocalThinkingTranslationModelState = "not_downloaded" | "downloading" | "ready" | "error";
+
+export type LocalThinkingTranslationModelStatus = {
+  state: LocalThinkingTranslationModelState;
+  modelId: string;
+  estimatedBytes: number;
+  downloadedBytes?: number;
+  totalBytes?: number;
+  progress?: number;
+  currentFile?: string;
+  message?: string;
+};
+
+export type LocalThinkingTranslationModelStatusResponse = {
+  success: true;
+  data: LocalThinkingTranslationModelStatus;
+} | {
+  success: false;
+  error: string;
 };
 
 export type ThinkingTranslationErrorCode =
@@ -1266,7 +1290,9 @@ export type ThinkingTranslationErrorCode =
   | "timeout"
   | "network_error"
   | "provider_error"
-  | "invalid_response";
+  | "invalid_response"
+  | "model_not_downloaded"
+  | "model_unavailable";
 
 export type ThinkingTranslationResponse = {
   success: true;
@@ -1683,7 +1709,9 @@ export type AppSettings = {
   experimentalKimiServerSessions: boolean;
   experimentalKimiToolSelect: boolean;
   kimiMonthlyQuotaEnabled: boolean;
-  thinkingTranslationEnabled: boolean;
+  thinkingTranslationProvider: ThinkingTranslationProvider;
+  /** @deprecated 仅用于迁移 2.21.80 及更早版本的布尔开关。 */
+  thinkingTranslationEnabled?: boolean;
   thinkingTranslationIntervalMs: number;
   thinkingTranslationDisplayMode: "translated" | "bilingual";
   defaultOpenDir?: string;

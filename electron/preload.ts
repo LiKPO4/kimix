@@ -97,6 +97,8 @@ import type {
   KimiMonthlyQuotaResponse,
   SaveKimiMonthlyQuotaCredentialRequest,
   ThinkingTranslationCredentialStatusResponse,
+  LocalThinkingTranslationModelStatus,
+  LocalThinkingTranslationModelStatusResponse,
   SaveThinkingTranslationCredentialRequest,
   ThinkingTranslationRequest,
   ThinkingTranslationResponse,
@@ -410,6 +412,17 @@ const api = {
     ipcRenderer.invoke("thinking-translation:test"),
   translateThinking: (req: ThinkingTranslationRequest): Promise<ThinkingTranslationResponse> =>
     ipcRenderer.invoke("thinking-translation:translate", req),
+  getLocalThinkingTranslationModelStatus: (): Promise<LocalThinkingTranslationModelStatusResponse> =>
+    ipcRenderer.invoke("thinking-translation:getLocalModelStatus"),
+  downloadLocalThinkingTranslationModel: (): Promise<LocalThinkingTranslationModelStatusResponse> =>
+    ipcRenderer.invoke("thinking-translation:downloadLocalModel"),
+  deleteLocalThinkingTranslationModel: (): Promise<LocalThinkingTranslationModelStatusResponse> =>
+    ipcRenderer.invoke("thinking-translation:deleteLocalModel"),
+  onLocalThinkingTranslationModelStatus: (callback: (payload: LocalThinkingTranslationModelStatus) => void) => {
+    const handler = (_: unknown, payload: LocalThinkingTranslationModelStatus) => callback(payload);
+    ipcRenderer.on("thinking-translation:localModelStatus", handler);
+    return () => { ipcRenderer.off("thinking-translation:localModelStatus", handler); };
+  },
   getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
     ipcRenderer.invoke("kimi-code:getCacheHintConfig"),
   startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>

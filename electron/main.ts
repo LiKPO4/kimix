@@ -27,6 +27,7 @@ import {
   translateThinkingWithAzure,
   type AzureTranslatorCredential,
 } from "./thinkingTranslator";
+import { LocalThinkingTranslator } from "./localThinkingTranslator";
 import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
@@ -7435,6 +7436,23 @@ function thinkingTranslationCredentialPath(): string {
   return path.join(app.getPath("userData"), "thinking-translation-azure.bin");
 }
 
+let localThinkingTranslator: LocalThinkingTranslator | null = null;
+
+function getLocalThinkingTranslator(): LocalThinkingTranslator {
+  if (!localThinkingTranslator) {
+    localThinkingTranslator = new LocalThinkingTranslator(
+      app.getPath("userData"),
+      path.join(__dirname, "localThinkingTranslatorWorker.cjs"),
+      (status) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("thinking-translation:localModelStatus", status);
+        }
+      },
+    );
+  }
+  return localThinkingTranslator;
+}
+
 function readThinkingTranslationCredential(): AzureTranslatorCredential | null {
   const credentialPath = thinkingTranslationCredentialPath();
   if (!fs.existsSync(credentialPath)) return null;
@@ -7483,8 +7501,15 @@ function thinkingTranslationFailure(error: unknown) {
   };
 }
 
-async function runThinkingTranslation(text: string, requestId?: string) {
+async function runThinkingTranslation(
+  text: string,
+  requestId?: string,
+  provider: "local" | "azure" = "azure",
+) {
   try {
+    if (provider === "local") {
+      return await getLocalThinkingTranslator().translate(text, requestId);
+    }
     if (!safeStorage.isEncryptionAvailable()) {
       return {
         success: false as const,
@@ -7558,12 +7583,34 @@ ipcMain.handle("thinking-translation:clearCredential", async () => {
   }
 });
 
-ipcMain.handle("thinking-translation:test", async () => runThinkingTranslation("Hello"));
+ipcMain.handle("thinking-translation:test", async () => runThinkingTranslation("Hello", undefined, "azure"));
+
+ipcMain.handle("thinking-translation:getLocalModelStatus", async () => ({
+  success: true,
+  data: getLocalThinkingTranslator().getStatus(),
+}));
+
+ipcMain.handle("thinking-translation:downloadLocalModel", async () => {
+  try {
+    return { success: true, data: await getLocalThinkingTranslator().download() };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("thinking-translation:deleteLocalModel", async () => {
+  try {
+    return { success: true, data: await getLocalThinkingTranslator().remove() };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
 
 ipcMain.handle("thinking-translation:translate", async (_, request: unknown) => {
   const parsed = z.object({
     text: z.string().min(1).max(50_000).refine((value) => Boolean(value.trim())),
     requestId: z.string().trim().min(1).max(200).optional(),
+    provider: z.enum(["local", "azure"]),
   }).safeParse(request);
   if (!parsed.success) {
     return {
@@ -7572,7 +7619,7 @@ ipcMain.handle("thinking-translation:translate", async (_, request: unknown) => 
     };
   }
   try {
-    return await runThinkingTranslation(parsed.data.text, parsed.data.requestId);
+    return await runThinkingTranslation(parsed.data.text, parsed.data.requestId, parsed.data.provider);
   } catch (error) {
     return thinkingTranslationFailure(error);
   }
@@ -8084,6 +8131,7 @@ const SettingsSchema = z.object({
   experimentalKimiServerSessions: z.boolean().optional(),
   experimentalKimiToolSelect: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
+  thinkingTranslationProvider: z.enum(["off", "local", "azure"]).optional(),
   thinkingTranslationEnabled: z.boolean().optional(),
   thinkingTranslationIntervalMs: z.number().int().min(1_000).max(5_000).optional(),
   thinkingTranslationDisplayMode: z.enum(["translated", "bilingual"]).optional(),
@@ -8476,6 +8524,7 @@ ipcMain.handle("window:close", () => {
 
 function performGracefulQuit(): void {
   if (isQuitting) return;
+  localThinkingTranslator?.stop();
   const ids = kimiCodeHost.getActiveSessionIds();
   const serverStatus = kimiCodeServerHost.getStatus();
   if (ids.length === 0 && !serverStatus.managed) {

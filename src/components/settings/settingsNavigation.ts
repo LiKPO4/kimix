@@ -18,6 +18,7 @@ export type SettingsSectionId =
   | "context"
   | "message"
   | "processDisplay"
+  | "thinkingTranslation"
   | "filePreview"
   | "newSession"
   | "notification"
@@ -65,7 +66,7 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     group: "基础设置",
     label: "对话与权限",
     description: "控制 Agent 权限、上下文信息和执行过程的展示方式。",
-    sections: ["permission", "context", "message", "processDisplay"],
+    sections: ["permission", "context", "message", "processDisplay", "thinkingTranslation"],
   },
   {
     id: "account",
@@ -207,6 +208,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     pageId: "conversation",
     sectionId: "processDisplay",
     keywords: ["折叠", "展开", "工具", "思考"],
+  },
+  {
+    id: "thinking-translation",
+    label: "思考翻译",
+    description: "选择本地模型或 Microsoft 云端服务，将思考内容翻译为中文",
+    pageId: "conversation",
+    sectionId: "thinkingTranslation",
+    keywords: ["翻译", "中文", "本地模型", "离线", "Microsoft Translator", "Azure"],
   },
   {
     id: "connection",

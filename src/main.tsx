@@ -31,6 +31,7 @@ import type {
   KimiMonthlyQuotaResponse,
   ThinkingTranslationCredentialStatusResponse,
   ThinkingTranslationResponse,
+  LocalThinkingTranslationModelStatusResponse,
   ListLongTasksResponse,
   ListRecentResponse,
   ListSessionsResponse,
@@ -127,7 +128,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
   kimiMonthlyQuotaEnabled: false,
-  thinkingTranslationEnabled: false,
+  thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,
   thinkingTranslationDisplayMode: "translated",
   autoReadAgentsMd: true,
@@ -558,6 +559,23 @@ function installBrowserPreviewApi() {
       success: false,
       error: { code: "credential_missing", message: unsupported("翻译思考内容") },
     }),
+    getLocalThinkingTranslationModelStatus: (): Promise<LocalThinkingTranslationModelStatusResponse> => Promise.resolve({
+      success: true,
+      data: {
+        state: "not_downloaded",
+        modelId: "Xenova/opus-mt-en-zh",
+        estimatedBytes: 121_000_000,
+      },
+    }),
+    downloadLocalThinkingTranslationModel: (): Promise<LocalThinkingTranslationModelStatusResponse> => Promise.resolve({
+      success: false,
+      error: unsupported("下载本地翻译模型"),
+    }),
+    deleteLocalThinkingTranslationModel: (): Promise<LocalThinkingTranslationModelStatusResponse> => Promise.resolve({
+      success: false,
+      error: unsupported("删除本地翻译模型"),
+    }),
+    onLocalThinkingTranslationModelStatus: () => () => {},
     getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
       Promise.resolve({ success: true, data: null }),
     startKimiCodeVis: (): Promise<VoidResponse> => fail("启动 Kimi Code 会话可视化"),

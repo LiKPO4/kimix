@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -14,7 +14,7 @@ import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
-import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode } from "@/types/ui";
+import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
 import { UI_STYLES } from "@/utils/uiStyles";
 import { buildUiStyleAiPrompt } from "@/utils/builtinUiStyleDocuments";
@@ -28,7 +28,7 @@ import {
 import { forgetArchivedSessionTombstonesByIds } from "@/utils/persistence";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { formatRoomLifecycleOutcomes, restoreCollaborationRoom } from "@/utils/sessionArchive";
-import type { GitBashStatus, KimiCodeArchivedSessionSummary, KimiCodeSecondaryModelPoolEntry, KimiCodeServerStatusInfo, KimiModelConfigSummary } from "@electron/types/ipc";
+import type { GitBashStatus, KimiCodeArchivedSessionSummary, KimiCodeSecondaryModelPoolEntry, KimiCodeServerStatusInfo, KimiModelConfigSummary, LocalThinkingTranslationModelStatus } from "@electron/types/ipc";
 import {
   archivedTimeMs,
   archivedWorkspaceOptions,
@@ -45,7 +45,7 @@ import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 import { ModelProviderManager } from "./ModelProviderManager";
 import { NumberInput } from "../common/NumberInput";
-import { clearThinkingTranslationsAfterCredentialRemoval, retryVisibleThinkingTranslations } from "@/utils/thinkingTranslationStore";
+import { clearThinkingTranslationsAfterCredentialRemoval, clearVisibleThinkingTranslations, retryVisibleThinkingTranslations } from "@/utils/thinkingTranslationStore";
 import {
   getSettingsPage,
   getSettingsPageForSection,
@@ -78,6 +78,11 @@ const KIMI_MONTHLY_QUOTA_CHANGED_EVENT = "kimix:kimi-monthly-quota-settings-chan
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
 const MICROSOFT_TRANSLATOR_RESOURCE_GUIDE_URL = "https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to/create-translator-resource";
 
+function formatModelBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+  return `${Math.max(1, Math.round(bytes / 1024 / 1024))} MB`;
+}
+
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
 const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
@@ -95,6 +100,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "context",
   "message",
   "processDisplay",
+  "thinkingTranslation",
   "filePreview",
   "newSession",
   "notification",
@@ -411,8 +417,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
   const setCollapseProcessWhileRunning = useAppStore((s) => s.setCollapseProcessWhileRunning);
-  const thinkingTranslationEnabled = useAppStore((s) => s.thinkingTranslationEnabled);
-  const setThinkingTranslationEnabled = useAppStore((s) => s.setThinkingTranslationEnabled);
+  const thinkingTranslationProvider = useAppStore((s) => s.thinkingTranslationProvider);
+  const setThinkingTranslationProvider = useAppStore((s) => s.setThinkingTranslationProvider);
   const thinkingTranslationIntervalMs = useAppStore((s) => s.thinkingTranslationIntervalMs);
   const setThinkingTranslationIntervalMs = useAppStore((s) => s.setThinkingTranslationIntervalMs);
   const thinkingTranslationDisplayMode = useAppStore((s) => s.thinkingTranslationDisplayMode);
@@ -529,6 +535,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [thinkingTranslationLoading, setThinkingTranslationLoading] = useState(true);
   const [thinkingTranslationBusy, setThinkingTranslationBusy] = useState<"save" | "clear" | "test" | null>(null);
   const [thinkingTranslationMessage, setThinkingTranslationMessage] = useState("");
+  const [localThinkingTranslationStatus, setLocalThinkingTranslationStatus] = useState<LocalThinkingTranslationModelStatus | null>(null);
+  const [localThinkingTranslationBusy, setLocalThinkingTranslationBusy] = useState<"download" | "delete" | null>(null);
+  const [localThinkingTranslationMessage, setLocalThinkingTranslationMessage] = useState("");
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
   const [themeDeleteBusyId, setThemeDeleteBusyId] = useState<string | null>(null);
@@ -1360,6 +1369,64 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const refreshLocalThinkingTranslationStatus = async () => {
+    const result = await window.api.getLocalThinkingTranslationModelStatus();
+    if (!result.success) {
+      setLocalThinkingTranslationMessage(`读取本地模型状态失败：${result.error}`);
+      return;
+    }
+    setLocalThinkingTranslationStatus(result.data);
+  };
+
+  useEffect(() => {
+    void refreshLocalThinkingTranslationStatus();
+    const unsubscribe = window.api.onLocalThinkingTranslationModelStatus((status) => {
+      setLocalThinkingTranslationStatus(status);
+      if (status.state === "downloading") {
+        const progress = Math.round((status.progress ?? 0) * 100);
+        setLocalThinkingTranslationMessage(`正在下载本地模型：${progress}%`);
+      } else if (status.state === "error") {
+        setLocalThinkingTranslationMessage(`本地模型处理失败：${status.message ?? "未知错误"}`);
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
+    // 进入设置页时读取一次，后续进度由主进程事件推送。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const downloadLocalThinkingTranslationModel = async () => {
+    if (localThinkingTranslationBusy) return;
+    setLocalThinkingTranslationBusy("download");
+    setLocalThinkingTranslationMessage("正在准备下载本地翻译模型...");
+    const result = await window.api.downloadLocalThinkingTranslationModel();
+    setLocalThinkingTranslationBusy(null);
+    if (!result.success) {
+      setLocalThinkingTranslationMessage(`下载失败：${result.error}`);
+      return;
+    }
+    setLocalThinkingTranslationStatus(result.data);
+    setThinkingTranslationProvider("local");
+    setLocalThinkingTranslationMessage("本地模型已下载并启用；后续翻译在设备上离线完成。");
+    retryVisibleThinkingTranslations();
+  };
+
+  const deleteLocalThinkingTranslationModel = async () => {
+    if (localThinkingTranslationBusy) return;
+    setLocalThinkingTranslationBusy("delete");
+    const result = await window.api.deleteLocalThinkingTranslationModel();
+    setLocalThinkingTranslationBusy(null);
+    if (!result.success) {
+      setLocalThinkingTranslationMessage(`删除失败：${result.error}`);
+      return;
+    }
+    setLocalThinkingTranslationStatus(result.data);
+    if (thinkingTranslationProvider === "local") setThinkingTranslationProvider("off");
+    clearVisibleThinkingTranslations("本地翻译模型已删除");
+    setLocalThinkingTranslationMessage("本地模型已删除，思考翻译已关闭。");
+  };
+
   const saveThinkingTranslationCredential = async () => {
     const key = thinkingTranslationKey.trim();
     if (!key) {
@@ -2188,30 +2255,42 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </button>
                 </div>
-                <div className="kimix-settings-card" style={{ marginTop: 16, padding: "16px" }}>
-                  <button
-                    type="button"
-                    aria-pressed={thinkingTranslationEnabled}
-                    onClick={() => setThinkingTranslationEnabled(!thinkingTranslationEnabled)}
-                    className="kimix-style-exempt grid w-full min-w-0 items-center text-left"
-                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12 }}
-                  >
-                    <SelectionIndicator selected={thinkingTranslationEnabled} />
-                    <div className="min-w-0">
-                      <div className="kimix-settings-permission-label">自动翻译思考内容</div>
-                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
-                        默认关闭；开启后约每 2–3 秒将新增思考内容翻译为简体中文。
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded-full text-[11.5px] leading-5 ${thinkingTranslationEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
-                      style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      {thinkingTranslationEnabled ? "已开启" : "关闭"}
-                    </span>
-                  </button>
+              </div>
 
-                  {thinkingTranslationEnabled && (
+              <div className="kimix-settings-section" {...settingsSectionProps("thinkingTranslation", 8)}>
+                <div className="kimix-settings-section-title">
+                  <Languages size={16} className="text-text-muted" />
+                  <span>思考翻译</span>
+                  {settingsDragHandle("thinkingTranslation", "思考翻译")}
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "16px" }}>
+                  <div className="kimix-settings-permission-label">翻译方式</div>
+                  <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
+                    三种状态互斥：使用本地模型、使用 Microsoft 云端翻译，或完全关闭。
+                  </div>
+                  <div className="kimix-settings-permissions" style={{ marginTop: 14 }}>
+                    {([
+                      ["off", "不启用翻译", "始终显示原始思考内容，不调用任何翻译服务。"],
+                      ["local", "本地轻量翻译", "约 120 MB，下载一次后离线运行；速度快，译文以可读为主。"],
+                      ["azure", "Microsoft 云端翻译", "使用你自己的 Translator Key；原文会发送到 Microsoft。"],
+                    ] as const).map(([provider, label, desc]) => (
+                      <button
+                        key={provider}
+                        type="button"
+                        aria-pressed={thinkingTranslationProvider === provider}
+                        onClick={() => setThinkingTranslationProvider(provider as ThinkingTranslationProvider)}
+                        className={`kimix-settings-permission ${thinkingTranslationProvider === provider ? "is-active" : ""}`}
+                      >
+                        <SelectionIndicator selected={thinkingTranslationProvider === provider} />
+                        <div className="kimix-settings-permission-copy">
+                          <div className="kimix-settings-permission-label">{label}</div>
+                          <div className="kimix-settings-permission-desc">{desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {thinkingTranslationProvider !== "off" && (
                     <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "16px" }}>
                       <div className="kimix-settings-permission-label">译文显示</div>
                       <div className="kimix-settings-permissions" style={{ marginTop: 10 }}>
@@ -2251,6 +2330,81 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         ))}
                       </div>
 
+                      {thinkingTranslationProvider === "local" && (
+                        <div className="rounded-xl bg-[var(--kimix-panel-raised-bg)]" style={{ marginTop: 18, padding: "16px" }}>
+                          <div
+                            style={{
+                              alignItems: "center",
+                              columnGap: 12,
+                              display: "grid",
+                              gridTemplateColumns: "minmax(0, 1fr) auto",
+                            }}
+                          >
+                            <div className="min-w-0">
+                              <div className="kimix-settings-permission-label">本地轻量翻译模型</div>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
+                                Xenova/opus-mt-en-zh 量化版，约 {formatModelBytes(localThinkingTranslationStatus?.estimatedBytes ?? 121_000_000)}。下载后无需账号、Key 或网络。
+                              </div>
+                            </div>
+                            <HardDrive size={18} className="text-text-muted" />
+                          </div>
+
+                          {localThinkingTranslationStatus?.state === "downloading" && (
+                            <div style={{ marginTop: 14 }}>
+                              <div
+                                className="overflow-hidden rounded-full bg-[var(--kimix-panel-soft-bg)]"
+                                style={{ height: 8 }}
+                                role="progressbar"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round((localThinkingTranslationStatus.progress ?? 0) * 100)}
+                              >
+                                <div
+                                  className="h-full rounded-full bg-accent-primary"
+                                  style={{ width: `${Math.round((localThinkingTranslationStatus.progress ?? 0) * 100)}%` }}
+                                />
+                              </div>
+                              <div className="kimix-settings-permission-desc" style={{ marginTop: 8 }}>
+                                已下载 {formatModelBytes(localThinkingTranslationStatus.downloadedBytes ?? 0)} / {formatModelBytes(localThinkingTranslationStatus.totalBytes ?? localThinkingTranslationStatus.estimatedBytes)}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap" style={{ gap: 8, marginTop: 14 }}>
+                            {localThinkingTranslationStatus?.state !== "ready" && (
+                              <button
+                                type="button"
+                                onClick={() => void downloadLocalThinkingTranslationModel()}
+                                disabled={Boolean(localThinkingTranslationBusy) || localThinkingTranslationStatus?.state === "downloading"}
+                                className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {localThinkingTranslationStatus?.state === "downloading" || localThinkingTranslationBusy === "download"
+                                  ? <RefreshCw size={14} className="kimix-spin" />
+                                  : <Download size={14} />}
+                                <span>{localThinkingTranslationStatus?.state === "downloading" ? "下载中" : "下载并启用"}</span>
+                              </button>
+                            )}
+                            {localThinkingTranslationStatus?.state === "ready" && (
+                              <button
+                                type="button"
+                                onClick={() => void deleteLocalThinkingTranslationModel()}
+                                disabled={Boolean(localThinkingTranslationBusy)}
+                                className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:opacity-50"
+                              >
+                                <Trash2 size={14} />
+                                <span>{localThinkingTranslationBusy === "delete" ? "删除中" : "删除模型"}</span>
+                              </button>
+                            )}
+                          </div>
+                          <div className="kimix-settings-permission-desc" style={{ marginTop: 12 }}>
+                            {localThinkingTranslationMessage || (localThinkingTranslationStatus?.state === "ready"
+                              ? "模型已就绪，当前思考内容只在本机处理。"
+                              : "模型尚未下载；下载完成前会保留原始思考内容。")}
+                          </div>
+                        </div>
+                      )}
+
+                      {thinkingTranslationProvider === "azure" && (<>
                       <div
                         style={{
                           alignItems: "center",
@@ -2343,6 +2497,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       >
                         {thinkingTranslationLoading ? "正在读取翻译配置..." : thinkingTranslationMessage}
                       </div>
+                      </>)}
                     </div>
                   )}
                 </div>

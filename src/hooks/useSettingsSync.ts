@@ -27,7 +27,7 @@ export function useSettingsSync() {
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
         state.voiceShortcut !== prev.voiceShortcut ||
         state.notificationMode !== prev.notificationMode ||
-        state.thinkingTranslationEnabled !== prev.thinkingTranslationEnabled ||
+        state.thinkingTranslationProvider !== prev.thinkingTranslationProvider ||
         state.thinkingTranslationIntervalMs !== prev.thinkingTranslationIntervalMs ||
         state.thinkingTranslationDisplayMode !== prev.thinkingTranslationDisplayMode ||
         state.filePreviewExtensions !== prev.filePreviewExtensions
@@ -62,7 +62,7 @@ export function useSettingsSync() {
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
           voiceShortcut: state.voiceShortcut,
           notificationMode: state.notificationMode,
-          thinkingTranslationEnabled: state.thinkingTranslationEnabled,
+          thinkingTranslationProvider: state.thinkingTranslationProvider,
           thinkingTranslationIntervalMs: state.thinkingTranslationIntervalMs,
           thinkingTranslationDisplayMode: state.thinkingTranslationDisplayMode,
           filePreviewExtensions: state.filePreviewExtensions,

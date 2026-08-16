@@ -799,22 +799,23 @@ function normalizeThinkingMarkdown(text: string) {
 
 function useThinkingDisplayText(sourceKey: string, sourceText: string, final: boolean) {
   const {
-    enabled,
+    provider,
     intervalMs,
     displayMode,
   } = useAppStore(useShallow((state) => ({
-    enabled: state.thinkingTranslationEnabled,
+    provider: state.thinkingTranslationProvider,
     intervalMs: state.thinkingTranslationIntervalMs,
     displayMode: state.thinkingTranslationDisplayMode,
   })));
   const translation = useThinkingTranslation({
     key: sourceKey,
     sourceText,
-    enabled,
+    enabled: provider !== "off",
+    provider: provider === "off" ? "azure" : provider,
     intervalMs,
     final,
   });
-  if (!enabled || translation.status === "error" || !translation.translatedText.trim()) {
+  if (provider === "off" || translation.status === "error" || !translation.translatedText.trim()) {
     return sourceText;
   }
   const pendingSource = sourceText.slice(Math.min(sourceText.length, translation.translatedSourceEnd));

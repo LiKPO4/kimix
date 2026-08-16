@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
   kimiMonthlyQuotaEnabled: false,
-  thinkingTranslationEnabled: false,
+  thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,
   thinkingTranslationDisplayMode: "translated",
   autoReadAgentsMd: true,
@@ -89,6 +89,14 @@ function writeFileAtomic(filePath: string, data: string): void {
   }
 }
 
+export function normalizeThinkingTranslationProvider(
+  provider: unknown,
+  legacyEnabled: unknown,
+): AppSettings["thinkingTranslationProvider"] {
+  if (provider === "local" || provider === "azure" || provider === "off") return provider;
+  return legacyEnabled === true ? "azure" : "off";
+}
+
 export function loadSettings(): AppSettings {
   ensureDir();
   if (!fs.existsSync(SETTINGS_FILE)) {
@@ -113,6 +121,12 @@ export function loadSettings(): AppSettings {
       Object.prototype.hasOwnProperty.call(sanitizedRawSettings, "clarificationToolEnabled");
     delete sanitizedRawSettings.clarificationToolMode;
     delete sanitizedRawSettings.clarificationToolEnabled;
+    const hadLegacyThinkingTranslationEnabled = Object.prototype.hasOwnProperty.call(
+      sanitizedRawSettings,
+      "thinkingTranslationEnabled",
+    );
+    const legacyThinkingTranslationEnabled = sanitizedRawSettings.thinkingTranslationEnabled === true;
+    delete sanitizedRawSettings.thinkingTranslationEnabled;
     const shouldMigrateLegacyFontSize = (sanitizedRawSettings.fontSizeBaselineVersion ?? 0) < 1 && sanitizedRawSettings.fontSize === 14;
     const settings = {
       ...DEFAULT_SETTINGS,
@@ -121,7 +135,10 @@ export function loadSettings(): AppSettings {
         ?? ((sanitizedRawSettings.defaultThinking ?? DEFAULT_SETTINGS.defaultThinking) ? "on" : "off"),
       fontSize: shouldMigrateLegacyFontSize ? 15 : sanitizedRawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
       fontSizeBaselineVersion: 1,
-      thinkingTranslationEnabled: sanitizedRawSettings.thinkingTranslationEnabled === true,
+      thinkingTranslationProvider: normalizeThinkingTranslationProvider(
+        sanitizedRawSettings.thinkingTranslationProvider,
+        legacyThinkingTranslationEnabled,
+      ),
       thinkingTranslationIntervalMs: typeof sanitizedRawSettings.thinkingTranslationIntervalMs === "number" &&
         Number.isInteger(sanitizedRawSettings.thinkingTranslationIntervalMs) &&
         sanitizedRawSettings.thinkingTranslationIntervalMs >= 1_000 &&
@@ -132,8 +149,13 @@ export function loadSettings(): AppSettings {
         ? "bilingual"
         : DEFAULT_SETTINGS.thinkingTranslationDisplayMode,
     };
-    if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting || hadLegacySkillSettings) {
-      writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...sanitizedRawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));
+    if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting || hadLegacySkillSettings || hadLegacyThinkingTranslationEnabled) {
+      writeFileAtomic(SETTINGS_FILE, JSON.stringify({
+        ...sanitizedRawSettings,
+        fontSize: settings.fontSize,
+        fontSizeBaselineVersion: 1,
+        thinkingTranslationProvider: settings.thinkingTranslationProvider,
+      }, null, 2));
     }
     const legacyKimiThemePalette = (sanitizedRawSettings as { kimiThemePalette?: AppSettings["kimiThemePalette"] }).kimiThemePalette;
     if ((!settings.kimiThemePalettes || settings.kimiThemePalettes.length === 0) && legacyKimiThemePalette) {

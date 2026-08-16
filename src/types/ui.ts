@@ -69,6 +69,7 @@ export interface RoomAgentActivity {
 
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ThinkingTranslationDisplayMode = "translated" | "bilingual";
+export type ThinkingTranslationProvider = "off" | "local" | "azure";
 export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm" | "bash" | "subagent";
 export type RightSidebarCardId = "longTaskStatus" | "background" | "subagentTasks" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "subagent" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
@@ -102,8 +103,8 @@ export interface AppState {
   notificationShowContent: boolean;
   processDisplayMode: ProcessDisplayMode;
   collapseProcessWhileRunning: boolean;
-  /** 是否将可见的思考内容通过已配置的翻译服务近实时翻译为中文。 */
-  thinkingTranslationEnabled: boolean;
+  /** 思考翻译提供方；互斥选择关闭、本地模型或 Microsoft 云端服务。 */
+  thinkingTranslationProvider: ThinkingTranslationProvider;
   /** 思考翻译调度间隔（毫秒）。 */
   thinkingTranslationIntervalMs: number;
   /** 思考译文展示方式：仅中文或中英对照。 */

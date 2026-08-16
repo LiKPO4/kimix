@@ -7,6 +7,7 @@ import {
   restoreThinkingCode,
   thinkingTranslationJoinSeparator,
 } from "./thinkingTranslation";
+import type { ThinkingTranslationProvider } from "@/types/ui";
 
 export type ThinkingTranslationSnapshot = {
   sourceText: string;
@@ -18,6 +19,7 @@ export type ThinkingTranslationSnapshot = {
 
 type TranslationEntry = ThinkingTranslationSnapshot & {
   key: string;
+  provider: Exclude<ThinkingTranslationProvider, "off">;
   intervalMs: number;
   finalRequested: boolean;
   inFlight: boolean;
@@ -82,6 +84,7 @@ function createEntry(key: string): TranslationEntry {
   const entry: TranslationEntry = {
     ...EMPTY_SNAPSHOT,
     key,
+    provider: "azure",
     intervalMs: DEFAULT_THINKING_TRANSLATION_INTERVAL_MS,
     finalRequested: false,
     inFlight: false,
@@ -149,7 +152,7 @@ function scheduleRetry(entry: TranslationEntry, delayMs: number) {
 
 function retryDelayFor(code: string, retryAfterMs?: number): number | null {
   if (code === "rate_limited") return retryAfterMs ?? 10_000;
-  if (code === "timeout" || code === "network_error" || code === "provider_error") return 5_000;
+  if (code === "timeout" || code === "network_error" || code === "provider_error" || code === "model_unavailable") return 5_000;
   return null;
 }
 
@@ -159,6 +162,7 @@ async function translateNextChunk(entry: TranslationEntry): Promise<void> {
     entry.sourceText,
     entry.translatedSourceEnd,
     entry.finalRequested,
+    entry.provider === "local" ? 900 : undefined,
   );
   if (!chunk) return;
   const joinSeparator = thinkingTranslationJoinSeparator(entry.sourceText.slice(0, entry.translatedSourceEnd));
@@ -187,7 +191,11 @@ async function translateNextChunk(entry: TranslationEntry): Promise<void> {
   publish(entry);
 
   try {
-    const response = await window.api.translateThinking({ text: chunk.protectedText, requestId });
+    const response = await window.api.translateThinking({
+      text: chunk.protectedText,
+      requestId,
+      provider: entry.provider,
+    });
     if (version !== entry.requestVersion || entry.listeners.size === 0) return;
     if (!response.success) {
       entry.status = "error";
@@ -232,14 +240,16 @@ async function translateNextChunk(entry: TranslationEntry): Promise<void> {
 export function updateThinkingTranslationSource(options: {
   key: string;
   sourceText: string;
+  provider: Exclude<ThinkingTranslationProvider, "off">;
   intervalMs?: number;
   final?: boolean;
 }) {
   const entry = getEntry(options.key);
   const sourceText = options.sourceText;
+  const providerChanged = entry.provider !== options.provider;
   const isAppend = sourceText.startsWith(entry.sourceText);
   let seededFromCompatibleEntry = false;
-  if (!isAppend) {
+  if (!isAppend || providerChanged) {
     entry.requestVersion += 1;
     entry.translatedText = "";
     entry.translatedSourceEnd = 0;
@@ -247,12 +257,13 @@ export function updateThinkingTranslationSource(options: {
     entry.error = undefined;
     entry.retryCount = 0;
   }
+  entry.provider = options.provider;
   entry.sourceText = sourceText;
   entry.intervalMs = Math.max(1000, Math.min(5000, options.intervalMs ?? DEFAULT_THINKING_TRANSLATION_INTERVAL_MS));
   entry.finalRequested = Boolean(options.final);
   if (options.final && entry.translatedSourceEnd === 0 && !entry.translatedText) {
     const compatible = [...entries.values()]
-      .filter((candidate) => candidate !== entry && candidate.translatedSourceEnd > 0 && candidate.translatedText)
+      .filter((candidate) => candidate !== entry && candidate.provider === options.provider && candidate.translatedSourceEnd > 0 && candidate.translatedText)
       .filter((candidate) => (
         sourceText.slice(0, candidate.translatedSourceEnd) === candidate.sourceText.slice(0, candidate.translatedSourceEnd)
       ))
@@ -267,7 +278,7 @@ export function updateThinkingTranslationSource(options: {
   // Appended deltas already rendered this leaf once through the canonical draft
   // subscription. Do not publish the same source change through a second store
   // subscription; only a reset needs to invalidate an existing translated prefix.
-  if (!isAppend || seededFromCompatibleEntry) publish(entry);
+  if (!isAppend || providerChanged || seededFromCompatibleEntry) publish(entry);
   if (entry.translatedSourceEnd < sourceText.length && entry.status !== "error") {
     schedule(entry, entry.finalRequested);
   }
@@ -292,7 +303,7 @@ export function retryVisibleThinkingTranslations() {
   }
 }
 
-export function clearThinkingTranslationsAfterCredentialRemoval() {
+export function clearVisibleThinkingTranslations(message: string) {
   for (const entry of [...entries.values()]) {
     entry.requestVersion += 1;
     if (entry.timer) clearTimeout(entry.timer);
@@ -305,10 +316,14 @@ export function clearThinkingTranslationsAfterCredentialRemoval() {
     entry.translatedText = "";
     entry.translatedSourceEnd = 0;
     entry.status = "error";
-    entry.error = "翻译凭据已清除";
+    entry.error = message;
     entry.retryCount = 0;
     publish(entry);
   }
+}
+
+export function clearThinkingTranslationsAfterCredentialRemoval() {
+  clearVisibleThinkingTranslations("翻译凭据已清除");
 }
 
 function subscribe(key: string, listener: () => void) {
@@ -330,6 +345,7 @@ export function useThinkingTranslation(options: {
   key: string;
   sourceText: string;
   enabled: boolean;
+  provider: Exclude<ThinkingTranslationProvider, "off">;
   intervalMs?: number;
   final?: boolean;
 }): ThinkingTranslationSnapshot {
@@ -353,7 +369,7 @@ export function useThinkingTranslation(options: {
       return;
     }
     updateThinkingTranslationSource(options);
-  }, [options.enabled, options.final, options.intervalMs, options.key, options.sourceText]);
+  }, [options.enabled, options.final, options.intervalMs, options.key, options.provider, options.sourceText]);
 
   return snapshot;
 }
