@@ -8085,7 +8085,7 @@ const SettingsSchema = z.object({
   experimentalKimiToolSelect: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
   thinkingTranslationEnabled: z.boolean().optional(),
-  thinkingTranslationIntervalMs: z.number().int().min(2_000).max(3_000).optional(),
+  thinkingTranslationIntervalMs: z.number().int().min(1_000).max(5_000).optional(),
   thinkingTranslationDisplayMode: z.enum(["translated", "bilingual"]).optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),

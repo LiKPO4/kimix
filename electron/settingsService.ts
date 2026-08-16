@@ -124,8 +124,8 @@ export function loadSettings(): AppSettings {
       thinkingTranslationEnabled: sanitizedRawSettings.thinkingTranslationEnabled === true,
       thinkingTranslationIntervalMs: typeof sanitizedRawSettings.thinkingTranslationIntervalMs === "number" &&
         Number.isInteger(sanitizedRawSettings.thinkingTranslationIntervalMs) &&
-        sanitizedRawSettings.thinkingTranslationIntervalMs >= 2_000 &&
-        sanitizedRawSettings.thinkingTranslationIntervalMs <= 3_000
+        sanitizedRawSettings.thinkingTranslationIntervalMs >= 1_000 &&
+        sanitizedRawSettings.thinkingTranslationIntervalMs <= 5_000
         ? sanitizedRawSettings.thinkingTranslationIntervalMs
         : DEFAULT_SETTINGS.thinkingTranslationIntervalMs,
       thinkingTranslationDisplayMode: sanitizedRawSettings.thinkingTranslationDisplayMode === "bilingual"

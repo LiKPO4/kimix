@@ -6568,3 +6568,319 @@ docx 待办已清空；进入下一阶段前先等你按 v2.7.29 截图验收。
 - 修复：新增 `--kimix-modern-workspace-background` 呈现 token，浅色模式以 96% `surface-elevated` + 4% `surface-base` 生成接近白色但仍带主题底色的工作画布，深色模式使用 78%/22% 保持相对提亮；聊天主壳、工具栏、Footer、设置、插件与 Hooks 统一消费该 token，侧栏、选中态、强调色和所有颜色主题源 token 不变。
 - 实机验收：Windows 直接操作 v2.20.99，对照 Codex 参考检查空白对话主界面、外观设置和插件工作区；主画布明显提亮，外围主题色与卡片层级仍可辨，无漂白或边界消失。证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22099/01-modern-main.png`、`02-modern-settings.png`、`03-modern-plugins.png`。
 - 验证：定向 UI 风格 12 项、全量 152 文件 1458 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BIpNiJJT.css`、JS `assets/index-D1OODTQw.js`）、OKF strict/audit 校验（12 concepts、376 links）通过。
+
+---
+
+> 本批次收纳范围：2026-08-02。
+> 归档时间：2026-08-16；仅搬运、内容未改写。最新任务状态见 TASK_STATE.md。
+
+## 2026-08-02 修复：Swarm 改走官方 Server 原生接口，不再迁移 SDK（v2.20.152）
+
+- 起因：用户指出官方 Web 的 Swarm 可正常使用。实测官方 0.31.1：profile `agent_config.swarm_mode` 可双向切换（status.swarm_mode 跟随），prompts 请求接受 `swarm_mode` 标记并正常完成；此前「Swarm 只能 SDK」是 ≤0.29 探针的过时结论。
+- 修复：`setSwarmMode`/`swarm` 在 Server 会话上改走 `updateSession({swarm_mode})` + prompt 携带 `swarm_mode`（serverControls 仅在为真时写字段）；不再 `migrateServerSessionToSdk`、不再 pin；运行中开启仍拒绝（渲染层记 desired 下轮生效）。
+- 影响：开 Swarm 不再换引擎/换 id/跳链路，与官方 Web 同链路；迁移窗口竞态类问题（气泡掏空）的该诱因消除。
+- 验证：官方 Server 实测（profile/prompt/schema）+ typecheck + 全量 1483 测试 + build。实机待 v2.20.152 切换 Swarm 确认。
+
+## 2026-08-02 修复：轮次收尾帧丢失后立即可自愈（v2.20.151）
+
+- 现场：与 Kimi Web 共存时本轮最终总结在 Kimix 缺失（官方 wire 有 1112 字全文，Kimix 本地只到 21:58:32；丢帧窗口与 dev 重启重合）。
+- 根因：丢帧只在轮次尾巴发生时无法自愈——启动水合在轮次完成前跑完，而轮询判定 terminal 后只 settle 不再对账；30s running-sample 又要求 running 态。与 Web 共存不互踢（cursor/epoch 可续传订阅），非必现。
+- 修复：抽出共用 `reconcileFromHistorySnapshot`（原 running-sample 内联块）；terminal 分支在流上最后事件 >8s 无更新时触发一次同守卫（熔断器 + shouldReplace 单调性，settled 投影）的 `terminal-tail` 对账；`AgentCanonicalHistoryReason` 加 `"terminal-tail"`。
+- 验证：typecheck + 全量 1483 测试过。实机待 v2.20.151。
+
+## 2026-08-02 排查：发送后约 1 分钟才响应、中途卡顿（无版本变更）
+
+- 方法：解析会话 `336f7ae6` 完整 wire.jsonl（57MB），逐轮计算三段耗时。
+- 数据：turn.prompt→llm.request = 0s（链路零开销）；llm.request→首字 17–123s（中位 ~23s）；tool.result→下一请求 = 0s。每步输入 ~409k tokens、459 条消息、think=high、maxTokens 65536、grok-4.5 第三方 relay；16:09 曾达 ~786k，16:23 手动 compact 后砍半，5 小时又涨回 409k。diag 的 [live] silence 显示卡顿期间 thinking delta 仍在流。
+- 结论：瓶颈 = 超大上下文 × relay × high thinking 的模型往返，非 Kimix 缺陷；不修渲染/事件管线。
+- 处置：runbook 沉淀 `knowledge/maintenance/large-context-latency.md`；建议用户 compact/新会话、降 thinking 与 maxTokens。纯文档，未 bump。
+
+## 2026-08-02 排查：切换 Swarm 后上一条 assistant 气泡被掏空（无版本变更）
+
+- 现象：20:53 切 Swarm 后，发布轮气泡只剩文件变更卡 + 模型页脚。
+- 快照结论：wire canonical、IndexedDB 本地、buildRenderItems 三层全部健康；本地事件 id 已重生成，证明之后被一次完整 canonical 水合自愈；渲染管线无 bug。
+- 根因方向：Server→SDK 迁移窗口瞬态（快照回放/水合/wire 重写竞态），精确写入路径不可回溯；唯一无回归守卫的替换入口是非房间水合直换路径 `preserveLocalUserMediaInCanonicalHistory`（App.tsx ~2343）。
+- 快照文档：`docs/issue-swarm-toggle-assistant-bubble-gutted-events-snapshot.md`。纯文档，未 bump。
+
+## 2026-08-02 优化：单工具调用直接显示工具行（v2.20.150）
+
+- 根因：工具组只有 1 个调用时仍包一层「1 个工具调用」折叠头，信息冗余。
+- 修复：`KimiWebToolGroupCard` 在 tools.length===1 时直接渲染 `KimiWebToolRow`（保留卡片外壳、状态图标与自身展开详情）；两条渲染路径（KimiWebProcessGroup / TurnBlocksProcessGroup）共用该组件，一并生效。
+- 验证：typecheck + 全量 1483 测试过；pnpm build 过。实机待 v2.20.150 截图。
+
+## 2026-08-02 修复：设置页按钮接入界面风格体系（v2.20.149）
+
+- 根因：设置侧栏「返回对话」、折叠图标钮、导航项/搜索结果硬编码 `surface-hover`，未消费 `--ui-nav-action-*` / `--ui-nav-list-*` / `--ui-selection-*` token，怀旧（和复古）的浮雕/触感覆盖不到。
+- 修复：全部接入语义 token（active 走 selection，含 `.is-active:hover`）；怀旧下 `.kimix-workspace-header` 的「返回对话」静止即 raised 浮雕、按下 sunken（设置/Hooks/Skills 共用该头部，一并生效）。
+- 注意：默认/现代化风格下导航项 hover 现在会带 `--ui-nav-list-hover-*` 的细边/无阴影，与主侧栏行行为一致，属预期对齐。
+- 验证：settingsLayoutStyles + SettingsWorkspaceSidebar + uiStyles 27 过；pnpm build 过。实机待 v2.20.149 截图。
+
+## 2026-08-02 修复：怀旧风格可保存 + 风格网格一行三列（v2.20.148）
+
+- 根因：IPC `uiStyle` zod 与 settingsService 白名单仍是 default/modern/retro，选 nostalgia 触发 Invalid settings data。
+- 修复：主进程/加载校验/ipc 类型放行 nostalgia；外观风格网格恢复 repeat(3)。
+- 验证：结构抽查。实机待 v2.20.148 切换怀旧/复古保存。
+
+## 2026-08-02 修复：顶栏侧栏按钮与导航键同尺寸（v2.20.147）
+
+- 根因：侧栏折叠键写死 40×40，后退/前进为 h-8 w-8（32）。
+- 修复：侧栏键改为 h-8 w-8，与相邻导航键一致；间距交给父级 gap。
+- 验证：结构抽查。实机待 v2.20.147。
+
+## 2026-08-02 功能：新增怀旧（Win98）界面风格（v2.20.146）
+
+- 提炼：零圆角、硬浮雕斜切（亮上左/暗下右）、静止即立体、按下反转内凹、输入沉入、弹层硬偏移阴影、选中实面无侧栏导条；不锁定灰绿系统色，与「复古 Platinum」区分。
+- 实现：`UiStyleId=nostalgia`，外观页「怀旧」；token + 角色覆盖（壳层/Composer/卡片/控件/浮层/侧栏/房间）。
+- 验证：uiStyles 定向。实机待 v2.20.146 切换怀旧截图。
+
+## 2026-08-02 修复：运行/文件分体钮展开态误用 toggle 蓝底（v2.20.145）
+
+- 根因：`kimix-split-control.is-expanded` 走 `--ui-toggle-*`（accent-primary-light），菜单打开像模式选中；展开悬停仍锁蓝底。
+- 修复：展开改为 sticky hover 表面；从共享 toggle 规则移除 split-control；分片 hover 用 surface-hover/active。
+- 验证：uiStyles。实机待 v2.20.145。
+
+## 2026-08-02 优化：默认浅色主题对比度与辨识度（v2.20.144）
+
+- 根因：浅色 `text-muted`/`border-*` 过浅（muted≈2.5:1，边框≈1.2–1.5）；`borderSubtle` 还向白混合；surface ladder 过近。
+- 修复：加深 muted/secondary/placeholder 与边框；边框改为向墨色混合；拉大 ground/base/hover 阶梯；四套默认 palette seed 略加深；浅色对比度单测。
+- 验证：themePalettes/uiStyles。实机待 v2.20.144 暖纸/灰白等截图。
+
+## 2026-08-02 优化：现代化工具卡背景改浅（v2.20.143）
+
+- 对照：官方工具行为近白浅灰细边；Kimix modern 工具组用 `kimix-soft-card` + `surface-base`，在近白工作画布上偏深灰实底。
+- 修复：新增 `--kimix-modern-process-background/border`（elevated 为主的浅 wash）；modern 下 soft-card 使用该色，贴近官方深度。
+- 验证：uiStyles 定向。实机待 v2.20.143 现代化截图。
+
+## 2026-08-02 调整：刻度条左距加倍（v2.20.142）
+
+- 反馈：v2.20.141 贴边过近。
+- 调整：轨道 left 4→8，刻度 left 2→4（相对主区左缘约 12px）。
+- 验证：结构抽查。实机待 v2.20.142。
+
+## 2026-08-02 修复：刻度条视觉贴左（v2.20.141）
+
+- 根因：v2.20.140 虽把轨道挂到视口左缘，但刻度画在 40px 热区 `right: 8`，视觉中心约在 left+30px，仍显偏右。
+- 修复：热区改左对齐，刻度 `left: 2`，轨道 `left: 4`、宽 28；标记 transform-origin 改为 left。
+- 验证：结构抽查。实机待 v2.20.141 最大化确认贴主区左缘。
+
+## 2026-08-02 修复：全屏时刻度条水平位置漂移（v2.20.140）
+
+- 根因：`ChatNavigationRail` 挂在居中的 `kimix-chat-stream-column` 内，并用 `left: -46` 相对内容柱定位；窗口变宽后内容柱居中，刻度条跟着离开聊天区左缘。
+- 修复：轨道改为挂在聊天视口 `absolute inset-0` 层，`left: 10` 相对视口左缘固定，不再嵌套居中内容柱。
+- 验证：结构抽查。实机待 v2.20.140 最大化/还原对比。
+
+## 2026-08-02 修复：窗口最大化/还原改回方框样式（v2.20.139）
+
+- 反馈：Minimize2/Maximize2 箭头不像常见窗口控件；最小化横线是对的，问题在全屏键。
+- 修复：最大化用单方框 SVG，还原用重叠双框 SVG；最小化仍为 Minus 横线，关闭仍为 X，尺寸 14 对齐。
+- 验证：结构抽查。实机待 v2.20.139 截图。
+
+## 2026-08-02 修复：窗口最大化按钮图标不一致（v2.20.138）
+
+- 根因：最大化/还原使用 `Square`/`Copy` 且仅 12px，最小化/关闭为 14px Lucide 线标，中间键观感像字符。
+- 修复：改为 `Maximize2`/`Minimize2`，统一 14px、`strokeWidth=2`，与两侧窗口控件一致。
+- 验证：结构抽查。实机待 v2.20.138 截图。
+
+## 2026-08-02 优化：文件预览侧栏层次与内边距（v2.20.137）
+
+- 根因：面板壳、内层块、文件行全用 `surface-base`，再叠 14–18px 外圈 padding，观感全面内陷、无层次。
+- 修复：外圈 padding 收到 10–12px；列表区用 `.kimix-section-card`；文件行改为 `surface-elevated`+细边，与壳层 base 区分。
+- 验证：结构抽查。实机待 v2.20.137 截图。
+
+## 2026-08-02 优化：会话侧栏卡片标题与内容间距（v2.20.136）
+
+- 根因：标题下方正文多用 Tailwind `mt-3`/`mt-4`，spacing 类在本项目常不生效，标题贴内容。
+- 修复：侧栏卡片 `mt-3`/`mt-4` 改为 inline `marginTop: 14`，统一标题→内容呼吸间距。
+- 验证：结构抽查；实机待 v2.20.136 截图。
+
+## 2026-08-02 优化：界面风格说明去外部产品名（v2.20.135）
+
+- 调整：三套界面风格描述改为自有表述，不再出现 Codex / Platinum 等外部名称。
+- 验证：文案与 uiStyles 单测。
+
+## 2026-08-02 修复：深色模式层级与对比度灾难（v2.20.134）
+
+- 根因：`buildDarkTokens` 把 surface 种子与 `#050505` 高比例混合，ground/base/elevated/hover 几乎同色；边框反而更暗；`--text-muted` 在 elevated 上约 2.5:1。
+- 参考：Material Design 3 elevation、VS Code Dark+、GitHub Dark——抬升画布、表面阶梯可辨、边框向白、次要文字接近 AA。
+- 修复：重建暗色 ladder + 亮边框 + 提亮 secondary/muted；同步 CSS `[data-theme=dark]` 与 Kimi dark；对比度单测锁门槛。
+- 验证：themePalettes/uiStyles 定向 + 对比度断言。实机待 v2.20.134 深色截图。
+
+## 2026-08-02 修复：顶栏启动/打开分体钮默认像选中（v2.20.133）
+
+- 根因：`.kimix-split-control` 静止态强制 `--ui-compound-*` 实心底+边，观感等同 toggle/选中；默认顶栏其它工具键只是 soft border。
+- 修复：静止态只保留 overflow，走与 toolbar-button 相同的 control 合约；展开时才用 `--ui-toggle-*`；分片分隔线仍用 compound divider。
+- 验证：uiStyles 定向。实机待 v2.20.133 截图。
+
+## 2026-08-02 修复：选中行悬停与普通悬停描边对齐（v2.20.132）
+
+- 根因：v2.20.131 的 `--ui-selection-hover-*` 用“加深选中底”另一套语义，和普通 `--ui-nav-list-hover-*`（描边/触感）不一致。
+- 修复：selection-hover 的 border/background 直接复用 nav-list-hover；默认/现代列表悬停补 subtle 描边；复古 hover shadow = 左侧选中条 + list-hover 浮雕。
+- 验证：uiStyles 定向。实机待 v2.20.132 截图。
+
+## 2026-08-02 修复：侧栏已选中行悬停无反馈（v2.20.131）
+
+- 根因：`.kimix-sidebar-project-row.is-active:hover` 与 `.is-active` 共用 `--ui-selection-*`，悬停被锁死为选中静止底。
+- 修复：拆分选中/选中悬停；新增 `--ui-selection-hover-*`（默认更深 `surface-active`，复古保留左侧 inset 标记）。
+- 验证：uiStyles 定向。实机待 v2.20.131 截图。
+
+## 2026-08-02 修复：会话侧栏剩余交互面接入风格角色（v2.20.130）
+
+- 根因：仅 Git 五键与 section-card 外壳入角色；Plan 刷新、会话树 ±、最近变更行、大量 icon-text 仍用 Tailwind 固定底/圆角，切换 Modern/Retro 几乎不变。
+- 修复：次级按钮统一 `.kimix-inspector-action`（去 accent-light 常驻底）；32px 图标钮 `.kimix-inline-icon-action.is-roomy`；列表行 `.kimix-inspector-list-item`；中性内嵌块 `.kimix-inset-section`。
+- 验证：uiStyles 定向；OKF。实机待 v2.20.130 截图。
+
+## 2026-08-02 修复：侧栏 Git 矩阵按钮可辨浅底（v2.20.129）
+
+- 根因：v2.20.128 去掉常驻 accent/surface 工具类后，Git 五键只剩文字，静止态无法辨认为按钮。
+- 修复：新增 `.kimix-inspector-action` 安静芯片角色（`--surface-base` + 细边框），hover 再加深；复古仍仅在 hover/active 加 Platinum 触感，不用 accent-light 常驻底。
+- 验证：uiStyles 定向；OKF strict。实机视觉待 v2.20.129 截图。
+
+## 2026-08-02 修复：会话侧栏次级按钮静止态过重（v2.20.128）
+
+- 根因：v2.20.123 把侧栏 `.kimix-icon-text-button` 静止态套上 compound 浮雕；Git「详情/拉取/推送/图谱/刷新」又常驻 `bg-accent-primary-light`/`bg-surface-base`，默认就读成 hover。
+- 修复：Git 矩阵去掉常驻底色，仅保留文字色与 hover 底；Retro 侧栏次级按钮改为静止透明、hover/active 才给 border+inset；`.bg-accent-primary` 主按钮不套该皮。
+- 验证：uiStyles 17 项通过；OKF strict 通过。实机视觉待用户在 v2.20.128 截图确认。
+
+## 2026-08-02 功能：子代理模型同步覆盖 Kimi Code Web 与 Swarm（v2.20.127）
+
+- 根因：Kimix 原先只写 `[secondary_model]`，并只给自管 Server 注入 `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1`；外部启动的 `kimi web` 不继承该环境，配置会被忽略。Kimi Code 0.31.1 已支持持久化 `[experimental] secondary-model = true` 和通过 `POST /api/v1/config` 热更新；最新版还通过 `/api/v1/meta.experimental_flags` 暴露有效状态。
+- 修复：设置子代理模型时同时写入 `secondary_model` 与 `experimental`，活动 Web 走官方 Config API 立即生效并回读确认；支持新版 Meta 字段时再校验有效状态，早期 0.31.1 缺该字段时兼容。TOML 作为旧版回退且保留其他实验项。该配置同时作用于后续 Agent 与 AgentSwarm 新建子代理，恢复中的子代理仍保留原模型。侧栏名称同步调整为“子 Agent / Swarm 模型”。
+- 验证：定向 3 文件 39 项、全量 155 文件 1480 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-G0mJAJkX.js`）、OKF strict（13 concepts、403 links）与 180 天审计通过；对本机 Kimi Web `0.31.1` 的只读探测确认 Config API 已暴露 `experimental`/`secondary_model`，该早期构建尚未暴露最新版 `meta.experimental_flags`，兼容回读路径覆盖此边界。
+
+## 2026-08-02 优化：精简上传媒体菜单项（v2.20.126）
+
+- 调整：“上传图片或视频”按钮名已能完整表达用途，移除重复的“视频将直接作为多模态内容发送”副标题；文本改为单行截断，按钮最小高度从 52px 收敛到与相邻菜单项一致的 48px。上传逻辑、图标、禁用态和点击热区不变。
+- 验证：全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-CbX7JbeB.js`）、OKF strict（13 concepts、402 links）通过；实机视觉验收等待用户在 v2.20.126 截图确认。
+
+## 2026-08-02 修复：Agent 选择项机器人图标垂直居中（v2.20.125）
+
+- 根因：接收者弹层的 Agent 选择项使用 48px 最小行高和三列 Grid，文字列与勾选列已有 `self-center`，但 28px 机器人图标容器沿用 Grid 默认拉伸单元格的起始位置，视觉上贴近顶部。
+- 修复：为机器人图标容器补充 `self-center`，只校正垂直位置，不改变图标尺寸、行高、列宽、点击热区或选择逻辑；增加源码回归断言锁定对齐约束。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-EtzmU645.js`）、OKF strict（13 concepts、402 links）通过；实机视觉验收等待用户在 v2.20.125 截图确认。
+
+## 2026-08-02 修复：Composer 房间触发器恢复同排层级（v2.20.124）
+
+- 根因：Retro 将 `.kimix-room-trigger` 与弹窗 `.kimix-room-secondary-action` 合并使用 `--ui-compound-*`，使 Composer 底栏的 `Agents` 和正文范围触发器在静止态持续带框、浮雕；它们因此比同排的权限、Swarm、Plan 和思考强度更突出，错误表达成主操作层级。
+- 修复：拆分房间触发器与弹窗次级按钮材质。`.kimix-room-trigger` 回到 `--ui-control-*` 基线，Retro 静止态透明，仅在 hover、展开和按压时显示触感；`.kimix-room-secondary-action` 继续保留完整 compound 边界。尺寸、弹层逻辑和 Multi-Agent 行为不变。
+- 边界：同为 Multi-Agent 控件不代表共享同一静止材质；Composer 工具行按同排层级统一，弹窗命令按钮按独立操作层级处理。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DDoRVO1c.css`、JS `assets/index-YVEx1elZ.js`）、OKF strict/audit（13 concepts、402 links）通过；实机视觉验收等待用户在 v2.20.124 截图确认。
+
+## 2026-08-02 修复：会话侧栏内部控件接入界面风格（v2.20.123）
+
+- 根因：v2.20.122 只把会话侧栏 18 张外层分区迁移为 `.kimix-section-card`；Git 操作、长程任务控制等内部按钮仍只使用通用 `.kimix-icon-text-button`，模型选择和 BTW 输入仍由 Tailwind 固定表面拼装。Retro 对普通按钮采用“静止扁平、悬停触感”的全局策略，因此外卡虽已变化，内部密集操作区仍明显扁平。
+- 修复：将 `.kimix-longtask-inspector .kimix-section-card .kimix-icon-text-button` 定义为侧栏专属成组操作角色，Retro 复用 `--ui-compound-*` 获得静止态小圆角、主题边界、轻浮雕与按压内凹，Modern 保持透明边界和扁平表面；目标步数、子 Agent 模型/思考强度和 BTW 输入接入 `.kimix-inspector-field` 字段角色，拖拽柄接入 `.kimix-inspector-drag-handle`。
+- 边界：规则必须同时由 `.kimix-longtask-inspector` 与 `.kimix-section-card` 限定，不给全局 `.kimix-icon-text-button` 永久换肤，也不改变业务按钮的背景色、文字色与主次状态。
+- 验证：界面风格定向 17 项、全量 155 文件 1476 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-c9sRM_1J.css`、JS `assets/index-C2PCKuH-.js`）、OKF strict/audit（13 concepts、401 links）通过；实机视觉验收等待用户在 v2.20.123 截图确认。
+
+## 2026-08-02 重构：内容表面确定接入界面风格角色（v2.20.122）
+
+- 根因：界面风格已能通过语义类控制壳层、浮层、菜单和设置卡，但会话侧栏 18 张分区卡、Hooks 顶层分区及多类对话事件卡仍在业务组件中拼装固定圆角、边框和阴影；Retro 因此通常只改变 Tailwind 圆角变量，无法获得完整的 Platinum 小圆角与克制浮雕质感。
+- 修复：新增 `.kimix-section-card` 统一独立中性分区的完整表面，新增 `.kimix-event-card` 只接管审批、澄清、错误、会话建议和恢复卡的形状/质感，`.kimix-inset-section` 为完整卡片内部提供无边框背景分层；业务语义色继续归组件所有。会话侧栏 18 卡、Hooks 6 分区及文件变更、文件、Todo 完成迁移，提问块使用内层递减角色。AppShell、弹窗、浮层、附件缩略图清除覆盖既有语义角色的固定圆角/阴影，文件卡打开控件复用 split-control 合约并保留 Kimix 默认基线。
+- 边界：不重定义 `--border-*` 颜色主题 token；输入框、可点击选择项、分隔线、弹窗内说明块及图片预览等上下文特例不机械迁移为完整卡片，避免角色误判和框套框。
+- 验证：界面风格定向 2 文件 19 项、全量 155 文件 1475 项、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BJx-m4wp.css`、JS `assets/index-BJ_YD1_r.js`）、OKF strict/audit（13 concepts、400 links）通过；执行策略阻止删除 `out/`/Vite 缓存，因此本轮不是清缓存构建。实机视觉验收等待用户在 v2.20.122 截图确认。
+
+## 2026-08-02 修复：恢复默认顶栏并补齐多 Agent 风格角色（v2.20.120）
+
+- 根因：v2.20.95（`e79dd434`）建立全局界面风格合约时，把共享控件的默认边框、背景和阴影设为透明；`SessionToolbar` 又移除了原先的 `rounded-xl border border-[var(--kimix-panel-border-soft)]`，于是新增风格意外改变了 Kimix 默认顶栏。底部 ContextBar 没有被同一提交删除，但默认 hover 仅靠浅背景与低扩散阴影，在当前配色上辨识不足。
+- 修复：仅在没有 `data-ui-style` 的 Kimix 默认作用域恢复顶栏 12px 圆角、细边框、hover 轻上浮与展开/选中完整状态；长程任务状态按钮保留自己的语义边框，不被默认恢复规则覆盖。默认底栏 action 增加主题色派生的浅边界、完整文字色与 1px 上浮反馈。
+- 多 Agent：为接收者/正文范围触发器、模型与权限选项、消息选择项、关闭/取消/管理模型和添加/保存主操作补充 `.kimix-room-*` 语义角色。Modern 继续使用安静大圆角；Retro 使用小圆角、主题派生边界、轻浮雕与内凹选中态，不覆盖任何颜色主题 token。
+- 验证：UI 风格定向 15 项、全量 155 文件 1474 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-Bk3h-5yh.css`、JS `assets/index-BcasY1xp.js`）、OKF strict/audit（13 concepts、399 links）通过；v2.20.120 开发窗口已重启，实际按钮观感等待用户截图验收。
+
+## 2026-08-02 审计修复：发布门禁与多窗口草稿隔离（v2.20.119）
+
+- 发布说明缺口核验：v2.20.76–118 均未打 tag，按“从上个实际发布版本聚合”的规则不需要 43 份内部 patch 说明；真实风险是 workflow 缺专属文件时静默回退到过期 `RELEASE_NOTES.md`。现改为缺文件直接失败，并新增下一实际发布候选 `v2.20.119.md`，范围从 v2.20.75 起算。
+- TASK_STATE 缺口核验：v2.20.76–91 的 16 个版本确无独立条目，但 Git 版本提交完整；已按不可变提交记录补记，未虚构原轮测试结果。v2.20.103 从未写入 `package.json`，属于跳号而非遗失版本，无需补条目或 release notes。
+- 多窗口草稿风险真实：旧实现虽写入 `updatedAt`，但读取不使用，且所有窗口写同一 localStorage 键。现按 renderer 窗口建立独立持久槽，恢复时选择最新有效内容，清空只影响当前窗口，并兼容 v1 旧记录；附件跨完整重启仍保持原有已知边界。
+- Retro hover 当前不存在所报 `:where + !important` 冲突：低权重 allowlist、状态按钮专用规则和防全局 button fallback 测试均在；radius 双轨分别服务 Tailwind 固定尺寸与语义容器尺寸，当前不做高风险合并。
+- UI 验收核验：v2.20.104–108 有实机证据记录；v2.20.109–118 仍需一次集中截图验收，属于待验收状态而非可由代码自动修复的缺陷。
+- 验证：草稿与发布门禁定向 2 文件 8 项、全量 155 文件 1472 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-B0OfNeag.css`、JS `assets/index-BqmfPaOa.js`）、OKF strict/audit 校验（13 concepts、398 links）通过；多窗口草稿真实交互与 v2.20.109–118 集中视觉验收仍需用户实机复验。
+
+## 2026-08-02 补记：v2.20.76–91 版本上下文恢复
+
+- 2026-08-02 审计确认这 16 个版本在 `TASK_STATE.md` / `TASK_HISTORY.md` 中没有独立任务条目，但对应 Git 提交与 `package.json` 版本变更完整存在。以下内容按不可变提交记录回填；原轮次更细的测试输出未保留，不补写无法核实的验证结论。
+- **v2.20.76** `f2e9dc48`：模型列表默认模型标识改为明确语义。
+- **v2.20.77** `e960cadf`：修复 Assistant footer 回落为裸“已完成”的根因。
+- **v2.20.78** `84542a74`：默认模型按钮改为与 Swarm 模式一致的开关形式。
+- **v2.20.79** `033d586c`：项目会话列表默认只展示最近 5 个，其余按需展开。
+- **v2.20.80** `b93218ce`：设置头部完整显示默认模型名，并固定默认按钮宽度。
+- **v2.20.81** `bb8a5802`：会话侧栏新增“后台 Bash / 子 Agent”任务面板。
+- **v2.20.82** `e85fe84e`：隐藏两处不应暴露给用户的内部运行状态。
+- **v2.20.83** `fe5a16b2`：会话列表收起入口与展开入口对称，并显示数量。
+- **v2.20.84** `0c6d2eff`：后台任务卡空态自动隐藏，消除刷新闪烁。
+- **v2.20.85** `4fd106a0`：“最近变更”与对话流变更记录对齐。
+- **v2.20.86** `73312574`：文件预览列表新增排序弹窗切换。
+- **v2.20.87** `0ea2a8d3`：外观页色彩方案拆为独立设置分区，并与主题分区格式对齐。
+- **v2.20.88** `a485ceeb`：外观页新增 Kimix 默认、现代化、复古三套界面风格切换。
+- **v2.20.89** `e9a14cd7`：修复界面风格机制并重做三套基础呈现。
+- **v2.20.90** `ed26d236`：统一复古风格圆角与阴影。
+- **v2.20.91** `050cb9c1`：按 `frontend-design` 方法论重做界面风格；其视觉方向随后在 v2.20.92 根据用户截图调整为 Classic Mac OS Platinum。
+
+## 2026-08-02 修正：恢复设置侧栏上下文并移除正文重复标题（v2.20.118）
+
+- 根因：v2.20.117 为统一工作区顶栏，误把设置替换侧栏中的“返回对话/设置”也当成重复身份移除；同时保留了右侧“常规/外观”等活动分类标题，既损失导航上下文，又继续占用正文空间。
+- 修正：恢复展开与折叠设置侧栏的返回入口，展开态恢复“设置”标题；删除右侧活动分类标题与说明，让正文直接进入配置内容。模型页的默认模型信息、诊断和刷新操作改为独立紧凑工具行，功能不随标题删除。
+- 验证：设置侧栏、布局与 UI 风格定向 3 文件 22 项、全量 154 文件 1470 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-B0OfNeag.css`、JS `assets/index-BKntR3ty.js`）、OKF strict/audit 校验（13 concepts、396 links）通过；实际空间与层级观感等待用户在 v2.20.118 截图验收。
+
+## 2026-08-02 优化：设置页统一工作区顶栏（v2.20.117）
+
+- 根因：插件与 Hooks 把页面身份、范围说明和返回动作统一放在右侧工作区顶栏；设置页却把“返回对话/设置”塞进替换侧栏，右侧正文直接从当前分类标题开始，同级全页工作区出现两套层级结构。
+- 修复：设置工作区复用 `.kimix-workspace-header`，展示设置图标、范围说明和右侧“返回对话”；设置侧栏仅保留搜索、分类导航与版本信息。工作区面板改为固定顶栏加剩余高度正文，避免新增顶栏后滚动内容溢出。
+- 验证：设置侧栏、布局与 UI 风格定向 3 文件 22 项、全量 154 文件 1470 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CmAXhwa6.css`、JS `assets/index-CnUiimmE.js`）、OKF strict/audit 校验（13 concepts、395 links）通过；实际顶栏观感等待用户在 v2.20.117 截图验收。
+
+## 2026-08-02 修复：复古 Swarm/Plan 分离 hover 与选中态（v2.20.116）
+
+- 根因：Retro 将共享 `--ui-toggle-*` 改成中性浮雕值，导致 Swarm/Plan 的持久开启态看起来像 hover；未选中 hover 又由通用按钮兜底环负责，只出现普通阴影，状态层级反转。
+- 修复：把 `.kimix-state-button` 从独立按钮兜底白名单移出。未选中 hover 显式使用 Retro 边框、背景和 inset 阴影；`aria-pressed="true"` 使用 Kimix 默认同源的蓝色边框、浅蓝背景和蓝色文字，且选中后 hover 不退回中性浮雕。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-pLCc4bvR.css`、JS `assets/index-D05m6Ujm.js`）、OKF strict/audit 校验（13 concepts、394 links）通过；构建产物确认包含独立的未选中 hover 与 `aria-pressed="true"` 规则，实际状态观感等待用户在 v2.20.116 复验。
+
+## 2026-08-02 修复：复古混合角色按钮移除双层描边（v2.20.115）
+
+- 根因：Composer 的添加、权限、思考强度、上下文用量等按钮同时具有结构控件类与通用按钮类；v2.20.113 的通用复古 hover 白名单使用高权重 `[data-ui-style="retro"]` 作用域，压过后置的结构控件规则，导致真实 1px 边框与额外 1px 阴影环同时显示。
+- 修复：将通用白名单的 preset 作用域降为零权重 `:where([data-ui-style="retro"])`。后置结构控件重新接管其单层边框与浮雕阴影；无真实边框的独立按钮、Agent 折叠标题仍保留兜底环和 v2.20.114 的平滑过渡。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DrvnGm_l.css`、JS `assets/index-Q9XW1yLp.js`）、OKF strict/audit 校验（13 concepts、393 links）通过；构建产物确认保留零权重 `:where([data-ui-style...])` 作用域，实际描边观感等待用户在 v2.20.115 复验。
+
+## 2026-08-02 优化：复古按钮阴影过渡与 Agent 标题 hover（v2.20.114）
+
+- 根因：顶部菜单触发器会同时过渡背景与浮雕阴影，其他部分独立按钮虽然在 v2.20.112/113 获得相同阴影，但多个语义类没有声明 `box-shadow` 过渡，阴影直接跳变；Agent 内容标题使用 `button.kimix-chat-collapse-row`，此前又未登记到复古按钮角色白名单。
+- 修复：为静默按钮、行内图标、侧栏图标、弹窗关闭按钮和折叠标题补齐共享 150ms 阴影过渡；顶部菜单同时平滑过渡边框；只把可交互的 `button.kimix-chat-collapse-row` 加入复古 hover 合约，非按钮标题和嵌套点击热区不受影响。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-k1CvEqEz.css`、JS `assets/index-BMhpkE1x.js`）、OKF strict/audit 校验（13 concepts、392 links）通过；构建产物确认包含 `button.kimix-chat-collapse-row` 复古角色，实际观感等待用户在 v2.20.114 检查动画连贯性。
+
+## 2026-08-02 修复：复古会话行移除嵌套文字框（v2.20.113）
+
+- 根因：v2.20.112 的全局原生 `button:hover` 兜底同时命中了会话行外层视觉表面内的标题点击按钮，导致一行 hover 时出现“整行外框 + 文字内框”两个边界所有者。
+- 修复：删除全局原生按钮兜底，改为独立视觉按钮语义类白名单；会话行继续由 `.kimix-sidebar-session-row` 绘制唯一 hover 外框，内部标题按钮只保留点击热区，右侧独立操作按钮仍有自己的 hover 反馈。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-BPPwNv4t.css`、JS `assets/index-ML95Vm0Q.js`）、OKF strict/audit 校验（13 concepts、391 links）通过；实际观感等待用户在 v2.20.113 检查会话行 hover。
+
+## 2026-08-02 优化：复古按钮 hover 全覆盖并移除底栏外框（v2.20.112）
+
+- 根因一：左上角新对话、搜索等使用 `ui-nav-action`，Retro 将该角色的 hover 边框/阴影设为透明与 `none`；顶部菜单和工具按钮则走另一套 tactile token，造成同为按钮却反馈不一致。
+- 修复一：新增 Retro 共享 hover border/background/shadow token，并让 control、nav action、nav list、menu trigger 与 ContextBar action 统一消费；增加零 specificity 的原生 button hover 兜底，业务主操作、危险、选中和展开态仍可用更具体规则覆盖。
+- 根因二：Retro 把底部 ContextBar 当成连续控制带，额外添加整体边框、底色和内阴影，与上方 Composer 外框叠成双层框。
+- 修复二：ContextBar 恢复透明、无边框、无阴影，仅保留内部按钮在 hover/展开时的复古触感。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-rIXsImFv.css`、JS `assets/index-DXbWuSS5.js`）、OKF strict/audit 校验（13 concepts、390 links）通过；实际观感等待用户在 v2.20.112 检查导航 hover 与无框底栏。
+
+## 2026-08-02 修复：默认模式移除复古选中左条（v2.20.111）
+
+- 根因：v2.20.95 建立全局界面风格合约时，基础 `:root` 将 `--ui-selection-shadow` 初始化为蓝色 inset 左条；Modern 显式覆盖为 `none`，Retro 单独增强，因此默认模式反而一直继承了本应属于复古的标记。
+- 修复：基础 selection shadow 恢复为 `none`；项目、会话、设置等默认选中态继续保留主题背景，不再显示左条。Retro 仍由自己的 preset token 提供左条，Modern 保持无左条。
+- 验证：UI 风格定向 13 项、全量 154 文件 1469 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CRMnqXlI.css`、JS `assets/index-D22joVgt.js`）、OKF strict/audit 校验（13 concepts、389 links）通过；实际观感等待用户在 v2.20.111 切换默认/复古截图验收。
+
+## 2026-08-02 修正：现代用户消息改为同源单次混合（v2.20.110）
+
+- 连续两次小幅加权仍未解决用户气泡过浅。v2.20.109 截图取样：工作画布亮度约 254、用户气泡约 247、信息气泡约 242；用户气泡与画布只差约 7 级。
+- 根因：用户气泡先取得已混合的信息表面，再向 elevated 二次混合；浅色 52% 的表面权重等效只保留约 30% hover，参数名看似过半，实际对比仍被连续稀释。
+- 修正：用户气泡改为与信息气泡同源的单次混合。浅色使用 46% hover（信息气泡 58%），深色使用 54%（信息气泡 66%），明确保留 12 个百分点的较浅层级，同时把浅色目标亮度拉到约 244–245。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-CVLHZ1wY.css`、JS `assets/index-BWU3Q_OB.js`）、OKF strict/audit 校验（13 concepts、388 links）通过；实际观感等待用户在 v2.20.110 截图验收。
+
+## 2026-08-02 调整：现代用户消息气泡回收过浅层级（v2.20.109）
+
+- 用户实机反馈 v2.20.108 的用户消息气泡与画布过于接近，短消息的作者归属不够清晰。
+- 调整：保持信息气泡与 Agent 行内代码的共享色不变；用户气泡对共享色的权重由浅色 44% 提至 52%、深色 50% 提至 56%，仅略微加深，仍明确低于共享色本身。
+- 验证：UI 风格定向 12 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DgED8crQ.css`、JS `assets/index-4UY0sHiF.js`）、OKF strict/audit 校验（13 concepts、387 links）通过；实际观感等待用户在 v2.20.109 截图验收。
+
+## 2026-08-02 调整：现代消息中性色统一为两级层次（v2.20.108）
+
+- 现状核对：消息信息气泡与 Agent 正文行内代码原本同为 `surface-hover`；用户消息另用 `surface-active/elevated` 混合。三者并非全相同，且不同主题下两套来源可能造成层级反转。
+- 修复：消息信息气泡与行内代码统一消费 `--kimix-modern-message-meta-background`，浅色由 58% hover + elevated 混合；用户消息再由该共享表面向 elevated 淡化，浅色只保留 44% 共享表面。深色对应为 66% 与 50%，保证用户消息始终比前两者淡一级。
+- 实机验收：Windows v2.20.108 同屏确认消息信息气泡与 Agent 行内代码保持同色，用户消息为更浅一级的无描边表面；证据：`C:/Users/Administrator/AppData/Local/Temp/kimix-ui-audit-22108/01-modern-message-surface-hierarchy.jpg`。
+- 验证：消息表面定向 3 文件 20 项、全量 154 文件 1468 项测试、Node/Renderer typecheck、生产构建（renderer CSS `assets/index-DwKZO88K.css`、JS `assets/index-BiWjGHSx.js`）、OKF strict/audit 校验（13 concepts、387 links）通过。

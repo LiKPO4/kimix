@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -76,6 +76,7 @@ const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
 const KIMI_MONTHLY_QUOTA_CHANGED_EVENT = "kimix:kimi-monthly-quota-settings-changed";
 const SETTINGS_PREVIEW_ITEM_LIMIT = 5;
+const MICROSOFT_TRANSLATOR_RESOURCE_GUIDE_URL = "https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to/create-translator-resource";
 
 const FILE_PREVIEW_EXTENSION_OPTIONS = [...PREVIEW_READABLE_TEXT_EXTENSIONS];
 
@@ -2236,22 +2237,40 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
                       <div className="kimix-settings-permission-label" style={{ marginTop: 16 }}>更新频率</div>
                       <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
-                        {([2000, 2500, 3000] as const).map((intervalMs) => (
+                        {([1000, 2000, 2500, 3000, 4000, 5000] as const).map((intervalMs) => (
                           <button
                             key={intervalMs}
                             type="button"
                             aria-pressed={thinkingTranslationIntervalMs === intervalMs}
                             onClick={() => setThinkingTranslationIntervalMs(intervalMs)}
                             className={`kimix-icon-text-button is-compact ${thinkingTranslationIntervalMs === intervalMs ? "bg-accent-primary-light text-accent-primary" : "kimix-muted-action"}`}
-                            style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                            style={{ minHeight: 32, minWidth: 54, paddingLeft: 12, paddingRight: 12 }}
                           >
-                            {intervalMs === 2500 ? "2.5 秒" : `${intervalMs / 1000} 秒`}
+                            {`${intervalMs / 1000} 秒`}
                           </button>
                         ))}
                       </div>
 
-                      <div className="kimix-settings-permission-label" style={{ marginTop: 18 }}>
-                        Microsoft Translator 凭据
+                      <div
+                        style={{
+                          alignItems: "center",
+                          columnGap: 12,
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 1fr) auto",
+                          marginTop: 18,
+                        }}
+                      >
+                        <div className="kimix-settings-permission-label">Microsoft Translator 凭据</div>
+                        <button
+                          type="button"
+                          onClick={() => void window.api.openExternal(MICROSOFT_TRANSLATOR_RESOURCE_GUIDE_URL)}
+                          className="kimix-icon-text-button is-compact kimix-muted-action text-accent-primary"
+                          style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                          title="打开 Microsoft 官方 Translator 资源与 Key 获取说明"
+                        >
+                          <ExternalLink size={14} />
+                          <span>获取 Key</span>
+                        </button>
                       </div>
                       <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
                         开启后，当前可见的思考原文会发送至 Microsoft Translator。密钥仅保存在本机系统安全存储中。

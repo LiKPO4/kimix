@@ -248,7 +248,7 @@ export function updateThinkingTranslationSource(options: {
     entry.retryCount = 0;
   }
   entry.sourceText = sourceText;
-  entry.intervalMs = Math.max(2000, Math.min(3000, options.intervalMs ?? DEFAULT_THINKING_TRANSLATION_INTERVAL_MS));
+  entry.intervalMs = Math.max(1000, Math.min(5000, options.intervalMs ?? DEFAULT_THINKING_TRANSLATION_INTERVAL_MS));
   entry.finalRequested = Boolean(options.final);
   if (options.final && entry.translatedSourceEnd === 0 && !entry.translatedText) {
     const compatible = [...entries.values()]

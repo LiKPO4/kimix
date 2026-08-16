@@ -365,7 +365,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   },
   setThinkingTranslationEnabled: (enabled) => set({ thinkingTranslationEnabled: enabled }),
   setThinkingTranslationIntervalMs: (intervalMs) => set({
-    thinkingTranslationIntervalMs: Math.max(2000, Math.min(3000, Math.round(intervalMs))),
+    thinkingTranslationIntervalMs: Math.max(1000, Math.min(5000, Math.round(intervalMs))),
   }),
   setThinkingTranslationDisplayMode: (mode) => set({ thinkingTranslationDisplayMode: mode }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),

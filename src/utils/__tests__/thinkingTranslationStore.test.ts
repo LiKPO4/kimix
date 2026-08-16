@@ -12,6 +12,7 @@ type HookProps = {
   translationKey?: string;
   sourceText: string;
   final?: boolean;
+  intervalMs?: number;
 };
 
 describe("thinkingTranslationStore", () => {
@@ -25,7 +26,7 @@ describe("thinkingTranslationStore", () => {
       key: props.translationKey ?? "draft:session-1:turn-1",
       sourceText: props.sourceText,
       enabled: true,
-      intervalMs: 2500,
+      intervalMs: props.intervalMs ?? 2500,
       final: props.final,
     });
     return null;
@@ -83,6 +84,20 @@ describe("thinkingTranslationStore", () => {
     });
     expect(translateThinking).toHaveBeenCalledTimes(2);
     expect(translateThinking.mock.calls[1][0].text).toBe("unfinished tail. ");
+  });
+
+  it("支持 1 秒档位，并把超出范围的间隔限制在 5 秒", async () => {
+    await render({ sourceText: "Fast sentence. ", intervalMs: 1000 });
+    await act(async () => vi.advanceTimersByTimeAsync(999));
+    expect(translateThinking).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(translateThinking).toHaveBeenCalledTimes(1);
+
+    await render({ translationKey: "draft:session-1:turn-2", sourceText: "Slow sentence. ", intervalMs: 10_000 });
+    await act(async () => vi.advanceTimersByTimeAsync(4999));
+    expect(translateThinking).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(translateThinking).toHaveBeenCalledTimes(2);
   });
 
   it("落定内容立即补译未闭合尾巴", async () => {

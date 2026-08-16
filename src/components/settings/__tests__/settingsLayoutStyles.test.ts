@@ -117,6 +117,14 @@ describe("settings workspace scroll layout", () => {
     );
   });
 
+  it("exposes the official Translator key guide and the complete 1–5 second cadence choices", () => {
+    expect(settingsPanel).toContain(
+      'https://learn.microsoft.com/en-us/azure/ai-services/translator/how-to/create-translator-resource',
+    );
+    expect(settingsPanel).toContain("<span>获取 Key</span>");
+    expect(settingsPanel).toContain("[1000, 2000, 2500, 3000, 4000, 5000]");
+  });
+
   it("keeps UI style, display preferences, and palette in separate appearance sections", () => {
     const themeStart = settingsPanel.indexOf('settingsSectionProps("theme", 3)');
     const styleStart = settingsPanel.indexOf('settingsSectionProps("uiStyle", 4)');
