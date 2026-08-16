@@ -45,6 +45,7 @@ import { APP_VERSION } from "@/utils/appVersion";
 import { RoomDeliveryIdentityInspector } from "./RoomDeliveryIdentityInspector";
 import { ModelProviderManager } from "./ModelProviderManager";
 import { NumberInput } from "../common/NumberInput";
+import { clearThinkingTranslationsAfterCredentialRemoval, retryVisibleThinkingTranslations } from "@/utils/thinkingTranslationStore";
 import {
   getSettingsPage,
   getSettingsPageForSection,
@@ -409,6 +410,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
   const setCollapseProcessWhileRunning = useAppStore((s) => s.setCollapseProcessWhileRunning);
+  const thinkingTranslationEnabled = useAppStore((s) => s.thinkingTranslationEnabled);
+  const setThinkingTranslationEnabled = useAppStore((s) => s.setThinkingTranslationEnabled);
+  const thinkingTranslationIntervalMs = useAppStore((s) => s.thinkingTranslationIntervalMs);
+  const setThinkingTranslationIntervalMs = useAppStore((s) => s.setThinkingTranslationIntervalMs);
+  const thinkingTranslationDisplayMode = useAppStore((s) => s.thinkingTranslationDisplayMode);
+  const setThinkingTranslationDisplayMode = useAppStore((s) => s.setThinkingTranslationDisplayMode);
   const filePreviewExtensions = useAppStore((s) => s.filePreviewExtensions);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setCurrentSession = useAppStore((s) => s.setCurrentSession);
@@ -513,6 +520,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [monthlyQuotaSaving, setMonthlyQuotaSaving] = useState(false);
   const [monthlyQuotaAcquiring, setMonthlyQuotaAcquiring] = useState(false);
   const [monthlyQuotaMessage, setMonthlyQuotaMessage] = useState("");
+  const [thinkingTranslationKey, setThinkingTranslationKey] = useState("");
+  const [thinkingTranslationRegion, setThinkingTranslationRegion] = useState("");
+  const [thinkingTranslationEndpoint, setThinkingTranslationEndpoint] = useState("");
+  const [thinkingTranslationConfigured, setThinkingTranslationConfigured] = useState(false);
+  const [thinkingTranslationStorageAvailable, setThinkingTranslationStorageAvailable] = useState(true);
+  const [thinkingTranslationLoading, setThinkingTranslationLoading] = useState(true);
+  const [thinkingTranslationBusy, setThinkingTranslationBusy] = useState<"save" | "clear" | "test" | null>(null);
+  const [thinkingTranslationMessage, setThinkingTranslationMessage] = useState("");
   const [themeScanLoading, setThemeScanLoading] = useState(false);
   const [themeScanMessage, setThemeScanMessage] = useState<string | null>(null);
   const [themeDeleteBusyId, setThemeDeleteBusyId] = useState<string | null>(null);
@@ -1319,6 +1334,79 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     window.dispatchEvent(new Event(KIMI_MONTHLY_QUOTA_CHANGED_EVENT));
   };
 
+  const refreshThinkingTranslationCredential = async () => {
+    setThinkingTranslationLoading(true);
+    const result = await window.api.getThinkingTranslationCredentialStatus();
+    setThinkingTranslationLoading(false);
+    if (!result.success) {
+      setThinkingTranslationMessage(`读取翻译凭据失败：${result.error}`);
+      return;
+    }
+    setThinkingTranslationConfigured(result.data.configured);
+    setThinkingTranslationStorageAvailable(result.data.storageAvailable);
+    setThinkingTranslationRegion(result.data.region ?? "");
+    setThinkingTranslationEndpoint(result.data.endpoint ?? "");
+    setThinkingTranslationMessage(!result.data.storageAvailable
+      ? "当前系统安全存储不可用，Kimix 不会以明文方式保存翻译密钥。"
+      : result.data.configured
+        ? "Microsoft Translator 凭据已使用系统安全存储保存；Kimix 不会回显密钥。"
+        : "尚未配置 Microsoft Translator 凭据，开启翻译后仍会保留原始思考内容。");
+  };
+
+  useEffect(() => {
+    void refreshThinkingTranslationCredential();
+    // 进入设置页时读取一次；保存、清除和测试操作会主动刷新状态。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveThinkingTranslationCredential = async () => {
+    const key = thinkingTranslationKey.trim();
+    if (!key) {
+      setThinkingTranslationMessage("请先填写 Microsoft Translator Key。");
+      return;
+    }
+    setThinkingTranslationBusy("save");
+    const result = await window.api.saveThinkingTranslationCredential({
+      key,
+      region: thinkingTranslationRegion.trim() || undefined,
+      endpoint: thinkingTranslationEndpoint.trim() || undefined,
+    });
+    setThinkingTranslationBusy(null);
+    if (!result.success) {
+      setThinkingTranslationMessage(`保存翻译凭据失败：${result.error}`);
+      return;
+    }
+    setThinkingTranslationKey("");
+    await refreshThinkingTranslationCredential();
+    retryVisibleThinkingTranslations();
+  };
+
+  const clearThinkingTranslationCredential = async () => {
+    setThinkingTranslationBusy("clear");
+    const result = await window.api.clearThinkingTranslationCredential();
+    setThinkingTranslationBusy(null);
+    if (!result.success) {
+      setThinkingTranslationMessage(`清除翻译凭据失败：${result.error}`);
+      return;
+    }
+    setThinkingTranslationKey("");
+    setThinkingTranslationConfigured(false);
+    clearThinkingTranslationsAfterCredentialRemoval();
+    setThinkingTranslationMessage("已清除 Microsoft Translator 凭据；自动翻译会回退显示原文。");
+  };
+
+  const testThinkingTranslation = async () => {
+    setThinkingTranslationBusy("test");
+    setThinkingTranslationMessage("正在测试 Microsoft Translator 连接...");
+    const result = await window.api.testThinkingTranslation();
+    setThinkingTranslationBusy(null);
+    if (!result.success) {
+      setThinkingTranslationMessage(`连接测试失败：${result.error.message}`);
+      return;
+    }
+    setThinkingTranslationMessage(`连接成功：Hello → ${result.data.translatedText}`);
+  };
+
   const handleToggleCacheHintDismissed = async () => {
     const next = !cacheHintDismissed;
     setCacheHintDismissedState(next);
@@ -2098,6 +2186,146 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-desc">默认开启，Agent 输出期间过程区只显示单行摘要以保持滚动流畅；关闭后运行中也按过程展示方式展开</div>
                     </div>
                   </button>
+                </div>
+                <div className="kimix-settings-card" style={{ marginTop: 16, padding: "16px" }}>
+                  <button
+                    type="button"
+                    aria-pressed={thinkingTranslationEnabled}
+                    onClick={() => setThinkingTranslationEnabled(!thinkingTranslationEnabled)}
+                    className="kimix-style-exempt grid w-full min-w-0 items-center text-left"
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12 }}
+                  >
+                    <SelectionIndicator selected={thinkingTranslationEnabled} />
+                    <div className="min-w-0">
+                      <div className="kimix-settings-permission-label">自动翻译思考内容</div>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
+                        默认关闭；开启后约每 2–3 秒将新增思考内容翻译为简体中文。
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full text-[11.5px] leading-5 ${thinkingTranslationEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`}
+                      style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      {thinkingTranslationEnabled ? "已开启" : "关闭"}
+                    </span>
+                  </button>
+
+                  {thinkingTranslationEnabled && (
+                    <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)]" style={{ marginTop: 16, padding: "16px" }}>
+                      <div className="kimix-settings-permission-label">译文显示</div>
+                      <div className="kimix-settings-permissions" style={{ marginTop: 10 }}>
+                        {([
+                          ["translated", "仅显示中文", "思考区以中文译文为主；译文未就绪或失败时自动回退原文。"],
+                          ["bilingual", "中英对照", "同时显示原始思考与中文译文。"],
+                        ] as const).map(([mode, label, desc]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            aria-pressed={thinkingTranslationDisplayMode === mode}
+                            onClick={() => setThinkingTranslationDisplayMode(mode)}
+                            className={`kimix-settings-permission ${thinkingTranslationDisplayMode === mode ? "is-active" : ""}`}
+                          >
+                            <SelectionIndicator selected={thinkingTranslationDisplayMode === mode} />
+                            <div className="kimix-settings-permission-copy">
+                              <div className="kimix-settings-permission-label">{label}</div>
+                              <div className="kimix-settings-permission-desc">{desc}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="kimix-settings-permission-label" style={{ marginTop: 16 }}>更新频率</div>
+                      <div className="flex flex-wrap" style={{ gap: 8, marginTop: 10 }}>
+                        {([2000, 2500, 3000] as const).map((intervalMs) => (
+                          <button
+                            key={intervalMs}
+                            type="button"
+                            aria-pressed={thinkingTranslationIntervalMs === intervalMs}
+                            onClick={() => setThinkingTranslationIntervalMs(intervalMs)}
+                            className={`kimix-icon-text-button is-compact ${thinkingTranslationIntervalMs === intervalMs ? "bg-accent-primary-light text-accent-primary" : "kimix-muted-action"}`}
+                            style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
+                          >
+                            {intervalMs === 2500 ? "2.5 秒" : `${intervalMs / 1000} 秒`}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="kimix-settings-permission-label" style={{ marginTop: 18 }}>
+                        Microsoft Translator 凭据
+                      </div>
+                      <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
+                        开启后，当前可见的思考原文会发送至 Microsoft Translator。密钥仅保存在本机系统安全存储中。
+                      </div>
+                      <input
+                        type="password"
+                        value={thinkingTranslationKey}
+                        onChange={(event) => setThinkingTranslationKey(event.target.value)}
+                        disabled={Boolean(thinkingTranslationBusy) || !thinkingTranslationStorageAvailable}
+                        placeholder={thinkingTranslationConfigured ? "填写新 Key 可覆盖现有配置" : "Microsoft Translator Key"}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="kimix-settings-input h-10 w-full rounded-lg text-[13px] outline-none"
+                        style={{ marginTop: 14, paddingLeft: 12, paddingRight: 12 }}
+                      />
+                      <input
+                        value={thinkingTranslationRegion}
+                        onChange={(event) => setThinkingTranslationRegion(event.target.value)}
+                        disabled={Boolean(thinkingTranslationBusy) || !thinkingTranslationStorageAvailable}
+                        placeholder="Azure 区域（可选，例如 eastasia）"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="kimix-settings-input h-10 w-full rounded-lg text-[13px] outline-none"
+                        style={{ marginTop: 12, paddingLeft: 12, paddingRight: 12 }}
+                      />
+                      <input
+                        value={thinkingTranslationEndpoint}
+                        onChange={(event) => setThinkingTranslationEndpoint(event.target.value)}
+                        disabled={Boolean(thinkingTranslationBusy) || !thinkingTranslationStorageAvailable}
+                        placeholder="自定义 Endpoint（可选）"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="kimix-settings-input h-10 w-full rounded-lg text-[13px] outline-none"
+                        style={{ marginTop: 12, paddingLeft: 12, paddingRight: 12 }}
+                      />
+                      <div className="flex flex-wrap" style={{ gap: 8, marginTop: 14 }}>
+                        <button
+                          type="button"
+                          onClick={() => void saveThinkingTranslationCredential()}
+                          disabled={Boolean(thinkingTranslationBusy) || !thinkingTranslationStorageAvailable || !thinkingTranslationKey.trim()}
+                          className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {thinkingTranslationBusy === "save" ? <RefreshCw size={14} className="kimix-spin" /> : <KeyRound size={14} />}
+                          <span>{thinkingTranslationBusy === "save" ? "保存中" : thinkingTranslationConfigured ? "更新凭据" : "保存凭据"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void testThinkingTranslation()}
+                          disabled={Boolean(thinkingTranslationBusy) || !thinkingTranslationConfigured}
+                          className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-[var(--kimix-panel-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <RefreshCw size={14} className={thinkingTranslationBusy === "test" ? "kimix-spin" : ""} />
+                          <span>{thinkingTranslationBusy === "test" ? "测试中" : "测试连接"}</span>
+                        </button>
+                        {thinkingTranslationConfigured && (
+                          <button
+                            type="button"
+                            onClick={() => void clearThinkingTranslationCredential()}
+                            disabled={Boolean(thinkingTranslationBusy)}
+                            className="kimix-icon-text-button is-compact border border-[var(--kimix-panel-border-soft)] text-accent-danger hover:bg-accent-danger-light disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            <span>{thinkingTranslationBusy === "clear" ? "清除中" : "清除凭据"}</span>
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        className="rounded-lg bg-[var(--kimix-panel-raised-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]"
+                        style={{ marginTop: 14, padding: "12px 14px" }}
+                      >
+                        {thinkingTranslationLoading ? "正在读取翻译配置..." : thinkingTranslationMessage}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

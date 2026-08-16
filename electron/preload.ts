@@ -96,6 +96,10 @@ import type {
   KimiMonthlyQuotaCredentialStatusResponse,
   KimiMonthlyQuotaResponse,
   SaveKimiMonthlyQuotaCredentialRequest,
+  ThinkingTranslationCredentialStatusResponse,
+  SaveThinkingTranslationCredentialRequest,
+  ThinkingTranslationRequest,
+  ThinkingTranslationResponse,
   OpenFileRequest,
   ChangePreviewRequest,
   ChangePreviewResponse,
@@ -396,6 +400,16 @@ const api = {
     ipcRenderer.invoke("kimi-code:acquireMonthlyQuotaCredential"),
   clearKimiMonthlyQuotaCredential: (): Promise<VoidResponse> =>
     ipcRenderer.invoke("kimi-code:clearMonthlyQuotaCredential"),
+  getThinkingTranslationCredentialStatus: (): Promise<ThinkingTranslationCredentialStatusResponse> =>
+    ipcRenderer.invoke("thinking-translation:getCredentialStatus"),
+  saveThinkingTranslationCredential: (req: SaveThinkingTranslationCredentialRequest): Promise<VoidResponse> =>
+    ipcRenderer.invoke("thinking-translation:saveCredential", req),
+  clearThinkingTranslationCredential: (): Promise<VoidResponse> =>
+    ipcRenderer.invoke("thinking-translation:clearCredential"),
+  testThinkingTranslation: (): Promise<ThinkingTranslationResponse> =>
+    ipcRenderer.invoke("thinking-translation:test"),
+  translateThinking: (req: ThinkingTranslationRequest): Promise<ThinkingTranslationResponse> =>
+    ipcRenderer.invoke("thinking-translation:translate", req),
   getKimiCodeCacheHintConfig: (): Promise<KimiCodeCacheHintConfigResponse> =>
     ipcRenderer.invoke("kimi-code:getCacheHintConfig"),
   startKimiCodeVis: (req?: { sessionId?: string; noOpen?: boolean }): Promise<VoidResponse> =>

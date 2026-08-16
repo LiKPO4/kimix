@@ -1233,6 +1233,58 @@ export type SaveKimiMonthlyQuotaCredentialRequest = {
   token: string;
 };
 
+export type ThinkingTranslationCredentialStatusResponse = {
+  success: true;
+  data: {
+    configured: boolean;
+    storageAvailable: boolean;
+    region?: string;
+    endpoint?: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type SaveThinkingTranslationCredentialRequest = {
+  key: string;
+  region?: string;
+  endpoint?: string;
+};
+
+export type ThinkingTranslationRequest = {
+  text: string;
+  requestId?: string;
+};
+
+export type ThinkingTranslationErrorCode =
+  | "credential_missing"
+  | "storage_unavailable"
+  | "invalid_request"
+  | "authentication_failed"
+  | "rate_limited"
+  | "timeout"
+  | "network_error"
+  | "provider_error"
+  | "invalid_response";
+
+export type ThinkingTranslationResponse = {
+  success: true;
+  data: {
+    translatedText: string;
+    detectedLanguage?: string;
+    targetLanguage: "zh-Hans";
+    requestId?: string;
+  };
+} | {
+  success: false;
+  error: {
+    code: ThinkingTranslationErrorCode;
+    message: string;
+    retryAfterMs?: number;
+  };
+};
+
 export type KimiMonthlyQuotaResponse = {
   success: true;
   data: KimiMonthlyQuotaInfo | null;
@@ -1631,6 +1683,9 @@ export type AppSettings = {
   experimentalKimiServerSessions: boolean;
   experimentalKimiToolSelect: boolean;
   kimiMonthlyQuotaEnabled: boolean;
+  thinkingTranslationEnabled: boolean;
+  thinkingTranslationIntervalMs: number;
+  thinkingTranslationDisplayMode: "translated" | "bilingual";
   defaultOpenDir?: string;
   selectedExecutablePath?: string;
   selectedLaunchCommand?: string;

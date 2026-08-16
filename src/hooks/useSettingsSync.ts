@@ -27,6 +27,9 @@ export function useSettingsSync() {
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
         state.voiceShortcut !== prev.voiceShortcut ||
         state.notificationMode !== prev.notificationMode ||
+        state.thinkingTranslationEnabled !== prev.thinkingTranslationEnabled ||
+        state.thinkingTranslationIntervalMs !== prev.thinkingTranslationIntervalMs ||
+        state.thinkingTranslationDisplayMode !== prev.thinkingTranslationDisplayMode ||
         state.filePreviewExtensions !== prev.filePreviewExtensions
       ) {
         writeCachedThemeSnapshot({
@@ -59,6 +62,9 @@ export function useSettingsSync() {
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,
           voiceShortcut: state.voiceShortcut,
           notificationMode: state.notificationMode,
+          thinkingTranslationEnabled: state.thinkingTranslationEnabled,
+          thinkingTranslationIntervalMs: state.thinkingTranslationIntervalMs,
+          thinkingTranslationDisplayMode: state.thinkingTranslationDisplayMode,
           filePreviewExtensions: state.filePreviewExtensions,
         }).then((res) => {
           if (res && typeof res === "object" && (res as { success?: unknown }).success === false) {

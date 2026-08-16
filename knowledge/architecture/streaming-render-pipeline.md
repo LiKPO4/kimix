@@ -1,10 +1,10 @@
 ---
 type: Architecture
 title: Streaming Render Pipeline
-description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, rich streaming markdown, and scroll-yield viewport gates.
+description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, derived thinking translation, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-12T10:32:00+08:00"
+timestamp: "2026-08-16T10:25:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -333,6 +333,12 @@ immediately and carry buffered deltas with them; immediacy is a correctness
 requirement, not a tuning knob.
 
 Draft notifications are coalesced, never per-token. SSE deltas arrive at token frequency; waking React per delta saturates the main thread (whole-bubble re-render plus full-content markdown work per event), starving unrelated UI like menus. `scheduleNotify` batches draft updates to at most one per animation frame — and to a 250 ms timer while the user is actively scrolling — while commit paths (`take`/`clear`) flush pending notifications synchronously so no update is lost. Draft accumulation itself is append-only by construction (snapshot/barrier frames stay formal), so per-delta work must stay O(fragment); the plain streaming path also skips the full markdown-repair stack and renders raw content until the settled rich pass.
+
+## Thinking translation is a derived leaf pipeline
+
+Automatic thinking translation never changes `TimelineEvent.thinking`, `thinkingParts`, active-turn offsets, or persisted official history. A visible thinking leaf observes the already-coalesced draft or settled `ThinkingBlock` and writes only to an in-memory `thinkingTranslationStore`, keyed by draft/block identity. Live sources wait for the configured 2–3 second coalescing window, submit only newly completed sentence/line chunks (bounded to 4,000 characters), and keep at most one request in flight per key with a global concurrency ceiling. A settled block flushes its remaining tail immediately and adopts a compatible translated draft prefix before translating only the remaining source tail. Source resets increment a request version so stale responses cannot overwrite a newer turn; unmounting the last visible consumer cancels queued work, which prevents hidden/background sessions from spending translation quota. Transient provider failures use bounded retry backoff, while completed inactive entries are retained only in a 160-entry LRU so long-running app sessions do not accumulate an unbounded translation cache.
+
+The translation result is presentation data: until a chunk returns, the original tail remains visible; failures fall back to the complete original without affecting answer generation. Mostly-Chinese chunks bypass the provider, fenced and inline code are protected by placeholders, and translated-only versus bilingual rendering is chosen at the leaf. Provider credentials and HTTP calls belong to the Electron main process, with the Azure key stored separately through `safeStorage`; renderer settings contain only enablement, interval, and display mode. Any later Google or local provider must preserve this scheduler/store boundary instead of attaching network work to `thinking.delta` or rebuilding the parent `MessageBubble` on each tick.
 
 Session persistence is a main-thread budget item, not background work. Each debounced persist walks and serializes the whole sessions value (tens of MB for long sessions: stringify plus IndexedDB structured clone), so it freezes every interaction when it runs on a hot interval. While any session is actively streaming, the debounced cadence stretches to at most one persist per minute (`resolvePersistDelayMs`), with explicit flushes on streaming end, archive/delete, visibility loss, and unload; server-backed sessions re-import from canonical history after a crash, so the wider window is safe. The startup window gets the same treatment: for the first 30 s after renderer launch the non-streaming cadence stretches to a 10 s debounce / 30 s max wait, because the history-repair loop and catalog sync each produce real state changes that would otherwise trigger a full ~70 MB persist apiece inside the first 15 s (measured: two persists ≈ 3.3 s of long tasks). Explicit flushes never consult `resolvePersistDelayMs`, and `timeAsync` (not `timeSync`) must wrap `commitState` — the stringify hides in the Promise continuation where a synchronous timer reads 0 ms. The event flush classifier must likewise keep informational high-frequency events (status updates, running-subagent progress) inside the 80 ms batch; only true boundaries (tool lifecycle, approvals, questions, errors, completion, subagent status transitions) flush immediately.
 

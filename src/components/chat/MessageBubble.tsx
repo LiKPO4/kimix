@@ -62,6 +62,8 @@ import {
 } from "@/utils/activeTurnDraftStore";
 import { getProcessManualExpand, noteProcessManualExpand, processManualExpandTurnKey } from "@/utils/processManualExpand";
 import { isActiveTurnDraftEnabled } from "@/utils/perfFlags";
+import { joinThinkingTranslations, thinkingTranslationJoinSeparator } from "@/utils/thinkingTranslation";
+import { useThinkingTranslation } from "@/utils/thinkingTranslationStore";
 
 interface MessageBubbleProps {
   event: Extract<TimelineEvent, { type: "user_message" | "steer_message" | "assistant_message" }>;
@@ -795,13 +797,46 @@ function normalizeThinkingMarkdown(text: string) {
     .replace(/([^\n])(\d+\.\s)/g, "$1\n$2");
 }
 
+function useThinkingDisplayText(sourceKey: string, sourceText: string, final: boolean) {
+  const {
+    enabled,
+    intervalMs,
+    displayMode,
+  } = useAppStore(useShallow((state) => ({
+    enabled: state.thinkingTranslationEnabled,
+    intervalMs: state.thinkingTranslationIntervalMs,
+    displayMode: state.thinkingTranslationDisplayMode,
+  })));
+  const translation = useThinkingTranslation({
+    key: sourceKey,
+    sourceText,
+    enabled,
+    intervalMs,
+    final,
+  });
+  if (!enabled || translation.status === "error" || !translation.translatedText.trim()) {
+    return sourceText;
+  }
+  const pendingSource = sourceText.slice(Math.min(sourceText.length, translation.translatedSourceEnd));
+  const translatedWithTail = joinThinkingTranslations(
+    translation.translatedText,
+    pendingSource,
+    thinkingTranslationJoinSeparator(sourceText.slice(0, translation.translatedSourceEnd)),
+  );
+  if (displayMode !== "bilingual" || translatedWithTail.trim() === sourceText.trim()) {
+    return translatedWithTail;
+  }
+  return `${translatedWithTail}\n\n原文\n${sourceText}`;
+}
+
 function describeTool(tool: ToolEvent) {
   return toolArgumentPreview(tool) || tool.toolName || "工具调用";
 }
 
-function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
+function ThinkingProcessItem({ block, translationScope }: { block: ThinkingBlock; translationScope: string }) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = block.text.trim().length > 0;
+  const displayText = useThinkingDisplayText(`${translationScope}:thinking-block:${block.id}`, block.text, true);
   const rowContent = (
     <>
       <span className="flex h-5 w-[18px] shrink-0 items-center justify-center text-[var(--kimix-process-muted)]">
@@ -836,7 +871,7 @@ function ThinkingProcessItem({ block }: { block: ThinkingBlock }) {
       )}
       {expanded && (
         <div className="kimix-thinking-detail kimix-soft-card-strong mt-1 min-w-0 rounded-lg text-[13.5px] leading-7" style={{ padding: "14px 16px" }}>
-          <MarkdownRenderer content={normalizeThinkingMarkdown(block.text)} wrapLongLines />
+          <MarkdownRenderer content={normalizeThinkingMarkdown(displayText)} wrapLongLines />
         </div>
       )}
     </div>
@@ -1015,9 +1050,9 @@ function formatAgentRole(role?: "executor" | "reviewer") {
   return null;
 }
 
-function renderProcessItem(item: ProcessItem, index: number) {
+function renderProcessItem(item: ProcessItem, index: number, translationScope: string) {
   return item.type === "thinking"
-    ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} />
+    ? <ThinkingProcessItem key={item.block.id || `thinking-${index}`} block={item.block} translationScope={translationScope} />
     : item.type === "tool"
       ? <ToolProcessItem key={item.tool.id} tool={item.tool} />
       : item.type === "approval"
@@ -1029,7 +1064,7 @@ function renderProcessItem(item: ProcessItem, index: number) {
           : <SubagentProcessItem key={item.subagent.id} subagent={item.subagent} />;
 }
 
-const ProcessDetailList = memo(function ProcessDetailList({ items }: { items: ProcessItem[] }) {
+const ProcessDetailList = memo(function ProcessDetailList({ items, translationScope }: { items: ProcessItem[]; translationScope: string }) {
   const [showAll, setShowAll] = useState(false);
   const previousLengthRef = useRef(items.length);
   const shouldLimit = !showAll && items.length > PROCESS_DETAIL_RENDER_LIMIT;
@@ -1062,7 +1097,7 @@ const ProcessDetailList = memo(function ProcessDetailList({ items }: { items: Pr
           </div>
         </div>
       )}
-      {visibleItems.map(renderProcessItem)}
+      {visibleItems.map((item, index) => renderProcessItem(item, index, translationScope))}
     </>
   );
 });
@@ -1261,28 +1296,29 @@ const KIMI_WEB_THINKING_SUMMARY_STYLE: CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-function KimiWebThinkingItem({ block, isLive }: { block: ThinkingBlock; isLive: boolean }) {
+function KimiWebThinkingItem({ block, isLive, translationScope }: { block: ThinkingBlock; isLive: boolean; translationScope: string }) {
+  const displayText = useThinkingDisplayText(`${translationScope}:thinking-block:${block.id}`, block.text, true);
   if (isLive) {
     return (
       <div
         className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
         style={KIMI_WEB_THINKING_SUMMARY_STYLE}
       >
-        {block.text}
+        {displayText}
       </div>
     );
   }
-  return <KimiWebSettledThinkingItem block={block} />;
+  return <KimiWebSettledThinkingItem displayText={displayText} />;
 }
 
-function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
+function KimiWebSettledThinkingItem({ displayText }: { displayText: string }) {
   const [expanded, setExpanded] = useState(false);
   // Official kimi-web ThinkingBlock.vue folds to the LAST paragraph; the shared
   // rule also folds long single-paragraph streams (teaser = last non-empty
   // line) so settled long thinking never becomes a fixed, non-clickable wall.
   const { foldable: isFoldable, teaser } = useMemo(
-    () => resolveSettledThinkingFold(block.text),
-    [block.text]
+    () => resolveSettledThinkingFold(displayText),
+    [displayText]
   );
   return (
     <div className="flex flex-col" style={{ gap: expanded && isFoldable ? 8 : 0 }}>
@@ -1301,7 +1337,7 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
           className="kimix-kimi-web-inline-summary text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
           style={KIMI_WEB_THINKING_SUMMARY_STYLE}
         >
-          {block.text}
+          {displayText}
         </div>
       )}
       {expanded && isFoldable && (
@@ -1309,7 +1345,7 @@ function KimiWebSettledThinkingItem({ block }: { block: ThinkingBlock }) {
           className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-muted)]"
           style={{ whiteSpace: "pre-wrap" }}
         >
-          {block.text}
+          {displayText}
         </div>
       )}
     </div>
@@ -1351,7 +1387,7 @@ export function KimiWebIntermediateTextBlock({ content, streaming = false }: { c
   );
 }
 
-function KimiWebThinkingBlock({ blocks, isLive, liveDraftKey }: { blocks: ThinkingBlock[]; isLive: boolean; liveDraftKey?: string | null }) {
+function KimiWebThinkingBlock({ blocks, isLive, liveDraftKey, translationScope }: { blocks: ThinkingBlock[]; isLive: boolean; liveDraftKey?: string | null; translationScope: string }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const dedupedBlocks = useMemo(() => {
@@ -1429,7 +1465,7 @@ function KimiWebThinkingBlock({ blocks, isLive, liveDraftKey }: { blocks: Thinki
       onTouchMove={isLive ? (event) => event.stopPropagation() : undefined}
     >
       {dedupedBlocks.map((block) => (
-        <KimiWebThinkingItem key={block.id} block={block} isLive={isLive} />
+        <KimiWebThinkingItem key={block.id} block={block} isLive={isLive} translationScope={translationScope} />
       ))}
       {isLive && liveDraftKey ? (
         <LiveThinkingDraftTail draftKey={liveDraftKey} viewportRef={viewportRef} followLatestRef={followLatestRef} />
@@ -1455,7 +1491,7 @@ function LiveDraftTail({ draftKey, isActiveAssistant, showTextTail, suppressThin
   if (!thinkingText && !draftContent) return null;
   return (
     <div className="flex min-w-0 flex-col" style={{ gap: 10 }}>
-      {thinkingText && <LiveThinkingPre text={thinkingText} />}
+      {thinkingText && draftKey && <LiveThinkingPre sourceKey={`thinking-draft:${draftKey}`} text={thinkingText} />}
       {showTextTail && draftContent && <KimiWebIntermediateTextBlock content={draftContent} streaming />}
     </div>
   );
@@ -1466,10 +1502,11 @@ function LiveDraftTail({ draftKey, isActiveAssistant, showTextTail, suppressThin
  * （用户上翻后不抢滚动，恢复滚到底部后自动重新跟随）。viewport 高度固定，
  * 思考增长不会让外层对话逐帧 reflow。
  */
-function LiveThinkingPre({ text }: { text: string }) {
+function LiveThinkingPre({ sourceKey, text }: { sourceKey: string; text: string }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
-  const contentVersion = text.length;
+  const displayText = useThinkingDisplayText(sourceKey, text, false);
+  const contentVersion = displayText.length;
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -1519,7 +1556,7 @@ function LiveThinkingPre({ text }: { text: string }) {
         className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
         style={KIMI_WEB_THINKING_SUMMARY_STYLE}
       >
-        {text}
+        {displayText}
       </div>
     </div>
   );
@@ -1542,7 +1579,8 @@ function LiveThinkingDraftTail({
 }) {
   const draft = useActiveTurnDraft(draftKey);
   const text = draft ? draftThinkingText(draft) : "";
-  const textLength = text.length;
+  const displayText = useThinkingDisplayText(`thinking-draft:${draftKey}`, text, false);
+  const textLength = displayText.length;
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || !followLatestRef.current) return;
@@ -1554,7 +1592,7 @@ function LiveThinkingDraftTail({
       className="text-left text-[14.5px] leading-6 text-[var(--kimix-panel-text-secondary)]"
       style={KIMI_WEB_THINKING_SUMMARY_STYLE}
     >
-      {text}
+      {displayText}
     </div>
   );
 }
@@ -2330,10 +2368,10 @@ function KimiWebQuestionGroupCard({ question }: { question: QuestionEvent }) {
 function savedQuestionAnswer(event: QuestionEvent, item: QuestionEvent["questions"][number]): string {
   return event.answers?.[item.question]?.trim() || (item.id ? event.answers?.[item.id]?.trim() : undefined) || "";
 }
-function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: boolean }) {
+function KimiWebProcessGroup({ group, isLive, translationScope }: { group: ProcessGroup; isLive: boolean; translationScope: string }) {
   switch (group.type) {
     case "thinking":
-      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} />;
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} translationScope={translationScope} />;
     case "tool":
       return <KimiWebToolGroupCard tools={group.tools} />;
     case "subagent":
@@ -2345,7 +2383,7 @@ function KimiWebProcessGroup({ group, isLive }: { group: ProcessGroup; isLive: b
   }
 }
 
-export function KimiWebProcessList({ items, isActiveAssistant, preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; preserveDuringFinalTransition?: boolean }) {
+export function KimiWebProcessList({ items, isActiveAssistant, translationScope = "process-list", preserveDuringFinalTransition = false }: { items: ProcessItem[]; isActiveAssistant: boolean; translationScope?: string; preserveDuringFinalTransition?: boolean }) {
   const groups = useMemo(() => groupProcessItems(items), [items]);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
@@ -2353,6 +2391,7 @@ export function KimiWebProcessList({ items, isActiveAssistant, preserveDuringFin
         <KimiWebProcessGroup
           key={`${group.type}-${index}`}
           group={group}
+          translationScope={translationScope}
           isLive={shouldUseLiveThinkingViewport({
             groupIndex: index,
             groupCount: groups.length,
@@ -2375,7 +2414,7 @@ export function KimiWebProcessList({ items, isActiveAssistant, preserveDuringFin
  * bottom body Markdown so the answer stays in the answer area and is not
  * duplicated in the process detail.
  */
-function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preserveDuringFinalTransition = false, liveThinkingDraftKey = null }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; preserveDuringFinalTransition?: boolean; liveThinkingDraftKey?: string | null }) {
+function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, translationScope, preserveDuringFinalTransition = false, liveThinkingDraftKey = null }: { blocks: TurnBlock[]; isActiveAssistant: boolean; hasFinalContent: boolean; translationScope: string; preserveDuringFinalTransition?: boolean; liveThinkingDraftKey?: string | null }) {
   const groups = useMemo(() => groupTurnBlocks(blocks), [blocks]);
   // 与正文区 computeFinalTextBlockContent 选中同一块：按块 key 跳过，不再按
   // "数组最后文本组"启发式。最后文本块后有迟到工具、或回放对账把旧时间戳
@@ -2414,6 +2453,7 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
             <TurnBlocksProcessGroup
               group={group}
               isLive={isLiveGroup}
+              translationScope={translationScope}
               liveThinkingDraftKey={isLiveGroup && group.type === "thinking" ? liveThinkingDraftKey : null}
             />
           </div>
@@ -2423,10 +2463,10 @@ function TurnBlocksTimeline({ blocks, isActiveAssistant, hasFinalContent, preser
   );
 }
 
-function TurnBlocksProcessGroup({ group, isLive, liveThinkingDraftKey = null }: { group: Exclude<TurnBlockGroup, { type: "text" }>; isLive: boolean; liveThinkingDraftKey?: string | null }) {
+function TurnBlocksProcessGroup({ group, isLive, translationScope, liveThinkingDraftKey = null }: { group: Exclude<TurnBlockGroup, { type: "text" }>; isLive: boolean; translationScope: string; liveThinkingDraftKey?: string | null }) {
   switch (group.type) {
     case "thinking":
-      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} liveDraftKey={liveThinkingDraftKey} />;
+      return <KimiWebThinkingBlock blocks={group.blocks} isLive={isLive} liveDraftKey={liveThinkingDraftKey} translationScope={translationScope} />;
     case "question":
       return <KimiWebQuestionGroupCard question={group.question} />;
     case "tool":
@@ -2446,6 +2486,7 @@ function TurnBlocksProcessGroup({ group, isLive, liveThinkingDraftKey = null }: 
 
 function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveDraftKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveDraftKey?: string | null; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
+  const thinkingTranslationScope = `${sessionId ?? "unknown"}:${event.roomAgentId ?? "single"}:${event.agentTurnId ?? event.id}:${event.id}`;
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
   const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !(isActiveAssistant && collapseWhileRunning);
@@ -2690,6 +2731,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
                 blocks={effectiveTurnBlocks}
                 isActiveAssistant={isActiveAssistant}
                 hasFinalContent={hasFinalContent}
+                translationScope={thinkingTranslationScope}
                 preserveDuringFinalTransition={isFinalContentTransition}
                 liveThinkingDraftKey={mergeLiveThinkingDraft ? (liveDraftKey ?? null) : null}
               />
@@ -2697,10 +2739,11 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
             <KimiWebProcessList
               items={items}
               isActiveAssistant={isActiveAssistant}
+              translationScope={thinkingTranslationScope}
               preserveDuringFinalTransition={isFinalContentTransition}
             />
             )
-          ) : <ProcessDetailList items={items} />}
+          ) : <ProcessDetailList items={items} translationScope={thinkingTranslationScope} />}
           <LiveDraftTail
             draftKey={liveDraftKey ?? null}
             isActiveAssistant={isActiveAssistant}

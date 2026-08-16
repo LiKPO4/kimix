@@ -20,6 +20,14 @@ import * as sessionHistory from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
 import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KimiCredentialAuthTaskCoordinator, KimiCredentialCandidateQueue, KIMI_WEB_QUOTA_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
 import {
+  DEFAULT_AZURE_TRANSLATOR_ENDPOINT,
+  THINKING_TRANSLATION_TARGET_LANGUAGE,
+  ThinkingTranslationError,
+  normalizeAzureTranslatorEndpoint,
+  translateThinkingWithAzure,
+  type AzureTranslatorCredential,
+} from "./thinkingTranslator";
+import {
   installNonVisionFetchInterceptor,
   markModelAsNonVideo,
   markModelAsNonVision,
@@ -7407,6 +7415,169 @@ ipcMain.handle("kimi-code:clearMonthlyQuotaCredential", async () => {
   }
 });
 
+const ThinkingTranslationCredentialSchema = z.object({
+  key: z.string().trim().min(1).max(1_024),
+  region: z.string().trim().max(120).optional(),
+  endpoint: z.string().trim().url().max(2_048).transform((value, context) => {
+    try {
+      return normalizeAzureTranslatorEndpoint(value);
+    } catch (error) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : "Azure Translator Endpoint 无效。",
+      });
+      return z.NEVER;
+    }
+  }).optional(),
+});
+
+function thinkingTranslationCredentialPath(): string {
+  return path.join(app.getPath("userData"), "thinking-translation-azure.bin");
+}
+
+function readThinkingTranslationCredential(): AzureTranslatorCredential | null {
+  const credentialPath = thinkingTranslationCredentialPath();
+  if (!fs.existsSync(credentialPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("当前系统安全存储不可用，无法读取翻译服务凭据。");
+  }
+  const decrypted = safeStorage.decryptString(fs.readFileSync(credentialPath));
+  return ThinkingTranslationCredentialSchema.parse(JSON.parse(decrypted));
+}
+
+function writeThinkingTranslationCredential(credential: AzureTranslatorCredential): void {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("当前系统安全存储不可用，未保存翻译服务凭据。");
+  }
+  const credentialPath = thinkingTranslationCredentialPath();
+  const tempPath = `${credentialPath}.tmp`;
+  fs.mkdirSync(path.dirname(credentialPath), { recursive: true });
+  try {
+    const encrypted = safeStorage.encryptString(JSON.stringify(credential));
+    fs.writeFileSync(tempPath, encrypted, { mode: 0o600 });
+    if (fs.existsSync(credentialPath)) fs.rmSync(credentialPath, { force: true });
+    fs.renameSync(tempPath, credentialPath);
+  } catch (error) {
+    try { fs.rmSync(tempPath, { force: true }); } catch {}
+    throw error;
+  }
+}
+
+function thinkingTranslationFailure(error: unknown) {
+  if (error instanceof ThinkingTranslationError) {
+    return {
+      success: false as const,
+      error: {
+        code: error.code,
+        message: error.message,
+        retryAfterMs: error.retryAfterMs,
+      },
+    };
+  }
+  return {
+    success: false as const,
+    error: {
+      code: "provider_error" as const,
+      message: error instanceof Error ? error.message : String(error),
+    },
+  };
+}
+
+async function runThinkingTranslation(text: string, requestId?: string) {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return {
+        success: false as const,
+        error: { code: "storage_unavailable" as const, message: "当前系统安全存储不可用，无法使用翻译服务凭据。" },
+      };
+    }
+    const credential = readThinkingTranslationCredential();
+    if (!credential) {
+      return {
+        success: false as const,
+        error: { code: "credential_missing" as const, message: "尚未配置 Azure Translator 凭据。" },
+      };
+    }
+    const translated = await translateThinkingWithAzure(text, credential);
+    return {
+      success: true as const,
+      data: {
+        ...translated,
+        targetLanguage: THINKING_TRANSLATION_TARGET_LANGUAGE,
+        requestId,
+      },
+    };
+  } catch (error) {
+    return thinkingTranslationFailure(error);
+  }
+}
+
+ipcMain.handle("thinking-translation:getCredentialStatus", async () => {
+  try {
+    const credentialPath = thinkingTranslationCredentialPath();
+    const configured = fs.existsSync(credentialPath);
+    const storageAvailable = safeStorage.isEncryptionAvailable();
+    if (!configured || !storageAvailable) {
+      return { success: true, data: { configured, storageAvailable } };
+    }
+    const credential = readThinkingTranslationCredential();
+    return {
+      success: true,
+      data: {
+        configured: Boolean(credential),
+        storageAvailable,
+        region: credential?.region,
+        endpoint: credential?.endpoint ?? DEFAULT_AZURE_TRANSLATOR_ENDPOINT,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("thinking-translation:saveCredential", async (_, request: unknown) => {
+  try {
+    const parsed = ThinkingTranslationCredentialSchema.parse(request);
+    writeThinkingTranslationCredential({
+      key: parsed.key,
+      region: parsed.region || undefined,
+      endpoint: parsed.endpoint || undefined,
+    });
+    return { success: true, data: undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("thinking-translation:clearCredential", async () => {
+  try {
+    fs.rmSync(thinkingTranslationCredentialPath(), { force: true });
+    return { success: true, data: undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle("thinking-translation:test", async () => runThinkingTranslation("Hello"));
+
+ipcMain.handle("thinking-translation:translate", async (_, request: unknown) => {
+  const parsed = z.object({
+    text: z.string().min(1).max(50_000).refine((value) => Boolean(value.trim())),
+    requestId: z.string().trim().min(1).max(200).optional(),
+  }).safeParse(request);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: { code: "invalid_request", message: "翻译请求格式无效或文本长度超过限制。" },
+    };
+  }
+  try {
+    return await runThinkingTranslation(parsed.data.text, parsed.data.requestId);
+  } catch (error) {
+    return thinkingTranslationFailure(error);
+  }
+});
+
 // ---------- 上下文缓存过期提醒（上游 0.34.0 #2646）：client_configs ----------
 
 const CACHE_HINT_CONFIG_TTL_MS = 24 * 60 * 60 * 1000;
@@ -7913,6 +8084,9 @@ const SettingsSchema = z.object({
   experimentalKimiServerSessions: z.boolean().optional(),
   experimentalKimiToolSelect: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
+  thinkingTranslationEnabled: z.boolean().optional(),
+  thinkingTranslationIntervalMs: z.number().int().min(2_000).max(3_000).optional(),
+  thinkingTranslationDisplayMode: z.enum(["translated", "bilingual"]).optional(),
   defaultOpenDir: z.string().optional(),
   selectedExecutablePath: z.string().optional(),
   selectedLaunchCommand: z.string().optional(),

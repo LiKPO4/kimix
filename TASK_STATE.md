@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-16 功能：思考内容通过 Azure Translator 近实时翻译（v2.21.79）
+
+- 目标：在不改变 Kimi Code 官方思考事件、历史和流式性能边界的前提下，将当前可见思考按 2～3 秒节奏自动翻译为简体中文。
+- 实现：新增默认关闭的思考翻译设置，支持仅中文/中英对照和 2、2.5、3 秒频率；Azure Key 由主进程 `safeStorage` 单独加密，Renderer 只调用凭据状态、保存/清除、测试和翻译 IPC，不能读取明文。
+- 流式边界：翻译调度接在 `activeTurnDraftStore` 聚合后的叶子渲染层；只发送新增完整句段，单键串行、全局最多 2 个请求，使用 source version 丢弃过期响应，隐藏/卸载的思考不继续排队。落定块立即补译尾巴，中文块跳过服务，代码段使用占位保护，任何失败都回退官方原文。
+- 安全边界：自定义 Endpoint 仅允许 Microsoft Translator 或 Cognitive Services 官方 HTTPS 根地址，避免把订阅密钥发送到任意主机；凭据不进入 AppSettings、会话历史或日志。
+- 验证：Azure Provider 与增量调度定向测试覆盖认证/限流/超时、Endpoint 限制、2.5 秒合并、增量句段和落定补译；Node/Renderer typecheck、知识库校验和生产构建由本轮统一收尾。
+
 ## 2026-08-13 功能：通过官方 extra_skill_dirs 接入外部 Skill（v2.21.60）
 
 - 目标：实现类似 Codex 的外部 Skill 来源接入，但不恢复 Kimix 私有扫描、单项勾选或目录复制。

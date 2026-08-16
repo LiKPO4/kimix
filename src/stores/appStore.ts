@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
@@ -177,6 +177,9 @@ export interface AppStore extends AppState {
   setNotificationShowContent: (enabled: boolean) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setCollapseProcessWhileRunning: (enabled: boolean) => void;
+  setThinkingTranslationEnabled: (enabled: boolean) => void;
+  setThinkingTranslationIntervalMs: (intervalMs: number) => void;
+  setThinkingTranslationDisplayMode: (mode: ThinkingTranslationDisplayMode) => void;
   setPendingNewSessionModel: (model: string | null) => void;
   setFilePreviewExtensions: (extensions: string[]) => void;
   setLongTasksOpen: (open: boolean) => void;
@@ -240,6 +243,9 @@ export const useAppStore = create<AppStore>((rawSet) => {
   notificationShowContent: false,
   processDisplayMode: readProcessDisplayMode(),
   collapseProcessWhileRunning: readCollapseProcessWhileRunning(),
+  thinkingTranslationEnabled: false,
+  thinkingTranslationIntervalMs: 2500,
+  thinkingTranslationDisplayMode: "translated",
   pendingNewSessionModel: readPendingNewSessionModel(),
   filePreviewExtensions: ["md", "txt"],
   longTasksOpen: false,
@@ -357,6 +363,11 @@ export const useAppStore = create<AppStore>((rawSet) => {
     writeActiveSettingsPage(pageId);
     set({ activeSettingsPageId: pageId });
   },
+  setThinkingTranslationEnabled: (enabled) => set({ thinkingTranslationEnabled: enabled }),
+  setThinkingTranslationIntervalMs: (intervalMs) => set({
+    thinkingTranslationIntervalMs: Math.max(2000, Math.min(3000, Math.round(intervalMs))),
+  }),
+  setThinkingTranslationDisplayMode: (mode) => set({ thinkingTranslationDisplayMode: mode }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   triggerFocusInput: () => set({ focusInputTrigger: Date.now() }),

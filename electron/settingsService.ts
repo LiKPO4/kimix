@@ -44,6 +44,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
   kimiMonthlyQuotaEnabled: false,
+  thinkingTranslationEnabled: false,
+  thinkingTranslationIntervalMs: 2500,
+  thinkingTranslationDisplayMode: "translated",
   autoReadAgentsMd: true,
   autoShowGitStatus: true,
   additionalWorkDirs: [],
@@ -118,6 +121,16 @@ export function loadSettings(): AppSettings {
         ?? ((sanitizedRawSettings.defaultThinking ?? DEFAULT_SETTINGS.defaultThinking) ? "on" : "off"),
       fontSize: shouldMigrateLegacyFontSize ? 15 : sanitizedRawSettings.fontSize ?? DEFAULT_SETTINGS.fontSize,
       fontSizeBaselineVersion: 1,
+      thinkingTranslationEnabled: sanitizedRawSettings.thinkingTranslationEnabled === true,
+      thinkingTranslationIntervalMs: typeof sanitizedRawSettings.thinkingTranslationIntervalMs === "number" &&
+        Number.isInteger(sanitizedRawSettings.thinkingTranslationIntervalMs) &&
+        sanitizedRawSettings.thinkingTranslationIntervalMs >= 2_000 &&
+        sanitizedRawSettings.thinkingTranslationIntervalMs <= 3_000
+        ? sanitizedRawSettings.thinkingTranslationIntervalMs
+        : DEFAULT_SETTINGS.thinkingTranslationIntervalMs,
+      thinkingTranslationDisplayMode: sanitizedRawSettings.thinkingTranslationDisplayMode === "bilingual"
+        ? "bilingual"
+        : DEFAULT_SETTINGS.thinkingTranslationDisplayMode,
     };
     if (shouldMigrateLegacyFontSize || sanitizedRawSettings.fontSizeBaselineVersion !== 1 || hadLegacyClarificationSetting || hadLegacySkillSettings) {
       writeFileAtomic(SETTINGS_FILE, JSON.stringify({ ...sanitizedRawSettings, fontSize: settings.fontSize, fontSizeBaselineVersion: 1 }, null, 2));

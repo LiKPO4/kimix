@@ -1476,6 +1476,9 @@ function App() {
   const setVoiceShortcut = useAppStore((s) => s.setVoiceShortcut);
   const setNotificationMode = useAppStore((s) => s.setNotificationMode);
   const setNotificationShowContent = useAppStore((s) => s.setNotificationShowContent);
+  const setThinkingTranslationEnabled = useAppStore((s) => s.setThinkingTranslationEnabled);
+  const setThinkingTranslationIntervalMs = useAppStore((s) => s.setThinkingTranslationIntervalMs);
+  const setThinkingTranslationDisplayMode = useAppStore((s) => s.setThinkingTranslationDisplayMode);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
@@ -1588,6 +1591,9 @@ function App() {
       setVoiceShortcut,
       setNotificationMode,
       setNotificationShowContent,
+      setThinkingTranslationEnabled,
+      setThinkingTranslationIntervalMs,
+      setThinkingTranslationDisplayMode,
       setFilePreviewExtensions,
       setRecentProjects,
     }), [
@@ -1597,6 +1603,7 @@ function App() {
       setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,
+      setThinkingTranslationEnabled, setThinkingTranslationIntervalMs, setThinkingTranslationDisplayMode,
       setFilePreviewExtensions, setRecentProjects,
     ]);
     useBootstrap(bootstrapSetters);
