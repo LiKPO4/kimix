@@ -397,6 +397,7 @@ export function LongTaskInspectorPanel({
   const gitInfoRequestIdRef = useRef(0);
   const gitDetailsRequestIdRef = useRef(0);
   const gitGraphRequestIdRef = useRef(0);
+  const bashTaskTitle = bashTasks.some((task) => task.subagentType === "tool") ? "后台任务" : "后台 Bash";
   const projectPathForSession = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const openFile = (filePath: string, projectPath = projectPathForSession) => {
     if (projectPath) void window.api.openFile({ projectPath, filePath });
@@ -1792,7 +1793,7 @@ export function LongTaskInspectorPanel({
             <section className="kimix-section-card" {...rightCardSectionProps("background", 2, { padding: "16px 16px 18px" })}>
               <div className="flex items-start justify-between" style={{ gap: 12 }}>
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium leading-5 text-text-muted">后台 Bash</div>
+                  <div className="text-[13px] font-medium leading-5 text-text-muted">{bashTaskTitle}</div>
                   <div className="mt-1 truncate text-[13px] leading-5 text-text-primary">
                     {bashTasks.length > 0 ? `${bashTasks.length} 个任务` : "当前没有后台任务"}
                   </div>
@@ -1803,7 +1804,7 @@ export function LongTaskInspectorPanel({
                       type="button"
                       onClick={() => onSetComposerCardHidden(composerCardSessionId, "bash", false)}
                       className="kimix-icon-text-button kimix-inspector-action is-compact shrink-0"
-                      title="恢复输入区的后台 Bash 胶囊"
+                      title={`恢复输入区的${bashTaskTitle}胶囊`}
                     >
                       恢复胶囊
                     </button>
@@ -1818,7 +1819,7 @@ export function LongTaskInspectorPanel({
                   >
                     <RefreshCw size={13} className={backgroundTasksLoading ? "animate-spin" : ""} />
                   </button>
-                  {rightCardDragHandle("background", "后台 Bash")}
+                  {rightCardDragHandle("background", bashTaskTitle)}
                 </div>
               </div>
               {backgroundTasksError ? (

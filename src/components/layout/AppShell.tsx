@@ -34,7 +34,7 @@ import { type DownloadProgressInfo } from "@/utils/format";
 import { isSamePath } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
 import { sendDocumentCommand, deleteSelection } from "@/utils/dom";
-import { findSessionPlanPath, hasSessionPlanSignal } from "@/utils/planPath";
+import { findSessionPlanSignal } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { DialogSystem } from "./DialogSystem";
@@ -374,6 +374,7 @@ export function AppShell() {
     error: null,
     message: undefined,
   });
+  const sessionPlanRequestRef = useRef(0);
   const [btwTransientBySessionId, setBtwTransientBySessionId] = useState<Record<string, BtwTransientState>>({});
 
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1129,13 +1130,11 @@ export function AppShell() {
     );
     return sessionLongTasks.filter((task) => activeTaskIds.has(task.id));
   }, [sessionLongTasks, sessions]);
-  const sessionPlanPath = useMemo(
-    () => {
-      const events = mutationSessionView?.events ?? [];
-      return findSessionPlanPath(events) ?? (hasSessionPlanSignal(events) ? "__latest_kimi_plan__" : null);
-    },
+  const sessionPlanSignal = useMemo(
+    () => findSessionPlanSignal(mutationSessionView?.events ?? []),
     [mutationSessionView?.events],
   );
+  const sessionPlanPath = sessionPlanSignal?.path ?? (sessionPlanSignal ? "__latest_kimi_plan__" : null);
   const rightPanelTitle = longTaskMeta ? "长程任务" : "会话侧栏";
   const rightPanelSubtitle = longTaskMeta
     ? longTaskMeta.title
@@ -1548,7 +1547,8 @@ ${isFinalStep
   };
 
   const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
-    if (!longTaskInspectorOpen || hasLongTaskMeta || !liveCurrentSessionProjectPath || !mutationSessionView) {
+    const requestId = ++sessionPlanRequestRef.current;
+    if (hasLongTaskMeta || !liveCurrentSessionProjectPath || !mutationSessionView) {
       setSessionPlanState({
         loading: false,
         path: null,
@@ -1559,7 +1559,22 @@ ${isFinalStep
       });
       return;
     }
-    const pathToRead = sessionPlanPath ?? "__latest_kimi_plan__";
+    if (sessionPlanSignal?.content) {
+      setSessionPlanState({
+        loading: false,
+        path: sessionPlanSignal.path,
+        content: sessionPlanSignal.content,
+        updatedAt: null,
+        error: null,
+        message: undefined,
+      });
+      return;
+    }
+    if (!sessionPlanPath) {
+      setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null, message: undefined });
+      return;
+    }
+    const pathToRead = sessionPlanPath;
     if (!options?.silent) {
       setSessionPlanState((state) => ({ ...state, loading: true, path: sessionPlanPath, error: null }));
     }
@@ -1568,6 +1583,7 @@ ${isFinalStep
       sessionId: mutationSessionView ? getRuntimeSessionId(mutationSessionView) ?? undefined : undefined,
       path: pathToRead,
     }).then((res) => {
+      if (requestId !== sessionPlanRequestRef.current) return;
       if (res.success) {
         setSessionPlanState({
           loading: false,
@@ -1581,6 +1597,7 @@ ${isFinalStep
         setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error, message: undefined });
       }
     }).catch((err: unknown) => {
+      if (requestId !== sessionPlanRequestRef.current) return;
       setSessionPlanState({
         loading: false,
         path: sessionPlanPath,
@@ -1597,9 +1614,9 @@ ${isFinalStep
     mutationSessionView?.runtimeSessionId,
     liveCurrentSessionProjectPath,
     liveCurrentSession?.collaboration,
-    longTaskInspectorOpen,
     mutationOwnerError,
     sessionPlanPath,
+    sessionPlanSignal,
   ]);
 
   const refreshSessionLongTasks = useCallback((options?: { silent?: boolean }) => {

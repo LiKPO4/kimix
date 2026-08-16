@@ -8,7 +8,7 @@ import { TodoListItems, todoCounts } from "./TodoPanel";
 
 /**
  * 输入区 dock 胶囊行（对齐官方 kimi-web ChatDock 的 dock work chips）：
- * 「后台 Bash (N)」「子 Agent (N)」「待办 (done/total)」「队列 (N)」小胶囊，
+ * 「目标」「计划」「后台 Bash/后台任务」「子 Agent」「当前进度」及「队列」小胶囊，
  * 点击向上展开半透明面板；单面板互斥、点外部关闭、数据清空自动关闭。
  * 替代原 TodoPanel 卡片与排队消息浮动面板（重量级实心卡，遮挡聊天内容）。
  */
@@ -181,13 +181,14 @@ export function ComposerDockBar({
 
   const { doneCount } = todoCounts(todoItems);
   const runningOf = (tasks: KimiCodeBackgroundTaskInfo[]) => tasks.filter((task) => !isBackgroundTaskTerminalStatus(task.status)).length;
+  const bashLabel = bashTasks.some((task) => task.subagentType === "tool") ? "后台任务" : "后台 Bash";
   const capsules: { id: ComposerDockPanelId; label: string; count: string; running: number; icon: ReactNode }[] = [];
   const goalVisible = Boolean(goal && !isTerminalGoalStatus(goal.status));
-  const planVisible = Boolean(planMode) || Boolean(planContent && planContent.trim());
+  const planVisible = Boolean(planMode) || Boolean(planPath) || Boolean(planContent && planContent.trim());
   if (goalVisible && goal) capsules.push({ id: "goal", label: "目标", count: goalCapsuleStatusLabel(goal.status), running: 0, icon: <Target size={13} /> });
   // 对齐官方 0.36 dock：planMode 或已捕获计划文件时显示计划胶囊。
   if (planVisible) capsules.push({ id: "plan", label: "计划", count: "", running: 0, icon: <PenLine size={13} /> });
-  if (bashTasks.length > 0) capsules.push({ id: "bash", label: "后台 Bash", count: String(bashTasks.length), running: runningOf(bashTasks), icon: <SquareTerminal size={13} /> });
+  if (bashTasks.length > 0) capsules.push({ id: "bash", label: bashLabel, count: String(bashTasks.length), running: runningOf(bashTasks), icon: <SquareTerminal size={13} /> });
   if (subagentTasks.length > 0) capsules.push({ id: "subagent", label: "子 Agent", count: String(subagentTasks.length), running: runningOf(subagentTasks), icon: <Users size={13} /> });
   // 对齐官方文案：待办胶囊叫「当前进度 done/total」，全部完成时换 check-list 图标。
   if (todoItems.length > 0) capsules.push({ id: "todo", label: "当前进度", count: `${doneCount}/${todoItems.length}`, running: 0, icon: doneCount >= todoItems.length ? <ListChecks size={13} /> : <List size={13} /> });
@@ -220,7 +221,7 @@ export function ComposerDockBar({
 
   const panelConfig: Record<ComposerDockPanelId, { title: string; body: ReactNode; onHide?: () => void }> = {
     bash: {
-      title: `后台 Bash · ${bashTasks.length} 个任务`,
+      title: `${bashLabel} · ${bashTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={bashTasks} />,
       onHide: onHideBash,
     },

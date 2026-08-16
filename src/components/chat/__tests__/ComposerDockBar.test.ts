@@ -101,6 +101,43 @@ describe("ComposerDockBar", () => {
     expect(labels[3]).toContain("(3)");
   });
 
+  it("完整覆盖官方五类工作胶囊，并把队列放在最后", () => {
+    render(
+      makeProps({
+        goal: { objective: "完成当前目标", status: "active" },
+        planContent: "# 实施计划",
+        bashTasks: [makeTask()],
+        subagentTasks: [makeTask({ taskId: "sub-1", subagentType: "subagent" })],
+        todoItems: todoFixture,
+        queueCount: 1,
+      }),
+    );
+    const labels = capsuleLabels();
+    expect(labels).toHaveLength(6);
+    expect(labels[0]).toContain("目标");
+    expect(labels[1]).toContain("计划");
+    expect(labels[2]).toContain("后台 Bash");
+    expect(labels[3]).toContain("子 Agent");
+    expect(labels[4]).toContain("当前进度");
+    expect(labels[5]).toContain("队列");
+  });
+
+  it("计划路径本身也会显示计划胶囊", () => {
+    render(makeProps({ planPath: "C:\\.kimi\\plans\\current.md" }));
+    expect(capsuleLabels()).toHaveLength(1);
+    expect(capsuleLabels()[0]).toContain("计划");
+    clickCapsule(0);
+    expect(container.querySelector(".kimix-dock-panel")?.textContent).toContain("current.md");
+  });
+
+  it("官方 tool 类后台任务使用后台任务文案", () => {
+    render(makeProps({ bashTasks: [makeTask({ subagentType: "tool" })] }));
+    expect(capsuleLabels()[0]).toContain("后台任务");
+    expect(capsuleLabels()[0]).not.toContain("后台 Bash");
+    clickCapsule(0);
+    expect(container.querySelector(".kimix-dock-panel")?.textContent).toContain("后台任务 · 1 个任务");
+  });
+
   it("点击胶囊展开面板，再点关闭，面板互斥切换", () => {
     render(makeProps({ bashTasks: [makeTask()], todoItems: todoFixture }));
     expect(container.querySelector(".kimix-dock-panel")).toBeNull();

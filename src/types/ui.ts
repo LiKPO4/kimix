@@ -70,7 +70,7 @@ export interface RoomAgentActivity {
 export type NotificationMode = "never" | "unfocused" | "always";
 export type ThinkingTranslationDisplayMode = "translated" | "bilingual";
 export type ThinkingTranslationProvider = "off" | "local" | "azure";
-export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm" | "bash" | "subagent";
+export type ComposerDockCard = "todo" | "pending" | "goal" | "swarm" | "plan" | "bash" | "subagent";
 export type RightSidebarCardId = "longTaskStatus" | "background" | "subagentTasks" | "bigPlan" | "rounds" | "review" | "confirmed" | "hidden" | "longTask" | "kimi" | "subagent" | "git" | "goal" | "btw" | "plan" | "serverTree" | "session" | "diffs";
 export type WorkspaceView = "chat" | "plugins" | "hooks" | "mcp" | "settings";
 export type SettingsPageId = "general" | "appearance" | "conversation" | "account" | "models" | "subagents" | "experiments" | "data" | "diagnostics";

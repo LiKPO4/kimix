@@ -4368,6 +4368,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const pendingHidden = hiddenCards.includes("pending");
   const bashHidden = hiddenCards.includes("bash");
   const subagentHidden = hiddenCards.includes("subagent");
+  const bashCardLabel = bashTasks.some((task) => task.subagentType === "tool") ? "后台任务" : "后台 Bash";
   const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
   const visibleRoomControlTargets = roomControlRequest?.action === "stop" ? roomStopTargets : roomSteerTargets;
   const roomControlTitle = roomControlRequest?.action === "stop" ? "选择要停止的 Agent" : "选择要引导的 Agent";
@@ -4516,7 +4517,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         onResumeGoal={onResumeOfficialGoal}
         onCancelGoal={onCancelOfficialGoal}
         onRefreshGoal={onRefreshOfficialGoal}
-        onHideBash={() => hideComposerCard("bash", "后台 Bash")}
+        onHideBash={() => hideComposerCard("bash", bashCardLabel)}
         onHideSubagent={() => hideComposerCard("subagent", "子 Agent")}
         onHideTodo={() => hideComposerCard("todo", "TodoList")}
         onHideQueue={() => hideComposerCard("pending", "排队消息")}
