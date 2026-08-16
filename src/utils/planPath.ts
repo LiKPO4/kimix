@@ -1,5 +1,18 @@
 import type { TimelineEvent } from "@/types/ui";
 
+export const SESSION_PLAN_RETRY_INTERVAL_MS = 1_000;
+export const SESSION_PLAN_MAX_RETRIES = 15;
+
+export function shouldRetrySessionPlanRead(
+  requestPath: string,
+  retryable: boolean | undefined,
+  retryAttempt: number,
+) {
+  return requestPath === "__latest_kimi_plan__"
+    && retryable === true
+    && retryAttempt < SESSION_PLAN_MAX_RETRIES;
+}
+
 const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi(?:-code)?\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi(?:-code)?\/plans\/[^\s"'<>|]+\.md|\.kimi(?:-code)?[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
 
 export function cleanPlanPath(pathValue: string) {

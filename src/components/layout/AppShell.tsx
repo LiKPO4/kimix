@@ -34,7 +34,7 @@ import { type DownloadProgressInfo } from "@/utils/format";
 import { isSamePath } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
 import { sendDocumentCommand, deleteSelection } from "@/utils/dom";
-import { findSessionPlanSignal } from "@/utils/planPath";
+import { findSessionPlanSignal, SESSION_PLAN_RETRY_INTERVAL_MS, shouldRetrySessionPlanRead } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { DialogSystem } from "./DialogSystem";
@@ -375,6 +375,7 @@ export function AppShell() {
     message: undefined,
   });
   const sessionPlanRequestRef = useRef(0);
+  const sessionPlanRetryTimerRef = useRef<number | null>(null);
   const [btwTransientBySessionId, setBtwTransientBySessionId] = useState<Record<string, BtwTransientState>>({});
 
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1546,7 +1547,11 @@ ${isFinalStep
     refreshLongTaskBackgroundTasks({ silent: true });
   };
 
-  const refreshSessionPlan = useCallback((options?: { silent?: boolean }) => {
+  const refreshSessionPlan = useCallback((options?: { silent?: boolean; retryAttempt?: number }) => {
+    if (sessionPlanRetryTimerRef.current !== null) {
+      window.clearTimeout(sessionPlanRetryTimerRef.current);
+      sessionPlanRetryTimerRef.current = null;
+    }
     const requestId = ++sessionPlanRequestRef.current;
     if (hasLongTaskMeta || !liveCurrentSessionProjectPath || !mutationSessionView) {
       setSessionPlanState({
@@ -1593,6 +1598,13 @@ ${isFinalStep
           error: null,
           message: res.data.message,
         });
+        const retryAttempt = options?.retryAttempt ?? 0;
+        if (shouldRetrySessionPlanRead(pathToRead, res.data.retryable, retryAttempt)) {
+          sessionPlanRetryTimerRef.current = window.setTimeout(() => {
+            sessionPlanRetryTimerRef.current = null;
+            refreshSessionPlan({ silent: true, retryAttempt: retryAttempt + 1 });
+          }, SESSION_PLAN_RETRY_INTERVAL_MS);
+        }
       } else {
         setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error, message: undefined });
       }
@@ -1647,6 +1659,12 @@ ${isFinalStep
   useEffect(() => {
     refreshSessionPlan();
   }, [refreshSessionPlan]);
+
+  useEffect(() => () => {
+    if (sessionPlanRetryTimerRef.current !== null) {
+      window.clearTimeout(sessionPlanRetryTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     refreshSessionLongTasks();

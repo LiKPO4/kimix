@@ -1352,6 +1352,7 @@ export type ReadTextFileResponse = {
     content: string;
     updatedAt: number;
     missing?: boolean;
+    retryable?: boolean;
     message?: string;
   };
 } | {

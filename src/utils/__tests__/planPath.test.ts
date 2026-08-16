@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { findSessionPlanPath, findSessionPlanSignal, hasSessionPlanSignal } from "../planPath";
+import {
+  findSessionPlanPath,
+  findSessionPlanSignal,
+  hasSessionPlanSignal,
+  SESSION_PLAN_MAX_RETRIES,
+  shouldRetrySessionPlanRead,
+} from "../planPath";
 
 describe("planPath", () => {
+  it("仅在官方计划会话尚未绑定时执行有上限的首次恢复重试", () => {
+    expect(shouldRetrySessionPlanRead("__latest_kimi_plan__", true, 0)).toBe(true);
+    expect(shouldRetrySessionPlanRead("__latest_kimi_plan__", true, SESSION_PLAN_MAX_RETRIES)).toBe(false);
+    expect(shouldRetrySessionPlanRead("__latest_kimi_plan__", false, 0)).toBe(false);
+    expect(shouldRetrySessionPlanRead(".kimi/plans/legacy.md", true, 0)).toBe(false);
+  });
+
   it("从官方 ExitPlanMode 工具参数识别会话计划正文", () => {
     const events: TimelineEvent[] = [{
       id: "tool-1",

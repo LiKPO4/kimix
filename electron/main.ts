@@ -5080,6 +5080,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
     const requestPath = typeof req.path === "string" ? req.path : "";
     const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
     const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    let planRuntimePending = false;
     if (requestPath.trim() === "__latest_kimi_plan__") {
       if (sessionId && projectPath) {
         try {
@@ -5090,6 +5091,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
         } catch (error) {
           console.warn("[KimiCodeServerHost] official transcript plan read failed; using local fallback:", error);
         }
+        planRuntimePending = kimiCodeHost.getSessionRuntimeKind(sessionId) === null;
       }
       const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
       const hasPlanFile = fs.existsSync(kimiPlansDir) && fs.readdirSync(kimiPlansDir, { withFileTypes: true })
@@ -5102,6 +5104,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
             content: "",
             updatedAt: 0,
             missing: true,
+            retryable: planRuntimePending,
             message: "Kimi 还没有生成 Plan 文件",
           },
         };
@@ -5127,6 +5130,7 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
         path: resolvedFile,
         content,
         updatedAt,
+        ...(planRuntimePending ? { retryable: true } : {}),
       },
     };
   } catch (err) {
