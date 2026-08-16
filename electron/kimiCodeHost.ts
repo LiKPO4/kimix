@@ -2397,6 +2397,22 @@ export async function readServerSessionTextFile(
   return { path: result.path, content: result.content };
 }
 
+export async function readServerSessionPlan(
+  sessionId: string,
+  workDir: string,
+): Promise<{ path?: string; content: string } | undefined> {
+  const managed = serverSessions.get(sessionId);
+  if (!managed) return undefined;
+  const expectedRoot = normalizePathForComparison(path.resolve(workDir));
+  const sessionRoot = normalizePathForComparison(path.resolve(managed.workDir));
+  if (expectedRoot !== sessionRoot) return undefined;
+  const result = await getServerClient().listTranscriptPlans(sessionId, "main");
+  const latestPlan = result.plans.at(-1);
+  if (!latestPlan || typeof latestPlan.plan !== "string" || !latestPlan.plan.trim()) return undefined;
+  if (Buffer.byteLength(latestPlan.plan, "utf8") > 1_048_576) throw new Error("Plan content is too large");
+  return { path: latestPlan.path, content: latestPlan.plan };
+}
+
 export async function getServerModelCatalog(): Promise<KimiCodeServerModelCatalog> {
   const client = getServerClient();
   const [auth, config, models, providers] = await Promise.all([

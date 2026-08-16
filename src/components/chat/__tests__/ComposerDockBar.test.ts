@@ -130,6 +130,14 @@ describe("ComposerDockBar", () => {
     expect(container.querySelector(".kimix-dock-panel")?.textContent).toContain("current.md");
   });
 
+  it("计划面板使用 Markdown 渲染官方正文", () => {
+    render(makeProps({ planContent: "# 实施计划\n\n- 第一步" }));
+    clickCapsule(0);
+    const panel = container.querySelector(".kimix-dock-panel");
+    expect(panel?.querySelector("h1")?.textContent).toBe("实施计划");
+    expect(panel?.querySelector("li")?.textContent).toContain("第一步");
+  });
+
   it("官方 tool 类后台任务使用后台任务文案", () => {
     render(makeProps({ bashTasks: [makeTask({ subagentType: "tool" })] }));
     expect(capsuleLabels()[0]).toContain("后台任务");

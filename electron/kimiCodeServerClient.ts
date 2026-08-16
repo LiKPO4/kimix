@@ -323,6 +323,20 @@ export type ServerPromptSummary = {
   created_at: string;
 };
 
+export type ServerTranscriptPlan = {
+  tool_call_id: string;
+  turn_id: string;
+  source: "interaction" | "display" | "output";
+  plan: string;
+  path?: string;
+  options?: Array<{ label: string; description?: string }>;
+  review?: {
+    state: "pending" | "approved" | "rejected" | "cancelled";
+    selected_option?: string;
+    feedback?: string;
+  };
+};
+
 export type ServerTerminal = {
   id: string;
   session_id: string;
@@ -1305,6 +1319,11 @@ export class KimiCodeServerClient {
   listMessages(sessionId: string, pageSize = 20): Promise<{ items: ServerMessageSummary[]; has_more: boolean }> {
     const query = new URLSearchParams({ page_size: String(Math.max(1, Math.min(100, pageSize))) });
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages?${query}`);
+  }
+
+  listTranscriptPlans(sessionId: string, agentId = "main"): Promise<{ agent_id: string; plans: ServerTranscriptPlan[] }> {
+    const query = new URLSearchParams({ agent_id: agentId });
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/transcript/plan?${query}`);
   }
 
   getSnapshot(sessionId: string): Promise<ServerSnapshot> {

@@ -5,6 +5,7 @@ import type { OfficialGoalSnapshot, TodoItem } from "@/types/ui";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone, isBackgroundTaskTerminalStatus } from "@/utils/backgroundTasks";
 import { TodoListItems, todoCounts } from "./TodoPanel";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 /**
  * 输入区 dock 胶囊行（对齐官方 kimi-web ChatDock 的 dock work chips）：
@@ -248,7 +249,9 @@ export function ComposerDockBar({
             <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" title={planPath}>{planPath}</div>
           ) : null}
           {planContent && planContent.trim() ? (
-            <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{planContent}</div>
+            <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ wordBreak: "break-word" }}>
+              <MarkdownRenderer content={planContent} wrapLongLines />
+            </div>
           ) : (
             <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">Plan 模式已开启，等待生成计划文件。</div>
           )}

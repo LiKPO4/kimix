@@ -1225,6 +1225,34 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("reads the official session transcript plan with the main agent scope", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      return new Response(JSON.stringify({
+        code: 0,
+        data: {
+          agent_id: "main",
+          plans: [{
+            tool_call_id: "call-1",
+            turn_id: "t4",
+            source: "output",
+            plan: "# 实施计划\n\n- 第一步",
+            path: "C:/sessions/session-1/agents/main/plans/current.md",
+          }],
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+    await expect(client.listTranscriptPlans("session/1")).resolves.toMatchObject({
+      agent_id: "main",
+      plans: [{ plan: "# 实施计划\n\n- 第一步" }],
+    });
+    expect(calls).toEqual([
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/transcript/plan?agent_id=main",
+    ]);
+  });
+
   it("uses the official OAuth lifecycle routes", async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

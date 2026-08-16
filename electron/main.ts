@@ -5081,6 +5081,16 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
     const projectPath = typeof req.projectPath === "string" ? req.projectPath : undefined;
     const sessionId = typeof req.sessionId === "string" ? req.sessionId.trim() : "";
     if (requestPath.trim() === "__latest_kimi_plan__") {
+      if (sessionId && projectPath) {
+        try {
+          const officialPlan = await kimiCodeHost.readServerSessionPlan(sessionId, projectPath);
+          if (officialPlan) {
+            return { success: true, data: { ...officialPlan, updatedAt: 0 } };
+          }
+        } catch (error) {
+          console.warn("[KimiCodeServerHost] official transcript plan read failed; using local fallback:", error);
+        }
+      }
       const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
       const hasPlanFile = fs.existsSync(kimiPlansDir) && fs.readdirSync(kimiPlansDir, { withFileTypes: true })
         .some((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"));

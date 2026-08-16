@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-16 修复：计划胶囊读取官方会话正文（v2.21.83）
+
+- 现场复现确认 v2.21.82 只通过事件恢复了计划胶囊的显隐，却仍从全局 `~/.kimi-code/plans` 猜测计划文件，因此官方会话的实际计划位于 session/agent 专属目录时，面板只能显示目录和“待生成”。
+- 对 Project06 会话抓取 Kimi Code Server 0.36.1 数据后确认，官方权威来源是 `GET /api/v1/sessions/{session_id}/transcript/plan?agent_id=main`；响应直接包含按时间线排列的完整 Markdown、精确文件路径和审批状态。
+- 修复：Server 会话优先读取官方 transcript plan 的最后一项，并校验会话与工作目录归属；接口缺失、会话未托管或请求失败时继续使用旧版本地文件回退。计划面板改用现有 Markdown 渲染器，外层保持限高滚动。
+- 回归保护：新增官方 plan endpoint 路由、agent scope、正文响应与计划面板 Markdown 标题/列表渲染测试；定向 2 文件 85 项、全量 183 文件 / 1988 项、Node/Renderer typecheck、生产构建与知识库严格校验通过。
+
 ## 2026-08-16 修复：补全官方工作胶囊状态链路（v2.21.82）
 
 - 对照本机 Kimi Code Web 0.36.1 的 `ChatDock` 确认官方工作胶囊共五类：目标、计划、后台 Bash/后台任务、子 Agent、当前进度；消息队列属于输入区的独立队列胶囊。Kimix 并非缺少新的独立类型，而是“计划”胶囊的数据链路不完整。
