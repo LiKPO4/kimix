@@ -46,6 +46,26 @@ let activeRequestCount = 0;
 const MAX_CONCURRENT_REQUESTS = 2;
 const MAX_CACHED_ENTRIES = 160;
 
+function requestKeyFingerprint(value: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  return `${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+export function thinkingTranslationRequestId(
+  key: string,
+  version: number,
+  sourceEnd: number,
+  startedAt: number,
+): string {
+  return `thinking:${requestKeyFingerprint(key)}:${version}:${sourceEnd}:${startedAt}`;
+}
+
 function disposeEntry(entry: TranslationEntry) {
   entry.requestVersion += 1;
   if (entry.timer) clearTimeout(entry.timer);
@@ -187,7 +207,12 @@ async function translateNextChunk(entry: TranslationEntry): Promise<void> {
   entry.error = undefined;
   entry.lastRequestStartedAt = Date.now();
   const version = entry.requestVersion;
-  const requestId = `${entry.key}:${version}:${chunk.sourceEnd}:${entry.lastRequestStartedAt}`;
+  const requestId = thinkingTranslationRequestId(
+    entry.key,
+    version,
+    chunk.sourceEnd,
+    entry.lastRequestStartedAt,
+  );
   publish(entry);
 
   try {

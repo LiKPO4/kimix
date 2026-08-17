@@ -192,4 +192,29 @@ describe("thinkingTranslationStore", () => {
     expect(translateThinking).toHaveBeenCalledTimes(2);
     expect(translateThinking.mock.calls[1][0].provider).toBe("local");
   });
+
+  it("超长官方会话键使用固定长度 requestId，不会被主进程参数校验拒绝", async () => {
+    const longOfficialKey = [
+      `session_${"a".repeat(36)}`,
+      `room-agent:session_${"b".repeat(36)}`,
+      `snapshot:msg_session_${"c".repeat(36)}_000008:assistant:0`,
+      `thinking-block:thinking-snapshot:${"d".repeat(160)}`,
+    ].join(":");
+    expect(longOfficialKey.length).toBeGreaterThan(350);
+
+    await render({
+      translationKey: longOfficialKey,
+      sourceText: "Long session key should still translate.",
+      final: true,
+      provider: "local",
+    });
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    expect(translateThinking).toHaveBeenCalledTimes(1);
+    const request = translateThinking.mock.calls[0][0];
+    expect(request.provider).toBe("local");
+    expect(request.requestId).toMatch(/^thinking:[0-9a-f]{16}:/u);
+    expect(request.requestId.length).toBeLessThanOrEqual(200);
+    expect(latest.translatedText).toContain("Long session key should still translate.");
+  });
 });
