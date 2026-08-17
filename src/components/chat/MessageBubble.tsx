@@ -2167,6 +2167,17 @@ export function KimiWebTaskCard({ subagent, tool }: { subagent: SubagentEvent; t
 }
 
 export function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEvent[] }) {
+  const orderedSubagents = useMemo(
+    () => subagents
+      .map((subagent, originalIndex) => ({ subagent, originalIndex }))
+      .sort((left, right) => {
+        const leftIndex = typeof left.subagent.swarmIndex === "number" ? left.subagent.swarmIndex : Number.POSITIVE_INFINITY;
+        const rightIndex = typeof right.subagent.swarmIndex === "number" ? right.subagent.swarmIndex : Number.POSITIVE_INFINITY;
+        return leftIndex - rightIndex || left.originalIndex - right.originalIndex;
+      })
+      .map(({ subagent }) => subagent),
+    [subagents],
+  );
   const activeCount = subagents.filter((subagent) => subagent.status === "queued" || subagent.status === "running" || subagent.status === "suspended").length;
   const completedCount = subagents.filter((subagent) => subagent.status === "completed").length;
   const failedCount = subagents.filter((subagent) => subagent.status === "error").length;
@@ -2216,7 +2227,7 @@ export function KimiWebSubagentGroupCard({ subagents }: { subagents: SubagentEve
             </div>
           </div>
           <div style={{ borderTop: "1px solid var(--kimix-panel-divider)" }}>
-            {subagents.map((subagent, index) => <KimiWebSubagentRow key={subagent.id} subagent={subagent} isLast={index === subagents.length - 1} />)}
+            {orderedSubagents.map((subagent, index) => <KimiWebSubagentRow key={subagent.id} subagent={subagent} isLast={index === orderedSubagents.length - 1} />)}
           </div>
         </div>
       )}

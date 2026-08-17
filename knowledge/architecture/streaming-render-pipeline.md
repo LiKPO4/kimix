@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, derived thinking translation, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-17T23:05:00+08:00"
+timestamp: "2026-08-17T23:10:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -63,7 +63,7 @@ task card (with prompt) intact across restore/reload. At render time a single-di
 group becomes an official-style 任务 card (KimiWebTaskCard: 任务 + agent type +
 status header, expanded full delegation prompt, internal activity, result
 summary — the card body renders only when the user expands that entry); multi-dispatch
-groups keep the Swarm progress card. Expansion is strictly per level: the
+groups keep the Swarm progress card. Its task rows are a display projection sorted by the official `swarmIndex`, so differing running/completion update arrival cannot turn `#1, #2, #3` into status-driven order; legacy rows without an index follow indexed rows and retain their original stable order. Expansion is strictly per level: the
 parent 思考工具链 summary only reveals the entry list, and every inner
 collapsible card (task card, Swarm card, tool group, approval group, question
 card, subagent row, thinking teaser) starts collapsed on mount regardless of

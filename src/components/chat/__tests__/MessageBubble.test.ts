@@ -384,6 +384,29 @@ describe("MessageBubble kimi-web cards stay collapsed unless the user expands th
     expect(container.textContent).toContain("coder");
   });
 
+  it("按 swarmIndex 将乱序到达的子代理稳定排列为 #1、#2、#3", async () => {
+    const task = (swarmIndex: number, status: SubagentEvent["status"]): SubagentEvent => ({
+      id: `s${swarmIndex}`,
+      type: "subagent",
+      timestamp: swarmIndex,
+      agentName: "explore",
+      description: "修罗炼狱改动三项审查",
+      swarmIndex,
+      status,
+      events: [],
+    });
+    await act(async () => {
+      root.render(createElement(KimiWebSubagentGroupCard, {
+        subagents: [task(3, "running"), task(1, "completed"), task(2, "completed")],
+      }));
+    });
+
+    act(() => container.querySelector("button")!.click());
+    const text = container.textContent ?? "";
+    expect(text.indexOf("#1")).toBeLessThan(text.indexOf("#2"));
+    expect(text.indexOf("#2")).toBeLessThan(text.indexOf("#3"));
+  });
+
   it("expanding the parent process list only reveals entries: inner subagent/tool cards stay collapsed", async () => {
     const { subagent, tool } = runningTaskFixture();
     const runningTool: ToolCallEvent = {
