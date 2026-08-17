@@ -1,6 +1,6 @@
 {
   "name": "kimix",
-  "version": "2.21.86",
+  "version": "2.21.87",
   "packageManager": "pnpm@11.0.8",
   "pnpm": {
     "allowBuilds": {
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "3.8.1",
-    "adm-zip": "^0.5.17",
+    "adm-zip": "^0.6.0",
     "electron-store": "^10.0.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",

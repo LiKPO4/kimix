@@ -4,6 +4,7 @@ import {
   findSessionPlanPath,
   findSessionPlanSignal,
   hasSessionPlanSignal,
+  sessionPlanFallbackPolicy,
   SESSION_PLAN_MAX_RETRIES,
   shouldRetrySessionPlanRead,
 } from "../planPath";
@@ -14,6 +15,12 @@ describe("planPath", () => {
     expect(shouldRetrySessionPlanRead("__latest_kimi_plan__", true, SESSION_PLAN_MAX_RETRIES)).toBe(false);
     expect(shouldRetrySessionPlanRead("__latest_kimi_plan__", false, 0)).toBe(false);
     expect(shouldRetrySessionPlanRead(".kimi/plans/legacy.md", true, 0)).toBe(false);
+  });
+
+  it("只允许 SDK 会话回退到全局本地计划目录", () => {
+    expect(sessionPlanFallbackPolicy("sdk")).toBe("local");
+    expect(sessionPlanFallbackPolicy(null)).toBe("retry");
+    expect(sessionPlanFallbackPolicy("server")).toBe("official_only");
   });
 
   it("从官方 ExitPlanMode 工具参数识别会话计划正文", () => {

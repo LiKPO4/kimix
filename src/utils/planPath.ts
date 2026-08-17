@@ -3,6 +3,14 @@ import type { TimelineEvent } from "@/types/ui";
 export const SESSION_PLAN_RETRY_INTERVAL_MS = 1_000;
 export const SESSION_PLAN_MAX_RETRIES = 15;
 
+export type SessionPlanRuntimeKind = "server" | "sdk" | null;
+
+export function sessionPlanFallbackPolicy(runtimeKind: SessionPlanRuntimeKind) {
+  if (runtimeKind === "sdk") return "local" as const;
+  if (runtimeKind === null) return "retry" as const;
+  return "official_only" as const;
+}
+
 export function shouldRetrySessionPlanRead(
   requestPath: string,
   retryable: boolean | undefined,

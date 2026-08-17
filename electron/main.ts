@@ -38,6 +38,7 @@ import {
 import * as projectService from "./projectService";
 import * as settingsService from "./settingsService";
 import { normalizePathForComparison } from "../src/utils/pathCase";
+import { sessionPlanFallbackPolicy } from "../src/utils/planPath";
 import { normalizePreviewExtensions, previewExtensionSet, isPreviewReadableExtension } from "../src/utils/previewExtensions";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
 import { pickUpdateAssetForPlatform } from "../src/utils/updateAsset";
@@ -5089,9 +5090,26 @@ ipcMain.handle("project:readTextFile", async (_, request: unknown) => {
             return { success: true, data: { ...officialPlan, updatedAt: 0 } };
           }
         } catch (error) {
-          console.warn("[KimiCodeServerHost] official transcript plan read failed; using local fallback:", error);
+          console.warn("[KimiCodeServerHost] official transcript plan read failed:", error);
         }
-        planRuntimePending = kimiCodeHost.getSessionRuntimeKind(sessionId) === null;
+        const fallbackPolicy = sessionPlanFallbackPolicy(kimiCodeHost.getSessionRuntimeKind(sessionId));
+        planRuntimePending = fallbackPolicy === "retry";
+        if (fallbackPolicy !== "local") {
+          const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
+          return {
+            success: true,
+            data: {
+              path: kimiPlansDir,
+              content: "",
+              updatedAt: 0,
+              missing: true,
+              retryable: planRuntimePending,
+              message: planRuntimePending
+                ? "正在连接当前会话，等待读取官方 Plan"
+                : "当前官方会话还没有生成 Plan",
+            },
+          };
+        }
       }
       const kimiPlansDir = path.join(resolveKimiShareDir(), "plans");
       const hasPlanFile = fs.existsSync(kimiPlansDir) && fs.readdirSync(kimiPlansDir, { withFileTypes: true })
