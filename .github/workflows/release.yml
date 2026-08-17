@@ -56,9 +56,17 @@ jobs:
         run: pnpm install
 
       - name: Build and package
-        run: pnpm build && pnpm electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm build && pnpm electron-builder --win --publish never
+
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-win
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
 
   build-mac:
     needs: validate-knowledge
@@ -79,9 +87,19 @@ jobs:
         run: pnpm install
 
       - name: Build and package
-        run: pnpm build && pnpm electron-builder --mac --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm build && pnpm electron-builder --mac --publish never
+
+      - name: Upload macOS release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mac
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*.zip
+            dist/*.zip.blockmap
+            dist/latest-mac.yml
 
   build-linux:
     needs: validate-knowledge
@@ -102,9 +120,17 @@ jobs:
         run: pnpm install
 
       - name: Build and package
-        run: pnpm build && pnpm electron-builder --linux --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm build && pnpm electron-builder --linux --publish never
+
+      - name: Upload Linux release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/latest-linux.yml
 
   publish-release:
     runs-on: ubuntu-latest
@@ -113,7 +139,13 @@ jobs:
       - name: Checkout release notes
         uses: actions/checkout@v6
 
-      - name: Publish release
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create draft release and upload all platform artifacts
         run: |
           NOTES_FILE="docs/release-notes/${GITHUB_REF_NAME}.md"
           if [ ! -f "$NOTES_FILE" ]; then
@@ -121,21 +153,21 @@ jobs:
             exit 1
           fi
           echo "Using release notes: $NOTES_FILE"
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file "$NOTES_FILE"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "${GITHUB_REF_NAME#v}" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --title "${GITHUB_REF_NAME#v}" --notes-file "$NOTES_FILE"
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
 
-      - name: Generate and upload SHA256SUMS.txt
+      - name: Generate checksums and publish release
         run: |
-          mkdir -p release-assets
-          gh release download "$GITHUB_REF_NAME" -D release-assets || true
-          if [ "$(ls -A release-assets)" ]; then
-            (cd release-assets && sha256sum * > ../SHA256SUMS.txt)
-            gh release upload "$GITHUB_REF_NAME" SHA256SUMS.txt --clobber
-          else
-            echo "No release assets to checksum"
-          fi
+          (cd release-assets && sha256sum * > ../SHA256SUMS.txt)
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS.txt --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file "docs/release-notes/${GITHUB_REF_NAME}.md"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}

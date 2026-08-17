@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-08-02T12:40:45+08:00"
+timestamp: "2026-08-17T23:27:00+08:00"
 ---
 
 # Release Process
@@ -26,9 +26,10 @@ After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `p
 
 1. Create tag `vX.Y.Z` on the intended commit.
 2. Push the tag.
-3. Let `.github/workflows/release.yml` validate the tag-specific notes before building Windows, macOS, and Linux artifacts.
-4. Confirm the release job found `docs/release-notes/vX.Y.Z.md`; the workflow must fail before publishing when the tag-specific file is missing and must never fall back to `RELEASE_NOTES.md`.
-5. Confirm all platform jobs and the final published release succeeded.
+3. Let `.github/workflows/release.yml` validate the tag-specific notes before building Windows, macOS, and Linux artifacts. Platform jobs package with `--publish never` and upload Actions artifacts; they must never create GitHub Releases in parallel.
+4. The single `publish-release` job downloads and merges all platform artifacts, creates one draft Release, uploads every asset plus `SHA256SUMS.txt`, and only then makes it public. This job is the sole Release owner.
+5. Confirm the release job found `docs/release-notes/vX.Y.Z.md`; the workflow must fail before publishing when the tag-specific file is missing and must never fall back to `RELEASE_NOTES.md`.
+6. Confirm all platform jobs and the final published release succeeded, then inspect the public asset inventory. A green workflow is insufficient when Windows, macOS, or Linux artifacts are absent.
 
 # Development Guidelines
 
@@ -48,6 +49,7 @@ Best-effort cleanup operations (`cancelKimiCodeTurn`, `closeKimiCodeSession`) ma
 * Do not tag without version-specific release notes.
 * Do not reuse stale release notes from a previous version.
 * Do not add one release-notes file for every untagged internal patch. The next actual release gets one aggregate file covering changes since the previous published tag.
+* Do not let parallel platform jobs use `electron-builder --publish always`; concurrent draft creation can split one tag's assets across multiple hidden Releases.
 
 # Related Knowledge
 

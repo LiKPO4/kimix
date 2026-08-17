@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-17 修复：Release 三平台产物改为单点汇总发布（v2.21.88）
+
+- v2.21.87 Actions 五个 job 均成功，但最终核验发现三个并行 `electron-builder --publish always` 同时创建同标签草稿：公开 Release 只得到 Linux 产物，Windows/macOS 产物分别留在两个隐藏草稿。Actions 全绿不等于 Release 资产完整。
+- 修复：三平台 job 改用 `--publish never`，分别上传 Actions artifact；最终 `publish-release` 单一 job 下载合并全部产物，只创建一个草稿 Release，统一上传、生成 SHA256SUMS 后再公开。发布职责从三个并行构建器收敛为一个串行 owner。
+- v2.21.87 的两个隐藏草稿暂未删除，避免未经确认执行不可逆的远端清理；v2.21.88 成功后再由用户决定是否清理。
+- 回归保护：发布工作流契约测试扩展为 2 项，强制三平台 `--publish never`、三份 artifact 上传、单点下载合并与唯一 Release 创建；全量 183 文件 / 1993 项、Node/Renderer typecheck、生产构建、知识库严格校验、生产依赖 audit 与 YAML 解析通过。
+
 ## 2026-08-17 修复：官方 Plan 不再串用其他会话的全局本地文件（v2.21.87）
 
 - 发布前审查发现：官方 Server 会话在冷启动尚未绑定、transcript 暂无计划或读取失败时，旧逻辑仍可能落到 `~/.kimi-code/plans` 的全局最新文件；该目录不带当前会话归属，存在把另一会话 Plan 显示到当前会话的风险。
