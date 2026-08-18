@@ -183,6 +183,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const sessions = useSessionStore((s) => s.sessions);
   // 项目会话列表“展开全部”状态（默认只展示最近 5 个，超出折叠）
   const [sessionListExpandedPaths, setSessionListExpandedPaths] = useState<ReadonlySet<string>>(new Set());
+  // 展开项目的官方目录确认态：未确认的项目先渲染加载占位，等 catalog 刷新
+  // reconcile 完成后再一次显示最终列表，避免“先显示旧镜像、再异步隐藏 Web 端已归档会话”的闪现。
+  const [confirmedProjectPaths, setConfirmedProjectPaths] = useState<ReadonlySet<string>>(new Set());
   const [timelineExpiryTick, setTimelineExpiryTick] = useState(0);
   const sidebarActivityNow = Date.now();
   const sidebarRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities), [roomAgentActivities]);
@@ -307,6 +310,14 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         reportError(err, { context: "refreshExpandedProjectSessions" });
       }).finally(() => {
         projectCatalogRefreshInFlightRef.current.delete(projectKey);
+        // 无论成功失败都确认目录态：成功则列表已 reconcile 到最新，失败则降级显示
+        // 当前 store 列表，避免展开的项目永久停留在加载占位。
+        setConfirmedProjectPaths((current) => {
+          if (current.has(projectKey)) return current;
+          const next = new Set(current);
+          next.add(projectKey);
+          return next;
+        });
       });
     }
   }, [expandedProjectPaths, recentProjects, catalogRefreshTick]);
@@ -661,6 +672,17 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const projectSessions = (projectPath: string) =>
     sessionsByProjectPath.get(normalizeProjectPath(projectPath)) ?? [];
 
+  /** 用户主动展开项目：进入“目录确认中”，catalog 刷新完成前渲染加载占位。 */
+  const expandProjectPath = (projectPathKey: string) => {
+    setExpandedProjectPaths((current) => new Set([...current, projectPathKey]));
+    setConfirmedProjectPaths((current) => {
+      if (!current.has(projectPathKey)) return current;
+      const next = new Set(current);
+      next.delete(projectPathKey);
+      return next;
+    });
+  };
+
   const handleProjectClick = async (project: Project, availableSessions: Session[], isExpanded: boolean) => {
     setProjectActionFocusId(null);
     const projectPathKey = normalizeProjectPath(project.path);
@@ -677,13 +699,19 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       return;
     }
 
-    if (action === "collapse") lastAutoExpandedProjectPath.current = projectPathKey;
-    setExpandedProjectPaths((current) => {
-      const next = new Set(current);
-      if (next.has(projectPathKey)) next.delete(projectPathKey);
-      else next.add(projectPathKey);
-      return next;
-    });
+    if (action === "collapse") {
+      lastAutoExpandedProjectPath.current = projectPathKey;
+      setExpandedProjectPaths((current) => {
+        const next = new Set(current);
+        next.delete(projectPathKey);
+        return next;
+      });
+      return;
+    }
+
+    // 主动展开：先展开并移除目录确认态，刷新 reconcile 完成前渲染加载占位，
+    // 避免旧镜像（含 Web 端已归档会话）先闪现再被异步隐藏。
+    expandProjectPath(projectPathKey);
   };
 
   const loadSessionWithSkillParentFallback = async (session: Session) => {
@@ -1055,7 +1083,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                           )}
                         </div>
 
-                        {isExpanded && pSessions.length > 0 && (
+                        {isExpanded && (
+                          confirmedProjectPaths.has(projectPathKey) ? (
+                            pSessions.length > 0 && (
                           <div
                             style={{
                               paddingLeft: 20,
@@ -1191,7 +1221,24 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 {sessionListWindow.collapsed ? `展开剩余 ${sessionListWindow.hiddenCount} 个对话` : `收起 ${sessionListWindow.hiddenCount} 个对话`}
                               </button>
                             )}
-                          </div>
+                            </div>
+                            )
+                          ) : (
+                            <div
+                              style={{
+                                paddingLeft: 36,
+                                paddingRight: 10,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                height: 32,
+                              }}
+                              className="text-[13px] text-text-muted"
+                            >
+                              <Loader2 size={14} className="kimix-spin shrink-0" />
+                              <span>正在同步会话…</span>
+                            </div>
+                          )
                         )}
                       </section>
                     );
