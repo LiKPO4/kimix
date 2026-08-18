@@ -61,12 +61,20 @@ describe("deriveSessionTitle", () => {
     expect(deriveSessionTitle(events)).toBe("Review drawing board layout");
   });
 
-  it("falls back to assistant message when user content is not meaningful", () => {
+  it("uses short user message as title (matches official catalog behavior)", () => {
     const events: TimelineEvent[] = [
       { id: "1", type: "user_message", timestamp: 1, content: "Hi" },
       { id: "2", type: "assistant_message", timestamp: 2, content: "Hello there", isThinking: false, isComplete: true },
     ];
-    expect(deriveSessionTitle(events)).toBe("Hello there");
+    expect(deriveSessionTitle(events)).toBe("Hi");
+  });
+
+  it("uses short Chinese user message as title", () => {
+    const events: TimelineEvent[] = [
+      { id: "1", type: "user_message", timestamp: 1, content: "你好呀" },
+      { id: "2", type: "user_message", timestamp: 2, content: "当前项目我发现偶尔还是会出现问题" },
+    ];
+    expect(deriveSessionTitle(events)).toBe("你好呀");
   });
 
   it("uses fallback param when provided", () => {

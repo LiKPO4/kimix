@@ -291,6 +291,54 @@ function normalizeThinkingWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Find the longest suffix of `left` that matches a prefix of `right`
+ * (whitespace-insensitive), and return the overlap length in normalized chars.
+ * Returns 0 when no meaningful overlap exists.
+ */
+const THINKING_OVERLAP_MIN_CHARS = 20;
+function findThinkingOverlap(left: string, right: string): number {
+  const nl = normalizeThinkingWhitespace(left);
+  const nr = normalizeThinkingWhitespace(right);
+  if (!nl || !nr) return 0;
+  const maxOverlap = Math.min(nl.length, nr.length);
+  if (maxOverlap < THINKING_OVERLAP_MIN_CHARS) return 0;
+  // Walk down from the largest possible overlap; take the first that matches.
+  for (let len = maxOverlap; len >= THINKING_OVERLAP_MIN_CHARS; len -= 1) {
+    if (nl.slice(-len) === nr.slice(0, len)) return len;
+  }
+  return 0;
+}
+
+/**
+ * Remove a whitespace-normalized prefix of `overlapChars` length from `text`
+ * while preserving the original formatting of the remaining tail. Works by
+ * walking the original string and counting non-whitespace characters until
+ * the normalized budget is exhausted.
+ */
+function stripNormalizedPrefix(text: string, overlapChars: number): string {
+  if (overlapChars <= 0) return text;
+  let remaining = overlapChars;
+  let index = 0;
+  let inWhitespaceRun = false;
+  while (index < text.length && remaining > 0) {
+    const ch = text[index];
+    if (/\s/.test(ch)) {
+      if (!inWhitespaceRun) {
+        // One normalized space = 1 char. Count it the first time we enter a run.
+        remaining -= 1;
+        inWhitespaceRun = true;
+      }
+      index += 1;
+      continue;
+    }
+    inWhitespaceRun = false;
+    remaining -= 1;
+    index += 1;
+  }
+  return text.slice(index);
+}
+
 /** Merge thinking text without losing earlier steps or duplicating stream prefixes. */
 export function mergeAssistantThinkingText(existing?: string, incoming?: string): string | undefined {
   const left = existing ?? "";
@@ -299,6 +347,9 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   if (!left.trim()) return incoming;
   if (right === left || right.includes(left)) return right;
   if (left.includes(right)) return left;
+  // Exact suffix-prefix overlap (raw text) — common in cumulative delta replays.
+  if (left.endsWith(right)) return left;
+  if (right.startsWith(left)) return right;
   // Live-accumulated text and full snapshot replays of the same thought often
   // differ only in whitespace (newlines/indentation), which defeats the raw
   // includes checks above and duplicates the whole passage as left + right.
@@ -307,6 +358,19 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   const normalizedRight = normalizeThinkingWhitespace(right);
   if (normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight)) return left;
   if (normalizedRight.includes(normalizedLeft)) return right;
+  // Mid-stream overlap: the tail of left overlaps the head of right (e.g. a
+  // reconnect replay resends from a mid-point, or a snapshot fragment overlaps
+  // the live draft). Without this we concatenate and produce a duplicated tail
+  // that looks like "random text + wall of repeating characters" when the
+  // overlap region is a separator / divider line.
+  const overlap = findThinkingOverlap(left, right);
+  if (overlap > 0) {
+    const trimmedRight = stripNormalizedPrefix(right, overlap);
+    // Safety: if stripping ate the whole right, the two are effectively
+    // duplicates (should have been caught above, but guard anyway).
+    if (!trimmedRight.trim()) return left;
+    return left + trimmedRight;
+  }
   return left + right;
 }
 
