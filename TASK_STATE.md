@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-18 修复：侧栏展开项目不再闪现已归档会话（v2.21.90）
+
+- 根因：侧栏项目会话列表先以 sessionStore 旧状态同步渲染，其中 Web 端已归档的会话本地尚无 archivedAt 标记，先全部显示；随后展开触发的 listKimiCodeSessions（活动目录 + 归档目录合并）异步返回，reconcileOfficialSessionCatalog 依据归档目录 archived:true 行把对应本地镜像标记 archivedAt，Sidebar 过滤后瞬间隐藏——表现为“先显示多个、再一闪而过少几个”。
+- 修复：Sidebar 引入目录确认态 confirmedProjectPaths。用户主动展开项目（handleProjectClick expand 分支）先移除确认态并渲染加载占位，catalog 刷新 reconcile 完成（含失败降级）后才一次显示最终列表；30s 轮询 / focus / 可见性回归刷新在 finally 统一确认，幂等。
+- 回归保护：Node/Renderer typecheck、生产构建、sidebarProjectExpansion / sidebarSessionList / sessionCatalog 共 49 项单测通过。
+- 已知边界：已确认项目在 30s 轮询窗口内 Web 端新归档时，项目保持展开期间仍可能有一次 ≤30s 的隐藏更新；收起再展开会强制重新确认，无展开期闪现。
+
 ## 2026-08-18 修复：Windows 自动更新下载失败 + 安装包体积翻倍（v2.21.89）
 
 - 根因一（更新失败）：v2.21.88 发布后 Windows 资产被重命名为点号风格（`Kimix.Setup.2.21.88.exe`），与构建产物 `latest.yml`（连字符 `Kimix-Setup-2.21.88.exe`）和 `SHA256SUMS.txt`（带空格 `Kimix Setup 2.21.88.exe`）三处文件名不一致；应用走 GitHub API 拿资产后 sha256 查不到（SHA256SUMS key 不匹配）、按名合并 latest.yml 的 sha512 也失败，最终抛「缺少 SHA256/SHA512 校验值」拒绝自动安装。另外 `parseReleaseSha256` 对带空格文件名的 `split` 解析本身也是错的（只取 `parts[1]`）。
