@@ -236,3 +236,20 @@ export function mergeReleaseAssets<T extends ReleaseFeedAsset>(
 export function releaseHasInstallerAsset(assets: { name: string }[]) {
   return assets.some((asset) => /\.(exe|dmg|zip|appimage|deb)$/i.test(asset.name));
 }
+
+/**
+ * Parse `sha256sum` output (e.g. SHA256SUMS.txt). Filenames may contain spaces
+ * (GNU style) or carry a BSD-style `*` marker; both are handled here.
+ */
+export function parseSha256SumsText(text: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const matched = trimmed.match(/^([0-9a-f]{64})\s+(.+)$/i);
+    if (!matched) continue;
+    const filename = matched[2].replace(/^\*+/, "").trim();
+    if (filename) map.set(filename, matched[1].toLowerCase());
+  }
+  return map;
+}

@@ -58,6 +58,10 @@ jobs:
       - name: Build and package
         run: pnpm build && pnpm electron-builder --win --publish never
 
+      - name: Verify latest.yml path matches built artifacts
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');const yml=fs.readFileSync('dist/latest.yml','utf8');const m=yml.match(/^path:\s*(.+)\s*$/m);if(!m)throw new Error('latest.yml missing path');const p=m[1].trim();if(!fs.existsSync('dist/'+p))throw new Error('latest.yml path not found: '+p);console.log('OK latest.yml path matches:',p);"
       - name: Upload Windows release artifacts
         uses: actions/upload-artifact@v4
         with:

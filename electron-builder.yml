@@ -18,7 +18,18 @@ extraResources:
 asar: true
 asarUnpack:
   - "**/*.node"
+  - "node_modules/onnxruntime-node/**"
 mac:
+  files:
+    - out/**/*
+    - package.json
+    - "!src"
+    - "!scripts"
+    - "!electron"
+    - "!**/*.map"
+    - "!**/dev.cjs"
+    - "!**/onnxruntime-node/bin/napi-v3/{linux,win32}/**"
+    - "!**/onnxruntime-web/**"
   category: public.app-category.developer-tools
   artifactName: "${productName}-${version}-${arch}.${ext}"
   target:
@@ -31,6 +42,16 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 win:
+  files:
+    - out/**/*
+    - package.json
+    - "!src"
+    - "!scripts"
+    - "!electron"
+    - "!**/*.map"
+    - "!**/dev.cjs"
+    - "!**/onnxruntime-node/bin/napi-v3/{darwin,linux}/**"
+    - "!**/onnxruntime-web/**"
   target:
     - target: nsis
       arch: [x64]
@@ -38,6 +59,16 @@ win:
       arch: [x64]
   verifyUpdateCodeSignature: false
 linux:
+  files:
+    - out/**/*
+    - package.json
+    - "!src"
+    - "!scripts"
+    - "!electron"
+    - "!**/*.map"
+    - "!**/dev.cjs"
+    - "!**/onnxruntime-node/bin/napi-v3/{darwin,win32}/**"
+    - "!**/onnxruntime-web/**"
   target:
     - target: AppImage
       arch: [x64]
@@ -46,12 +77,15 @@ linux:
   category: Development
   maintainer: LiKPO4
 nsis:
+  artifactName: "${productName}-Setup-${version}.${ext}"
   oneClick: false
   allowToChangeInstallationDirectory: true
   include: build/installer.nsh
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Kimix
+portable:
+  artifactName: "${productName}-${version}.${ext}"
 # Publish config is passed via CLI in CI
 # Local builds use: pnpm pack
 # CI releases use: electron-builder --publish always

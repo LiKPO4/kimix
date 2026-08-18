@@ -77,6 +77,7 @@ import {
   mergeReleaseAssets,
   parseElectronBuilderLatestYml,
   parseReleaseAtom,
+  parseSha256SumsText,
   releaseHasInstallerAsset,
   type ReleaseFeedAsset,
   type ReleaseFeedItem,
@@ -3153,19 +3154,7 @@ async function parseReleaseSha256(assets: { name?: unknown; browser_download_url
   try {
     const res = await fetchGitHubUpdateUrl(checksumUrl, { headers: { "User-Agent": "Kimix" } });
     if (!res.ok) return new Map();
-    const text = await res.text();
-    const map = new Map<string, string>();
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const parts = trimmed.split(/\s+/);
-      if (parts.length >= 2) {
-        const hash = parts[0].toLowerCase();
-        const filename = parts[1];
-        if (/^[0-9a-f]{64}$/.test(hash)) map.set(filename, hash);
-      }
-    }
-    return map;
+    return parseSha256SumsText(await res.text());
   } catch {
     return new Map();
   }

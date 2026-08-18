@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-18 修复：Windows 自动更新下载失败 + 安装包体积翻倍（v2.21.89）
+
+- 根因一（更新失败）：v2.21.88 发布后 Windows 资产被重命名为点号风格（`Kimix.Setup.2.21.88.exe`），与构建产物 `latest.yml`（连字符 `Kimix-Setup-2.21.88.exe`）和 `SHA256SUMS.txt`（带空格 `Kimix Setup 2.21.88.exe`）三处文件名不一致；应用走 GitHub API 拿资产后 sha256 查不到（SHA256SUMS key 不匹配）、按名合并 latest.yml 的 sha512 也失败，最终抛「缺少 SHA256/SHA512 校验值」拒绝自动安装。另外 `parseReleaseSha256` 对带空格文件名的 `split` 解析本身也是错的（只取 `parts[1]`）。
+- 修复：`electron-builder.yml` 显式固定 win `nsis/portable` artifactName（连字符命名，与历史一致）；发布工作流新增「latest.yml path 与产物一致性」断言；`main.ts` 改用 `releaseFeed.ts` 新增的 `parseSha256SumsText` 纯函数（正则取完整文件名，兼容 BSD `*` 前缀）并补 3 项单测。
+- 根因二（体积翻倍）：v2.21.75→v2.21.88 安装器 92.9MB→169.7MB；区间引入 `@huggingface/transformers@3.8.1`（思考内容本地翻译），其 optional 依赖 `onnxruntime-node@1.21.0`（208MB，npm 包内置全平台二进制）+ `onnxruntime-web`（89MB）+ transformers（47MB）全部打进生产依赖。修复：三平台 `files` 分别剔除非当前平台 onnx 二进制与 `onnxruntime-web`（worker 仅用 node backend）。
+- 回归保护：新增 1 文件 3 项单测；全量 184 文件 / 1996 项、Node/Renderer typecheck、生产构建均通过；发布前追加断言已合入工作流。
+
 ## 2026-08-17 修复：Release 三平台产物改为单点汇总发布（v2.21.88）
 
 - v2.21.87 Actions 五个 job 均成功，但最终核验发现三个并行 `electron-builder --publish always` 同时创建同标签草稿：公开 Release 只得到 Linux 产物，Windows/macOS 产物分别留在两个隐藏草稿。Actions 全绿不等于 Release 资产完整。
