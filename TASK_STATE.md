@@ -6,6 +6,7 @@
 - 修复：`electron-builder.yml` 显式固定 win `nsis/portable` artifactName（连字符命名，与历史一致）；发布工作流新增「latest.yml path 与产物一致性」断言；`main.ts` 改用 `releaseFeed.ts` 新增的 `parseSha256SumsText` 纯函数（正则取完整文件名，兼容 BSD `*` 前缀）并补 3 项单测。
 - 根因二（体积翻倍）：v2.21.75→v2.21.88 安装器 92.9MB→169.7MB；区间引入 `@huggingface/transformers@3.8.1`（思考内容本地翻译），其 optional 依赖 `onnxruntime-node@1.21.0`（208MB，npm 包内置全平台二进制）+ `onnxruntime-web`（89MB）+ transformers（47MB）全部打进生产依赖。修复：三平台 `files` 分别剔除非当前平台 onnx 二进制与 `onnxruntime-web`（worker 仅用 node backend）。
 - 回归保护：新增 1 文件 3 项单测；全量 184 文件 / 1996 项、Node/Renderer typecheck、生产构建均通过；发布前追加断言已合入工作流。
+- 发布结果（v2.21.89 已发布）：CI 全绿；三平台体积：Windows 安装器 127.6MB（v2.21.88 为 169.7MB）、mac dmg x64 155.7MB / arm64 150.4MB（此前 203-208MB）、Linux AppImage 369.8MB（此前 423.7MB）。最新一环三处命名实测一致（latest.yml / SHA256SUMS / 资产名均为连字符），`releases/latest/download/Kimix-Setup-2.21.89.exe` 返回 200。本地打包曾踩「平台级 files 覆盖顶层白名单」坑（把 .pnpm-store 1.2GB 打进 asar，包 469MB），已按平台写完整清单修复。
 
 ## 2026-08-17 修复：Release 三平台产物改为单点汇总发布（v2.21.88）
 

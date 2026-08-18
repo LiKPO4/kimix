@@ -31,6 +31,18 @@ After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `p
 5. Confirm the release job found `docs/release-notes/vX.Y.Z.md`; the workflow must fail before publishing when the tag-specific file is missing and must never fall back to `RELEASE_NOTES.md`.
 6. Confirm all platform jobs and the final published release succeeded, then inspect the public asset inventory. A green workflow is insufficient when Windows, macOS, or Linux artifacts are absent.
 
+7. Verify naming consistency across the three metadata sources before declaring the release healthy: `latest.yml` / `latest-mac.yml` / `latest-linux.yml`, `SHA256SUMS.txt`, and the actual Release asset names must match exactly. The Windows updater reads `latest.yml`, resolves `releases/latest/download/<path>`, and verifies SHA256/SHA512 keyed by asset name. A mismatch (e.g. re-renamed assets after upload) breaks auto-update with “缺少 SHA256/SHA512 校验值” or a 404. Spot-check with `curl -sIL <download-url>`. The workflow already asserts that the built `latest.yml` path exists in `dist/` before upload.
+
+
+
+# Packaging Notes
+
+* Platform-level `files` (e.g. `win.files`) **replaces** the top-level `files` whitelist instead of merging. Keep the full whitelist (`out/**/*`, `package.json`, exclusions) inside every platform block; otherwise electron-builder packages the entire working directory, including local-only directories such as `.pnpm-store` (multi-GB), blowing up `app.asar`.
+
+* `@huggingface/transformers` pulls `onnxruntime-node` (npm tarball ships all-platform libs, ~208 MB) and `onnxruntime-web` (~89 MB) into production dependencies. Exclude non-current-platform binaries per platform block (`!**/onnxruntime-node/bin/napi-v3/{darwin,linux}/**` on Windows, etc.) and exclude `onnxruntime-web` entirely — the local-translation worker only uses the Node backend. Unpack `node_modules/onnxruntime-node/**` via `asarUnpack` because its DLLs must be real files for `LoadLibrary`.
+
+* Windows artifact naming defaults vary; pin explicit `nsis.artifactName` / `portable.artifactName` so `latest.yml`, `SHA256SUMS.txt`, and the uploaded asset names stay identical across builds.
+
 # Development Guidelines
 
 ## Error reporting
