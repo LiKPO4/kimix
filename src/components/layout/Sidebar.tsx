@@ -672,15 +672,10 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const projectSessions = (projectPath: string) =>
     sessionsByProjectPath.get(normalizeProjectPath(projectPath)) ?? [];
 
-  /** 用户主动展开项目：进入“目录确认中”，catalog 刷新完成前渲染加载占位。 */
+  /** 用户主动展开项目：直接展示 store 已有会话，后台异步刷新 catalog 增量更新。
+   *  不再移除确认态强制等待——已有会话即时显示，刷新完成后归档/新增会话平滑更新。 */
   const expandProjectPath = (projectPathKey: string) => {
     setExpandedProjectPaths((current) => new Set([...current, projectPathKey]));
-    setConfirmedProjectPaths((current) => {
-      if (!current.has(projectPathKey)) return current;
-      const next = new Set(current);
-      next.delete(projectPathKey);
-      return next;
-    });
   };
 
   const handleProjectClick = async (project: Project, availableSessions: Session[], isExpanded: boolean) => {
@@ -1084,8 +1079,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                         </div>
 
                         {isExpanded && (
-                          confirmedProjectPaths.has(projectPathKey) ? (
-                            pSessions.length > 0 && (
+                          pSessions.length > 0 ? (
                           <div
                             style={{
                               paddingLeft: 20,
@@ -1222,8 +1216,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               </button>
                             )}
                             </div>
-                            )
-                          ) : (
+                          ) : !confirmedProjectPaths.has(projectPathKey) ? (
                             <div
                               style={{
                                 paddingLeft: 36,
@@ -1238,7 +1231,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               <Loader2 size={14} className="kimix-spin shrink-0" />
                               <span>正在同步会话…</span>
                             </div>
-                          )
+                          ) : null
                         )}
                       </section>
                     );
