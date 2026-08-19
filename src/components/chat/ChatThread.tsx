@@ -835,6 +835,19 @@ export function buildRenderItems(
     const durationMs = reliableDurations.length > 0
       ? Math.max(...reliableDurations)
       : undefined;
+    const mergedThinkingParts = visible.reduce<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>(
+      (merged, event) => mergeAssistantThinkingParts(merged, event.thinkingParts),
+      undefined,
+    );
+    // thinking 字符串从 thinkingParts 合并结果派生，消除双轨漂移：
+    // live 渲染优先读 thinking，settle 后优先读 thinkingParts，独立合并
+    // 会让同一内容在渲染路径切换时"变样"。
+    const mergedThinking = mergedThinkingParts?.length
+      ? mergedThinkingParts.map((part) => part.text).join("") || undefined
+      : visible.reduce<string | undefined>(
+          (merged, event) => mergeAssistantThinkingText(merged, event.thinking),
+          undefined,
+        );
     return {
       ...first,
       id: first.agentTurnId || first.roomMessageId
@@ -842,16 +855,8 @@ export function buildRenderItems(
         : first.id,
       timestamp: first.timestamp,
       content: visible.map((event) => event.content).filter((content) => content.trim()).join("\n\n"),
-      // Reuse the idempotent merges so a full thinking replay overlapping live
-      // fragments across split assistant events is deduplicated, not doubled.
-      thinking: visible.reduce<string | undefined>(
-        (merged, event) => mergeAssistantThinkingText(merged, event.thinking),
-        undefined,
-      ),
-      thinkingParts: visible.reduce<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>(
-        (merged, event) => mergeAssistantThinkingParts(merged, event.thinkingParts),
-        undefined,
-      ),
+      thinking: mergedThinking,
+      thinkingParts: mergedThinkingParts,
       model,
       isThinking: visible.some((event) => event.isThinking && !event.isComplete),
       isComplete: visible.every((event) => event.isComplete),

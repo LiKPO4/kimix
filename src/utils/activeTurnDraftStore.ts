@@ -454,11 +454,21 @@ export function applyActiveTurnDraftDelta(
       ? [{
           ...base,
           content: appendStreamingText(base.content, event.content ?? ""),
-          thinking: mergeAssistantThinkingText(base.thinking, event.thinking),
+          // thinking 单字符串与 thinkingParts 必须保持一致：live 渲染用
+          // draftThinkingText（优先 thinking 字符串），settle 后用
+          // buildThinkingBlocks（优先 thinkingParts）。若两者独立合并，对非
+          // 包含关系的碎片会产出不同结果（thinking 做 left+right 拼接，
+          // thinkingParts 保留独立 part），切换渲染路径时同一内容会"变样"。
+          // 统一从 thinkingParts 的合并结果派生 thinking 字符串，消除双轨漂移。
           thinkingParts: mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
           model: event.model ?? base.model,
           agentRole: event.agentRole ?? base.agentRole,
-        }]
+        }].map((mergedEvent) => ({
+          ...mergedEvent,
+          thinking: mergedEvent.thinkingParts?.length
+            ? mergedEvent.thinkingParts.map((part) => part.text).join("")
+            : mergeAssistantThinkingText(base.thinking, event.thinking),
+        }))
       : mergeEvents([base], {
           ...event,
           isComplete: false,

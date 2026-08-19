@@ -4,6 +4,7 @@ import { normalizePathForComparison } from "@/utils/pathCase";
 import { parseOfficialRoomMetadata } from "@/utils/roomSessionMetadata";
 import { isDefaultSessionTitle, truncateSessionTitle } from "@/utils/sessionTitle";
 import { normalizeOfficialLastTurnReason } from "@/utils/sessionActivity";
+import { logEvent } from "@/utils/reportError";
 
 const EMPTY_SESSION_CREATION_GRACE_MS = 5 * 60 * 1000;
 /**
@@ -466,6 +467,19 @@ export function reconcileOfficialSessionCatalog(
       // 目录缺席不等于官方移除（exclude_empty、注册表不全、快照分页都会让目录不完整），
       // 所有路由统一只凭显式证据归档：可见重复镜像 / 官方明确归档 / 透明 fork 取代 / 本地空镜像。
       if (!referencesVisibleSession && !explicitlyArchived && !supersededByTransparentFork && !isAbandonedEmptyMirror(session, projectPath)) return;
+      logEvent("sessionCatalog.archiveMirror", {
+        sessionId: session.id,
+        runtimeSessionId: session.runtimeSessionId ?? null,
+        officialSessionId: session.officialSessionId ?? null,
+        reason: explicitlyArchived
+          ? "official-archived"
+          : supersededByTransparentFork
+            ? "transparent-fork"
+            : isAbandonedEmptyMirror(session, projectPath)
+              ? "abandoned-empty-mirror"
+              : "unclaimed-duplicate",
+        serverAuthoritative,
+      });
       if (next === sessions) next = [...sessions];
       next[index] = { ...session, archivedAt, updatedAt: Math.max(session.updatedAt, archivedAt) };
       changed = true;

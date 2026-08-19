@@ -7,6 +7,7 @@ import { preferPositiveMetric } from "@/utils/sessionMetrics";
 import { normalizePathForComparison } from "./pathCase";
 import { countUnifiedDiffChanges } from "./diff";
 import { extractFileAttachmentText } from "./userFileAttachments";
+import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -291,53 +292,7 @@ function normalizeThinkingWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/**
- * Find the longest suffix of `left` that matches a prefix of `right`
- * (whitespace-insensitive), and return the overlap length in normalized chars.
- * Returns 0 when no meaningful overlap exists.
- */
 const THINKING_OVERLAP_MIN_CHARS = 20;
-function findThinkingOverlap(left: string, right: string): number {
-  const nl = normalizeThinkingWhitespace(left);
-  const nr = normalizeThinkingWhitespace(right);
-  if (!nl || !nr) return 0;
-  const maxOverlap = Math.min(nl.length, nr.length);
-  if (maxOverlap < THINKING_OVERLAP_MIN_CHARS) return 0;
-  // Walk down from the largest possible overlap; take the first that matches.
-  for (let len = maxOverlap; len >= THINKING_OVERLAP_MIN_CHARS; len -= 1) {
-    if (nl.slice(-len) === nr.slice(0, len)) return len;
-  }
-  return 0;
-}
-
-/**
- * Remove a whitespace-normalized prefix of `overlapChars` length from `text`
- * while preserving the original formatting of the remaining tail. Works by
- * walking the original string and counting non-whitespace characters until
- * the normalized budget is exhausted.
- */
-function stripNormalizedPrefix(text: string, overlapChars: number): string {
-  if (overlapChars <= 0) return text;
-  let remaining = overlapChars;
-  let index = 0;
-  let inWhitespaceRun = false;
-  while (index < text.length && remaining > 0) {
-    const ch = text[index];
-    if (/\s/.test(ch)) {
-      if (!inWhitespaceRun) {
-        // One normalized space = 1 char. Count it the first time we enter a run.
-        remaining -= 1;
-        inWhitespaceRun = true;
-      }
-      index += 1;
-      continue;
-    }
-    inWhitespaceRun = false;
-    remaining -= 1;
-    index += 1;
-  }
-  return text.slice(index);
-}
 
 /** Merge thinking text without losing earlier steps or duplicating stream prefixes. */
 export function mergeAssistantThinkingText(existing?: string, incoming?: string): string | undefined {
@@ -347,7 +302,7 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   if (!left.trim()) return incoming;
   if (right === left || right.includes(left)) return right;
   if (left.includes(right)) return left;
-  // Exact suffix-prefix overlap (raw text) — common in cumulative delta replays.
+  // Exact suffix-prefix overlap (raw text) - common in cumulative delta replays.
   if (left.endsWith(right)) return left;
   if (right.startsWith(left)) return right;
   // Live-accumulated text and full snapshot replays of the same thought often
@@ -363,7 +318,7 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   // the live draft). Without this we concatenate and produce a duplicated tail
   // that looks like "random text + wall of repeating characters" when the
   // overlap region is a separator / divider line.
-  const overlap = findThinkingOverlap(left, right);
+  const overlap = longestSuffixPrefixOverlap(normalizedLeft, normalizedRight, THINKING_OVERLAP_MIN_CHARS);
   if (overlap > 0) {
     const trimmedRight = stripNormalizedPrefix(right, overlap);
     // Safety: if stripping ate the whole right, the two are effectively
@@ -398,6 +353,38 @@ function normalizedThinkingPart(part: AssistantThinkingPart): string {
 
 function sameThinkingPartOrder(left: AssistantThinkingPart[], right: AssistantThinkingPart[]): boolean {
   return left.length === right.length && left.every((part, index) => part === right[index]);
+}
+
+/**
+ * Derive the `thinking` string from merged `thinkingParts` so the two fields
+ * never drift apart. Live rendering reads `thinking` first; settled rendering
+ * reads `thinkingParts` first. When they are merged independently, non-
+ * inclusive fragments produce different texts (string concat vs. kept-as-
+ * separate-parts), and the display "changes" when switching render paths.
+ */
+function deriveThinkingFromParts(
+  parts: AssistantThinkingPart[] | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (parts?.length) {
+    const joined = parts.map((part) => part.text).join("");
+    return joined || fallback;
+  }
+  return fallback;
+}
+
+/** Merge thinking text and parts as a unit, keeping the string field in sync with parts. */
+function mergeAssistantThinkingUnified(
+  baseThinking: string | undefined,
+  baseParts: AssistantThinkingPart[] | undefined,
+  incomingThinking: string | undefined,
+  incomingParts: AssistantThinkingPart[] | undefined,
+): { thinking: string | undefined; thinkingParts: AssistantThinkingPart[] | undefined } {
+  const mergedParts = mergeAssistantThinkingParts(baseParts, incomingParts);
+  if (mergedParts?.length) {
+    return { thinking: deriveThinkingFromParts(mergedParts, mergeAssistantThinkingText(baseThinking, incomingThinking)), thinkingParts: mergedParts };
+  }
+  return { thinking: mergeAssistantThinkingText(baseThinking, incomingThinking), thinkingParts: mergedParts };
 }
 
 /**
@@ -2300,10 +2287,10 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: hasCompletionBarrierBody
             ? (incoming.completionBarrierFullBody === true ? incoming.content : mergeCompletionBarrierContent(target, incoming))
             : mergeAssistantContentWithOffset(target, incoming),
-            thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
-            thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
-            isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
-            isComplete: remainsComplete,
+          thinking: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
+          thinkingParts: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
+          isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
+          isComplete: remainsComplete,
             durationMs: incoming.isComplete && !target.isComplete
               ? completedAssistantDuration(existing, stableAssistantIndex, target, incoming.timestamp, incoming.durationMs)
               : reliableAssistantDurationMs(target.durationMs),
@@ -2350,8 +2337,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: incoming.completionBarrierFullBody === true
             ? incoming.content
             : mergeCompletionBarrierContent(target, incoming),
-          thinking: mergeAssistantThinkingText(target.thinking, incoming.thinking),
-          thinkingParts: mergeAssistantThinkingParts(target.thinkingParts, incoming.thinkingParts),
+          thinking: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
+          thinkingParts: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
           isThinking: target.isThinking || Boolean(incoming.thinking),
           isComplete: incoming.isComplete || target.isComplete,
         };
@@ -2496,8 +2483,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: replaceOpenBody
             ? incoming.content
             : mergeAssistantContentWithOffset(last, incoming),
-        thinking: mergeAssistantThinkingText(last.thinking, incoming.thinking),
-        thinkingParts: mergeAssistantThinkingParts(last.thinkingParts, incoming.thinkingParts),
+        thinking: mergeAssistantThinkingUnified(last.thinking, last.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
+        thinkingParts: mergeAssistantThinkingUnified(last.thinking, last.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
         durationMs: incoming.isComplete

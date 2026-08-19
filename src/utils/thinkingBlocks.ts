@@ -1,4 +1,5 @@
 import type { ThinkingPart } from "@/types/ui";
+import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap";
 
 const THINKING_PART_OVERLAP_MIN_CHARS = 16;
 
@@ -6,46 +7,12 @@ function normalizeForOverlap(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/**
- * Longest suffix of `prev` that matches a prefix of `next`, measured in
- * whitespace-normalized characters. Returns 0 when no meaningful overlap.
- */
 function findPartOverlap(prev: string, next: string): number {
-  const np = normalizeForOverlap(prev);
-  const nn = normalizeForOverlap(next);
-  if (!np || !nn) return 0;
-  const maxOverlap = Math.min(np.length, nn.length);
-  if (maxOverlap < THINKING_PART_OVERLAP_MIN_CHARS) return 0;
-  for (let len = maxOverlap; len >= THINKING_PART_OVERLAP_MIN_CHARS; len -= 1) {
-    if (np.slice(-len) === nn.slice(0, len)) return len;
-  }
-  return 0;
-}
-
-/**
- * Remove the first `overlapChars` normalized characters from `text` while
- * keeping the original formatting of the remainder.
- */
-function stripNormalizedPrefix(text: string, overlapChars: number): string {
-  if (overlapChars <= 0) return text;
-  let remaining = overlapChars;
-  let index = 0;
-  let inWhitespaceRun = false;
-  while (index < text.length && remaining > 0) {
-    const ch = text[index];
-    if (/\s/.test(ch)) {
-      if (!inWhitespaceRun) {
-        remaining -= 1;
-        inWhitespaceRun = true;
-      }
-      index += 1;
-      continue;
-    }
-    inWhitespaceRun = false;
-    remaining -= 1;
-    index += 1;
-  }
-  return text.slice(index);
+  return longestSuffixPrefixOverlap(
+    normalizeForOverlap(prev),
+    normalizeForOverlap(next),
+    THINKING_PART_OVERLAP_MIN_CHARS,
+  );
 }
 
 export type ThinkingBlock = {
