@@ -70,6 +70,11 @@ import {
   unescapeTomlString,
   validateSecondaryModelPoolDraft,
 } from "./secondaryModelPoolToml";
+import {
+  applyCustomModelCapabilitiesFix,
+  buildModelCapabilities,
+  toModelCapabilitiesLiteral,
+} from "./customModelCapabilitiesToml";
 import * as longTaskService from "./longTaskService";
 import { UpdateLongTaskStateSchema } from "./longTaskSchemas";
 import {
@@ -1157,6 +1162,19 @@ function ensureKimiCodeMigratedConfig() {
       fs.copyFileSync(legacyConfig, currentConfig);
     }
   }
+  ensureCustomModelCapabilitiesOnDisk();
+}
+
+// 官方 CLI 新版以 [models.<alias>] 声明的 capabilities 作为模型能力事实源；
+// 为存量自定义模型一次性补写（deepseek 除外），迁移后不再自动改写，尊重用户手动调整。
+function ensureCustomModelCapabilitiesOnDisk() {
+  const configPath = getKimiPaths().config;
+  if (!fs.existsSync(configPath)) return;
+  const raw = fs.readFileSync(configPath, "utf-8");
+  const { next, changed } = applyCustomModelCapabilitiesFix(raw);
+  if (!changed) return;
+  backupFileIfExists(configPath);
+  fs.writeFileSync(configPath, next, "utf-8");
 }
 
 function hasKimiCodeOAuthReloginNotice() {
@@ -1340,6 +1358,7 @@ function buildKimixManagedModelBlock(config: SavedOpenAiProviderConfig) {
     `[models.${modelKey}]`,
     `provider = "${escapeTomlString(config.providerName)}"`,
     `model = "${escapeTomlString(config.model)}"`,
+    `capabilities = ${toModelCapabilitiesLiteral(buildModelCapabilities(config.providerName, config.baseUrl, config.model))}`,
     `max_context_size = ${maxContextSize}`,
     `display_name = "${escapeTomlString(config.modelAlias)}"`,
     ...(disableAdaptiveThinking ? ["adaptive_thinking = false"] : []),
@@ -1606,6 +1625,7 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
           maxContextSize,
           displayName: existing?.displayName || config.modelAlias,
           adaptiveThinking: existing?.adaptiveThinking ?? (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined),
+          capabilities: existing?.capabilities?.length ? existing.capabilities : buildModelCapabilities(config.providerName, provider.baseUrl, config.model),
           ...(supportEfforts !== undefined ? { supportEfforts, ...(defaultEffort ? { defaultEffort } : {}) } : {}),
         },
       },
@@ -1638,6 +1658,9 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
     next = setTomlSectionValue(next, sectionName, "model", `"${escapeTomlString(config.model)}"`);
     next = setTomlSectionValue(next, sectionName, "max_context_size", String(maxContextSize));
     next = setTomlSectionValue(next, sectionName, "display_name", `"${escapeTomlString(existing?.displayName || config.modelAlias)}"`);
+    if (!readTomlStringArray(readTomlSectionBody(raw, sectionName) ?? "", "capabilities")) {
+      next = setTomlSectionValue(next, sectionName, "capabilities", toModelCapabilitiesLiteral(buildModelCapabilities(config.providerName, provider.baseUrl ?? undefined, config.model)));
+    }
     if (`${config.providerName} ${provider.baseUrl ?? ""} ${config.model}`.toLowerCase().includes("deepseek")) {
       next = setTomlSectionValue(next, sectionName, "adaptive_thinking", "false");
     }
@@ -1855,6 +1878,7 @@ async function saveOpenAiProviderConfigWithSdk(input: unknown) {
           maxContextSize: normalizeOpenAiProviderContextSize(config),
           displayName: config.modelAlias,
           adaptiveThinking: `${config.providerName} ${config.baseUrl} ${config.model}`.toLowerCase().includes("deepseek") ? false : undefined,
+          capabilities: buildModelCapabilities(config.providerName, config.baseUrl, config.model),
         },
       },
       ...(config.makeDefault ? { defaultModel: config.modelAlias } : {}),

@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-21 修复:自定义模型识图能力丢失——config.toml 补写 capabilities（v2.21.94）
+
+- 现象：官方 CLI 更新后，自定义 OpenAI 模型（如公司网关 kimi-k3）发图后模型看不到图，只能拿到 session media 目录的 PNG 路径，用 Read 工具读取报 "is an image file. Only text files can be read"，且 ReadMediaFile 不存在。
+- 根因（官方 v2 引擎）：`resolveModelCapabilities` 以 `[models.<alias>] capabilities` 声明为准，与内置静态模型名表取并集；未知/未收录模型全部为 false。未声明时 image_in=false → 不注册 ReadMediaFile、附件图片/视频不进上下文（文件落盘到 session media 目录但模型无工具可读）。Kimix 托管保存的自定义模型从未写 capabilities，官方更新后集体失去识图/视频能力。
+- 修复：新建纯函数模块 `electron/customModelCapabilitiesToml.ts`（buildModelCapabilities / applyCustomModelCapabilitiesFix）。三条写入路径统一补写 `capabilities = [ "image_in", "video_in", "tool_use" ]`（deepseek 只写 `[ "tool_use" ]`，不覆盖用户已声明列表）：`buildKimixManagedModelBlock`、`saveOpenAiProviderConfigWithSdk`、`saveProviderModelConfigWithSdk`（SDK patch + TOML fallback）。存量条目由 `ensureKimiCodeMigratedConfig` 末尾的一次性迁移补写，标记 `# Kimix: custom model capabilities migration v1` 落盘后不再自动改写，尊重手动调整；官方 `managed:kimi-code` 条目、`.overrides` 子表、无 provider/未知 provider 类型一律跳过。
+- 兜底：官方 CLI 进程内加载（getHarness → installNonVisionFetchInterceptor），个别真不支持图片的模型首张图会被 fetch 拦截器 400 降级重试文本，不会持续失败。
+- 回归保护：新增 customModelCapabilitiesToml.test.ts 7 项（含真实 config.toml 演练：11 个自定义条目补写、5 个 deepseek 仅 tool_use、managed 跳过）；electron 目录 64 项单测、Node/Renderer typecheck、生产构建通过；知识库严格校验通过。
+- 已知边界：思考能力（thinking/always_thinking）未声明——官方托管条目才会声明，自定义模型目前思考不受影响（截图会话思考过程已验证）；若后续官方对 thinking 也按声明门控，需要再补。
+
 ## 2026-08-18 修复：侧栏展开项目不再闪现已归档会话（v2.21.90）
 
 - 根因：侧栏项目会话列表先以 sessionStore 旧状态同步渲染，其中 Web 端已归档的会话本地尚无 archivedAt 标记，先全部显示；随后展开触发的 listKimiCodeSessions（活动目录 + 归档目录合并）异步返回，reconcileOfficialSessionCatalog 依据归档目录 archived:true 行把对应本地镜像标记 archivedAt，Sidebar 过滤后瞬间隐藏——表现为“先显示多个、再一闪而过少几个”。
