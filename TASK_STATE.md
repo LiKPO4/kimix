@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-22 修复：textOverlap KMP 提前终止致思考内容可被整段剥空 + 审查清单落地（v2.21.96）
+
+- 背景：v2.21.89 发布后范围全面审查（A=侧栏目录确认态 / B=思考双轨漂移 / C=capabilities），14 项清单经复核确认 13 项属实；本轮落地必修与建议项。
+- 根因（H2）：textOverlap.ts `if (state === right.length) break;` 把「right 完整出现在 left 中段」误当「后缀-前缀重叠」提前返回。mergeAssistantThinkingText 路径被前置 includes 检查挡住不可达；buildThinkingBlocks 路径可达（16 字符阈值下 part 全文为中段子串时），重叠=next 全文长度 → part 被整段剥空、静默丢内容。
+- 修复：删除提前 break（完整匹配后下一轮迭代 right[state]=undefined 自然经 fail 回退；匹配恰在文本末尾时循环结束保留全值），新增长注释说明不变量；buildThinkingBlocks 补「剥空则不追加」守卫（定位为防御性 no-op，与字符串路径对齐）；语义 A（中间完整包含不算重叠）按用户拍板以断言锁定，语义 B（段尾-段头真实 ≥16/20 字符同短语但非重放）作为启发式固有行为记入已知边界，待真实数据再定是否收紧阈值。
+- 同处落地：L1 eventMapper.ts 三处 mergeAssistantThinkingUnified 双调用改单次 spread（python 改，混合行尾保持）；M2 removeProject 无条件清理 confirmedProjectPaths（不挂 currentProject 分支）；清理 Sidebar.tsx 展开路径残留的过期注释（与「即时显示」新策略一致）。
+- 回归保护：新增 textOverlap.test.ts 10 项（空串/minLength 边界/完全相等/单字符/纯空白归一化/语义 A 负用例/真后缀重叠正用例）；eventMapper.test.ts 补语义 A 断言；thinkingBlocks.test.ts 补 part 级语义 A + 剥空守卫 2 条；全量 186 文件 2022 项、Node/Renderer typecheck、生产构建通过。
+- 已知边界（记录不修，对应审查清单）：① M6 capabilities 迁移标记靠 TOML 注释存活，官方 CLI 重写会清掉，此后首次启动会为「无 capabilities 条目」补写——用户想关图片应把 capabilities 改为 ["tool_use"]（非 deepseek 家族视为手动声明不动），而非删行；中期方案（标记挪到 Kimix 状态文件）backlog。② M3 展开集合引用变更触发全部已展开项目刷新风暴（幂等无碍，性能项）。③ L4 迟到刷新为已删项目 push 会话（窗口极小）。④ L5 provider 新建流程重新计算覆盖手动 capabilities（语义为新建，记录即可）。⑤ M4 server 路由 setConfig 透传 capabilities 未实机验证；M5 existing.capabilities 与迁移竞态需日志验证。
+- 知识库：sidebar-session-catalog.md 与 streaming-render-pipeline.md 同步检查见知识笔提交。
+
 ## 2026-08-21 修复：deepseek 视觉变体被名称一刀切降级，图片仍看不到（v2.21.95）
 
 - 现象：v2.21.94 上线 capabilities 补写后，用户用 `deepseek-v4-flash-vision-exp`（opencode-go 网关）发图仍看不到，模型原话引用 `[图片: image.png]` 占位符。

@@ -2287,8 +2287,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: hasCompletionBarrierBody
             ? (incoming.completionBarrierFullBody === true ? incoming.content : mergeCompletionBarrierContent(target, incoming))
             : mergeAssistantContentWithOffset(target, incoming),
-          thinking: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
-          thinkingParts: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
+          ...mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts),
+
           isThinking: remainsComplete ? false : (target.isThinking || Boolean(incoming.thinking)),
           isComplete: remainsComplete,
             durationMs: incoming.isComplete && !target.isComplete
@@ -2337,8 +2337,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: incoming.completionBarrierFullBody === true
             ? incoming.content
             : mergeCompletionBarrierContent(target, incoming),
-          thinking: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
-          thinkingParts: mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
+          ...mergeAssistantThinkingUnified(target.thinking, target.thinkingParts, incoming.thinking, incoming.thinkingParts),
+
           isThinking: target.isThinking || Boolean(incoming.thinking),
           isComplete: incoming.isComplete || target.isComplete,
         };
@@ -2483,8 +2483,8 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
           content: replaceOpenBody
             ? incoming.content
             : mergeAssistantContentWithOffset(last, incoming),
-        thinking: mergeAssistantThinkingUnified(last.thinking, last.thinkingParts, incoming.thinking, incoming.thinkingParts).thinking,
-        thinkingParts: mergeAssistantThinkingUnified(last.thinking, last.thinkingParts, incoming.thinking, incoming.thinkingParts).thinkingParts,
+        ...mergeAssistantThinkingUnified(last.thinking, last.thinkingParts, incoming.thinking, incoming.thinkingParts),
+
         isThinking: incoming.isComplete ? false : (last.isThinking || Boolean(incoming.thinking)),
         isComplete: incoming.isComplete,
         durationMs: incoming.isComplete

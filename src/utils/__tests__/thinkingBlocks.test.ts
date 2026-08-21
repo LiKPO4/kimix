@@ -109,6 +109,37 @@ describe("buildThinkingBlocks", () => {
   });
 });
 
+describe("buildThinkingBlocks", () => {
+  it("treats a mid-part full occurrence as contained, not overlap (KMP regression)", () => {
+    // 语义 A：part2 完整出现在 part1 中段但 part1 不以 part2 结尾 → 重叠为 0，
+    // part2 不得被剥空。
+    const phrase = "接下来我需要逐条核对接口返回的字段";
+    const blocks = buildThinkingBlocks({
+      timestamp: 1,
+      thinkingParts: [
+        { id: "p1", timestamp: 1, text: `先说结论${phrase}然后我去做了别的` },
+        { id: "p2", timestamp: 2, text: phrase },
+      ],
+    });
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.text).toBe(`先说结论${phrase}然后我去做了别的${phrase}`);
+  });
+
+  it("skips a following part that is exactly the accumulated text suffix", () => {
+    // 真后缀重叠（完整重放）：next 全文 = 前文已累积文本的后缀 → 剥空，守卫
+    // 跳过追加，文本不重复。
+    const phrase = "这是一个足够长的重复后缀短语内容";
+    const blocks = buildThinkingBlocks({
+      timestamp: 1,
+      thinkingParts: [
+        { id: "p1", timestamp: 1, text: `前半部分内容${phrase}` },
+        { id: "p2", timestamp: 2, text: phrase },
+      ],
+    });
+    expect(blocks[0]?.text).toBe(`前半部分内容${phrase}`);
+  });
+});
+
 describe("resolveSettledThinkingFold", () => {
   it("folds multi-paragraph thinking to the last paragraph", () => {
     const result = resolveSettledThinkingFold("第一段思考。\n\n第二段收尾。");

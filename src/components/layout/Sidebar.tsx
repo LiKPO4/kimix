@@ -568,13 +568,22 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const removeProject = async (project: Project) => {
     await window.api.removeRecentProject(project.id);
     const nextProjects = await refreshRecentProjects();
+    // 目录确认态必须无条件清理（无论是否当前项目），避免删掉的路径残留
+    // “已确认”标记，日后重加同路径项目时既不占位也不触发刷新提示。
+    const removedKey = normalizeProjectPath(project.path);
+    setConfirmedProjectPaths((current) => {
+      if (!current.has(removedKey)) return current;
+      const next = new Set(current);
+      next.delete(removedKey);
+      return next;
+    });
     if (currentProject?.id === project.id) {
       const nextProject = nextProjects.find((item) => item.id !== project.id) ?? null;
       setCurrentProject(nextProject);
       setCurrentSession(null);
       setExpandedProjectPaths((current) => {
         const next = new Set(current);
-        next.delete(normalizeProjectPath(project.path));
+        next.delete(removedKey);
         if (nextProject?.path) next.add(normalizeProjectPath(nextProject.path));
         return next;
       });
@@ -704,8 +713,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       return;
     }
 
-    // 主动展开：先展开并移除目录确认态，刷新 reconcile 完成前渲染加载占位，
-    // 避免旧镜像（含 Web 端已归档会话）先闪现再被异步隐藏。
+    // 主动展开：即时显示 store 已有会话，目录刷新在后台进行并增量更新。
     expandProjectPath(projectPathKey);
   };
 

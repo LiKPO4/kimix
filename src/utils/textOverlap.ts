@@ -24,7 +24,9 @@ export function longestSuffixPrefixOverlap(
   for (let i = 0; i < left.length; i += 1) {
     while (state > 0 && left[i] !== right[state]) state = fail[state - 1];
     if (left[i] === right[state]) state += 1;
-    if (state === right.length) break;
+    // 完整匹配后不提前返回：right 完整出现在 left 中段时只是中间匹配，不等于
+    // left 后缀与 right 前缀重叠；下一轮迭代 right[state] 为 undefined，while
+    // 自然会经 fail 回退继续匹配（匹配恰在文本末尾时循环结束，state 保留全值）。
   }
   return state >= minLength ? state : 0;
 }

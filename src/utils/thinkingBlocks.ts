@@ -120,7 +120,9 @@ export function buildThinkingBlocks(input: {
       const overlap = findPartOverlap(current.text, part.text);
       if (overlap > 0) {
         const trimmed = stripNormalizedPrefix(part.text, overlap);
-        current.text += trimmed;
+        // 剥空即整段重复（完整重放），不追加；与 mergeAssistantThinkingText 的
+        // 剥空处理对齐，避免 next 全文已是前文后缀时静默产出重复文本。
+        if (trimmed.trim()) current.text += trimmed;
       } else {
         current.text += part.text;
       }

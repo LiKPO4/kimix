@@ -3893,6 +3893,14 @@ describe("mergeAssistantThinkingText", () => {
     expect(mergeAssistantThinkingText("已有", "   ")).toBe("已有");
     expect(mergeAssistantThinkingText(undefined, "新增")).toBe("新增");
   });
+
+  it("does not strip a repeated phrase that only appears in the middle (KMP regression)", () => {
+    // 语义 A：right 只是 left 中段的完整出现，由 includes 保护分支处理；
+    // 不得被当成后缀-前缀重叠而进入剥离路径。
+    const phrase = "接下来我需要逐条核对接口返回的字段并与预期结果做对比验证";
+    const left = `先说结论${phrase}然后我去做了别的`;
+    expect(mergeAssistantThinkingText(left, phrase)).toBe(left);
+  });
 });
 
 describe("mergeAssistantThinkingParts", () => {
