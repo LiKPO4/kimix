@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-21 修复：deepseek 视觉变体被名称一刀切降级，图片仍看不到（v2.21.95）
+
+- 现象：v2.21.94 上线 capabilities 补写后，用户用 `deepseek-v4-flash-vision-exp`（opencode-go 网关）发图仍看不到，模型原话引用 `[图片: image.png]` 占位符。
+- 根因（两处叠加）：(1) Kimix 侧 `isKnownNonVisionModelName` 只要名字含 "deepseek" 就判非视觉 → `adaptPromptForModel` 在发送前把图片降级为文本占位 `[图片: xxx]`，模型根本没收到图像数据；(2) `buildModelCapabilities` 同样的 deepseek 一刀切给该条目写了 `capabilities = [ "tool_use" ]`，无 image_in。
+- 修复：判定收敛为“deepseek 家族且名称无 vision/vl/multimodal 标记才算非视觉”纯函数 `isKnownNonVisionModelName`（移入 customModelCapabilitiesToml.ts 统一事实源，fetch 拦截器/能力写入/迁移三处共用）；能力写入同规则；迁移新增自终止升级：deepseek 家族内精确 `["tool_use"]` 签名且新规则应含视觉时升级（该签名原本就是旧规则自动写的，非 deepseek 家族的 tool_use 是用户手动声明不动；升级后不再命中，不依赖可能被官方 CLI 重写时清掉的 marker 注释）。
+- 验证：单测新增 isKnownNonVisionModelName（vision/vl2/multimodal 变体）+ 升级规则共 5 项（12 项全过）；本机真实 config.toml 演练：vision-exp 升级为 `image_in, video_in, tool_use`，`deepseek-v4-flash` 纯文本保持 `tool_use`；electron 全量 69 项、typecheck、构建、知识库校验通过。
+- 已知边界：若网关对 vision-exp 实际拒绝图片，fetch 拦截器会 400 降级重试文本并标记该模型；官方 CLI 可能重写 config.toml 丢掉迁移标记注释（v2.21.95 已改用精确签名自终止，不依赖标记）。
+
 ## 2026-08-21 修复:自定义模型识图能力丢失——config.toml 补写 capabilities（v2.21.94）
 
 - 现象：官方 CLI 更新后，自定义 OpenAI 模型（如公司网关 kimi-k3）发图后模型看不到图，只能拿到 session media 目录的 PNG 路径，用 Read 工具读取报 "is an image file. Only text files can be read"，且 ReadMediaFile 不存在。

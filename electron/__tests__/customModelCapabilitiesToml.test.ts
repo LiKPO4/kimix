@@ -3,13 +3,38 @@ import {
   applyCustomModelCapabilitiesFix,
   buildModelCapabilities,
   CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER,
+  isKnownNonVisionModelName,
   toModelCapabilitiesLiteral,
 } from "../customModelCapabilitiesToml";
 import { readTomlSectionBody } from "../secondaryModelPoolToml";
 
+describe("isKnownNonVisionModelName", () => {
+  it("deepseek 官方纯文本模型视为非视觉", () => {
+    expect(isKnownNonVisionModelName("deepseek-chat")).toBe(true);
+    expect(isKnownNonVisionModelName("deepseek/deepseek-v4-flash")).toBe(true);
+  });
+
+  it("deepseek 视觉变体（vision/vl/multimodal）不算非视觉", () => {
+    expect(isKnownNonVisionModelName("deepseek-v4-flash-vision-exp")).toBe(false);
+    expect(isKnownNonVisionModelName("opencode-go/deepseek-v4-flash-vision-exp")).toBe(false);
+    expect(isKnownNonVisionModelName("deepseek-vl2")).toBe(false);
+    expect(isKnownNonVisionModelName("deepseek-multimodal")).toBe(false);
+  });
+
+  it("非 deepseek 模型一律不算非视觉", () => {
+    expect(isKnownNonVisionModelName("kimi-k3")).toBe(false);
+    expect(isKnownNonVisionModelName("grok-4.5")).toBe(false);
+  });
+});
+
 describe("buildModelCapabilities", () => {
-  it("deepseek 不声明 image_in/video_in", () => {
+  it("deepseek 纯文本不声明 image_in/video_in", () => {
     expect(buildModelCapabilities("deepseek", "https://api.deepseek.com", "deepseek-v4-flash")).toEqual(["tool_use"]);
+  });
+
+  it("deepseek 视觉变体声明 image_in/video_in/tool_use", () => {
+    expect(buildModelCapabilities("opencode-go", "https://opencode.ai/zen/go/v1", "deepseek-v4-flash-vision-exp"))
+      .toEqual(["image_in", "video_in", "tool_use"]);
   });
 
   it("普通自定义模型声明 image_in/video_in/tool_use", () => {
@@ -31,6 +56,11 @@ const RAW = [
   "base_url = \"https://gw.example.com/v1\"",
   "api_key = \"sk-test\"",
   "",
+  "[providers.opencode-go]",
+  "type = \"openai\"",
+  "base_url = \"https://opencode.ai/zen/go/v1\"",
+  "api_key = \"sk-test\"",
+  "",
   "[providers.deepseek]",
   "type = \"openai\"",
   "base_url = \"https://api.deepseek.com\"",
@@ -43,6 +73,11 @@ const RAW = [
   "provider = \"company\"",
   "model = \"kimi-k3\"",
   "max_context_size = 262144",
+  "",
+  "[models.\"opencode-go/deepseek-v4-flash-vision-exp\"]",
+  "provider = \"opencode-go\"",
+  "model = \"deepseek-v4-flash-vision-exp\"",
+  "max_context_size = 1000000",
   "",
   "[models.\"deepseek/deepseek-v4-flash\"]",
   "provider = \"deepseek\"",
@@ -70,13 +105,16 @@ const RAW = [
 ].join("\n");
 
 describe("applyCustomModelCapabilitiesFix", () => {
-  it("为自定义模型补写 capabilities，deepseek 不带 image_in，其余条目不动", () => {
+  it("为自定义模型补写 capabilities，deepseek 视觉变体带 image_in，其余条目不动", () => {
     const { next, changed } = applyCustomModelCapabilitiesFix(RAW);
     expect(changed).toBe(true);
     expect(next.startsWith(`${CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER}\n`)).toBe(true);
 
     const kimiBody = readTomlSectionBody(next, 'models."kimi-k3"') ?? "";
     expect(kimiBody).toContain('capabilities = [ "image_in", "video_in", "tool_use" ]');
+
+    const visionBody = readTomlSectionBody(next, 'models."opencode-go/deepseek-v4-flash-vision-exp"') ?? "";
+    expect(visionBody).toContain('capabilities = [ "image_in", "video_in", "tool_use" ]');
 
     const deepseekBody = readTomlSectionBody(next, 'models."deepseek/deepseek-v4-flash"') ?? "";
     expect(deepseekBody).toContain('capabilities = [ "tool_use" ]');
@@ -99,12 +137,49 @@ describe("applyCustomModelCapabilitiesFix", () => {
     expect(overridesBody).toContain("max_context_size = 65536");
     expect(overridesBody).not.toContain("capabilities");
 
-    // 二次执行：marker 已存在，不再改动
+    // 二次执行：marker 已存在且无旧签名条目，不再改动
     const second = applyCustomModelCapabilitiesFix(next);
     expect(second.changed).toBe(false);
   });
 
-  it("marker 已存在时整体跳过", () => {
+  it("旧规则写入的 tool_use 精确签名（视觉变体）被升级，纯文本 deepseek 保持", () => {
+    const legacy = [
+      CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER,
+      "[providers.opencode-go]",
+      "type = \"openai\"",
+      "base_url = \"https://opencode.ai/zen/go/v1\"",
+      "",
+      "[models.\"opencode-go/deepseek-v4-flash-vision-exp\"]",
+      "provider = \"opencode-go\"",
+      "model = \"deepseek-v4-flash-vision-exp\"",
+      "max_context_size = 1000000",
+      "capabilities = [ \"tool_use\" ]",
+      "",
+      "[models.\"opencode-go/deepseek-v4-flash\"]",
+      "provider = \"opencode-go\"",
+      "model = \"deepseek-v4-flash\"",
+      "capabilities = [ \"tool_use\" ]",
+      "",
+      "[models.\"opencode-go/text-only\"]",
+      "provider = \"opencode-go\"",
+      "model = \"text-only\"",
+      "capabilities = [ \"image_in\", \"video_in\", \"tool_use\" ]",
+    ].join("\n");
+    const { next, changed } = applyCustomModelCapabilitiesFix(legacy);
+    expect(changed).toBe(true);
+    const visionBody = readTomlSectionBody(next, 'models."opencode-go/deepseek-v4-flash-vision-exp"') ?? "";
+    expect(visionBody).toContain('capabilities = [ "image_in", "video_in", "tool_use" ]');
+    const plainBody = readTomlSectionBody(next, 'models."opencode-go/deepseek-v4-flash"') ?? "";
+    expect(plainBody).toContain('capabilities = [ "tool_use" ]');
+    expect(plainBody).not.toContain("image_in");
+    const manualBody = readTomlSectionBody(next, 'models."opencode-go/text-only"') ?? "";
+    expect(manualBody).toContain('capabilities = [ "image_in", "video_in", "tool_use" ]');
+    // 升级后自终止
+    const second = applyCustomModelCapabilitiesFix(next);
+    expect(second.changed).toBe(false);
+  });
+
+  it("marker 已存在时不再补写缺失 capabilities", () => {
     const done = `${CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER}\n${RAW}`;
     const { next, changed } = applyCustomModelCapabilitiesFix(done);
     expect(changed).toBe(false);

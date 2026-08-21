@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
 import { rewriteOpenAIContentForNonVision } from "./nonVisionContent";
+import { isKnownNonVisionModelName } from "./customModelCapabilitiesToml";
 
 const nonVisionModels = new Set<string>();
 
@@ -64,11 +65,6 @@ export function modelSupportsVideos(model: string | null | undefined): boolean {
   if (!model) return true;
   if (!modelSupportsImages(model)) return false;
   return !nonVideoModels.has(model);
-}
-
-function isKnownNonVisionModelName(model: string): boolean {
-  const normalized = normalizeModelName(model);
-  return normalized.includes("deepseek");
 }
 
 export function modelSupportsImages(model: string | null | undefined): boolean {

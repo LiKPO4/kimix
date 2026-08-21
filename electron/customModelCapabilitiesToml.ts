@@ -7,7 +7,6 @@
 
 import {
   escapeTomlString,
-  readTomlSectionBody,
   readTomlString,
 } from "./secondaryModelPoolToml";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
@@ -15,11 +14,17 @@ import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEdi
 // 迁移标记：首次迁移写入后不再自动补写，尊重用户后续手动调整 capabilities。
 export const CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER = "# Kimix: custom model capabilities migration v1";
 
-// Kimix 托管的自定义模型默认声明 input 能力；deepseek 无视觉输入，
+// Kimix 托管的自定义模型默认声明 input 能力；deepseek 官方纯文本模型无视觉输入，
 // 声明 image_in/video_in 只会让模型看到 ReadMediaFile 工具但每次调用失败。
+// 网关视觉变体（名称带 vision/vl/multimodal，如 deepseek-v4-flash-vision-exp）不算非视觉。
+export function isKnownNonVisionModelName(modelName: string): boolean {
+  const normalized = modelName.trim().toLowerCase();
+  return normalized.includes("deepseek") && !/(^|[-_/])(vision|vl|multimodal)([-_/0-9]|$)/.test(normalized);
+}
+
 export function buildModelCapabilities(providerName: string, baseUrl: string | undefined, model: string): string[] {
-  const isDeepSeek = `${providerName} ${baseUrl ?? ""} ${model}`.toLowerCase().includes("deepseek");
-  return isDeepSeek ? ["tool_use"] : ["image_in", "video_in", "tool_use"];
+  const deepSeekFamily = `${providerName} ${baseUrl ?? ""} ${model}`.toLowerCase().includes("deepseek");
+  return deepSeekFamily && isKnownNonVisionModelName(model) ? ["tool_use"] : ["image_in", "video_in", "tool_use"];
 }
 
 export function toModelCapabilitiesLiteral(capabilities: string[]): string {
@@ -56,7 +61,7 @@ function directModelAlias(sectionName: string): string | null {
 const CUSTOM_PROVIDER_TYPES = new Set(["openai", "kimi", "anthropic"]);
 
 export function applyCustomModelCapabilitiesFix(raw: string): { next: string; changed: boolean } {
-  if (raw.includes(CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER)) return { next: raw, changed: false };
+  const markerPresent = raw.includes(CUSTOM_MODEL_CAPABILITIES_MIGRATION_MARKER);
 
   const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
   const matches = Array.from(raw.matchAll(sectionPattern));
@@ -82,8 +87,21 @@ export function applyCustomModelCapabilitiesFix(raw: string): { next: string; ch
     const provider = readTomlString(section.body, "provider");
     if (!provider) continue;
     if (!CUSTOM_PROVIDER_TYPES.has(providerTypes.get(provider) ?? "")) continue;
-    if (readTomlStringArray(section.body, "capabilities")?.length) continue;
     const model = readTomlString(section.body, "model") ?? "";
+    const declared = readTomlStringArray(section.body, "capabilities");
+    if (declared) {
+      // v2.21.94 旧规则把 deepseek 家族（含视觉变体）误写为仅 tool_use；只在该精确签名、
+      // 且 deepseek 家族内按新规则应含视觉能力时升级（非 deepseek 家族的 tool_use 是用户手动声明）。
+      // 升级后不再命中，无需迁移标记即可自终止。
+      const deepSeekFamily = `${provider} ${providerBaseUrls.get(provider) ?? ""} ${model}`.toLowerCase().includes("deepseek");
+      if (declared.length === 1 && declared[0] === "tool_use" && deepSeekFamily && !isKnownNonVisionModelName(model)) {
+        const desired = buildModelCapabilities(provider, providerBaseUrls.get(provider), model);
+        next = setTomlSectionValuePreservingLayout(next, section.name, "capabilities", toModelCapabilitiesLiteral(desired));
+        changed = true;
+      }
+      continue;
+    }
+    if (markerPresent) continue;
     const capabilities = buildModelCapabilities(provider, providerBaseUrls.get(provider), model);
     next = setTomlSectionValuePreservingLayout(next, section.name, "capabilities", toModelCapabilitiesLiteral(capabilities));
     changed = true;
