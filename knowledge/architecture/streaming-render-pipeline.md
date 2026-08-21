@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How streaming output stays cheap and addressable through identity-preserving projection, active-turn draft writes, derived thinking translation, rich streaming markdown, and scroll-yield viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-17T23:10:00+08:00"
+timestamp: "2026-08-22T01:25:00+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -195,6 +195,7 @@ Live `thinking.delta` fragments and snapshot-replayed full `think` parts both
 converge on the same assistant event, so every merge point must be idempotent.
 `mergeAssistantThinkingText` compares whitespace-normalized containment before
 concatenating, and `mergeAssistantThinkingParts` lets a superset part supersede
+Beyond containment, both `mergeAssistantThinkingText` and `buildThinkingBlocks` strip a suffix-prefix overlap between adjacent chunks (reconnect replays resending from a mid-point). The KMP overlap must treat a mid-string full occurrence as containment, never as overlap; a stripped-to-empty full replay is dropped rather than duplicated (v2.21.96). The heuristics remain a bounded guard: genuinely repeated ≥16/20-char phrases across a real boundary are recorded as a known boundary until real data decides the threshold.
 *all* fragments it covers while dropping fragments already covered elsewhere;
 the draft fast path and `mergeAssistantProcessEvents` reuse these functions
 instead of blind concatenation. When a canonical snapshot row maps onto an
