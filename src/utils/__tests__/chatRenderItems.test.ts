@@ -406,6 +406,77 @@ describe("buildRenderItems usage footer", () => {
     expect(items.some((item) => item.type === "change_group")).toBe(false);
   });
 
+  it("keeps a current tool-derived change summary in the current turn when its timestamp is stale", () => {
+    const items = buildRenderItems([{
+      id: "user-old-turn",
+      type: "user_message",
+      timestamp: 1,
+      content: "上一轮任务",
+    }, {
+      id: "assistant-old-turn",
+      type: "assistant_message",
+      timestamp: 4,
+      content: "上一轮已完成",
+      isThinking: false,
+      isComplete: true,
+    }, {
+      id: "user-current-turn",
+      type: "user_message",
+      timestamp: 10,
+      content: "生成主题 JSON",
+    }, {
+      id: "assistant-current-turn",
+      type: "assistant_message",
+      timestamp: 11,
+      content: "我直接生成并写入文件。",
+      isThinking: false,
+      isComplete: false,
+    }, {
+      id: "tool-current-write",
+      type: "tool_call",
+      timestamp: 12,
+      toolCallId: "call-current-write",
+      toolName: "Write",
+      status: "success",
+      arguments: { path: "kimix-ui-style-winxp-bevel.json" },
+    }, {
+      // Server/snapshot replay can append a current result with an older source
+      // timestamp. Physical tool ownership must win over timestamp repair.
+      id: "call-current-write:change-summary",
+      type: "change_summary",
+      timestamp: 3,
+      files: [{
+        path: "kimix-ui-style-winxp-bevel.json",
+        additions: 311,
+        deletions: 0,
+        diffEventId: "call-current-write:diff",
+      }],
+      additions: 311,
+      deletions: 0,
+    }, {
+      id: "call-current-write:diff",
+      type: "diff",
+      timestamp: 3,
+      filePath: "kimix-ui-style-winxp-bevel.json",
+      oldText: "",
+      newText: "{}",
+    }], "kimi-code", undefined, true);
+
+    const oldAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "上一轮已完成"
+    ));
+    const currentAssistant = items.find((item) => (
+      item.type === "event" && item.event.type === "assistant_message" && item.event.content === "我直接生成并写入文件。"
+    ));
+    expect(oldAssistant?.type).toBe("event");
+    expect(currentAssistant?.type).toBe("event");
+    if (oldAssistant?.type !== "event" || currentAssistant?.type !== "event") return;
+    expect(oldAssistant.changeSummary).toBeUndefined();
+    expect(currentAssistant.changeSummary?.files.map((file) => file.path)).toEqual([
+      "kimix-ui-style-winxp-bevel.json",
+    ]);
+  });
+
   it("matches the sibling diff by timestamp and path when the summary lacks a diffEventId", () => {
     const items = buildRenderItems([{
       id: "user-old-change",

@@ -738,6 +738,34 @@ function restoreLateHistoricalChangePlacement(events: TimelineEvent[]): Timeline
       if (repaired) repaired.push(event);
       continue;
     }
+    const laterUser = target[laterUserIndex];
+    const explicitCurrentTurnOwner = Boolean(
+      (event.agentTurnId && laterUser.agentTurnId && event.agentTurnId === laterUser.agentTurnId) ||
+      (event.roomMessageId && laterUser.roomMessageId && event.roomMessageId === laterUser.roomMessageId)
+    );
+    const derivedSourceIds = new Set([
+      event.id.endsWith(":change-summary") ? event.id.slice(0, -":change-summary".length) : "",
+      ...event.files.flatMap((file) => (
+        file.diffEventId?.endsWith(":diff") ? [file.diffEventId.slice(0, -":diff".length)] : []
+      )),
+    ].filter(Boolean));
+    const laterUserSourceIndex = events.indexOf(laterUser);
+    const currentTurnSourceToolIndex = derivedSourceIds.size > 0
+      ? events.findIndex((candidate, candidateIndex) => (
+          candidateIndex > laterUserSourceIndex &&
+          candidateIndex < sourceIndex &&
+          candidate.type === "tool_call" &&
+          Boolean(candidate.toolCallId) &&
+          derivedSourceIds.has(candidate.toolCallId)
+        ))
+      : -1;
+    // A derived Write/Edit summary can be appended with a stale source timestamp
+    // during replay. Its matching tool call after the user boundary is stronger
+    // ownership evidence than timestamp ordering, so keep it in the current turn.
+    if (explicitCurrentTurnOwner || currentTurnSourceToolIndex !== -1) {
+      if (repaired) repaired.push(event);
+      continue;
+    }
     // The diff/todo derived from the same tool result is persisted right after
     // the summary; move it along so the restored turn keeps its structured diff
     // preview and the later turn does not render a stray standalone change card.
