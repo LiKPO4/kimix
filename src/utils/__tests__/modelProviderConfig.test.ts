@@ -1,11 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { buildModelMetadataAiQuestion, matchCatalogModel, matchCatalogProvider, prefillFromCatalog } from "../modelProviderConfig";
+import type { KimiModelConfigSummary } from "@electron/types/ipc";
+import { buildModelMetadataAiQuestion, groupModelsByProvider, matchCatalogModel, matchCatalogProvider, prefillFromCatalog } from "../modelProviderConfig";
 
 const catalog = [
   { id: "qwen3.8-max", maxContextSize: 1_000_000, supportEfforts: ["low", "high"] },
   { id: "gpt-5.1", maxContextSize: 400_000, supportEfforts: [] },
   { id: "Unknown-Case-Model", maxContextSize: 128_000 },
 ];
+
+describe("groupModelsByProvider", () => {
+  it("切换默认模型时保持模型列表位置不变", () => {
+    const model = (alias: string, isDefault: boolean) => ({
+      alias,
+      provider: "gateway",
+      model: alias.split("/").at(-1) ?? alias,
+      displayName: alias,
+      maxContextSize: 262_144,
+      adaptiveThinking: null,
+      supportEfforts: null,
+      defaultEffort: null,
+      isDefault,
+    });
+    const config = (defaultModel: string, models: KimiModelConfigSummary["models"]): KimiModelConfigSummary => ({
+      configPath: "C:/Users/test/.kimi-code/config.toml",
+      exists: true,
+      defaultModel,
+      providers: [{
+        name: "gateway",
+        type: "openai",
+        baseUrl: "https://gateway.example/v1",
+        hasApiKey: true,
+        hasEnv: false,
+        hasOauth: false,
+      }],
+      models,
+      secondaryModel: null,
+    });
+
+    const before = groupModelsByProvider(config("gateway/model-b", [
+      model("gateway/model-b", true),
+      model("gateway/model-a", false),
+    ]))[0].models.map((item) => item.alias);
+    const after = groupModelsByProvider(config("gateway/model-a", [
+      model("gateway/model-a", true),
+      model("gateway/model-b", false),
+    ]))[0].models.map((item) => item.alias);
+
+    expect(before).toEqual(["gateway/model-a", "gateway/model-b"]);
+    expect(after).toEqual(before);
+  });
+});
 
 describe("buildModelMetadataAiQuestion", () => {
   it("includes the provider, Base URL and model identity without inviting guesses", () => {

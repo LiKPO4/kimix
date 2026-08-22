@@ -20,13 +20,16 @@ export function groupModelsByProvider(config: KimiModelConfigSummary): ModelProv
     modelsByProvider.set(providerName, models);
   }
 
+  const sortModelsByAlias = (models: KimiModelConfigSummary["models"]) =>
+    [...models].sort((left, right) => left.alias.localeCompare(right.alias, "zh-CN"));
+
   const groups = config.providers.map((provider) => ({
     provider,
-    models: modelsByProvider.get(provider.name) ?? [],
+    models: sortModelsByAlias(modelsByProvider.get(provider.name) ?? []),
     managed: isManagedModelProvider(provider),
   }));
 
-  const unboundModels = modelsByProvider.get("__unbound__") ?? [];
+  const unboundModels = sortModelsByAlias(modelsByProvider.get("__unbound__") ?? []);
   if (unboundModels.length > 0) {
     groups.push({
       provider: {
