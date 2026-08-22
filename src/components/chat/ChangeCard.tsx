@@ -435,7 +435,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
-            className="kimix-muted-action flex min-w-0 flex-1 items-center rounded-lg text-left transition-colors"
+            className="kimix-control-button flex min-w-0 flex-1 items-center text-left"
             style={{ gap: 8, padding: "6px 8px" }}
             title={`预览 ${file.path} 的本轮变更`}
             aria-expanded={previewExpanded}
@@ -460,7 +460,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
             onClick={() => void toggleFilePreview(file, hasStructuredDiff)}
             disabled={loading}
             aria-expanded={previewExpanded}
-            className="kimix-muted-action justify-self-end rounded-md text-[12.5px] leading-5 text-text-muted transition-colors disabled:opacity-50"
+            className="kimix-control-button justify-self-end text-[12.5px] leading-5 text-text-muted disabled:opacity-50"
             style={{ minHeight: 32, paddingLeft: 12, paddingRight: 12 }}
           >
             {loading ? "加载中" : previewExpanded ? "收起" : "预览"}

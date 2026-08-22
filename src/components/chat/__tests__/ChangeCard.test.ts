@@ -15,6 +15,27 @@ afterEach(() => {
 });
 
 describe("ChangeCard", () => {
+  it("uses the same control role for the file-name and preview triggers", async () => {
+    useAppStore.setState({ currentProject: project, currentSession: null });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(createElement(ChangeCard, {
+      changes: [{ path: "src/example.ts", oldText: "before", newText: "after" }],
+    })));
+
+    const fileNameButton = container.querySelector<HTMLButtonElement>('button[title^="预览 "]');
+    const previewButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "预览");
+    expect(fileNameButton?.classList.contains("kimix-control-button")).toBe(true);
+    expect(previewButton?.classList.contains("kimix-control-button")).toBe(true);
+    expect(fileNameButton?.classList.contains("kimix-muted-action")).toBe(false);
+    expect(previewButton?.classList.contains("kimix-muted-action")).toBe(false);
+
+    await act(async () => root.unmount());
+  });
+
   it("loads and expands an immutable commit preview when the file row is clicked", async () => {
     const event: Extract<TimelineEvent, { type: "change_summary" }> = {
       id: "change",
