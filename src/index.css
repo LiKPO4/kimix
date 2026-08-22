@@ -2774,11 +2774,11 @@ button.bg-accent-primary:disabled:hover,
 .kimix-top-menu,
 .kimix-floating-menu,
 .kimix-menu-panel {
-  background: var(--ui-popup-background);
-  border: var(--ui-popup-border);
-  border-radius: var(--radius-lg) !important;
+  background: var(--ui-role-popup-resting-background, var(--ui-popup-background));
+  border: var(--ui-role-popup-resting-border, var(--ui-popup-border));
+  border-radius: var(--ui-role-popup-radius, var(--radius-lg)) !important;
   color: var(--text-secondary);
-  box-shadow: var(--ui-popup-shadow);
+  box-shadow: var(--ui-role-popup-resting-shadow, var(--ui-popup-shadow));
   backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 
@@ -4296,8 +4296,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
   .kimix-plugin-list-item,
-  .kimix-model-row,
-  .kimix-runtime-error-card
+  .kimix-model-row
 ) {
   border: var(--ui-role-interactive-card-resting-border);
   border-radius: var(--ui-role-interactive-card-radius);
@@ -4309,8 +4308,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
   .kimix-plugin-list-item,
-  .kimix-model-row,
-  .kimix-runtime-error-card
+  .kimix-model-row
 ):hover:not(:disabled) {
   border: var(--ui-role-interactive-card-hover-border);
   box-shadow: var(--ui-role-interactive-card-hover-shadow);
@@ -4321,8 +4319,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
   .kimix-plugin-list-item,
-  .kimix-model-row,
-  .kimix-runtime-error-card
+  .kimix-model-row
 ):active:not(:disabled) {
   border: var(--ui-role-interactive-card-active-border);
   box-shadow: var(--ui-role-interactive-card-active-shadow);
@@ -4333,8 +4330,7 @@ button.bg-accent-primary:disabled:hover,
   .kimix-settings-uistyle,
   .kimix-settings-palette-wrap,
   .kimix-plugin-list-item,
-  .kimix-model-row,
-  .kimix-runtime-error-card
+  .kimix-model-row
 ):is(.is-active, [aria-pressed="true"], [aria-selected="true"]) {
   border: var(--ui-role-interactive-card-selected-border);
   box-shadow: var(--ui-role-interactive-card-selected-shadow);
@@ -4490,6 +4486,7 @@ button.bg-accent-primary:disabled:hover,
 :root[data-ui-style-contract="v1"] :where(
   .kimix-modal-card,
   .kimix-onboarding-card,
+  .kimix-runtime-error-card,
   .kimix-settings-panel:not(.is-workspace)
 ) {
   border: var(--ui-role-modal-resting-border);
@@ -5459,12 +5456,12 @@ button.bg-accent-primary:disabled:hover,
 /* ── Floating Panel ── */
 
 .kimix-floating-panel {
-  border: var(--ui-popup-border);
-  background: var(--ui-popup-background);
+  border: var(--ui-role-popup-resting-border, var(--ui-popup-border));
+  background: var(--ui-role-popup-resting-background, var(--ui-popup-background));
   color: var(--text-primary);
-  box-shadow: var(--ui-popup-shadow);
+  box-shadow: var(--ui-role-popup-resting-shadow, var(--ui-popup-shadow));
   backdrop-filter: var(--ui-popup-backdrop-filter);
-  border-radius: var(--radius-lg) !important;
+  border-radius: var(--ui-role-popup-radius, var(--radius-lg)) !important;
 }
 
 /* ── Soft Card ── */
@@ -5707,11 +5704,11 @@ button.bg-accent-primary:disabled:hover,
 /* ── Diff Panel ── */
 
 .kimix-diff-panel {
-  border-color: var(--border-subtle) !important;
-  background: var(--surface-base) !important;
+  border: var(--ui-role-inspector-resting-border, 1px solid var(--border-subtle)) !important;
+  background: var(--ui-role-inspector-resting-background, var(--surface-base)) !important;
   color: var(--text-primary) !important;
-  border-radius: var(--radius-lg) !important;
-  box-shadow: 0 1px 2px rgba(25, 23, 20, 0.04);
+  border-radius: var(--ui-role-inspector-radius, var(--radius-lg)) !important;
+  box-shadow: var(--ui-role-inspector-resting-shadow, 0 1px 2px rgba(25, 23, 20, 0.04));
 }
 
 /* ── User Bubble ── */
@@ -5725,11 +5722,11 @@ button.bg-accent-primary:disabled:hover,
 /* ── Modal & Onboarding ── */
 
 .kimix-longtask-inspector {
-  border-color: var(--border-subtle) !important;
-  background: var(--surface-base) !important;
+  border: var(--ui-role-inspector-resting-border, 1px solid var(--border-subtle)) !important;
+  background: var(--ui-role-inspector-resting-background, var(--surface-base)) !important;
   color: var(--text-primary) !important;
-  border-radius: var(--radius-lg) !important;
-  box-shadow: 0 1px 2px rgba(25, 23, 20, 0.04);
+  border-radius: var(--ui-role-inspector-radius, var(--radius-lg)) !important;
+  box-shadow: var(--ui-role-inspector-resting-shadow, 0 1px 2px rgba(25, 23, 20, 0.04));
 }
 
 .kimix-longtask-inspector [data-right-sidebar-drop-position]::before {
@@ -5754,11 +5751,11 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-modal-card,
 .kimix-onboarding-card {
-  border: var(--ui-popup-border);
-  background: var(--ui-popup-background);
+  border: var(--ui-role-modal-resting-border, var(--ui-popup-border));
+  background: var(--ui-role-modal-resting-background, var(--ui-popup-background));
   color: var(--text-primary);
-  border-radius: var(--radius-lg) !important;
-  box-shadow: var(--ui-popup-shadow);
+  border-radius: var(--ui-role-modal-radius, var(--radius-lg)) !important;
+  box-shadow: var(--ui-role-modal-resting-shadow, var(--ui-popup-shadow));
   backdrop-filter: var(--ui-popup-backdrop-filter);
 }
 

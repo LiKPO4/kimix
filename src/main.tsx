@@ -737,7 +737,7 @@ function showCenteredError(message: string, detail?: string) {
   container.setAttribute("role", "alertdialog");
   container.setAttribute("aria-modal", "true");
   container.innerHTML = `
-    <div class="kimix-runtime-error-card">
+    <div class="kimix-runtime-error-card kimix-modal-card">
       <button class="kimix-runtime-error-close" type="button" aria-label="关闭错误提示">×</button>
       <div class="kimix-runtime-error-heading">
         <div class="kimix-runtime-error-icon" aria-hidden="true">

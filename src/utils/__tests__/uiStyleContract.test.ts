@@ -265,6 +265,20 @@ describe("compileUiStyleVariables", () => {
 });
 
 describe("自定义风格 CSS 角色消费契约", () => {
+  it("公共弹层外壳的强制基础声明直接消费自定义角色并保留默认回退", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const main = readFileSync(resolve(process.cwd(), "src/main.tsx"), "utf8");
+
+    expect(css).toMatch(/\.kimix-top-menu,[\s\S]*?\.kimix-menu-panel\s*\{[^}]*border-radius:\s*var\(--ui-role-popup-radius,\s*var\(--radius-lg\)\)\s*!important;/s);
+    expect(css).toMatch(/\.kimix-floating-panel\s*\{[^}]*border-radius:\s*var\(--ui-role-popup-radius,\s*var\(--radius-lg\)\)\s*!important;/s);
+    expect(css).toMatch(/\.kimix-modal-card,\s*\.kimix-onboarding-card\s*\{[^}]*border-radius:\s*var\(--ui-role-modal-radius,\s*var\(--radius-lg\)\)\s*!important;/s);
+    expect(css).toMatch(/\.kimix-diff-panel\s*\{[^}]*border:\s*var\(--ui-role-inspector-resting-border,\s*1px solid var\(--border-subtle\)\)\s*!important;[^}]*background:\s*var\(--ui-role-inspector-resting-background,\s*var\(--surface-base\)\)\s*!important;[^}]*border-radius:\s*var\(--ui-role-inspector-radius,\s*var\(--radius-lg\)\)\s*!important;/s);
+    expect(css).toMatch(/\.kimix-longtask-inspector\s*\{[^}]*border:\s*var\(--ui-role-inspector-resting-border,\s*1px solid var\(--border-subtle\)\)\s*!important;[^}]*background:\s*var\(--ui-role-inspector-resting-background,\s*var\(--surface-base\)\)\s*!important;[^}]*border-radius:\s*var\(--ui-role-inspector-radius,\s*var\(--radius-lg\)\)\s*!important;/s);
+    expect(css).not.toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-runtime-error-card[^)]*\)[^{]*\{[^}]*--ui-role-interactive-card-/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([\s\S]*?\.kimix-runtime-error-card[\s\S]*?\)\s*\{[^}]*--ui-role-modal-resting-border[^}]*--ui-role-modal-radius[^}]*--ui-role-modal-resting-background[^}]*--ui-role-modal-resting-shadow/s);
+    expect(main).toContain('<div class="kimix-runtime-error-card kimix-modal-card">');
+  });
+
   it("每一个公开角色都由固定选择器消费，避免 JSON 存在无效配置点", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     expect(css).toContain(':root[data-ui-style-contract="v1"] .kimix-app-shell-main');
