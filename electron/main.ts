@@ -12,6 +12,7 @@ import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
+import { writeKimiConfigTomlIfUnchanged } from "./kimiConfigWriteGuard";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
@@ -1174,7 +1175,7 @@ function ensureCustomModelCapabilitiesOnDisk() {
   const { next, changed } = applyCustomModelCapabilitiesFix(raw);
   if (!changed) return;
   backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, raw, next);
 }
 
 function hasKimiCodeOAuthReloginNotice() {
@@ -1591,7 +1592,7 @@ async function saveProviderConfigWithSdk(input: unknown) {
     let next = setTomlSectionValue(raw, sectionName, "type", '"openai"');
     next = setTomlSectionValue(next, sectionName, "base_url", `"${escapeTomlString(config.baseUrl)}"`);
     if (apiKey) next = setTomlSectionValue(next, sectionName, "api_key", `"${escapeTomlString(apiKey)}"`);
-    fs.writeFileSync(configPath, next, "utf-8");
+    writeKimiConfigTomlIfUnchanged(configPath, raw, next);
     return readKimiModelConfig();
   }
 }
@@ -1674,7 +1675,7 @@ async function saveProviderModelConfigWithSdk(input: unknown) {
       }
     }
     if (config.makeDefault) next = setTopLevelTomlString(next, "default_model", config.modelAlias);
-    fs.writeFileSync(configPath, next, "utf-8");
+    writeKimiConfigTomlIfUnchanged(configPath, raw, next);
     return readKimiModelConfig();
   }
 }
@@ -1686,7 +1687,7 @@ function clearPersistedDefaultEffort(modelAlias: string) {
   const next = removeTomlSectionValue(raw, `models.${toTomlTableKey(modelAlias)}`, "default_effort");
   if (next === raw) return;
   backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, raw, next);
 }
 
 async function saveKimiSecondaryModelConfig(input: unknown) {
@@ -1719,11 +1720,11 @@ async function saveKimiSecondaryModelConfig(input: unknown) {
     } catch (error) {
       console.warn("[kimi-code] secondary model Config API failed, falling back to TOML writer:", error);
       backupFileIfExists(configPath);
-      fs.writeFileSync(configPath, next, "utf-8");
+      writeKimiConfigTomlIfUnchanged(configPath, raw, next);
     }
   } else {
     backupFileIfExists(configPath);
-    fs.writeFileSync(configPath, next, "utf-8");
+    writeKimiConfigTomlIfUnchanged(configPath, raw, next);
   }
   const capabilities = await kimiCodeServerHost.refreshCapabilities().catch((error) => {
     console.warn("[kimi-code] failed to verify secondary-model experimental flag:", error);
@@ -1784,7 +1785,7 @@ async function saveKimiSecondaryModelPool(input: unknown) {
   // 与旧单模型写法一致：配置存在时持久化实验开关，保证外部启动的 kimi web 同样生效。
   if (poolDefaultModel) next = setTomlSectionValue(next, "experimental", "secondary-model", "true");
   backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, raw, next);
   const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
   const droppedNote = dropped.length > 0 ? `；已过滤未配置的别名：${dropped.join("、")}` : "";
   return {
@@ -1816,7 +1817,7 @@ async function setKimiModelDefaultEffort(input: unknown) {
   // overrides 表里的同名键会遮蔽主表，统一清掉，保持单一事实源。
   next = removeTomlSectionValue(next, `${section}.overrides`, "default_effort");
   backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, raw, next);
   const reloadResult = await reloadIdleKimiCodeSessionsAfterConfigChange();
   return {
     message: (effort ? `已将 ${req.alias} 的思考强度设为 ${effort}` : `已恢复 ${req.alias} 的思考强度为模型默认`) + buildConfigReloadSuffix(reloadResult),
@@ -1848,7 +1849,7 @@ function saveOpenAiProviderConfig(input: unknown) {
     ? setTopLevelTomlString(withoutManagedBlock, "default_model", config.modelAlias)
     : withoutManagedBlock;
   const next = `${base.trimEnd()}${base.trim() ? "\n\n" : ""}${buildKimixManagedModelBlock({ ...config, apiKey })}`;
-  fs.writeFileSync(configPath, next, "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, current, next);
   return readKimiModelConfig();
 }
 
@@ -1906,7 +1907,7 @@ function setDefaultKimiModel(input: unknown) {
     throw new Error(`模型别名 ${req.modelAlias} 不存在，请先保存或刷新模型配置`);
   }
   backupFileIfExists(configPath);
-  fs.writeFileSync(configPath, setTopLevelTomlString(current, "default_model", req.modelAlias), "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, current, setTopLevelTomlString(current, "default_model", req.modelAlias));
   return readKimiModelConfig();
 }
 
@@ -2005,7 +2006,7 @@ function removeKimiModelConfig(input: unknown) {
     next = setTopLevelTomlString(next, "default_model", fallback);
   }
   next = pruneSecondaryModelPoolForRemovedAliases(next, new Set(remainingModels.map((model) => model.alias)));
-  fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, current, next.trimEnd() + "\n");
   return readKimiModelConfig();
 }
 
@@ -2041,7 +2042,7 @@ function removeKimiProviderConfig(input: unknown) {
     next = setTopLevelTomlString(next, "default_model", fallback);
   }
   next = pruneSecondaryModelPoolForRemovedAliases(next, new Set(remainingModels.map((model) => model.alias)));
-  fs.writeFileSync(configPath, next.trimEnd() + "\n", "utf-8");
+  writeKimiConfigTomlIfUnchanged(configPath, current, next.trimEnd() + "\n");
   return readKimiModelConfig();
 }
 
@@ -6002,6 +6003,9 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
     const videos = parseKimiCodeVideos(req.videos);
     const files = parseKimiCodeFiles(req.files);
     const requestedModel = typeof req.model === "string" && req.model.trim() ? req.model.trim() : undefined;
+    const promptId = typeof req.promptId === "string" && req.promptId.trim()
+      ? req.promptId.trim()
+      : `kimix-${randomUUID()}`;
     if (!sessionId || (!content && images.length === 0 && videos.length === 0 && files.length === 0)) return { success: false, error: "Missing sessionId or content" };
     const model = requestedModel ?? kimiCodeHost.getSessionModel(sessionId);
     const dispatchWorkDir = kimiCodeHost.getSessionWorkDir(sessionId);
@@ -6024,7 +6028,7 @@ ipcMain.handle("kimi-code:sendPrompt", async (_, request: unknown) => {
       const input = toKimiCodePromptInput(promptContent, promptImages, promptVideos, files);
       const workDir = kimiCodeHost.getSessionWorkDir(sessionId);
       const finalInput = workDir ? await hookRunner.applyPromptSubmitHooks(sessionId, input, workDir) : input;
-      return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);
+      return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel, promptId);
     };
     const adapted = adaptPromptForModel(content, images, videos, model);
     try {

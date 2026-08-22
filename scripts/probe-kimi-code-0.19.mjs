@@ -78,7 +78,7 @@ async function waitForServer(server) {
 
 async function probeServerSnapshotSchema() {
   const server = spawn(kimiExecutable, [
-    "server", "run", "--foreground", "--port", String(port), "--debug-endpoints", "--log-level", "warn",
+    "web", "--no-open", "--port", String(port), "--debug-endpoints", "--log-level", "warn",
   ], {
     cwd: repoRoot,
     env: process.env,

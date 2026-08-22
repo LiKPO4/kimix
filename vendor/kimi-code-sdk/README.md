@@ -23,12 +23,12 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Official base | `b6144f94ea6b22455a4e750d1750d220987e7bc2` (tag `@moonshot-ai/kimi-code@0.36.0`) |
+| Official base | `0999454bdcb5ddd98f39bffee434dcf0a810f394` (tag `@moonshot-ai/kimi-code@0.38.0`) |
 | Feature overlay | None; custom Agents, plugin Agents/system prompts, and secondary-model routing are upstream |
 | Kimix overlay | MCP fallback startup timeout only, applied by the vendor script |
-| node-sdk version | `0.17.0` |
-| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.36.0` |
-| Bundled on | 2026-08-13 |
+| node-sdk version | `0.19.1` |
+| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.38.0` |
+| Bundled on | 2026-08-22 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 

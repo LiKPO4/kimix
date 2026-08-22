@@ -120,7 +120,7 @@ type KimiCodeSessionLike = {
   id: string;
   workDir: string;
   summary?: KimiCodeSessionSummary;
-  prompt(input: string | KimiCodePromptPart[]): Promise<void>;
+  prompt(input: string | KimiCodePromptPart[], options?: { promptId?: string }): Promise<void>;
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
   setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
@@ -1470,6 +1470,7 @@ export async function sendPrompt(
   sessionId: string,
   input: string | KimiCodePromptPart[],
   expectedModel?: string,
+  promptId?: string,
 ): Promise<KimiCodePromptRouteResult> {
   sessionId = resolveMigratedSessionId(sessionId);
   let serverManaged = serverSessions.get(sessionId);
@@ -1512,7 +1513,7 @@ export async function sendPrompt(
           });
           setStatus(sessionId, "running");
           const migratedFiles = await materializeSdkFileReferences(sessionId, input);
-          await migrated.session.prompt(await materializeVideoFileReferences(migratedFiles));
+          await migrated.session.prompt(await materializeVideoFileReferences(migratedFiles), { promptId });
           return { route: "sdk-fallback", fallbackReason: "server model config stale, migrated to SDK" };
         } catch (retryError) {
           if (migrated) {
@@ -1540,7 +1541,7 @@ export async function sendPrompt(
   setStatus(sessionId, "running");
   try {
     const materializedFiles = await materializeSdkFileReferences(sessionId, input);
-    await managed.session.prompt(await materializeVideoFileReferences(materializedFiles));
+    await managed.session.prompt(await materializeVideoFileReferences(materializedFiles), { promptId });
     const serverStatus = kimiCodeServerHost.getStatus();
     return {
       route: "sdk",
@@ -1561,7 +1562,7 @@ export async function sendPrompt(
         await managed.session.reloadSession();
         setStatus(sessionId, "running");
         const retryFiles = await materializeSdkFileReferences(sessionId, input);
-        await managed.session.prompt(await materializeVideoFileReferences(retryFiles));
+        await managed.session.prompt(await materializeVideoFileReferences(retryFiles), { promptId });
         return { route: "sdk" };
       } catch (retryError) {
         console.warn("[KimiCodeServerHost] stale model config SDK reload recovery failed:", retryError);

@@ -36,7 +36,7 @@ async function waitUntilReady() {
 
 async function main() {
   if (!externalEndpoint) {
-    server = spawn(executable, ["server", "run", "--foreground", "--port", String(port), "--log-level", "warn"], {
+    server = spawn(executable, ["web", "--no-open", "--port", String(port), "--log-level", "warn"], {
       cwd: workspace,
       env: { ...process.env, KIMI_CODE_NO_AUTO_UPDATE: "1" },
       windowsHide: true,

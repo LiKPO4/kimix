@@ -147,7 +147,7 @@ describe("Git fallback dispatch baseline contract", () => {
     const main = readFileSync(resolve(process.cwd(), "electron/main.ts"), "utf8");
     const app = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
     const baselineIndex = main.indexOf('type: "kimix.turn.git-baseline"');
-    const sendIndex = main.indexOf("return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel);");
+    const sendIndex = main.indexOf("return kimiCodeHost.sendPrompt(sessionId, finalInput, requestedModel, promptId);");
 
     expect(baselineIndex).toBeGreaterThan(-1);
     expect(sendIndex).toBeGreaterThan(baselineIndex);

@@ -84,3 +84,15 @@ describe("vendored Kimi Code 0.36", () => {
     expect(bundle).not.toContain("DEFAULT_STARTUP_TIMEOUT_MS = 3e4;");
   });
 });
+
+describe("vendored Kimi Code 0.38", () => {
+  it("提供 promptId、多 Skill 与统一 MCP 注册表契约", () => {
+    expect(bundle).toContain("promptWithSkills");
+    expect(bundle).toContain("PROMPT_ID_CONFLICT");
+    expect(bundle).toContain('authStatus: tokens?.hasTokens === true ? "oauth-expired" : "oauth-required"');
+  });
+
+  it("支持 kimi.com 与 kimi.ai 登录区域", () => {
+    expect(bundle).toContain('value === "mainland-cn" || value === "global"');
+  });
+});

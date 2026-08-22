@@ -1,9 +1,9 @@
 ---
 type: Standard
 title: Kimi Code Subagent Model Pool
-description: Pinned facts about the official 0.36.0 declarative subagent model pool ([secondary_model] config), its validation rules, and Kimix integration caveats.
+description: Pinned facts about the official declarative subagent model pool ([secondary_model] config), its validation rules, and Kimix integration caveats through 0.38.0.
 tags: [kimi-code, secondary-model, subagent, config, upstream]
-timestamp: "2026-08-13T16:15:00+08:00"
+timestamp: "2026-08-22T17:35:00+08:00"
 ---
 
 # Kimi Code Subagent Model Pool
@@ -29,9 +29,10 @@ Official Kimi Code 0.36.0 (PR #2700) replaces the experimental single secondary 
 ## Kimix Integration Notes
 
 - Kimix already injects `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1` for managed Servers and wires the pre-pool single secondary model (`saveKimiSecondaryModel`). Since v2.21.66 the settings Subagents page carries a pool editor (default model, force lock, alias+hint entries) writing `[secondary_model]` directly; provider/model deletion in Kimix applies the official cascade semantics (filter dangling entries, drop the section when its effective default dangles) so a broken pool can never block every session lifecycle.
-- The vendored SDK moved to the 0.36.0 tag in v2.21.68 (`b6144f94`, node-sdk 0.17.0, probe-verified), so the pool is live; the same bump picked up the strict-OpenAI-compatible interrupted-thinking 400 fix (#2819) and the plugin-root Markdown skill misidentification fix (#2847).
+- The vendored SDK first moved to the 0.36.0 tag in v2.21.68 (`b6144f94`, node-sdk 0.17.0), making the pool live. It advanced to the official 0.38.0 tag in v2.21.101 (`0999454b`, node-sdk 0.19.1); the pool contract remains active alongside the newer prompt-id, multi-Skill, and unified MCP registry behavior.
 
 # Sources
 
 - [PR #2700: replace the secondary-model experiment with a declarative subagent model pool](https://github.com/MoonshotAI/kimi-code/pull/2700)
 - [Release @moonshot-ai/kimi-code@0.36.0](https://github.com/MoonshotAI/kimi-code/releases/tag/%40moonshot-ai%2Fkimi-code%400.36.0)
+- [Release @moonshot-ai/kimi-code@0.38.0](https://github.com/MoonshotAI/kimi-code/releases/tag/%40moonshot-ai%2Fkimi-code%400.38.0)

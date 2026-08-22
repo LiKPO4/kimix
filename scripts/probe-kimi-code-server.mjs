@@ -271,7 +271,7 @@ async function startServer() {
 
   ownsServer = true;
   server = spawn(kimiExecutable, [
-    "server", "run", "--foreground", "--port", String(port), "--debug-endpoints", "--log-level", "warn",
+    "web", "--no-open", "--port", String(port), "--debug-endpoints", "--log-level", "warn",
   ], {
     cwd: repoRoot,
     env: process.env,

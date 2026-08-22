@@ -1146,11 +1146,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const getDraggedFilePath = (file: File) => {
-    const electronPath = typeof window.api.getDraggedFilePath === "function"
+    return typeof window.api.getDraggedFilePath === "function"
       ? window.api.getDraggedFilePath(file)
       : "";
-    if (electronPath) return electronPath;
-    return typeof (file as { path?: unknown }).path === "string" ? (file as { path: string }).path : "";
   };
 
   const addFileAttachments = (files: File[]) => {

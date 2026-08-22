@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-22 功能：跟进 Kimi Code 0.38 与 Electron 42 运行时（v2.21.101）
+
+- 官方基线：对 `@moonshot-ai/kimi-code@0.38.0` 实机启动 `kimi web --no-open`，健康检查、版本元数据、90 条 REST 路由和 WebSocket 契约通过；Kimix 依赖的 11 条 Server 路由均存在，旧探针统一移除已废弃的 `kimi server run`。
+- SDK：vendored Node SDK 从官方 0.36.0 / 0.17.0 刷新为 0.38.0 / 0.19.1（commit `0999454b`），保留唯一的 4 秒 MCP 启动超时覆盖；接入稳定 `promptId`，为重试提供官方冲突检测基础，并锁定多 Skill、统一 MCP 登录状态和双登录区域契约。
+- 桌面运行时：Electron 从 35 升级到 42.9.3（Node 24.18.1），移除 Electron 32 已删除的 `File.path` 兼容读取，只经 preload `webUtils.getPathForFile` 获取拖拽路径；原生依赖已按新 ABI 重建。
+- 配置安全：全部本地 `config.toml` 兜底写入改为 compare-before-write；若官方 Web/CLI 在 Kimix 读取后修改配置，本次保存会明确取消，不再静默覆盖外部新增字段或无效但仍需保留的内容。
+- 验证：Server 0.38 契约门禁通过；定向 3 文件 29 项、全量 187 文件 2031 项、Node/Renderer typecheck、Electron 42 原生依赖重建与生产构建通过。
+
 ## 2026-08-22 修复：文件名与预览按钮使用一致悬停反馈（v2.21.100）
 
 - 根因：文件变更卡的文件名入口和“预览”按钮虽然执行同一动作，却分别依赖泛用 `kimix-muted-action` 加不同 Tailwind 圆角；文件名的宽列因此显示成大面积列表灰底，而按钮还会叠加独立焦点/风格反馈。
