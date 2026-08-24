@@ -293,7 +293,6 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
       images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined });
-      if (!url) textParts.push("[图片]");
       return;
     }
     if (part.type === "image" && isRecord(part.source)) {
@@ -315,7 +314,6 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
           ? url
           : undefined;
       images.push({ name: id || `图片 ${index + 1}`, dataUrl });
-      if (!dataUrl) textParts.push("[图片]");
       return;
     }
     if (part.type === "video_url") {

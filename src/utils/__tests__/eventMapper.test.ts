@@ -489,6 +489,24 @@ describe("mapStreamEvent", () => {
     expect(user.images![0].name).toBe("shot.png");
     expect(user.images![0].dataUrl).toBe("data:image/png;base64,abc");
   });
+
+  it("keeps file-backed image parts out of the user message text", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: [
+          { type: "text", text: "参考这两张图" },
+          { type: "image", source: { kind: "file", file_id: "file-image-1" } },
+          { type: "image", source: { kind: "file", file_id: "file-image-2" } },
+        ],
+      },
+    });
+    const user = event as Extract<TimelineEvent, { type: "user_message" }>;
+
+    expect(user.content).toBe("参考这两张图");
+    expect(user.content).not.toContain("[图片]");
+    expect(user.images).toHaveLength(2);
+  });
 });
 
 describe("mergeEvents", () => {
