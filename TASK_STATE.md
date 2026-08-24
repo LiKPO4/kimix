@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-24 修复：默认窗口曲线与 Windows 任务栏图标收敛（v2.21.108）
+
+- 现场：v2.21.107 已消除灰色原生包裹，但默认/现代白色主工作区仍为 20px，和 Windows DWM 外轮廓约 8px 的曲线不一致；任务栏继续显示开发载体 `electron.exe` 的 Atom 图标。
+- 圆角：不重新裁切 HWND；默认与现代的最外应用壳、贴边主工作区统一使用 8px 系统兼容半径，主工作区改为消费同一个 `--kimix-window-corner-radius`。卡片、面板、Composer 等内部层级继续保留原有大圆角；复古、怀旧和自定义风格仍可在 renderer 内使用自己的 shell 半径。
+- 图标根因：开发态只在 BrowserWindow 构造参数传根目录 PNG，未明确更新任务栏按钮；打包文件白名单也不携带该运行时 PNG。Windows 因而可回退到 Electron 默认图标，打包态路径还可能不存在。
+- 图标修复：固化由现有 Kimix PNG 转换、包含 256px Windows 图标帧的 `build/icon.ico`，显式作为 Windows EXE 图标并复制到 resources；主进程按开发/打包路径加载 NativeImage，调用 `setIcon()` 与 `setAppDetails()` 写入同一 AppUserModelID 的任务栏身份。非 Windows 继续使用同源 PNG。
+- 回归保护：窗口契约测试锁定 8px 默认/现代贴边曲线、ICO 打包与运行时解析、`setIcon`/`setAppDetails`，并继续禁止实验性 `setShape()`；待用户彻底重启 v2.21.108 后截图验收。
+
 ## 2026-08-24 修复：恢复 Windows 原生窗口外壳与任务栏身份（v2.21.107）
 
 - 现象：v2.21.106 的应用内容外出现灰色矩形包裹，任务栏里的 Kimix 图标同时丢失；截图确认这是窗口级回归，不是界面风格本身的配色或容器样式。

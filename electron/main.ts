@@ -2832,6 +2832,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const APP_ROOT = path.join(__dirname, "..");
 process.env.APP_ROOT = APP_ROOT;
+const WINDOWS_APP_USER_MODEL_ID = "com.kimix.app";
+const APP_ICON_FILE_NAME = process.platform === "win32" ? "icon.ico" : "icon.png";
+const APP_ICON_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, APP_ICON_FILE_NAME)
+  : path.join(APP_ROOT, "..", "build", APP_ICON_FILE_NAME);
 
 export const DEV_SERVER_URL = process.env["ELECTRON_RENDERER_URL"] ?? process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(APP_ROOT, "..", "out", "renderer");
@@ -2841,7 +2846,7 @@ process.env.VITE_PUBLIC = DEV_SERVER_URL
   : RENDERER_DIST;
 
 if (process.platform === "win32") {
-  app.setAppUserModelId("com.kimix.app");
+  app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -4178,6 +4183,10 @@ const rememberStartupProject = createDistinctAsyncWriter<Project>(
 function createWindow() {
   logMainStartup("createWindow:start");
   rendererReloadedAfterBlank = false;
+  const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);
+  if (mainWindowIcon.isEmpty()) {
+    console.warn(`[window] app icon is empty: ${APP_ICON_PATH}`);
+  }
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -4194,8 +4203,16 @@ function createWindow() {
     autoHideMenuBar: true,
     frame: false,
     skipTaskbar: false,
-    icon: path.join(APP_ROOT, "..", "Kimix.png"),
+    icon: mainWindowIcon,
   });
+  if (process.platform === "win32" && !mainWindowIcon.isEmpty()) {
+    mainWindow.setIcon(mainWindowIcon);
+    mainWindow.setAppDetails({
+      appId: WINDOWS_APP_USER_MODEL_ID,
+      appIconPath: APP_ICON_PATH,
+      appIconIndex: 0,
+    });
+  }
 
   // Kimi Code Host is the single event source for renderer sessions.
   kimiCodeHost.setKimiCodeEventSink((payload) => {

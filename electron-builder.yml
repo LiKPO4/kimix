@@ -15,6 +15,10 @@ files:
 extraResources:
   - from: vendor/kimi-code-sdk
     to: vendor/kimi-code-sdk
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/icon.png
+    to: icon.png
 asar: true
 asarUnpack:
   - "**/*.node"
@@ -42,6 +46,7 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 win:
+  icon: build/icon.ico
   files:
     - out/**/*
     - package.json

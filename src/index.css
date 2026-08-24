@@ -135,7 +135,7 @@
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 20px;
-  --kimix-window-corner-radius: 20px;
+  --kimix-window-corner-radius: 8px;
   /* --ui-radius-* 由界面风格（[data-ui-style]）注入；默认风格不设置，
      rounded-* 经 tailwind.config.ts 的 fallback 回退为 6/12/8/12/16px，视觉不变 */
 
@@ -349,7 +349,6 @@
   --kimix-modern-control-radius: 10px;
   --kimix-modern-card-radius: 14px;
   --kimix-modern-panel-radius: 18px;
-  --kimix-modern-shell-radius: 20px;
   --kimix-modern-segment-gap: 6px;
   --kimix-modern-segment-radius: calc(var(--kimix-modern-control-radius) + var(--kimix-modern-segment-gap));
   /* 颜色仍由主题提供；Modern 只把 elevated/base 重新分配为更亮的工作画布。 */
@@ -362,7 +361,7 @@
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
-  --kimix-window-corner-radius: 20px;
+  --kimix-window-corner-radius: 8px;
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(25, 23, 20, 0.045), 0 1px 2px rgba(25, 23, 20, 0.025);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 8px 24px rgba(25, 23, 20, 0.065), 0 2px 6px rgba(25, 23, 20, 0.035);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 18px 46px rgba(25, 23, 20, 0.10), 0 4px 12px rgba(25, 23, 20, 0.045);
@@ -440,7 +439,7 @@
 /* 主工作区像一张安静的桌面卡片；侧栏仍使用颜色主题提供的 ground 色。 */
 [data-ui-style="modern"] .kimix-app-shell-main {
   border: 1px solid var(--ui-shell-border-color);
-  border-radius: var(--kimix-modern-shell-radius);
+  border-radius: var(--kimix-window-corner-radius);
   background: var(--kimix-modern-workspace-background);
   box-shadow: var(--kimix-modern-surface-shadow);
 }
@@ -3115,7 +3114,7 @@ button.bg-accent-primary:disabled:hover,
 .kimix-app-shell-main {
   border-color: var(--ui-shell-border-color);
   background: var(--surface-base);
-  border-radius: var(--radius-lg);
+  border-radius: var(--kimix-window-corner-radius);
 }
 
 .kimix-app-shell-toolbar,

@@ -4,7 +4,7 @@ title: Release Process
 description: Kimix releases are built and published only by the tag-triggered GitHub Actions workflow with version-specific release notes.
 resource: https://github.com/LiKPO4/kimix/blob/master/.github/workflows/release.yml
 tags: [release, github-actions, versioning, operations]
-timestamp: "2026-08-17T23:27:00+08:00"
+timestamp: "2026-08-24T21:38:41+08:00"
 ---
 
 # Release Process
@@ -42,6 +42,8 @@ After changing `package.json`, `pnpm-lock.yaml`, or dependency state, run the `p
 * `@huggingface/transformers` pulls `onnxruntime-node` (npm tarball ships all-platform libs, ~208 MB) and `onnxruntime-web` (~89 MB) into production dependencies. Exclude non-current-platform binaries per platform block (`!**/onnxruntime-node/bin/napi-v3/{darwin,linux}/**` on Windows, etc.) and exclude `onnxruntime-web` entirely — the local-translation worker only uses the Node backend. Unpack `node_modules/onnxruntime-node/**` via `asarUnpack` because its DLLs must be real files for `LoadLibrary`.
 
 * Windows artifact naming defaults vary; pin explicit `nsis.artifactName` / `portable.artifactName` so `latest.yml`, `SHA256SUMS.txt`, and the uploaded asset names stay identical across builds.
+
+* Windows icon identity has three linked consumers, none of which may rely on Electron fallback: `win.icon` embeds the version-controlled `build/icon.ico` into the executable, `extraResources` copies it to `resources/icon.ico`, and the main process loads that packaged/dev path for both `BrowserWindow.setIcon()` and `setAppDetails({ appId, appIconPath })`. The ICO must retain a 256px frame and the AppUserModelID must remain equal to electron-builder `appId`. A renderer PNG or an icon present only under `build/` is insufficient because platform `files` whitelists do not copy it into the packaged runtime.
 
 # Development Guidelines
 
