@@ -216,6 +216,21 @@ describe("mapStreamEvent", () => {
     expect((second[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
+  it("maps file-backed image references to server file ids", () => {
+    const event = mapStreamEvent({
+      type: "SteerInput",
+      payload: {
+        user_input: [
+          { type: "text", text: "Use this image" },
+          { type: "image_url", image_url: { url: "kimi-file://f_5399c25a-5ada-4a69-a8d2-5c9c2590929e", id: "f_5399c25a-5ada-4a69-a8d2-5c9c2590929e" } },
+        ],
+      },
+    });
+    const steer = event as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.images).toHaveLength(1);
+    expect(steer.images?.[0].fileId).toBe("f_5399c25a-5ada-4a69-a8d2-5c9c2590929e");
+  });
+
   it("maps SteerInput images", () => {
     const event = mapStreamEvent({
       type: "SteerInput",

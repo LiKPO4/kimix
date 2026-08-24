@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：历史 file-backed 图片走官方内容寻址流式渲染（v2.21.115）
+
+- 现象：老会话的图片附件显示文件名 + “未读取到绝对路径”（官方 Web 无此问题）；新图片正常。
+- 官方机制：Kimi Code 的图片协议用 `kimi-file://f_<id>`/`file_id` 内容寻址，官方 Web 端直接按 id 取文件内容渲染，不存在本地路径概念；本地端官方文件位于 `~/.kimi-code/files/<fileId>`，经官方 `fs:content` 读取。
+- 根因（两层）：① 两套入站映射器（eventMapper.extractUserMessage / kimiCodeEventMapper.extractPromptMessage）对 file-backed image part 只提取 dataUrl，未提取 fileId；② 渲染层 AttachmentThumb/getPreviewImages 只认 dataUrl，file-backed 图落入“文件面板”显示“未读取到绝对路径”；且历史会话 timeline 由本地缓存恢复，旧记录只有 `name=f_xxx`（即官方 file id），不会重新映射。
+- 修复：映射器提取 fileId（`kimi-file://f_` 前缀或 f_ 前缀 id）；渲染层对无 dataUrl 的图以 fileId（含 name 回退）走 `kimix-media://server-file/<fileId>` 流式渲染（复用视频的官方 fs:content 代理），预览 overlay 同样支持流式 url。
+- 验证：老会话 f_391a9c5f / f_5399c25a 两张历史图片渲染为真实缩略图（内容可见）；新增映射器测试 1 项；全量 2051 项通过。
 ## 2026-08-25 修复：Kimix 默认风格 shell 圆角 20px→16px，与面板/卡片层级顺滑（v2.21.114）
 
 - 用户反馈：默认（Kimix 默认）风格的主区/窗口圆角 20px 与该风格其他部分（卡 12、面板 16、控件 6）断层太大；现代风格的 20px 与自身体系无异议，不动。

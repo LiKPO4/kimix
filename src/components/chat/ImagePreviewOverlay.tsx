@@ -7,6 +7,7 @@ export type PreviewImage = {
   id?: string;
   name: string;
   dataUrl: string;
+  url?: string;
 };
 
 export function findPreviewImageIndex(current: PreviewImage, images: PreviewImage[]): number {
@@ -159,7 +160,7 @@ export function ImagePreviewOverlay({ image, images, onNavigate, onClose, onSave
           }}
         >
           <img
-            src={image.dataUrl}
+            src={image.dataUrl || image.url || ""}
             alt={image.name}
             className="kimix-preview-image max-h-[76vh] max-w-[86vw] rounded-xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
             onContextMenu={(event) => {

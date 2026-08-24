@@ -353,18 +353,18 @@ function AttachmentThumb({
   onPreview: (image: PreviewImage) => void;
 }) {
   if (image.kind === "video") return <VideoAttachmentThumb image={image} index={index} />;
-  if (image.dataUrl) {
-    const dataUrl = image.dataUrl;
+  if (image.dataUrl || imageFileId(image)) {
+    const source = imageSource(image);
     return (
       <button
         key={image.id ?? `${image.name}-${index}`}
         type="button"
-        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl })}
+        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl: image.dataUrl ?? "", url: image.dataUrl ? undefined : source })}
         className="kimix-media-thumb h-24 w-24 overflow-hidden"
         title="点击查看图片"
         aria-label={`查看图片 ${image.name}`}
       >
-        <img src={dataUrl} alt={image.name} className="kimix-media-preview h-full w-full object-cover" />
+        <img src={source} alt={image.name} className="kimix-media-preview h-full w-full object-cover" />
       </button>
     );
   }
@@ -465,10 +465,27 @@ function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index
   );
 }
 
+function serverFileStreamUrl(fileId: string): string {
+  return `kimix-media://server-file/${encodeURIComponent(fileId)}`;
+}
+
+function imageFileId(image: UserMessageImage): string | undefined {
+  if (image.fileId) return image.fileId;
+  // 官方历史以 f_ 前缀 id 内容寻址：老会话缓存的 name 就是该 id，可直接流式取回
+  const match = image.name.match(/^f_[A-Za-z0-9-]+$/);
+  return match ? image.name : undefined;
+}
+
+function imageSource(image: UserMessageImage): string {
+  if (image.dataUrl) return image.dataUrl;
+  const fileId = imageFileId(image);
+  return fileId ? serverFileStreamUrl(fileId) : "";
+}
+
 function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
   return images
-    .filter((image): image is UserMessageImage & { dataUrl: string } => image.kind !== "video" && Boolean(image.dataUrl?.startsWith("data:image/")))
-    .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl }));
+    .filter((image) => image.kind !== "video" && (Boolean(image.dataUrl?.startsWith("data:image/")) || Boolean(imageFileId(image))))
+    .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl ?? "", url: image.dataUrl ? undefined : (imageFileId(image) ? serverFileStreamUrl(imageFileId(image)!) : undefined) }));
 }
 
 export const USER_MESSAGE_COLLAPSED_HEIGHT_PX = 252;

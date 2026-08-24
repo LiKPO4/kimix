@@ -274,6 +274,17 @@ function getContentPart(event: Record<string, unknown>): Record<string, unknown>
   return isRecord(event.part) ? event.part : event;
 }
 
+/**
+ * 官方文件型图片引用解析：kimi-file://f_xxx 或 f_ 前缀 id → server file id。
+ * 官方 Web 以文件内容寻址渲染，本地端用同一 id 经 kimix-media: 流式取回，不依赖本地绝对路径。
+ */
+function resolveImageFileId(id: string | undefined, url: string | undefined): string | undefined {
+  const fromUrl = url?.match(/^kimi-file:\/\/(f_[A-Za-z0-9-]+)/)?.[1];
+  if (fromUrl) return fromUrl;
+  if (id && /^f_[A-Za-z0-9-]+$/.test(id)) return id;
+  return undefined;
+}
+
 function extractPromptMessage(input: unknown): { content: string; images: UserMessageImage[] } {
   if (isString(input)) return { content: input, images: [] };
   if (!Array.isArray(input)) return { content: "", images: [] };
@@ -292,7 +303,7 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
         : (isRecord(part.image_url) ? part.image_url : {});
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined });
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined, fileId: resolveImageFileId(id, url) });
       return;
     }
     if (part.type === "image" && isRecord(part.source)) {
@@ -313,7 +324,7 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
         : url?.startsWith("data:image/")
           ? url
           : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl });
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl, fileId: resolveImageFileId(id, url ?? dataUrl) });
       return;
     }
     if (part.type === "video_url") {
