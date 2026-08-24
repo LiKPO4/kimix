@@ -135,7 +135,7 @@
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 20px;
-  --kimix-window-corner-radius: 20px;
+  --kimix-window-corner-radius: 16px;
   /* --ui-radius-* 由界面风格（[data-ui-style]）注入；默认风格不设置，
      rounded-* 经 tailwind.config.ts 的 fallback 回退为 6/12/8/12/16px，视觉不变 */
 

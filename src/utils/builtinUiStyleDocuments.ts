@@ -130,7 +130,7 @@ export const BUILTIN_UI_STYLE_DOCUMENTS: Record<BuiltinUiStyleId, UiStyleDocumen
     "default",
     "Kimix 默认",
     "温和圆角、轻阴影，延续现有熟悉界面。",
-    { small: 6, medium: 12, large: 8, card: 12, panel: 16, shell: 20, pill: 999 },
+    { small: 6, medium: 12, large: 8, card: 12, panel: 16, shell: 16, pill: 999 },
     quietElevation,
     { hoverDuration: 150, panelDuration: 250, easing: "standard" },
   ),
