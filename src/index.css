@@ -3108,7 +3108,6 @@ button.bg-accent-primary:disabled:hover,
 .kimix-app-shell {
   background: var(--surface-ground);
   color: var(--text-primary);
-  padding-right: 1px;
   border-radius: var(--kimix-window-corner-radius);
 }
 
