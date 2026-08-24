@@ -14,9 +14,19 @@ describe("Windows 主窗口外壳", () => {
     expect(source).toContain("path.join(process.resourcesPath, APP_ICON_FILE_NAME)");
     expect(source).toContain('path.join(APP_ROOT, "..", "build", APP_ICON_FILE_NAME)');
     expect(source).toContain("icon: APP_ICON_PATH");
-    expect(source).toContain("win.setShape(buildRoundedWindowShape(width, height, mainWindowCornerRadius))");
+    expect(source).toContain('transparent: process.platform === "win32" ? true : false');
+    expect(source).toContain('backgroundColor: "#00000000"');
+    expect(source).not.toContain("setShape");
     expect(source).not.toContain("mainWindow.setIcon(");
     expect(source).not.toContain("mainWindow.setAppDetails(");
+  });
+
+  it("渲染进程为 Windows 透明外壳标记 CSS 消费分支", () => {
+    const renderer = readFileSync(resolve(process.cwd(), "src/main.tsx"), "utf8");
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(renderer).toContain('setAttribute("data-transparent-shell", "1")');
+    expect(css).toMatch(/:root\[data-transparent-shell="1"\]\s+body\s*\{[^}]*background-color:\s*transparent;/s);
   });
 
   it("安装包显式携带并嵌入 Windows 图标", () => {

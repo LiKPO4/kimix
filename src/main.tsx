@@ -777,6 +777,11 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+// Windows 使用透明窗口外壳，body 不铺底色让四角露出桌面（CSS data-transparent-shell 消费）
+if (window.api?.platform === "win32") {
+  document.documentElement.setAttribute("data-transparent-shell", "1");
+}
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element not found");
 const reportStartup = (label: string) => {

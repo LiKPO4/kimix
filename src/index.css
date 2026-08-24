@@ -1682,6 +1682,11 @@ body {
   line-height: 1.7;
 }
 
+/* Windows 透明窗口外壳：body 不铺底色，四角由 .kimix-app-shell 圆角露出桌面 */
+:root[data-transparent-shell="1"] body {
+  background-color: transparent;
+}
+
 button,
 input,
 textarea,

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-24 修复：透明窗口外壳消除圆角包边，窗口四角完全由 CSS 风格圆角决定（v2.21.110）
+
+- 现象：v2.21.109 的 setShape 原生区域方案在用户桌面（深色壁纸）上仍出现四角"包边"——窗口外圈有 7px 白色装饰带（DWM 窗口边框+阴影，按窗口矩形/8px 圆角绘制），不随 setShape 的 20px 自定义圆角，且 HRGN 只能裁 HWND 矩形内部、裁不掉 HWND 外的 DWM 装饰，inset 内缩也无解。本机无损截图（PIL ImageGrab）复现确认。
+- 方案：Windows 改用透明窗口（`transparent: true` + `backgroundColor: "#00000000"`），完全移除 setShape/windowShape 与 roundedCorners 干预；`html/body` 不再铺底色（仅 Windows 由 renderer 标记 `data-transparent-shell="1"` 使 body 透明），四角由 `.kimix-app-shell` 的 `--kimix-window-corner-radius`（默认/现代 20px、复古 6px、怀旧 0px、自定义 v1 contract）CSS 圆角 + alpha 裁剪决定，天然与主工作区同一半径、平滑抗锯齿、无系统装饰冲突。最大化经既有 `[data-window-maximized]` 归零为直角；非 Windows 继续原生窗口 + body 底色，行为不变。
+- 实测（本机 Win11 100% DPI）：左/右/底边缘像素扫描无黑带无白带，四角弧线平滑、直接透现桌面；MoveWindow 缩放无残影；最大化直角、任务栏不被遮挡；任务栏继续显示 Kimix 图标。代价：窗口不再有 DWM 系统投影（透明窗口无系统阴影），且 setShape 相关测试移除。
+- 知识库：interface-style-system.md 更新为"透明窗口外壳"决策，明确 setShape 与 DWM 装饰冲突为结构性限制。
+
 ## 2026-08-24 修复：窗口四角跟随风格圆角并恢复任务栏图标（v2.21.109）
 
 - 现象：v2.21.108 把默认/现代主工作区圆角缩到 8px 反向适配 DWM，现代化风格白色主区四角与窗口轮廓同为小圆角，违背"窗口四角应跟随风格主区域圆角"的需求；任务栏按钮继续显示开发载体 electron.exe 的 Atom 默认图标。
