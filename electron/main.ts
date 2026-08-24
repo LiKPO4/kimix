@@ -49,8 +49,12 @@ import { activateWindow } from "./windowActivation";
 import { discoverOpenAiModels, ModelListEndpointUnsupportedError } from "./providerModelDiscovery";
 import { redactDiagnosticData } from "../src/utils/diagnosticRedaction";
 import { mergeRuntimeAndDiskModelConfig } from "../src/utils/modelConfigSummary";
-import { canonicalizeCustomUiStyleDocument } from "../src/utils/builtinUiStyleDocuments";
+import {
+  canonicalizeCustomUiStyleDocument,
+  resolveUiStyleShellRadius,
+} from "../src/utils/builtinUiStyleDocuments";
 import { parseUiStyleDocument, uiStyleDocumentV1Schema } from "../src/utils/uiStyleContract";
+import { buildRoundedWindowShape } from "./windowShape";
 import {
   createDeferredOnceTask,
   createDistinctAsyncWriter,
@@ -2845,11 +2849,39 @@ process.env.VITE_PUBLIC = DEV_SERVER_URL
   ? path.join(APP_ROOT, "public")
   : RENDERER_DIST;
 
-if (process.platform === "win32") {
+if (process.platform === "win32" && app.isPackaged) {
+  // 打包态 EXE 图标即 Kimix，任务栏回退 exe 图标也正确；dev 下不设置，
+  // 否则无匹配快捷方式的自定义 AUMID 会让任务栏按钮回退到 electron.exe 的默认图标。
   app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 }
 
 let mainWindow: BrowserWindow | null = null;
+let mainWindowCornerRadius = 20;
+let mainWindowShapeTimer: NodeJS.Timeout | null = null;
+
+function applyMainWindowShape(win: BrowserWindow | null = mainWindow) {
+  if (process.platform !== "win32" || !win || win.isDestroyed()) return;
+  if (win.isMaximized() || win.isFullScreen() || mainWindowCornerRadius <= 0) {
+    win.setShape([]);
+    return;
+  }
+  const [width, height] = win.getSize();
+  win.setShape(buildRoundedWindowShape(width, height, mainWindowCornerRadius));
+}
+
+function scheduleMainWindowShape(win: BrowserWindow | null = mainWindow) {
+  if (process.platform !== "win32" || !win || win.isDestroyed()) return;
+  if (mainWindowShapeTimer) clearTimeout(mainWindowShapeTimer);
+  mainWindowShapeTimer = setTimeout(() => {
+    mainWindowShapeTimer = null;
+    applyMainWindowShape(win);
+  }, 16);
+}
+
+function syncMainWindowCornerRadius(settings: AppSettings = settingsService.loadSettings()) {
+  mainWindowCornerRadius = resolveUiStyleShellRadius(settings.uiStyle, settings.customUiStyles);
+  scheduleMainWindowShape();
+}
 
 function getDialogParent(): BrowserWindow | null {
   return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
@@ -2923,6 +2955,7 @@ const SKILL_SEARCH_IGNORES = new Set([
 
 function emitWindowStateFor(win: BrowserWindow | null) {
   if (!win || win.isDestroyed()) return;
+  scheduleMainWindowShape(win);
   win.webContents.send("window:maximized-change", {
     maximized: win.isMaximized(),
     fullscreen: win.isFullScreen(),
@@ -4183,10 +4216,6 @@ const rememberStartupProject = createDistinctAsyncWriter<Project>(
 function createWindow() {
   logMainStartup("createWindow:start");
   rendererReloadedAfterBlank = false;
-  const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);
-  if (mainWindowIcon.isEmpty()) {
-    console.warn(`[window] app icon is empty: ${APP_ICON_PATH}`);
-  }
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -4203,16 +4232,9 @@ function createWindow() {
     autoHideMenuBar: true,
     frame: false,
     skipTaskbar: false,
-    icon: mainWindowIcon,
+    icon: APP_ICON_PATH,
   });
-  if (process.platform === "win32" && !mainWindowIcon.isEmpty()) {
-    mainWindow.setIcon(mainWindowIcon);
-    mainWindow.setAppDetails({
-      appId: WINDOWS_APP_USER_MODEL_ID,
-      appIconPath: APP_ICON_PATH,
-      appIconIndex: 0,
-    });
-  }
+  syncMainWindowCornerRadius();
 
   // Kimi Code Host is the single event source for renderer sessions.
   kimiCodeHost.setKimiCodeEventSink((payload) => {
@@ -4270,6 +4292,7 @@ function createWindow() {
   });
 
   mainWindow.on("focus", clearTaskbarAttention);
+  mainWindow.on("resize", () => scheduleMainWindowShape(mainWindow));
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -4320,6 +4343,10 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     disposeStartupBootstrap();
+    if (mainWindowShapeTimer) {
+      clearTimeout(mainWindowShapeTimer);
+      mainWindowShapeTimer = null;
+    }
     if (rendererContentCheckTimer) {
       clearTimeout(rendererContentCheckTimer);
       rendererContentCheckTimer = null;
@@ -8243,6 +8270,7 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
       return { success: false, error: "Invalid settings data" };
     }
     settingsService.saveSettings(parsed.data as Partial<AppSettings>);
+    syncMainWindowCornerRadius(settingsService.loadSettings());
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

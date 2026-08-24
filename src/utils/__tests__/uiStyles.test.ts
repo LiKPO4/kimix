@@ -44,8 +44,8 @@ describe("UI_STYLES", () => {
   it("最外应用壳消费窗口圆角并在最大化时归零", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
-    expect(css).toMatch(/:root\s*\{[^}]*--kimix-window-corner-radius:\s*8px;/s);
-    expect(css).toMatch(/\[data-ui-style="modern"\]\s*\{[^}]*--kimix-window-corner-radius:\s*8px;/s);
+    expect(css).toMatch(/:root\s*\{[^}]*--kimix-window-corner-radius:\s*20px;/s);
+    expect(css).toMatch(/\[data-ui-style="modern"\]\s*\{[^}]*--kimix-window-corner-radius:\s*20px;/s);
     expect(css).toMatch(/\.kimix-app-shell\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
     expect(css).toMatch(/\.kimix-app-shell-main\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-main\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);

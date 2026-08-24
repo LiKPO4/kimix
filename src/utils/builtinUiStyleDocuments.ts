@@ -2,6 +2,7 @@ import {
   parseUiStyleDocument,
   UI_STYLE_ROLE_GUIDE,
   UI_STYLE_ROLE_IDS,
+  UI_STYLE_ROLE_RADIUS_MAX_PX,
   UI_STYLE_DESCRIPTION_MAX_LENGTH,
   DEFAULT_UI_STYLE_PALETTE,
   type UiStyleDocumentV1,
@@ -269,6 +270,30 @@ export function normalizeCustomUiStyleDocuments(value: unknown): UiStyleDocument
     if (document) byId.set(document.id, document);
   }
   return [...byId.values()];
+}
+
+/**
+ * 解析实际应用窗口使用的 shell 半径。主进程和 renderer 共用同一纯函数，
+ * 避免原生窗口裁切与 CSS 外壳在切换风格后出现两套几何。
+ */
+export function resolveUiStyleShellRadius(
+  value: unknown,
+  customDocuments: UiStyleDocumentV1[] = [],
+): number {
+  const builtinId = value === "modern" || value === "retro" || value === "nostalgia"
+    ? value
+    : "default";
+  let document = BUILTIN_UI_STYLE_DOCUMENTS[builtinId];
+  if (typeof value === "string" && value.startsWith("custom:")) {
+    const candidate = customDocuments.find((item) => `custom:${item.id}` === value);
+    const canonical = candidate ? canonicalizeCustomUiStyleDocument(candidate) : null;
+    if (canonical) document = canonical;
+  }
+  const role = document.roles.shell
+    ?? BUILTIN_UI_STYLE_DOCUMENTS[document.basedOn].roles.shell
+    ?? BUILTIN_UI_STYLE_DOCUMENTS.default.roles.shell!;
+  const rawRadius = document.primitives.radius[role.radius];
+  return Math.max(0, Math.min(UI_STYLE_ROLE_RADIUS_MAX_PX.shell, Math.round(rawRadius)));
 }
 
 export function buildUiStyleAiPrompt() {

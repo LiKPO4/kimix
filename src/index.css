@@ -135,7 +135,7 @@
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 20px;
-  --kimix-window-corner-radius: 8px;
+  --kimix-window-corner-radius: 20px;
   /* --ui-radius-* 由界面风格（[data-ui-style]）注入；默认风格不设置，
      rounded-* 经 tailwind.config.ts 的 fallback 回退为 6/12/8/12/16px，视觉不变 */
 
@@ -361,7 +361,7 @@
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
-  --kimix-window-corner-radius: 8px;
+  --kimix-window-corner-radius: 20px;
   --kimix-modern-surface-shadow: 0 0 0 1px rgba(25, 23, 20, 0.045), 0 1px 2px rgba(25, 23, 20, 0.025);
   --kimix-modern-elevated-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 8px 24px rgba(25, 23, 20, 0.065), 0 2px 6px rgba(25, 23, 20, 0.035);
   --kimix-modern-floating-shadow: 0 0 0 1px rgba(25, 23, 20, 0.055), 0 18px 46px rgba(25, 23, 20, 0.10), 0 4px 12px rgba(25, 23, 20, 0.045);

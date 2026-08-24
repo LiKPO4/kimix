@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-24 修复：窗口四角跟随风格圆角并恢复任务栏图标（v2.21.109）
+
+- 现象：v2.21.108 把默认/现代主工作区圆角缩到 8px 反向适配 DWM，现代化风格白色主区四角与窗口轮廓同为小圆角，违背"窗口四角应跟随风格主区域圆角"的需求；任务栏按钮继续显示开发载体 electron.exe 的 Atom 默认图标。
+- 圆角修复：主进程重新按 `resolveUiStyleShellRadius(settings.uiStyle, settings.customUiStyles)` 生成 `setShape()` 圆角矩形并集（默认/现代 20px、复古 6px、怀旧 0px、自定义 0–32px 由 v1 contract 同源解析），resize/最大化/还原/切换风格时同步，最大化与全屏恢复直角；`--kimix-window-corner-radius` 默认与现代恢复 20px，主工作区继续消费该变量，风格值重新成为几何事实源。与 v2.21.105 的关键区别：**不再设置 `roundedCorners: false`**，DWM 圆角保持平台默认——本机 100% DPI 实测四角 20px 曲线干净无灰框、无内容裁切（灰框根因指向 roundedCorners:false 与自定义 HWND 区域组合，而非 setShape 本身）。
+- 图标根因：`app.setAppUserModelId("com.kimix.app")` 是无匹配快捷方式的自定义 AUMID；Electron 42 下任务栏按钮图标因此回退 exe 图标（dev 载体 electron.exe 的 Atom），v2.21.108 的 setIcon/setAppDetails 也都盖不过该回退。修复：dev 态不再设置 AUMID；打包态 exe 图标即 Kimix（build/icon.ico 已嵌入），保留 AUMID 维持通知身份。
+- 窗口图标：统一 `APP_ICON_PATH`（dev 用 build/icon.ico，打包用 resources/icon.ico），构造参数直接传路径，不再使用 setIcon/setAppDetails。
+- 回归保护：windowShape 几何、windowChrome 外壳契约（setShape 存在、icon 路径、无 setIcon/setAppDetails）与 uiStyles 20px token 断言；定向 37 项、全量、typecheck、生产构建与知识库严格校验均通过；已在本机截图实测：任务栏显示 Kimix 图标、左上/右上 20px 圆角干净无灰框。高 DPI（非 100%）的 setShape 表现仍未实测，作为已知边界保留。
+
 ## 2026-08-24 修复：默认窗口曲线与 Windows 任务栏图标收敛（v2.21.108）
 
 - 现场：v2.21.107 已消除灰色原生包裹，但默认/现代白色主工作区仍为 20px，和 Windows DWM 外轮廓约 8px 的曲线不一致；任务栏继续显示开发载体 `electron.exe` 的 Atom 图标。

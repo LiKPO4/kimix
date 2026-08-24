@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Windows 主窗口外壳", () => {
-  it("保留系统 DWM 窗口与任务栏身份，不再应用实验性 shape", () => {
+  it("窗口四角随风格裁切，任务栏图标沿用窗口 Kimix 图标", () => {
     const source = readFileSync(resolve(process.cwd(), "electron/main.ts"), "utf8");
 
     expect(source).toContain("frame: false");
@@ -13,14 +13,10 @@ describe("Windows 主窗口外壳", () => {
     expect(source).toContain('const APP_ICON_FILE_NAME = process.platform === "win32" ? "icon.ico" : "icon.png";');
     expect(source).toContain("path.join(process.resourcesPath, APP_ICON_FILE_NAME)");
     expect(source).toContain('path.join(APP_ROOT, "..", "build", APP_ICON_FILE_NAME)');
-    expect(source).toContain("const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);");
-    expect(source).toContain("icon: mainWindowIcon");
-    expect(source).toContain("mainWindow.setIcon(mainWindowIcon);");
-    expect(source).toContain("mainWindow.setAppDetails({");
-    expect(source).toContain("appIconPath: APP_ICON_PATH");
-    expect(source).not.toContain(".setShape(");
-    expect(source).not.toContain("roundedCorners:");
-    expect(source).not.toContain('from "./windowShape"');
+    expect(source).toContain("icon: APP_ICON_PATH");
+    expect(source).toContain("win.setShape(buildRoundedWindowShape(width, height, mainWindowCornerRadius))");
+    expect(source).not.toContain("mainWindow.setIcon(");
+    expect(source).not.toContain("mainWindow.setAppDetails(");
   });
 
   it("安装包显式携带并嵌入 Windows 图标", () => {
