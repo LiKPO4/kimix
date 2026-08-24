@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：file-backed 图片预览 overlay 渲染条件补流式 url（v2.21.116）
+
+- 现象：v2.21.115 缩略图已能流式显示，但点击缩略图预览无反应。
+- 根因：ImagePreviewOverlay 的渲染条件为 `previewImage?.dataUrl && (...)`，file-id 流式 PreviewImage 的 dataUrl 为空字符串（内容是流式 url），条件为假不渲染。
+- 修复：两处条件改为 `previewImage && (previewImage.dataUrl || previewImage.url)`；实测点击缩略图打开预览 overlay（大图、画板、上一张/下一张、关闭齐全）。
 ## 2026-08-25 修复：历史 file-backed 图片走官方内容寻址流式渲染（v2.21.115）
 
 - 现象：老会话的图片附件显示文件名 + “未读取到绝对路径”（官方 Web 无此问题）；新图片正常。

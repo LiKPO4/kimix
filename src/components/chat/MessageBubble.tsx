@@ -783,7 +783,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
           )}
         </div>
       </div>
-      {previewImage?.dataUrl && (
+      {previewImage && (previewImage.dataUrl || previewImage.url) && (
         <ImagePreviewOverlay
           image={previewImage}
           images={previewImages}
@@ -841,7 +841,7 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
           {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger" style={{ paddingRight: 15 }}>{event.error.replace(/[。.]+$/u, "")}</div>}
         </div>
       </div>
-      {previewImage?.dataUrl && (
+      {previewImage && (previewImage.dataUrl || previewImage.url) && (
         <ImagePreviewOverlay
           image={previewImage}
           images={previewImages}
