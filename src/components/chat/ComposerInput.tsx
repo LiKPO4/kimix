@@ -22,6 +22,13 @@ const MIN_HEIGHT = 52;
 const SCROLLBAR_TRACK_VERTICAL_INSET = 9;
 const SCROLLBAR_THUMB_MIN_HEIGHT = 28;
 
+function resizeComposerTextarea(element: HTMLTextAreaElement): number {
+  element.style.height = "auto";
+  const height = Math.max(MIN_HEIGHT, Math.min(element.scrollHeight, MAX_HEIGHT));
+  element.style.height = `${height}px`;
+  return height;
+}
+
 interface ComposerScrollbarMetrics {
   visible: boolean;
   thumbHeight: number;
@@ -83,10 +90,19 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
       },
     }), [updateScrollbar]);
 
+    const autoResize = useCallback(() => {
+      const el = textareaRef.current;
+      if (!el) return null;
+      resizeComposerTextarea(el);
+      return requestAnimationFrame(updateScrollbar);
+    }, [updateScrollbar]);
+
     useLayoutEffect(() => {
-      const frame = requestAnimationFrame(updateScrollbar);
-      return () => cancelAnimationFrame(frame);
-    }, [updateScrollbar, value]);
+      const frame = autoResize();
+      return () => {
+        if (frame !== null) cancelAnimationFrame(frame);
+      };
+    }, [autoResize, value]);
 
     useLayoutEffect(() => {
       const el = textareaRef.current;
@@ -96,14 +112,6 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
       observer.observe(el);
       return () => observer.disconnect();
     }, [updateScrollbar]);
-
-    const autoResize = () => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.style.height = "auto";
-      el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`;
-      requestAnimationFrame(updateScrollbar);
-    };
 
     const scrollToThumbTop = (thumbTop: number) => {
       const el = textareaRef.current;
@@ -132,7 +140,6 @@ export const ComposerInput = forwardRef<ComposerInputHandle, ComposerInputProps>
           value={value}
           onChange={(e) => {
             onChange(e.target.value);
-            autoResize();
           }}
           onScroll={updateScrollbar}
           onKeyDown={handleKeyDown}
