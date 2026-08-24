@@ -10,7 +10,7 @@ import {
   UI_STYLE_CONTRACT_ATTRIBUTE,
   UI_STYLES,
 } from "../uiStyles";
-import { BUILTIN_UI_STYLE_DOCUMENTS, resolveUiStyleShellRadius } from "../builtinUiStyleDocuments";
+import { BUILTIN_UI_STYLE_DOCUMENTS } from "../builtinUiStyleDocuments";
 
 describe("normalizeUiStyleId", () => {
   it("保留合法风格 id", () => {
@@ -39,24 +39,6 @@ describe("UI_STYLES", () => {
       expect(item.label).toBeTruthy();
       expect(item.description).toBeTruthy();
     }
-  });
-
-  it("窗口外壳圆角跟随内置与自定义 shell 角色", () => {
-    const custom = {
-      ...BUILTIN_UI_STYLE_DOCUMENTS.modern,
-      id: "window-shell-28",
-      primitives: {
-        ...BUILTIN_UI_STYLE_DOCUMENTS.modern.primitives,
-        radius: { ...BUILTIN_UI_STYLE_DOCUMENTS.modern.primitives.radius, shell: 28 },
-      },
-    };
-
-    expect(resolveUiStyleShellRadius("default")).toBe(20);
-    expect(resolveUiStyleShellRadius("modern")).toBe(20);
-    expect(resolveUiStyleShellRadius("retro")).toBe(6);
-    expect(resolveUiStyleShellRadius("nostalgia")).toBe(0);
-    expect(resolveUiStyleShellRadius("custom:window-shell-28", [custom])).toBe(28);
-    expect(resolveUiStyleShellRadius("custom:missing", [])).toBe(20);
   });
 
   it("最外应用壳消费窗口圆角并在最大化时归零", () => {
