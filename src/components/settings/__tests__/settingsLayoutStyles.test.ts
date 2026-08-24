@@ -153,4 +153,12 @@ describe("settings workspace scroll layout", () => {
     expect(settingsPanel.slice(displayStart, paletteStart)).toContain("界面字号");
     expect(settingsPanel.slice(displayStart, paletteStart)).toContain("对话刻度");
   });
+
+  it("只为当前自定义风格追加一张带来源标记的自带色彩卡", () => {
+    expect(settingsPanel).toContain('const activeCustomUiStyle = uiStyle.startsWith("custom:")');
+    expect(settingsPanel).toContain("...(activeCustomUiStyle ? [{");
+    expect(settingsPanel).toContain("uiStyleThemePaletteId(activeCustomUiStyle.id)");
+    expect(settingsPanel).toContain("风格化自带");
+    expect(settingsPanel).not.toContain("...customUiStyles.map((document) => ({\n      value: uiStyleThemePaletteId");
+  });
 });

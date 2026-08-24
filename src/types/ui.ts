@@ -1,7 +1,7 @@
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 
 export type Theme = "dark" | "light" | "system";
-export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}`;
+export type ThemePaletteId = "warm-paper" | "neutral-gray" | "soft-green" | "warm-orange" | "custom" | `kimi:${string}` | `ui-style:${string}`;
 export type UiStyleId = "default" | "modern" | "retro" | "nostalgia" | `custom:${string}`;
 export interface ThemePaletteColors {
   primary: string;

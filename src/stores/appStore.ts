@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
 import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
-import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
+import { DEFAULT_THEME_PALETTE_ID, isUiStyleThemePaletteId, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, uiStyleThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
 import { DEFAULT_UI_STYLE_ID, normalizeUiStyleId } from "@/utils/uiStyles";
 import { canonicalizeCustomUiStyleDocument, normalizeCustomUiStyleDocuments } from "@/utils/builtinUiStyleDocuments";
@@ -374,20 +374,34 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setTheme: (theme) => set({ theme }),
-  setUiStyle: (id) => set({ uiStyle: normalizeUiStyleId(id) }),
+  setUiStyle: (id) => set((state) => {
+    const uiStyle = normalizeUiStyleId(id);
+    if (uiStyle.startsWith("custom:") && state.customUiStyles.some((document) => `custom:${document.id}` === uiStyle)) {
+      return { uiStyle, themePalette: uiStyleThemePaletteId(uiStyle) };
+    }
+    return {
+      uiStyle,
+      themePalette: isUiStyleThemePaletteId(state.themePalette) ? DEFAULT_THEME_PALETTE_ID : state.themePalette,
+    };
+  }),
   setCustomUiStyles: (documents) => set({ customUiStyles: normalizeCustomUiStyleDocuments(documents) }),
   upsertCustomUiStyle: (document) => set((state) => {
     const normalized = canonicalizeCustomUiStyleDocument(document);
     if (!normalized) return {};
     const next = state.customUiStyles.filter((item) => item.id !== normalized.id);
     next.push(normalized);
-    return { customUiStyles: next, uiStyle: `custom:${normalized.id}` as UiStyleId };
+    return {
+      customUiStyles: next,
+      uiStyle: `custom:${normalized.id}` as UiStyleId,
+      themePalette: uiStyleThemePaletteId(normalized.id),
+    };
   }),
   removeCustomUiStyle: (id) => set((state) => {
     const normalizedId = id.replace(/^custom:/, "");
     return {
       customUiStyles: state.customUiStyles.filter((item) => item.id !== normalizedId),
       uiStyle: state.uiStyle === `custom:${normalizedId}` ? DEFAULT_UI_STYLE_ID : state.uiStyle,
+      themePalette: state.themePalette === uiStyleThemePaletteId(normalizedId) ? DEFAULT_THEME_PALETTE_ID : state.themePalette,
     };
   }),
   setThemePalette: (palette) => set({ themePalette: normalizeThemePaletteId(palette) }),

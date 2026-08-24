@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   compileUiStyleVariables,
+  DEFAULT_UI_STYLE_PALETTE,
   parseUiStyleDocument,
   UI_STYLE_DESCRIPTION_MAX_LENGTH,
   UI_STYLE_ROLE_RADIUS_MAX_PX,
@@ -26,6 +27,7 @@ function documentFixture(): UiStyleDocumentV1 {
     name: "白金小圆角",
     description: "只描述界面质感，不包含颜色。",
     basedOn: "default",
+    palette: { primary: "#4B6FA8", surface: "#D8DEE8", accent: "#A05A6C" },
     primitives: {
       radius: { small: 3, medium: 4, large: 6, card: 6, panel: 8, shell: 8, pill: 999 },
       border: { controlWidth: 1, surfaceWidth: 1, focusWidth: 2, style: "solid" },
@@ -47,9 +49,26 @@ function documentFixture(): UiStyleDocumentV1 {
 }
 
 describe("uiStyleDocumentV1Schema", () => {
-  it("接受不包含颜色和任意 CSS 的完整语义风格", () => {
+  it("接受携带受控三色色组且不包含任意 CSS 的完整语义风格", () => {
     const result = parseUiStyleDocument(documentFixture());
     expect(result.success).toBe(true);
+  });
+
+  it("旧风格缺少 palette 时自动迁移为项目默认暖纸色组", () => {
+    const legacy = { ...documentFixture() } as Partial<UiStyleDocumentV1>;
+    delete legacy.palette;
+
+    const parsed = parseUiStyleDocument(legacy);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.palette).toEqual(DEFAULT_UI_STYLE_PALETTE);
+    expect(normalizeCustomUiStyleDocuments([legacy])[0].palette).toEqual(DEFAULT_UI_STYLE_PALETTE);
+  });
+
+  it("拒绝不完整、非十六进制或带额外字段的风格色组", () => {
+    const invalidHex = { ...documentFixture(), palette: { primary: "blue", surface: "#D8DEE8", accent: "#A05A6C" } };
+    expect(parseUiStyleDocument(invalidHex).success).toBe(false);
+    const extraColor = { ...documentFixture(), palette: { ...documentFixture().palette, text: "#111111" } };
+    expect(parseUiStyleDocument(extraColor).success).toBe(false);
   });
 
   it("拒绝颜色、选择器和其他未知字段", () => {
@@ -198,8 +217,9 @@ describe("uiStyleDocumentV1Schema", () => {
     const prompt = buildUiStyleAiPrompt();
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(roleId);
     for (const roleId of UI_STYLE_ROLE_IDS) expect(prompt).toContain(`- ${roleId}: ${UI_STYLE_ROLE_GUIDE[roleId]}`);
-    expect(prompt).toContain("忽略参考图中的颜色");
-    expect(prompt).toContain("禁止出现颜色值、CSS、选择器、url() 或脚本");
+    expect(prompt).toContain("palette 必须提供 primary、surface、accent");
+    expect(prompt).toContain("除 palette 三个字段外");
+    expect(prompt).toContain("禁止出现其他颜色值、CSS、选择器、url() 或脚本");
     expect(prompt).toContain("description 必须简洁，硬性上限为 48 个字符");
     expect(prompt).toContain("超出后 Kimix 会拒绝导入");
     expect(prompt).not.toContain("240 个");

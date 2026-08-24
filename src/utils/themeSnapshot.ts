@@ -83,7 +83,7 @@ export function applyThemeSnapshot(snapshot: ThemeSnapshot) {
   if (typeof document === "undefined") return;
   const mode = resolveThemeMode(snapshot.theme);
   document.documentElement.setAttribute("data-theme", mode);
-  applyThemePalette(snapshot.themePalette, snapshot.customThemePalette, mode, snapshot.kimiThemePalettes);
+  applyThemePalette(snapshot.themePalette, snapshot.customThemePalette, mode, snapshot.kimiThemePalettes, snapshot.customUiStyles);
   applyUiStyle(snapshot.uiStyle, snapshot.customUiStyles);
 }
 

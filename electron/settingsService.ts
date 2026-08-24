@@ -180,10 +180,26 @@ export function loadSettings(): AppSettings {
       !/^custom:[a-z0-9][a-z0-9._-]{0,63}$/.test(settings.uiStyle)) {
       settings.uiStyle = "default";
     }
+    const legacyStylePaletteIds = new Set(
+      (Array.isArray(settings.customUiStyles) ? settings.customUiStyles : [])
+        .filter((item) => item && typeof item === "object" && !Array.isArray(item)
+          && !Object.prototype.hasOwnProperty.call(item, "palette"))
+        .map((item) => (item as { id?: unknown }).id)
+        .filter((id): id is string => typeof id === "string"),
+    );
     settings.customUiStyles = normalizeCustomUiStyleDocuments(settings.customUiStyles);
     if (settings.uiStyle.startsWith("custom:") &&
       !settings.customUiStyles.some((document) => `custom:${document.id}` === settings.uiStyle)) {
       settings.uiStyle = "default";
+    }
+    if (settings.uiStyle.startsWith("custom:") && legacyStylePaletteIds.has(settings.uiStyle.slice("custom:".length))) {
+      settings.themePalette = `ui-style:${settings.uiStyle.slice("custom:".length)}`;
+    }
+    if ((settings.themePalette as string).startsWith("ui-style:")) {
+      const styleId = (settings.themePalette as string).slice("ui-style:".length);
+      const ownsActiveStylePalette = settings.uiStyle === `custom:${styleId}`
+        && settings.customUiStyles.some((document) => document.id === styleId);
+      if (!ownsActiveStylePalette) settings.themePalette = "warm-paper";
     }
     if (!["manual", "auto", "yolo"].includes(settings.defaultPermissionMode)) {
       settings.defaultPermissionMode = "manual";

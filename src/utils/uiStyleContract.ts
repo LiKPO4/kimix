@@ -2,6 +2,12 @@ import { z } from "zod";
 
 export const UI_STYLE_SCHEMA_VERSION = 1 as const;
 export const UI_STYLE_DESCRIPTION_MAX_LENGTH = 48 as const;
+/** 旧版自定义风格未携带 palette 时，固定迁移到 Kimix 默认「暖纸」色组。 */
+export const DEFAULT_UI_STYLE_PALETTE = {
+  primary: "#1677F0",
+  surface: "#E6E0D4",
+  accent: "#A8522E",
+} as const;
 
 export const UI_STYLE_ROLE_IDS = [
   "shell",
@@ -112,6 +118,11 @@ const borderTokenSchema = z.enum(["none", "subtle", "default", "strong"]);
 const elevationTokenSchema = z.enum(["none", "control", "card", "popup", "field"]);
 const elevationKindSchema = z.enum(["flat", "raised", "floating", "inset"]);
 const easingSchema = z.enum(["linear", "standard", "enter", "bounce"]);
+const paletteSchema = z.object({
+  primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  surface: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+}).strict();
 
 const treatmentSchema = z.object({
   surface: surfaceTokenSchema,
@@ -154,6 +165,7 @@ export const uiStyleDocumentV1Schema = z.object({
   ).default(""),
   author: z.string().trim().max(80).optional(),
   basedOn: z.enum(["default", "modern", "retro", "nostalgia"]),
+  palette: paletteSchema.default(DEFAULT_UI_STYLE_PALETTE),
   primitives: z.object({
     radius: z.object({
       small: z.number().min(0).max(32),

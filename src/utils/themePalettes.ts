@@ -1,9 +1,10 @@
 import type { KimiThemePalette, KimiThemePreset, ThemePaletteColors, ThemePaletteId } from "@/types/ui";
+import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 
 export type ResolvedThemeMode = "light" | "dark";
 
 type ThemePaletteDefinition = {
-  id: Exclude<ThemePaletteId, "custom" | `kimi:${string}`>;
+  id: Exclude<ThemePaletteId, "custom" | `kimi:${string}` | `ui-style:${string}`>;
   label: string;
   description: string;
   colors: ThemePaletteColors;
@@ -88,6 +89,7 @@ export const THEME_PALETTES: ThemePaletteDefinition[] = [
 export function normalizeThemePaletteId(value: unknown): ThemePaletteId {
   return value === "custom" || THEME_PALETTES.some((palette) => palette.id === value)
     || (typeof value === "string" && value.startsWith("kimi:") && value.length > "kimi:".length)
+    || (typeof value === "string" && /^ui-style:[a-z0-9][a-z0-9._-]{0,63}$/.test(value))
     ? value as ThemePaletteId
     : DEFAULT_THEME_PALETTE_ID;
 }
@@ -223,25 +225,45 @@ export function reconcileKimiThemePresetsFromDirectory(
   };
 }
 
-export function getThemePaletteColors(id: ThemePaletteId, custom: ThemePaletteColors): ThemePaletteColors {
+export function uiStyleThemePaletteId(id: string) {
+  return `ui-style:${id.replace(/^custom:/, "")}` as const;
+}
+
+export function isUiStyleThemePaletteId(id: ThemePaletteId): id is `ui-style:${string}` {
+  return id.startsWith("ui-style:");
+}
+
+export function getThemePaletteColors(
+  id: ThemePaletteId,
+  custom: ThemePaletteColors,
+  customUiStyles: UiStyleDocumentV1[] = [],
+): ThemePaletteColors {
   if (id === "custom") return normalizeThemePaletteColors(custom);
   if (isKimiThemePaletteId(id)) return DEFAULT_CUSTOM_THEME_PALETTE;
+  if (isUiStyleThemePaletteId(id)) {
+    const styleId = id.slice("ui-style:".length);
+    const styleDocument = customUiStyles.find((document) => document.id === styleId);
+    return styleDocument?.palette ?? THEME_PALETTES[0].colors;
+  }
   return THEME_PALETTES.find((palette) => palette.id === id)?.colors ?? THEME_PALETTES[0].colors;
 }
 
-export function resolveThemePaletteTokens(id: ThemePaletteId, custom: ThemePaletteColors, mode: ResolvedThemeMode, kimiPresets: KimiThemePreset[] = DEFAULT_KIMI_THEME_PRESETS): ThemeTokenMap {
+export function resolveThemePaletteTokens(id: ThemePaletteId, custom: ThemePaletteColors, mode: ResolvedThemeMode, kimiPresets: KimiThemePreset[] = DEFAULT_KIMI_THEME_PRESETS, customUiStyles: UiStyleDocumentV1[] = []): ThemeTokenMap {
   if (isKimiThemePaletteId(id)) {
     const preset = kimiPresets.find((item) => kimiThemePaletteId(item.id) === id);
     return buildKimiTokens(preset?.palette ?? DEFAULT_KIMI_THEME_PALETTE, mode);
   }
-  const colors = getThemePaletteColors(id, custom);
-  return mode === "dark" ? buildDarkTokens(colors) : buildLightTokens(colors, id === "warm-paper");
+  const colors = getThemePaletteColors(id, custom, customUiStyles);
+  const usesWarmPaperSeeds = colors.primary === THEME_PALETTES[0].colors.primary
+    && colors.surface === THEME_PALETTES[0].colors.surface
+    && colors.accent === THEME_PALETTES[0].colors.accent;
+  return mode === "dark" ? buildDarkTokens(colors) : buildLightTokens(colors, id === "warm-paper" || usesWarmPaperSeeds);
 }
 
-export function applyThemePalette(id: ThemePaletteId, custom: ThemePaletteColors, mode: ResolvedThemeMode, kimiPresets: KimiThemePreset[] = DEFAULT_KIMI_THEME_PRESETS) {
+export function applyThemePalette(id: ThemePaletteId, custom: ThemePaletteColors, mode: ResolvedThemeMode, kimiPresets: KimiThemePreset[] = DEFAULT_KIMI_THEME_PRESETS, customUiStyles: UiStyleDocumentV1[] = []) {
   const root = document.documentElement;
   root.setAttribute("data-theme-palette", id);
-  const tokens = resolveThemePaletteTokens(id, custom, mode, kimiPresets);
+  const tokens = resolveThemePaletteTokens(id, custom, mode, kimiPresets, customUiStyles);
   for (const [name, value] of Object.entries(tokens)) {
     root.style.setProperty(name, value);
   }

@@ -4825,6 +4825,29 @@ button.bg-accent-primary:disabled:hover,
   line-height: 20px;
 }
 
+.kimix-settings-palette-label-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.kimix-settings-palette-origin {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--surface-active);
+  color: var(--text-secondary);
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.kimix-settings-palette-wrap.is-active .kimix-settings-palette-origin {
+  background: color-mix(in srgb, var(--accent-primary) 12%, var(--surface-elevated));
+  color: var(--accent-primary);
+}
+
 .kimix-settings-palette-desc {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -9,7 +9,7 @@ okf_version: "0.1"
 # Architecture
 
 * [Collaboration Room Routing](architecture/collaboration-room-routing.md) - How multi-Agent rooms isolate official sessions while projecting routing, queues, visible-body sharing, and recovery into one conversation.
-* [Interface Style System](architecture/interface-style-system.md) - How color themes remain independent while component roles own shape, depth, focus, and interaction styling.
+* [Interface Style System](architecture/interface-style-system.md) - How component roles own material styling while custom styles carry one controlled palette linkage.
 * [Runtime Routing](architecture/runtime-routing.md)
 * [Sidebar Session Catalog Confirmation](architecture/sidebar-session-catalog.md) - Expanding a project confirms the official session catalog before rendering its list, so Web-archived sessions never flash in and then vanish. - How Kimix routes sessions between the official Server and vendored SDK fallback.
 * [Streaming Render Pipeline](architecture/streaming-render-pipeline.md) - How streaming output stays cheap and correct through identity-preserving projection, offset-anchored draft assembly, and scroll-yield viewport gates.

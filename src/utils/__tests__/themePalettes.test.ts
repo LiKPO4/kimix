@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { KimiThemePreset } from "@/types/ui";
-import { reconcileKimiThemePresetsFromDirectory, resolveThemePaletteTokens } from "../themePalettes";
+import { BUILTIN_UI_STYLE_DOCUMENTS } from "../builtinUiStyleDocuments";
+import { DEFAULT_UI_STYLE_PALETTE } from "../uiStyleContract";
+import { DEFAULT_CUSTOM_THEME_PALETTE, reconcileKimiThemePresetsFromDirectory, resolveThemePaletteTokens, THEME_PALETTES } from "../themePalettes";
 
 const palette = {
   primary: "#1565C0",
@@ -142,5 +144,38 @@ describe("light mode surface ladder", () => {
     // Light borders darken relative to white elevated, not wash lighter.
     expect(relativeLuminance(borderDefault)).toBeLessThan(relativeLuminance(elevated));
     expect(relativeLuminance(borderSubtle)).toBeLessThan(relativeLuminance(elevated));
+  });
+});
+
+describe("custom UI style palette", () => {
+  it("keeps the legacy-style migration seeds identical to the project default palette", () => {
+    expect(DEFAULT_UI_STYLE_PALETTE).toEqual(THEME_PALETTES[0].colors);
+  });
+
+  it("resolves only the requested custom style palette in both theme modes", () => {
+    const style = {
+      ...BUILTIN_UI_STYLE_DOCUMENTS.default,
+      id: "violet-glass",
+      name: "紫晶玻璃",
+      palette: { primary: "#6750A4", surface: "#DDD7EA", accent: "#9B4D73" },
+    };
+
+    for (const mode of ["light", "dark"] as const) {
+      expect(resolveThemePaletteTokens(
+        "ui-style:violet-glass",
+        DEFAULT_CUSTOM_THEME_PALETTE,
+        mode,
+        [],
+        [style],
+      )).toEqual(resolveThemePaletteTokens("custom", style.palette, mode));
+    }
+  });
+
+  it("falls back to the exact project default palette when the style is missing", () => {
+    expect(resolveThemePaletteTokens(
+      "ui-style:missing",
+      DEFAULT_CUSTOM_THEME_PALETTE,
+      "light",
+    )).toEqual(resolveThemePaletteTokens(THEME_PALETTES[0].id, DEFAULT_CUSTOM_THEME_PALETTE, "light"));
   });
 });

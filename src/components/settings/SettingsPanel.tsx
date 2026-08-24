@@ -15,7 +15,7 @@ import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
-import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES } from "@/utils/themePalettes";
+import { DEFAULT_THEME_PALETTE_ID, kimiThemePaletteId, reconcileKimiThemePresetsFromDirectory, THEME_PALETTES, uiStyleThemePaletteId } from "@/utils/themePalettes";
 import { UI_STYLES } from "@/utils/uiStyles";
 import { buildUiStyleAiPrompt } from "@/utils/builtinUiStyleDocuments";
 import {
@@ -1118,6 +1118,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const activeKimiTheme = themePalette.startsWith("kimi:")
     ? kimiThemePalettes.find((preset) => kimiThemePaletteId(preset.id) === themePalette)
     : null;
+  const activeCustomUiStyle = uiStyle.startsWith("custom:")
+    ? customUiStyles.find((document) => `custom:${document.id}` === uiStyle) ?? null
+    : null;
 
   const exportFreezeReport = (report: FreezeReport, index: number) => {
     const date = new Date(report.at);
@@ -1625,7 +1628,14 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     { value: "dark", label: "深色", icon: Moon },
     { value: "system", label: "跟随系统", icon: Monitor },
   ];
-  const paletteOptions: { value: ThemePaletteId; label: string; description: string; colors: ThemePaletteColors; kimiId?: string; sourcePath?: string }[] = [
+  const paletteOptions: { value: ThemePaletteId; label: string; description: string; colors: ThemePaletteColors; kimiId?: string; sourcePath?: string; uiStyleOwned?: boolean }[] = [
+    ...(activeCustomUiStyle ? [{
+      value: uiStyleThemePaletteId(activeCustomUiStyle.id),
+      label: `${activeCustomUiStyle.name} 配色`,
+      description: "随当前自定义风格自动应用",
+      colors: activeCustomUiStyle.palette,
+      uiStyleOwned: true,
+    }] : []),
     ...THEME_PALETTES.map((palette) => ({
       value: palette.id,
       label: palette.label,
@@ -2053,7 +2063,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         title={palette.description}
                       >
                         <span className="kimix-settings-palette-copy">
-                          <span className="kimix-settings-palette-label" title={palette.label}>{palette.label}</span>
+                          <span className="kimix-settings-palette-label-row">
+                            <span className="kimix-settings-palette-label" title={palette.label}>{palette.label}</span>
+                            {palette.uiStyleOwned && <span className="kimix-settings-palette-origin">风格化自带</span>}
+                          </span>
                           <span className="kimix-settings-palette-desc">{palette.description}</span>
                         </span>
                         <span className="kimix-settings-palette-swatches" aria-hidden="true">

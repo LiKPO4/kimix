@@ -8142,7 +8142,8 @@ const SettingsSchema = z.object({
   theme: z.enum(["dark", "light", "system"]).optional(),
   themePalette: z.string().refine((value) =>
     ["warm-paper", "neutral-gray", "soft-green", "warm-orange", "custom", "kimi"].includes(value) ||
-    /^kimi:[^:]+/.test(value)
+    /^kimi:[^:]+/.test(value) ||
+    /^ui-style:[a-z0-9][a-z0-9._-]{0,63}$/.test(value)
   ).optional(),
   uiStyle: z.string().refine((value) =>
     ["default", "modern", "retro", "nostalgia"].includes(value) ||
