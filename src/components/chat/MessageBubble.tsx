@@ -471,6 +471,67 @@ function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
     .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl }));
 }
 
+export const USER_MESSAGE_COLLAPSED_HEIGHT_PX = 252;
+
+export function CollapsibleUserMessageText({ content, messageId }: { content: string; messageId: string }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [isCollapsible, setIsCollapsible] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const bodyId = `kimix-user-message-${messageId.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+
+  useLayoutEffect(() => {
+    const node = contentRef.current;
+    if (!node) return;
+    const measure = () => {
+      const nextCollapsible = node.scrollHeight > USER_MESSAGE_COLLAPSED_HEIGHT_PX + 1;
+      setIsCollapsible(nextCollapsible);
+      if (!nextCollapsible) setIsExpanded(false);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [content]);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [content]);
+
+  const isCollapsed = isCollapsible && !isExpanded;
+  return (
+    <div className={`kimix-user-message-fold ${isCollapsed ? "is-collapsed" : ""}`}>
+      <div
+        id={bodyId}
+        className={`kimix-user-message-fold-body ${isCollapsed ? "is-collapsed" : ""}`}
+        style={isCollapsed ? { maxHeight: USER_MESSAGE_COLLAPSED_HEIGHT_PX } : undefined}
+      >
+        <div ref={contentRef} className="kimix-user-message-fold-text">{content}</div>
+      </div>
+      {isCollapsed && <div className="kimix-user-message-fold-fade" aria-hidden="true" />}
+      {isCollapsible && (
+        <div className="kimix-user-message-fold-action">
+          <button
+            type="button"
+            className="kimix-user-message-fold-toggle kimix-icon-text-button kimix-muted-action is-compact"
+            style={{ height: 32, minHeight: 32, paddingLeft: 13, paddingRight: 11 }}
+            aria-expanded={isExpanded}
+            aria-controls={bodyId}
+            onClick={() => setIsExpanded((value) => !value)}
+          >
+            <span>{isExpanded ? "收起" : "展开"}</span>
+            <StateIconSwap
+              active={isExpanded}
+              activeIcon={<ChevronUp size={14} />}
+              inactiveIcon={<ChevronDown size={14} />}
+            />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: { event: Extract<TimelineEvent, { type: "user_message" }>; onDelete?: (eventId: string) => void }) {
   const { copied, trigger } = useCopyTimeout();
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
@@ -655,7 +716,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
             style={{ minWidth: 64, paddingLeft: 15, paddingRight: 15, paddingTop: 8, paddingBottom: 8, whiteSpace: "pre-wrap" }}
             className="kimix-user-bubble rounded-[var(--radius-md)] text-[14.5px] leading-[1.45]"
           >
-            {event.content}
+            <CollapsibleUserMessageText content={event.content} messageId={event.id} />
           </div>
         )}
         <div

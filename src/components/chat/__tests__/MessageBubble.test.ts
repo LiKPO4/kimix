@@ -7,6 +7,8 @@ import type { SubagentEvent, TimelineEvent, ToolCallEvent } from "@/types/ui";
 import type { TurnBlock } from "@/utils/turnBlocks";
 import {
   KIMI_WEB_SUBAGENT_DETAIL_VIEWPORT_HEIGHT_PX,
+  USER_MESSAGE_COLLAPSED_HEIGHT_PX,
+  CollapsibleUserMessageText,
   KimiWebIntermediateTextBlock,
   KimiWebProcessList,
   KimiWebSubagentDetails,
@@ -15,6 +17,90 @@ import {
   MessageBubble,
 } from "../MessageBubble";
 import { QuestionCard } from "../QuestionCard";
+
+describe("超长用户消息折叠", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  let scrollHeightSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    scrollHeightSpy?.mockRestore();
+    container.remove();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+  });
+
+  it("短消息完整显示且不出现展开入口", async () => {
+    scrollHeightSpy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(120);
+
+    await act(async () => {
+      root.render(createElement(CollapsibleUserMessageText, { content: "这是一条普通长度的用户消息。", messageId: "short" }));
+    });
+
+    expect(container.querySelector(".kimix-user-message-fold-toggle")).toBeNull();
+    expect(container.querySelector(".kimix-user-message-fold-body")?.classList.contains("is-collapsed")).toBe(false);
+  });
+
+  it("超高正文默认折叠并可展开、再次收起", async () => {
+    scrollHeightSpy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(480);
+
+    await act(async () => {
+      root.render(createElement(CollapsibleUserMessageText, { content: "很长的正文\n".repeat(80), messageId: "long" }));
+    });
+
+    const body = container.querySelector<HTMLElement>(".kimix-user-message-fold-body");
+    const toggle = () => container.querySelector<HTMLButtonElement>(".kimix-user-message-fold-toggle");
+    expect(body?.classList.contains("is-collapsed")).toBe(true);
+    expect(body?.style.maxHeight).toBe(`${USER_MESSAGE_COLLAPSED_HEIGHT_PX}px`);
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle()?.textContent).toContain("展开");
+
+    await act(async () => toggle()!.click());
+    expect(body?.classList.contains("is-collapsed")).toBe(false);
+    expect(body?.style.maxHeight).toBe("");
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle()?.textContent).toContain("收起");
+
+    await act(async () => toggle()!.click());
+    expect(body?.classList.contains("is-collapsed")).toBe(true);
+    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("折叠只影响显示，图片附件与复制仍保留完整消息", async () => {
+    scrollHeightSpy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(480);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const content = "需要完整保留的正文。".repeat(120);
+
+    await act(async () => {
+      root.render(createElement(MessageBubble, {
+        event: {
+          id: "user-with-image",
+          type: "user_message",
+          timestamp: 1,
+          content,
+          images: [{ id: "image-1", kind: "image", name: "reference.png", dataUrl: "data:image/png;base64,AA==" }],
+        },
+      }));
+    });
+
+    expect(container.querySelector('[aria-label="查看图片 reference.png"]')).not.toBeNull();
+    expect(container.querySelector(".kimix-user-message-fold-body")?.classList.contains("is-collapsed")).toBe(true);
+    const copy = container.querySelector<HTMLButtonElement>('[aria-label="复制"]');
+    await act(async () => copy!.click());
+    expect(writeText).toHaveBeenCalledWith(`${content}\n\n[图片: reference.png]`);
+  });
+});
 
 function makeSubagent(detailCount: number): SubagentEvent {
   const events: TimelineEvent[] = Array.from({ length: detailCount }, (_, index) => ({

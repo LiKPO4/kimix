@@ -4,7 +4,7 @@ title: Streaming Render Pipeline
 description: How chat projection keeps structured media separate from text while streaming output stays cheap and addressable through stable identity, active-turn drafts, rich Markdown, and viewport gates.
 resource: https://github.com/LiKPO4/kimix/tree/master/src/components/chat
 tags: [architecture, chat, streaming, performance, projection, scroll-yield, search-navigation]
-timestamp: "2026-08-24T11:40:00+08:00"
+timestamp: "2026-08-24T12:00:59+08:00"
 ---
 
 # Streaming Render Pipeline
@@ -14,6 +14,12 @@ timestamp: "2026-08-24T11:40:00+08:00"
 Official user prompts keep text and media as separate content parts. Live wire history may reference an image through `image_url` plus a `kimi-file://` URL, while a Server snapshot may represent the same upload as `image` plus `source.kind=file`; neither form inserts `[图片]` into the user's text. Kimix must project every structured image part only into `TimelineEvent.images`. A missing inline data URL means the media bytes are file-backed or need renderer-local restoration; it does not authorize adding a visible placeholder to `TimelineEvent.content`.
 
 This separation is also a reconciliation invariant. The optimistic message owns the original text plus renderer-local image bytes, while canonical history owns the same text plus stable attachment identity. Keeping their text equal lets canonical replacement reattach local thumbnails instead of treating the replay as a different user message. Never fix this at render time with a global string replacement: a user may literally type `[图片]`, and the non-vision fallback `[图片: 文件名]` is deliberate model input rather than a structured-media projection.
+
+## Long user-message folding is display-only
+
+An ordinary `user_message` whose rendered text exceeds 252px starts visually collapsed. `CollapsibleUserMessageText` measures the real pre-wrapped body instead of guessing from character count, and a `ResizeObserver` re-evaluates after width, font-size, or font-layout changes. The collapsed view keeps a bottom fade plus an explicit expand control; expansion is local component state and remounting a history item intentionally restores the default collapsed state. `steer_message` remains outside this rule because it is an in-flight guidance/status surface rather than an ordinary settled user bubble.
+
+The fold is never a data transform. `TimelineEvent.content` remains complete, attachments render outside the clipped text body, and copy, withdraw-to-composer, reconciliation, persistence, export, and model context continue consuming the original text and image arrays. A visual threshold must never be reused to truncate stored content or attachment copy markers.
 
 ## Split turns keep protocol identity and unique render identity
 

@@ -498,6 +498,7 @@
 /* 用户输入再淡一级：可辨识作者归属，但不比元信息与代码阴影更抢眼。 */
 [data-ui-style="modern"] .kimix-user-bubble {
   background: var(--kimix-modern-user-bubble-background);
+  --kimix-user-message-fold-background: var(--kimix-modern-user-bubble-background);
 }
 
 /* 浮层、菜单、设置卡统一用同一套大圆角和低扩散阴影。 */
@@ -2581,6 +2582,87 @@ button.bg-accent-primary:disabled:hover,
   scale: 1;
 }
 
+.kimix-user-message-fold {
+  position: relative;
+  min-width: 0;
+}
+
+.kimix-user-message-fold-body {
+  min-width: 0;
+}
+
+.kimix-user-message-fold-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kimix-user-message-fold-body.is-collapsed {
+  overflow: hidden;
+  padding-bottom: 42px;
+}
+
+.kimix-user-message-fold-fade {
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 76px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--kimix-user-message-fold-background) 0%, transparent),
+    var(--kimix-user-message-fold-background) 68%
+  );
+}
+
+.kimix-user-message-fold-action {
+  position: relative;
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.kimix-user-message-fold.is-collapsed .kimix-user-message-fold-action {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  margin-top: 0;
+}
+
+.kimix-user-message-fold-toggle {
+  position: relative;
+  border: var(--ui-control-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-control-background);
+  box-shadow: var(--ui-control-shadow);
+}
+
+.kimix-user-message-fold-toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(100% + 4px);
+  height: 40px;
+  transform: translate(-50%, -50%);
+}
+
+:root:not([data-ui-style]) .kimix-user-message-fold-toggle {
+  border-color: var(--border-subtle);
+  background: var(--surface-base);
+  box-shadow: var(--shadow-hover);
+}
+
+[data-ui-style="modern"] .kimix-user-message-fold-toggle {
+  background: var(--surface-elevated);
+  box-shadow: var(--kimix-modern-surface-shadow);
+}
+
 .kimix-inline-icon-action {
   display: inline-flex;
   width: 28px;
@@ -4523,6 +4605,14 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--ui-role-user-bubble-radius);
   background: var(--ui-role-user-bubble-resting-background);
   box-shadow: var(--ui-role-user-bubble-resting-shadow);
+  --kimix-user-message-fold-background: var(--ui-role-user-bubble-resting-background);
+}
+
+:root[data-ui-style-contract="v1"] .kimix-user-message-fold-toggle {
+  border: var(--ui-role-control-resting-border);
+  border-radius: var(--ui-role-control-radius);
+  background: var(--ui-role-control-resting-background);
+  box-shadow: var(--ui-role-control-resting-shadow);
 }
 
 :root[data-ui-style-contract="v1"] :where(.kimix-status-surface, .kimix-settings-badge, .markdown-body .kimix-inline-code) {
@@ -5750,6 +5840,7 @@ button.bg-accent-primary:disabled:hover,
   background: var(--kimix-user-bubble-bg);
   color: var(--kimix-user-bubble-text);
   border-radius: var(--radius-md);
+  --kimix-user-message-fold-background: var(--kimix-user-bubble-bg);
 }
 
 /* ── Modal & Onboarding ── */
