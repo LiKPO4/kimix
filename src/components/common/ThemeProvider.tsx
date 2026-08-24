@@ -28,5 +28,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme, themePalette, customThemePalette, kimiThemePalettes, uiStyle, customUiStyles]);
 
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const applyWindowState = (maximized: boolean) => {
+      root.setAttribute("data-window-maximized", maximized ? "true" : "false");
+    };
+
+    void window.api.isWindowMaximized().then((result) => {
+      if (result.success) applyWindowState(result.data);
+    });
+    const unsubscribe = window.api.onWindowMaximizedChange((payload) => {
+      applyWindowState(payload.maximized || payload.fullscreen === true);
+    });
+    return () => {
+      unsubscribe();
+      root.removeAttribute("data-window-maximized");
+    };
+  }, []);
+
   return <>{children}</>;
 }

@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-24 功能：软件窗口圆角跟随界面风格（v2.21.105）
+
+- 根因：`roles.shell.radius` 只被 renderer 内层 `.kimix-app-shell-main` 消费；无边框 BrowserWindow 仍由 Windows DWM 使用固定系统圆角，CSS 无法改变最外层可见和可点击区域，所以怀旧直角、复古小圆角及自定义 shell 半径都在窗口四角失真。
+- 实现：Windows 主进程关闭固定系统圆角，依据内置/自定义风格的规范化 shell 半径生成 `setShape()` 整数矩形并集；切换风格、缩放窗口、还原窗口时动态同步，最大化/全屏恢复直角。renderer 最外 `.kimix-app-shell` 同时消费同一语义半径并在最大化时归零。
+- 兼容边界：默认/现代为 20px、复古为 6px、怀旧为 0px；自定义导入读取 `roles.shell.radius` 并保持现有 0–32px 契约上限，缺失或失效文档回退默认。macOS/Linux 继续使用平台原生窗口外形，避免透明窗口对缩放、最大化和系统阴影的已知破坏。
+- 回归保护：新增风格半径解析、CSS 外壳映射和窗口区域几何测试；Windows 原生外形仍待用户在实际桌面截图验收。
+
 ## 2026-08-24 修复：附带图片的用户消息不再显示协议占位符（v2.21.104）
 
 - 现场证据：截图对应的官方 `turn.prompt` 原始记录为 1 个 text part + 2 个 `image_url`（`kimi-file://` 独立引用），正文末尾没有 `[图片]`；Server 历史快照把已上传图片还原为 file-backed image part。
