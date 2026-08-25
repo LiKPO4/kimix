@@ -83,7 +83,9 @@ function readPersistedContent(key: string): string {
   const candidates: Array<{ content: string; updatedAt: number }> = [];
   const collect = (raw: string | null) => {
     const parsed = parse(raw);
-    if (parsed?.content) candidates.push(parsed);
+    // 空内容是一次权威清空，而不是“没有候选”。renderer 重启后 writerId 会变化，
+    // 若忽略较新的空槽，就会从其他旧 writer 槽恢复用户已经删除的文字。
+    if (parsed) candidates.push(parsed);
   };
   collect(localStorage.getItem(legacyStorageKey(key)));
   const prefix = draftStoragePrefix(key);
@@ -153,7 +155,6 @@ export function writeComposerDraft(key: string | null, draft: ComposerDraft): vo
         updatedAt: Date.now(),
         writerId: writerId(),
       }));
-      prunePersistedWriters(key, currentStorageKey);
     } else {
       localStorage.setItem(currentStorageKey, JSON.stringify({
         content: "",
@@ -161,6 +162,7 @@ export function writeComposerDraft(key: string | null, draft: ComposerDraft): vo
         writerId: writerId(),
       }));
     }
+    prunePersistedWriters(key, currentStorageKey);
     localStorage.removeItem(legacyStorageKey(key));
   } catch {
     // 内存副本仍然保护本次应用运行中的草稿；磁盘配额/权限错误不应打断输入。
@@ -172,11 +174,13 @@ export function clearComposerDraft(key: string | null): void {
   memoryDrafts.delete(key);
   try {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(storageKey(key), JSON.stringify({
+      const currentStorageKey = storageKey(key);
+      localStorage.setItem(currentStorageKey, JSON.stringify({
         content: "",
         updatedAt: Date.now(),
         writerId: writerId(),
       }));
+      prunePersistedWriters(key, currentStorageKey);
       localStorage.removeItem(legacyStorageKey(key));
     }
   } catch {

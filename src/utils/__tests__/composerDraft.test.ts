@@ -87,6 +87,24 @@ describe("composerDraft", () => {
     expect(localStorage.getItem(otherWindowKey)).toContain("另一个窗口尚未发送的内容");
   });
 
+  it("treats the newest empty writer slot as an authoritative clear after restart", () => {
+    const key = resolveComposerDraftKey("session-cleared-before-restart", "project-1")!;
+    const prefix = `kimix_composer_draft_v2:${encodeURIComponent(key)}:`;
+    localStorage.setItem(`${prefix}older-window`, JSON.stringify({
+      content: "已经在输入框中删除的旧长内容",
+      updatedAt: 100,
+      writerId: "older-window",
+    }));
+    localStorage.setItem(`${prefix}cleared-window`, JSON.stringify({
+      content: "",
+      updatedAt: 200,
+      writerId: "cleared-window",
+    }));
+    clearComposerDraftMemoryCache();
+
+    expect(readComposerDraft(key)).toEqual({ content: "", attachments: [] });
+  });
+
   it("keeps the draft contract wired across workspace unmounts and conversation switches", () => {
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
     const appShell = readFileSync(resolve(process.cwd(), "src/components/layout/AppShell.tsx"), "utf8");
