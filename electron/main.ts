@@ -4214,7 +4214,9 @@ function createWindow() {
     backgroundColor: "#00000000",
     icon: mainWindowIcon,
   });
-  if (process.platform === "win32" && !mainWindowIcon.isEmpty()) {
+  if (process.platform === "win32" && app.isPackaged && !mainWindowIcon.isEmpty()) {
+    // 打包态 EXE 图标即 Kimix，AUMID 分组身份与任务栏图标绑定；dev 态不设置，
+    // 否则无匹配快捷方式的自定义 AUMID 会让任务栏按钮回退宿主 electron.exe 的默认图标。
     mainWindow.setIcon(mainWindowIcon);
     mainWindow.setAppDetails({
       appId: WINDOWS_APP_USER_MODEL_ID,

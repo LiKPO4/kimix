@@ -15,6 +15,7 @@ describe("Windows 主窗口外壳", () => {
     expect(source).toContain('path.join(APP_ROOT, "..", "build", APP_ICON_FILE_NAME)');
     expect(source).toContain("const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);");
     expect(source).toContain("icon: mainWindowIcon");
+    expect(source).toContain('app.isPackaged && !mainWindowIcon.isEmpty()');
     expect(source).toContain("mainWindow.setIcon(mainWindowIcon);");
     expect(source).toContain("mainWindow.setAppDetails({");
     expect(source).toContain("appId: WINDOWS_APP_USER_MODEL_ID,");

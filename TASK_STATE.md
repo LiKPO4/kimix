@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：任务栏图标再次回退 androidx——setAppDetails 仅打包态（v2.21.120）
+
+- 现象：用户并行提交 41db22d6 恢复 dev 任务栏 Kimix 图标尝试失败，任务栏又显示 electron.exe 的默认 Atom 图标。
+- 根因：41db22d6 重新加入了 `mainWindow.setIcon + setAppDetails({appId: "com.kimix.app"})`（无条件执行）；dev 态自定义 AUMID 无匹配快捷方式时，Windows 任务栏按钮回退宿主 exe 图标——这正是 v2.21.109 已确认并移除的坑。
+- 修复：`setIcon/setAppDetails` 仅在 `app.isPackaged` 时执行（打包 EXE 图标即 Kimix，AUMID 分组身份保留）；dev 态不设置。windowChrome 测试断言同步。
+- 验证：重启后任务栏显示 Kimix 图标（深底白 K + active 下划线）；typecheck 与定向测试通过。
 ## 2026-08-25 修复：透明窗口补外描边并恢复任务栏 Kimix 图标（v2.21.119）
 
 - 现象：v2.21.118 的透明窗口在浅色桌面上缺少最外边界，窗口与背景辨识度低；Windows 任务栏按钮再次显示 Electron Atom 默认图标。
