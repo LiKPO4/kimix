@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：Kimi WebBridge 安装卡“部分就绪”——能力二进制占用释放（v2.21.121）
+
+- 现象：官方内置能力 Kimi WebBridge 卡在“部分就绪/继续安装”，顶部“正在安装…”一直转圈。
+- 根因：官方安装器把下载的 exe rename 到 `~/.kimi-webbridge/bin/` 时 EPERM（目标 `kimi-webbridge.exe` 正被运行中的进程占用，官方日志 `capability install failed step=download`），安装卡住并被标记 partial。
+- 修复：`kimiCodeHost.installCapability` 触发前按能力 id 先结束对应二进制进程（kimi-webbridge.exe / kimi-cu.exe），再调官方安装，重装/升级不再被占用打断。
+- 验证：本次 dev 重启后官方服务重新评估 wiring，WebBridge 已显示“就绪”（二进制与运行进程均有效），marketplace v1.11.3 已安装；typecheck 通过。
 ## 2026-08-25 修复：任务栏图标再次回退 androidx——setAppDetails 仅打包态（v2.21.120）
 
 - 现象：用户并行提交 41db22d6 恢复 dev 任务栏 Kimix 图标尝试失败，任务栏又显示 electron.exe 的默认 Atom 图标。

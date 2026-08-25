@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { execFile } from "node:child_process";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
@@ -2675,7 +2676,25 @@ export async function listCapabilities(): Promise<KimiCodeCapabilityStatus[]> {
   }
 }
 
+/**
+ * 官方安装器把下载的可执行文件 rename 到能力 bin 目录；运行中的二进制会占用目标文件，
+ * rename 以 EPERM 失败并把 capability 标记为“部分就绪”。Windows 下先结束对应二进制再触发安装。
+ */
+const CAPABILITY_BINARY_NAMES: Record<string, string> = {
+  "kimi-webbridge": "kimi-webbridge.exe",
+  "kimi-cu": "kimi-cu.exe",
+};
+
+async function stopCapabilityBinary(id: string): Promise<void> {
+  const processName = CAPABILITY_BINARY_NAMES[id];
+  if (process.platform !== "win32" || !processName) return;
+  await new Promise<void>((resolve) => {
+    execFile("taskkill", ["/F", "/IM", processName, "/T"], { windowsHide: true }, () => resolve());
+  });
+}
+
 export async function installCapability(id: string): Promise<KimiCodeCapabilityStatus> {
+  await stopCapabilityBinary(id);
   const sdkHarness = await getHarness();
   if (!sdkHarness.installCapability) throw new Error("当前引擎不支持官方内置能力（需要 SDK v2 引擎）。");
   try {
