@@ -13,6 +13,7 @@ import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { writeKimiConfigTomlIfUnchanged } from "./kimiConfigWriteGuard";
+import { KIMI_MEDIA_FILE_ID, readLocalKimiMediaFile, resolveKimiMediaFilePath } from "./kimiMediaFile";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
@@ -6204,7 +6205,22 @@ ipcMain.handle("kimi-code:loadFile", async (_, request: unknown) => {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const fileId = typeof req.fileId === "string" ? req.fileId.trim() : "";
     if (!fileId) return { success: false, error: "Missing fileId" };
-    return { success: true, data: await kimiCodeHost.loadServerFile(fileId) };
+    try {
+      return { success: true, data: await kimiCodeHost.loadServerFile(fileId) };
+    } catch (serverError) {
+      // 历史 f_* 文件在 Server 重启/离线时仍保存在当前 Kimi Home 的 files/ 下；
+      // 保持与 kimix-media 协议相同的受控路径和 MIME 推断，供图片预览、复制等 dataUrl 消费者回退。
+      const local = await readLocalKimiMediaFile(resolveKimiShareDir(), fileId);
+      if (local.status !== 200) throw serverError;
+      return {
+        success: true,
+        data: {
+          fileId,
+          mediaType: local.mediaType,
+          dataUrl: `data:${local.mediaType};base64,${local.data.toString("base64")}`,
+        },
+      };
+    }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -8674,41 +8690,57 @@ if (!app.isPackaged || process.env.KIMIX_REMOTE_DEBUGGING === "1") {
 }
 
 
-const KIMIX_MEDIA_FILE_ID = /^f_[A-Za-z0-9-]+$/;
 const KIMIX_MEDIA_MIME = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i;
 
-// 历史官方文件流式代理：fileId → ~/.kimi-code/files/<fileId> → 官方 fs:content（ETag + Range）。
-// 仅 Server 路由可用；渲染进程保留整段 dataUrl 加载作为回退路径（SDK 路由不受影响）。
+// 历史官方文件流式代理：fileId → 当前 Kimi shareDir/files/<fileId> → 官方 fs:content（ETag + Range）。
+// Server 不可用或读取失败时，由主进程从同一受控目录提供本地 Range/整文件回退。
 async function handleKimixMediaRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
     if (url.hostname !== "server-file") return new Response("Unknown kimix-media host", { status: 404 });
     const fileId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-    if (!KIMIX_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
-    const filesDir = path.resolve(os.homedir(), ".kimi-code", "files");
-    const filePath = path.resolve(filesDir, fileId);
-    // Reject anything that escapes the official files directory (defense in depth on top of fileId regex).
-    if (!filePath.startsWith(filesDir + path.sep) || path.basename(filePath) !== fileId || !fs.existsSync(filePath)) {
+    const shareDir = resolveKimiShareDir();
+    const filePath = resolveKimiMediaFilePath(shareDir, fileId);
+    if (!KIMI_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
+    // resolveKimiMediaFilePath performs both the strict f_* allowlist and containment check.
+    if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
       return new Response("File not found", { status: 404 });
     }
-    if (!kimiCodeServerHost.isReady()) return new Response("Kimi Server 未就绪", { status: 503 });
-    const endpoint = kimiCodeServerHost.getStatus().endpoint;
     const range = request.headers.get("range");
-    const upstream = await net.fetch(`${endpoint}/api/v1/fs:content?path=${encodeURIComponent(filePath)}`, {
-      headers: { ...serverAuthHeaders(), ...(range ? { range } : {}) },
-    });
-    if (!upstream.ok && upstream.status !== 206) {
-      return new Response(`fs:content upstream HTTP ${upstream.status}`, { status: upstream.status === 404 ? 404 : 502 });
-    }
     const mimeHint = url.searchParams.get("mime") ?? "";
-    const headers = new Headers();
-    headers.set("Content-Type", KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : upstream.headers.get("content-type") ?? "application/octet-stream");
-    for (const key of ["content-length", "content-range", "etag", "last-modified"]) {
-      const value = upstream.headers.get(key);
-      if (value) headers.set(key, value);
+    if (kimiCodeServerHost.isReady()) {
+      try {
+        const endpoint = kimiCodeServerHost.getStatus().endpoint;
+        const upstream = await net.fetch(`${endpoint}/api/v1/fs:content?path=${encodeURIComponent(filePath)}`, {
+          headers: { ...serverAuthHeaders(), ...(range ? { range } : {}) },
+        });
+        if (upstream.ok || upstream.status === 206) {
+          const headers = new Headers();
+          headers.set("Content-Type", KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : upstream.headers.get("content-type") ?? "application/octet-stream");
+          for (const key of ["content-length", "content-range", "etag", "last-modified"]) {
+            const value = upstream.headers.get(key);
+            if (value) headers.set(key, value);
+          }
+          headers.set("Accept-Ranges", "bytes");
+          return new Response(upstream.body, { status: upstream.status, headers });
+        }
+        console.warn(`[kimix-media] fs:content HTTP ${upstream.status}; falling back to local file ${fileId}`);
+      } catch (error) {
+        console.warn(`[kimix-media] fs:content failed; falling back to local file ${fileId}:`, error);
+      }
     }
-    headers.set("Accept-Ranges", "bytes");
-    return new Response(upstream.body, { status: upstream.status, headers });
+
+    const local = await readLocalKimiMediaFile(shareDir, fileId, range);
+    const headers = new Headers({
+      "Content-Type": KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : local.mediaType,
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(local.data.byteLength),
+    });
+    if (local.status === 206) headers.set("Content-Range", `bytes ${local.start}-${local.end}/${local.totalSize}`);
+    if (local.status === 416) headers.set("Content-Range", `bytes */${local.totalSize}`);
+    const body = new Uint8Array(local.data.byteLength);
+    body.set(local.data);
+    return new Response(local.status === 416 ? null : body, { status: local.status, headers });
   } catch (error) {
     return new Response(`media proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 502 });
   }

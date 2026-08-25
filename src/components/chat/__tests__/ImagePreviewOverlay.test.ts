@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { findPreviewImageIndex, getPreviewImageNeighbor, type PreviewImage } from "../ImagePreviewOverlay";
+import { describe, expect, it, vi } from "vitest";
+import { findPreviewImageIndex, getPreviewImageNeighbor, materializePreviewImageDataUrl, type PreviewImage } from "../ImagePreviewOverlay";
 
 const img: PreviewImage = { name: "a.png", dataUrl: "data:a", id: "img-1" };
 const imgNoId: PreviewImage = { name: "b.png", dataUrl: "data:b" };
@@ -31,6 +31,43 @@ describe("findPreviewImageIndex", () => {
 
   it("returns -1 for an empty list", () => {
     expect(findPreviewImageIndex(img, [])).toBe(-1);
+  });
+
+  it("keeps distinct file-backed images distinct when both data URLs are empty", () => {
+    const streamed: PreviewImage[] = [
+      { name: "f_first", fileId: "f_first", dataUrl: "", url: "kimix-media://server-file/f_first" },
+      { name: "f_second", fileId: "f_second", dataUrl: "", url: "kimix-media://server-file/f_second" },
+    ];
+
+    expect(findPreviewImageIndex(streamed[1], streamed)).toBe(1);
+    expect(getPreviewImageNeighbor(streamed[1], streamed, -1)).toBe(streamed[0]);
+  });
+});
+
+describe("materializePreviewImageDataUrl", () => {
+  it("loads a file-backed image into a usable data URL for copy and drawing", async () => {
+    const loadFile = vi.fn().mockResolvedValue({
+      success: true,
+      data: { fileId: "f_image", mediaType: "image/png", dataUrl: "data:image/png;base64,AA==" },
+    });
+
+    await expect(materializePreviewImageDataUrl({
+      name: "f_image",
+      fileId: "f_image",
+      dataUrl: "",
+      url: "kimix-media://server-file/f_image",
+    }, loadFile)).resolves.toBe("data:image/png;base64,AA==");
+    expect(loadFile).toHaveBeenCalledWith({ fileId: "f_image" });
+  });
+
+  it("rejects an unavailable stream instead of handing an empty data URL to copy or drawing", async () => {
+    const loadFile = vi.fn().mockResolvedValue({ success: false, error: "File not found" });
+
+    await expect(materializePreviewImageDataUrl({
+      name: "f_missing",
+      fileId: "f_missing",
+      dataUrl: "",
+    }, loadFile)).rejects.toThrow("File not found");
   });
 });
 

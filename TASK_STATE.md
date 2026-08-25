@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：历史 file-backed 图片操作与离线读取链路补齐（v2.21.118）
+
+- P2 根因一：file-backed 图片没有内联 dataUrl，预览列表却用空 dataUrl 兜底定位，导致多张历史图片都命中第一张；复制图片和画板也把空 dataUrl 直接传给后续能力。
+- P2 根因二：`kimix-media` 把文件目录固定为 `~/.kimi-code/files` 且强依赖已就绪 Server，与实际 `KIMI_CODE_HOME` / `KIMI_SHARE_DIR` / legacy `.kimi` 解析不一致，Server 离线时本地仍存在的历史媒体也无法读取。
+- 修复：预览身份按 `id → fileId → url → 非空 dataUrl → name` 分级定位；缩略图、预览失败以及复制/画板操作按需通过现有文件 IPC 物化 data URL。主进程统一从当前 Kimi shareDir 做严格 fileId/路径校验，优先官方 `fs:content`，失败后本地受控回退；Range 回退只读请求片段并返回 206/416。
+- 回归保护：覆盖多张空 dataUrl 图片导航、复制/画板物化、自定义/legacy Kimi 目录、路径逃逸、Range 局部读取与常见图片 MIME 推断。
+- 验证：全量 190 个测试文件 / 2061 项、Node/Renderer typecheck、OKF strict 校验与生产构建通过。
+
 ## 2026-08-25 修复：清空的 Composer 草稿重启后不再复活（v2.21.117）
 
 - 现象：输入框保留过长内容时，用户将文字全部删除并关闭应用，重新打开同一对话仍恢复已经删掉的旧文字。

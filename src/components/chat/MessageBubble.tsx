@@ -11,7 +11,7 @@ import { ChangeCard } from "./ChangeCard";
 import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
 import { QuestionCard } from "./QuestionCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
-import { ImagePreviewOverlay, type PreviewImage } from "./ImagePreviewOverlay";
+import { ImagePreviewOverlay, materializePreviewImageDataUrl, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
 import { assistantTurnStartedAt } from "@/utils/processTiming";
@@ -353,18 +353,80 @@ function AttachmentThumb({
   onPreview: (image: PreviewImage) => void;
 }) {
   if (image.kind === "video") return <VideoAttachmentThumb image={image} index={index} />;
+  return <ImageAttachmentThumb image={image} index={index} onPreview={onPreview} />;
+}
+
+function ImageAttachmentThumb({
+  image,
+  index,
+  onPreview,
+}: {
+  image: UserMessageImage;
+  index: number;
+  onPreview: (image: PreviewImage) => void;
+}) {
+  const fileId = imageFileId(image);
+  const [fallbackDataUrl, setFallbackDataUrl] = useState("");
+  const [isMaterializing, setIsMaterializing] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const fallbackAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    setFallbackDataUrl("");
+    setIsMaterializing(false);
+    setLoadError("");
+    fallbackAttemptedRef.current = false;
+  }, [image.dataUrl, fileId, image.url]);
+
+  const source = fallbackDataUrl || imageSource(image);
+  const materializeFallback = async () => {
+    if (!fileId || fallbackAttemptedRef.current) return;
+    fallbackAttemptedRef.current = true;
+    setIsMaterializing(true);
+    setLoadError("");
+    try {
+      const dataUrl = await materializePreviewImageDataUrl({
+        id: image.id,
+        fileId,
+        name: image.name,
+        dataUrl: image.dataUrl ?? "",
+        url: image.url,
+      }, (request) => window.api.loadKimiCodeFile(request));
+      setFallbackDataUrl(dataUrl);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsMaterializing(false);
+    }
+  };
+
   if (image.dataUrl || imageFileId(image)) {
-    const source = imageSource(image);
     return (
       <button
         key={image.id ?? `${image.name}-${index}`}
         type="button"
-        onClick={() => onPreview({ id: image.id, name: image.name, dataUrl: image.dataUrl ?? "", url: image.dataUrl ? undefined : source })}
-        className="kimix-media-thumb h-24 w-24 overflow-hidden"
-        title="点击查看图片"
+        onClick={() => onPreview({
+          id: image.id,
+          fileId,
+          name: image.name,
+          dataUrl: fallbackDataUrl || image.dataUrl || "",
+          url: fallbackDataUrl || image.dataUrl ? undefined : source,
+        })}
+        className="kimix-media-thumb relative h-24 w-24 overflow-hidden"
+        title={loadError || "点击查看图片"}
         aria-label={`查看图片 ${image.name}`}
       >
-        <img src={source} alt={image.name} className="kimix-media-preview h-full w-full object-cover" />
+        <img
+          src={source}
+          alt={image.name}
+          className="kimix-media-preview h-full w-full object-cover"
+          onError={() => void materializeFallback()}
+        />
+        {isMaterializing && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 text-white" aria-label="正在读取图片">
+            <Loader2 size={17} className="kimix-spin" />
+          </span>
+        )}
       </button>
     );
   }
@@ -485,7 +547,16 @@ function imageSource(image: UserMessageImage): string {
 function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
   return images
     .filter((image) => image.kind !== "video" && (Boolean(image.dataUrl?.startsWith("data:image/")) || Boolean(imageFileId(image))))
-    .map((image) => ({ id: image.id, name: image.name, dataUrl: image.dataUrl ?? "", url: image.dataUrl ? undefined : (imageFileId(image) ? serverFileStreamUrl(imageFileId(image)!) : undefined) }));
+    .map((image) => {
+      const fileId = imageFileId(image);
+      return {
+        id: image.id,
+        fileId,
+        name: image.name,
+        dataUrl: image.dataUrl ?? "",
+        url: image.dataUrl ? undefined : (fileId ? serverFileStreamUrl(fileId) : undefined),
+      };
+    });
 }
 
 export const USER_MESSAGE_COLLAPSED_HEIGHT_PX = 252;
