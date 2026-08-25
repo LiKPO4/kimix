@@ -144,6 +144,8 @@
   --shadow-elevated: 0 8px 24px rgba(25, 23, 20, 0.08), 0 2px 6px rgba(25, 23, 20, 0.04);
   --shadow-floating: 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
   --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px rgba(25, 23, 20, 0.12), 0 8px 20px rgba(25, 23, 20, 0.06);
+  /* 透明 BrowserWindow 没有 DWM 外框；用纯中性色内描边保持窗口与桌面可辨。 */
+  --kimix-window-outline: rgba(0, 0, 0, 0.22);
 
   /* Interface-style contract. Components consume these semantic tokens;
      presets override them without taking ownership of theme colors. */
@@ -240,6 +242,7 @@
   --border-subtle: #3E4658;
   --border-default: #556070;
   --border-strong: #6B768A;
+  --kimix-window-outline: rgba(255, 255, 255, 0.18);
 
   --accent-primary: #5AABFF;
   --accent-primary-light: #1A2F4A;
@@ -3106,13 +3109,31 @@ button.bg-accent-primary:disabled:hover,
 /* ── App Shell ── */
 
 .kimix-app-shell {
+  position: relative;
+  isolation: isolate;
   background: var(--surface-ground);
   color: var(--text-primary);
   border-radius: var(--kimix-window-corner-radius);
 }
 
+/* Windows 透明窗口没有可用的系统外描边，且向外的 shadow 会被 HWND 边界裁掉。
+   单独的覆盖层把 1px 中性描边画在窗口内部，不占布局，也不会重现灰色包裹层。 */
+:root[data-transparent-shell="1"] .kimix-app-shell::after {
+  content: "";
+  position: absolute;
+  z-index: 2147483647;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--kimix-window-outline);
+  pointer-events: none;
+}
+
 :root[data-window-maximized="true"] .kimix-app-shell {
   border-radius: 0;
+}
+
+:root[data-window-maximized="true"] .kimix-app-shell::after {
+  display: none;
 }
 
 .kimix-app-shell-main {

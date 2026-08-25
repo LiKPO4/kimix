@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-25 修复：透明窗口补外描边并恢复任务栏 Kimix 图标（v2.21.119）
+
+- 现象：v2.21.118 的透明窗口在浅色桌面上缺少最外边界，窗口与背景辨识度低；Windows 任务栏按钮再次显示 Electron Atom 默认图标。
+- 外框根因与修复：透明 BrowserWindow 不再具有 DWM 外框，`.kimix-app-shell` 只有圆角/底色，主内容区边框也不是窗口边界。最外壳新增不占布局、不接收鼠标的 1px 中性 inset 描边覆盖层（浅色低透明黑、深色低透明白），沿当前风格 shell 半径裁切，最大化时关闭；不向 HWND 外扩，因此不会重现灰色包裹层。
+- 图标证据与根因：发行 `Kimix.exe` 内嵌图标、`resources/icon.ico` 与仓库 `build/icon.ico` 一致，均为 Kimix K，排除打包资源遗漏。回归来自窗口创建链删除了显式 `nativeImage` / `setIcon` / `setAppDetails` 后，无框透明窗口的任务栏身份回退到 Electron 宿主图标。
+- 图标修复：恢复同源 NativeImage 校验和窗口级 `setIcon` / `setAppDetails`；AppID 继续使用与 electron-builder 一致的 `com.kimix.app`，安装版/便携版不产生新分组，dev 仍不设置进程 AUMID。
+- 回归保护：外框契约覆盖透明/最大化状态，Windows chrome 契约覆盖 nativeImage、窗口图标、任务栏 AppID/图标路径与打包资源；视觉验收等待用户安装或运行 v2.21.119 后截图确认。
+- 验证：全量 190 个测试文件 / 2061 项、Node/Renderer typecheck、OKF strict 校验与生产构建通过。
+
 ## 2026-08-25 修复：历史 file-backed 图片操作与离线读取链路补齐（v2.21.118）
 
 - P2 根因一：file-backed 图片没有内联 dataUrl，预览列表却用空 dataUrl 兜底定位，导致多张历史图片都命中第一张；复制图片和画板也把空 dataUrl 直接传给后续能力。

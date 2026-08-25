@@ -47,12 +47,14 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/:root\s*\{[^}]*--kimix-window-corner-radius:\s*16px;/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s*\{[^}]*--kimix-window-corner-radius:\s*20px;/s);
     expect(css).toMatch(/\.kimix-app-shell\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
+    expect(css).toMatch(/:root\[data-transparent-shell="1"\]\s+\.kimix-app-shell::after\s*\{[^}]*inset:\s*0;[^}]*border-radius:\s*inherit;[^}]*box-shadow:\s*inset 0 0 0 1px var\(--kimix-window-outline\);[^}]*pointer-events:\s*none;/s);
     expect(css).toMatch(/\.kimix-app-shell-main\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s+\.kimix-app-shell-main\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
     expect(css).toMatch(/\[data-ui-style="retro"\]\s*\{[^}]*--kimix-window-corner-radius:\s*6px;/s);
     expect(css).toMatch(/\[data-ui-style="nostalgia"\]\s*\{[^}]*--kimix-window-corner-radius:\s*0px;/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s*\{[^}]*--kimix-window-corner-radius:\s*var\(--ui-role-shell-radius\);/s);
     expect(css).toMatch(/:root\[data-window-maximized="true"\]\s+\.kimix-app-shell\s*\{[^}]*border-radius:\s*0;/s);
+    expect(css).toMatch(/:root\[data-window-maximized="true"\]\s+\.kimix-app-shell::after\s*\{[^}]*display:\s*none;/s);
   });
 
   it("复古风格只改变形状质感，不覆盖颜色主题 token", () => {

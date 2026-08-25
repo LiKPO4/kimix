@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Windows 主窗口外壳", () => {
-  it("窗口四角随风格裁切，任务栏图标沿用窗口 Kimix 图标", () => {
+  it("窗口四角随风格裁切，Windows 任务栏图标和分组身份都绑定 Kimix", () => {
     const source = readFileSync(resolve(process.cwd(), "electron/main.ts"), "utf8");
 
     expect(source).toContain("frame: false");
@@ -13,12 +13,16 @@ describe("Windows 主窗口外壳", () => {
     expect(source).toContain('const APP_ICON_FILE_NAME = process.platform === "win32" ? "icon.ico" : "icon.png";');
     expect(source).toContain("path.join(process.resourcesPath, APP_ICON_FILE_NAME)");
     expect(source).toContain('path.join(APP_ROOT, "..", "build", APP_ICON_FILE_NAME)');
-    expect(source).toContain("icon: APP_ICON_PATH");
+    expect(source).toContain("const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);");
+    expect(source).toContain("icon: mainWindowIcon");
+    expect(source).toContain("mainWindow.setIcon(mainWindowIcon);");
+    expect(source).toContain("mainWindow.setAppDetails({");
+    expect(source).toContain("appId: WINDOWS_APP_USER_MODEL_ID,");
+    expect(source).toContain("appIconPath: APP_ICON_PATH,");
+    expect(source).toContain("appIconIndex: 0,");
     expect(source).toContain('transparent: process.platform === "win32" ? true : false');
     expect(source).toContain('backgroundColor: "#00000000"');
     expect(source).not.toContain("setShape");
-    expect(source).not.toContain("mainWindow.setIcon(");
-    expect(source).not.toContain("mainWindow.setAppDetails(");
   });
 
   it("渲染进程为 Windows 透明外壳标记 CSS 消费分支", () => {

@@ -4186,6 +4186,14 @@ const rememberStartupProject = createDistinctAsyncWriter<Project>(
 function createWindow() {
   logMainStartup("createWindow:start");
   rendererReloadedAfterBlank = false;
+  // BrowserWindow 的 icon 选项只参与创建时的窗口图标初始化；Windows 任务栏在
+  // 自定义 AUMID 分组、无边框透明窗口等路径下仍可能回退到宿主 electron.exe。
+  // 显式复用同一 NativeImage 设回窗口，并将 taskbar button 的 appId 保持与
+  // electron-builder 的 appId 一致，避免图标正确但被分到另一个任务栏组。
+  const mainWindowIcon = nativeImage.createFromPath(APP_ICON_PATH);
+  if (mainWindowIcon.isEmpty()) {
+    console.warn(`[window] app icon is empty: ${APP_ICON_PATH}`);
+  }
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -4204,8 +4212,16 @@ function createWindow() {
     skipTaskbar: false,
     transparent: process.platform === "win32" ? true : false,
     backgroundColor: "#00000000",
-    icon: APP_ICON_PATH,
+    icon: mainWindowIcon,
   });
+  if (process.platform === "win32" && !mainWindowIcon.isEmpty()) {
+    mainWindow.setIcon(mainWindowIcon);
+    mainWindow.setAppDetails({
+      appId: WINDOWS_APP_USER_MODEL_ID,
+      appIconPath: APP_ICON_PATH,
+      appIconIndex: 0,
+    });
+  }
 
   // Kimi Code Host is the single event source for renderer sessions.
   kimiCodeHost.setKimiCodeEventSink((payload) => {
