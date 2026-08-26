@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { app } from "electron";
 import { candidateKimiShareDirs, findKimiCodeSessionDir, getFirstUserMessage, readKimiCodeSessionMetadata } from "./sessionHistory";
+import { collectOwnProcessIds, parseWin32ProcessTable } from "./win32ProcessTree";
 import { installNonVisionFetchInterceptor } from "./nonVisionFetchInterceptor";
 import { resolveCatalogModelMetadata } from "./providerEffortProbe";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
@@ -2678,19 +2679,47 @@ export async function listCapabilities(): Promise<KimiCodeCapabilityStatus[]> {
 
 /**
  * 官方安装器把下载的可执行文件 rename 到能力 bin 目录；运行中的二进制会占用目标文件，
- * rename 以 EPERM 失败并把 capability 标记为“部分就绪”。Windows 下先结束对应二进制再触发安装。
+ * rename 以 EPERM 失败并把 capability 标记为“部分就绪”。Windows 下先结束 Kimix 自己拉起的
+ * 同名二进制再触发安装：只按 PID 定向结束（当前进程的后代，或父进程已退出、来自上一实例的
+ * 残留孤儿），不用 taskkill /IM 按镜像名全局结束，避免误杀其他 Kimi 系工具的同名进程。
  */
 const CAPABILITY_BINARY_NAMES: Record<string, string> = {
   "kimi-webbridge": "kimi-webbridge.exe",
   "kimi-cu": "kimi-cu.exe",
 };
 
+function listWin32ProcessTable(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Select-Object Name,ProcessId,ParentProcessId | ConvertTo-Json -Compress"],
+      { windowsHide: true, timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
+      (error, stdout) => { if (error) reject(error); else resolve(stdout); },
+    );
+  });
+}
+
+function killProcessTree(pid: number): Promise<void> {
+  return new Promise((resolve) => {
+    execFile("taskkill", ["/F", "/T", "/PID", String(pid)], { windowsHide: true }, () => resolve());
+  });
+}
+
 async function stopCapabilityBinary(id: string): Promise<void> {
   const processName = CAPABILITY_BINARY_NAMES[id];
   if (process.platform !== "win32" || !processName) return;
-  await new Promise<void>((resolve) => {
-    execFile("taskkill", ["/F", "/IM", processName, "/T"], { windowsHide: true }, () => resolve());
-  });
+  try {
+    const table = parseWin32ProcessTable(await listWin32ProcessTable());
+    const pids = collectOwnProcessIds(table, process.pid, processName);
+    for (const pid of pids) await killProcessTree(pid);
+    if (pids.length > 0) {
+      console.warn(`[KimiCodeHost] capability install: stopped own ${processName} before install (pids: ${pids.join(", ")})`);
+    }
+  } catch (error) {
+    // 枚举失败时跳过预清理；文件确被占用时安装仍按原行为报部分就绪，不额外扩大影响面。
+    console.warn("[KimiCodeHost] capability pre-install stop skipped:", error);
+  }
 }
 
 export async function installCapability(id: string): Promise<KimiCodeCapabilityStatus> {

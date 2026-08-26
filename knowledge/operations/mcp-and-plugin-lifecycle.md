@@ -4,7 +4,7 @@ title: MCP and Plugin Lifecycle
 description: Safe rules for configuring ordinary MCP servers and updating plugin-provided MCP servers without self-locking managed directories.
 resource: https://github.com/LiKPO4/kimix/blob/master/src/components/layout/McpPanel.tsx
 tags: [mcp, plugins, operations, troubleshooting]
-timestamp: "2026-08-08T11:10:00+08:00"
+timestamp: "2026-08-26T10:30:00+08:00"
 ---
 
 # MCP and Plugin Lifecycle
@@ -32,6 +32,7 @@ Kimix distinguishes ordinary MCP configuration from MCP servers bundled inside a
 * A capability bundles a binary runtime plus agent wiring and reports layered readiness (`not_installed` / `partial` / `ready` / `unsupported`) with per-step states; `partial` means install can be resumed, and install progress (`install.step` / `percent`) is polled while `install.running`.
 * Official `installCapability` is fire-and-forget: the RPC resolves immediately after kicking off a background install, so callers must keep polling `listCapabilities` until `install.running` flips to `false` (v2.21.60 treated RPC return as completion, which froze the UI on a stale "installing" state with no step/percent).
 * Kimix surfaces them in the plugin store page through `kimi-code:listCapabilities` / `kimi-code:installCapability` IPC, and refreshes the SDK plugin state after install because installation wires a managed plugin.
+* The Windows pre-install binary release (added v2.21.121 for the EPERM rename lock) must stay scoped to Kimix-owned processes: kill only PIDs that are descendants of the current process or same-name orphans whose parent has exited, via the parsed Win32_Process table (`electron/win32ProcessTree.ts`). Never `taskkill /IM` by image name globally — other Kimi tooling may run the same binary. Enumeration failure skips the pre-clean and falls back to the ordinary partial-readiness report.
 
 # Local Skill Scan
 

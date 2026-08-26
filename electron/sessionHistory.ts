@@ -38,11 +38,11 @@ export interface SessionInfo {
 // Share / home directory resolution
 // ---------------------------------------------------------------------------
 
-function defaultKimiCodeShareDir() {
+export function defaultKimiCodeShareDir() {
   return path.join(os.homedir(), ".kimi-code");
 }
 
-function legacyKimiShareDir() {
+export function legacyKimiShareDir() {
   return path.join(os.homedir(), ".kimi");
 }
 

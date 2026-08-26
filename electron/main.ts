@@ -19,6 +19,7 @@ import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
+import { defaultKimiCodeShareDir, legacyKimiShareDir, resolveKimiShareDir } from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
 import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KimiCredentialAuthTaskCoordinator, KimiCredentialCandidateQueue, KIMI_WEB_QUOTA_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
 import {
@@ -635,24 +636,6 @@ function getKimiPaths() {
     config: path.join(shareDir, "config.toml"),
     mcpConfig: path.join(shareDir, "mcp.json"),
   };
-}
-
-function defaultKimiCodeShareDir() {
-  return path.join(os.homedir(), ".kimi-code");
-}
-
-function legacyKimiShareDir() {
-  return path.join(os.homedir(), ".kimi");
-}
-
-function resolveKimiShareDir() {
-  if (process.env.KIMI_CODE_HOME) return process.env.KIMI_CODE_HOME;
-  if (process.env.KIMI_SHARE_DIR) return process.env.KIMI_SHARE_DIR;
-  const current = defaultKimiCodeShareDir();
-  const legacy = legacyKimiShareDir();
-  if (fs.existsSync(current)) return current;
-  if (fs.existsSync(legacy)) return legacy;
-  return current;
 }
 
 function readKimiServerToken() {
@@ -8717,10 +8700,10 @@ async function handleKimixMediaRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (url.hostname !== "server-file") return new Response("Unknown kimix-media host", { status: 404 });
     const fileId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-    const shareDir = resolveKimiShareDir();
-    const filePath = resolveKimiMediaFilePath(shareDir, fileId);
     if (!KIMI_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
-    // resolveKimiMediaFilePath performs both the strict f_* allowlist and containment check.
+    const shareDir = resolveKimiShareDir();
+    // resolveKimiMediaFilePath re-checks the f_* allowlist and directory containment.
+    const filePath = resolveKimiMediaFilePath(shareDir, fileId);
     if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
       return new Response("File not found", { status: 404 });
     }

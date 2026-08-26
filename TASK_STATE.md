@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-26 修复：能力安装预清理不再按镜像名全局杀进程（v2.21.122）
+
+- 现场：v2.21.121 用 `taskkill /F /IM <exe>` 在能力安装前释放二进制占用，但该写法会结束全系统所有同名进程，可能误杀其他 Kimi 系工具拉起的 kimi-webbridge.exe / kimi-cu.exe。
+- 修复：新增 `electron/win32ProcessTree.ts`（PowerShell 枚举 Win32_Process 进程表），`stopCapabilityBinary` 只定向结束两类“自有”进程——当前 Kimix 进程的后代（本次实例经 SDK/Server 拉起），以及父进程已退出的同名孤儿（上一实例残留）；按 PID `taskkill /T`，不再按镜像名。枚举失败时跳过预清理（回到原部分就绪行为），不扩大影响面。
+- 顺带：main.ts 与 sessionHistory.ts 的 `resolveKimiShareDir` 三函数重复实现合并为 sessionHistory 单一导出；kimix-media 协议 fileId 校验顺序理顺（先正则后解析）。
+- 验证：新增 win32ProcessTree.test.ts 9 项（解析/后代/孤儿/他方进程/大小写/父链成环/root 兜底）；typecheck、kimiMediaFile/windowChrome 相关测试通过。
+
 ## 2026-08-25 修复：Kimi WebBridge 安装卡“部分就绪”——能力二进制占用释放（v2.21.121）
 
 - 现象：官方内置能力 Kimi WebBridge 卡在“部分就绪/继续安装”，顶部“正在安装…”一直转圈。
