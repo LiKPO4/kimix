@@ -69,6 +69,34 @@ describe("materializePreviewImageDataUrl", () => {
       dataUrl: "",
     }, loadFile)).rejects.toThrow("File not found");
   });
+
+  it("loads a blobref image from local session blobs for copy and drawing", async () => {
+    const blobRef = "b".repeat(64);
+    const loadFile = vi.fn().mockResolvedValue({
+      success: true,
+      data: { fileId: blobRef, mediaType: "image/png", dataUrl: "data:image/png;base64,AA==" },
+    });
+
+    await expect(materializePreviewImageDataUrl({
+      name: "图片 2",
+      blobRef,
+      dataUrl: "",
+      url: `kimix-media://blob/${blobRef}`,
+    }, loadFile)).resolves.toBe("data:image/png;base64,AA==");
+    expect(loadFile).toHaveBeenCalledWith({ fileId: undefined, blobRef });
+  });
+});
+
+describe("blobref 预览导航", () => {
+  it("keeps distinct blobref images distinct when data URLs are empty", () => {
+    const streamed: PreviewImage[] = [
+      { name: "图片 2", blobRef: "a".repeat(64), dataUrl: "" },
+      { name: "图片 3", blobRef: "b".repeat(64), dataUrl: "" },
+    ];
+
+    expect(findPreviewImageIndex(streamed[1], streamed)).toBe(1);
+    expect(getPreviewImageNeighbor(streamed[1], streamed, -1)).toBe(streamed[0]);
+  });
 });
 
 describe("getPreviewImageNeighbor", () => {

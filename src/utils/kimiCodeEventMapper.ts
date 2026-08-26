@@ -1,5 +1,5 @@
 import type { TimelineEvent, UserMessageImage } from "../types/ui";
-import { extractUserMessage, mergeEvents } from "./eventMapper";
+import { extractUserMessage, mergeEvents, parseBlobRefUrl } from "./eventMapper";
 import {
   formatKimiSkillActivationCommand,
   parseKimiAgentEnvelope,
@@ -303,7 +303,8 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
         : (isRecord(part.image_url) ? part.image_url : {});
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined, fileId: resolveImageFileId(id, url) });
+      const blob = parseBlobRefUrl(url);
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined, fileId: resolveImageFileId(id, url), blobRef: blob?.hash, mediaType: blob?.mediaType });
       return;
     }
     if (part.type === "image" && isRecord(part.source)) {
@@ -324,7 +325,8 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
         : url?.startsWith("data:image/")
           ? url
           : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl, fileId: resolveImageFileId(id, url ?? dataUrl) });
+      const blob = parseBlobRefUrl(url);
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl, fileId: resolveImageFileId(id, url ?? dataUrl), blobRef: blob?.hash, mediaType: blob?.mediaType });
       return;
     }
     if (part.type === "video_url") {
@@ -333,20 +335,23 @@ function extractPromptMessage(input: unknown): { content: string; images: UserMe
         : (isRecord(part.video_url) ? part.video_url : {});
       const url = isString(videoUrl.url) ? videoUrl.url : undefined;
       const id = isString(videoUrl.id) ? videoUrl.id : undefined;
-      images.push({ kind: "video", name: id || `视频 ${index + 1}`, dataUrl: url?.startsWith("data:video/") ? url : undefined, url: url && !url.startsWith("data:") ? url : undefined });
+      const blob = parseBlobRefUrl(url);
+      images.push({ kind: "video", name: id || `视频 ${index + 1}`, dataUrl: url?.startsWith("data:video/") ? url : undefined, url: url && !url.startsWith("data:") && !blob ? url : undefined, blobRef: blob?.hash, mediaType: blob?.mediaType });
       return;
     }
     if (part.type === "video" && isRecord(part.source)) {
       const mediaType = isString(part.source.media_type) ? part.source.media_type : "video/mp4";
       const data = isString(part.source.data) ? part.source.data : undefined;
       const url = isString(part.source.url) ? part.source.url : undefined;
+      const blob = parseBlobRefUrl(url);
       images.push({
         kind: "video",
         name: isString(part.name) ? part.name : `视频 ${index + 1}`,
         dataUrl: data ? (data.startsWith("data:video/") ? data : `data:${mediaType};base64,${data}`) : undefined,
         fileId: isString(part.source.file_id) ? part.source.file_id : undefined,
-        mediaType,
-        url: url && !url.startsWith("data:") ? url : undefined,
+        mediaType: blob?.mediaType ?? mediaType,
+        url: url && !url.startsWith("data:") && !blob ? url : undefined,
+        blobRef: blob?.hash,
       });
     }
   });

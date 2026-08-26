@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-26 修复：blobref 会话媒体丢失——官方新内容寻址形态接入（v2.21.123）
+
+- 现象：v2.21.115 修过 kimi-file://f_ 后仍有用户反馈历史图片显示"图片 N / 未读取到绝对路径"占位卡（截图版本 v2.21.122）。
+- 根因：官方 wire 新增会话级内容寻址 `blobref:<mime>;<sha256>`（image_url/video_url part 的 url），内容落在会话目录 `sessions/<bucket>/<sessionId>/agents/<agent>/blobs/<hash>`，不在 `files/`、不经 fs:content；两套映射器只认 data:/kimi-file://f_，blobref 图既无 dataUrl 也无 fileId，渲染层落占位卡。本机 wire 抽样确认 blobref 与 kimi-file、data: 三形态并存。
+- 修复：映射器（eventMapper/kimiCodeEventMapper）提取 `blobRef`+MIME（blobref 原始串不泄漏进 url）；渲染层 `kimix-media://blob/<hash>?mime=` 流式缩略/预览/视频播放；主进程协议新增 blob 路由，按 sha256 跨候选 share dir 解析本地 blobs（命中缓存、miss 不缓存），Range/206/416 语义复用；`kimi-code:loadFile` IPC 增加 blobRef 参数供复制/画板物化。
+- 验证：新增映射/blob 解析/预览物化用例，全量 191 文件 2075 项、typecheck、OKF strict、生产构建通过；待用户截图验收真实 blobref 会话。
+
 ## 2026-08-26 修复：能力安装预清理不再按镜像名全局杀进程（v2.21.122）
 
 - 现场：v2.21.121 用 `taskkill /F /IM <exe>` 在能力安装前释放二进制占用，但该写法会结束全系统所有同名进程，可能误杀其他 Kimi 系工具拉起的 kimi-webbridge.exe / kimi-cu.exe。

@@ -425,6 +425,8 @@ export interface UserMessageImage {
   dataUrl?: string;
   filePath?: string;
   fileId?: string;
+  /** 官方 blobref 内容寻址哈希，内容在会话目录本地 blobs 下，经 kimix-media://blob 流式读取。 */
+  blobRef?: string;
   mediaType?: string;
   size?: number;
   url?: string;

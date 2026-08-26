@@ -3,6 +3,9 @@ import path from "node:path";
 
 export const KIMI_MEDIA_FILE_ID = /^f_[A-Za-z0-9-]+$/;
 
+/** blobref 内容寻址的哈希部分：sha256 十六进制，纯 hex 天然不可能路径逃逸。 */
+export const KIMI_MEDIA_BLOB_HASH = /^[a-f0-9]{64}$/;
+
 export type LocalKimiMediaFile = {
   status: 200 | 206 | 416;
   data: Buffer;
@@ -82,13 +85,63 @@ async function readKimiMediaHeader(filePath: string, totalSize: number): Promise
   return readFileSegment(filePath, 0, Math.min(32, totalSize));
 }
 
-export async function readLocalKimiMediaFile(
-  shareDir: string,
-  fileId: string,
+const blobPathCache = new Map<string, string>();
+
+/**
+ * blobref:<mime>;<sha256> 的内容落在官方会话目录
+ * sessions/<bucket>/<sessionId>/agents/<agent>/blobs/<hash>，纯本地、不经过 fs:content。
+ * 内容寻址哈希全局唯一，按候选 share dir 遍历命中后缓存；miss 不缓存，避免迟到写入被永久判死。
+ */
+export function resolveKimiMediaBlobPath(shareDirs: string[], hash: string): string | null {
+  if (!KIMI_MEDIA_BLOB_HASH.test(hash)) return null;
+  const cached = blobPathCache.get(hash);
+  if (cached) {
+    if (fs.existsSync(cached)) return cached;
+    blobPathCache.delete(hash);
+  }
+  for (const shareDir of shareDirs) {
+    const sessionsDir = path.resolve(shareDir, "sessions");
+    let buckets: string[];
+    try {
+      buckets = fs.readdirSync(sessionsDir);
+    } catch {
+      continue;
+    }
+    for (const bucket of buckets) {
+      let sessionDirs: string[];
+      try {
+        sessionDirs = fs.readdirSync(path.join(sessionsDir, bucket));
+      } catch {
+        continue;
+      }
+      for (const sessionDir of sessionDirs) {
+        let agents: string[];
+        try {
+          agents = fs.readdirSync(path.join(sessionsDir, bucket, sessionDir, "agents"));
+        } catch {
+          continue;
+        }
+        for (const agent of agents) {
+          const blobFile = path.join(sessionsDir, bucket, sessionDir, "agents", agent, "blobs", hash);
+          try {
+            if (fs.statSync(blobFile).isFile()) {
+              blobPathCache.set(hash, blobFile);
+              return blobFile;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export async function readLocalMediaFileAtPath(
+  filePath: string,
   rangeHeader?: string | null,
 ): Promise<LocalKimiMediaFile> {
-  const filePath = resolveKimiMediaFilePath(shareDir, fileId);
-  if (!filePath) throw new Error("Invalid file id");
   const stat = await fs.promises.stat(filePath);
   if (!stat.isFile()) throw new Error("Kimi media entry is not a file");
   const totalSize = stat.size;
@@ -114,4 +167,14 @@ export async function readLocalKimiMediaFile(
     start: range.start,
     end: range.end,
   };
+}
+
+export async function readLocalKimiMediaFile(
+  shareDir: string,
+  fileId: string,
+  rangeHeader?: string | null,
+): Promise<LocalKimiMediaFile> {
+  const filePath = resolveKimiMediaFilePath(shareDir, fileId);
+  if (!filePath) throw new Error("Invalid file id");
+  return readLocalMediaFileAtPath(filePath, rangeHeader);
 }

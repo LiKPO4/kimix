@@ -1265,6 +1265,17 @@ function resolveImageFileId(id: string | undefined, url: string | undefined): st
   return undefined;
 }
 
+/**
+ * 官方会话级内容寻址：blobref:<mime>;<sha256>，内容落在会话目录本地 blobs 下，
+ * 与 kimi-file://f_ 的全局 files 目录不同，本地经 kimix-media://blob 直接流式读取。
+ */
+export function parseBlobRefUrl(url: string | undefined): { hash: string; mediaType: string } | undefined {
+  if (!url?.startsWith("blobref:")) return undefined;
+  const match = url.match(/^blobref:([a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]+);([a-f0-9]{64})$/i);
+  if (!match) return undefined;
+  return { mediaType: match[1], hash: match[2] };
+}
+
 export function extractUserMessage(input: unknown): ExtractedUserMessage {
   if (isString(input)) {
     const parsed = parseRoomDeliveryPrompt(input);
@@ -1323,7 +1334,8 @@ export function extractUserMessage(input: unknown): ExtractedUserMessage {
         : (isRecord(part.image_url) ? part.image_url : {});
       const url = isString(imageUrl.url) ? imageUrl.url : undefined;
       const id = isString(imageUrl.id) ? imageUrl.id : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined, fileId: resolveImageFileId(id, url) });
+      const blob = parseBlobRefUrl(url);
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl: url?.startsWith("data:image/") ? url : undefined, fileId: resolveImageFileId(id, url), blobRef: blob?.hash, mediaType: blob?.mediaType });
       return;
     }
     if (part.type === "image" && isRecord(part.source)) {
@@ -1344,7 +1356,8 @@ export function extractUserMessage(input: unknown): ExtractedUserMessage {
         : url?.startsWith("data:image/")
           ? url
           : undefined;
-      images.push({ name: id || `图片 ${index + 1}`, dataUrl, fileId: resolveImageFileId(id, url ?? dataUrl) });
+      const blob = parseBlobRefUrl(url);
+      images.push({ name: id || `图片 ${index + 1}`, dataUrl, fileId: resolveImageFileId(id, url ?? dataUrl), blobRef: blob?.hash, mediaType: blob?.mediaType });
       return;
     }
     if (part.type === "video_url") {
@@ -1353,11 +1366,15 @@ export function extractUserMessage(input: unknown): ExtractedUserMessage {
         : (isRecord(part.video_url) ? part.video_url : {});
       const url = isString(videoUrl.url) ? videoUrl.url : undefined;
       const id = isString(videoUrl.id) ? videoUrl.id : undefined;
+      const blob = parseBlobRefUrl(url);
       images.push({
         kind: "video",
         name: id || `视频 ${index + 1}`,
         dataUrl: url?.startsWith("data:video/") ? url : undefined,
-        url: url && !url.startsWith("data:") ? url : undefined,
+        // blobref 原始串不能直接作 src，走 blobRef 由渲染层拼 kimix-media 流式地址。
+        url: url && !url.startsWith("data:") && !blob ? url : undefined,
+        blobRef: blob?.hash,
+        mediaType: blob?.mediaType,
       });
       return;
     }
@@ -1370,13 +1387,15 @@ export function extractUserMessage(input: unknown): ExtractedUserMessage {
       const data = isString(part.source.data) ? part.source.data : undefined;
       const url = isString(part.source.url) ? part.source.url : undefined;
       const fileId = isString(part.source.file_id) ? part.source.file_id : undefined;
+      const blob = parseBlobRefUrl(url);
       images.push({
         kind: "video",
         name: isString(part.name) ? part.name : `视频 ${index + 1}`,
         dataUrl: data ? (data.startsWith("data:video/") ? data : `data:${mediaType};base64,${data}`) : undefined,
         fileId,
-        mediaType,
-        url: url && !url.startsWith("data:") ? url : undefined,
+        mediaType: blob?.mediaType ?? mediaType,
+        url: url && !url.startsWith("data:") && !blob ? url : undefined,
+        blobRef: blob?.hash,
       });
     }
   });
@@ -1401,19 +1420,19 @@ function normalizeUserContent(content: string): string {
 
 function getUserImageSignature(event: Extract<TimelineEvent, { type: "user_message" }>): string {
   return (event.images ?? [])
-    .map((image) => image.fileId || image.dataUrl || image.url || image.name || "媒体")
+    .map((image) => image.fileId || image.blobRef || image.dataUrl || image.url || image.name || "媒体")
     .join("|");
 }
 
 function hasDisplayableImages(images?: UserMessageImage[]) {
   return Boolean(images?.some((image) => (
-    Boolean(image.fileId || image.url) ||
+    Boolean(image.fileId || image.url || image.blobRef) ||
     Boolean(image.dataUrl && /^(?:data:|blob:|https?:\/\/)/i.test(image.dataUrl))
   )));
 }
 
 function hasLocalUserMedia(images?: UserMessageImage[]) {
-  return Boolean(images?.some((image) => Boolean(image.dataUrl || image.filePath || image.fileId || image.url)));
+  return Boolean(images?.some((image) => Boolean(image.dataUrl || image.filePath || image.fileId || image.blobRef || image.url)));
 }
 
 function mergeUserMedia(
@@ -1433,6 +1452,7 @@ function mergeUserMedia(
       dataUrl: image.dataUrl ?? local.dataUrl,
       filePath: image.filePath ?? local.filePath,
       fileId: image.fileId ?? local.fileId,
+      blobRef: image.blobRef ?? local.blobRef,
       mediaType: image.mediaType ?? local.mediaType,
       url: image.url ?? local.url,
     };

@@ -121,7 +121,7 @@ function computeTimelineEventMemoKey(event: TimelineEvent): string {
         event.type,
         event.timestamp,
         event.content,
-        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.blobRef ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
       ].join("\u001e");
     case "steer_message":
       return [
@@ -130,7 +130,7 @@ function computeTimelineEventMemoKey(event: TimelineEvent): string {
         event.timestamp,
         event.content,
         event.status ?? "",
-        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
+        event.images?.map((image) => `${image.id ?? ""}:${image.kind ?? ""}:${image.name}:${image.filePath ?? ""}:${image.fileId ?? ""}:${image.blobRef ?? ""}:${image.url ?? ""}:${image.dataUrl?.length ?? 0}`).join("\u001f") ?? "",
       ].join("\u001e");
     case "tool_call":
       return [
@@ -338,7 +338,7 @@ function buildAssistantFullCopyText(event: Extract<TimelineEvent, { type: "assis
 function attachmentCopyText(images: UserMessageImage[] = []) {
   return images.map((image) => {
     if (image.kind === "video") return `[视频: ${image.name}]`;
-    if (image.dataUrl) return `[图片: ${image.name}]`;
+    if (image.dataUrl || image.blobRef) return `[图片: ${image.name}]`;
     return `[附件: ${image.name}${image.filePath ? ` | ${image.filePath}` : ""}]`;
   }).join("\n");
 }
@@ -380,7 +380,7 @@ function ImageAttachmentThumb({
 
   const source = fallbackDataUrl || imageSource(image);
   const materializeFallback = async () => {
-    if (!fileId || fallbackAttemptedRef.current) return;
+    if ((!fileId && !image.blobRef) || fallbackAttemptedRef.current) return;
     fallbackAttemptedRef.current = true;
     setIsMaterializing(true);
     setLoadError("");
@@ -388,6 +388,7 @@ function ImageAttachmentThumb({
       const dataUrl = await materializePreviewImageDataUrl({
         id: image.id,
         fileId,
+        blobRef: image.blobRef,
         name: image.name,
         dataUrl: image.dataUrl ?? "",
         url: image.url,
@@ -400,7 +401,7 @@ function ImageAttachmentThumb({
     }
   };
 
-  if (image.dataUrl || imageFileId(image)) {
+  if (image.dataUrl || imageFileId(image) || image.blobRef) {
     return (
       <button
         key={image.id ?? `${image.name}-${index}`}
@@ -408,6 +409,7 @@ function ImageAttachmentThumb({
         onClick={() => onPreview({
           id: image.id,
           fileId,
+          blobRef: image.blobRef,
           name: image.name,
           dataUrl: fallbackDataUrl || image.dataUrl || "",
           url: fallbackDataUrl || image.dataUrl ? undefined : source,
@@ -446,15 +448,19 @@ function ImageAttachmentThumb({
   );
 }
 
+function videoSource(image: UserMessageImage): string {
+  return image.dataUrl || image.url || (image.blobRef ? blobStreamUrl(image) : "");
+}
+
 function VideoAttachmentThumb({ image, index }: { image: UserMessageImage; index: number }) {
-  const [source, setSource] = useState(image.dataUrl || image.url || "");
+  const [source, setSource] = useState(videoSource(image));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const nextSource = image.dataUrl || image.url || "";
+    const nextSource = videoSource(image);
     if (nextSource) setSource(nextSource);
-  }, [image.dataUrl, image.url]);
+  }, [image.dataUrl, image.url, image.blobRef, image.mediaType]);
 
   // Server 路由：挂载 kimix-media 流式地址，由主进程经官方 fs:content 按 Range 拉取；失败回退整段 dataUrl
   const streamUrl = image.fileId
@@ -531,6 +537,11 @@ function serverFileStreamUrl(fileId: string): string {
   return `kimix-media://server-file/${encodeURIComponent(fileId)}`;
 }
 
+// blobref 内容寻址：主进程按哈希在会话目录本地 blobs 下流式读取，不依赖 Server。
+function blobStreamUrl(image: UserMessageImage): string {
+  return `kimix-media://blob/${image.blobRef}?mime=${encodeURIComponent(image.mediaType ?? "")}`;
+}
+
 function imageFileId(image: UserMessageImage): string | undefined {
   if (image.fileId) return image.fileId;
   // 官方历史以 f_ 前缀 id 内容寻址：老会话缓存的 name 就是该 id，可直接流式取回
@@ -541,20 +552,22 @@ function imageFileId(image: UserMessageImage): string | undefined {
 function imageSource(image: UserMessageImage): string {
   if (image.dataUrl) return image.dataUrl;
   const fileId = imageFileId(image);
-  return fileId ? serverFileStreamUrl(fileId) : "";
+  if (fileId) return serverFileStreamUrl(fileId);
+  return image.blobRef ? blobStreamUrl(image) : "";
 }
 
 function getPreviewImages(images: UserMessageImage[]): PreviewImage[] {
   return images
-    .filter((image) => image.kind !== "video" && (Boolean(image.dataUrl?.startsWith("data:image/")) || Boolean(imageFileId(image))))
+    .filter((image) => image.kind !== "video" && (Boolean(image.dataUrl?.startsWith("data:image/")) || Boolean(imageFileId(image)) || Boolean(image.blobRef)))
     .map((image) => {
       const fileId = imageFileId(image);
       return {
         id: image.id,
         fileId,
+        blobRef: image.blobRef,
         name: image.name,
         dataUrl: image.dataUrl ?? "",
-        url: image.dataUrl ? undefined : (fileId ? serverFileStreamUrl(fileId) : undefined),
+        url: image.dataUrl ? undefined : (fileId ? serverFileStreamUrl(fileId) : (image.blobRef ? blobStreamUrl(image) : undefined)),
       };
     });
 }

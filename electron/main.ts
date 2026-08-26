@@ -13,13 +13,13 @@ import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { writeKimiConfigTomlIfUnchanged } from "./kimiConfigWriteGuard";
-import { KIMI_MEDIA_FILE_ID, readLocalKimiMediaFile, resolveKimiMediaFilePath } from "./kimiMediaFile";
+import { KIMI_MEDIA_BLOB_HASH, KIMI_MEDIA_FILE_ID, readLocalKimiMediaFile, readLocalMediaFileAtPath, resolveKimiMediaBlobPath, resolveKimiMediaFilePath, type LocalKimiMediaFile } from "./kimiMediaFile";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
 import { listKimiCodeSlashCommands } from "./kimiCodeSlashCommands";
 import { deleteKimiThemeSourceFile } from "./kimiThemeFiles";
 import * as sessionHistory from "./sessionHistory";
-import { defaultKimiCodeShareDir, legacyKimiShareDir, resolveKimiShareDir } from "./sessionHistory";
+import { candidateKimiShareDirs, defaultKimiCodeShareDir, legacyKimiShareDir, resolveKimiShareDir } from "./sessionHistory";
 import { formatKimiUsageError, getRecord, parseKimiUsagePayload, parseManagedUsagePayload, parseServerUsagePayload, stripHtmlForError } from "./kimiUsage";
 import { fetchKimiMonthlyQuota, inspectKimiWebToken, isAllowedKimiWebAuthUrl, KimiCredentialAuthTaskCoordinator, KimiCredentialCandidateQueue, KIMI_WEB_QUOTA_URL, normalizeKimiWebToken, selectKimiWebTokenCandidate } from "./kimiMonthlyQuota";
 import {
@@ -6205,7 +6205,22 @@ ipcMain.handle("kimi-code:loadFile", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
     const fileId = typeof req.fileId === "string" ? req.fileId.trim() : "";
-    if (!fileId) return { success: false, error: "Missing fileId" };
+    const blobRef = typeof req.blobRef === "string" ? req.blobRef.trim() : "";
+    if (!fileId && !blobRef) return { success: false, error: "Missing fileId or blobRef" };
+    if (blobRef) {
+      // blobref 内容只在会话目录本地，不经过 Server/fs:content。
+      const filePath = resolveKimiMediaBlobPath(candidateKimiShareDirs(), blobRef);
+      if (!filePath) return { success: false, error: "Blob not found" };
+      const local = await readLocalMediaFileAtPath(filePath);
+      return {
+        success: true,
+        data: {
+          fileId: blobRef,
+          mediaType: local.mediaType,
+          dataUrl: `data:${local.mediaType};base64,${local.data.toString("base64")}`,
+        },
+      };
+    }
     try {
       return { success: true, data: await kimiCodeHost.loadServerFile(fileId) };
     } catch (serverError) {
@@ -8693,11 +8708,35 @@ if (!app.isPackaged || process.env.KIMIX_REMOTE_DEBUGGING === "1") {
 
 const KIMIX_MEDIA_MIME = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i;
 
+function localMediaResponse(local: LocalKimiMediaFile, mimeHint: string): Response {
+  const headers = new Headers({
+    "Content-Type": KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : local.mediaType,
+    "Accept-Ranges": "bytes",
+    "Content-Length": String(local.data.byteLength),
+  });
+  if (local.status === 206) headers.set("Content-Range", `bytes ${local.start}-${local.end}/${local.totalSize}`);
+  if (local.status === 416) headers.set("Content-Range", `bytes */${local.totalSize}`);
+  const body = new Uint8Array(local.data.byteLength);
+  body.set(local.data);
+  return new Response(local.status === 416 ? null : body, { status: local.status, headers });
+}
+
+// blobref 内容寻址：会话目录 agents/*/blobs/<sha256>，纯本地流式读取，不经过官方 fs:content。
+async function handleKimixMediaBlobRequest(url: URL, request: Request): Promise<Response> {
+  const hash = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+  if (!KIMI_MEDIA_BLOB_HASH.test(hash)) return new Response("Invalid blob ref", { status: 400 });
+  const filePath = resolveKimiMediaBlobPath(candidateKimiShareDirs(), hash);
+  if (!filePath) return new Response("Blob not found", { status: 404 });
+  const local = await readLocalMediaFileAtPath(filePath, request.headers.get("range"));
+  return localMediaResponse(local, url.searchParams.get("mime") ?? "");
+}
+
 // 历史官方文件流式代理：fileId → 当前 Kimi shareDir/files/<fileId> → 官方 fs:content（ETag + Range）。
 // Server 不可用或读取失败时，由主进程从同一受控目录提供本地 Range/整文件回退。
 async function handleKimixMediaRequest(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
+    if (url.hostname === "blob") return handleKimixMediaBlobRequest(url, request);
     if (url.hostname !== "server-file") return new Response("Unknown kimix-media host", { status: 404 });
     const fileId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
     if (!KIMI_MEDIA_FILE_ID.test(fileId)) return new Response("Invalid file id", { status: 400 });
@@ -8732,16 +8771,7 @@ async function handleKimixMediaRequest(request: Request): Promise<Response> {
     }
 
     const local = await readLocalKimiMediaFile(shareDir, fileId, range);
-    const headers = new Headers({
-      "Content-Type": KIMIX_MEDIA_MIME.test(mimeHint) ? mimeHint : local.mediaType,
-      "Accept-Ranges": "bytes",
-      "Content-Length": String(local.data.byteLength),
-    });
-    if (local.status === 206) headers.set("Content-Range", `bytes ${local.start}-${local.end}/${local.totalSize}`);
-    if (local.status === 416) headers.set("Content-Range", `bytes */${local.totalSize}`);
-    const body = new Uint8Array(local.data.byteLength);
-    body.set(local.data);
-    return new Response(local.status === 416 ? null : body, { status: local.status, headers });
+    return localMediaResponse(local, mimeHint);
   } catch (error) {
     return new Response(`media proxy error: ${error instanceof Error ? error.message : String(error)}`, { status: 502 });
   }

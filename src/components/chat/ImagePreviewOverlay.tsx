@@ -6,6 +6,7 @@ import { DrawingBoard, type DrawingBoardRequest } from "./DrawingBoard";
 export type PreviewImage = {
   id?: string;
   fileId?: string;
+  blobRef?: string;
   name: string;
   dataUrl: string;
   url?: string;
@@ -17,11 +18,12 @@ type PreviewFileLoadResult = {
   error?: string;
 };
 
-type PreviewFileLoader = (request: { fileId: string }) => Promise<PreviewFileLoadResult>;
+type PreviewFileLoader = (request: { fileId?: string; blobRef?: string }) => Promise<PreviewFileLoadResult>;
 
 export function previewImageIdentity(image: PreviewImage): string {
   if (image.id) return `id:${image.id}`;
   if (image.fileId) return `file:${image.fileId}`;
+  if (image.blobRef) return `blob:${image.blobRef}`;
   if (image.url) return `url:${image.url}`;
   if (image.dataUrl) return `data:${image.dataUrl}`;
   return `name:${image.name}`;
@@ -35,6 +37,10 @@ export function findPreviewImageIndex(current: PreviewImage, images: PreviewImag
   if (current.fileId) {
     const byFileId = images.findIndex((item) => item.fileId === current.fileId);
     if (byFileId !== -1) return byFileId;
+  }
+  if (current.blobRef) {
+    const byBlobRef = images.findIndex((item) => item.blobRef === current.blobRef);
+    if (byBlobRef !== -1) return byBlobRef;
   }
   if (current.url) {
     const byUrl = images.findIndex((item) => item.url === current.url);
@@ -68,8 +74,8 @@ export async function materializePreviewImageDataUrl(
   loadFile: PreviewFileLoader,
 ): Promise<string> {
   if (image.dataUrl.startsWith("data:image/")) return image.dataUrl;
-  if (!image.fileId) throw new Error("图片没有可读取的文件标识");
-  const result = await loadFile({ fileId: image.fileId });
+  if (!image.fileId && !image.blobRef) throw new Error("图片没有可读取的文件标识");
+  const result = await loadFile({ fileId: image.fileId, blobRef: image.blobRef });
   if (!result.success) throw new Error(result.error || "读取图片失败");
   const dataUrl = result.data?.dataUrl ?? "";
   if (!dataUrl.startsWith("data:image/")) throw new Error("读取到的不是可用图片");

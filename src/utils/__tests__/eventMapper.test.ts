@@ -231,6 +231,29 @@ describe("mapStreamEvent", () => {
     expect(steer.images?.[0].fileId).toBe("f_5399c25a-5ada-4a69-a8d2-5c9c2590929e");
   });
 
+  it("maps blobref content-addressed media to local blob refs", () => {
+    const imageHash = "8b621fe204cc9bfdc9adbf6c90f31ef28df85f5e390a8dd5d20a939b3144e235";
+    const videoHash = "09b127b75cf59a14edec78a6223481f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0";
+    const event = mapStreamEvent({
+      type: "SteerInput",
+      payload: {
+        user_input: [
+          { type: "text", text: "如图" },
+          { type: "image_url", imageUrl: { url: `blobref:image/png;${imageHash}` } },
+          { type: "video_url", videoUrl: { url: `blobref:video/mp4;${videoHash}` } },
+        ],
+      },
+    });
+    const steer = event as Extract<TimelineEvent, { type: "steer_message" }>;
+    expect(steer.images).toHaveLength(2);
+    expect(steer.images?.[0]).toMatchObject({ blobRef: imageHash, mediaType: "image/png" });
+    expect(steer.images?.[0].dataUrl).toBeUndefined();
+    expect(steer.images?.[0].fileId).toBeUndefined();
+    expect(steer.images?.[1]).toMatchObject({ kind: "video", blobRef: videoHash, mediaType: "video/mp4" });
+    // blobref 原始串不能泄漏成可直接播放的 url，渲染层按 blobRef 拼 kimix-media 流式地址。
+    expect(steer.images?.[1].url).toBeUndefined();
+  });
+
   it("maps SteerInput images", () => {
     const event = mapStreamEvent({
       type: "SteerInput",

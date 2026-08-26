@@ -2065,7 +2065,9 @@ export type KimiCodeActivateSkillRequest = {
 };
 
 export type KimiCodeFileRequest = {
-  fileId: string;
+  fileId?: string;
+  // 官方 blobref 内容寻址哈希（会话目录 blobs/<hash>），与 fileId 二选一。
+  blobRef?: string;
 };
 
 export type KimiCodeFileResponse = {
