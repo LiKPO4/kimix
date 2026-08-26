@@ -1,4 +1,4 @@
-import type { TimelineEvent } from "@/types/ui";
+import type { TimelineEvent, UserMessageImage } from "@/types/ui";
 import { extractModelFromStatusMessage } from "./modelDisplay";
 import { hasMalformedAssistantMarkdown } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeEvents } from "@/utils/eventMapper";
@@ -536,9 +536,21 @@ export function hasPossiblyLostUserImages(events: TimelineEvent[]): boolean {
     if (event.type !== "user_message" && event.type !== "steer_message") return false;
     return (event.images ?? []).some((image) => (
       !image.filePath &&
-      !(typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/"))
+      !hasDisplayableUserImageRefs([image])
     ));
   });
+}
+
+/**
+ * 图片是否带可渲染引用：内联 dataUrl、本地路径之外的官方引用（fileId/blobRef/url）
+ * 都能渲染（fileId/blobRef 走 kimix-media 流式）。旧版映射器持久化的 images 可能只剩
+ * name——既不能渲染，也不应视为「已持有」。
+ */
+export function hasDisplayableUserImageRefs(images?: UserMessageImage[]): boolean {
+  return Boolean(images?.some((image) => (
+    Boolean(image.fileId || image.blobRef || image.url) ||
+    Boolean(typeof image.dataUrl === "string" && image.dataUrl.startsWith("data:image/"))
+  )));
 }
 
 function sameMatchedUserTurn(
@@ -894,7 +906,9 @@ export function mergeCanonicalFragmentTurnBodies(
   const canonicalTurns = sliceTurns(normalized.canonical);
   const replacements = new Map<string, string>();
   const clearedSegmentIds = new Set<string>();
+  const imageRepairs = new Map<string, UserMessageImage[]>();
   let patchedTurns = 0;
+  let patchedImageTurns = 0;
   let alignedTurns = 0;
   let mismatchedTurns = 0;
   let crossTurnRemnants = 0;
@@ -917,6 +931,14 @@ export function mergeCanonicalFragmentTurnBodies(
     cursor = matchIndex + 1;
     alignedTurns += 1;
     const canonical = canonicalTurns[matchIndex];
+    // 历史图片自愈：旧版映射器持久化的 user images 可能只剩 name（无任何可渲染
+    // 引用），canonical 重映射带 fileId/blobRef/url。本地不可展示而官方可展示时
+    // 用官方引用修补，否则坏数据会被「本地优先」合并永久保留（占位卡永生）。
+    const canonicalImages = canonical.user.images;
+    if (canonicalImages && !hasDisplayableUserImageRefs(local.user.images) && hasDisplayableUserImageRefs(canonicalImages)) {
+      imageRepairs.set(local.user.id, canonicalImages);
+      patchedImageTurns += 1;
+    }
     const canonicalWithBody = canonical.assistants.filter((event) => event.content.trim());
     const localWithBody = local.assistants.filter((event) => event.content.trim());
     if (canonicalWithBody.length === 0 || localWithBody.length === 0) continue;
@@ -973,7 +995,7 @@ export function mergeCanonicalFragmentTurnBodies(
     }
     patchedTurns += 1;
   }
-  if (patchedTurns === 0) {
+  if (patchedTurns === 0 && patchedImageTurns === 0) {
     // 对齐上了却一条没补时留痕：没有这条日志，「触发了但零命中」只能靠猜。
     // 只在确有正文不一致的轮次时打，避免稳态刷屏；不打正文，只打计数。
     if (mismatchedTurns > 0) {
@@ -996,6 +1018,7 @@ export function mergeCanonicalFragmentTurnBodies(
     roomAgentId: meta.roomAgentId,
     reason: meta.reason,
     patchedTurns,
+    patchedImageTurns,
     localTurns: localTurns.length,
     canonicalTurns: canonicalTurns.length,
     alignedTurns,
@@ -1004,11 +1027,14 @@ export function mergeCanonicalFragmentTurnBodies(
     crossTurnUnalignedSkips,
   });
   return localEvents.map((event) => {
-    if (event.type !== "assistant_message") return event;
-    const replacement = replacements.get(event.id);
-    if (replacement !== undefined) return { ...event, content: replacement };
-    if (clearedSegmentIds.has(event.id)) return { ...event, content: "" };
-    return event;
+    if (event.type === "assistant_message") {
+      const replacement = replacements.get(event.id);
+      if (replacement !== undefined) return { ...event, content: replacement };
+      if (clearedSegmentIds.has(event.id)) return { ...event, content: "" };
+      return event;
+    }
+    const repairedImages = imageRepairs.get(event.id);
+    return repairedImages ? { ...event, images: repairedImages } : event;
   });
 }
 

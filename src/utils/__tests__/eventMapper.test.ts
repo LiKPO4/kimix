@@ -216,6 +216,44 @@ describe("mapStreamEvent", () => {
     expect((second[0] as Extract<TimelineEvent, { type: "steer_message" }>).status).toBe("sent");
   });
 
+  it("repairs name-only persisted user images from a canonical replay", () => {
+    const existing: TimelineEvent[] = [
+      { id: "user-local", type: "user_message", timestamp: 1_000, content: "如图", images: [{ name: "图片 2" }, { name: "图片 3" }] },
+    ];
+    const canonical: TimelineEvent = {
+      id: "user-canonical",
+      type: "user_message",
+      timestamp: 5_000,
+      content: "如图",
+      images: [
+        { name: "图片 2", fileId: "f_aaa" },
+        { name: "图片 3", fileId: "f_bbb" },
+      ],
+    };
+    const merged = mergeEvents(existing, canonical);
+    expect(merged).toHaveLength(1);
+    const user = merged[0] as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(user.images?.[0]).toMatchObject({ fileId: "f_aaa" });
+    expect(user.images?.[1]).toMatchObject({ fileId: "f_bbb" });
+  });
+
+  it("keeps displayable local dataUrl images when canonical replay arrives", () => {
+    const localImages = [{ name: "pic.png", dataUrl: "data:image/png;base64,AA" }];
+    const existing: TimelineEvent[] = [
+      { id: "user-local", type: "user_message", timestamp: 1_000, content: "如图", images: localImages },
+    ];
+    const canonical: TimelineEvent = {
+      id: "user-canonical",
+      type: "user_message",
+      timestamp: 5_000,
+      content: "如图",
+      images: [{ name: "图片 2", fileId: "f_aaa" }],
+    };
+    const merged = mergeEvents(existing, canonical);
+    expect(merged).toHaveLength(1);
+    expect((merged[0] as Extract<TimelineEvent, { type: "user_message" }>).images).toBe(localImages);
+  });
+
   it("maps file-backed image references to server file ids", () => {
     const event = mapStreamEvent({
       type: "SteerInput",

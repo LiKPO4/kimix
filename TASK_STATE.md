@@ -1,11 +1,20 @@
 # Kimix 长程任务状态
 
+## 2026-08-26 修复：历史图片占位卡真根因——持久化坏 images 不被 canonical 修补（v2.21.124）
+
+- 现象：v2.21.123（blobref 接入）后用户复测同一会话仍显示"图片 2/图片 3 / 未读取到绝对路径"。
+- 证据链：用户提供官方导出包（agents/main/wire.jsonl）。该会话图片 part 实为标准 `kimi-file://f_xxx`（无 id 字段）；本地复现 v2.21.123 映射链（parseKimiCodeRecord → mapStreamEvent）输出 `{name:"图片 2", fileId:"f_…"}` 完全正确——**映射与渲染层健康，blobref 并非本会话根因**（blobref 形态在本机 wire 确实存在，v2.21.123 的支持保留，属前瞻兼容）。
+- 真根因：旧版（v2.21.115 之前）映射器落地的持久化 images 只剩 `{name}`，无任何可渲染字段；历史修复管线 `hasPossiblyLostUserImages` 每次启动都检测到丢失并拉取 canonical，但 ① 该检测只认 filePath/dataUrl，不认 fileId——即使修好也会永远反复触发；② `mergeCanonicalFragmentTurnBodies` 只补 assistant 正文残片，从不把 canonical 的可展示 images 写回本地 user_message；③ `mergeEvents` 的「内容匹配 → 原样保留」去重分支同样丢弃 canonical 好数据。坏数据因此永生。
+- 修复（三处闭环）：① `hasDisplayableUserImageRefs` 认可 fileId/blobRef/url，`hasPossiblyLostUserImages` 用之（修好后不再反复触发修复）；② `mergeCanonicalFragmentTurnBodies` 轮次对齐后，本地 images 不可展示而 canonical 可展示时用官方引用修补（imageRepairs，日志加 patchedImageTurns）；③ `mergeEvents` 盖章/十秒窗口去重分支加 `repairedUserImages` 自愈（本地 dataUrl 可展示时不覆盖）。
+- 验证：新增 5 项单测（mergeEvents 修补/不覆盖、轮次补丁修补/不覆盖、丢失检测认可引用）；typecheck、全量 191 文件 2080 项通过；待用户装 v2.21.124 截图复验该会话。
+
 ## 2026-08-26 修复：blobref 会话媒体丢失——官方新内容寻址形态接入（v2.21.123）
 
 - 现象：v2.21.115 修过 kimi-file://f_ 后仍有用户反馈历史图片显示"图片 N / 未读取到绝对路径"占位卡（截图版本 v2.21.122）。
 - 根因：官方 wire 新增会话级内容寻址 `blobref:<mime>;<sha256>`（image_url/video_url part 的 url），内容落在会话目录 `sessions/<bucket>/<sessionId>/agents/<agent>/blobs/<hash>`，不在 `files/`、不经 fs:content；两套映射器只认 data:/kimi-file://f_，blobref 图既无 dataUrl 也无 fileId，渲染层落占位卡。本机 wire 抽样确认 blobref 与 kimi-file、data: 三形态并存。
 - 修复：映射器（eventMapper/kimiCodeEventMapper）提取 `blobRef`+MIME（blobref 原始串不泄漏进 url）；渲染层 `kimix-media://blob/<hash>?mime=` 流式缩略/预览/视频播放；主进程协议新增 blob 路由，按 sha256 跨候选 share dir 解析本地 blobs（命中缓存、miss 不缓存），Range/206/416 语义复用；`kimi-code:loadFile` IPC 增加 blobRef 参数供复制/画板物化。
 - 验证：新增映射/blob 解析/预览物化用例，全量 191 文件 2075 项、typecheck、OKF strict、生产构建通过；待用户截图验收真实 blobref 会话。
+- 修正（2026-08-26 晚）：用户复测证明该会话根因不是 blobref（实为 kimi-file://f_ + 持久化坏数据不自愈，见 v2.21.124）；blobref 形态在本机 wire 确实存在，接入保留为前瞻兼容。
 
 ## 2026-08-26 修复：能力安装预清理不再按镜像名全局杀进程（v2.21.122）
 

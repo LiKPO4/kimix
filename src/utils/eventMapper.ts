@@ -1519,6 +1519,20 @@ function hasSameUserMediaShape(
   ));
 }
 
+/**
+ * 历史自愈：旧版映射器持久化的 user images 可能只剩 name（无任何可渲染引用），
+ * canonical 回放重新映射后带 fileId/blobRef/url。「内容匹配 → 原样保留」的去重
+ * 分支会把坏数据永久留在本地；本地不可展示而 canonical 可展示时用 canonical 修补。
+ */
+function repairedUserImages(
+  local: Extract<TimelineEvent, { type: "user_message" | "steer_message" }>["images"],
+  incoming: Extract<TimelineEvent, { type: "user_message" | "steer_message" }>["images"],
+): Extract<TimelineEvent, { type: "user_message" | "steer_message" }>["images"] {
+  if (hasDisplayableImages(local)) return local;
+  if (!hasDisplayableImages(incoming)) return local;
+  return incoming;
+}
+
 function readTimestampCandidate(value: unknown): number | null {
   if (isNumber(value) && Number.isFinite(value) && value > 0) return value;
   if (!isString(value) || !value.trim()) return null;
@@ -2147,6 +2161,7 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
             ...optimistic,
             snapshotMessageId: incomingSnapshotId,
             snapshotMessageIdStable: true,
+            images: repairedUserImages(optimistic.images, incoming.images),
           };
           return result;
         }
@@ -2161,10 +2176,16 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
         if (lastUser.snapshotMessageIdStable !== true && Math.abs(lastUser.timestamp - incoming.timestamp) <= 10000) {
           const lastContent = normalizeUserContent(lastUser.content);
           const incomingContent = normalizeUserContent(incoming.content);
-          if (lastContent === incomingContent && incomingContent.length > 0) {
-            return existing;
-          }
-          if (lastContent === incomingContent && incomingContent.length === 0) {
+          if (lastContent === incomingContent) {
+            const repairedImages = repairedUserImages(lastUser.images, incoming.images);
+            if (repairedImages !== lastUser.images) {
+              const result = [...existing];
+              result[lastUserMessageIndex] = { ...lastUser, images: repairedImages };
+              return result;
+            }
+            if (incomingContent.length > 0) {
+              return existing;
+            }
             if (shouldPreserveLocalUserImages(lastUser, incoming)) {
               return existing;
             }

@@ -3,8 +3,10 @@ import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
 import {
   collapseDuplicateMaterializations,
+  hasDisplayableUserImageRefs,
   hasEquivalentKimiHistoryTurnBodies,
   hasInflatedLocalKimiThinkingHistory,
+  hasPossiblyLostUserImages,
   mergeCanonicalFragmentTurnBodies,
   mergeMissingLatestCanonicalAssistant,
   mergeMissingUsageStatusEvents,
@@ -89,6 +91,43 @@ describe("mergeCanonicalFragmentTurnBodies", () => {
     const local: TimelineEvent[] = [{ ...userMessage }, assistant(fullBody, { id: "a-1" })];
     const canonical: TimelineEvent[] = [{ ...userMessage }, assistant(fullBody, { id: "c-1" })];
     expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
+  });
+
+  it("repairs name-only persisted user images from canonical file refs", () => {
+    const local: TimelineEvent[] = [
+      { ...userMessage, images: [{ name: "图片 2" }, { name: "图片 3" }] },
+      assistant(fullBody, { id: "a-1" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, images: [{ name: "图片 2", fileId: "f_aaa" }, { name: "图片 3", fileId: "f_bbb" }] },
+      assistant(fullBody, { id: "c-1" }),
+    ];
+
+    const merged = mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" });
+    const user = merged.find((event) => event.type === "user_message") as Extract<TimelineEvent, { type: "user_message" }>;
+    expect(user.images?.[0]).toMatchObject({ fileId: "f_aaa" });
+    expect(user.images?.[1]).toMatchObject({ fileId: "f_bbb" });
+  });
+
+  it("keeps displayable local dataUrl images over canonical refs", () => {
+    const localImages = [{ name: "pic.png", dataUrl: "data:image/png;base64,AA" }];
+    const local: TimelineEvent[] = [{ ...userMessage, images: localImages }, assistant(fullBody, { id: "a-1" })];
+    const canonical: TimelineEvent[] = [
+      { ...userMessage, images: [{ name: "图片 2", fileId: "f_aaa" }] },
+      assistant(fullBody, { id: "c-1" }),
+    ];
+
+    expect(mergeCanonicalFragmentTurnBodies(local, canonical, { reason: "test" })).toBe(local);
+  });
+
+  it("treats file references as held and name-only images as lost", () => {
+    expect(hasPossiblyLostUserImages([{ ...userMessage, images: [{ name: "图片 2", fileId: "f_a" }] }])).toBe(false);
+    expect(hasPossiblyLostUserImages([{ ...userMessage, images: [{ name: "图片 2", blobRef: "b".repeat(64) }] }])).toBe(false);
+    expect(hasPossiblyLostUserImages([{ ...userMessage, images: [{ name: "图片 2", url: "kimix-media://blob/x" }] }])).toBe(false);
+    expect(hasPossiblyLostUserImages([{ ...userMessage, images: [{ name: "图片 2" }] }])).toBe(true);
+    expect(hasPossiblyLostUserImages([{ ...userMessage }])).toBe(false);
+    expect(hasDisplayableUserImageRefs([{ name: "图片 2", fileId: "f_a" }])).toBe(true);
+    expect(hasDisplayableUserImageRefs([{ name: "图片 2" }])).toBe(false);
   });
 
   it("does not rewrite a genuinely different final body", () => {
