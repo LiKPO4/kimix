@@ -142,8 +142,13 @@ function TowerPanelBody({ towerPending, snapshot, tasks, subagents, busy, onExit
   const orderedAgents = [...records].sort((left, right) => (
     (right.endedAt ?? right.startedAt) - (left.endedAt ?? left.startedAt)
   ));
+  const recentCompletedAgents = orderedAgents.filter((record) => towerAgentIsCompleted(record.status)).slice(0, 6);
+  const recentAgents = [
+    ...orderedAgents.filter((record) => !towerAgentIsCompleted(record.status)),
+    ...recentCompletedAgents,
+  ];
   const visibleAgents = filter === "recent"
-    ? orderedAgents.slice(0, 6)
+    ? recentAgents
     : filter === "active"
       ? orderedAgents.filter((record) => !towerAgentIsCompleted(record.status))
       : filter === "completed"

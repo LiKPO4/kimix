@@ -549,6 +549,8 @@ describe("Tower 后台 Agent 面板契约", () => {
     expect(dockBar).toContain('label: "后台 Agent"');
     expect(dockBar).toContain("hideHeader: true");
     expect(dockBar).toContain("<KimiWebSubagentDetails subagent={selectedRecord.subagent} />");
+    expect(dockBar).toContain("const recentCompletedAgents = orderedAgents.filter((record) => towerAgentIsCompleted(record.status)).slice(0, 6);");
+    expect(dockBar).toContain("...orderedAgents.filter((record) => !towerAgentIsCompleted(record.status))");
     expect(appShell).toContain("splitBackgroundTasksByKind(nonTowerBackgroundTasks)");
     expect(appShell).toContain("pruneHiddenTaskKeysWhenEmpty(nonTowerBackgroundTasks, hiddenKeys)");
   });
