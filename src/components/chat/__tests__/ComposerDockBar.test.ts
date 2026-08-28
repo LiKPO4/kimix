@@ -268,14 +268,14 @@ describe("ComposerDockBar", () => {
     expect(container.querySelector(".kimix-dock-panel")).toBeNull();
   });
 
-  it("点击组件外部关闭面板", () => {
+  it("输入区等外部交互不会关闭面板", () => {
     render(makeProps({ bashTasks: [makeTask()] }));
     clickCapsule(0);
     expect(container.querySelector(".kimix-dock-panel")).not.toBeNull();
     act(() => {
       document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     });
-    expect(container.querySelector(".kimix-dock-panel")).toBeNull();
+    expect(container.querySelector(".kimix-dock-panel")).not.toBeNull();
   });
 
   it("数据清空后自动关闭对应面板", () => {

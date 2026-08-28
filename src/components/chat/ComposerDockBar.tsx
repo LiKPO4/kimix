@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2, Clock3, List, ListChecks, ListOrdered, PanelRightClose, Pause, PenLine, Play, RadioTower, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
 import type { OfficialGoalSnapshot, TimelineEvent, TodoItem } from "@/types/ui";
@@ -12,7 +12,7 @@ import { towerStatusLabel, type TowerAgentView, type TowerMissionView, type Towe
 /**
  * 输入区 dock 胶囊行（对齐官方 kimi-web ChatDock 的 dock work chips）：
  * 「目标」「计划」「后台 Bash/后台任务」「子 Agent」「Tower」「当前进度」及「队列」小胶囊，
- * 点击向上展开半透明面板；单面板互斥、点外部关闭、数据清空自动关闭。
+ * 点击向上展开半透明面板；单面板互斥、点击胶囊或 X 关闭、数据清空自动关闭。
  * 替代原 TodoPanel 卡片与排队消息浮动面板（重量级实心卡，遮挡聊天内容）。
  */
 
@@ -409,7 +409,6 @@ export function ComposerDockBar({
   onHideQueue,
 }: ComposerDockBarProps) {
   const [openPanel, setOpenPanel] = useState<ComposerDockPanelId | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   const { doneCount } = todoCounts(todoItems);
   const runningOf = (tasks: KimiCodeBackgroundTaskInfo[]) => tasks.filter((task) => !isBackgroundTaskTerminalStatus(task.status)).length;
@@ -444,19 +443,6 @@ export function ComposerDockBar({
     if (openPanel === "goal" && !goalVisible) setOpenPanel(null);
     if (openPanel === "plan" && !planVisible) setOpenPanel(null);
   }, [openPanel, bashTasks.length, subagentTasks.length, todoItems.length, queueCount, goalVisible, planVisible, towerVisible]);
-
-  // 点面板/胶囊行以外任意处关闭（capture 阶段，面板内部交互不触发）。
-  useEffect(() => {
-    if (!openPanel) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      const root = rootRef.current;
-      if (root && event.target instanceof Node && !root.contains(event.target)) {
-        setOpenPanel(null);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown, true);
-    return () => document.removeEventListener("mousedown", handlePointerDown, true);
-  }, [openPanel]);
 
   if (capsules.length === 0) return null;
 
@@ -529,7 +515,7 @@ export function ComposerDockBar({
 
   return (
     // 脱离文档流悬浮在聊天内容之上：不占 footer 高度，不形成实色背景带遮挡消息。
-    <div ref={rootRef} style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 0, zIndex: 20 }}>
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: "100%", marginBottom: 0, zIndex: 20 }}>
       {active && (
         <div
           className="kimix-dock-panel flex flex-col overflow-hidden"
