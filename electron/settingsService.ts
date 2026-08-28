@@ -7,7 +7,7 @@ import { normalizeCustomUiStyleDocuments } from "../src/utils/builtinUiStyleDocu
 const CONFIG_DIR = path.join(os.homedir(), ".kimix");
 const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: "kimi-code/kimi-for-coding",
   defaultThinking: true,
   defaultThinkingEffort: "on",
@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiServer: true,
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
+  experimentalKimiSubagentFork: false,
   kimiMonthlyQuotaEnabled: false,
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,

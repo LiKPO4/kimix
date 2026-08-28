@@ -1709,6 +1709,7 @@ export type AppSettings = {
   experimentalKimiServer: boolean;
   experimentalKimiServerSessions: boolean;
   experimentalKimiToolSelect: boolean;
+  experimentalKimiSubagentFork: boolean;
   kimiMonthlyQuotaEnabled: boolean;
   thinkingTranslationProvider: ThinkingTranslationProvider;
   /** @deprecated 仅用于迁移 2.21.80 及更早版本的布尔开关。 */
@@ -1778,7 +1779,7 @@ export type SettingsResponse = {
 export type SaveSettingsRequest = Partial<AppSettings>;
 
 export type KimiCodeSetExperimentalFeatureRequest = {
-  id: string;
+  id: import("../kimiCodeExperimentalFeatures").KimiCodeExperimentalFeatureId;
   enabled: boolean;
 };
 

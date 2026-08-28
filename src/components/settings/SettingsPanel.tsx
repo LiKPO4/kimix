@@ -677,6 +677,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelDoctorLoading, setModelDoctorLoading] = useState(false);
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
+  const [experimentalKimiSubagentFork, setExperimentalKimiSubagentFork] = useState(false);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
@@ -1226,7 +1227,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       return;
     }
     setExperimentalKimiToolSelect(Boolean(res.data.experimentalKimiToolSelect));
-    setExperimentalSettingsMessage("实验功能默认关闭；仅在模型声明支持 select_tools 时生效。");
+    setExperimentalKimiSubagentFork(Boolean(res.data.experimentalKimiSubagentFork));
+    setExperimentalSettingsMessage("实验功能默认关闭；设置变更会重载空闲会话以更新工具定义。");
   };
 
   const saveExperimentalToolSelect = async (toolSelectEnabled: boolean) => {
@@ -1252,6 +1254,32 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
     setExperimentalSettingsSaving(false);
     setExperimentalSettingsMessage(`保存工具加载设置失败：${res.error}`);
+    void refreshExperimentalSettings();
+  };
+
+  const saveExperimentalSubagentFork = async (enabled: boolean) => {
+    setExperimentalKimiSubagentFork(enabled);
+    setExperimentalSettingsSaving(true);
+    const res = await window.api.saveSettings({
+      experimentalKimiSubagentFork: enabled,
+    });
+    if (res.success) {
+      const featureRes = await window.api.setKimiCodeExperimentalFeature({
+        id: "subagent_fork",
+        enabled,
+      });
+      setExperimentalSettingsSaving(false);
+      if (!featureRes.success) {
+        setExperimentalSettingsMessage(`本地已保存；同步官方 subagent_fork 失败：${featureRes.error}`);
+        return;
+      }
+      setExperimentalSettingsMessage(enabled
+        ? "已开启子 Agent 上下文 fork；空闲 SDK 会话已重载，Server 会话由官方配置热更新；运行中的会话不会被中断。"
+        : "已关闭子 Agent 上下文 fork；空闲 SDK 会话已重载，运行中的会话不会被中断。");
+      return;
+    }
+    setExperimentalSettingsSaving(false);
+    setExperimentalSettingsMessage(`保存子 Agent 上下文 fork 设置失败：${res.error}`);
     void refreshExperimentalSettings();
   };
 
@@ -3231,8 +3259,30 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       {multiAgentRoomUiEnabled ? "已开启" : "关闭"}
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={experimentalKimiSubagentFork}
+                    onClick={() => void saveExperimentalSubagentFork(!experimentalKimiSubagentFork)}
+                    disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                    className={`kimix-settings-permission kimix-settings-permission-with-status ${experimentalKimiSubagentFork ? "is-active" : ""}`}
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                  >
+                    <SelectionIndicator selected={experimentalKimiSubagentFork} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
+                        <GitBranch size={14} className="text-text-muted" />
+                        <span>子 Agent 上下文 fork</span>
+                      </div>
+                      <div className="kimix-settings-permission-desc">
+                        允许模型在需要时将当前已完成的完整对话历史复制给子 Agent；每个 fork 都会增加上下文 Token，Swarm 会按成员数放大成本；需 Kimi Code 0.39.0+，默认关闭。
+                      </div>
+                    </div>
+                    <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiSubagentFork ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {experimentalKimiSubagentFork ? "已开启" : "关闭"}
+                    </span>
+                  </button>
                 </div>
-                <div className="rounded-xl border border-[var(--kimix-panel-border-soft)] bg-surface-base text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
+                <div className="rounded-xl bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ padding: "12px 14px", marginTop: 14 }}>
                   {experimentalSettingsMessage || "读取工具加载设置中..."}
                 </div>
               </div>

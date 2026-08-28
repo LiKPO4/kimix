@@ -8,6 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
+import { KimiCodeExperimentalFeatureSchema } from "./kimiCodeExperimentalFeatures";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
@@ -6601,15 +6602,11 @@ ipcMain.handle("kimi-code:getServerModelCatalog", async () => {
   }
 });
 
-const KimiCodeExperimentalFeatureSchema = z.object({
-  id: z.literal("tool-select"),
-  enabled: z.boolean(),
-});
-
 ipcMain.handle("kimi-code:setExperimentalFeature", async (_, request: unknown) => {
   try {
     const req = KimiCodeExperimentalFeatureSchema.parse(request);
     await kimiCodeHost.setExperimentalFeature(req.id, req.enabled);
+    await reloadIdleKimiCodeSessionsAfterConfigChange();
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -8222,6 +8219,7 @@ const SettingsSchema = z.object({
   experimentalKimiServer: z.boolean().optional(),
   experimentalKimiServerSessions: z.boolean().optional(),
   experimentalKimiToolSelect: z.boolean().optional(),
+  experimentalKimiSubagentFork: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
   thinkingTranslationProvider: z.enum(["off", "local", "azure"]).optional(),
   thinkingTranslationEnabled: z.boolean().optional(),

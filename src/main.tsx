@@ -127,6 +127,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   experimentalKimiServer: true,
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
+  experimentalKimiSubagentFork: false,
   kimiMonthlyQuotaEnabled: false,
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,

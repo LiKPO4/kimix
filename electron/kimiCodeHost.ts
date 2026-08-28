@@ -12,6 +12,10 @@ import { resolveCatalogModelMetadata } from "./providerEffortProbe";
 import { kimiCodeServerHost } from "./kimiCodeServerHost";
 import { genericAttachmentMediaType, MAX_GENERIC_ATTACHMENT_BYTES, safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { setTomlSectionValuePreservingLayout } from "../src/utils/tomlSectionEditor";
+import {
+  buildExperimentalFeatureConfigPatch,
+  type KimiCodeExperimentalFeatureId,
+} from "./kimiCodeExperimentalFeatures";
 
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
@@ -3057,8 +3061,8 @@ export async function setConfig(patch: KimiCodeConfigPatch): Promise<KimiCodeCon
   return sdkHarness.setConfig(patch);
 }
 
-export async function setExperimentalFeature(id: "tool-select", enabled: boolean): Promise<KimiCodeConfig> {
-  return setConfig({ experimental: { [id]: enabled } } as KimiCodeConfigPatch);
+export async function setExperimentalFeature(id: KimiCodeExperimentalFeatureId, enabled: boolean): Promise<KimiCodeConfig> {
+  return setConfig(buildExperimentalFeatureConfigPatch(id, enabled) as KimiCodeConfigPatch);
 }
 
 function normalizeCatalogMaxContextSize(value: number | null): number | null {

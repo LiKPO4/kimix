@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 功能：子 Agent 上下文 fork 实验开关（v2.21.127）
+
+- 新增默认关闭的“子 Agent 上下文 fork”设置，严格写入官方 `experimental.subagent_fork`；IPC 只接受 `tool-select | subagent_fork`，不开放任意实验 ID。
+- 设置页明确说明 fork 只赋予模型可选参数，会把调用方已完成的完整对话复制给子 Agent；AgentSwarm 会按成员数放大上下文 Token 与成本。
+- 官方 Server 通过配置事件热更新实验标志；SDK 空闲会话在配置变化后主动 reload，运行中的会话不被中断。
+- Tower 仅完成产品交互分析，尚未开放：后续应区分会话模式、`.tower` 工作区与 teardown 三层状态，并以官方生成的 `.tower/comms/state.json` 作为只读仪表盘数据源。
+- 验证：定向 3 文件 16 项、全量 192 文件 2088 项、Node/Renderer typecheck、生产构建和知识库严格校验通过。
+
 ## 2026-08-28 功能：跟进 Kimi Code 0.39 SDK 与任务转后台协议（v2.21.126）
 
 - 官方基线：vendored Node SDK 从 Kimi Code 0.38.0 / SDK 0.19.1 刷新到官方 0.39.0 / SDK 0.19.2（commit `52e8d19d`），继续只保留 Kimix 的 4 秒 MCP 默认启动超时覆盖。
