@@ -115,6 +115,8 @@ describe("settings workspace scroll layout", () => {
     expect(css).toMatch(
       /\.kimix-settings-permission-status\s*\{[^}]*justify-self:\s*end;/s,
     );
+    expect(settingsPanel).toContain("将已完成的对话复制给子 Agent；fork 会增加上下文 Token，Swarm 成本更高。");
+    expect(settingsPanel).toContain("用 Git worktree 拆分、审阅并合并任务；更改后需重启 Kimix。");
   });
 
   it("exposes the official Translator key guide and the complete 1–5 second cadence choices", () => {

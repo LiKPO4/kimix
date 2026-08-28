@@ -32,14 +32,21 @@ describe("Tower renderer projection", () => {
       base: "master",
       mode: "branch",
       createdAt: "2026-08-28T00:00:00Z",
-      roster: { agents: [{ name: "worker-1", agentId: "a1", kind: "worker", missionId: "m1", branch: "tower/m1", spawnedAt: "2026-08-28T00:00:00Z" }] },
+      roster: { agents: [{ name: "worker-1", agentId: "a1", sessionId: "session-worker-1", kind: "worker", missionId: "m1", branch: "tower/m1", spawnedAt: "2026-08-28T00:00:00Z" }] },
       missions: [{ id: "m1", title: "设置页", slug: "settings", kind: "build", scope: ["src"], branch: "tower/m1", worktree: "D:/repo/.tower/m1", deps: [], status: "completed", tasks: [{ text: "实现", done: true }, { text: "测试", done: false }], notes: [], blockers: [] }, { id: "m2", title: "合并设置", slug: "merge-settings", kind: "build", scope: ["src"], branch: "tower/m2", worktree: "D:/repo/.tower/m2", deps: ["m1"], status: "merged", tasks: [], notes: [], blockers: [] }],
       activity: ["worker-1 started"],
       ownership: { ownerSessionId: "session-a", ownedByCurrentSession: true, openMissionIds: ["m1"] },
     });
     expect(snapshot).toMatchObject({ base: "master", owner: "session-a", totalCount: 2, mergedCount: 1, blockedCount: 0 });
     expect(snapshot.missions[0]).toMatchObject({ id: "m1", completedTasks: 1, totalTasks: 2 });
-    expect(snapshot.agents[0]).toMatchObject({ id: "a1", mission: "m1", branch: "tower/m1" });
+    expect(snapshot.agents[0]).toMatchObject({
+      id: "a1",
+      sessionId: "session-worker-1",
+      mission: "m1",
+      branch: "tower/m1",
+      status: "completed",
+      spawnedAt: "2026-08-28T00:00:00Z",
+    });
     expect(snapshot.activity[0]?.message).toBe("worker-1 started");
   });
 

@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 优化：Tower 入口与后台 Agent 胶囊对齐（v2.21.129）
+
+- Composer 加号菜单新增 Tower 开关，与底部模式按钮共用 Git 预检、互斥检查和官方模式切换；待首轮开启状态可从菜单、工具栏或胶囊展开层撤销。
+- 移除输入区上方的 Tower 横向状态卡，接入现有 Dock 胶囊；展开层参考官方 Web 的“后台 Agent”，提供最近/进行中/已完成/全部筛选，并可点击 Agent 卡片查看任务、分支与官方会话 ID，完整状态仍可进入右侧检查器。
+- Tower roster 投影补充 sessionId/spawnedAt，并在 roster 缺少状态时从关联 mission 推导，保证筛选与状态标签可用。
+- 缩短“子 Agent 上下文 fork”和“Tower 协作编排”的设置描述，使实验功能行在常见设置宽度下保持单行说明和一致行高。
+- 验证：定向 4 文件 62 项、全量 195 文件 2102 项、Node/Renderer typecheck、生产构建、diff 检查与知识库严格校验通过。
+
 ## 2026-08-28 功能：接入官方 Tower 协作编排（v2.21.128）
 
 - 设置页新增默认关闭的 Tower 实验开关，严格写入官方 `experimental.tower`；Tower 工具与 worker profile 属于 App-scope 组装，开启或关闭后需要重启 Kimix/托管 Kimi Server，Kimix 不会重启外部 Server。

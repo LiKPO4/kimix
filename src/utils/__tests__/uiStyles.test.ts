@@ -532,6 +532,10 @@ describe("Composer 新会话配置能力", () => {
       composer.match(/disabled=\{!canConfigureNextTurn \|\| \(towerModeEnabled && !swarmModeEnabled\)\}/g)?.length,
     ).toBeGreaterThanOrEqual(2);
     expect(composer).toContain("Swarm 模式将在首次发消息时");
+    expect(composer).toContain("<span>Tower 模式</span>");
+    expect(composer).toContain("多 Agent 工作树编排");
+    expect(composer).toContain("已取消 Tower 待开启状态。");
+    expect(composer).toContain('{towerModeDesired ? "取消" : towerModeEnabled ? "关闭" : "开启"}');
     expect(composer).toContain("权限模式将在首次发消息时生效。");
     expect(composer).toContain("将在首次发消息时生效。");
   });

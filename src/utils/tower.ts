@@ -12,10 +12,12 @@ export type TowerMissionView = {
 export type TowerAgentView = {
   id: string;
   name?: string;
+  sessionId?: string;
   kind: string;
   mission?: string;
   branch?: string;
   status?: string;
+  spawnedAt?: string;
 };
 
 export type TowerActivityView = {
@@ -86,10 +88,12 @@ function normalizeAgent(value: unknown, index: number): TowerAgentView {
   return {
     id: asText(entry.agentId) ?? `agent-${index + 1}`,
     name: asText(entry.name),
+    sessionId: asText(entry.sessionId),
     kind: asText(entry.kind) ?? "worker",
     mission: asText(entry.missionId) ?? asText(entry.reviewTarget),
     branch: asText(entry.branch),
     status: asText(entry.status),
+    spawnedAt: asText(entry.spawnedAt),
   };
 }
 
@@ -111,7 +115,11 @@ export function normalizeTowerSnapshot(raw: unknown): TowerSnapshotView {
   const roster = asRecord(value.roster);
   const ownership = asRecord(value.ownership);
   const missions = asArray(value.missions).map(normalizeMission);
-  const agents = asArray(roster.agents).map(normalizeAgent);
+  const missionStatusById = new Map(missions.map((mission) => [mission.id, mission.status]));
+  const agents = asArray(roster.agents).map(normalizeAgent).map((agent) => ({
+    ...agent,
+    status: agent.status ?? (agent.mission ? missionStatusById.get(agent.mission) : undefined),
+  }));
   const activity = asArray(value.activity).map(normalizeActivity);
   const enabled = value.enabled === true;
   const mergedCount = missions.filter((mission) => mission.status === "merged").length;

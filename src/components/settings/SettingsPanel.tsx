@@ -3297,7 +3297,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <span>子 Agent 上下文 fork</span>
                       </div>
                       <div className="kimix-settings-permission-desc">
-                        允许模型在需要时将当前已完成的完整对话历史复制给子 Agent；每个 fork 都会增加上下文 Token，Swarm 会按成员数放大成本；需 Kimi Code 0.39.0+，默认关闭。
+                        将已完成的对话复制给子 Agent；fork 会增加上下文 Token，Swarm 成本更高。
                       </div>
                     </div>
                     <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiSubagentFork ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -3319,7 +3319,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         <span>Tower 协作编排</span>
                       </div>
                       <div className="kimix-settings-permission-desc">
-                        允许官方 Tower 在 Git worktree 中拆分、审阅并合并多项任务；需 Kimi Code 0.39.0+，开启或关闭后必须重启 Kimix 或托管 Kimi Server，默认关闭。
+                        用 Git worktree 拆分、审阅并合并任务；更改后需重启 Kimix。
                       </div>
                     </div>
                     <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiTower ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>

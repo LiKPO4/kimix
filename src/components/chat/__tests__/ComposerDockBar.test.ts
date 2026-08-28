@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
 import type { TodoItem } from "@/types/ui";
+import type { TowerSnapshotView } from "@/utils/tower";
 import { ComposerDockBar } from "../ComposerDockBar";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -29,6 +30,24 @@ const todoFixture: TodoItem[] = [
   { id: "t2", content: "跑测试", status: "in_progress" },
   { id: "t3", content: "提交", status: "pending" },
 ];
+
+const towerFixture: TowerSnapshotView = {
+  enabled: true,
+  base: "master",
+  owner: "session-main",
+  mergedCount: 1,
+  totalCount: 2,
+  blockedCount: 0,
+  missions: [
+    { id: "M1", title: "实现设置入口", status: "active", branch: "feat/settings", owner: "worker-a" },
+    { id: "M2", title: "补充回归测试", status: "merged", branch: "feat/tests", owner: "worker-b" },
+  ],
+  agents: [
+    { id: "agent-a", name: "worker-a", sessionId: "session-a", kind: "worker", mission: "M1", branch: "feat/settings", status: "active", spawnedAt: "2026-08-28T10:00:00Z" },
+    { id: "agent-b", name: "worker-b", sessionId: "session-b", kind: "worker", mission: "M2", branch: "feat/tests", status: "merged", spawnedAt: "2026-08-28T09:00:00Z" },
+  ],
+  activity: [],
+};
 
 function makeProps(overrides: Partial<DockProps> = {}): DockProps {
   return {
@@ -136,6 +155,25 @@ describe("ComposerDockBar", () => {
     const panel = container.querySelector(".kimix-dock-panel");
     expect(panel?.querySelector("h1")?.textContent).toBe("实施计划");
     expect(panel?.querySelector("li")?.textContent).toContain("第一步");
+  });
+
+  it("Tower 使用后台 Agent 胶囊，展开后可筛选并点开 Agent 卡片", () => {
+    render(makeProps({ towerMode: true, towerSnapshot: towerFixture }));
+    expect(capsuleLabels()).toHaveLength(1);
+    expect(capsuleLabels()[0]).toContain("Tower Agent");
+    expect(capsuleLabels()[0]).toContain("(1/2)");
+
+    clickCapsule(0);
+    const panel = container.querySelector(".kimix-dock-panel");
+    expect(panel?.textContent).toContain("后台 Agent");
+    expect(panel?.textContent).toContain("1 运行中");
+    expect(panel?.querySelectorAll("[role='tab']")).toHaveLength(4);
+
+    const agentCard = Array.from(panel!.querySelectorAll<HTMLButtonElement>("button")).find((item) => item.textContent?.includes("worker-a"));
+    act(() => agentCard?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(panel?.textContent).toContain("实现设置入口");
+    expect(panel?.textContent).toContain("feat/settings");
+    expect(panel?.textContent).toContain("session-a");
   });
 
   it("官方 tool 类后台任务使用后台任务文案", () => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images, RadioTower, AlertTriangle, Eye } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images, RadioTower, AlertTriangle } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -4159,6 +4159,15 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       }));
       return;
     }
+    if (towerModeDesired) {
+      if (activeSession) {
+        updateSession(activeSession.id, (session) => ({ ...session, towerModeDesired: undefined, updatedAt: Date.now() }));
+        syncCurrentSessionFromStore(activeSession.id);
+        void persistLocalConversationState();
+      }
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已取消 Tower 待开启状态。" }));
+      return;
+    }
     if (towerModeEnabled) {
       const runtimeSessionId = activeRuntimeSessionId;
       if (!runtimeSessionId) {
@@ -4627,49 +4636,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         aria-hidden="true"
         onChange={handleMediaFileSelection}
       />
-      {(towerModeEnabled || towerModeDesired) && (
-        <div
-          className="kimix-floating-panel grid items-center"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, marginBottom: 10, padding: "10px 14px" }}
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary-light text-accent-primary">
-              <RadioTower size={15} />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" style={{ gap: 8 }}>
-                <span>Tower</span>
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />
-                <span className="truncate text-[12px] font-normal text-[var(--kimix-panel-text-muted)]">{towerModeDesired ? "待首轮开启" : towerSnapshot?.base ?? "官方运行时"}</span>
-              </div>
-              {!towerModeDesired && (
-                <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
-                  {towerSnapshot ? `${towerSnapshot.mergedCount} / ${towerSnapshot.totalCount} 已合并${towerSnapshot.blockedCount > 0 ? ` · ${towerSnapshot.blockedCount} 受阻` : ""}` : "正在同步 Tower 状态..."}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
-            <button type="button" onClick={onOpenTowerInspector} className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted" style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}>
-              <Eye size={14} />
-              查看
-            </button>
-            <button
-              type="button"
-              disabled={towerMutationBusy || towerModeDesired}
-              onClick={() => void requestTowerMode()}
-              className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
-              style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}
-              title={towerModeDesired ? "会在创建官方会话后自动开启" : "退出 Tower 模式，不会清理 worktree 或分支"}
-            >
-              {towerMutationBusy ? <Loader2 size={14} className="animate-spin" /> : <RadioTower size={14} />}
-              退出
-            </button>
-          </div>
-        </div>
-      )}
       <ComposerDockBar
         bashTasks={bashHidden ? [] : bashTasks}
         subagentTasks={subagentHidden ? [] : subagentTasks}
@@ -4680,10 +4646,17 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         planMode={mutationPlanMode}
         planContent={sessionPlanState?.content ?? null}
         planPath={sessionPlanState?.path ?? null}
+        towerMode={towerModeEnabled}
+        towerPending={towerModeDesired}
+        towerSnapshot={towerSnapshot}
+        towerBusy={towerMutationBusy}
         onPauseGoal={onPauseOfficialGoal}
         onResumeGoal={onResumeOfficialGoal}
         onCancelGoal={onCancelOfficialGoal}
         onRefreshGoal={onRefreshOfficialGoal}
+        onRefreshTower={onRefreshTower}
+        onOpenTowerInspector={onOpenTowerInspector}
+        onExitTower={requestTowerMode}
         onHideBash={() => hideComposerCard("bash", bashCardLabel)}
         onHideSubagent={() => hideComposerCard("subagent", "子 Agent")}
         onHideTodo={() => hideComposerCard("todo", "TodoList")}
@@ -5083,6 +5056,35 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                           {swarmModeEnabled ? "关闭" : "开启"}
                         </button>
                       </div>
+                      <div className="grid items-center border-t border-[var(--kimix-panel-divider)]" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, marginTop: 14, paddingTop: 14 }}>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center text-[13.5px] font-medium text-[var(--kimix-panel-text)]" style={{ gap: 8 }}>
+                            <RadioTower size={15} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />
+                            <span>Tower 模式</span>
+                          </div>
+                          <p className="m-0 text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>
+                            多 Agent 工作树编排
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={towerMutationBusy || (!towerModeEnabled && !towerModeDesired && !canToggleTowerMode)}
+                          onClick={() => {
+                            setShowAddMenu(false);
+                            void requestTowerMode();
+                          }}
+                          className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-55"
+                          aria-pressed={towerModeEnabled}
+                          style={{ minWidth: 72, height: 32, paddingLeft: 12, paddingRight: 12 }}
+                          title={towerModeDesired
+                            ? "取消发送首条目标前自动开启 Tower"
+                            : towerModeEnabled
+                              ? "退出 Tower 模式；不会清理 worktree 或分支"
+                              : "预检当前 Git 工作区并开启 Tower"}
+                        >
+                          {towerModeDesired ? "取消" : towerModeEnabled ? "关闭" : "开启"}
+                        </button>
+                      </div>
                     </section>
 
                   </div>
@@ -5208,7 +5210,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             {(activeSession || currentProject) && (
               <button
                 type="button"
-                disabled={towerMutationBusy || (!towerModeEnabled && !canToggleTowerMode)}
+                disabled={towerMutationBusy || (!towerModeEnabled && !towerModeDesired && !canToggleTowerMode)}
                 onClick={() => void requestTowerMode()}
                 className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -5230,7 +5232,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 aria-pressed={towerModeEnabled}
               >
                 {towerMutationBusy ? <Loader2 size={14} className="shrink-0 animate-spin" /> : <RadioTower size={14} className="shrink-0" />}
-                <span>Tower</span>
+                <span>{towerModeDesired ? "待开启" : "Tower"}</span>
               </button>
             )}
             <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
