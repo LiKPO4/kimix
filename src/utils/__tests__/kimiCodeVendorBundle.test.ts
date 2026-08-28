@@ -14,7 +14,7 @@ function section(startMarker: string, endMarker: string): string {
   return bundle.slice(start, end);
 }
 
-describe("vendored Kimi Code 0.31 fallback", () => {
+describe("vendored Kimi Code fallback", () => {
   it("为被中断但尚未执行的工具调用补齐 call/result 事件", () => {
     const recorder = section("async function recordUnexecutedToolCalls", "function preflightToolCall");
     expect(recorder).toContain('type: "tool.call"');
@@ -74,7 +74,6 @@ describe("vendored Kimi Code 0.34", () => {
 
 describe("vendored Kimi Code 0.36", () => {
   it("保留子代理模型池与二级模型强制排除能力", () => {
-    expect(bundle).toContain("cascadeSubagentModelPool");
     expect(bundle).toContain("SECONDARY_MODEL_FORCE_EXCLUDES_MODELS");
   });
 
@@ -94,5 +93,30 @@ describe("vendored Kimi Code 0.38", () => {
 
   it("支持 kimi.com 与 kimi.ai 登录区域", () => {
     expect(bundle).toContain('value === "mainland-cn" || value === "global"');
+  });
+});
+
+describe("vendored Kimi Code 0.39", () => {
+  it("恢复 v2 实时 Context 状态快照", () => {
+    const snapshot = section("function withStatusSnapshot", "function createKimiHarnessV2");
+    expect(snapshot).toContain("tokenCounting.statusSize(context)");
+    expect(snapshot).toContain("contextUsage");
+    expect(snapshot).toContain("usage: usageService.status(context)");
+  });
+
+  it("全局 MCP 管理支持 cwd，并保留离线授权状态查询", () => {
+    const management = section(
+      "async listMcpServers(options2 = {})",
+      "async authenticateAppMcpServer(locator, options2)",
+    );
+    expect(management).toContain("this.rpc.listGlobalMcpServers(options2)");
+    expect(management).toContain("this.rpc.listGlobalMcpServerAuthStatuses(options2)");
+    expect(management).toContain("{ cwd: options2.cwd }");
+  });
+
+  it("暴露 Tower 模式，并按官方 0.39 语义保留失效的 secondary_model 配置", () => {
+    expect(bundle).toContain("async setTowerMode(enabled)");
+    expect(bundle).toContain("towerMode: external_exports.boolean().optional()");
+    expect(bundle).not.toContain("cascadeSubagentModelPool");
   });
 });

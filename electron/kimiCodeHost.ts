@@ -37,6 +37,7 @@ import {
   toServerConfigPatch,
   type ServerFrame,
   type ServerAuthSummary,
+  type ServerBackgroundTask,
   type ServerMcpServer,
   type ServerOAuthFlow,
   type ServerSession,
@@ -2475,22 +2476,7 @@ export async function listBackgroundTasks(sessionId: string, options: { activeOn
   sessionId = resolveMigratedSessionId(sessionId);
   try {
     const tasks = await getServerClient().listTasks(sessionId, options.activeOnly ? "running" : undefined);
-    const mapped = tasks.map((task) => ({
-      taskId: task.id,
-      command: task.command ?? "",
-      description: task.description,
-      status: task.status === "cancelled" ? "killed" as const : task.status,
-      pid: 0,
-      exitCode: null,
-      startedAt: Date.parse(task.started_at ?? task.created_at),
-      endedAt: task.completed_at ? Date.parse(task.completed_at) : null,
-      subagentType: task.kind,
-      outputBytes: task.output_bytes,
-      outputPreview: task.output_preview,
-      transport: "server" as const,
-      stopReason: task.status === "cancelled" ? "任务已被官方 Server 标记为取消。" : undefined,
-      failureReason: task.status === "failed" && task.output_bytes ? `任务失败，已有约 ${formatBytes(task.output_bytes)} 输出可查看。` : undefined,
-    }));
+    const mapped = tasks.map(mapServerBackgroundTask);
     return options.limit ? mapped.slice(0, options.limit) : mapped;
   } catch (serverErr) {
     if (serverSessions.has(sessionId)) throw serverErr;
@@ -2538,13 +2524,36 @@ export async function stopBackgroundTask(sessionId: string, taskId: string, reas
 }
 
 export async function detachBackgroundTask(sessionId: string, taskId: string): Promise<KimiCodeBackgroundTaskInfo | undefined> {
+  sessionId = resolveMigratedSessionId(sessionId);
   if (serverSessions.has(sessionId)) {
-    throw new Error("官方 Server 暂未公开前台任务转后台接口。已在后台运行的任务仍可查看、复制输出或停止。");
+    await getServerClient().detachTask(sessionId, taskId);
+    const task = await getServerClient().getTask(sessionId, taskId);
+    return mapServerBackgroundTask(task);
   }
   const managed = getManagedSession(sessionId);
   if (!managed.session.detachBackgroundTask) throw new Error("当前兼容链路不支持前台任务转后台。");
   const task = await managed.session.detachBackgroundTask(taskId);
   return task ? { ...task, transport: "sdk" as const } : undefined;
+}
+
+function mapServerBackgroundTask(task: ServerBackgroundTask): KimiCodeBackgroundTaskInfo {
+  return {
+    taskId: task.id,
+    command: task.command ?? "",
+    description: task.description,
+    status: task.status === "cancelled" ? "killed" : task.status,
+    pid: 0,
+    exitCode: null,
+    startedAt: Date.parse(task.started_at ?? task.created_at),
+    endedAt: task.completed_at ? Date.parse(task.completed_at) : null,
+    agentId: task.agent_id,
+    subagentType: task.kind,
+    outputBytes: task.output_bytes,
+    outputPreview: task.output_preview,
+    transport: "server",
+    stopReason: task.status === "cancelled" ? "任务已被官方 Server 标记为取消。" : undefined,
+    failureReason: task.status === "failed" && task.output_bytes ? `任务失败，已有约 ${formatBytes(task.output_bytes)} 输出可查看。` : undefined,
+  };
 }
 
 function formatBytes(bytes: number): string {

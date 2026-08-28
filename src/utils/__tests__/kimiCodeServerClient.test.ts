@@ -1191,6 +1191,52 @@ describe("KimiCodeServerClient protocol adapters", () => {
     ]);
   });
 
+  it("moves a foreground Server task to the background through the official detach route", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      code: 0,
+      data: { detached: true, status: "running" },
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+
+    await expect(client.detachTask("session/1", "task/1")).resolves.toEqual({
+      detached: true,
+      status: "running",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:58627/api/v1/sessions/session%2F1/tasks/task%2F1:detach",
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    );
+  });
+
+  it("reads detached task metadata without downloading task output", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      code: 0,
+      data: {
+        id: "task-1",
+        session_id: "session-1",
+        kind: "bash",
+        description: "build",
+        status: "running",
+        created_at: "2026-08-28T10:00:00+08:00",
+      },
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new KimiCodeServerClient("http://127.0.0.1:58627");
+
+    await client.getTask("session-1", "task-1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:58627/api/v1/sessions/session-1/tasks/task-1",
+      expect.any(Object),
+    );
+  });
+
   it("asks the official Server to exclude empty sessions", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {

@@ -23,12 +23,12 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Official base | `0999454bdcb5ddd98f39bffee434dcf0a810f394` (tag `@moonshot-ai/kimi-code@0.38.0`) |
+| Official base | `52e8d19dbd17efebc2e73f8e1a879bef7f23c2b1` (tag `@moonshot-ai/kimi-code@0.39.0`) |
 | Feature overlay | None; custom Agents, plugin Agents/system prompts, and secondary-model routing are upstream |
 | Kimix overlay | MCP fallback startup timeout only, applied by the vendor script |
-| node-sdk version | `0.19.1` |
-| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.38.0` |
-| Bundled on | 2026-08-22 |
+| node-sdk version | `0.19.2` |
+| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.39.0` |
+| Bundled on | 2026-08-28 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
@@ -46,6 +46,12 @@ legacy Node SDK path, and adds plugin-contributed Agents and system prompts to b
 engines. Kimix therefore vendors the clean official tag instead of carrying the
 former dual-model-routing and sticky-resume overlays. Runtime feature flags and
 profile precedence remain owned by the official SDK.
+
+The `0.39.0` SDK restores live v2 context-window usage snapshots, lets global MCP
+management calls carry an optional working directory, and exposes Tower mode through
+the SDK session contract. Kimix receives the live context snapshots through its existing
+status path. Global MCP management options and Tower remain available in the bundle but
+are not surfaced by the desktop UI in this refresh.
 
 The `0.31.0` host-identity contract requires `productName`, `version`, and `platform`.
 Kimix identifies itself as the desktop host rather than impersonating the CLI.

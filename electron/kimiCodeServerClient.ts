@@ -300,6 +300,11 @@ export type ServerBackgroundTask = {
   description: string;
   status: "running" | "completed" | "failed" | "cancelled";
   command?: string;
+  model?: string;
+  thinking_effort?: string;
+  agent_id?: string;
+  parent_tool_call_id?: string;
+  run_in_background?: boolean;
   created_at: string;
   started_at?: string;
   completed_at?: string;
@@ -1692,8 +1697,9 @@ export class KimiCodeServerClient {
     return result.items;
   }
 
-  getTask(sessionId: string, taskId: string, outputBytes = 65_536): Promise<ServerBackgroundTask> {
-    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}?with_output=true&output_bytes=${outputBytes}`);
+  getTask(sessionId: string, taskId: string, outputBytes?: number): Promise<ServerBackgroundTask> {
+    const query = outputBytes === undefined ? "" : `?with_output=true&output_bytes=${outputBytes}`;
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}${query}`);
   }
 
   async cancelTask(sessionId: string, taskId: string): Promise<{ cancelled: boolean }> {
@@ -1708,6 +1714,13 @@ export class KimiCodeServerClient {
     if (envelope.code === 0) return envelope.data;
     if (envelope.code === 40904) return envelope.data ?? { cancelled: false };
     throw new Error(`${pathname}: ${envelope.msg ?? envelope.code}`);
+  }
+
+  detachTask(sessionId: string, taskId: string): Promise<{ detached: boolean; status: ServerBackgroundTask["status"] }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/tasks/${encodeURIComponent(taskId)}:detach`, {
+      method: "POST",
+      body: "{}",
+    });
   }
 
   async listTerminals(sessionId: string): Promise<ServerTerminal[]> {
