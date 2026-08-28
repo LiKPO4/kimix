@@ -194,7 +194,13 @@ function TowerPanelBody({ towerPending, snapshot, tasks, subagents, busy, onExit
                     setSelectedAgentId(null);
                   }}
                   className={`kimix-icon-text-button is-compact text-[12px] ${filter === item.id ? "kimix-state-button" : "text-text-muted"}`}
-                  style={{ minHeight: 32, height: 32, paddingLeft: 12, paddingRight: 12 }}
+                  style={{
+                    minHeight: 32,
+                    height: 32,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    borderRadius: "var(--ui-role-navigation-item-radius, var(--radius-sm))",
+                  }}
                 >
                   {item.label}
                 </button>

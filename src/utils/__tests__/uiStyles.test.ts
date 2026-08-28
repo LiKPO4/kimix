@@ -551,6 +551,7 @@ describe("Tower 后台 Agent 面板契约", () => {
     expect(dockBar).toContain("<KimiWebSubagentDetails subagent={selectedRecord.subagent} />");
     expect(dockBar).toContain('aria-selected={filter === item.id}');
     expect(dockBar).toContain('filter === item.id ? "kimix-state-button"');
+    expect(dockBar).toContain('borderRadius: "var(--ui-role-navigation-item-radius, var(--radius-sm))"');
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     expect(css).toContain('.kimix-state-button:is([aria-pressed="true"], [aria-selected="true"])');
     expect(css).toContain(':is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled)');

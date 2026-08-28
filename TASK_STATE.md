@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：Tower 筛选框改为硬圆角（v2.21.133）
+
+- 根因：筛选 Tab 复用了 toggle 角色，风格化的 toggle 半径为 pill，导致“最近”等选中项呈胶囊形。
+- 修复：筛选 Tab 使用 navigationItem 的 medium 半径；自定义风格读取 `--ui-role-navigation-item-radius`，旧内置风格回退到对应的 `--radius-sm`，保留选中颜色与描边。
+- 验证：定向 UI 契约测试、全量测试、Node/Renderer typecheck、生产构建、diff 检查与知识库严格校验通过。
+
 ## 2026-08-28 修正：修复风格化筛选选中态（v2.21.132）
 
 - 根因：Tower 后台 Agent 筛选使用语义正确的 `aria-selected`，但通用风格契约只识别 `aria-pressed`，导致自定义风格下“全部”等选中项缺少选中背景与描边。
