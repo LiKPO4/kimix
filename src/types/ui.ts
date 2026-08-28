@@ -300,6 +300,10 @@ export interface Session {
   swarmMode?: boolean;
   /** 运行中切换 Swarm 时记录的下一轮目标状态；应用成功后清除。 */
   swarmModeDesired?: boolean;
+  /** 官方 Tower 当前报告的模式状态；仅普通单 Agent 会话可使用。 */
+  towerMode?: boolean;
+  /** 首次创建或恢复官方 runtime 后、发送首条目标前应用的 Tower 意图。 */
+  towerModeDesired?: boolean;
   titleLocked?: boolean;
   model?: string | null;
   permissionMode?: PermissionMode;

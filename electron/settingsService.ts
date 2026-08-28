@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiServerSessions: true,
   experimentalKimiToolSelect: false,
   experimentalKimiSubagentFork: false,
+  experimentalKimiTower: false,
   kimiMonthlyQuotaEnabled: false,
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,

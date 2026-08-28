@@ -43,6 +43,7 @@ import { SessionToolbar } from "./SessionToolbar";
 import { DiffPanel } from "./DiffPanel";
 import { ToastSystem } from "./ToastSystem";
 import { LongTaskInspectorPanel, type BtwPanelState, type HiddenComposerCardEntry, type LongTaskBackgroundTaskView, type SessionPlanState } from "./LongTaskInspectorPanel";
+import { normalizeTowerSnapshot, type TowerSnapshotView } from "@/utils/tower";
 import { ResizeHandle } from "./ResizeHandle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { claimRuntimeSessionOwnership, shouldHideOfficialSessionPlaceholder } from "@/utils/sessionCatalog";
@@ -374,6 +375,7 @@ export function AppShell() {
     error: null,
     message: undefined,
   });
+  const [towerSnapshot, setTowerSnapshot] = useState<TowerSnapshotView | null>(null);
   const sessionPlanRequestRef = useRef(0);
   const sessionPlanRetryTimerRef = useRef<number | null>(null);
   const [btwTransientBySessionId, setBtwTransientBySessionId] = useState<Record<string, BtwTransientState>>({});
@@ -1050,6 +1052,22 @@ export function AppShell() {
     backgroundTasksRuntimeSessionIdRef.current = backgroundTasksRuntimeSessionId;
   }, [backgroundTasksRuntimeSessionId]);
   const liveCurrentSessionProjectPath = liveCurrentSession?.projectPath;
+  const refreshTowerSnapshot = useCallback(async () => {
+    const latest = useSessionStore.getState().sessions.find((session) => session.id === useAppStore.getState().currentSession?.id)
+      ?? useAppStore.getState().currentSession;
+    if (!latest || latest.collaboration) {
+      setTowerSnapshot(null);
+      return;
+    }
+    const runtimeSessionId = getRuntimeSessionId(latest);
+    if (!runtimeSessionId) return;
+    const response = await window.api.getKimiCodeTowerSnapshot({ sessionId: runtimeSessionId });
+    if (response.success) setTowerSnapshot(normalizeTowerSnapshot(response.data));
+  }, []);
+  useEffect(() => {
+    setTowerSnapshot(null);
+    if (liveCurrentSession?.towerMode && !liveCurrentSession.collaboration) void refreshTowerSnapshot();
+  }, [liveCurrentSession?.id, liveCurrentSession?.towerMode, liveCurrentSession?.collaboration, refreshTowerSnapshot]);
   const parsedLongTaskDetail = useMemo(() => parseLongTaskDetail(longTaskDetail), [longTaskDetail]);
   const reviewedReviewItems = useMemo(() => new Set((longTaskMeta?.reviewedReviewItems ?? []).map(normalizeReviewItem)), [longTaskMeta?.reviewedReviewItems]);
   const pendingReviewItems = useMemo(
@@ -2143,6 +2161,9 @@ ${isFinalStep
                     subagentTasks={subagentTasks}
                     officialGoal={mutationSessionView?.officialGoal}
                     sessionPlanState={sessionPlanState}
+                    towerSnapshot={towerSnapshot}
+                    onRefreshTower={refreshTowerSnapshot}
+                    onOpenTowerInspector={() => setLongTaskInspectorOpen(true)}
                     onPauseOfficialGoal={pauseOfficialGoal}
                     onResumeOfficialGoal={resumeOfficialGoal}
                     onCancelOfficialGoal={cancelOfficialGoal}
@@ -2197,6 +2218,8 @@ ${isFinalStep
             btwDisabled={!liveCurrentSession || !activeMutationOwner || isMutationOwnerRunning}
             defaultPlanMode={mutationSessionView?.planMode ?? defaultPlanMode}
             officialGoal={mutationSessionView?.officialGoal}
+            towerSnapshot={towerSnapshot}
+            onTowerSnapshotChange={setTowerSnapshot}
             sessionAgentLabel={liveCurrentSession?.collaboration ? activeMutationOwner?.displayName : undefined}
             gitDetailsOpenSignal={gitDetailsOpenSignal}
             gitGraphOpenSignal={gitGraphOpenSignal}

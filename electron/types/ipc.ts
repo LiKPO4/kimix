@@ -1710,6 +1710,7 @@ export type AppSettings = {
   experimentalKimiServerSessions: boolean;
   experimentalKimiToolSelect: boolean;
   experimentalKimiSubagentFork: boolean;
+  experimentalKimiTower: boolean;
   kimiMonthlyQuotaEnabled: boolean;
   thinkingTranslationProvider: ThinkingTranslationProvider;
   /** @deprecated 仅用于迁移 2.21.80 及更早版本的布尔开关。 */
@@ -1783,6 +1784,78 @@ export type KimiCodeSetExperimentalFeatureRequest = {
   enabled: boolean;
 };
 
+export type KimiCodeTowerPreflightRequest = {
+  sessionId?: string;
+  workDir?: string;
+};
+
+export type KimiCodeTowerSetModeRequest = {
+  sessionId: string;
+  enabled: boolean;
+};
+
+export type KimiCodeTowerMission = {
+  id: string;
+  title: string;
+  slug: string;
+  kind: "build" | "survey";
+  scope: string[];
+  branch: string;
+  worktree: string;
+  deps: string[];
+  status: "planned" | "active" | "completed" | "blocked" | "paused" | "merged" | "abandoned";
+  owner?: string;
+  tasks: Array<{ text: string; done: boolean }>;
+  notes: string[];
+  blockers: string[];
+};
+
+export type KimiCodeTowerSnapshot = {
+  version: 1;
+  repoRoot: string;
+  base: string;
+  mode: "branch" | "pr";
+  createdAt: string;
+  sessionId?: string;
+  roster: { agents: Array<{
+    name: string;
+    agentId: string;
+    sessionId?: string;
+    kind: "worker" | "reviewer";
+    missionId?: string;
+    reviewTarget?: string;
+    worktree?: string;
+    branch?: string;
+    spawnedAt: string;
+  }> };
+  missions: KimiCodeTowerMission[];
+  activity: string[];
+  ownership: {
+    ownerSessionId?: string;
+    ownedByCurrentSession: boolean;
+    openMissionIds: string[];
+  };
+};
+
+export type KimiCodeTowerPreflight = {
+  workDir: string;
+  repoRoot?: string;
+  isGitRepo: boolean;
+  hasCommit: boolean;
+  branch?: string;
+  detached: boolean;
+  dirty: boolean;
+  warnings: string[];
+  state: {
+    exists: boolean;
+    valid: boolean;
+    ownerSessionId?: string;
+    openMissionIds: string[];
+    error?: string;
+  };
+  canEnable: boolean;
+};
+
 export type KimiCodePermissionMode = "manual" | "auto" | "yolo";
 
 export type KimiCodeEngineStatus =
@@ -1815,6 +1888,7 @@ export type KimiCodeSessionStatus = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   swarmMode?: boolean;
+  towerMode?: boolean;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -2552,11 +2626,32 @@ export type KimiCodeArchivedSessionResponse = {
 
 export type KimiCodeSetExperimentalFeatureResponse = {
   success: true;
-  data: void;
+  // 旧版 renderer fallback 仍可能返回 void；Electron 实现始终返回 restartRequired。
+  data: void | { restartRequired: boolean; message?: string };
 } | {
   success: false;
   error: string;
 };
+
+export type KimiCodeTowerPreflightResponse = {
+  success: true;
+  data: KimiCodeTowerPreflight;
+} | { success: false; error: string };
+
+export type KimiCodeTowerSnapshotResponse = {
+  success: true;
+  data: KimiCodeTowerSnapshot;
+} | { success: false; error: string };
+
+export type KimiCodeTowerSetModeResponse = {
+  success: true;
+  data: { enabled: boolean };
+} | { success: false; error: string };
+
+export type KimiCodeTowerTeardownResponse = {
+  success: true;
+  data: { dispatched: true };
+} | { success: false; error: string };
 
 export type KimiCodeServerTerminalResponse = {
   success: true;

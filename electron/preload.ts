@@ -174,6 +174,12 @@ import type {
   KimiCodeArchivedSessionsResponse,
   KimiCodeSetExperimentalFeatureRequest,
   KimiCodeSetExperimentalFeatureResponse,
+  KimiCodeTowerPreflightRequest,
+  KimiCodeTowerPreflightResponse,
+  KimiCodeTowerSetModeRequest,
+  KimiCodeTowerSetModeResponse,
+  KimiCodeTowerSnapshotResponse,
+  KimiCodeTowerTeardownResponse,
   KimiCodePluginResponse,
   KimiCodePromptResponse,
   KimiCodeFileRequest,
@@ -515,6 +521,14 @@ const api = {
     ipcRenderer.invoke("kimi-code:restoreArchivedSession", req),
   setKimiCodeExperimentalFeature: (req: KimiCodeSetExperimentalFeatureRequest): Promise<KimiCodeSetExperimentalFeatureResponse> =>
     ipcRenderer.invoke("kimi-code:setExperimentalFeature", req),
+  preflightKimiCodeTower: (req: KimiCodeTowerPreflightRequest): Promise<KimiCodeTowerPreflightResponse> =>
+    ipcRenderer.invoke("kimi-code:towerPreflight", req),
+  getKimiCodeTowerSnapshot: (req: KimiCodeSessionRequest): Promise<KimiCodeTowerSnapshotResponse> =>
+    ipcRenderer.invoke("kimi-code:towerSnapshot", req),
+  setKimiCodeTowerMode: (req: KimiCodeTowerSetModeRequest): Promise<KimiCodeTowerSetModeResponse> =>
+    ipcRenderer.invoke("kimi-code:setTowerMode", req),
+  teardownKimiCodeTower: (req: KimiCodeSessionRequest): Promise<KimiCodeTowerTeardownResponse> =>
+    ipcRenderer.invoke("kimi-code:towerTeardown", req),
   reconnectKimiCodeMcpServer: (req: KimiCodeMcpServerRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:reconnectMcpServer", req),
   listKimiCodeBackgroundTasks: (req: KimiCodeListBackgroundTasksRequest): Promise<KimiCodeListBackgroundTasksResponse> =>

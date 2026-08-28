@@ -49,6 +49,9 @@ import { isWindows } from "@/utils/platform";
 import { alignSessionDiffsToGitStatus, type SessionDiffEntry } from "@/utils/diff";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone } from "@/utils/backgroundTasks";
+import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { TowerInspector } from "./TowerInspector";
+import type { TowerSnapshotView } from "@/utils/tower";
 
 const GIT_GRAPH_PAGE_SIZE = 100;
 
@@ -237,6 +240,8 @@ interface LongTaskInspectorPanelProps {
   btwDisabled: boolean;
   defaultPlanMode: boolean;
   officialGoal: Session["officialGoal"] | null | undefined;
+  towerSnapshot?: TowerSnapshotView | null;
+  onTowerSnapshotChange?: (snapshot: TowerSnapshotView | null) => void;
   sessionAgentLabel?: string;
   gitDetailsOpenSignal?: number;
   gitGraphOpenSignal?: number;
@@ -306,6 +311,8 @@ export function LongTaskInspectorPanel({
   btwState,
   btwDisabled,
   defaultPlanMode,
+  towerSnapshot,
+  onTowerSnapshotChange,
   sessionAgentLabel,
   gitDetailsOpenSignal,
   gitGraphOpenSignal,
@@ -1220,6 +1227,18 @@ export function LongTaskInspectorPanel({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
+        {(liveCurrentSession?.towerMode || towerSnapshot?.missions.length || towerSnapshot?.agents.length) && (
+          <div style={{ marginBottom: 16 }}>
+            <TowerInspector
+              open={panelOpen}
+              runtimeSessionId={getRuntimeSessionId(liveCurrentSession ?? undefined)}
+              workDir={liveCurrentSession?.projectPath ?? currentProject?.path}
+              towerMode={Boolean(liveCurrentSession?.towerMode)}
+              onSnapshotChange={onTowerSnapshotChange}
+              showToast={showToast}
+            />
+          </div>
+        )}
         {longTaskMeta ? (
           <div className="flex flex-col" style={{ gap: 16 }}>
             <section className="kimix-section-card" {...rightCardSectionProps("longTaskStatus", 0, { padding: "18px 16px 20px" })}>

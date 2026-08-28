@@ -527,7 +527,10 @@ describe("Composer 新会话配置能力", () => {
 
     expect(composer).toContain("const canConfigureNextTurn = canUseComposer && (!activeSession || hasUniqueMutationOwner);");
     expect(composer).toContain("{(activeSession || currentProject) && (");
-    expect(composer.match(/disabled=\{!canConfigureNextTurn\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(composer.match(/disabled=\{!canConfigureNextTurn\}/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(
+      composer.match(/disabled=\{!canConfigureNextTurn \|\| \(towerModeEnabled && !swarmModeEnabled\)\}/g)?.length,
+    ).toBeGreaterThanOrEqual(2);
     expect(composer).toContain("Swarm 模式将在首次发消息时");
     expect(composer).toContain("权限模式将在首次发消息时生效。");
     expect(composer).toContain("将在首次发消息时生效。");

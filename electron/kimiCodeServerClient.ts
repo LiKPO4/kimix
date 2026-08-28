@@ -134,6 +134,7 @@ export type ServerSessionStatus = {
   permission: string;
   plan_mode: boolean;
   swarm_mode: boolean;
+  tower_mode?: boolean;
   context_tokens: number;
   max_context_tokens: number;
   context_usage: number;

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images, RadioTower, AlertTriangle, Eye } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -34,6 +34,7 @@ import { logError } from "@/utils/reportError";
 import { hasRecentDuplicatePendingMessage } from "@/utils/promptQueue";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
+import { normalizeTowerPreflight, type TowerPreflightView, type TowerSnapshotView } from "@/utils/tower";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
 import { buildSessionModelOptions } from "@/utils/sessionModelCatalog";
 import { APP_VERSION } from "@/utils/appVersion";
@@ -497,8 +498,11 @@ type ComposerProps = {
   onCancelOfficialGoal?: () => void | Promise<void>;
   onRefreshOfficialGoal?: () => void | Promise<void>;
   sessionPlanState?: { loading: boolean; path: string | null; content: string; updatedAt: number | null; error: string | null; message?: string; } | null;
+  towerSnapshot?: TowerSnapshotView | null;
+  onRefreshTower?: () => void | Promise<void>;
+  onOpenTowerInspector?: () => void;
 };
-export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal, sessionPlanState }: ComposerProps = {}) {
+export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal, sessionPlanState, towerSnapshot, onRefreshTower, onOpenTowerInspector }: ComposerProps = {}) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
@@ -534,6 +538,8 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const roomDispatchingRef = useRef(new Set<string>());
   const { createSession } = useCreateProjectSession();
   const [cacheHintDialog, setCacheHintDialog] = useState<CacheHintDialogData | null>(null);
+  const [towerPreflightDialog, setTowerPreflightDialog] = useState<TowerPreflightView | null>(null);
+  const [towerMutationBusy, setTowerMutationBusy] = useState(false);
 
   const runningSessionId = useAppStore((s) => s.runningSessionId);
   const handoffSessionId = useAppStore((s) => s.handoffSessionId);
@@ -717,6 +723,8 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   }, [activeThinkingEffort, thinkingEffortOptions, selectedThinkingEffort, thinkingModelOption?.supportEfforts, mutationModelAlias]);
   const swarmModeEnabled = displayedSwarmMode(mutationSessionView);
   const swarmModePending = hasPendingSwarmMode(mutationSessionView);
+  const towerModeEnabled = !activeSession?.collaboration && (activeSession?.towerMode ?? towerSnapshot?.enabled ?? false);
+  const towerModeDesired = !activeSession?.collaboration && activeSession?.towerModeDesired === true;
   const canSteerActiveTurn = Boolean(
     activeSession?.collaboration
       ? roomSteerTargets.length > 0
@@ -728,6 +736,8 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   // Agent 房间需要锁定，避免把配置误写到错误成员。
   const canConfigureNextTurn = canUseComposer && (!activeSession || hasUniqueMutationOwner);
   const canTogglePlanMode = canConfigureNextTurn;
+  const towerRoomBlocked = Boolean(activeSession?.collaboration);
+  const canToggleTowerMode = canConfigureNextTurn && !towerRoomBlocked && !isMutationOwnerRunning;
 
   useEffect(() => () => {
     writeComposerDraft(composerDraftKey, {
@@ -1723,6 +1733,19 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
           }));
           targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         };
+        const applyDesiredTowerMode = async (runtimeSessionId: string) => {
+          if (targetSession.collaboration || targetSession.towerModeDesired === undefined) return;
+          const desired = targetSession.towerModeDesired;
+          const res = await window.api.setKimiCodeTowerMode({ sessionId: runtimeSessionId, enabled: desired });
+          if (!res.success) throw new Error(`应用 Tower 模式失败：${res.error}`);
+          updateSession(targetSession.id, (session) => ({
+            ...session,
+            towerMode: desired,
+            towerModeDesired: undefined,
+            updatedAt: Date.now(),
+          }));
+          targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
+        };
         const recoveryTarget = getPrimaryRecoveryTarget(targetSession);
         if (!roomAgentCanResume(targetSession, primaryAgentId)) {
           const issue = getPrimaryRoomAgent(targetSession).recoveryIssue;
@@ -1792,6 +1815,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             }
             updateLinkStatus("消息发送中", "info");
             await applyDesiredSwarmMode(resumeRes.data.sessionId);
+            await applyDesiredTowerMode(resumeRes.data.sessionId);
             return resumeRes.data.sessionId;
           }
           updateLinkStatus("消息发送中", "info");
@@ -1828,6 +1852,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         targetSession = syncCurrentSessionFromStore(targetSession.id) ?? targetSession;
         updateLinkStatus("消息发送中", "info");
         await applyDesiredSwarmMode(createRes.data.sessionId);
+        await applyDesiredTowerMode(createRes.data.sessionId);
         return createRes.data.sessionId;
       };
 
@@ -2393,6 +2418,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
 
   const setSwarmModeForCurrentSession = async (enabled: boolean, options?: { feedback?: "toast" | "status" }) => {
     const feedback = options?.feedback ?? "toast";
+    if (enabled && towerModeEnabled) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 模式正在管理 Agent 与工作树，请先退出 Tower 后再开启 Swarm。" }));
+      return false;
+    }
     const latestActiveSession = activeSession
       ? useSessionStore.getState().sessions.find((session) => session.id === activeSession.id) ?? activeSession
       : null;
@@ -3019,6 +3048,11 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
         return true;
       }
+      if (towerModeEnabled && normalized !== "off") {
+        await appendSlashUserMessage(commandNotice, owner.roomAgentId);
+        await appendStatusMessage("Tower 模式正在管理 Agent 与工作树，请先退出 Tower 后再使用 Swarm。", owner.roomAgentId);
+        return true;
+      }
       if (!args) {
         await appendSlashUserMessage(commandNotice, owner.roomAgentId);
         await appendStatusMessage("请输入 Swarm 任务，例如：/swarm 并行检查最近改动并给出修复建议；也可使用 /swarm on 或 /swarm off 切换模式。", owner.roomAgentId);
@@ -3115,6 +3149,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         : normalized === "off" || normalized === "false" || normalized === "0"
           ? false
           : !mutationPlanMode;
+      if (next && towerModeEnabled) {
+        await appendStatusMessage("Tower 模式正在管理任务编排，请先退出 Tower 后再开启 Plan。", owner.roomAgentId);
+        return true;
+      }
       updateSession(activeSession!.id, (session) => updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: next }), permissionMode));
       syncCurrentSessionFromStore(activeSession!.id);
       if (owner.runtimeSessionId) {
@@ -4051,19 +4089,23 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const handleTogglePlanMode = async () => {
-    if (!canTogglePlanMode) return;
+    if (!canTogglePlanMode) return false;
+    if (!mutationPlanMode && towerModeEnabled) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 模式正在管理任务编排，请先退出 Tower 后再开启 Plan。" }));
+      return false;
+    }
     if (!activeSession) {
       const next = !defaultPlanMode;
       setDefaultPlanMode(next);
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `Plan 模式已${next ? "开启" : "关闭"}，将在首次发消息时生效。`,
       }));
-      return;
+      return true;
     }
     const owner = activeMutationOwner;
     if (!owner) {
       window.dispatchEvent(new CustomEvent("kimix:toast", { detail: mutationOwnerError || "请先选择一个 Agent。" }));
-      return;
+      return false;
     }
     const next = !mutationPlanMode;
     updateSession(activeSession.id, (session) => ({
@@ -4077,7 +4119,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `${owner.displayName} · ${next ? "Plan 模式已开启，新会话发送时生效" : "Plan 模式已关闭"}`,
       }));
-      return;
+      return true;
     }
     const res = await window.api.setKimiCodePlanMode({ sessionId: runtimeSessionId, enabled: next });
     if (!res.success) {
@@ -4085,7 +4127,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         window.dispatchEvent(new CustomEvent("kimix:toast", {
           detail: `${owner.displayName} · ${next ? "Plan 模式已开启，将在下次发消息时生效" : "Plan 模式已关闭，将在下次发消息时生效"}`,
         }));
-        return;
+        return true;
       }
       updateSession(activeSession.id, (session) => ({
         ...updateRoomMutationOwner(session, owner.roomAgentId, (agent) => ({ ...agent, planMode: !next }), permissionMode),
@@ -4096,11 +4138,95 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: `Plan 模式切换失败：${res.error}`,
       }));
-      return;
+      return false;
     }
     window.dispatchEvent(new CustomEvent("kimix:toast", {
       detail: `${owner.displayName} · ${next ? "Plan 模式已开启" : "Plan 模式已关闭"}`,
     }));
+    return true;
+  };
+
+  const requestTowerMode = async () => {
+    if (towerRoomBlocked) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "Tower 自己管理工作树与 Agent，不能与多 Agent 房间协作同时使用。",
+      }));
+      return;
+    }
+    if (isMutationOwnerRunning) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", {
+        detail: "当前 Agent 正在运行；Tower 不会中断当前轮，请完成后再开启。",
+      }));
+      return;
+    }
+    if (towerModeEnabled) {
+      const runtimeSessionId = activeRuntimeSessionId;
+      if (!runtimeSessionId) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 还没有绑定官方运行会话，无法退出。" }));
+        return;
+      }
+      setTowerMutationBusy(true);
+      const res = await window.api.setKimiCodeTowerMode({ sessionId: runtimeSessionId, enabled: false });
+      setTowerMutationBusy(false);
+      if (!res.success) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `退出 Tower 失败：${res.error}` }));
+        return;
+      }
+      if (activeSession) {
+        updateSession(activeSession.id, (session) => ({ ...session, towerMode: false, towerModeDesired: undefined, updatedAt: Date.now() }));
+        syncCurrentSessionFromStore(activeSession.id);
+      }
+      void onRefreshTower?.();
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "已退出 Tower 模式；工作树和分支仍保留。" }));
+      return;
+    }
+    setTowerMutationBusy(true);
+    const res = await window.api.preflightKimiCodeTower({
+      sessionId: activeRuntimeSessionId ?? undefined,
+      workDir: activeSession?.projectPath ?? currentProject?.path,
+    });
+    setTowerMutationBusy(false);
+    if (!res.success) {
+      window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `Tower 预检失败：${res.error}` }));
+      return;
+    }
+    setTowerPreflightDialog(normalizeTowerPreflight(res.data));
+  };
+
+  const confirmTowerMode = async () => {
+    const preflight = towerPreflightDialog;
+    if (!preflight?.allowed || towerMutationBusy) return;
+    setTowerMutationBusy(true);
+    try {
+      if (swarmModeEnabled && !(await setSwarmModeForCurrentSession(false, { feedback: "toast" }))) return;
+      if (mutationPlanMode && !(await handleTogglePlanMode())) return;
+      const target = activeSession ?? await ensureSession();
+      if (!target) return;
+      if (target.collaboration) {
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 自己管理工作树与 Agent，不能与多 Agent 房间协作同时使用。" }));
+        return;
+      }
+      const runtimeSessionId = getRuntimeSessionId(target);
+      if (!runtimeSessionId) {
+        updateSession(target.id, (session) => ({ ...session, towerModeDesired: true, updatedAt: Date.now() }));
+        syncCurrentSessionFromStore(target.id);
+        void persistLocalConversationState();
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 已准备就绪，将在创建官方会话后、发送首条目标前开启。" }));
+      } else {
+        const res = await window.api.setKimiCodeTowerMode({ sessionId: runtimeSessionId, enabled: true });
+        if (!res.success) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `开启 Tower 失败：${res.error}` }));
+          return;
+        }
+        updateSession(target.id, (session) => ({ ...session, towerMode: true, towerModeDesired: undefined, updatedAt: Date.now() }));
+        syncCurrentSessionFromStore(target.id);
+        void onRefreshTower?.();
+        window.dispatchEvent(new CustomEvent("kimix:toast", { detail: "Tower 模式已开启。" }));
+      }
+      setTowerPreflightDialog(null);
+    } finally {
+      setTowerMutationBusy(false);
+    }
   };
 
   const isMultiAgentRoomActive = Boolean(activeSession?.collaboration) && selectedRoomAgents.length > 1;
@@ -4501,6 +4627,49 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         aria-hidden="true"
         onChange={handleMediaFileSelection}
       />
+      {(towerModeEnabled || towerModeDesired) && (
+        <div
+          className="kimix-floating-panel grid items-center"
+          style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, marginBottom: 10, padding: "10px 14px" }}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex min-w-0 items-center" style={{ gap: 10 }}>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary-light text-accent-primary">
+              <RadioTower size={15} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" style={{ gap: 8 }}>
+                <span>Tower</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-primary" aria-hidden="true" />
+                <span className="truncate text-[12px] font-normal text-[var(--kimix-panel-text-muted)]">{towerModeDesired ? "待首轮开启" : towerSnapshot?.base ?? "官方运行时"}</span>
+              </div>
+              {!towerModeDesired && (
+                <div className="truncate text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">
+                  {towerSnapshot ? `${towerSnapshot.mergedCount} / ${towerSnapshot.totalCount} 已合并${towerSnapshot.blockedCount > 0 ? ` · ${towerSnapshot.blockedCount} 受阻` : ""}` : "正在同步 Tower 状态..."}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center" style={{ gap: 8 }}>
+            <button type="button" onClick={onOpenTowerInspector} className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted" style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}>
+              <Eye size={14} />
+              查看
+            </button>
+            <button
+              type="button"
+              disabled={towerMutationBusy || towerModeDesired}
+              onClick={() => void requestTowerMode()}
+              className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted disabled:cursor-not-allowed disabled:opacity-55"
+              style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}
+              title={towerModeDesired ? "会在创建官方会话后自动开启" : "退出 Tower 模式，不会清理 worktree 或分支"}
+            >
+              {towerMutationBusy ? <Loader2 size={14} className="animate-spin" /> : <RadioTower size={14} />}
+              退出
+            </button>
+          </div>
+        </div>
+      )}
       <ComposerDockBar
         bashTasks={bashHidden ? [] : bashTasks}
         subagentTasks={subagentHidden ? [] : subagentTasks}
@@ -4898,7 +5067,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                         </div>
                         <button
                           type="button"
-                          disabled={!canConfigureNextTurn}
+                          disabled={!canConfigureNextTurn || (towerModeEnabled && !swarmModeEnabled)}
                           onClick={() => {
                             setShowAddMenu(false);
                             void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" });
@@ -4991,7 +5160,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             {(activeSession || currentProject) && (
               <button
                 type="button"
-                disabled={!canConfigureNextTurn}
+                disabled={!canConfigureNextTurn || (towerModeEnabled && !swarmModeEnabled)}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
                 className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
@@ -5005,7 +5174,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 }}
                 title={swarmModePending
                   ? `${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}`
-                  : swarmModeEnabled
+                  : towerModeEnabled
+                    ? "Tower 模式下不能开启 Swarm，请先退出 Tower"
+                    : swarmModeEnabled
                     ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 模式`
                     : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Swarm 模式`}
                 aria-label={swarmModePending ? `Swarm 将在下一轮${swarmModeEnabled ? "开启" : "关闭"}` : `Swarm 模式已${swarmModeEnabled ? "开启" : "关闭"}`}
@@ -5016,7 +5187,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
               </button>
             )}
             <button
-              disabled={!canTogglePlanMode}
+              disabled={!canTogglePlanMode || (towerModeEnabled && !mutationPlanMode)}
               onClick={() => void handleTogglePlanMode()}
               className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
               style={{
@@ -5028,12 +5199,40 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 paddingLeft: 12,
                 paddingRight: 12,
               }}
-              title={mutationPlanMode ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式` : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式`}
+              title={towerModeEnabled ? "Tower 模式下不能开启 Plan，请先退出 Tower" : mutationPlanMode ? `关闭 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式` : `开启 ${activeMutationOwner?.displayName ?? "Agent"} 的 Plan 模式`}
               aria-pressed={mutationPlanMode}
             >
               <ClipboardList size={14} className="shrink-0" />
               <span>Plan</span>
             </button>
+            {(activeSession || currentProject) && (
+              <button
+                type="button"
+                disabled={towerMutationBusy || (!towerModeEnabled && !canToggleTowerMode)}
+                onClick={() => void requestTowerMode()}
+                className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
+                style={{
+                  width: 80,
+                  minWidth: 80,
+                  fontSize: 13,
+                  lineHeight: "20px",
+                  gap: 6,
+                  paddingLeft: 12,
+                  paddingRight: 12,
+                }}
+                title={towerRoomBlocked
+                  ? "Tower 自己管理工作树与 Agent，不能与多 Agent 房间协作同时使用"
+                  : isMutationOwnerRunning
+                    ? "当前 Agent 正在运行；Tower 不会中断当前轮，请完成后再开启"
+                    : towerModeEnabled
+                      ? "退出 Tower 模式；不会清理 worktree 或分支"
+                      : "开启 Tower 模式：预检 Git 仓库、初始提交、分支与现有 Tower 工作区"}
+                aria-pressed={towerModeEnabled}
+              >
+                {towerMutationBusy ? <Loader2 size={14} className="shrink-0 animate-spin" /> : <RadioTower size={14} className="shrink-0" />}
+                <span>Tower</span>
+              </button>
+            )}
             <div ref={thinkingBtnRef} className="relative shrink-0" style={{ minWidth: 84 }}>
               <button
                 disabled={!canConfigureNextTurn}
@@ -5245,6 +5444,49 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
           }}
           onSubmit={(input) => void handleRenameRoomAgent(input)}
         />
+      )}
+      {towerPreflightDialog && (
+        <div className="fixed inset-0 z-[92] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]" style={{ padding: 20 }} onMouseDown={() => !towerMutationBusy && setTowerPreflightDialog(null)}>
+          <div className="kimix-modal-card w-full max-w-[560px] overflow-hidden" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="tower-preflight-title">
+            <div className="flex items-start border-b border-border-subtle" style={{ gap: 12, padding: "18px 20px" }}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-primary-light text-accent-primary"><RadioTower size={18} /></span>
+              <div className="min-w-0 flex-1">
+                <div id="tower-preflight-title" className="text-[16px] font-semibold leading-6 text-text-primary">{towerPreflightDialog.allowed ? "开启 Tower 模式" : "Tower 预检未通过"}</div>
+                <div className="text-[12.5px] leading-5 text-text-muted" style={{ marginTop: 4 }}>Tower 将自行创建并管理任务 worktree、分支与 Agent。</div>
+              </div>
+              <button type="button" disabled={towerMutationBusy} onClick={() => setTowerPreflightDialog(null)} className="kimix-inline-icon-action is-roomy text-text-muted hover:bg-surface-hover" aria-label="关闭 Tower 预检"><X size={16} /></button>
+            </div>
+            <div style={{ padding: "18px 20px" }}>
+              {!towerPreflightDialog.allowed && (
+                <div className="rounded-lg bg-accent-danger-light text-[13px] leading-5 text-accent-danger" style={{ padding: "11px 12px", marginBottom: 14 }}>
+                  {towerPreflightDialog.reason || "当前工作区不满足 Tower 的 Git 前置条件。"}
+                </div>
+              )}
+              <div className="grid text-[13px] leading-5" style={{ gridTemplateColumns: "132px minmax(0, 1fr)", rowGap: 10, columnGap: 12 }}>
+                <span className="text-text-muted">基础分支</span><span className="min-w-0 truncate text-text-primary">{towerPreflightDialog.base ?? "未检测到"}</span>
+                <span className="text-text-muted">工作区</span><span className="text-text-primary">{towerPreflightDialog.dirty ? "存在未提交改动（仅警告）" : "干净"}</span>
+                <span className="text-text-muted">现有 Tower</span><span className="text-text-primary">{towerPreflightDialog.towerExists ? "已存在" : "未发现"}</span>
+                <span className="text-text-muted">开放任务</span><span className="text-text-primary">{towerPreflightDialog.openMissions} 项</span>
+                <span className="text-text-muted">工作区所有者</span><span className="min-w-0 truncate text-text-primary">{towerPreflightDialog.owner ?? "无"}</span>
+              </div>
+              {towerPreflightDialog.dirty && towerPreflightDialog.allowed && (
+                <div className="flex rounded-lg bg-accent-warning-light text-[12.5px] leading-5 text-accent-warning" style={{ gap: 8, marginTop: 14, padding: "11px 12px" }}>
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+                  <span>当前工作区有未提交改动。Tower 可以继续启动，但这些改动不会自动进入任何任务分支。</span>
+                </div>
+              )}
+              {(swarmModeEnabled || mutationPlanMode) && towerPreflightDialog.allowed && (
+                <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)] text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" style={{ marginTop: 14, padding: "11px 12px" }}>
+                  {swarmModeEnabled ? "Swarm" : ""}{swarmModeEnabled && mutationPlanMode ? " 与 " : ""}{mutationPlanMode ? "Plan" : ""} 会在开启 Tower 前关闭。Tower 与这两种编排模式互斥。
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end border-t border-border-subtle" style={{ gap: 10, padding: "14px 20px" }}>
+              <button type="button" disabled={towerMutationBusy} onClick={() => setTowerPreflightDialog(null)} className="kimix-icon-text-button kimix-inspector-action is-compact text-text-muted">取消</button>
+              {towerPreflightDialog.allowed && <button type="button" disabled={towerMutationBusy} onClick={() => void confirmTowerMode()} className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary-dark disabled:cursor-not-allowed disabled:opacity-55">{towerMutationBusy ? <Loader2 size={14} className="animate-spin" /> : <RadioTower size={14} />}确认开启</button>}
+            </div>
+          </div>
+        </div>
       )}
       <CacheHintDialog
         dialog={cacheHintDialog}

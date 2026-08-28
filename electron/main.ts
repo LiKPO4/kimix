@@ -8,7 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
-import { KimiCodeExperimentalFeatureSchema } from "./kimiCodeExperimentalFeatures";
+import { experimentalFeatureRequiresRestart, KimiCodeExperimentalFeatureSchema } from "./kimiCodeExperimentalFeatures";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
@@ -4333,6 +4333,9 @@ function createWindow() {
 
 function requestKimiServerStartup() {
   if (kimiServerStartupPromise) return kimiServerStartupPromise;
+  // Tower 是 App-scope 功能，必须在官方 Server 进程创建前注入环境变量；运行中的
+  // Server 不会被此处重启，设置页会据此提示用户重启 Kimix。
+  process.env.KIMI_CODE_EXPERIMENTAL_TOWER = settingsService.loadSettings().experimentalKimiTower ? "1" : "0";
   logMainStartup("kimi-server:start");
   kimiServerStartupPromise = kimiCodeServerHost.start().then((serverStatus) => {
     if (serverStatus.enabled) {
@@ -6606,8 +6609,72 @@ ipcMain.handle("kimi-code:setExperimentalFeature", async (_, request: unknown) =
   try {
     const req = KimiCodeExperimentalFeatureSchema.parse(request);
     await kimiCodeHost.setExperimentalFeature(req.id, req.enabled);
-    await reloadIdleKimiCodeSessionsAfterConfigChange();
-    return { success: true, data: undefined };
+    const restartRequired = experimentalFeatureRequiresRestart(req.id);
+    if (req.id === "tower") {
+      // 只影响下一次托管 Server 启动，不能以热加载名义打断或重启外部 Server。
+      process.env.KIMI_CODE_EXPERIMENTAL_TOWER = req.enabled ? "1" : "0";
+    }
+    if (!restartRequired) await reloadIdleKimiCodeSessionsAfterConfigChange();
+    return {
+      success: true,
+      data: restartRequired
+        ? { restartRequired: true, message: "Tower 会在重启 Kimix（及其托管 Kimi Server）后生效；外部 Server 不会被 Kimix 重启。" }
+        : { restartRequired: false },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+const KimiCodeTowerSessionSchema = z.object({ sessionId: z.string().trim().min(1).max(200) });
+
+const KimiCodeTowerPreflightSchema = z.object({
+  sessionId: z.string().trim().min(1).max(200).optional(),
+  workDir: z.string().trim().min(1).max(32_000).optional(),
+}).refine((value) => Boolean(value.sessionId || value.workDir), {
+  message: "请提供 sessionId 或 workDir",
+});
+
+const KimiCodeTowerSetModeSchema = KimiCodeTowerSessionSchema.extend({
+  enabled: z.boolean(),
+});
+
+ipcMain.handle("kimi-code:towerPreflight", async (_, request: unknown) => {
+  try {
+    const req = KimiCodeTowerPreflightSchema.parse(request);
+    return { success: true, data: await kimiCodeHost.preflightTower(req) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:towerSnapshot", async (_, request: unknown) => {
+  try {
+    const req = KimiCodeTowerSessionSchema.parse(request);
+    return { success: true, data: await kimiCodeHost.getTowerSnapshot(req.sessionId) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:setTowerMode", async (_, request: unknown) => {
+  try {
+    const req = KimiCodeTowerSetModeSchema.parse(request);
+    const preflight = await kimiCodeHost.preflightTower({ sessionId: req.sessionId });
+    if (req.enabled && !preflight.canEnable) {
+      return { success: false, error: preflight.warnings[0] ?? "当前工作区未通过 Tower 预检。" };
+    }
+    await kimiCodeHost.setTowerMode(req.sessionId, req.enabled);
+    return { success: true, data: { enabled: req.enabled } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:towerTeardown", async (_, request: unknown) => {
+  try {
+    const req = KimiCodeTowerSessionSchema.parse(request);
+    return { success: true, data: await kimiCodeHost.teardownTower(req.sessionId) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -8220,6 +8287,7 @@ const SettingsSchema = z.object({
   experimentalKimiServerSessions: z.boolean().optional(),
   experimentalKimiToolSelect: z.boolean().optional(),
   experimentalKimiSubagentFork: z.boolean().optional(),
+  experimentalKimiTower: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
   thinkingTranslationProvider: z.enum(["off", "local", "azure"]).optional(),
   thinkingTranslationEnabled: z.boolean().optional(),
@@ -8265,6 +8333,10 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
       return { success: false, error: "Invalid settings data" };
     }
     settingsService.saveSettings(parsed.data as Partial<AppSettings>);
+    if (typeof parsed.data.experimentalKimiTower === "boolean") {
+      // 下一次托管 Server 启动读取持久化选择；不触碰已经附着的外部 Server。
+      process.env.KIMI_CODE_EXPERIMENTAL_TOWER = parsed.data.experimentalKimiTower ? "1" : "0";
+    }
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

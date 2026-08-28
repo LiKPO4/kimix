@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive, RadioTower } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -678,6 +678,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [modelConfigMessage, setModelConfigMessage] = useState(settingsStatusCache.modelConfigMessage);
   const [experimentalKimiToolSelect, setExperimentalKimiToolSelect] = useState(false);
   const [experimentalKimiSubagentFork, setExperimentalKimiSubagentFork] = useState(false);
+  const [experimentalKimiTower, setExperimentalKimiTower] = useState(false);
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
@@ -1228,7 +1229,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
     setExperimentalKimiToolSelect(Boolean(res.data.experimentalKimiToolSelect));
     setExperimentalKimiSubagentFork(Boolean(res.data.experimentalKimiSubagentFork));
-    setExperimentalSettingsMessage("实验功能默认关闭；设置变更会重载空闲会话以更新工具定义。");
+    setExperimentalKimiTower(Boolean(res.data.experimentalKimiTower));
+    setExperimentalSettingsMessage("实验功能默认关闭；工具实验项会重载空闲会话，Tower 需重启托管 Kimi Server 后生效。");
   };
 
   const saveExperimentalToolSelect = async (toolSelectEnabled: boolean) => {
@@ -1280,6 +1282,27 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     }
     setExperimentalSettingsSaving(false);
     setExperimentalSettingsMessage(`保存子 Agent 上下文 fork 设置失败：${res.error}`);
+    void refreshExperimentalSettings();
+  };
+
+  const saveExperimentalTower = async (enabled: boolean) => {
+    setExperimentalKimiTower(enabled);
+    setExperimentalSettingsSaving(true);
+    const res = await window.api.saveSettings({ experimentalKimiTower: enabled });
+    if (res.success) {
+      const featureRes = await window.api.setKimiCodeExperimentalFeature({ id: "tower", enabled });
+      setExperimentalSettingsSaving(false);
+      if (!featureRes.success) {
+        setExperimentalSettingsMessage(`本地已保存；同步官方 Tower 失败：${featureRes.error}`);
+        return;
+      }
+      setExperimentalSettingsMessage(enabled
+        ? "已开启 Tower 实验功能。请重启 Kimix 或托管 Kimi Server 后，再在 Composer 启用 Tower 模式。"
+        : "已关闭 Tower 实验功能。请重启 Kimix 或托管 Kimi Server 后完全移除官方 Tower 工具。");
+      return;
+    }
+    setExperimentalSettingsSaving(false);
+    setExperimentalSettingsMessage(`保存 Tower 设置失败：${res.error}`);
     void refreshExperimentalSettings();
   };
 
@@ -3279,6 +3302,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                     <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiSubagentFork ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {experimentalKimiSubagentFork ? "已开启" : "关闭"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={experimentalKimiTower}
+                    onClick={() => void saveExperimentalTower(!experimentalKimiTower)}
+                    disabled={experimentalSettingsLoading || experimentalSettingsSaving}
+                    className={`kimix-settings-permission kimix-settings-permission-with-status ${experimentalKimiTower ? "is-active" : ""}`}
+                    style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
+                  >
+                    <SelectionIndicator selected={experimentalKimiTower} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label flex items-center" style={{ gap: 7 }}>
+                        <RadioTower size={14} className="text-text-muted" />
+                        <span>Tower 协作编排</span>
+                      </div>
+                      <div className="kimix-settings-permission-desc">
+                        允许官方 Tower 在 Git worktree 中拆分、审阅并合并多项任务；需 Kimi Code 0.39.0+，开启或关闭后必须重启 Kimix 或托管 Kimi Server，默认关闭。
+                      </div>
+                    </div>
+                    <span className={`kimix-settings-permission-status rounded-full text-[11.5px] leading-5 ${experimentalKimiTower ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {experimentalKimiTower ? "已开启" : "关闭"}
                     </span>
                   </button>
                 </div>

@@ -851,6 +851,12 @@ async function reconcileGitFallbackChanges(options: {
   });
 }
 
+function extractTowerModeStatus(value: unknown): boolean | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as { towerMode?: unknown };
+  return typeof record.towerMode === "boolean" ? record.towerMode : undefined;
+}
+
 function notifyClarificationNeeded(uiSessionId: string, runtimeSessionId: string, event: Extract<TimelineEvent, { type: "question_request" }>) {
   const { session, roomAgentId, agentName } = getNotificationAgentContext(uiSessionId, runtimeSessionId, event);
   const sessionTitle = session?.title?.trim() || "当前会话";
@@ -1664,6 +1670,17 @@ function App() {
     });
     syncCurrentSessionFromStore(uiSessionId);
   }, [updateSession]);
+  const syncSessionTowerMode = useCallback((uiSessionId: string, source: unknown) => {
+    const towerMode = extractTowerModeStatus(source);
+    if (towerMode === undefined) return;
+    updateSession(uiSessionId, (session) => {
+      // Tower owns its own workers/worktrees and is never valid for Kimix rooms.
+      if (session.collaboration) return session.towerMode === false ? session : { ...session, towerMode: false, towerModeDesired: undefined };
+      if (session.towerMode === towerMode && session.towerModeDesired === undefined) return session;
+      return { ...session, towerMode, towerModeDesired: undefined };
+    });
+    syncCurrentSessionFromStore(uiSessionId);
+  }, [updateSession]);
   const syncSessionPermissionMode = useCallback((uiSessionId: string, source: unknown, roomAgentId?: string) => {
     const permissionMode = extractPermissionModeStatus(source);
     if (permissionMode === undefined) return;
@@ -2415,6 +2432,7 @@ function App() {
               );
               const runtimeModel = runtimeStatus?.success ? runtimeStatus.data.model : undefined;
               const runtimeSwarmMode = runtimeStatus?.success ? extractSwarmModeStatus(runtimeStatus.data) : undefined;
+              const runtimeTowerMode = runtimeStatus?.success ? extractTowerModeStatus(runtimeStatus.data) : undefined;
               const mappedEvents = mapHistoryEvents(Array.isArray(loaded.data.events) ? loaded.data.events : []);
               const baseCanonicalEvents = runtimeIsActive ? mappedEvents : settleInactiveEvents(mappedEvents, Date.now(), false, true);
               const canonicalEvents = settleHistoricalQuestions(baseCanonicalEvents, {
@@ -2483,6 +2501,8 @@ function App() {
                     }),
                     switchedToModel: runtimeModel ? undefined : hydrated.switchedToModel,
                     swarmMode: runtimeSwarmMode ?? hydrated.swarmMode,
+                    towerMode: runtimeTowerMode ?? hydrated.towerMode,
+                    towerModeDesired: runtimeTowerMode === undefined ? hydrated.towerModeDesired : undefined,
                   };
                 }
                 if (canonicalAdopted || (
@@ -2532,6 +2552,7 @@ function App() {
                   historyModel: getLastUsedModelFromEvents(events),
                 }),
                 swarmMode: runtimeSwarmMode ?? activeLocalSession?.swarmMode,
+                towerMode: runtimeTowerMode ?? activeLocalSession?.towerMode,
                 title: deriveSessionTitle(events, latest?.brief || activeLocalSession?.title || "新会话"),
                 projectPath: activeProject.path,
                 createdAt: latest?.updatedAt ?? activeLocalSession?.createdAt ?? Date.now(),
@@ -2807,6 +2828,7 @@ function App() {
         : null;
       if (rawEvent?.type === "agent.status.updated") {
         syncSessionSwarmMode(uiSessionId, rawEvent, roomAgentId);
+        syncSessionTowerMode(uiSessionId, rawEvent);
         syncSessionPermissionMode(uiSessionId, rawEvent, roomAgentId);
       }
       if (rawEvent?.type === "goal.updated") {
@@ -3210,6 +3232,8 @@ function App() {
               ...session,
               model: response.data.model ?? session.model,
               swarmMode: extractSwarmModeStatus(response.data) ?? session.swarmMode,
+              towerMode: extractTowerModeStatus(response.data) ?? session.towerMode,
+              towerModeDesired: extractTowerModeStatus(response.data) === undefined ? session.towerModeDesired : undefined,
               updatedAt: Date.now(),
             };
           });
@@ -3660,7 +3684,7 @@ function App() {
     };
   // Runtime listeners own session continuity. Preference changes are read from
   // useAppStore at operation time and must never restart bootstrap or history recovery.
-  }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode]);
+  }, [setHandoffSessionId, setRunningSessionId, setRoomAgentActivity, updateSession, setRecentProjects, enqueueStreamEvent, flushStreamEvents, syncSessionSwarmMode, syncSessionTowerMode]);
 
   useEffect(() => {
     if (!runningSessionId && !activeRoomAgentActivitySignature && !activeRoomDeliverySignature) return;
@@ -3738,6 +3762,7 @@ function App() {
         }
         runtimeSessionId = resolvedRuntimeSessionId;
         syncSessionSwarmMode(session.id, response.data, roomAgentId);
+        syncSessionTowerMode(session.id, response.data);
         // 轮次收尾帧丢失信号阈值：polling 判定终端时，流上最后事件距现在超过
         // 该值即视为 turn.ended/usage 等收尾帧没到（重启、订阅被顶替、断线）。
         const TERMINAL_STREAM_GAP_MS = 8_000;
@@ -3968,7 +3993,7 @@ function App() {
       window.removeEventListener("focus", syncNow);
       document.removeEventListener("visibilitychange", syncNow);
     };
-  }, [activeRoomAgentActivitySignature, activeRoomDeliverySignature, runningSessionId, setRoomAgentActivity, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode]);
+  }, [activeRoomAgentActivitySignature, activeRoomDeliverySignature, runningSessionId, setRoomAgentActivity, setRunningSessionId, updateSession, flushStreamEvents, syncSessionSwarmMode, syncSessionTowerMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

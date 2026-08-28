@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 功能：接入官方 Tower 协作编排（v2.21.128）
+
+- 设置页新增默认关闭的 Tower 实验开关，严格写入官方 `experimental.tower`；Tower 工具与 worker profile 属于 App-scope 组装，开启或关闭后需要重启 Kimix/托管 Kimi Server，Kimix 不会重启外部 Server。
+- 普通单 Agent 会话可在 Composer 预检 Git 仓库、初始提交、分支、脏工作区和已有 Tower owner/open missions；新会话会保留开启意图，在官方 runtime 创建后、首个目标发送前回读确认 Tower 已生效。
+- Tower 与 Plan、Swarm 双向互斥，多 Agent 房间明确禁用；运行时 status 是模式真值，切换失败不会伪造本地开启状态。
+- 右侧检查器只读解析官方 `.tower/comms/state.json` v1 与最近 100 条 activity，展示任务、Agent、活动；未知版本、损坏结构和越界符号链接 fail closed，不解析生成的 Markdown，也不写 `.tower`。
+- 退出 Tower 只关闭会话模式并保留工作区。独立 Teardown 经 owner/idle 校验后派发固定空参数官方指令，不开放 `force`，不由 Kimix 直接删除 worktree、分支或审计记录。
+- 验证：Tower 定向 4 文件 16 项、全量 195 文件 2101 项、Node/Renderer typecheck、生产构建、diff 检查和知识库严格校验通过。
+
 ## 2026-08-28 功能：子 Agent 上下文 fork 实验开关（v2.21.127）
 
 - 新增默认关闭的“子 Agent 上下文 fork”设置，严格写入官方 `experimental.subagent_fork`；IPC 只接受 `tool-select | subagent_fork`，不开放任意实验 ID。

@@ -16,6 +16,13 @@ import {
   buildExperimentalFeatureConfigPatch,
   type KimiCodeExperimentalFeatureId,
 } from "./kimiCodeExperimentalFeatures";
+import {
+  getTowerWorkspaceSnapshot,
+  preflightTowerWorkspace,
+  TOWER_TEARDOWN_INSTRUCTION,
+  type TowerWorkspacePreflight,
+  type TowerWorkspaceSnapshot,
+} from "./towerWorkspace";
 
 import { normalizePathForComparison } from "../src/utils/pathCase";
 import { parseOfficialRoomMetadata, selectExistingRoomSession } from "./roomSessionMetadata";
@@ -131,6 +138,7 @@ type KimiCodeSessionLike = {
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
   setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
+  setTowerMode?(enabled: boolean): Promise<void>;
   reloadSession?(options?: { forcePluginSessionStartReminder?: boolean }): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
@@ -240,6 +248,7 @@ export type KimiCodeSessionStatus = {
   permission?: KimiCodePermissionMode;
   planMode?: boolean;
   swarmMode?: boolean;
+  towerMode?: boolean;
   contextTokens?: number;
   maxContextTokens?: number;
   contextUsage?: number;
@@ -781,6 +790,7 @@ type ServerManagedSession = {
   permission: KimiCodePermissionMode;
   planMode: boolean;
   swarmMode: boolean;
+  towerMode: boolean;
   additionalDirs: readonly string[];
   metadata?: JsonObject;
   btwRuns: Map<string, BtwRun>;
@@ -1693,6 +1703,82 @@ export async function setSwarmMode(sessionId: string, enabled: boolean, trigger:
   if (!managed.session.setSwarmMode) throw new Error("当前兼容链路不支持 Swarm 模式。");
   await managed.session.setSwarmMode(enabled, trigger);
   sdkPinnedSessionIds.add(sessionId);
+}
+
+function assertTowerModeEffective(enabled: boolean, effective: boolean | undefined): void {
+  if (effective === enabled) return;
+  if (enabled) {
+    throw new Error("Tower 未能启用：实验功能可能尚未在重启后的 Kimi Server 中组装，或该工作区正被另一个会话占用。");
+  }
+  throw new Error("Tower 未能关闭，请稍后重试。");
+}
+
+function assertTowerSessionIsIdle(status: KimiCodeEngineStatus | undefined): void {
+  if (status === "running" || status === "waiting_approval" || status === "waiting_question") {
+    throw new Error("当前轮正在运行，不能切换 Tower。请等本轮结束后重试。");
+  }
+}
+
+export async function setTowerMode(sessionId: string, enabled: boolean): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    assertTowerSessionIsIdle(serverManaged.status);
+    try {
+      await getServerClient().updateSession(sessionId, { tower_mode: enabled });
+      const status = await refreshServerSessionStatus(sessionId, true);
+      serverManaged.towerMode = status.tower_mode === true;
+      assertTowerModeEffective(enabled, serverManaged.towerMode);
+      return;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`设置 Tower 失败：${detail}`);
+    }
+  }
+  const managed = getManagedSession(sessionId);
+  assertTowerSessionIsIdle(managed.status);
+  if (!managed.session.setTowerMode) {
+    throw new Error("当前 Kimi Code 兼容链路不支持 Tower；请升级到 0.39 或更高版本并重启。");
+  }
+  try {
+    await managed.session.setTowerMode(enabled);
+    const status = normalizeSdkSessionStatus(await managed.session.getStatus(), managed.status);
+    assertTowerModeEffective(enabled, status.towerMode);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`设置 Tower 失败：${detail}`);
+  }
+}
+
+export async function preflightTower(input: { sessionId?: string; workDir?: string }): Promise<TowerWorkspacePreflight> {
+  const sessionId = input.sessionId ? resolveMigratedSessionId(input.sessionId) : undefined;
+  const workDir = sessionId ? getSessionWorkDir(sessionId) : input.workDir;
+  if (!workDir) throw new Error("未找到会话工作目录，无法检查 Tower。");
+  const stat = await fs.promises.stat(workDir).catch(() => null);
+  if (!stat?.isDirectory()) throw new Error("Tower 工作目录不存在或不是目录。");
+  return preflightTowerWorkspace(workDir);
+}
+
+export async function getTowerSnapshot(sessionId: string): Promise<TowerWorkspaceSnapshot> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  const workDir = getSessionWorkDir(sessionId);
+  if (!workDir) throw new Error("未找到会话工作目录，无法读取 Tower 状态。");
+  return getTowerWorkspaceSnapshot(workDir, sessionId);
+}
+
+export async function teardownTower(sessionId: string): Promise<{ dispatched: true }> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  const status = await getStatus(sessionId);
+  assertTowerSessionIsIdle(status.engineStatus);
+  const snapshot = await getTowerSnapshot(sessionId);
+  if (!snapshot.ownership.ownerSessionId) {
+    throw new Error("Tower 状态没有 owner 会话，拒绝派发 teardown。请在原 Tower 会话中检查状态。");
+  }
+  if (!snapshot.ownership.ownedByCurrentSession) {
+    throw new Error(`Tower 由会话 ${snapshot.ownership.ownerSessionId} 持有，拒绝从当前会话 teardown。`);
+  }
+  await sendPrompt(sessionId, TOWER_TEARDOWN_INSTRUCTION);
+  return { dispatched: true };
 }
 
 export async function swarm(sessionId: string, input: string | KimiCodePromptPart[]): Promise<void> {
@@ -3394,6 +3480,7 @@ async function registerServerSession(
       : options.permission ?? "manual",
     planMode: typeof config.plan_mode === "boolean" ? config.plan_mode : options.planMode ?? false,
     swarmMode: typeof config.swarm_mode === "boolean" ? config.swarm_mode : false,
+    towerMode: typeof config.tower_mode === "boolean" ? config.tower_mode : false,
     additionalDirs: options.additionalDirs ?? [],
     metadata: session.metadata ?? options.metadata,
     btwRuns: new Map(),
@@ -3771,6 +3858,7 @@ async function refreshServerSessionStatus(sessionId: string, emitEvent: boolean)
   }
   managed.planMode = status.plan_mode;
   managed.swarmMode = status.swarm_mode;
+  managed.towerMode = status.tower_mode === true;
   if (emitEvent) eventSink?.({ sessionId, event: { ...serverStatusToAgentEvent(effectiveStatus), kimixStatusRefresh: true } });
   return effectiveStatus;
 }
@@ -3783,6 +3871,7 @@ export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<st
     permission: status.permission,
     planMode: status.plan_mode,
     swarmMode: status.swarm_mode,
+    towerMode: status.tower_mode,
     contextTokens: status.context_tokens,
     maxContextTokens: status.max_context_tokens,
     contextUsage: status.context_usage,
@@ -3824,6 +3913,7 @@ function serverStatusToKimiCodeStatus(
       : undefined,
     planMode: status.plan_mode,
     swarmMode: status.swarm_mode,
+    towerMode: status.tower_mode,
     contextTokens: status.context_tokens,
     maxContextTokens: status.max_context_tokens,
     contextUsage: status.context_usage,
