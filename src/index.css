@@ -1013,15 +1013,15 @@
 }
 
 /* 二元状态按钮分离“可点击”与“已开启”：hover 保留复古触感，开启态回到 Kimix 蓝色语义。 */
-[data-ui-style="retro"] .kimix-state-button:not([aria-pressed="true"]):hover:not(:disabled) {
+[data-ui-style="retro"] .kimix-state-button:not([aria-pressed="true"]):not([aria-selected="true"]):hover:not(:disabled) {
   border-color: var(--kimix-retro-button-hover-border-color);
   background: var(--kimix-retro-button-hover-background);
   color: var(--text-primary);
   box-shadow: var(--kimix-retro-button-hover-shadow);
 }
 
-[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"],
-[data-ui-style="retro"] .kimix-state-button[aria-pressed="true"]:hover:not(:disabled) {
+[data-ui-style="retro"] .kimix-state-button:is([aria-pressed="true"], [aria-selected="true"]),
+[data-ui-style="retro"] .kimix-state-button:is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled) {
   border-color: var(--accent-primary-soft);
   background: var(--accent-primary-light);
   color: var(--accent-primary-dark);
@@ -1476,14 +1476,14 @@
   box-shadow: var(--kimix-nostalgia-sunken-shadow);
 }
 
-[data-ui-style="nostalgia"] .kimix-state-button:not([aria-pressed="true"]):hover:not(:disabled) {
+[data-ui-style="nostalgia"] .kimix-state-button:not([aria-pressed="true"]):not([aria-selected="true"]):hover:not(:disabled) {
   border: var(--kimix-nostalgia-flat-border);
   background: var(--surface-hover);
   box-shadow: var(--kimix-nostalgia-raised-shadow);
 }
 
-[data-ui-style="nostalgia"] .kimix-state-button[aria-pressed="true"],
-[data-ui-style="nostalgia"] .kimix-state-button[aria-pressed="true"]:hover:not(:disabled) {
+[data-ui-style="nostalgia"] .kimix-state-button:is([aria-pressed="true"], [aria-selected="true"]),
+[data-ui-style="nostalgia"] .kimix-state-button:is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled) {
   border-color: var(--accent-primary-soft);
   background: var(--accent-primary-light);
   color: var(--accent-primary-dark);
@@ -2379,7 +2379,7 @@ body::before {
   transform: translateY(-50%);
 }
 
-/* 二元状态按钮统一依赖 aria-pressed；业务组件不再内联拼装选中边框。 */
+/* 二元状态按钮统一依赖 aria-pressed / aria-selected；业务组件不再内联拼装选中边框。 */
 .kimix-state-button {
   border: 1px solid transparent;
   background: transparent;
@@ -2392,7 +2392,7 @@ body::before {
   color: var(--text-primary);
 }
 
-.kimix-state-button[aria-pressed="true"] {
+.kimix-state-button:is([aria-pressed="true"], [aria-selected="true"]) {
   border-color: var(--ui-toggle-border-color);
   background: var(--ui-toggle-background);
   color: var(--ui-toggle-color);
@@ -4333,20 +4333,20 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-toggle-resting-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):hover:not(:disabled):not([aria-pressed="true"]) {
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):hover:not(:disabled):not([aria-pressed="true"]):not([aria-selected="true"]) {
   border: var(--ui-role-toggle-hover-border);
   background: var(--ui-role-toggle-hover-background);
   box-shadow: var(--ui-role-toggle-hover-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):active:not(:disabled):not([aria-pressed="true"]) {
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):active:not(:disabled):not([aria-pressed="true"]):not([aria-selected="true"]) {
   border: var(--ui-role-toggle-active-border);
   background: var(--ui-role-toggle-active-background);
   box-shadow: var(--ui-role-toggle-active-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"],
-:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission)[aria-pressed="true"]:hover:not(:disabled) {
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):is([aria-pressed="true"], [aria-selected="true"]),
+:root[data-ui-style-contract="v1"] :where(.kimix-state-button, .kimix-settings-permission):is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled) {
   border: var(--ui-role-toggle-selected-border);
   border-radius: var(--ui-role-toggle-radius);
   background: var(--ui-role-toggle-selected-background);

@@ -205,10 +205,10 @@ describe("UI_STYLES", () => {
   it("按钮开启态与纵向导航选中态使用不同的视觉语法", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
-    expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
-    expect(css).not.toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow:\s*var\(--ui-selection-shadow\);/);
-    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button:not\(\[aria-pressed="true"\]\):hover:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--kimix-retro-button-hover-border-color\);[^}]*background:\s*var\(--kimix-retro-button-hover-background\);[^}]*box-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/s);
-    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button\[aria-pressed="true"\],[\s\S]*?\{[^}]*border-color:\s*var\(--accent-primary-soft\);[^}]*background:\s*var\(--accent-primary-light\);[^}]*color:\s*var\(--accent-primary-dark\);/s);
+    expect(css).toMatch(/\.kimix-state-button:is\(\[aria-pressed="true"\],\s*\[aria-selected="true"\]\)\s*\{[^}]*box-shadow:\s*var\(--ui-toggle-shadow\);/);
+    expect(css).not.toMatch(/\.kimix-state-button:is\(\[aria-pressed="true"\],\s*\[aria-selected="true"\]\)\s*\{[^}]*box-shadow:\s*var\(--ui-selection-shadow\);/);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button:not\(\[aria-pressed="true"\]\):not\(\[aria-selected="true"\]\):hover:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--kimix-retro-button-hover-border-color\);[^}]*background:\s*var\(--kimix-retro-button-hover-background\);[^}]*box-shadow:\s*var\(--kimix-retro-button-hover-shadow\);/s);
+    expect(css).toMatch(/\[data-ui-style="retro"\]\s+\.kimix-state-button:is\(\[aria-pressed="true"\],\s*\[aria-selected="true"\]\),[\s\S]*?\{[^}]*border-color:\s*var\(--accent-primary-soft\);[^}]*background:\s*var\(--accent-primary-light\);[^}]*color:\s*var\(--accent-primary-dark\);/s);
     expect(css).toMatch(/:where\(\.kimix-toolbar-button\)\.is-expanded,[\s\S]*?box-shadow:\s*var\(--ui-toggle-shadow\);/);
     expect(css).not.toMatch(/:where\([^)]*\.kimix-split-control[^)]*\)\.is-expanded[\s\S]{0,120}--ui-toggle-background/);
     expect(css).toMatch(/\.kimix-split-control\.is-expanded,[\s\S]*?\.kimix-split-control\.is-expanded:hover\s*\{[^}]*background-color:\s*var\(--ui-control-hover-background\);/);
@@ -262,7 +262,7 @@ describe("UI_STYLES", () => {
     const topMenuBar = readFileSync(resolve(process.cwd(), "src/components/layout/TopMenuBar.tsx"), "utf8");
     const sessionToolbar = readFileSync(resolve(process.cwd(), "src/components/layout/SessionToolbar.tsx"), "utf8");
 
-    expect(css).toMatch(/\.kimix-state-button\[aria-pressed="true"\]\s*\{/);
+    expect(css).toMatch(/\.kimix-state-button:is\(\[aria-pressed="true"\],\s*\[aria-selected="true"\]\)\s*\{/);
     expect(css).toMatch(/\.kimix-menu-panel\s*\{/);
     expect(css).toMatch(/\.kimix-floating-panel\s*\{/);
     expect(composer).toContain("kimix-state-button");
@@ -549,6 +549,11 @@ describe("Tower 后台 Agent 面板契约", () => {
     expect(dockBar).toContain('label: "后台 Agent"');
     expect(dockBar).toContain("hideHeader: true");
     expect(dockBar).toContain("<KimiWebSubagentDetails subagent={selectedRecord.subagent} />");
+    expect(dockBar).toContain('aria-selected={filter === item.id}');
+    expect(dockBar).toContain('filter === item.id ? "kimix-state-button"');
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    expect(css).toContain('.kimix-state-button:is([aria-pressed="true"], [aria-selected="true"])');
+    expect(css).toContain(':is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled)');
     expect(dockBar).toContain("const recentCompletedAgents = orderedAgents.filter((record) => towerAgentIsCompleted(record.status)).slice(0, 6);");
     expect(dockBar).toContain("...orderedAgents.filter((record) => !towerAgentIsCompleted(record.status))");
     expect(appShell).toContain("splitBackgroundTasksByKind(nonTowerBackgroundTasks)");

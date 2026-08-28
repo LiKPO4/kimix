@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：修复风格化筛选选中态（v2.21.132）
+
+- 根因：Tower 后台 Agent 筛选使用语义正确的 `aria-selected`，但通用风格契约只识别 `aria-pressed`，导致自定义风格下“全部”等选中项缺少选中背景与描边。
+- 修复：`kimix-state-button` 基础样式和自定义风格契约同时识别 `aria-pressed="true"` / `aria-selected="true"`，不改变 Tab 语义。
+- 验证：定向 2 文件 47 项、Node/Renderer typecheck、全量测试、生产构建、diff 检查与知识库严格校验通过。
+
 ## 2026-08-28 修正：Tower 后台 Agent 面板按官方 Web 语义对齐（v2.21.131）
 
 - 明确 v2.21.129 只完成了胶囊入口形态，并未完整对齐官方 Web：旧实现仍使用 Tower roster 元数据作为卡片主信息，且展开层存在 Kimix 自定义头部与操作区。
