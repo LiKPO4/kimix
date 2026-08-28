@@ -46,6 +46,8 @@ describe("UI_STYLES", () => {
 
     expect(css).toMatch(/:root\s*\{[^}]*--kimix-window-corner-radius:\s*16px;/s);
     expect(css).toMatch(/\[data-ui-style="modern"\]\s*\{[^}]*--kimix-window-corner-radius:\s*20px;/s);
+    expect(css).toMatch(/:root\[data-transparent-shell="1"\]\s+body\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);[^}]*clip-path:\s*inset\(0 round var\(--kimix-window-corner-radius\)\);/s);
+    expect(css).toMatch(/:root\[data-transparent-shell="1"\]\[data-window-maximized="true"\]\s+body\s*\{[^}]*border-radius:\s*0;[^}]*clip-path:\s*none;/s);
     expect(css).toMatch(/\.kimix-app-shell\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);
     expect(css).toMatch(/:root\[data-transparent-shell="1"\]\s+\.kimix-app-shell::after\s*\{[^}]*inset:\s*0;[^}]*border-radius:\s*inherit;[^}]*box-shadow:\s*inset 0 0 0 1px var\(--kimix-window-outline\);[^}]*pointer-events:\s*none;/s);
     expect(css).toMatch(/\.kimix-app-shell-main\s*\{[^}]*border-radius:\s*var\(--kimix-window-corner-radius\);/s);

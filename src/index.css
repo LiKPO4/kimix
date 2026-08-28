@@ -1685,9 +1685,17 @@ body {
   line-height: 1.7;
 }
 
-/* Windows 透明窗口外壳：body 不铺底色，四角由 .kimix-app-shell 圆角露出桌面 */
+/* Windows 透明窗口外壳：body 不铺底色，并作为统一的视口裁剪边界。
+   fixed / Portal 遮罩可能绕过 .kimix-app-shell 的 overflow；clip-path 确保它们也不能回填透明四角。 */
 :root[data-transparent-shell="1"] body {
   background-color: transparent;
+  border-radius: var(--kimix-window-corner-radius);
+  clip-path: inset(0 round var(--kimix-window-corner-radius));
+}
+
+:root[data-transparent-shell="1"][data-window-maximized="true"] body {
+  border-radius: 0;
+  clip-path: none;
 }
 
 button,
