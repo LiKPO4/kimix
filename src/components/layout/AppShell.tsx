@@ -1501,10 +1501,21 @@ ${isFinalStep
     hasLongTaskMeta,
   ]);
 
-  // 按官方 tasks 的 kind 分组：subagent 进「子 Agent」卡，其余（bash/tool/未知）进「后台 Bash」卡
+  const towerAgentIds = useMemo(
+    () => new Set((towerSnapshot?.agents ?? []).map((agent) => agent.id)),
+    [towerSnapshot?.agents],
+  );
+  const towerTasks = useMemo(() => {
+    return longTaskBackgroundTasks.filter((task) => Boolean(task.agentId && towerAgentIds.has(task.agentId)));
+  }, [longTaskBackgroundTasks, towerAgentIds]);
+  const nonTowerBackgroundTasks = useMemo(
+    () => longTaskBackgroundTasks.filter((task) => !task.agentId || !towerAgentIds.has(task.agentId)),
+    [longTaskBackgroundTasks, towerAgentIds],
+  );
+  // Tower Agent 由官方式「后台 Agent」面板独占；其余任务再按 kind 进入普通胶囊，避免同一 task 重复展示。
   const { bashTasks, subagentTasks } = useMemo(
-    () => splitBackgroundTasksByKind(longTaskBackgroundTasks),
-    [longTaskBackgroundTasks],
+    () => splitBackgroundTasksByKind(nonTowerBackgroundTasks),
+    [nonTowerBackgroundTasks],
   );
 
   const hiddenComposerCardList = hiddenComposerCards[composerCardSessionId] ?? [];
@@ -1513,12 +1524,12 @@ ${isFinalStep
   // 更新处做派生清理，不在渲染层打补丁。
   useEffect(() => {
     const hiddenKeys = hiddenComposerCards[composerCardSessionId] ?? [];
-    const pruned = pruneHiddenTaskKeysWhenEmpty(longTaskBackgroundTasks, hiddenKeys);
+    const pruned = pruneHiddenTaskKeysWhenEmpty(nonTowerBackgroundTasks, hiddenKeys);
     if (pruned.length === hiddenKeys.length) return;
     for (const key of hiddenKeys) {
       if (!pruned.includes(key)) setComposerCardHidden(composerCardSessionId, key, false);
     }
-  }, [longTaskBackgroundTasks, hiddenComposerCards, composerCardSessionId, setComposerCardHidden]);
+  }, [nonTowerBackgroundTasks, hiddenComposerCards, composerCardSessionId, setComposerCardHidden]);
   const hiddenComposerCardEntries = [
     hiddenComposerCardList.includes("todo") && latestTodos.length > 0
       ? {
@@ -2162,8 +2173,8 @@ ${isFinalStep
                     officialGoal={mutationSessionView?.officialGoal}
                     sessionPlanState={sessionPlanState}
                     towerSnapshot={towerSnapshot}
+                    towerTasks={towerTasks}
                     onRefreshTower={refreshTowerSnapshot}
-                    onOpenTowerInspector={() => setLongTaskInspectorOpen(true)}
                     onPauseOfficialGoal={pauseOfficialGoal}
                     onResumeOfficialGoal={resumeOfficialGoal}
                     onCancelOfficialGoal={cancelOfficialGoal}

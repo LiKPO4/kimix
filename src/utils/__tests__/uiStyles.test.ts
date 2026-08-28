@@ -541,6 +541,19 @@ describe("Composer 新会话配置能力", () => {
   });
 });
 
+describe("Tower 后台 Agent 面板契约", () => {
+  it("使用官方式标题、真实子 Agent 详情并从普通后台任务胶囊中去重", () => {
+    const dockBar = readFileSync(resolve(process.cwd(), "src/components/chat/ComposerDockBar.tsx"), "utf8");
+    const appShell = readFileSync(resolve(process.cwd(), "src/components/layout/AppShell.tsx"), "utf8");
+
+    expect(dockBar).toContain('label: "后台 Agent"');
+    expect(dockBar).toContain("hideHeader: true");
+    expect(dockBar).toContain("<KimiWebSubagentDetails subagent={selectedRecord.subagent} />");
+    expect(appShell).toContain("splitBackgroundTasksByKind(nonTowerBackgroundTasks)");
+    expect(appShell).toContain("pruneHiddenTaskKeysWhenEmpty(nonTowerBackgroundTasks, hiddenKeys)");
+  });
+});
+
 describe("applyUiStyle", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute(UI_STYLE_ATTRIBUTE);

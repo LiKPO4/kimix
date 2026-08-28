@@ -2,7 +2,7 @@ import { act, createElement, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
-import type { TodoItem } from "@/types/ui";
+import type { TimelineEvent, TodoItem } from "@/types/ui";
 import type { TowerSnapshotView } from "@/utils/tower";
 import { ComposerDockBar } from "../ComposerDockBar";
 
@@ -48,6 +48,45 @@ const towerFixture: TowerSnapshotView = {
   ],
   activity: [],
 };
+
+const towerTasksFixture: KimiCodeBackgroundTaskInfo[] = [
+  makeTask({
+    taskId: "tower-task-a",
+    description: "tower worker worker-a: 实现设置入口",
+    agentId: "agent-a",
+    subagentType: "tower-worker",
+    status: "running",
+    startedAt: Date.now() - 65_000,
+  }),
+  makeTask({
+    taskId: "tower-task-b",
+    description: "tower worker worker-b: 补充回归测试",
+    agentId: "agent-b",
+    subagentType: "tower-worker",
+    status: "completed",
+    startedAt: Date.now() - 125_000,
+    endedAt: Date.now(),
+  }),
+];
+
+const towerSubagentsFixture: Extract<TimelineEvent, { type: "subagent" }>[] = [{
+  id: "subagent-a",
+  type: "subagent",
+  timestamp: Date.now() - 65_000,
+  agentId: "agent-a",
+  agentName: "worker-a",
+  description: "实现设置入口",
+  status: "running",
+  events: [{
+    id: "agent-a-output",
+    type: "assistant_message",
+    timestamp: Date.now() - 5_000,
+    agentId: "agent-a",
+    content: "正在核对官方 Tower 事件流",
+    isThinking: false,
+    isComplete: true,
+  }],
+}];
 
 function makeProps(overrides: Partial<DockProps> = {}): DockProps {
   return {
@@ -158,22 +197,33 @@ describe("ComposerDockBar", () => {
   });
 
   it("Tower 使用后台 Agent 胶囊，展开后可筛选并点开 Agent 卡片", () => {
-    render(makeProps({ towerMode: true, towerSnapshot: towerFixture }));
+    render(makeProps({
+      towerMode: true,
+      towerSnapshot: towerFixture,
+      towerTasks: towerTasksFixture,
+      towerSubagents: towerSubagentsFixture,
+    }));
     expect(capsuleLabels()).toHaveLength(1);
-    expect(capsuleLabels()[0]).toContain("Tower Agent");
-    expect(capsuleLabels()[0]).toContain("(1/2)");
+    expect(capsuleLabels()[0]).toContain("后台 Agent");
+    expect(capsuleLabels()[0]).not.toContain("(1/2)");
 
     clickCapsule(0);
     const panel = container.querySelector(".kimix-dock-panel");
     expect(panel?.textContent).toContain("后台 Agent");
     expect(panel?.textContent).toContain("1 运行中");
     expect(panel?.querySelectorAll("[role='tab']")).toHaveLength(4);
+    expect(panel?.textContent).toContain("tower worker worker-a: 实现设置入口");
+    expect(panel?.textContent).toContain("2分5秒");
 
-    const agentCard = Array.from(panel!.querySelectorAll<HTMLButtonElement>("button")).find((item) => item.textContent?.includes("worker-a"));
+    const agentCard = panel?.querySelector<HTMLButtonElement>('button[aria-label="查看 worker-a 详情"]');
     act(() => agentCard?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(panel?.textContent).toContain("实现设置入口");
+    expect(panel?.textContent).toContain("正在核对官方 Tower 事件流");
     expect(panel?.textContent).toContain("feat/settings");
-    expect(panel?.textContent).toContain("session-a");
+
+    const completedTab = Array.from(panel!.querySelectorAll<HTMLButtonElement>("[role='tab']")).find((item) => item.textContent === "已完成");
+    act(() => completedTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(panel?.textContent).not.toContain("正在核对官方 Tower 事件流");
+    expect(panel?.textContent).toContain("tower worker worker-b: 补充回归测试");
   });
 
   it("官方 tool 类后台任务使用后台任务文案", () => {

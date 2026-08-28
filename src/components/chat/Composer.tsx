@@ -499,10 +499,10 @@ type ComposerProps = {
   onRefreshOfficialGoal?: () => void | Promise<void>;
   sessionPlanState?: { loading: boolean; path: string | null; content: string; updatedAt: number | null; error: string | null; message?: string; } | null;
   towerSnapshot?: TowerSnapshotView | null;
+  towerTasks?: KimiCodeBackgroundTaskInfo[];
   onRefreshTower?: () => void | Promise<void>;
-  onOpenTowerInspector?: () => void;
 };
-export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal, sessionPlanState, towerSnapshot, onRefreshTower, onOpenTowerInspector }: ComposerProps = {}) {
+export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onPauseOfficialGoal, onResumeOfficialGoal, onCancelOfficialGoal, onRefreshOfficialGoal, sessionPlanState, towerSnapshot, towerTasks = [], onRefreshTower }: ComposerProps = {}) {
   const currentProject = useAppStore((s) => s.currentProject);
   const currentSession = useAppStore((s) => s.currentSession);
   const composerDraftKey = resolveComposerDraftKey(currentSession?.id, currentProject?.id);
@@ -4502,6 +4502,10 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const bashHidden = hiddenCards.includes("bash");
   const subagentHidden = hiddenCards.includes("subagent");
   const bashCardLabel = bashTasks.some((task) => task.subagentType === "tool") ? "后台任务" : "后台 Bash";
+  const towerAgentIds = new Set((towerSnapshot?.agents ?? []).map((agent) => agent.id));
+  const towerSubagents = activeSession?.events.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => (
+    event.type === "subagent" && Boolean(event.agentId && towerAgentIds.has(event.agentId))
+  )) ?? [];
   const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
   const visibleRoomControlTargets = roomControlRequest?.action === "stop" ? roomStopTargets : roomSteerTargets;
   const roomControlTitle = roomControlRequest?.action === "stop" ? "选择要停止的 Agent" : "选择要引导的 Agent";
@@ -4649,13 +4653,13 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         towerMode={towerModeEnabled}
         towerPending={towerModeDesired}
         towerSnapshot={towerSnapshot}
+        towerTasks={towerTasks}
+        towerSubagents={towerSubagents}
         towerBusy={towerMutationBusy}
         onPauseGoal={onPauseOfficialGoal}
         onResumeGoal={onResumeOfficialGoal}
         onCancelGoal={onCancelOfficialGoal}
         onRefreshGoal={onRefreshOfficialGoal}
-        onRefreshTower={onRefreshTower}
-        onOpenTowerInspector={onOpenTowerInspector}
         onExitTower={requestTowerMode}
         onHideBash={() => hideComposerCard("bash", bashCardLabel)}
         onHideSubagent={() => hideComposerCard("subagent", "子 Agent")}

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Eye, List, ListChecks, ListOrdered, LogOut, PanelRightClose, Pause, PenLine, Play, RadioTower, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
+import { CheckCircle2, Clock3, List, ListChecks, ListOrdered, PanelRightClose, Pause, PenLine, Play, RadioTower, RefreshCw, SquareTerminal, Target, Users, X } from "lucide-react";
 import type { KimiCodeBackgroundTaskInfo } from "@electron/types/ipc";
-import type { OfficialGoalSnapshot, TodoItem } from "@/types/ui";
+import type { OfficialGoalSnapshot, TimelineEvent, TodoItem } from "@/types/ui";
 import { isTerminalGoalStatus } from "@/utils/officialGoalState";
 import { backgroundTaskDurationLabel, backgroundTaskKindLabel, backgroundTaskSummary, backgroundTaskTone, isBackgroundTaskTerminalStatus } from "@/utils/backgroundTasks";
 import { TodoListItems, todoCounts } from "./TodoPanel";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { towerStatusLabel, type TowerSnapshotView } from "@/utils/tower";
+import { KimiWebSubagentDetails } from "./MessageBubble";
+import { towerStatusLabel, type TowerAgentView, type TowerMissionView, type TowerSnapshotView } from "@/utils/tower";
 
 /**
  * 输入区 dock 胶囊行（对齐官方 kimi-web ChatDock 的 dock work chips）：
@@ -35,13 +36,13 @@ type ComposerDockBarProps = {
   towerMode?: boolean;
   towerPending?: boolean;
   towerSnapshot?: TowerSnapshotView | null;
+  towerTasks?: KimiCodeBackgroundTaskInfo[];
+  towerSubagents?: Extract<TimelineEvent, { type: "subagent" }>[];
   towerBusy?: boolean;
   onPauseGoal?: () => void | Promise<void>;
   onResumeGoal?: () => void | Promise<void>;
   onCancelGoal?: () => void | Promise<void>;
   onRefreshGoal?: () => void | Promise<void>;
-  onRefreshTower?: () => void | Promise<void>;
-  onOpenTowerInspector?: () => void;
   onExitTower?: () => void | Promise<void>;
   onHideBash?: () => void;
   onHideSubagent?: () => void;
@@ -50,6 +51,17 @@ type ComposerDockBarProps = {
 };
 
 type TowerAgentFilter = "recent" | "active" | "completed" | "all";
+type TowerSubagentEvent = Extract<TimelineEvent, { type: "subagent" }>;
+
+type TowerAgentRecord = {
+  agent: TowerAgentView;
+  mission?: TowerMissionView;
+  task?: KimiCodeBackgroundTaskInfo;
+  subagent?: TowerSubagentEvent;
+  status: string;
+  startedAt: number;
+  endedAt: number | null;
+};
 
 const TOWER_AGENT_FILTERS: Array<{ id: TowerAgentFilter; label: string }> = [
   { id: "recent", label: "最近" },
@@ -58,39 +70,105 @@ const TOWER_AGENT_FILTERS: Array<{ id: TowerAgentFilter; label: string }> = [
   { id: "all", label: "全部" },
 ];
 
+const TOWER_AGENT_TERMINAL_STATUSES = new Set([
+  "completed", "merged", "abandoned", "failed", "error", "timed_out", "killed", "lost", "cancelled", "stopped", "exited",
+]);
+
 function towerAgentIsCompleted(status?: string) {
-  return status === "completed" || status === "merged" || status === "abandoned";
+  return Boolean(status && TOWER_AGENT_TERMINAL_STATUSES.has(status));
 }
 
-function TowerPanelBody({ towerMode, towerPending, snapshot, busy, onRefresh, onOpenInspector, onExit }: {
-  towerMode: boolean;
+function towerAgentStatusLabel(status: string) {
+  if (status === "completed" || status === "merged") return "完成";
+  if (status === "running" || status === "active") return "运行中";
+  if (status === "queued") return "排队中";
+  if (status === "suspended") return "已暂停";
+  if (status === "blocked") return "受阻";
+  if (status === "awaiting_approval") return "待确认";
+  if (status === "failed" || status === "error") return "失败";
+  if (["timed_out", "lost"].includes(status)) return "异常结束";
+  if (["killed", "cancelled", "stopped", "exited", "abandoned"].includes(status)) return "已停止";
+  return towerStatusLabel(status);
+}
+
+function towerAgentDurationLabel(startedAt: number, endedAt: number | null, now: number) {
+  if (!startedAt) return null;
+  const totalSeconds = Math.max(0, Math.round(((endedAt ?? now) - startedAt) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}时${minutes}分`;
+  if (minutes > 0) return `${minutes}分${seconds}秒`;
+  return `${seconds}秒`;
+}
+
+function towerAgentRecord(
+  agent: TowerAgentView,
+  snapshot: TowerSnapshotView,
+  tasks: KimiCodeBackgroundTaskInfo[],
+  subagents: TowerSubagentEvent[],
+): TowerAgentRecord {
+  const task = tasks.find((candidate) => candidate.agentId === agent.id);
+  const subagent = subagents.find((candidate) => candidate.agentId === agent.id);
+  const mission = agent.mission ? snapshot.missions.find((candidate) => candidate.id === agent.mission) : undefined;
+  const status = task?.status ?? subagent?.status ?? agent.status ?? mission?.status ?? "active";
+  const subagentEndedAt = towerAgentIsCompleted(status)
+    ? subagent?.events.at(-1)?.timestamp ?? subagent?.timestamp ?? null
+    : null;
+  return {
+    agent,
+    mission,
+    task,
+    subagent,
+    status,
+    startedAt: task?.startedAt ?? (Date.parse(agent.spawnedAt ?? "") || 0),
+    endedAt: task?.endedAt ?? subagentEndedAt,
+  };
+}
+
+function TowerPanelBody({ towerPending, snapshot, tasks, subagents, busy, onExit }: {
   towerPending: boolean;
   snapshot?: TowerSnapshotView | null;
+  tasks: KimiCodeBackgroundTaskInfo[];
+  subagents: TowerSubagentEvent[];
   busy?: boolean;
-  onRefresh?: () => void | Promise<void>;
-  onOpenInspector?: () => void;
   onExit?: () => void | Promise<void>;
 }) {
   const [filter, setFilter] = useState<TowerAgentFilter>("recent");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const agents = snapshot?.agents ?? [];
-  const activeCount = agents.filter((agent) => !towerAgentIsCompleted(agent.status)).length;
-  const orderedAgents = [...agents].sort((left, right) => (right.spawnedAt ?? "").localeCompare(left.spawnedAt ?? ""));
+  const [now, setNow] = useState(Date.now());
+  const records = snapshot ? snapshot.agents.map((agent) => towerAgentRecord(agent, snapshot, tasks, subagents)) : [];
+  const activeCount = records.filter((record) => !towerAgentIsCompleted(record.status)).length;
+  const orderedAgents = [...records].sort((left, right) => (
+    (right.endedAt ?? right.startedAt) - (left.endedAt ?? left.startedAt)
+  ));
   const visibleAgents = filter === "recent"
     ? orderedAgents.slice(0, 6)
     : filter === "active"
-      ? orderedAgents.filter((agent) => !towerAgentIsCompleted(agent.status))
+      ? orderedAgents.filter((record) => !towerAgentIsCompleted(record.status))
       : filter === "completed"
-        ? orderedAgents.filter((agent) => towerAgentIsCompleted(agent.status))
+        ? orderedAgents.filter((record) => towerAgentIsCompleted(record.status))
         : orderedAgents;
-  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId);
-  const selectedMission = selectedAgent?.mission
-    ? snapshot?.missions.find((mission) => mission.id === selectedAgent.mission)
-    : undefined;
+  const selectedRecord = records.find((record) => record.agent.id === selectedAgentId);
+
+  useEffect(() => {
+    if (activeCount === 0) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeCount]);
+
   return (
-    <div className="flex flex-col" style={{ gap: 12, padding: "8px 16px 10px" }}>
+    <div className="flex flex-col" style={{ gap: 14, minHeight: 230, padding: "10px 16px 12px" }}>
       {towerPending ? (
-        <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">将在创建官方会话后、发送首条目标前开启 Tower。</div>
+        <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 16, padding: "10px 0" }}>
+          <div>
+            <div className="text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]">Tower 待开启</div>
+            <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>将在创建官方会话后、发送首条目标前开启。</div>
+          </div>
+          <button type="button" disabled={busy} onClick={() => void onExit?.()} className="kimix-icon-text-button text-text-muted disabled:cursor-not-allowed disabled:opacity-55">
+            取消
+          </button>
+        </div>
       ) : snapshot ? (
         <>
           <div className="flex flex-wrap items-center justify-between" style={{ gap: 10 }}>
@@ -99,14 +177,17 @@ function TowerPanelBody({ towerMode, towerPending, snapshot, busy, onRefresh, on
               <span>后台 Agent</span>
               <span className="text-[var(--kimix-panel-text-muted)]">{activeCount} 运行中</span>
             </div>
-            <div className="flex flex-wrap items-center" style={{ gap: 4 }} role="tablist" aria-label="筛选 Tower Agent">
+            <div className="flex flex-wrap items-center" style={{ gap: 4 }} role="tablist" aria-label="筛选后台 Agent">
               {TOWER_AGENT_FILTERS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   role="tab"
                   aria-selected={filter === item.id}
-                  onClick={() => setFilter(item.id)}
+                  onClick={() => {
+                    setFilter(item.id);
+                    setSelectedAgentId(null);
+                  }}
                   className={`kimix-icon-text-button is-compact text-[12px] ${filter === item.id ? "kimix-state-button" : "text-text-muted"}`}
                   style={{ minHeight: 32, height: 32, paddingLeft: 12, paddingRight: 12 }}
                 >
@@ -115,8 +196,13 @@ function TowerPanelBody({ towerMode, towerPending, snapshot, busy, onRefresh, on
               ))}
             </div>
           </div>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))", gap: 8 }}>
-            {visibleAgents.length > 0 ? visibleAgents.map((agent) => (
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+            {visibleAgents.length > 0 ? visibleAgents.map((record) => {
+              const { agent, mission, task, status, startedAt, endedAt } = record;
+              const title = task?.description || mission?.title || agent.name || agent.id;
+              const duration = towerAgentDurationLabel(startedAt, endedAt, now);
+              const terminal = towerAgentIsCompleted(status);
+              return (
               <button
                 key={agent.id}
                 type="button"
@@ -124,42 +210,40 @@ function TowerPanelBody({ towerMode, towerPending, snapshot, busy, onRefresh, on
                 aria-pressed={selectedAgentId === agent.id}
                 onClick={() => setSelectedAgentId((current) => current === agent.id ? null : agent.id)}
                 className={`kimix-style-exempt min-w-0 rounded-lg text-left ${selectedAgentId === agent.id ? "bg-[var(--ui-selection-background)]" : "bg-[var(--kimix-panel-soft-bg)] hover:bg-surface-hover"}`}
-                style={{ minHeight: 72, padding: "10px 12px" }}
+                style={{ minHeight: 72, padding: "10px 16px" }}
               >
-                <div className="truncate text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]">{String(Math.max(agents.findIndex((item) => item.id === agent.id) + 1, 1)).padStart(2, "0")} {agent.name ?? agent.id}</div>
+                <div className="truncate text-[13px] font-medium leading-5 text-[var(--kimix-panel-text)]" title={title}>{String(Math.max((snapshot?.agents ?? []).findIndex((item) => item.id === agent.id) + 1, 1)).padStart(2, "0")} {title}</div>
                 <div className="flex min-w-0 items-center justify-between text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ gap: 8, marginTop: 6 }}>
-                  <span className={agent.status === "blocked" ? "text-accent-danger" : towerAgentIsCompleted(agent.status) ? "text-accent-success" : "text-accent-primary"}>{towerStatusLabel(agent.status ?? "active")}</span>
-                  <span className="truncate">{agent.mission ?? agent.kind}</span>
+                  <span className={`flex min-w-0 items-center ${status === "blocked" || status === "failed" || status === "error" ? "text-accent-danger" : terminal ? "text-accent-success" : "text-accent-primary"}`} style={{ gap: 5 }}>
+                    {terminal ? <CheckCircle2 size={12} /> : <span className="h-2 w-2 shrink-0 rounded-full bg-current" />}
+                    {towerAgentStatusLabel(status)}
+                  </span>
+                  {duration && <span className="flex shrink-0 items-center" style={{ gap: 5 }}><Clock3 size={12} />{duration}</span>}
                 </div>
               </button>
-            )) : <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">当前筛选下没有 Agent。</div>}
+              );
+            }) : <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">当前筛选下没有 Agent。</div>}
           </div>
-          {selectedAgent && (
-            <div className="grid border-t border-[var(--kimix-panel-divider)] text-[12.5px] leading-5" style={{ gridTemplateColumns: "88px minmax(0, 1fr)", rowGap: 6, columnGap: 12, paddingTop: 10 }} aria-live="polite">
-              <span className="text-[var(--kimix-panel-text-muted)]">Agent</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedAgent.name ?? selectedAgent.id}</span>
-              <span className="text-[var(--kimix-panel-text-muted)]">任务</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedMission?.title ?? selectedAgent.mission ?? "未分配"}</span>
-              <span className="text-[var(--kimix-panel-text-muted)]">分支</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedAgent.branch ?? selectedMission?.branch ?? "未创建"}</span>
-              <span className="text-[var(--kimix-panel-text-muted)]">会话</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedAgent.sessionId ?? "未记录"}</span>
+          {selectedRecord && (
+            <div className="rounded-lg bg-[var(--kimix-panel-soft-bg)]" style={{ padding: "12px 16px" }} aria-live="polite">
+              <div className="grid text-[12.5px] leading-5" style={{ gridTemplateColumns: "72px minmax(0, 1fr)", rowGap: 6, columnGap: 12 }}>
+                <span className="text-[var(--kimix-panel-text-muted)]">Agent</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedRecord.agent.name ?? selectedRecord.agent.id}</span>
+                <span className="text-[var(--kimix-panel-text-muted)]">任务</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedRecord.task?.description ?? selectedRecord.mission?.title ?? selectedRecord.agent.mission ?? "未分配"}</span>
+                <span className="text-[var(--kimix-panel-text-muted)]">分支</span><span className="truncate text-[var(--kimix-panel-text)]">{selectedRecord.agent.branch ?? selectedRecord.mission?.branch ?? "未创建"}</span>
+              </div>
+              <div className="border-t border-[var(--kimix-panel-divider)]" style={{ marginTop: 10, paddingTop: 10 }}>
+                {selectedRecord.subagent ? (
+                  <KimiWebSubagentDetails subagent={selectedRecord.subagent} />
+                ) : (
+                  <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-muted)]">该 Agent 的事件详情尚未进入本地会话记录。</div>
+                )}
+              </div>
             </div>
           )}
         </>
       ) : (
         <div className="text-[13px] leading-6 text-[var(--kimix-panel-text-muted)]">正在同步官方 Tower 状态...</div>
       )}
-      <div className="flex flex-wrap items-center border-t border-[var(--kimix-panel-divider)]" style={{ gap: 8, paddingTop: 10 }}>
-        <button type="button" disabled={busy || !towerMode} onClick={() => void onRefresh?.()} className="kimix-icon-text-button text-text-muted disabled:cursor-not-allowed disabled:opacity-55">
-          <RefreshCw size={13} className={busy ? "animate-spin" : ""} />刷新
-        </button>
-        <button type="button" disabled={!onOpenInspector} onClick={onOpenInspector} className="kimix-icon-text-button text-text-muted disabled:cursor-not-allowed disabled:opacity-55">
-          <Eye size={13} />完整详情
-        </button>
-        <div style={{ flex: 1 }} />
-        {(towerMode || towerPending) && (
-          <button type="button" disabled={busy} onClick={() => void onExit?.()} className="kimix-icon-text-button text-text-muted disabled:cursor-not-allowed disabled:opacity-55">
-            <LogOut size={13} />{towerPending ? "取消待开启" : "退出 Tower"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -294,13 +378,13 @@ export function ComposerDockBar({
   towerMode = false,
   towerPending = false,
   towerSnapshot,
+  towerTasks = [],
+  towerSubagents = [],
   towerBusy,
   onPauseGoal,
   onResumeGoal,
   onCancelGoal,
   onRefreshGoal,
-  onRefreshTower,
-  onOpenTowerInspector,
   onExitTower,
   onHideBash,
   onHideSubagent,
@@ -324,8 +408,8 @@ export function ComposerDockBar({
   if (subagentTasks.length > 0) capsules.push({ id: "subagent", label: "子 Agent", count: String(subagentTasks.length), running: runningOf(subagentTasks), icon: <Users size={13} /> });
   if (towerVisible) capsules.push({
     id: "tower",
-    label: "Tower Agent",
-    count: towerPending ? "待开启" : towerSnapshot && towerSnapshot.totalCount > 0 ? `${towerSnapshot.mergedCount}/${towerSnapshot.totalCount}` : "运行中",
+    label: "后台 Agent",
+    count: towerPending ? "待开启" : "",
     running: 0,
     icon: <RadioTower size={13} />,
   });
@@ -359,7 +443,7 @@ export function ComposerDockBar({
 
   if (capsules.length === 0) return null;
 
-  const panelConfig: Record<ComposerDockPanelId, { title: string; body: ReactNode; onHide?: () => void }> = {
+  const panelConfig: Record<ComposerDockPanelId, { title: string; body: ReactNode; onHide?: () => void; hideHeader?: boolean }> = {
     bash: {
       title: `${bashLabel} · ${bashTasks.length} 个任务`,
       body: <BackgroundTaskListItems tasks={bashTasks} />,
@@ -371,15 +455,15 @@ export function ComposerDockBar({
       onHide: onHideSubagent,
     },
     tower: {
-      title: towerPending ? "Tower · 待首轮开启" : `Tower · ${towerSnapshot?.base ?? "官方运行时"}`,
+      title: towerPending ? "Tower 待开启" : "后台 Agent",
+      hideHeader: true,
       body: (
         <TowerPanelBody
-          towerMode={towerMode}
           towerPending={towerPending}
           snapshot={towerSnapshot}
+          tasks={towerTasks}
+          subagents={towerSubagents}
           busy={towerBusy}
-          onRefresh={onRefreshTower}
-          onOpenInspector={onOpenTowerInspector}
           onExit={onExitTower}
         />
       ),
@@ -440,37 +524,39 @@ export function ComposerDockBar({
           role="dialog"
           aria-label={active.title}
         >
-          <div
-            className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[13px] text-[var(--kimix-panel-text-secondary)]"
-            style={{ gap: 12, paddingLeft: 16, paddingRight: 12 }}
-          >
-            <span className="min-w-0 truncate">{active.title}</span>
-            <div className="flex shrink-0 items-center" style={{ gap: 4 }}>
-              {active.onHide && (
+          {!active.hideHeader && (
+            <div
+              className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--kimix-panel-divider)] text-[13px] text-[var(--kimix-panel-text-secondary)]"
+              style={{ gap: 12, paddingLeft: 16, paddingRight: 12 }}
+            >
+              <span className="min-w-0 truncate">{active.title}</span>
+              <div className="flex shrink-0 items-center" style={{ gap: 4 }}>
+                {active.onHide && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      active.onHide?.();
+                      setOpenPanel(null);
+                    }}
+                    className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    title="收起到侧栏"
+                    aria-label="收起到侧栏"
+                  >
+                    <PanelRightClose size={13} />
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => {
-                    active.onHide?.();
-                    setOpenPanel(null);
-                  }}
+                  onClick={() => setOpenPanel(null)}
                   className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                  title="收起到侧栏"
-                  aria-label="收起到侧栏"
+                  title="关闭面板"
+                  aria-label="关闭面板"
                 >
-                  <PanelRightClose size={13} />
+                  <X size={13} />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setOpenPanel(null)}
-                className="kimix-muted-action flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                title="关闭面板"
-                aria-label="关闭面板"
-              >
-                <X size={13} />
-              </button>
+              </div>
             </div>
-          </div>
+          )}
           <div className="overflow-y-auto" style={{ paddingTop: 6, paddingBottom: 6 }}>
             {active.body}
           </div>
