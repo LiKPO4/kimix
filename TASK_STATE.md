@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：Tower 终态优先于滞后任务状态（v2.21.135）
+
+- 根因：Tower 卡片原先优先使用后台任务列表状态；任务列表短暂保留 `running` 时，会覆盖官方 roster/事件已报告的完成状态。
+- 修复：Tower 记录从任务、事件、roster、mission 汇总状态，任一来源明确终态即优先采用；兼容 `complete`、`finished`、`success`、`done`、`terminated` 等官方常见终态别名，并统一状态文案归一化。
+- 验证：定向 Tower/样式测试、全量测试、Node/Renderer typecheck、生产构建、diff 检查与知识库严格校验通过。
+
 ## 2026-08-28 修正：Tower 筛选框改为硬圆角（v2.21.133）
 
 - 根因：筛选 Tab 复用了 toggle 角色，风格化的 toggle 半径为 pill，导致“最近”等选中项呈胶囊形。

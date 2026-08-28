@@ -71,24 +71,25 @@ const TOWER_AGENT_FILTERS: Array<{ id: TowerAgentFilter; label: string }> = [
 ];
 
 const TOWER_AGENT_TERMINAL_STATUSES = new Set([
-  "completed", "merged", "abandoned", "failed", "error", "timed_out", "killed", "lost", "cancelled", "stopped", "exited",
+  "completed", "complete", "finished", "success", "done", "terminated", "merged", "abandoned", "failed", "error", "timed_out", "killed", "lost", "cancelled", "stopped", "exited",
 ]);
 
 function towerAgentIsCompleted(status?: string) {
-  return Boolean(status && TOWER_AGENT_TERMINAL_STATUSES.has(status));
+  return Boolean(status && TOWER_AGENT_TERMINAL_STATUSES.has(status.trim().toLowerCase()));
 }
 
 function towerAgentStatusLabel(status: string) {
-  if (status === "completed" || status === "merged") return "完成";
-  if (status === "running" || status === "active") return "运行中";
-  if (status === "queued") return "排队中";
-  if (status === "suspended") return "已暂停";
-  if (status === "blocked") return "受阻";
-  if (status === "awaiting_approval") return "待确认";
-  if (status === "failed" || status === "error") return "失败";
-  if (["timed_out", "lost"].includes(status)) return "异常结束";
-  if (["killed", "cancelled", "stopped", "exited", "abandoned"].includes(status)) return "已停止";
-  return towerStatusLabel(status);
+  const normalized = status.trim().toLowerCase();
+  if (["completed", "complete", "finished", "success", "done", "merged"].includes(normalized)) return "完成";
+  if (["running", "active"].includes(normalized)) return "运行中";
+  if (normalized === "queued") return "排队中";
+  if (normalized === "suspended") return "已暂停";
+  if (normalized === "blocked") return "受阻";
+  if (normalized === "awaiting_approval") return "待确认";
+  if (["failed", "error"].includes(normalized)) return "失败";
+  if (["timed_out", "lost"].includes(normalized)) return "异常结束";
+  if (["killed", "cancelled", "stopped", "exited", "terminated", "abandoned"].includes(normalized)) return "已停止";
+  return towerStatusLabel(normalized);
 }
 
 function towerAgentDurationLabel(startedAt: number, endedAt: number | null, now: number) {
@@ -111,7 +112,12 @@ function towerAgentRecord(
   const task = tasks.find((candidate) => candidate.agentId === agent.id);
   const subagent = subagents.find((candidate) => candidate.agentId === agent.id);
   const mission = agent.mission ? snapshot.missions.find((candidate) => candidate.id === agent.mission) : undefined;
-  const status = task?.status ?? subagent?.status ?? agent.status ?? mission?.status ?? "active";
+  const statusCandidates = [task?.status, subagent?.status, agent.status, mission?.status]
+    .filter((candidate): candidate is string => Boolean(candidate?.trim()));
+  // 任务列表可能短暂滞后于官方 Tower roster/事件；明确终态优先，避免已结束 worker 被显示为运行中。
+  const status = statusCandidates.find((candidate) => towerAgentIsCompleted(candidate))
+    ?? statusCandidates[0]
+    ?? "active";
   const subagentEndedAt = towerAgentIsCompleted(status)
     ? subagent?.events.at(-1)?.timestamp ?? subagent?.timestamp ?? null
     : null;

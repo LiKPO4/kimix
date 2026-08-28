@@ -226,6 +226,23 @@ describe("ComposerDockBar", () => {
     expect(panel?.textContent).toContain("tower worker worker-b: 补充回归测试");
   });
 
+  it("官方 Tower 已结束时优先终态，不被滞后的后台任务 running 覆盖", () => {
+    render(makeProps({
+      towerMode: true,
+      towerSnapshot: {
+        ...towerFixture,
+        totalCount: 1,
+        missions: [{ id: "M1", title: "已完成任务", status: "completed" }],
+        agents: [{ ...towerFixture.agents[0], status: "completed", mission: "M1" }],
+      },
+      towerTasks: [makeTask({ agentId: "agent-a", status: "running" })],
+    }));
+    clickCapsule(0);
+    const panel = container.querySelector(".kimix-dock-panel");
+    expect(panel?.textContent).toContain("0 运行中");
+    expect(panel?.textContent).toContain("完成");
+  });
+
   it("官方 tool 类后台任务使用后台任务文案", () => {
     render(makeProps({ bashTasks: [makeTask({ subagentType: "tool" })] }));
     expect(capsuleLabels()[0]).toContain("后台任务");
