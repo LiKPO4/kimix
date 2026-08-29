@@ -4648,7 +4648,9 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-media-thumb-active-shadow);
 }
 
-:root[data-ui-style-contract="v1"] :where(.kimix-longtask-inspector, .kimix-diff-panel, .kimix-model-provider-sidebar) {
+/* 模型供应商侧栏（.kimix-model-provider-sidebar）是管理器卡的平铺窗格，由外卡
+   overflow:hidden 裁切圆角；不套用 inspector 独立卡角色，否则双层边框+圆角错位。 */
+:root[data-ui-style-contract="v1"] :where(.kimix-longtask-inspector, .kimix-diff-panel) {
   border: var(--ui-role-inspector-resting-border);
   border-radius: var(--ui-role-inspector-radius);
   background: var(--ui-role-inspector-resting-background);

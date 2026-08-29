@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：自定义风格下模型页侧栏圆角错位（v2.21.142）
+
+- 根因：用户启用自定义风格 `custom:win11-fluent-light`（`data-ui-style-contract="v1"` 生效），契约层 inspector 角色规则把 `.kimix-model-provider-sidebar` 当独立检查器卡，给了 12px 圆角+完整四边边框+阴影；但它实际是管理器卡（8px 圆角+overflow:hidden）内的平铺窗格，形成双层边框与圆角错位月牙缝。v2.21.141 只改了内置默认风格下的外卡圆角，未触及契约层，故用户截图"还是不一致"。
+- 修复：`src/index.css` 契约 inspector 组移除 `.kimix-model-provider-sidebar`（保留 longtask-inspector/diff-panel），侧栏回落基础平铺规则（仅右分隔线、surface-base 背景、由外卡裁切圆角）；`uiStyleContract.ts` inspector 角色描述同步。
+- 验证手法（可复用）：未打包实例默认开 CDP 9222（`electron/main.ts:8774`），用 Runtime.evaluate 读 computed style 实测：sidebar radius 12px→0px、box-shadow→none、仅余 1px 右分隔线；截图确认四角与外卡一致。
+- 已知边界：自定义风格不再能通过 inspector 角色给供应商侧栏单独配背景/边框（现为平铺窗格）；如后续需要可为侧栏单设角色变量。
+- 验证：typecheck、定向 2 文件 51 项、全量测试、生产构建。
+
 ## 2026-08-28 修正：模型页圆角统一 + 侧栏底部切换按钮完全对齐（v2.21.141）
 
 - 圆角：模型与供应商页外卡 `.kimix-model-provider-manager` 从 `--radius-md`(12px) 改为 `--radius-sm`(6px)，与设置页通用卡 `.kimix-settings-card`、消息条、模型行一致；管理器内层背景块固定 `rounded-xl`(12px，不吃风格 token) 改为 `rounded-sm-token`。

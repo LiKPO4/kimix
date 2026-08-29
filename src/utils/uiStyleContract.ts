@@ -106,7 +106,7 @@ export const UI_STYLE_ROLE_GUIDE: Record<UiStyleRoleId, string> = {
   codeBlock: "Markdown 代码块",
   table: "Markdown 表格外框",
   mediaThumb: "图片与媒体缩略图",
-  inspector: "检查器、Diff 和模型侧栏",
+  inspector: "检查器与 Diff 面板（模型供应商侧栏为平铺窗格，不在此列）",
   toast: "通知和对话导航预览",
   dock: "底部停靠面板与胶囊",
   roomChoice: "多 Agent 房间中的模型、权限和范围选项",
