@@ -89,19 +89,10 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
           minHeight: 0,
           flexDirection: "column",
           alignItems: "center",
-          padding: "0 2px 16px 10px",
+          padding: "0 2px 18px 10px",
         }}
         aria-label="设置导航"
       >
-        <button
-          type="button"
-          onClick={() => setWorkspaceView("chat")}
-          className="kimix-settings-sidebar-icon-button kimix-settings-navigation-item"
-          title="返回对话"
-          aria-label="返回对话"
-        >
-          <ArrowLeft size={17} />
-        </button>
         <nav className="kimix-settings-sidebar-collapsed-pages" aria-label="设置分类">
           {SETTINGS_PAGES.map((page) => (
             <button
@@ -119,6 +110,17 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
             </button>
           ))}
         </nav>
+        <div style={{ marginTop: "auto", height: 36 }}>
+          <button
+            type="button"
+            onClick={() => setWorkspaceView("chat")}
+            className="kimix-settings-sidebar-icon-button kimix-settings-navigation-item"
+            title="返回对话"
+            aria-label="返回对话"
+          >
+            <ArrowLeft size={17} />
+          </button>
+        </div>
       </aside>
     );
   }
@@ -130,14 +132,6 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
       aria-label="设置导航"
     >
       <div className="kimix-settings-sidebar-header">
-        <button
-          type="button"
-          onClick={() => setWorkspaceView("chat")}
-          className="kimix-settings-sidebar-back kimix-settings-navigation-item"
-        >
-          <ArrowLeft size={16} />
-          <span>返回对话</span>
-        </button>
         <div className="kimix-settings-sidebar-title">
           <Settings size={18} />
           <span>设置</span>
@@ -215,9 +209,18 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         )}
       </div>
 
-      <div className="kimix-settings-sidebar-version">
-        <span>Kimix</span>
-        <span>v{APP_VERSION}</span>
+      <div style={{ padding: "8px 14px 6px 8px" }}>
+        <button
+          type="button"
+          onClick={() => setWorkspaceView("chat")}
+          className="kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors"
+          style={{ height: 36 }}
+          aria-label="返回对话"
+        >
+          <ArrowLeft size={18} className="text-text-secondary" />
+          <span>返回对话</span>
+          <span className="ml-auto shrink-0 text-[13px] text-text-muted">v{APP_VERSION}</span>
+        </button>
       </div>
     </aside>
   );

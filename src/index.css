@@ -3390,7 +3390,6 @@ button.bg-accent-primary:disabled:hover,
   padding: 0 8px 14px;
 }
 
-.kimix-settings-sidebar-back,
 .kimix-settings-sidebar-title {
   display: flex;
   width: 100%;
@@ -3399,30 +3398,6 @@ button.bg-accent-primary:disabled:hover,
   gap: 10px;
   padding-left: 16px;
   padding-right: 16px;
-}
-
-.kimix-settings-sidebar-back {
-  border: var(--ui-nav-action-border);
-  border-radius: var(--radius-sm);
-  background-color: var(--ui-nav-action-background);
-  background-image: var(--ui-nav-action-background-image);
-  box-shadow: var(--ui-nav-action-shadow);
-  color: var(--text-muted);
-  font-size: 13.5px;
-  transition-property: background-color, border-color, box-shadow, color, scale;
-  transition-duration: var(--duration-fast);
-  transition-timing-function: ease-out;
-}
-
-.kimix-settings-sidebar-back:hover {
-  border-color: var(--ui-nav-action-hover-border-color);
-  background: var(--ui-nav-action-hover-background);
-  box-shadow: var(--ui-nav-action-hover-shadow);
-  color: var(--text-primary);
-}
-
-.kimix-settings-sidebar-back:active {
-  scale: 0.96;
 }
 
 .kimix-settings-sidebar-title {
@@ -3448,20 +3423,6 @@ button.bg-accent-primary:disabled:hover,
   scrollbar-gutter: stable;
 }
 
-.kimix-settings-sidebar-version {
-  display: grid;
-  min-height: 36px;
-  flex-shrink: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 8px 0;
-  border-top: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  padding: 12px 8px 0;
-}
 
 .kimix-settings-sidebar-icon-button {
   display: flex;

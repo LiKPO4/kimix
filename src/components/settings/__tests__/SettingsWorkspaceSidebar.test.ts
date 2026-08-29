@@ -46,7 +46,10 @@ describe("SettingsWorkspaceSidebar", () => {
     expect(container.textContent).not.toContain("新对话");
     expect(container.textContent).not.toContain("项目");
 
-    await act(async () => buttonByText(container, "返回对话")?.click());
+    // 底部按钮与对话页「设置」同位置同结构（含右侧版本号），用 aria-label 定位。
+    const backButton = container.querySelector<HTMLButtonElement>('button[aria-label="返回对话"]');
+    expect(backButton?.className).toContain("kimix-settings-entry");
+    await act(async () => backButton?.click());
     expect(useAppStore.getState().workspaceView).toBe("chat");
 
     await act(async () => buttonByText(container, "模型与供应商")?.click());
