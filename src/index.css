@@ -5283,7 +5283,7 @@ button.bg-accent-primary:disabled:hover,
   grid-template-columns: 210px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface-elevated);
 }
 

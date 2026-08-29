@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：模型页圆角统一 + 侧栏底部切换按钮完全对齐（v2.21.141）
+
+- 圆角：模型与供应商页外卡 `.kimix-model-provider-manager` 从 `--radius-md`(12px) 改为 `--radius-sm`(6px)，与设置页通用卡 `.kimix-settings-card`、消息条、模型行一致；管理器内层背景块固定 `rounded-xl`(12px，不吃风格 token) 改为 `rounded-sm-token`。
+- 对齐：对话页「设置」按钮的 `pb-2`/`px-2 pt-2`/`gap-3` 等 Tailwind spacing 类在本项目有静默不生成前科（Sidebar.tsx:898 注释即此案），全部改 inline style；两侧按钮几何确定且一致：左 20、右 W-14、底 18、高 36、gap 12，同类名同结构。
+- 验证：定向 10 文件 83 项、typecheck；全量测试与构建见本轮收尾。
+
 ## 2026-08-28 修正：两条顶栏统一收缩（v2.21.140）
 
 - 顶部菜单栏 48 → 40px（AppShell grid 行 + TopMenuBar `h-12`→`h-10`）；页面级工具栏 56 → 48px（对话页 SessionToolbar `h-14`→`h-12`，设置/Hooks/插件/Skills 共用 `.kimix-workspace-header` 56→48px）。

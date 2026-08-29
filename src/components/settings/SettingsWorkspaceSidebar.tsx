@@ -213,8 +213,8 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
         <button
           type="button"
           onClick={() => setWorkspaceView("chat")}
-          className="kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors"
-          style={{ height: 36 }}
+          className="kimix-settings-entry flex w-full items-center rounded-lg text-[16px] text-text-primary transition-colors"
+          style={{ height: 36, gap: 12 }}
           aria-label="返回对话"
         >
           <ArrowLeft size={18} className="text-text-secondary" />

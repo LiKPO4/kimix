@@ -832,7 +832,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             </label>
 
             {isCreatingProvider && (
-              <div className="rounded-xl bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
+              <div className="rounded-sm-token bg-surface-base" style={{ marginTop: 14, padding: "12px 14px" }}>
                 <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 }}>
                   <div className="min-w-0">
                     <div className="text-[12.5px] font-medium text-text-primary">官方 Provider 目录</div>
@@ -954,7 +954,7 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 </div>
               ))}
               {selectedGroup.models.length === 0 && (
-                <div className="rounded-xl bg-surface-base text-[12px] leading-5 text-text-muted" style={{ padding: "16px 18px" }}>
+                <div className="rounded-sm-token bg-surface-base text-[12px] leading-5 text-text-muted" style={{ padding: "16px 18px" }}>
                   此供应商还没有模型。连接配置只需保存一次，之后可以连续添加多个模型。
                 </div>
               )}

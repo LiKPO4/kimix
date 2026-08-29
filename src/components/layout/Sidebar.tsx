@@ -858,7 +858,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   return (
-    <aside style={{ width, paddingLeft: 12, paddingRight: 6 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col pb-2">
+    <aside style={{ width, paddingLeft: 12, paddingRight: 6, paddingBottom: 8 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col">
       <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
@@ -1254,11 +1254,11 @@ export function Sidebar({ width = 320 }: SidebarProps) {
 
       </div>
 
-      <div className="px-2 pt-2" style={{ paddingBottom: 10 }}>
+      <div style={{ padding: "8px 8px 10px" }}>
         <button
           onClick={() => toggleWorkspaceView("settings")}
-          className="kimix-settings-entry flex w-full items-center gap-3 rounded-lg text-[16px] text-text-primary transition-colors"
-          style={{ height: 36 }}
+          className="kimix-settings-entry flex w-full items-center rounded-lg text-[16px] text-text-primary transition-colors"
+          style={{ height: 36, gap: 12 }}
         >
           <Settings size={18} className="text-text-secondary" />
           <span>设置</span>
