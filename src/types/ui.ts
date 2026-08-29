@@ -103,6 +103,8 @@ export interface AppState {
   notificationShowContent: boolean;
   processDisplayMode: ProcessDisplayMode;
   collapseProcessWhileRunning: boolean;
+  /** 消息自动折叠：回合结束时自动折叠工作过程，仅展示总结；关闭后过程保持展开。 */
+  autoCollapseTurnProcess: boolean;
   /** 思考翻译提供方；互斥选择关闭、本地模型或 Microsoft 云端服务。 */
   thinkingTranslationProvider: ThinkingTranslationProvider;
   /** 思考翻译调度间隔（毫秒）。 */

@@ -5,6 +5,7 @@ import {
   canLiveThinkingViewportConsumeWheel,
   LIVE_THINKING_MAX_HEIGHT_PX,
   resolveHasFinalProcessContent,
+  resolveProcessDefaultExpanded,
   resolveLiveTextBlockKey,
   resolveLiveThinkingBlockKey,
   shouldCollapseKimiWebProcessOnFinalContent,
@@ -103,6 +104,27 @@ describe("liveThinkingViewport", () => {
       ...base,
       manuallyExpanded: true,
     })).toBe(false);
+  });
+
+  it("消息自动折叠开关控制过程区默认展开状态", () => {
+    const base = {
+      isKimiWeb: true,
+      expandByDefault: true,
+      hasFinalContent: true,
+      isActiveAssistant: false,
+      collapseWhileRunning: true,
+      autoCollapseTurnProcess: true,
+    };
+    // 开启（默认）：kimi-web 最新回合出现最终正文后折叠；kimix 模式始终折叠为摘要。
+    expect(resolveProcessDefaultExpanded(base)).toBe(false);
+    expect(resolveProcessDefaultExpanded({ ...base, hasFinalContent: false })).toBe(true);
+    expect(resolveProcessDefaultExpanded({ ...base, isKimiWeb: false })).toBe(false);
+    // 关闭：两种模式的过程都保持展开（含非最新回合）。
+    expect(resolveProcessDefaultExpanded({ ...base, autoCollapseTurnProcess: false })).toBe(true);
+    expect(resolveProcessDefaultExpanded({ ...base, autoCollapseTurnProcess: false, isKimiWeb: false })).toBe(true);
+    expect(resolveProcessDefaultExpanded({ ...base, autoCollapseTurnProcess: false, expandByDefault: false })).toBe(true);
+    // 运行中折叠优先于本开关。
+    expect(resolveProcessDefaultExpanded({ ...base, autoCollapseTurnProcess: false, isActiveAssistant: true })).toBe(false);
   });
 
   it("treats only a completed turn with body content as final content", () => {

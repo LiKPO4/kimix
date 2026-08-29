@@ -145,6 +145,32 @@ export function shouldCollapseKimiWebProcessOnFinalContent({
 }
 
 /**
+ * 过程区挂载时的默认展开状态。「消息自动折叠」关闭后过程保持展开（对应官方
+ * turnFolding 关闭语义：folded/visible 合并全量展示）；开启（默认）时维持原行为：
+ * kimi-web 模式最新回合在出现最终正文后折叠，kimix 模式过程始终折叠为摘要。
+ * 运行中折叠由 collapseWhileRunning 单独控制，优先于本开关。
+ */
+export function resolveProcessDefaultExpanded({
+  isKimiWeb,
+  expandByDefault,
+  hasFinalContent,
+  isActiveAssistant,
+  collapseWhileRunning,
+  autoCollapseTurnProcess,
+}: {
+  isKimiWeb: boolean;
+  expandByDefault: boolean;
+  hasFinalContent: boolean;
+  isActiveAssistant: boolean;
+  collapseWhileRunning: boolean;
+  autoCollapseTurnProcess: boolean;
+}): boolean {
+  if (isActiveAssistant && collapseWhileRunning) return false;
+  if (!autoCollapseTurnProcess) return true;
+  return isKimiWeb ? expandByDefault && !hasFinalContent : false;
+}
+
+/**
  * 判定一轮是否有「最终内容」（触发 Kimi Web 过程自动折叠的唯一条件）。
  * 必须是「轮次完成且有正文」——运行中任何流式内容（思考、预告段）都不算，
  * 否则第一个字到达就会误触发自动折叠，使「未勾选运行中折叠时全程展开」失效。

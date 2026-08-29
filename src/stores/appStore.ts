@@ -12,6 +12,7 @@ const RIGHT_SIDEBAR_CARD_ORDER_KEY = "kimix_right_sidebar_card_order";
 const DEFAULT_RIGHT_SIDEBAR_CARD_ORDER: RightSidebarCardId[] = ["longTaskStatus", "background", "subagentTasks", "bigPlan", "rounds", "review", "confirmed", "hidden", "longTask", "kimi", "subagent", "git", "btw", "plan", "serverTree", "session", "diffs"];
 const PROCESS_DISPLAY_MODE_KEY = "kimix_process_display_mode";
 const COLLAPSE_PROCESS_WHILE_RUNNING_KEY = "kimix_collapse_process_while_running";
+const AUTO_COLLAPSE_TURN_PROCESS_KEY = "kimix_auto_collapse_turn_process";
 const PENDING_NEW_SESSION_MODEL_KEY = "kimix_pending_new_session_model";
 const SETTINGS_ACTIVE_PAGE_KEY = "kimix_settings_active_page";
 const SETTINGS_PAGE_IDS = new Set<SettingsPageId>([
@@ -98,6 +99,23 @@ function writeCollapseProcessWhileRunning(enabled: boolean) {
   }
 }
 
+function readAutoCollapseTurnProcess(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(AUTO_COLLAPSE_TURN_PROCESS_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function writeAutoCollapseTurnProcess(enabled: boolean) {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(AUTO_COLLAPSE_TURN_PROCESS_KEY, enabled ? "1" : "0");
+  } catch {
+    // Ignore local persistence errors; the in-memory value still updates.
+  }
+}
+
 function readProcessDisplayMode(): ProcessDisplayMode {
   try {
     if (typeof localStorage === "undefined") return "kimix";
@@ -177,6 +195,7 @@ export interface AppStore extends AppState {
   setNotificationShowContent: (enabled: boolean) => void;
   setProcessDisplayMode: (mode: ProcessDisplayMode) => void;
   setCollapseProcessWhileRunning: (enabled: boolean) => void;
+  setAutoCollapseTurnProcess: (enabled: boolean) => void;
   setThinkingTranslationProvider: (provider: ThinkingTranslationProvider) => void;
   setThinkingTranslationIntervalMs: (intervalMs: number) => void;
   setThinkingTranslationDisplayMode: (mode: ThinkingTranslationDisplayMode) => void;
@@ -243,6 +262,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   notificationShowContent: false,
   processDisplayMode: readProcessDisplayMode(),
   collapseProcessWhileRunning: readCollapseProcessWhileRunning(),
+  autoCollapseTurnProcess: readAutoCollapseTurnProcess(),
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,
   thinkingTranslationDisplayMode: "translated",
@@ -321,6 +341,10 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setCollapseProcessWhileRunning: (enabled) => {
     writeCollapseProcessWhileRunning(enabled);
     set({ collapseProcessWhileRunning: enabled });
+  },
+  setAutoCollapseTurnProcess: (enabled) => {
+    writeAutoCollapseTurnProcess(enabled);
+    set({ autoCollapseTurnProcess: enabled });
   },
   setPendingNewSessionModel: (model) => {
     writePendingNewSessionModel(model);

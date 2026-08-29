@@ -41,6 +41,7 @@ import {
   canLiveThinkingViewportConsumeWheel,
   LIVE_THINKING_MAX_HEIGHT_PX,
   resolveHasFinalProcessContent,
+  resolveProcessDefaultExpanded,
   shouldCollapseKimiWebProcessOnFinalContent,
   shouldFollowLiveThinkingViewport,
   shouldMergeLiveThinkingDraftIntoTimeline,
@@ -2658,12 +2659,19 @@ function TurnBlocksProcessGroup({ group, isLive, translationScope, liveThinkingD
   }
 }
 
-function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, turnBlocks, liveDraftKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; turnBlocks?: TurnBlock[]; liveDraftKey?: string | null; onExpandedChange?: (expanded: boolean) => void }) {
+function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals, label, displayMode = "kimix", expandByDefault = false, isActiveAssistant = false, hasFinalContent = false, collapseWhileRunning = true, autoCollapseTurnProcess = true, turnBlocks, liveDraftKey, onExpandedChange }: { event: AssistantEvent; sessionId?: string; tools: ToolEvent[]; subagents: SubagentEvent[]; approvals: ApprovalEvent[]; label: ReactNode; displayMode?: ProcessDisplayMode; expandByDefault?: boolean; isActiveAssistant?: boolean; hasFinalContent?: boolean; collapseWhileRunning?: boolean; autoCollapseTurnProcess?: boolean; turnBlocks?: TurnBlock[]; liveDraftKey?: string | null; onExpandedChange?: (expanded: boolean) => void }) {
   const isKimiWeb = displayMode === "kimi-web";
   const thinkingTranslationScope = `${sessionId ?? "unknown"}:${event.roomAgentId ?? "single"}:${event.agentTurnId ?? event.id}:${event.id}`;
   // B3: while the turn is actively running, keep process details collapsed by
   // default (one summary row). Users can still expand manually.
-  const defaultExpanded = isKimiWeb && expandByDefault && !hasFinalContent && !(isActiveAssistant && collapseWhileRunning);
+  const defaultExpanded = resolveProcessDefaultExpanded({
+    isKimiWeb,
+    expandByDefault,
+    hasFinalContent,
+    isActiveAssistant,
+    collapseWhileRunning,
+    autoCollapseTurnProcess,
+  });
   // The assistant bubble can remount mid-turn (pending placeholder swap,
   // merged-id fallback). Restore the user's last manual expand/collapse
   // choice after a remount instead of falling back to the default.
@@ -2766,7 +2774,7 @@ function AssistantProcessSummary({ event, sessionId, tools, subagents, approvals
     summaryApprovalCount > 0 ? `${summaryApprovalCount} 个工具请求` : "",
     summaryNotificationCount > 0 ? `${summaryNotificationCount} 条通知` : "",
   ]), [summaryApprovalCount, summaryNotificationCount, detailUnit, summarySubagentCount, thinkingBlocks.length, summaryToolCount]);
-  const isFinalContentTransition = shouldCollapseKimiWebProcessOnFinalContent({
+  const isFinalContentTransition = autoCollapseTurnProcess && shouldCollapseKimiWebProcessOnFinalContent({
     previousHasFinalContent: previousHasFinalContentRef.current,
     hasFinalContent,
     isKimiWeb,
@@ -3073,6 +3081,7 @@ type AssistantProcessBlockProps = {
   hasFinalContent: boolean;
   isInterrupted: boolean;
   collapseWhileRunning: boolean;
+  autoCollapseTurnProcess: boolean;
   turnStartedAt?: number;
   activeStatusMessage?: string;
   turnBlocks?: TurnBlock[];
@@ -3090,6 +3099,7 @@ function assistantProcessBlockEqual(prev: AssistantProcessBlockProps, next: Assi
     prev.hasFinalContent === next.hasFinalContent &&
     prev.isInterrupted === next.isInterrupted &&
     prev.collapseWhileRunning === next.collapseWhileRunning &&
+    prev.autoCollapseTurnProcess === next.autoCollapseTurnProcess &&
     prev.turnStartedAt === next.turnStartedAt &&
     prev.activeStatusMessage === next.activeStatusMessage &&
     prev.liveDraftKey === next.liveDraftKey &&
@@ -3128,6 +3138,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
   hasFinalContent,
   isInterrupted,
   collapseWhileRunning,
+  autoCollapseTurnProcess,
   turnStartedAt,
   activeStatusMessage,
   turnBlocks,
@@ -3175,6 +3186,7 @@ const AssistantProcessBlock = memo(function AssistantProcessBlock({
       isActiveAssistant={isActiveAssistant}
       hasFinalContent={hasFinalContent}
       collapseWhileRunning={collapseWhileRunning}
+      autoCollapseTurnProcess={autoCollapseTurnProcess}
       label={processLabel}
       turnBlocks={turnBlocks}
       liveDraftKey={liveDraftKey}
@@ -3350,6 +3362,7 @@ const AssistantBodyBlock = memo(function AssistantBodyBlock({
 function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantActive, leadingTools = [], leadingSubagents = [], leadingHooks = [], leadingApprovals = [], activeStatus, changedFiles = [], changeSummary, trailingStatuses = [], hideProcessSummary = false, expandProcessByDefault = false, eagerMarkdown = false, turnBlocks }: { event: Extract<TimelineEvent, { type: "assistant_message" }>; sessionId?: string; turnStartedAt?: number; isAssistantActive?: boolean; leadingTools?: Extract<TimelineEvent, { type: "tool_call" }>[]; leadingSubagents?: Extract<TimelineEvent, { type: "subagent" }>[]; leadingHooks?: Extract<TimelineEvent, { type: "hook" }>[]; leadingApprovals?: Extract<TimelineEvent, { type: "approval_request" }>[]; activeStatus?: Extract<TimelineEvent, { type: "status_update" }>; changedFiles?: string[]; changeSummary?: Extract<TimelineEvent, { type: "change_summary" }>; trailingStatuses?: Extract<TimelineEvent, { type: "status_update" }>[]; hideProcessSummary?: boolean; expandProcessByDefault?: boolean; eagerMarkdown?: boolean; turnBlocks?: TurnBlock[] }) {
   const processDisplayMode = useAppStore((s) => s.processDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
+  const autoCollapseTurnProcess = useAppStore((s) => s.autoCollapseTurnProcess);
   const sessionHasRunningBackgroundBash = useAppStore((s) => s.sessionHasRunningBackgroundBash);
   // Option C: when the process detail is expanded, the trailing text streams
   // in flow and the body stays empty; when it is collapsed (the flow copy is
@@ -3458,6 +3471,7 @@ function AssistantMessageBubble({ event, sessionId, turnStartedAt, isAssistantAc
             hasFinalContent={resolveHasFinalProcessContent(event.isComplete, hasContent, isActiveAssistant)}
             isInterrupted={Boolean(isInterrupted)}
             collapseWhileRunning={collapseProcessWhileRunning}
+            autoCollapseTurnProcess={autoCollapseTurnProcess}
             turnStartedAt={turnStartedAt}
             activeStatusMessage={activeStatus?.message}
             turnBlocks={turnBlocks}

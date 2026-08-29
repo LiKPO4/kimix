@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 功能：消息自动折叠开关（v2.21.137）
+
+- 参考官方 Kimi Code web 0.39.1（本机缓存 bundle）：`kimi-web.turn-folding` 开关默认关、回合结束时把最后一条非空正文之前的过程块折叠为「已工作 X」条；官方另有 `activityRunFolding`（工具调用汇总，默认开），Kimix 已有连续工具聚合，不在本轮范围。
+- Kimix 落地：新增 `autoCollapseTurnProcess`（localStorage `kimix_auto_collapse_turn_process`，**默认开**，与官方默认相反，用户明确要求），设置入口在「对话与权限 → 过程展示方式」分区；持久化链路复用 `collapseProcessWhileRunning` 的 localStorage-only 模式，不进 settings.json。
+- 行为：开关拆为纯函数 `resolveProcessDefaultExpanded`（liveThinkingViewport.ts），开启时行为与之前完全一致（kimi-web 最新回合出现最终正文后折叠、kimix 始终摘要）；关闭后过程保持展开（含历史回合），且 `isFinalContentTransition` 自动折叠事务不再触发；「运行中折叠过程详情」仍优先。
+- 验证：定向 3 文件 33 项、全量测试、Node/Renderer typecheck。
+
 ## 2026-08-28 修正：输入区交互不再误收起后台卡片（v2.21.136）
 
 - 根因：ComposerDockBar 注册了全局 capture 阶段的 `mousedown` 外部点击关闭；输入框位于 dock 根节点之外，因此聚焦输入框会误收起已打开的任务面板。

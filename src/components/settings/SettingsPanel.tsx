@@ -417,6 +417,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const setProcessDisplayMode = useAppStore((s) => s.setProcessDisplayMode);
   const collapseProcessWhileRunning = useAppStore((s) => s.collapseProcessWhileRunning);
   const setCollapseProcessWhileRunning = useAppStore((s) => s.setCollapseProcessWhileRunning);
+  const autoCollapseTurnProcess = useAppStore((s) => s.autoCollapseTurnProcess);
+  const setAutoCollapseTurnProcess = useAppStore((s) => s.setAutoCollapseTurnProcess);
   const thinkingTranslationProvider = useAppStore((s) => s.thinkingTranslationProvider);
   const setThinkingTranslationProvider = useAppStore((s) => s.setThinkingTranslationProvider);
   const thinkingTranslationIntervalMs = useAppStore((s) => s.thinkingTranslationIntervalMs);
@@ -2316,6 +2318,18 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">运行中折叠过程详情</div>
                       <div className="kimix-settings-permission-desc">默认开启，Agent 输出期间过程区只显示单行摘要以保持滚动流畅；关闭后运行中也按过程展示方式展开</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={autoCollapseTurnProcess}
+                    onClick={() => setAutoCollapseTurnProcess(!autoCollapseTurnProcess)}
+                    className={`kimix-settings-permission ${autoCollapseTurnProcess ? "is-active" : ""}`}
+                  >
+                    <SelectionIndicator selected={autoCollapseTurnProcess} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">消息自动折叠</div>
+                      <div className="kimix-settings-permission-desc">默认开启，回合结束时自动折叠工作过程，仅展示总结；关闭后过程保持展开</div>
                     </div>
                   </button>
                 </div>
