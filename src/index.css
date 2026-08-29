@@ -5377,6 +5377,15 @@ button.bg-accent-primary:disabled:hover,
   outline: none;
 }
 
+/* 「设为默认」悬停必须预览选中态：模型行 hover 灰底与控件角色 hover 灰底可能同色
+   （win11-fluent 均为 --surface-hover），仅靠角色 hover 看不出按钮可点。
+   !important 用于压过自定义风格 control 角色的 hover 规则。 */
+.kimix-model-default-action:hover:not(:disabled):not([aria-pressed="true"]) {
+  background: var(--accent-primary-light) !important;
+  border-color: var(--accent-primary-soft) !important;
+  color: var(--accent-primary-dark);
+}
+
 @media (max-width: 860px) {
   .kimix-model-provider-manager {
     grid-template-columns: minmax(0, 1fr);

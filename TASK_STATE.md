@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：「默认」按钮悬停改为 accent 预览态（v2.21.144）
+
+- 上一轮（v2.21.143）移除内联透明背景后用户仍反馈"看不出变化"。实测根因：win11-fluent 下 `--surface-hover`、模型行 hover 底、control 角色 hover 底三者同为 #EDEEEB，按钮 hover 融进已 hover 的行里；且 hover 边框色仍被内联 `borderColor: transparent` 挡住。
+- 修复：按钮加专属类 `.kimix-model-default-action`，悬停预览选中态（accent-primary-light 底 + accent-soft 边 + accent-dark 字，`!important` 压过契约 control hover 规则，排除已选中态）；className 里冗余的 `hover:bg-surface-hover` 移除。
+- 验证手法：CDP `CSS.forcePseudoState` 同时强制行+按钮 hover 模拟真实悬停，计算样式 bg rgb(230,240,249)/border 1px accent 蓝；`Page.captureScreenshot` 截图实证按钮蓝底与灰行对比清晰。注意 forcePseudoState 在 ws 断开后失效，截图须在连接存活期内用 CDP 自带截图完成。
+- 验证：typecheck、定向 6 文件 41 项、全量测试、生产构建。
+
 ## 2026-08-28 修正：模型行「默认」按钮悬停无反馈（v2.21.143）
 
 - 根因：非默认态内联 `backgroundColor: "transparent"` 压过一切 class hover 规则（`.kimix-icon-text-button:hover` 与自定义风格 control 角色 hover），悬停零反馈。
