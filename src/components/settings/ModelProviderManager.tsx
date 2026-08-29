@@ -937,7 +937,9 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                         paddingLeft: 12,
                         paddingRight: 12,
                         borderColor: model.isDefault ? "var(--accent-primary-soft)" : "transparent",
-                        backgroundColor: model.isDefault ? "var(--accent-primary-light)" : "transparent",
+                        // 非默认态不要内联 backgroundColor：内联样式会压过 class 的 hover 规则
+                        //（.kimix-icon-text-button:hover 与自定义风格 control 角色 hover），导致悬停无反馈。
+                        backgroundColor: model.isDefault ? "var(--accent-primary-light)" : undefined,
                         color: model.isDefault ? "var(--accent-primary-dark)" : undefined,
                       }}
                     >

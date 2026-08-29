@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-28 修正：模型行「默认」按钮悬停无反馈（v2.21.143）
+
+- 根因：非默认态内联 `backgroundColor: "transparent"` 压过一切 class hover 规则（`.kimix-icon-text-button:hover` 与自定义风格 control 角色 hover），悬停零反馈。
+- 修复：非默认态不再内联背景（改为 undefined），静止仍透明（win11-fluent control resting 实测 transparent），悬停吃到角色 hover 背景 #EDEEEB；默认选中态的内联 accent 样式保留，悬停不被覆盖。
+- 验证手法：CDP `CSS.forcePseudoState` 强制 hover 实测计算样式；注意按钮有 background-color transition，强制后须等约 600ms 再读，否则读到过渡初值误判"没生效"。
+- 验证：typecheck、定向 6 文件 41 项、全量测试、生产构建。
+
 ## 2026-08-28 修正：自定义风格下模型页侧栏圆角错位（v2.21.142）
 
 - 根因：用户启用自定义风格 `custom:win11-fluent-light`（`data-ui-style-contract="v1"` 生效），契约层 inspector 角色规则把 `.kimix-model-provider-sidebar` 当独立检查器卡，给了 12px 圆角+完整四边边框+阴影；但它实际是管理器卡（8px 圆角+overflow:hidden）内的平铺窗格，形成双层边框与圆角错位月牙缝。v2.21.141 只改了内置默认风格下的外卡圆角，未触及契约层，故用户截图"还是不一致"。
