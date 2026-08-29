@@ -753,9 +753,16 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
             </div>
           </div>
           {!isCreatingProvider && selectedGroup && (
-            <span className={`rounded-full text-[11.5px] leading-5 ${selectedProviderHasCredential ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ minWidth: 68, height: 26, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {selectedProviderHasCredential ? "凭据就绪" : "未配置"}
-            </span>
+            <div className="flex items-center" style={{ gap: 8 }}>
+              <span className={`rounded-full text-[11.5px] leading-5 ${selectedProviderHasCredential ? "bg-accent-success-light text-accent-success" : "bg-accent-warning-light text-accent-warning"}`} style={{ minWidth: 68, height: 26, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {selectedProviderHasCredential ? "凭据就绪" : "未配置"}
+              </span>
+              {!selectedProviderManaged && (
+                <button type="button" onClick={() => void handleRemoveProvider()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-accent-danger-light hover:text-accent-danger disabled:opacity-55" title="删除供应商及其模型">
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -863,11 +870,6 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                   <Check size={13} />
                   保存供应商
                 </button>
-                {!isCreatingProvider && (
-                  <button type="button" onClick={() => void handleRemoveProvider()} disabled={Boolean(busyAction)} className="kimix-icon-text-button is-compact text-text-secondary hover:bg-accent-danger-light hover:text-accent-danger disabled:opacity-55" title="删除供应商及其模型">
-                    <Trash2 size={13} />
-                  </button>
-                )}
               </div>
             </div>
           </>
