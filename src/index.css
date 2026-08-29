@@ -3258,8 +3258,8 @@ button.bg-accent-primary:disabled:hover,
 
 .kimix-workspace-header {
   display: grid;
-  height: 56px;
-  min-height: 56px;
+  height: 48px;
+  min-height: 48px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 18px;

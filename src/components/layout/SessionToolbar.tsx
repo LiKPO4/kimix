@@ -423,7 +423,7 @@ export function SessionToolbar({
   return (
     <>
     <div
-      className="kimix-app-shell-toolbar grid h-14 shrink-0 items-center border-b"
+      className="kimix-app-shell-toolbar grid h-12 shrink-0 items-center border-b"
       style={{ gridTemplateColumns: "minmax(0, 1fr) auto", minWidth: 0, width: "100%", maxWidth: "100%", paddingLeft: 30, paddingRight: 12 }}
     >
       <div className="flex min-w-0 items-center gap-2.5">

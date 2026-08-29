@@ -178,7 +178,7 @@ export function TopMenuBar({
 
   return (
     <header
-      className="z-50 flex h-12 w-full shrink-0 items-center justify-between"
+      className="z-50 flex h-10 w-full shrink-0 items-center justify-between"
       style={{ WebkitAppRegion: "drag" as const, paddingLeft: 12, paddingRight: 0 }}
     >
       <div className="flex h-full items-center gap-7" style={{ WebkitAppRegion: "no-drag" as const }}>
