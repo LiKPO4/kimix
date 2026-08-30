@@ -440,7 +440,7 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-swarm-off", label: "/swarm off", detail: "关闭 Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
   { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方终端主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
   { id: "slash-uistyle-custom", label: "/自定义风格", detail: "发送界面风格 AI 提示词，生成自定义风格 JSON，可附风格需求", insertText: "/自定义风格 ", commandName: "自定义风格", kind: "slash" },
-  { id: "slash-uistyle-custom-template", label: "/自定义风格 做一套低饱和莫兰迪色系风格", detail: "带需求模板：生成自定义界面风格", insertText: "/自定义风格 做一套低饱和莫兰迪色系风格", commandName: "自定义风格", kind: "slash" },
+  { id: "slash-uistyle-custom-template", label: "/自定义风格 做一套低饱和、大圆角卡片质感的界面风格", detail: "带需求模板：形状/质感/色彩都可定制", insertText: "/自定义风格 做一套低饱和、大圆角卡片质感的界面风格", commandName: "自定义风格", kind: "slash" },
   { id: "slash-custom-theme", label: "/custom-theme", detail: "调用官方内置 Skill 创建或修改主题", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
   { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "调用官方内置 Skill 设计主题", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
   { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "调用官方内置 Skill 导入 Claude Code / Codex 配置", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
