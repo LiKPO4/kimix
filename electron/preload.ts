@@ -73,6 +73,11 @@ import type {
   KimiThemeSourceDeleteResponse,
   UiStyleImportRequest,
   UiStyleImportResponse,
+  UiStyleInboxDeleteRequest,
+  UiStyleInboxDeleteResponse,
+  UiStyleInboxDirResponse,
+  UiStyleInboxEventPayload,
+  UiStyleInboxScanResponse,
   ExportSessionRequest,
   ExportSessionResponse,
   ExportSessionBackupRequest,
@@ -386,6 +391,17 @@ const api = {
     ipcRenderer.invoke("kimi:deleteThemeSource", req),
   importUiStyle: (req?: UiStyleImportRequest): Promise<UiStyleImportResponse> =>
     ipcRenderer.invoke("app:importUiStyle", req),
+  getUiStyleInboxDir: (): Promise<UiStyleInboxDirResponse> =>
+    ipcRenderer.invoke("app:getUiStyleInboxDir"),
+  scanUiStyleInbox: (): Promise<UiStyleInboxScanResponse> =>
+    ipcRenderer.invoke("app:scanUiStyleInbox"),
+  deleteUiStyleInboxFile: (req: UiStyleInboxDeleteRequest): Promise<UiStyleInboxDeleteResponse> =>
+    ipcRenderer.invoke("app:deleteUiStyleInboxFile", req),
+  onUiStyleInbox: (callback: (payload: UiStyleInboxEventPayload) => void) => {
+    const handler = (_: unknown, payload: UiStyleInboxEventPayload) => callback(payload);
+    ipcRenderer.on("kimix:ui-style-inbox", handler);
+    return () => { ipcRenderer.off("kimix:ui-style-inbox", handler); };
+  },
   listKimiCodeHistorySessions: (req: ListSessionsRequest): Promise<ListSessionsResponse> =>
     ipcRenderer.invoke("kimi-code:listHistorySessions", req),
   exportKimiCodeSession: (req?: ExportSessionRequest): Promise<ExportSessionResponse> =>

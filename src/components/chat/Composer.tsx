@@ -2675,7 +2675,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     // 完全一致：否则官方回放 canonical 用户消息时 echo 去重失败，会把完整提示词
     // 追加成第二个用户气泡，同一轮被拆成两条消息。
     if (name === "自定义风格") {
-      const stylePrompt = buildUiStyleAiPrompt();
+      const inboxDirRes = await window.api.getUiStyleInboxDir().catch(() => null);
+      const inboxDir = inboxDirRes && inboxDirRes.success ? inboxDirRes.data.dir : undefined;
+      const stylePrompt = buildUiStyleAiPrompt(inboxDir);
       await sendPromptContent(args ? `${stylePrompt}
 
 我的风格需求：${args}` : stylePrompt);

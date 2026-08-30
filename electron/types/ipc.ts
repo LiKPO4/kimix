@@ -1511,6 +1511,45 @@ export type UiStyleImportResponse = {
   error: string;
 };
 
+export type UiStyleInboxDirResponse = {
+  success: true;
+  data: {
+    dir: string;
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type UiStyleInboxScanResponse = {
+  success: true;
+  data: {
+    documents: UiStyleDocumentV1[];
+    errors: { file: string; error: string }[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type UiStyleInboxDeleteRequest = {
+  id: string;
+};
+
+export type UiStyleInboxDeleteResponse = {
+  success: true;
+  data: {
+    deleted: string[];
+  };
+} | {
+  success: false;
+  error: string;
+};
+
+export type UiStyleInboxEventPayload = {
+  documents: UiStyleDocumentV1[];
+};
+
 export type AppInfoResponse = {
   success: true;
   data: {

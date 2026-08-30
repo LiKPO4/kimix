@@ -55,6 +55,12 @@ import { mergeRuntimeAndDiskModelConfig } from "../src/utils/modelConfigSummary"
 import { canonicalizeCustomUiStyleDocument } from "../src/utils/builtinUiStyleDocuments";
 import { parseUiStyleDocument, uiStyleDocumentV1Schema } from "../src/utils/uiStyleContract";
 import {
+  deleteUiStyleInboxDocuments,
+  ensureUiStyleInboxDir,
+  scanUiStyleInbox,
+  startUiStyleInboxWatcher,
+} from "./uiStyleInbox";
+import {
   createDeferredOnceTask,
   createDistinctAsyncWriter,
   publishStartupBootstrap,
@@ -8063,6 +8069,32 @@ ipcMain.handle("app:importUiStyle", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("app:getUiStyleInboxDir", async () => {
+  try {
+    return { success: true, data: { dir: ensureUiStyleInboxDir() } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:scanUiStyleInbox", async () => {
+  try {
+    return { success: true, data: scanUiStyleInbox() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:deleteUiStyleInboxFile", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as { id?: unknown } : {};
+    const id = typeof req.id === "string" ? req.id : "";
+    return { success: true, data: { deleted: deleteUiStyleInboxDocuments(id) } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("project:exportMarkdown", async (_, request: unknown) => {
   try {
     return { success: true, data: await exportMarkdownDocument(request) };
@@ -8856,6 +8888,11 @@ app.whenReady().then(() => {
   protocol.handle("kimix-media", (request) => handleKimixMediaRequest(request));
   logMainStartup("app-ready");
   cleanupStaleScheduledShutdown();
+  startUiStyleInboxWatcher((documents) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send("kimix:ui-style-inbox", { documents });
+    }
+  });
   createWindow();
 });
 

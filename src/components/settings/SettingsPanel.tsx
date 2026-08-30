@@ -1037,13 +1037,19 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const deleteCustomUiStyle = (id: string, name: string) => {
     if (!window.confirm(`删除自定义界面风格「${name}」？\n\n内置风格不会受到影响。`)) return;
     removeCustomUiStyle(id);
+    // 同步清理收件箱文件，防止下次扫描时该风格复活
+    void window.api.deleteUiStyleInboxFile({ id }).catch(() => {});
     setUiStyleImportMessage(`已删除「${name}」。`);
   };
 
   const copyUiStyleAiPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(buildUiStyleAiPrompt());
-      setUiStyleImportMessage("已复制界面风格 AI 生成提示。可直接发给 AI，再补充参考图或关键词。");
+      const inboxDirRes = await window.api.getUiStyleInboxDir().catch(() => null);
+      const inboxDir = inboxDirRes && inboxDirRes.success ? inboxDirRes.data.dir : undefined;
+      await navigator.clipboard.writeText(buildUiStyleAiPrompt(inboxDir));
+      setUiStyleImportMessage(inboxDir
+        ? "已复制界面风格 AI 生成提示。发给 AI 后它会直接写入收件箱目录，Kimix 自动导入并启用。"
+        : "已复制界面风格 AI 生成提示。可直接发给 AI，再补充参考图或关键词。");
     } catch (error) {
       setUiStyleImportMessage(`复制失败：${error instanceof Error ? error.message : String(error)}`);
     }

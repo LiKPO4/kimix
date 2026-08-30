@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 功能：界面风格收件箱自动导入（v2.21.155）
+
+- 需求：提示词与 /自定义风格 命令引导 agent 把生成的 UI Style JSON 直接写到正确位置，Kimix 自动解锁（导入并启用），不再手动导入。
+- 实现：新增收件箱目录 `~/.kimix/ui-styles/`（electron/uiStyleInbox.ts：扫描/按 id 删除/fs.watch 监听 600ms 防抖，内容指纹去重）；主进程 3 个 IPC（getUiStyleInboxDir/scanUiStyleInbox/deleteUiStyleInboxFile）+ `kimix:ui-style-inbox` 广播；渲染端 `useUiStyleInboxSync`（App.tsx 挂载）：新 id → upsertCustomUiStyle（与手动导入一致，自动启用），已有 id 内容变化 → 仅更新文档不劫持启用选择；启动时兜底扫描一次。buildUiStyleAiPrompt(inboxDir?) 第 16/17 条改为引导写入收件箱绝对路径；设置页「复制 AI 提示」与 /自定义风格 共用。删除自定义风格时同步清理收件箱文件防止复活。
+- 验证：typecheck、定向 27 项（收件箱 5 + uiStyleContract 19 + palette 3）通过；全量与构建见收尾。
+
+
 ## 2026-08-30 修复：/自定义风格 双气泡与输入框残留（v2.21.154）
 
 - 现象：选中模板命令发送后，①输入框残留完整命令文本且补全面板仍开；②对话流里同一轮被拆成两个用户气泡（命令文本 + 完整提示词）。

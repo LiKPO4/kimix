@@ -83,6 +83,7 @@ import type {
   UpdateKimiCliResponse,
   VoidResponse,
   GenerateHookRuleResponse,
+  UiStyleInboxScanResponse,
 } from "../electron/types/ipc";
 import App from "./App";
 import "./index.css";
@@ -240,6 +241,10 @@ function installBrowserPreviewApi() {
     previewKimiThemeImport: () => fail("预览 Kimi 主题导入"),
     applyKimiThemeImport: () => fail("导入 Kimi 主题"),
     importUiStyle: () => fail("导入界面风格"),
+    getUiStyleInboxDir: () => fail("读取界面风格收件箱目录"),
+    scanUiStyleInbox: (): Promise<UiStyleInboxScanResponse> =>
+      Promise.resolve({ success: true, data: { documents: [], errors: [] } }),
+    deleteUiStyleInboxFile: () => fail("删除界面风格收件箱文件"),
     listLongTasks: (): Promise<ListLongTasksResponse> => Promise.resolve({ success: true, data: [] }),
     createLongTask: () => fail("创建长程任务"),
     getLongTaskDetail: () => fail("读取长程任务详情"),
@@ -720,6 +725,7 @@ function installBrowserPreviewApi() {
     onWindowMaximizedChange: () => () => {},
     closeWindow: () => Promise.resolve(),
     onMainLog: () => () => {},
+    onUiStyleInbox: () => () => {},
   };
 
   window.api = previewApi;

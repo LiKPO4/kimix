@@ -296,7 +296,7 @@ export function resolveUiStyleShellRadius(
   return Math.max(0, Math.min(UI_STYLE_ROLE_RADIUS_MAX_PX.shell, Math.round(rawRadius)));
 }
 
-export function buildUiStyleAiPrompt() {
+export function buildUiStyleAiPrompt(inboxDir?: string) {
   const template: UiStyleDocumentV1 = {
     ...BUILTIN_UI_STYLE_DOCUMENTS.default,
     $schema: "https://kimix.app/schemas/ui-style-v1.json",
@@ -325,8 +325,15 @@ export function buildUiStyleAiPrompt() {
     "13. surface 只能是 transparent、ground、base、elevated、hover、active。",
     "14. border 只能是 none、subtle、default、strong；elevation 只能是 none、control、card、popup、field。",
     "15. elevation.kind 只能是 flat、raised、floating、inset；所有数值必须保持在模板展示的合理量级内。",
-    "16. 完成 JSON 后，必须优先使用你可用的文件工具在当前工作目录创建 `kimix-ui-style-<id>.json`；`<id>` 使用最终 JSON 中的 id。文件必须是 UTF-8 编码的纯 JSON，不得包含 Markdown 代码围栏或 JSON 注释。",
-    "17. 文件创建成功后，不要在对话中重复整份 JSON，只需简洁说明已创建并给出可点击或可复制的文件路径。",
+    ...(inboxDir
+      ? [
+        `16. 完成 JSON 后，必须优先使用你可用的文件工具，把最终 JSON 写入 Kimix 界面风格收件箱目录 \`${inboxDir}\` 下的 \`kimix-ui-style-<id>.json\` 文件（\`<id>\` 使用最终 JSON 中的 id；目录通常已存在，若不存在就先创建）。这是 Kimix 的自动导入通道：文件写入后 Kimix 会自动校验、导入并立即启用该风格，无需用户手动操作。文件必须是 UTF-8 编码的纯 JSON，不得包含 Markdown 代码围栏或 JSON 注释。`,
+        "17. 文件创建成功后，不要在对话中重复整份 JSON，只需简洁说明已创建、给出文件路径，并告知用户 Kimix 会自动导入并启用该风格。",
+      ]
+      : [
+        "16. 完成 JSON 后，必须优先使用你可用的文件工具在当前工作目录创建 `kimix-ui-style-<id>.json`；`<id>` 使用最终 JSON 中的 id。文件必须是 UTF-8 编码的纯 JSON，不得包含 Markdown 代码围栏或 JSON 注释。",
+        "17. 文件创建成功后，不要在对话中重复整份 JSON，只需简洁说明已创建并给出可点击或可复制的文件路径。",
+      ]),
     "18. 只有当当前环境确实没有文件写入能力时，才允许降级为在对话中输出一个 JSON 代码块，并明确说明未能创建文件。",
     "",
     "请以这份完整模板为结构生成结果：",

@@ -64,6 +64,7 @@ import {
 import { useRendererLagDetector } from "@/hooks/useRendererLagDetector";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSettingsSync } from "@/hooks/useSettingsSync";
+import { useUiStyleInboxSync } from "@/hooks/useUiStyleInboxSync";
 import { useStatePersistence } from "@/hooks/useStatePersistence";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useBootstrap } from "@/hooks/useBootstrap";
@@ -1556,6 +1557,7 @@ function App() {
 
   useRendererLagDetector();
   useSettingsSync();
+  useUiStyleInboxSync();
   useStatePersistence(startupContextResolved);
   const { enqueueStreamEvent, flushStreamEvents } = useEventStream();
 
