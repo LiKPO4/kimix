@@ -1436,7 +1436,7 @@ function readKimiModelConfig() {
         defaultEffort,
         isDefault: alias === defaultModel,
       };
-    }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN")),
+    }),
     secondaryModel: readSecondaryModelFromToml(raw),
   };
 }
@@ -1470,7 +1470,7 @@ function kimiCodeConfigToModelSummary(config: kimiCodeHost.KimiCodeConfig) {
       defaultEffort,
       isDefault: alias === defaultModel,
     };
-  }).sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.alias.localeCompare(b.alias, "zh-CN"));
+  });
 
   return {
     configPath,

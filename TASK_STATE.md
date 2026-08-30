@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 功能：模型列表按添加顺序从老到新排列（v2.21.145）
+
+- 用户要求：设置 → 模型与供应商的模型列表按添加时间从老到新，新添加的模型在下方。
+- 根因：排序发生在两层——electron 汇总层（`readKimiModelConfig`、`kimiCodeConfigToModelSummary`、`mergeRuntimeAndDiskModelConfig`）按「默认优先 + 别名字母序」重排；渲染层 `groupModelsByProvider` 再按别名排序，插入顺序在到达 UI 前已被销毁。
+- 实证：`config.toml` 的 `[models.*]` 段落顺序即添加顺序（千问 provider：qwen3.8-max 在 158 行先添加、qwen3.8-flash 在 206 行后添加，但 UI 按字母序把 flash 显示在上），SDK/TOML 写入均为末尾追加，保留文件顺序即得老→新。
+- 修复：三处汇总排序与渲染层别名排序全部移除，全程保持插入顺序；`mergeRuntimeAndDiskModelConfig` 的 Map 语义保证受管模型按 SDK 配置顺序在前、第三方模型按 config.toml 书写顺序在后。
+- 影响面：模型选择下拉（ContextBar、AddRoomAgentDialog）同步变为添加顺序，默认模型不再置顶（列表内有「默认」徽章标识）；`handleTestProvider` 的连接测试回退模型变为最老模型。
+- 测试更新：`modelProviderConfig.test.ts` 原用例「切换默认模型时保持模型列表位置不变」锁定的是别名排序，改为锁定「保持插入顺序 + 切换默认位置不变」的原始意图。
+- 验证：typecheck、定向 2 文件 25 项 + 设置 6 文件 41 项、全量 195 文件 2105 项、生产构建通过；运行实例 DOM 实测未做（用户已安装的 Kimix.exe 持有单实例锁，dev 实例无法同机共存），待用户截图验收。
+
 ## 2026-08-28 修正：「默认」按钮悬停改为 accent 预览态（v2.21.144）
 
 - 上一轮（v2.21.143）移除内联透明背景后用户仍反馈"看不出变化"。实测根因：win11-fluent 下 `--surface-hover`、模型行 hover 底、control 角色 hover 底三者同为 #EDEEEB，按钮 hover 融进已 hover 的行里；且 hover 边框色仍被内联 `borderColor: transparent` 挡住。

@@ -55,9 +55,10 @@ export function mergeRuntimeAndDiskModelConfig(
     exists: disk.exists || runtime.exists,
     defaultModel,
     providers: [...providers.values()].sort((left, right) => left.name.localeCompare(right.name, "zh-CN")),
+    // 保持插入顺序（runtime 受管模型按 SDK 配置顺序在前，磁盘模型按 config.toml 书写顺序在后），
+    // 设置页模型列表按「从老到新」展示，切换默认模型不再改变列表位置。
     models: [...models.values()]
-      .map((model) => ({ ...model, isDefault: model.alias === defaultModel }))
-      .sort((left, right) => Number(right.isDefault) - Number(left.isDefault) || left.alias.localeCompare(right.alias, "zh-CN")),
+      .map((model) => ({ ...model, isDefault: model.alias === defaultModel })),
     secondaryModel: disk.secondaryModel ?? runtime.secondaryModel ?? null,
   };
 }

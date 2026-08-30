@@ -20,16 +20,15 @@ export function groupModelsByProvider(config: KimiModelConfigSummary): ModelProv
     modelsByProvider.set(providerName, models);
   }
 
-  const sortModelsByAlias = (models: KimiModelConfigSummary["models"]) =>
-    [...models].sort((left, right) => left.alias.localeCompare(right.alias, "zh-CN"));
-
+  // 保持 config.models 的插入顺序（老 → 新），新添加的模型自然落在列表底部；
+  // 汇总层（electron/main.ts、modelConfigSummary）已不排序，切换默认模型也不再改变位置。
   const groups = config.providers.map((provider) => ({
     provider,
-    models: sortModelsByAlias(modelsByProvider.get(provider.name) ?? []),
+    models: modelsByProvider.get(provider.name) ?? [],
     managed: isManagedModelProvider(provider),
   }));
 
-  const unboundModels = sortModelsByAlias(modelsByProvider.get("__unbound__") ?? []);
+  const unboundModels = modelsByProvider.get("__unbound__") ?? [];
   if (unboundModels.length > 0) {
     groups.push({
       provider: {

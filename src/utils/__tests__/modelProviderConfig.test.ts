@@ -9,7 +9,7 @@ const catalog = [
 ];
 
 describe("groupModelsByProvider", () => {
-  it("切换默认模型时保持模型列表位置不变", () => {
+  it("保持插入顺序（老 → 新），切换默认模型时列表位置不变", () => {
     const model = (alias: string, isDefault: boolean) => ({
       alias,
       provider: "gateway",
@@ -42,11 +42,11 @@ describe("groupModelsByProvider", () => {
       model("gateway/model-a", false),
     ]))[0].models.map((item) => item.alias);
     const after = groupModelsByProvider(config("gateway/model-a", [
-      model("gateway/model-a", true),
       model("gateway/model-b", false),
+      model("gateway/model-a", true),
     ]))[0].models.map((item) => item.alias);
 
-    expect(before).toEqual(["gateway/model-a", "gateway/model-b"]);
+    expect(before).toEqual(["gateway/model-b", "gateway/model-a"]);
     expect(after).toEqual(before);
   });
 });
