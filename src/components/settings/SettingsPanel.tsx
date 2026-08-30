@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive, RadioTower } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive, RadioTower, BellOff } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -3689,20 +3689,18 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </button>
                 </div>
-                <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+                <div className="kimix-settings-permissions" style={{ marginTop: 14 }}>
                   <button
                     type="button"
                     aria-pressed={cacheHintDismissed}
                     onClick={() => void handleToggleCacheHintDismissed()}
-                    className="kimix-style-exempt flex min-w-0 items-center text-left"
-                    style={{ gap: 12 }}
+                    className={`kimix-settings-permission ${cacheHintDismissed ? "is-active" : ""}`}
                   >
                     <SelectionIndicator selected={cacheHintDismissed} />
-                    <div className="min-w-0 flex-1">
+                    <BellOff size={18} className={`mt-0.5 shrink-0 ${cacheHintDismissed ? "text-accent-primary" : "text-text-muted"}`} />
+                    <div className="kimix-settings-permission-copy">
                       <div className="kimix-settings-permission-label">关闭上下文缓存过期提示</div>
-                      <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>
-                        开启后对话区不再弹出上下文缓存过期提示；关闭开关可随时恢复提醒。
-                      </div>
+                      <div className="kimix-settings-permission-desc">开启后对话区不再弹出上下文缓存过期提示；关闭开关可随时恢复提醒。</div>
                     </div>
                   </button>
                 </div>

@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 修复：设置页选项行角色归一 + 风格提示词补对比度硬约束（v2.21.157）
+
+- 问题 1：设置页「关闭上下文缓存过期提示」用 kimix-settings-card 独立卡片外壳，与兄弟选项行（kimix-settings-permission）角色不同源，自定义风格下呈现灰底分段块与白色浮起卡两种差异极大的样式。
+- 修复：该行改为与兄弟完全一致的 permission 行结构（kimix-settings-permissions 容器 + is-active 按钮 + SelectionIndicator + BellOff 图标 + permission-copy），纳入同一角色，四套内置风格与自定义契约层下自动一致。
+- 问题 2：自定义风格化对界面对比度不重视，容器层级与选中态经常难以分辨。
+- 修复：buildUiStyleAiPrompt 新增第 16/17 条硬性要求（对比度是硬指标：surface 与文字/主色明度差、容器层级必须肉眼可分辨、禁止全容器同 surface 且 border 全 none；状态反馈必须可感知：selected 一眼可辨、subtle 边框不得淡到近乎消失），原 16/17/18 顺延为 18/19/20（收件箱/回退两分支同步改号）。
+- 验证：typecheck、uiStyleContract 定向 19 项通过；全量与构建见收尾。
+
+
 ## 2026-08-30 修复：本地斜杠命令发送后输入框残留（v2.21.156）
 
 - 现象：v2.21.155 实机发送 /自定义风格 后输入框仍残留命令文本（截图可见「消息发送中 3秒」仍在派发）。

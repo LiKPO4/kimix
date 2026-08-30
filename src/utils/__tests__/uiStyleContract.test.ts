@@ -234,6 +234,10 @@ describe("uiStyleDocumentV1Schema", () => {
     expect(prompt).toContain("非透明 selected 必须保持立体 elevation");
     expect(prompt).toContain("复古与怀旧通常为按下内凹");
     expect(prompt).toContain("只在悬停、展开或选中时醒目");
+    expect(prompt).toContain("对比度是硬指标");
+    expect(prompt).toContain("禁止所有容器共用同一 surface 且 border 全 none");
+    expect(prompt).toContain("状态反馈必须可感知");
+    expect(prompt).toContain("selected 必须一眼能认出当前选中项");
     expect(prompt).toContain("Agent 过程消息头与游离的可展开思考摘要仅在悬停、聚焦或按下时显示此材质");
     expect(prompt).toContain("pill 只用于 navigationItem、navigationAction、control、primaryAction、compoundControl、toggle、menuTrigger、statusSurface");
     expect(prompt).toContain("内容承载角色按语义硬限制在 20–32px");
