@@ -137,6 +137,8 @@ export interface AppState {
   themePalette: ThemePaletteId;
   customThemePalette: ThemePaletteColors;
   kimiThemePalettes: KimiThemePreset[];
+  /** 启动设置是否已完成首次水合（getSettings 已落定）；界面风格收件箱等启动同步必须等它置位，避免拿首绘快照残量误判为新风格。 */
+  settingsHydrated: boolean;
 }
 
 export type StatusUpdateDisplay = "each" | "turn_end" | "never";

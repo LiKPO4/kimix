@@ -8,9 +8,14 @@ import type { UiStyleDocumentV1 } from "../utils/uiStyleContract";
  * - 新 id → upsert（与手动导入一致，自动启用）；
  * - 已有 id 内容变化 → 仅更新文档，不劫持用户当前的启用选择；
  * - 启动时兜底扫描一次，补导入应用关闭期间写入的文件。
+ * 启动扫描与订阅都必须等设置完成首次水合（settingsHydrated）：水合前
+ * customUiStyles 只是首绘快照里的活动风格残量，直接比对会把已有风格
+ * 误判为新 id，重复弹「已自动导入」提示并劫持当前启用选择。
  */
 export function useUiStyleInboxSync() {
+  const settingsHydrated = useAppStore((s) => s.settingsHydrated);
   useEffect(() => {
+    if (!settingsHydrated) return;
     const importDocuments = (documents: UiStyleDocumentV1[]) => {
       const applied: string[] = [];
       const updated: string[] = [];
@@ -36,5 +41,5 @@ export function useUiStyleInboxSync() {
       if (res.success) importDocuments(res.data.documents);
     }).catch(() => {});
     return window.api.onUiStyleInbox((payload) => importDocuments(payload.documents));
-  }, []);
+  }, [settingsHydrated]);
 }

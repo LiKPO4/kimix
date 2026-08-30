@@ -30,6 +30,7 @@ interface BootstrapSetters {
   setThinkingTranslationDisplayMode: (v: ThinkingTranslationDisplayMode) => void;
   setFilePreviewExtensions: (v: string[]) => void;
   setRecentProjects: (projects: Project[]) => void;
+  markSettingsHydrated: () => void;
 }
 
 export function useBootstrap(setters: BootstrapSetters) {
@@ -77,6 +78,8 @@ export function useBootstrap(setters: BootstrapSetters) {
         }
       }).catch((err) => {
         console.warn("[useBootstrap] getSettings threw:", err);
+      }).finally(() => {
+        setters.markSettingsHydrated();
       });
     }
 

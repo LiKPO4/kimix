@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 修复：重启后重复弹「界面风格已导入」提示（v2.21.158）
+
+- 现象：每次重新进入软件都会再弹一次风格已导入/已更新提示。
+- 根因：useUiStyleInboxSync 启动扫描与 useBootstrap 的 getSettings 水合存在竞态。水合完成前 store 里的 customUiStyles 只是首绘快照（只含当前活动风格），扫描先到时把收件箱里早已导入的风格误判为新 id → 重复 upsert + 弹 toast，且 upsert 路径会自动启用，可能劫持用户当前风格选择；随之而来的 customUiStyles 变化还会触发 useSettingsSync 用残量列表回写设置。
+- 修复：AppState 新增 settingsHydrated 标志，useBootstrap 在 getSettings 落定后（含失败兜底 finally）置位；useUiStyleInboxSync 的启动扫描与广播订阅统一等水合完成后再挂，水合前的文件事件由扫描兜底覆盖。
+- 验证：typecheck、全量、构建见收尾。
+
+
 ## 2026-08-30 修复：设置页选项行角色归一 + 风格提示词补对比度硬约束（v2.21.157）
 
 - 问题 1：设置页「关闭上下文缓存过期提示」用 kimix-settings-card 独立卡片外壳，与兄弟选项行（kimix-settings-permission）角色不同源，自定义风格下呈现灰底分段块与白色浮起卡两种差异极大的样式。

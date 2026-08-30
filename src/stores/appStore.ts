@@ -216,6 +216,7 @@ export interface AppStore extends AppState {
   setCustomUiStyles: (documents: UiStyleDocumentV1[]) => void;
   upsertCustomUiStyle: (document: UiStyleDocumentV1) => void;
   removeCustomUiStyle: (id: string) => void;
+  markSettingsHydrated: () => void;
   setThemePalette: (palette: ThemePaletteId) => void;
   setCustomThemePalette: (colors: ThemePaletteColors) => void;
   setKimiThemePalettes: (presets: KimiThemePreset[]) => void;
@@ -278,6 +279,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   workspaceView: "chat",
   activeSettingsPageId: readActiveSettingsPage(),
   sidebarOpen: true,
+  settingsHydrated: false,
   theme: cachedThemeSnapshot.theme,
   uiStyle: cachedThemeSnapshot.uiStyle,
   customUiStyles: cachedThemeSnapshot.customUiStyles,
@@ -409,6 +411,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
     };
   }),
   setCustomUiStyles: (documents) => set({ customUiStyles: normalizeCustomUiStyleDocuments(documents) }),
+  markSettingsHydrated: () => set({ settingsHydrated: true }),
   upsertCustomUiStyle: (document) => set((state) => {
     const normalized = canonicalizeCustomUiStyleDocument(document);
     if (!normalized) return {};

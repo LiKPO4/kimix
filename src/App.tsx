@@ -1487,6 +1487,7 @@ function App() {
   const setThinkingTranslationIntervalMs = useAppStore((s) => s.setThinkingTranslationIntervalMs);
   const setThinkingTranslationDisplayMode = useAppStore((s) => s.setThinkingTranslationDisplayMode);
   const setFilePreviewExtensions = useAppStore((s) => s.setFilePreviewExtensions);
+  const markSettingsHydrated = useAppStore((s) => s.markSettingsHydrated);
   const setHandoffSessionId = useAppStore((s) => s.setHandoffSessionId);
   const setRunningSessionId = useAppStore((s) => s.setRunningSessionId);
   const setRoomAgentActivity = useAppStore((s) => s.setRoomAgentActivity);
@@ -1604,6 +1605,7 @@ function App() {
       setThinkingTranslationDisplayMode,
       setFilePreviewExtensions,
       setRecentProjects,
+      markSettingsHydrated,
     }), [
       setTheme, setUiStyle, setCustomUiStyles, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
       setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
@@ -1612,7 +1614,7 @@ function App() {
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,
       setThinkingTranslationProvider, setThinkingTranslationIntervalMs, setThinkingTranslationDisplayMode,
-      setFilePreviewExtensions, setRecentProjects,
+      setFilePreviewExtensions, setRecentProjects, markSettingsHydrated,
     ]);
     useBootstrap(bootstrapSetters);
 
