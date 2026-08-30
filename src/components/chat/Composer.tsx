@@ -3480,13 +3480,13 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       // 残留进输入框。直接走命令处理；/自定义风格 的提示词发送遇到活动轮冲突时，
       // sendPromptContent 会把完整提示词回补队列（可见消息=发送内容，见上方命令实现）。
       if (slashRouting === "local") {
+        // 先清空输入框再执行命令：命令链路含收件箱 IPC/会话创建/派发等耗时 await，
+        // 否则等待期间输入框一直残留原文，看起来像没发出去（内容已从 trimmed 捕获）。
+        setInput("");
+        setImageAttachments([]);
+        inputRef.current?.reset();
         const slashHandledWhileActive = await handleSdkSlashCommand(trimmed, slashRoomAgentId);
-        if (slashHandledWhileActive) {
-          setInput("");
-          setImageAttachments([]);
-          inputRef.current?.reset();
-          return;
-        }
+        if (slashHandledWhileActive) return;
       }
       setInput("");
       setImageAttachments([]);
@@ -3581,9 +3581,17 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         return;
       }
     }
-    const slashHandled = trimmed.startsWith("/")
-      ? await handleSdkSlashCommand(trimmed, slashRoomAgentId)
-      : false;
+    // 本地斜杠命令与 skill/plugin 分支保持一致：先清空输入框再异步执行命令，
+    // 避免命令链路（IPC/会话创建/发送派发）耗时期间输入框残留原文。
+    let slashHandled = false;
+    if (trimmed.startsWith("/") && slashRouting === "local") {
+      setInput("");
+      setImageAttachments([]);
+      inputRef.current?.reset();
+      slashHandled = await handleSdkSlashCommand(trimmed, slashRoomAgentId);
+    } else if (trimmed.startsWith("/")) {
+      slashHandled = await handleSdkSlashCommand(trimmed, slashRoomAgentId);
+    }
     if (slashHandled) {
       setInput("");
       setImageAttachments([]);
