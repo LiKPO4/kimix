@@ -1692,6 +1692,19 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
     case "TurnBegin": {
       const userMessage = extractUserMessage(payload.user_input);
       if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
+      // 压缩摘要合成消息（官方 metadata.origin.kind === "compaction_summary"）：
+      // 官方 Web 把它映射成压缩分隔行而不是用户气泡；这里映射为压缩完成卡片，
+      // 摘要随卡片展示，不再产生一条与用户消息重复的摘要气泡。
+      if (isRecord(payload.origin) && payload.origin.kind === "compaction_summary") {
+        return {
+          id: generateId(),
+          type: "compaction",
+          timestamp: eventTimestamp,
+          phase: "end",
+          outcome: "completed",
+          summary: userMessage.content,
+        };
+      }
       const envelope = parseKimiAgentEnvelope(userMessage.content);
       if (envelope) {
         return {

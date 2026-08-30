@@ -110,6 +110,38 @@ describe("mapKimiCodeEvent", () => {
     expect(mapped).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
   });
 
+  it("maps compaction-summary TurnBegin to a compaction card, never a user bubble", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      user_input: "接手备忘（给我自己）：……",
+      origin: { kind: "compaction_summary" },
+      snapshotMessageId: "msg_compact_0001",
+      snapshotMessageIdStable: true,
+    }, testOptions());
+
+    expect(mapped).not.toBeNull();
+    expect(mapped).toMatchObject({
+      id: "compaction:msg_compact_0001",
+      type: "compaction",
+      phase: "end",
+      outcome: "completed",
+      summary: "接手备忘（给我自己）：……",
+    });
+  });
+
+  it("reads compaction-summary origin from the nested wire-history payload", () => {
+    const mapped = mapKimiCodeEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: "压缩摘要正文",
+        origin: { kind: "compaction_summary" },
+      },
+      time: 1000,
+    }, testOptions());
+
+    expect(mapped).toMatchObject({ type: "compaction", phase: "end", summary: "压缩摘要正文" });
+  });
+
   it("keeps Resume-the-goal and ordinary TurnBegin messages as user_message", () => {
     const resume = mapKimiCodeEvent({
       type: "TurnBegin",

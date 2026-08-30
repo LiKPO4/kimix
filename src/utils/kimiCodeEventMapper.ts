@@ -438,6 +438,22 @@ export function mapKimiCodeEvent(
         payload.text,
       );
       if (!userMessage.content.trim() && userMessage.images.length === 0) return null;
+      // 压缩摘要合成消息（官方 metadata.origin.kind === "compaction_summary"）：
+      // 官方 Web 把它映射成压缩分隔行而不是用户气泡；这里映射为压缩完成卡片，
+      // 摘要随卡片展示，不再产生一条与用户消息重复的摘要气泡。相邻的实时压缩
+      // 卡片由 normalizeCompactionDisplay 簇归一去重（优先保留带摘要者）。
+      const compactionSummaryOrigin = isRecord(event.origin) ? event.origin : isRecord(payload.origin) ? payload.origin : undefined;
+      if (compactionSummaryOrigin?.kind === "compaction_summary") {
+        const summarySnapshotId = getSnapshotMessageId(event);
+        return {
+          id: summarySnapshotId ? `compaction:${summarySnapshotId}` : getId(options),
+          type: "compaction",
+          timestamp,
+          phase: "end",
+          outcome: "completed",
+          summary: userMessage.content,
+        };
+      }
       const envelope = parseKimiAgentEnvelope(userMessage.content);
       if (envelope) {
         return {

@@ -42,6 +42,18 @@ describe("mapStreamEvent", () => {
     expect(byPrefix).toMatchObject({ type: "status_update", message: "目标续跑", source: "runtime", tone: "info" });
   });
 
+  it("maps compaction-summary wire TurnBegin to a compaction card instead of a user bubble", () => {
+    const event = mapStreamEvent({
+      type: "TurnBegin",
+      payload: {
+        user_input: "压缩摘要正文",
+        origin: { kind: "compaction_summary" },
+      },
+    });
+
+    expect(event).toMatchObject({ type: "compaction", phase: "end", outcome: "completed", summary: "压缩摘要正文" });
+  });
+
   it("keeps Resume-the-goal and ordinary wire TurnBegin as user_message", () => {
     const resume = mapStreamEvent({
       type: "TurnBegin",

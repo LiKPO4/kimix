@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 修复：压缩摘要重复显示为用户气泡（对齐官方）（v2.21.147）
+
+- 现象：压缩后同一时间线出现两块相同内容——用户消息气泡里是摘要全文，「上下文压缩完成」卡片里又是同一摘要。
+- 官方逻辑（bundle 0.39.1 实证）：SDK 把 `context.apply_compaction` 的摘要物化为 `role:"user"` + `origin:{kind:"compaction_summary"}` 的合成消息；官方 Web 历史映射层先判 `metadata.origin.kind === "compaction_summary"`，命中即映射为 `role:"compaction"` 的 compact-divider 分隔行（「上下文已压缩」，摘要只在侧边面板查看），**绝不进用户气泡分支**。
+- 我方根因：两个 TurnBegin 映射器（`eventMapper.ts` wire/host、`kimiCodeEventMapper.ts` server 快照）对所有 role=user 带文本消息一律渲染用户气泡，没有 compaction_summary origin 判定。
+- 修复：两个映射器把该 origin 映射为带摘要的 compaction end 事件（server 路径用 `compaction:{snapshotMessageId}` 稳定 id），摘要落到既有压缩卡片；相邻重复卡片由 `normalizeCompactionDisplay` 簇归一去重（优先带摘要者）。卡片本身保留 Kimix 既有设计（内联展开），未改成官方分隔线+侧面板。
+- 已知边界：修复前已持久化的旧会话时间线里的摘要气泡不会回溯清除，待该会话下次被官方历史替换后消失；SDK 路由 wire 不含摘要消息，本修复主要作用于 Server 快照与实时流。
+- 验证：typecheck、定向 3 文件 326 项（含新增 3 条映射用例）、全量 2108 项、生产构建通过；知识库新增 /references/kimi-code-web-compaction-display.md 并通过严格校验。
+
 ## 2026-08-30 修复：缓存过期弹窗「开启新会话」发回旧会话 + 间距与「暂不发送」（v2.21.146）
 
 - 根因（发回旧会话）：`handleCacheHintAction` 的 new-session 分支 `await createSession()` 后调用 `sendPromptContent`，后者经 `ensureSession()` 读的是**渲染闭包**里的 `currentSession`（zustand 已切换、闭包未更新），消息被发回旧会话；旧会话上下文超限触发 SDK 自动压缩，表现为「先压缩再发送到旧会话」。修复：`ensureSession()` 改读 `useAppStore.getState().currentSession` 现值（7 个调用点语义均为「当前会话」，读现值严格更正确）。
