@@ -787,7 +787,7 @@ interface CacheHintDialogProps {
 }
 
 // 上下文缓存过期提醒（上游 0.34.0 #2646）：发送前命中提示时由 Composer 驱动。
-// 四个动作都在 Composer 内执行（压缩后重发/新建会话带原文/直接发送/不再询问），
+// 五个动作都在 Composer 内执行（压缩后重发/新建会话带原文/直接发送/暂不发送/不再询问），
 // 因此本组件独立导出、由 Composer 渲染，不经过 AppShell 状态提升。
 export function CacheHintDialog({ dialog, onAction }: CacheHintDialogProps) {
   const presence = usePresence(Boolean(dialog));
@@ -807,19 +807,26 @@ export function CacheHintDialog({ dialog, onAction }: CacheHintDialogProps) {
         style={{ padding: "22px 24px" }}
       >
         <div className="text-[18px] font-semibold leading-6 text-text-primary">上下文缓存可能已过期</div>
-        <div className="mt-3 text-[14px] leading-6 text-text-secondary">
+        <div className="text-[14px] leading-6 text-text-secondary" style={{ marginTop: 14 }}>
           距上次对话完成已超过 {formatIdleDuration(visibleDialog.idleSeconds)}（该模型缓存时长 {formatIdleDuration(visibleDialog.cacheDurationSeconds)}），当前上下文约 {visibleDialog.totalTokens.toLocaleString()} tokens。直接发送可能按完整上下文计费。
         </div>
-        <div className="mt-5 rounded-xl bg-surface-base text-[13px] leading-5 text-text-muted" style={{ padding: "12px 16px" }}>
+        <div className="rounded-xl bg-surface-base text-[13px] leading-5 text-text-muted" style={{ marginTop: 16, padding: "12px 16px" }}>
           建议先压缩上下文或开启新会话，减少旧上下文开销；也可以直接发送，保持当前会话继续。
         </div>
-        <div className="mt-5 flex flex-wrap justify-end" style={{ gap: 12 }}>
+        <div className="flex flex-wrap justify-end" style={{ gap: 10, marginTop: 20 }}>
           <button
             type="button"
             onClick={() => onAction("dismiss")}
             className="kimix-icon-text-button text-text-secondary hover:bg-surface-hover"
           >
             不再询问
+          </button>
+          <button
+            type="button"
+            onClick={() => onAction("hold")}
+            className="kimix-icon-text-button text-text-secondary hover:bg-surface-hover"
+          >
+            暂不发送
           </button>
           <button
             type="button"

@@ -1226,8 +1226,11 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const ensureSession = async (): Promise<Session | null> => {
-    if (currentSession) {
-      return useSessionStore.getState().sessions.find((session) => session.id === currentSession.id) ?? currentSession;
+    // 读 store 现值而非渲染闭包：缓存过期弹窗「开启新会话」后 createSession 已切换
+    // currentSession，闭包里的旧值会把消息发回旧会话（曾表现为在旧会话先压缩再发送）。
+    const liveSession = useAppStore.getState().currentSession;
+    if (liveSession) {
+      return useSessionStore.getState().sessions.find((session) => session.id === liveSession.id) ?? liveSession;
     }
     if (!currentProject) return null;
     // 待使用模型（欢迎屏切换，只影响下一个新会话）优先于官方默认模型；
@@ -3367,6 +3370,13 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     const dialog = cacheHintDialog;
     if (!dialog) return;
     setCacheHintDialog(null);
+    // 暂不发送：只关闭弹窗。弹窗打开时输入框草稿自始未被清空，原样保留即可。
+    if (action === "hold") return;
+    // 命中弹窗时 handleSend 提前 return，输入框仍留着草稿；确定要发送的动作必须先
+    // 清空输入框，否则用户再点一次发送会把同一段内容发两遍。
+    setInput("");
+    setImageAttachments([]);
+    inputRef.current?.reset();
     if (action === "dismiss") {
       await setCacheHintDismissed(true);
       await sendPromptContent(dialog.content, { images: dialog.images });

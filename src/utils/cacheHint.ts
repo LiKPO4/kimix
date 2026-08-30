@@ -203,7 +203,7 @@ export function warmCacheHintConfig(): void {
 
 // ---------- 对话框数据 ----------
 
-export type CacheHintDialogAction = "compact" | "new-session" | "continue" | "dismiss";
+export type CacheHintDialogAction = "compact" | "new-session" | "continue" | "hold" | "dismiss";
 
 export interface CacheHintDialogData {
   /** 待发送的原文（压缩/新会话成功后重发用）。 */

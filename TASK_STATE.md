@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 修复：缓存过期弹窗「开启新会话」发回旧会话 + 间距与「暂不发送」（v2.21.146）
+
+- 根因（发回旧会话）：`handleCacheHintAction` 的 new-session 分支 `await createSession()` 后调用 `sendPromptContent`，后者经 `ensureSession()` 读的是**渲染闭包**里的 `currentSession`（zustand 已切换、闭包未更新），消息被发回旧会话；旧会话上下文超限触发 SDK 自动压缩，表现为「先压缩再发送到旧会话」。修复：`ensureSession()` 改读 `useAppStore.getState().currentSession` 现值（7 个调用点语义均为「当前会话」，读现值严格更正确）。
+- 附带修复：弹窗命中时 `handleSend` 提前 return 未清输入框，发送类动作（直接发送/开启新会话/压缩并继续/不再询问）执行前先 `setInput("")` + 清空附件，避免草稿残留导致同内容二次发送；压缩失败的草稿恢复路径不受影响（prev 为空时回填 dialog.content）。
+- 新功能：新增「暂不发送」动作（`CacheHintDialogAction` 加 `"hold"`），只关闭弹窗，输入框草稿原样保留。
+- 间距：弹窗内 `mt-3`/`mt-5` Tailwind spacing 类按规则改 inline style（描述 14px、提示卡 16px、按钮行 20px、gap 10）；按钮顺序：不再询问 / 暂不发送 / 直接发送 / 开启新会话 / 压缩并继续。
+- 验证：typecheck、定向 chat 15 文件 138 项 + cacheHint、全量 195 文件 2105 项、生产构建通过。Composer 发送流无既有测试夹具，未新增单测；弹窗实机交互待用户验收。
+
 ## 2026-08-30 功能：模型列表按添加顺序从老到新排列（v2.21.145）
 
 - 用户要求：设置 → 模型与供应商的模型列表按添加时间从老到新，新添加的模型在下方。
