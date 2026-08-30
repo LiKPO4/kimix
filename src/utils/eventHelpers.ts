@@ -43,27 +43,43 @@ export function parseKimiAgentEnvelope(content: string): AgentEnvelopeSummary | 
   if (notification) {
     const attrs = notification[1];
     const type = envelopeAttr(attrs, "type") ?? "";
-    const text = notification[2].replace(/<output-file\b[\s\S]*?(<\/output-file>|$)/gi, "").trim();
+    const inner = notification[2];
+    // 对齐官方：解析 <output-file path bytes>，卡片展示输出文件行与复制路径入口。
+    const outputFileMatch = inner.match(/<output-file\b([^>]*)>/i);
+    const outputPath = outputFileMatch ? envelopeAttr(outputFileMatch[1], "path") : undefined;
+    const outputBytes = outputFileMatch ? Number(envelopeAttr(outputFileMatch[1], "bytes")) : NaN;
+    const outputFile = outputPath
+      ? { path: outputPath, bytes: Number.isFinite(outputBytes) ? outputBytes : undefined }
+      : undefined;
+    const text = inner.replace(/<output-file\b[\s\S]*?(<\/output-file>|$)/gi, "").trim();
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const title = lines.find((line) => /^Title:/i.test(line))?.replace(/^Title:\s*/i, "") ?? "";
     const severity = lines.find((line) => /^Severity:/i.test(line))?.replace(/^Severity:\s*/i, "") ?? "";
     const description = lines.filter((line) => !/^(Title|Severity):/i.test(line)).join(" ").trim();
-    const target = description.replace(/\s+(completed|lost|failed|stopped)\.?$/i, "").trim() || description || title;
+    const target = description.replace(/\s+(completed|lost|failed|stopped|timed out|killed)\.?$/i, "").trim() || description || title;
+    const sourceKind = envelopeAttr(attrs, "source_kind");
     const detail: StatusNotificationDetail = {
       kind: "notification",
       type,
       category: envelopeAttr(attrs, "category"),
-      sourceKind: envelopeAttr(attrs, "source_kind"),
+      sourceKind,
       sourceId: envelopeAttr(attrs, "source_id"),
       agentId: envelopeAttr(attrs, "agent_id"),
       title: title || undefined,
       severity: severity || undefined,
       body: description || undefined,
       raw: trimmed,
+      outputFile,
     };
-    if (type === "task.completed") return { kind: "notification", tone: "success", summary: `后台任务已完成：${target}`, notification: detail };
-    if (type === "task.lost") return { kind: "notification", tone: "warning", summary: `后台任务已丢失：${target}`, notification: detail };
-    return { kind: "notification", tone: "info", summary: `后台任务通知：${target}`, notification: detail };
+    // 对齐官方：来源名按 source_kind 区分 子代理/后台任务；状态按 type 后缀识别
+    // （completed/failed/timed_out/killed/lost，其余按通知兜底）。
+    const kindLabel = sourceKind === "subagent" ? "子代理" : "后台任务";
+    if (type.endsWith(".completed")) return { kind: "notification", tone: "success", summary: `${kindLabel}已完成：${target}`, notification: detail };
+    if (type.endsWith(".lost")) return { kind: "notification", tone: "warning", summary: `${kindLabel}已丢失：${target}`, notification: detail };
+    if (type.endsWith(".failed")) return { kind: "notification", tone: "warning", summary: `${kindLabel}已失败：${target}`, notification: detail };
+    if (type.endsWith(".timed_out")) return { kind: "notification", tone: "warning", summary: `${kindLabel}已超时：${target}`, notification: detail };
+    if (type.endsWith(".killed")) return { kind: "notification", tone: "warning", summary: `${kindLabel}已终止：${target}`, notification: detail };
+    return { kind: "notification", tone: "info", summary: `${kindLabel}通知：${target}`, notification: detail };
   }
   const cronFire = trimmed.match(/^<cron-fire\b([^>]*)>([\s\S]*?)<\/cron-fire>\s*$/i);
   if (cronFire) {

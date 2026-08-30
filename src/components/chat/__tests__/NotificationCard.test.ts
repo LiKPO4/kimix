@@ -82,14 +82,43 @@ describe("NotificationCard", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("标题与状态文案按类型映射", () => {
-    expect(notificationHeadline(makeDetail())).toBe("后台任务完成");
+  it("标题与状态文案按类型映射，来源头带来源 id", () => {
+    expect(notificationHeadline(makeDetail())).toBe("后台任务完成 · bash-33vs0s7e");
     expect(notificationStatusLabel(makeDetail())).toBe("完成");
-    expect(notificationHeadline(makeDetail({ type: "task.lost" }))).toBe("后台任务丢失");
+    expect(notificationHeadline(makeDetail({ type: "task.lost" }))).toBe("后台任务丢失 · bash-33vs0s7e");
     expect(notificationStatusLabel(makeDetail({ type: "task.lost" }))).toBe("丢失");
-    expect(notificationHeadline(makeDetail({ kind: "cron-fire", type: "cron.fire" }))).toBe("定时任务触发");
+    expect(notificationHeadline(makeDetail({ type: "task.timed_out" }))).toBe("后台任务超时 · bash-33vs0s7e");
+    expect(notificationStatusLabel(makeDetail({ type: "task.timed_out" }))).toBe("超时");
+    expect(notificationHeadline(makeDetail({ type: "task.killed" }))).toBe("后台任务被终止 · bash-33vs0s7e");
+    expect(notificationStatusLabel(makeDetail({ type: "task.killed" }))).toBe("已终止");
+    expect(notificationHeadline(makeDetail({ kind: "cron-fire", type: "cron.fire" }))).toBe("定时任务触发 · bash-33vs0s7e");
     expect(notificationStatusLabel(makeDetail({ kind: "cron-fire", type: "cron.fire" }))).toBe("触发");
-    expect(notificationHeadline(makeDetail({ type: "task.other" }))).toBe("后台任务通知");
+    expect(notificationHeadline(makeDetail({ type: "task.other" }))).toBe("后台任务通知 · bash-33vs0s7e");
+  });
+
+  it("子代理通知来源头用 子代理 + agentId", () => {
+    const detail = makeDetail({
+      sourceKind: "subagent",
+      sourceId: "agent-bxryd4pv",
+      agentId: "agent-4",
+      title: "Background agent completed",
+    });
+    expect(notificationHeadline(detail)).toBe("子代理完成 · agent-4");
+    // 子代理缺 agentId 时回退 sourceId
+    expect(notificationHeadline(makeDetail({ sourceKind: "subagent", sourceId: "agent-bxryd4pv", agentId: undefined }))).toBe("子代理完成 · agent-bxryd4pv");
+  });
+
+  it("展开后展示输出文件行与复制路径按钮", () => {
+    renderCard(makeEvent({
+      notification: makeDetail({ outputFile: { path: "C:/Users/x/output.log", bytes: 310 } }),
+    }));
+    const button = container.querySelector("button");
+    act(() => {
+      button!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("C:/Users/x/output.log");
+    expect(container.textContent).toContain("310 B");
+    expect(container.textContent).toContain("复制路径");
   });
 });
 
@@ -128,7 +157,7 @@ describe("NotificationGroupCard", () => {
     });
     // 展开后摘要行收起，出现 4 张嵌入卡（各自可再展开详情）
     expect(container.textContent).not.toContain("Background agent completed · Background agent completed");
-    const headlines = Array.from(container.querySelectorAll("span")).filter((el) => el.textContent === "后台任务完成");
+    const headlines = Array.from(container.querySelectorAll("span")).filter((el) => el.textContent === "后台任务完成 · bash-33vs0s7e");
     expect(headlines.length).toBe(4);
   });
 });

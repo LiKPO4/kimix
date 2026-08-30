@@ -1,5 +1,16 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 功能：通知信封卡片对齐官方来源署名（v2.21.148）
+
+- 用户要求：参考官方 Kimi Code Web，非用户发的消息（后台任务/子代理完成等通知）上方必须注明来源信息，如「子代理完成 · agent-4」。
+- 官方逻辑（bundle 0.39.1 实证）：仅 origin.kind 为 task/background_task/task_notification 且携带 <notification> XML（或 kimiWeb.taskNotification 缓存对象）的 role=user 消息走 NotificationCard；来源头固定为「{kind}{状态} · {id}」，kind 按 source_kind 区分 子代理/后台任务，id 子代理取 agentId、其余取 sourceId；状态按 type 后缀识别 completed/failed/timed_out/killed/lost（兜底 info）；卡片体含 Title、正文、<output-file> 输出文件行（路径+字节数+复制路径）、原始 payload 折叠。cron-fire/goal 续跑/injection/skill_activation 各有独立渲染或丢弃路径，不走通知卡。
+- 我方改动（在既有折叠卡设计上对齐，卡片仍默认折叠、外观不变）：
+  - parseKimiAgentEnvelope：来源名按 source_kind 区分（摘要出现「子代理已完成：…」），状态识别从精确等值 task.completed/task.lost 改为 endsWith 后缀（补齐 failed/timed_out/killed 三态，warning 色调）；新增解析 <output-file path bytes> 到 detail.outputFile。
+  - NotificationCard：头部标题改为官方格式「子代理完成 · agent-4」/「后台任务完成 · bash-bv5pc30f」/「定时任务触发 · jobId」；状态文案与图标补齐 超时(Clock)/被终止(CircleStop)；展开详情新增输出文件行（路径 rtl 截断 + 字节数 + 复制路径按钮，已复制反馈）。
+  - sessionMetrics 的 isNotificationSummaryMessage 从前缀数组改正则，覆盖 子代理/后台任务 × 全部状态后缀。
+- 验证：typecheck、定向 9 文件 463 项（含新增 6 条用例）、全量 195 文件 2112 项、生产构建通过；uiStyles 治理（新按钮声明 kimix-style-exempt）通过。实机截图验收待用户回传。
+- 已知边界：官方 cron-fire 渲染为独立 role:cron 消息（显示 prompt 全文），Kimix 保留自有「定时任务触发」折叠卡，属刻意差异；官方 output-preview 预览未接入（信封里未见实际产出）。
+
 ## 2026-08-30 修复：压缩摘要重复显示为用户气泡（对齐官方）（v2.21.147）
 
 - 现象：压缩后同一时间线出现两块相同内容——用户消息气泡里是摘要全文，「上下文压缩完成」卡片里又是同一摘要。

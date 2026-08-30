@@ -639,6 +639,8 @@ export interface StatusNotificationDetail {
   body?: string;
   /** 原始信封文本，供「原始 payload」折叠展示。 */
   raw: string;
+  /** 信封 <output-file> 指向的输出文件（对齐官方后台任务卡的输出文件行）。 */
+  outputFile?: { path: string; bytes?: number };
 }
 
 export interface FileArtifactEvent {

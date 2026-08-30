@@ -296,6 +296,47 @@ describe("sanitizePersistedEvents", () => {
     const detail = sanitized[0].type === "status_update" ? sanitized[0].notification : undefined;
     expect(detail?.raw).toContain('<notification id="task:bash-hbcvffrs:completed"');
     expect(detail?.raw).toContain('</notification>');
+    // <output-file> 解析为结构化输出文件（对齐官方后台任务卡的输出文件行）
+    expect(detail?.outputFile).toEqual({ path: "C:/Users/x/output.log", bytes: 533 });
+  });
+
+  it("collapses subagent notification envelopes with 子代理 attribution", () => {
+    const events: TimelineEvent[] = [{
+      id: "notif-sub",
+      type: "user_message",
+      timestamp: 3,
+      content: '<notification id="task:agent-bxryd4pv:completed" category="task" type="task.completed" severity="info" source_kind="subagent" source_id="agent-bxryd4pv" agent_id="agent-4">\nTitle: Background agent completed\nSeverity: info\n查官方压缩摘要渲染逻辑 completed.\n</notification>',
+    }];
+
+    expect(sanitizePersistedEvents(events)).toMatchObject([{
+      type: "status_update",
+      message: "子代理已完成：查官方压缩摘要渲染逻辑",
+      tone: "success",
+      notification: {
+        kind: "notification",
+        type: "task.completed",
+        sourceKind: "subagent",
+        sourceId: "agent-bxryd4pv",
+        agentId: "agent-4",
+        title: "Background agent completed",
+      },
+    }]);
+  });
+
+  it("collapses failed/timed_out/killed notifications with warning tone", () => {
+    for (const [type, summary] of [
+      ["task.failed", "后台任务已失败：跑测试"],
+      ["task.timed_out", "后台任务已超时：跑测试"],
+      ["task.killed", "后台任务已终止：跑测试"],
+    ] as const) {
+      const events: TimelineEvent[] = [{
+        id: `notif-${type}`,
+        type: "user_message",
+        timestamp: 3,
+        content: `<notification type="${type}" source_kind="background_task" source_id="bash-x">\nTitle: t\nSeverity: warning\n跑测试\n</notification>`,
+      }];
+      expect(sanitizePersistedEvents(events)).toMatchObject([{ type: "status_update", message: summary, tone: "warning" }]);
+    }
   });
 
   it("collapses lost-task notification envelopes with warning tone", () => {
