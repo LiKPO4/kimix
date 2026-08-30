@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 修复：runtime 会话下本地斜杠命令从补全列表消失（v2.21.152）
+
+- 现象：用户输入 /自定义 补全面板只显示 /custom-theme 等官方命令，/自定义风格 不出现（v2.21.150 截图实证）。
+- 根因：有 runtime 会话时 `setSlashCommands(res.data.map(...))` 用官方 Server 命令列表**整体替换**本地列表，`slashCompletionSource` 优先取 slashCommands，导致全部 Kimix 本地命令（/theme /settings /自定义风格 等）从补全消失（命令本身仍可执行，只是无联想）。
+- 修复：官方命令优先展示，conservativeSlashCommandItems 按 commandName 去重后追加合并；findOfficialPluginCommand 只匹配 kind==="plugin-command"，不受合并影响。
+- 验证：typecheck、全量 195 文件 2113 项、生产构建通过。实机补全列表待用户验收。
+
 ## 2026-08-30 功能：新建会话后侧栏自动定位居中（v2.21.151）
 
 - 需求：侧栏「在该项目下新对话」创建会话后，左侧应定位到该项目的这个会话，尽量在会话列表中居中。

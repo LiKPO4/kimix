@@ -879,7 +879,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         setSlashCommands([]);
         return;
       }
-      setSlashCommands(res.data.map((command) => {
+      const officialSlashItems = res.data.map((command) => {
         const isPluginCommand = command.kind === "plugin-command" && command.pluginId && command.commandName;
         return {
           id: isPluginCommand
@@ -895,7 +895,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
           pluginCommandName: isPluginCommand ? command.commandName : undefined,
           kind: isPluginCommand ? "plugin-command" : "slash",
         } satisfies CompletionItem;
-      }));
+      });
+      // 官方命令优先展示；Kimix 本地命令（/theme、/settings、/自定义风格 等）按 commandName
+      // 去重后追加，否则 runtime 会话下补全列表只剩官方命令，本地命令看似"不生效"。
+      const officialSlashNames = new Set(res.data.map((command) => command.name));
+      setSlashCommands([
+        ...officialSlashItems,
+        ...conservativeSlashCommandItems.filter((item) => !item.commandName || !officialSlashNames.has(item.commandName)),
+      ]);
     }).catch((err) => {
       if (cancelled) return;
       console.warn("List slash commands failed:", err);
