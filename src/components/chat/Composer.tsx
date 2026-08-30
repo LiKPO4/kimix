@@ -2671,17 +2671,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     }
     // Kimix 自有中文命令：/自定义风格 → 直接发送界面风格 AI 生成提示词
     // （与设置页「复制 AI 提示」同一份 buildUiStyleAiPrompt，内容与效果一致）；
-    // args 作为用户的风格需求追加在提示词之后。可见用户消息只保留命令本身。
+    // args 作为用户的风格需求追加在提示词之后。可见用户消息必须与实际发送内容
+    // 完全一致：否则官方回放 canonical 用户消息时 echo 去重失败，会把完整提示词
+    // 追加成第二个用户气泡，同一轮被拆成两条消息。
     if (name === "自定义风格") {
-      await appendSlashUserMessage(commandNotice, roomAgentId);
       const stylePrompt = buildUiStyleAiPrompt();
-      await sendPromptContent(commandNotice, {
-        addUserEvent: false,
-        manualSubmitAutoScroll: false,
-        outboundContent: args ? `${stylePrompt}
+      await sendPromptContent(args ? `${stylePrompt}
 
-我的风格需求：${args}` : stylePrompt,
-      });
+我的风格需求：${args}` : stylePrompt);
       return true;
     }
     if (name === "new" || name === "clear") {
@@ -3471,17 +3468,30 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         return;
       }
     }
+    const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
+    const slashArgs = trimmed.match(slashCommandPattern)?.[2]?.trim() || undefined;
+    const slashRouting = classifySlashCommand(slashName);
+    const pluginCommand = findOfficialPluginCommand(slashName);
     if (hasActiveAssistantTurn && currentSession && !currentSession.collaboration) {
+      // Kimix 本地斜杠命令是 UI/控制指令（/new、/theme、/自定义风格 等），不应作为
+      // 普通文本原样排队：否则 drain 时会把命令文本发给模型，编辑回补也会把命令
+      // 残留进输入框。直接走命令处理；/自定义风格 的提示词发送遇到活动轮冲突时，
+      // sendPromptContent 会把完整提示词回补队列（可见消息=发送内容，见上方命令实现）。
+      if (slashRouting === "local") {
+        const slashHandledWhileActive = await handleSdkSlashCommand(trimmed, slashRoomAgentId);
+        if (slashHandledWhileActive) {
+          setInput("");
+          setImageAttachments([]);
+          inputRef.current?.reset();
+          return;
+        }
+      }
       setInput("");
       setImageAttachments([]);
       inputRef.current?.reset();
       addPendingMessage(currentSession.id, trimmed, toUserAttachments(imagesToSend), pendingMessagePinnedModel(currentSession));
       return;
     }
-    const slashName = trimmed.match(slashCommandPattern)?.[1] ?? "";
-    const slashArgs = trimmed.match(slashCommandPattern)?.[2]?.trim() || undefined;
-    const slashRouting = classifySlashCommand(slashName);
-    const pluginCommand = findOfficialPluginCommand(slashName);
     if (shouldActivateSkillBeforePrompt(slashName)) {
       const match = trimmed.match(slashCommandPattern);
       const skillName = match?.[1]?.slice("skill:".length) ?? "";
