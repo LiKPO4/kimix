@@ -408,6 +408,13 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       setWorkspaceView("chat");
       setCurrentSession(session);
       setExpandedProjectPaths((current) => new Set([...current, normalizeProjectPath(project.path)]));
+      // 新会话落位后在侧栏定位到该项目会话列表并尽量居中（对齐 ContextBar 的 smooth+center 模式），
+      // 避免列表较长时新建项虽在顶部、项目分组却不在可视区内。
+      window.setTimeout(() => {
+        document
+          .querySelector(`[data-session-id="${CSS.escape(session.id)}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
       } catch (err) {
         reportError(err, { context: "createSessionForProject", userVisible: true });
       } finally {
@@ -1109,6 +1116,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                               return (
                                 <div
                                   key={s.id}
+                                  data-session-id={s.id}
                                   style={{ paddingLeft: 16, paddingRight: 10 }}
                                   className={`kimix-sidebar-session-row group flex h-8 items-center gap-2 rounded-lg text-[14px] transition-colors ${
                                     currentSession?.id === s.id

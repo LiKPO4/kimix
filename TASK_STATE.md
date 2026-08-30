@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 功能：新建会话后侧栏自动定位居中（v2.21.151）
+
+- 需求：侧栏「在该项目下新对话」创建会话后，左侧应定位到该项目的这个会话，尽量在会话列表中居中。
+- 实现：`createSessionForProject` 落位后 80ms 对 `[data-session-id]` 行 `scrollIntoView({ behavior: "smooth", block: "center" })`（对齐 ContextBar 既有模式）；会话行新增 `data-session-id` 属性。列表折叠窗口既有「当前会话在折叠区外自动展开」保护（sidebarSessionList），新建会话设为 current 必定渲染，无需额外展开逻辑。
+- 覆盖面：createSessionForProject 是所有新建入口（侧栏项目按钮、顶部新对话、EmptyState 等）的共用函数，均受益。
+- 验证：typecheck、layout+sidebarSessionList 定向 15 项、全量 195 文件 2113 项、生产构建通过。实机滚动效果待用户截图验收。
+
 ## 2026-08-30 功能：新增本地斜杠命令 /自定义风格（v2.21.150）
 
 - 需求：斜杠命令应直接发送「自定义风格化」的提示词（用户纠正：第一版做成打开设置页，太敷衍，已重写）。
