@@ -30,6 +30,14 @@ describe("classifySlashCommand", () => {
     expect("/skill:code-style".match(slashCommandPattern)?.[1]).toBe("skill:code-style");
   });
 
+  it("支持 Kimix 自有中文命令（/自定义风格）的解析与本地路由", () => {
+    expect("/自定义风格".match(slashCommandPattern)?.[1]).toBe("自定义风格");
+    expect("/自定义风格 参数".match(slashCommandPattern)?.[2]).toBe("参数");
+    expect(classifySlashCommand("自定义风格")).toBe("local");
+    // 名称中的斜杠仍不允许（路径误输入不命中）
+    expect("/路径/不对".match(slashCommandPattern)).toBeNull();
+  });
+
   it("routes supported and compatibility commands before generic prompt submission", () => {
     expect(classifySlashCommand("goal")).toBe("direct");
     expect(classifySlashCommand("swarm")).toBe("direct");

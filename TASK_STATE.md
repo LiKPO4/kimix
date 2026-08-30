@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-08-30 功能：新增本地斜杠命令 /自定义风格（v2.21.149）
+
+- 需求：把「自定义风格化」（设置 → 外观 → 界面风格）做成斜杠命令，内容与效果和原入口一致。
+- 实现：
+  - `slashRouting.ts`：`slashCommandPattern` 名称字符类扩展 CJK（`一-鿿`），`KIMIX_LOCAL_SLASH_COMMANDS` 注册「自定义风格」（local 路由）。扩展后 ASCII 命令行为不变，`/路径/x` 这类含斜杠输入仍不命中。
+  - `Composer.tsx`：补全项（label /自定义风格）、`handleSdkSlashCommand` 新增分支——`setWorkspaceView("settings")` + 80ms 后派发 `kimix:focus-settings-section`（sectionId `uiStyle`），复用 /provider 同款聚焦机制；/help 面板命令列表补记。
+  - 效果与原入口一致：打开设置页并滚动聚焦「界面风格」分区（focusSettingsSection 内部会切到对应设置页）。
+- 验证：typecheck、slashRouting 定向 9 项（含新增中文命令解析/路由/路径拒绝用例）、全量 195 文件 2113 项、生产构建通过。实机验收待用户截图。
+
 ## 2026-08-30 功能：通知信封卡片对齐官方来源署名（v2.21.148）
 
 - 用户要求：参考官方 Kimi Code Web，非用户发的消息（后台任务/子代理完成等通知）上方必须注明来源信息，如「子代理完成 · agent-4」。

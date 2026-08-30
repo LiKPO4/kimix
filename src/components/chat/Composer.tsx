@@ -438,6 +438,7 @@ const sdkSlashCommandItems: CompletionItem[] = [
   { id: "slash-swarm-on", label: "/swarm on", detail: "开启 Swarm 模式", insertText: "/swarm on ", commandName: "swarm", kind: "slash" },
   { id: "slash-swarm-off", label: "/swarm off", detail: "关闭 Swarm 模式", insertText: "/swarm off ", commandName: "swarm", kind: "slash" },
   { id: "slash-theme", label: "/theme", detail: "打开 Kimix 主题设置；官方终端主题仅供参考", insertText: "/theme", commandName: "theme", kind: "slash" },
+  { id: "slash-uistyle-custom", label: "/自定义风格", detail: "打开界面风格设置（自定义风格化）", insertText: "/自定义风格", commandName: "自定义风格", kind: "slash" },
   { id: "slash-custom-theme", label: "/custom-theme", detail: "调用官方内置 Skill 创建或修改主题", insertText: "/custom-theme ", commandName: "custom-theme", kind: "slash" },
   { id: "slash-custom-theme-template", label: "/custom-theme 做一套低饱和绿色主题", detail: "调用官方内置 Skill 设计主题", insertText: "/custom-theme 做一套低饱和绿色主题", commandName: "custom-theme", kind: "slash" },
   { id: "slash-import-from-cc-codex", label: "/import-from-cc-codex", detail: "调用官方内置 Skill 导入 Claude Code / Codex 配置", insertText: "/import-from-cc-codex", commandName: "import-from-cc-codex", kind: "slash" },
@@ -2659,6 +2660,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       await appendStatusMessage("已打开 Kimix 主题设置。官方 /theme 是终端 Kimi Code 的主题选择器，Kimix 使用独立的全局主题色板。", roomAgentId);
       return true;
     }
+    // Kimix 自有中文命令：/自定义风格 → 设置页界面风格分区（与 /provider 同款的聚焦事件机制）。
+    if (name === "自定义风格") {
+      await appendSlashUserMessage(commandNotice, roomAgentId);
+      setWorkspaceView("settings");
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-settings-section", { detail: { sectionId: "uiStyle" } })), 80);
+      await appendStatusMessage("已打开设置中的界面风格（自定义风格化）。", roomAgentId);
+      return true;
+    }
     if (name === "new" || name === "clear") {
       await appendSlashUserMessage(commandNotice, roomAgentId);
       if (!currentProject) {
@@ -2823,7 +2832,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
         "可用斜杠命令：",
         "会话：/new /fork /title /compact /undo /export-md /copy /init",
         "模式：/plan /yolo /auto /permission /model /swarm /goal /btw",
-        "面板：/settings /provider /mcp /plugins /tasks /theme",
+        "面板：/settings /provider /mcp /plugins /tasks /theme /自定义风格",
         "信息：/status /usage /help /version /reload",
         "Skill：/write-goal /update-config /check-kimi-code-docs /sub-skill /custom-theme /import-from-cc-codex /mcp-config /skill:<名称>",
         "其他：/exit（关闭窗口）；未占用的 /<名称> 会回退匹配 /skill:<名称>。",

@@ -1,5 +1,7 @@
 export const KIMIX_LOCAL_SLASH_COMMANDS = new Set([
   "theme",
+  // Kimix 自有中文命令（界面风格/自定义风格化）
+  "自定义风格",
   // 会话管理
   "new", "clear",
   "fork",
@@ -33,8 +35,9 @@ export const KIMIX_LOCAL_SLASH_COMMANDS = new Set([
   "feedback",
 ]);
 
-/** 斜杠命令解析：名称允许字母/数字/下划线/冒号/连字符/点号（子 Skill 点分命令）。 */
-export const slashCommandPattern = /^\/([a-zA-Z][\w:.-]*)(?:\s+([\s\S]*))?$/;
+/** 斜杠命令解析：名称允许字母/数字/下划线/冒号/连字符/点号（子 Skill 点分命令），
+ *  以及 CJK 汉字（Kimix 自有中文命令，如 /自定义风格）。 */
+export const slashCommandPattern = /^\/([a-zA-Z\u4e00-\u9fff][\w:.\-\u4e00-\u9fff]*)(?:\s+([\s\S]*))?$/;
 
 export const KIMI_BUILTIN_SKILL_SLASH_COMMANDS = new Set([
   "custom-theme",
