@@ -1,13 +1,13 @@
 # Kimix 长程任务状态
 
-## 2026-08-30 功能：新增本地斜杠命令 /自定义风格（v2.21.149）
+## 2026-08-30 功能：新增本地斜杠命令 /自定义风格（v2.21.150）
 
-- 需求：把「自定义风格化」（设置 → 外观 → 界面风格）做成斜杠命令，内容与效果和原入口一致。
+- 需求：斜杠命令应直接发送「自定义风格化」的提示词（用户纠正：第一版做成打开设置页，太敷衍，已重写）。
 - 实现：
-  - `slashRouting.ts`：`slashCommandPattern` 名称字符类扩展 CJK（`一-鿿`），`KIMIX_LOCAL_SLASH_COMMANDS` 注册「自定义风格」（local 路由）。扩展后 ASCII 命令行为不变，`/路径/x` 这类含斜杠输入仍不命中。
-  - `Composer.tsx`：补全项（label /自定义风格）、`handleSdkSlashCommand` 新增分支——`setWorkspaceView("settings")` + 80ms 后派发 `kimix:focus-settings-section`（sectionId `uiStyle`），复用 /provider 同款聚焦机制；/help 面板命令列表补记。
-  - 效果与原入口一致：打开设置页并滚动聚焦「界面风格」分区（focusSettingsSection 内部会切到对应设置页）。
-- 验证：typecheck、slashRouting 定向 9 项（含新增中文命令解析/路由/路径拒绝用例）、全量 195 文件 2113 项、生产构建通过。实机验收待用户截图。
+  - `slashRouting.ts`：`slashCommandPattern` 名称字符类扩展 CJK（`一-鿿`），`KIMIX_LOCAL_SLASH_COMMANDS` 注册「自定义风格」（local 路由）。ASCII 命令行为不变，`/路径/x` 含斜杠输入仍不命中。
+  - `Composer.tsx`：`handleSdkSlashCommand` 新分支直接调用 `buildUiStyleAiPrompt()`（与设置页「复制 AI 提示」同一份提示词，内容与效果一致），经 `sendPromptContent` 的 `outboundContent` 发送；可见用户消息只显示命令本身（沿用 goal kickoff 同款模式）；`/自定义风格 <需求>` 的 args 以「我的风格需求：…」追加在提示词后。补全项含基础项与带需求模板项，insertText 带尾随空格引导补需求；/help「其他」行补记。
+- 验证：typecheck、slashRouting 定向 9 项、全量 195 文件 2113 项、生产构建通过。实机验收待用户截图。
+
 
 ## 2026-08-30 功能：通知信封卡片对齐官方来源署名（v2.21.148）
 

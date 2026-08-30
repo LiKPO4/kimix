@@ -1,6 +1,6 @@
 export const KIMIX_LOCAL_SLASH_COMMANDS = new Set([
   "theme",
-  // Kimix 自有中文命令（界面风格/自定义风格化）
+  // Kimix 自有中文命令：/自定义风格 → 发送界面风格 AI 生成提示词（buildUiStyleAiPrompt）
   "自定义风格",
   // 会话管理
   "new", "clear",
