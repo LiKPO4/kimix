@@ -1,6 +1,7 @@
 import type { StatusNotificationDetail, TimelineEvent } from "@/types/ui";
+import type { KimiCodeEngineStatus } from "@electron/types/ipc";
 import { reliableAssistantDurationMs } from "./duration";
-import { STALE_TIMELINE_WORK_MS } from "./sessionActivity";
+import { isTerminalKimiCodeEngineStatus, STALE_TIMELINE_WORK_MS } from "./sessionActivity";
 import { extractFileAttachmentText } from "./userFileAttachments";
 
 export function isLegacyKimiWorkDirError(message: string) {
@@ -508,6 +509,24 @@ export function settleInactiveEvents(events: TimelineEvent[], settledAt = Date.n
     return [{ ...event, isComplete: true, isThinking: false, durationMs: reliableAssistantDurationMs(event.durationMs) }];
   });
   return closeOpenCompaction(settled);
+}
+
+/**
+ * Reconcile cached/canonical history with a fresh runtime status. This must be
+ * applied after local/canonical merging because a richer local timeline may
+ * retain stale open work even when the official history is already terminal.
+ */
+export function reconcileKimiHistoryRuntimeState(
+  events: TimelineEvent[],
+  engineStatus: KimiCodeEngineStatus | undefined,
+  settledAt = Date.now(),
+): TimelineEvent[] {
+  const questionSettledEvents = settleHistoricalQuestions(events, {
+    isWaitingQuestion: engineStatus === "waiting_question",
+  });
+  return isTerminalKimiCodeEngineStatus(engineStatus)
+    ? settleInactiveEvents(questionSettledEvents, settledAt, false, true)
+    : questionSettledEvents;
 }
 
 export function settleFailedEvents(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
-import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, normalizeCompactionDisplay, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, parseKimiGoalContinuation, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
+import { formatKimiSkillActivationCommand, hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, hasMalformedAssistantMarkdown, hasOfficialTurnEvidenceAfterUser, hasTurnReceivedBody, normalizeCompactionDisplay, officialHistoryHasUserMessageAsLatest, isLatestUserInputEvent, parseKimiGoalContinuation, reconcileKimiHistoryRuntimeState, removeLocalUserSendAttempt, repairStableAssistantOrder, sanitizeKimiSkillActivationTitle, sanitizePersistedEvents, settleFailedEvents, settleHistoricalQuestions, settleInactiveEvents, truncateLatestUserTurn } from "../eventHelpers";
 
 describe("eventHelpers", () => {
   it("keeps assistant messages that only have thinking parts when settling", () => {
@@ -128,6 +128,44 @@ describe("eventHelpers", () => {
     const open = settled.find((event) => event.id === "assistant-open") as Extract<TimelineEvent, { type: "assistant_message" }> | undefined;
     expect(open?.isComplete).toBe(true);
     expect(settled.find((event) => event.id === "assistant-empty")).toBeUndefined();
+  });
+
+  it("settles stale replay residue when fresh runtime status is idle", () => {
+    const now = 60 * 60 * 1000;
+    const events: TimelineEvent[] = [{
+      id: "assistant-replayed",
+      type: "assistant_message",
+      timestamp: now - 15 * 60 * 1000,
+      content: "历史回答",
+      isThinking: true,
+      isComplete: false,
+    }, {
+      id: "tool-replayed",
+      type: "tool_call",
+      timestamp: now - 15 * 60 * 1000,
+      toolCallId: "tool-replayed",
+      toolName: "Bash",
+      status: "running",
+      arguments: {},
+    }];
+
+    const settled = reconcileKimiHistoryRuntimeState(events, "idle", now);
+    expect(settled[0]).toMatchObject({ type: "assistant_message", isComplete: true, isThinking: false });
+    expect(settled[1]).toMatchObject({ type: "tool_call", status: "error" });
+  });
+
+  it("keeps replayed work open while the fresh runtime status is running", () => {
+    const events: TimelineEvent[] = [{
+      id: "assistant-live",
+      type: "assistant_message",
+      timestamp: 1,
+      content: "仍在执行",
+      isThinking: true,
+      isComplete: false,
+    }];
+
+    expect(reconcileKimiHistoryRuntimeState(events, "running", 10_000)[0])
+      .toMatchObject({ type: "assistant_message", isComplete: false, isThinking: true });
   });
 
   it("immediate settle still force-completes recent open assistants (authoritative path unchanged)", () => {

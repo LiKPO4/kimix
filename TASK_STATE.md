@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-31 修复：旧会话重开后误显示数百分钟“执行中”（v2.21.159）
+
+- 现象：已于前一日结束的会话，重开 Kimix 后仍显示 `执行中 913分+`，时间持续增长。
+- 根因：Server 新绑定继承上一进程的旧 `running`，首次 fresh REST `idle` 未覆盖 managed status；恢复快照把历史 tool/body 再投影成活动事件，而 renderer 的 idle 分支与 Sidebar 历史路径都未完整收敛最终本地事件。残留 `assistant.isComplete=false` 触发 MessageBubble 从旧事件时间戳持续计时。
+- 修复：首次 fresh status 覆盖旧 managed status（不影响进程内 continuation grace）；恢复 idle 清除 transient activity 且不触发旧会话完成通知/队列派发；Sidebar 缓存与 canonical 合并路径均在最终事件集上按 fresh runtime 终态 guarded settle。
+- 取证：`docs/issue-stale-running-session-events-snapshot.md` 保存官方 `TurnEnd/end_turn`、runtime `idle`、UI 回放未完成事件及 54,782,642ms 精确对应截图的事件快照。
+- 验证：定向回归、typecheck、全量测试、构建见收尾。
+
 ## 2026-08-30 修复：重启后重复弹「界面风格已导入」提示（v2.21.158）
 
 - 现象：每次重新进入软件都会再弹一次风格已导入/已更新提示。

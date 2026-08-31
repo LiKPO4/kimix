@@ -385,6 +385,14 @@ describe("shouldDelayServerPromptCompletion", () => {
 });
 
 describe("resolveEffectiveServerEngineStatus", () => {
+  it("lets a fresh recovery status override a stale status from the previous process", () => {
+    expect(resolveEffectiveServerEngineStatus(
+      { status: "idle", busy: false },
+      "running",
+      { initialRecovery: true },
+    )).toBe("idle");
+  });
+
   it("keeps the Host continuation grace authoritative over raw REST idle", () => {
     expect(resolveEffectiveServerEngineStatus({ status: "idle", busy: false }, "running")).toBe("running");
     expect(resolveEffectiveServerEngineStatus({ status: "completed", busy: false }, "running")).toBe("running");

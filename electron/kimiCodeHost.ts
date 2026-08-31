@@ -3488,7 +3488,13 @@ async function registerServerSession(
   };
   serverSessions.set(session.id, managed);
   await getServerClient().subscribe(session.id);
-  await refreshServerSessionStatus(session.id, true).catch((error) => {
+  await refreshServerSessionStatus(session.id, true).then((status) => {
+    // getSession() can carry the status persisted when the previous process
+    // exited. The first fresh REST status is authoritative for a newly
+    // registered binding; continuation grace only applies after this process
+    // has started a turn itself.
+    managed.status = resolveEffectiveServerEngineStatus(status, managed.status, { initialRecovery: true });
+  }).catch((error) => {
     if (isKimiCodeSessionMissingError(error)) {
       serverSessions.delete(session.id);
       console.warn(`[KimiCodeServerHost] session ${session.id} vanished during initial status refresh; removed stale Server binding.`);
@@ -3888,8 +3894,10 @@ export function serverStatusToAgentEvent(status: ServerSessionStatus): Record<st
 export function resolveEffectiveServerEngineStatus(
   status: { status?: unknown; busy?: unknown },
   managedStatus?: KimiCodeEngineStatus,
+  options?: { initialRecovery?: boolean },
 ): KimiCodeEngineStatus {
   const rawStatus = resolveServerEngineStatus(status);
+  if (options?.initialRecovery) return rawStatus;
   if (managedStatus === "waiting_approval" || managedStatus === "waiting_question") return managedStatus;
   if (managedStatus === "error" || managedStatus === "interrupted") return managedStatus;
   if (rawStatus === "running" || rawStatus === "waiting_approval" || rawStatus === "waiting_question") {

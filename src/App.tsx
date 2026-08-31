@@ -3292,7 +3292,60 @@ function App() {
         return;
       }
 
-      if (!isTerminalKimiCodeEngineStatus(payload.status) || payload.status === "idle") return;
+      if (payload.status === "idle") {
+        // A newly resumed Server binding can replay historical running frames
+        // before its fresh REST status arrives. Idle is authoritative for that
+        // recovery, but it must not run the ordinary completion side effects
+        // (notification, queue drain) for an old conversation.
+        cleanupRuntimeRefs(statusRuntimeSessionId, "completed", {
+          notifiedQuestionRequest: notifiedQuestionRequestRef.current,
+          hiddenLongTaskEvents: hiddenLongTaskEventsRef.current,
+        });
+        runtimeLastStreamEventAtRef.current.delete(statusRuntimeSessionId);
+        runtimeHistoryRefreshAtRef.current.delete(statusRuntimeSessionId);
+        const idleActivity = roomAgentId
+          ? useAppStore.getState().roomAgentActivities[roomAgentActivityKey(uiSessionId, roomAgentId)]
+          : undefined;
+        const idleRoomMessageId = idleActivity?.roomMessageId;
+        if (roomAgentId) {
+          setRoomAgentActivity({
+            roomId: uiSessionId,
+            roomAgentId,
+            runtimeSessionId: statusRuntimeSessionId,
+            status: "completed",
+            roomMessageId: undefined,
+            activeTurnId: undefined,
+            updatedAt: Date.now(),
+          });
+          if (idleRoomMessageId) {
+            updateSession(uiSessionId, (session) => applyRoomDeliveryRuntimeStatus(
+              session,
+              idleRoomMessageId,
+              roomAgentId,
+              "completed",
+            ));
+          }
+        }
+        const idleRunningSessionId = useAppStore.getState().runningSessionId;
+        const idleRoom = useSessionStore.getState().sessions.find((session) => session.id === uiSessionId);
+        if (
+          (!roomAgentId || !idleRoom || isPrimaryRoomAgent(idleRoom, roomAgentId)) &&
+          (idleRunningSessionId === uiSessionId || idleRunningSessionId === statusRuntimeSessionId)
+        ) {
+          setRunningSessionId(null);
+        }
+        updateSession(uiSessionId, (session) => {
+          const ownerAgentId = roomAgentId ?? getPrimaryRoomAgent(session).id;
+          const next = updateRoomAgentEvents(session, ownerAgentId, (events) => (
+            settlePendingQuestions(settleInactiveEvents(events, Date.now(), false, true), "skipped")
+          ));
+          return { ...next, updatedAt: Date.now() };
+        });
+        syncCurrentSessionFromStore(uiSessionId);
+        return;
+      }
+
+      if (!isTerminalKimiCodeEngineStatus(payload.status)) return;
       const terminalStatus = payload.status;
 
       if (payload.migratedTo) {

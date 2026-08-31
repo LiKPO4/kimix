@@ -5,7 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { Project, Session } from "@/types/ui";
 import { mapHistoryEvents } from "@/utils/eventMapper";
-import { settleHistoricalQuestions } from "@/utils/eventHelpers";
+import { reconcileKimiHistoryRuntimeState, settleHistoricalQuestions } from "@/utils/eventHelpers";
 import { deriveSessionTitle, isDefaultSessionTitle } from "@/utils/sessionTitle";
 import { isHiddenInternalSession } from "@/utils/internalSessions";
 import { sessionToMarkdown } from "@/utils/markdownExport";
@@ -777,9 +777,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           // 缓存快速路径同样对齐已解决的澄清提问：Web 端答完后 engineStatus 已离开
           // waiting_question，缓存中的 pending question_request 不应继续显示待提问。
           const settledEvents = runtimeStatus?.success
-            ? settleHistoricalQuestions(current.events, {
-              isWaitingQuestion: runtimeStatus.data.engineStatus === "waiting_question",
-            })
+            ? reconcileKimiHistoryRuntimeState(current.events, runtimeStatus.data.engineStatus)
             : current.events;
           const hydrated = hydrateSessionModel({ ...current, events: settledEvents }, runtimeStatus?.success ? runtimeStatus.data.model : undefined, undefined);
           return hydrateSessionSwarmMode(
@@ -829,7 +827,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         events,
         { sessionId: session.id, reason: "sidebar-select" },
       );
-      const hydratedEvents = canonicalAdopted
+      const mergedEvents = canonicalAdopted
         ? backfillTurnModelsFromUsageStatuses(events)
         : mergeMissingUsageStatusEvents(
           mergeMissingLatestCanonicalAssistant(
@@ -839,6 +837,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           ),
           events,
         );
+      // Canonical adoption is not guaranteed: a richer local timeline may be
+      // retained and can still contain stale open assistants/tools. Reconcile
+      // the final merged result against the authoritative runtime status.
+      const hydratedEvents = runtimeStatus?.success
+        ? reconcileKimiHistoryRuntimeState(mergedEvents, runtimeStatus.data.engineStatus)
+        : mergedEvents;
       return hydrateSessionSwarmMode(
         {
           ...hydrateSessionModel(
