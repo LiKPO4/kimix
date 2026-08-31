@@ -301,13 +301,13 @@ export function AddRoomAgentDialog({
             房间最多 4 个 Agent；当前已有 {session.collaboration?.agents.filter((agent) => !agent.removedAt).length ?? 1} 个。
           </div>
           <div className="flex items-center" style={{ gap: 10 }}>
-            <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
+            <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action kimix-dialog-footer-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
               取消
             </button>
             <button
               type="submit"
               disabled={busy || loading || !modelAlias || !displayName.trim() || !mentionName.trim()}
-              className="kimix-icon-text-button kimix-room-primary-action bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="kimix-icon-text-button kimix-room-primary-action kimix-dialog-footer-action bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
               style={{ height: 34, minWidth: 98, justifyContent: "center", paddingLeft: 14, paddingRight: 14 }}
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}

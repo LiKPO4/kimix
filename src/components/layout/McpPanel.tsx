@@ -624,7 +624,7 @@ mcp.json：${configPath || auth?.mcpConfigPath || "-"}`}
                       type="button"
                       onClick={() => setForm((current) => ({ ...current, authOauth: !current.authOauth }))}
                       aria-pressed={form.authOauth}
-                      className="kimix-state-button mt-2 flex h-10 w-full items-center justify-between rounded-xl text-[14px] transition-colors"
+                      className="kimix-state-button kimix-form-field-state-button mt-2 flex h-10 w-full items-center justify-between rounded-xl text-[14px] transition-colors"
                       style={{ paddingLeft: 16, paddingRight: 16 }}
                     >
                       <span>{form.authOauth ? "已启用" : "未启用"}</span>

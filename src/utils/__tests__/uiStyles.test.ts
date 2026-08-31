@@ -421,6 +421,22 @@ describe("UI_STYLES", () => {
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-composer-toolbar-secondary\s+\.kimix-composer-mode-button\s*\{[^}]*border-radius:\s*var\(--ui-role-control-radius\);/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\(\.kimix-state-button,\s*\.kimix-settings-permission\)[\s\S]*?background:\s*var\(--ui-role-toggle-selected-background\);/s);
   });
+  it("自定义风格下同排同级控件共享局部几何且不因展开换形", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const toolbar = readFileSync(resolve(process.cwd(), "src/components/layout/SessionToolbar.tsx"), "utf8");
+    const mcpPanel = readFileSync(resolve(process.cwd(), "src/components/layout/McpPanel.tsx"), "utf8");
+    const addRoomAgent = readFileSync(resolve(process.cwd(), "src/components/chat/AddRoomAgentDialog.tsx"), "utf8");
+    const editRoomAgent = readFileSync(resolve(process.cwd(), "src/components/chat/EditRoomAgentDialog.tsx"), "utf8");
+
+    expect(toolbar.match(/kimix-split-control kimix-toolbar-compound-control/g)).toHaveLength(2);
+    expect(mcpPanel).toContain("kimix-state-button kimix-form-field-state-button");
+    expect(addRoomAgent.match(/kimix-dialog-footer-action/g)).toHaveLength(2);
+    expect(editRoomAgent.match(/kimix-dialog-footer-action/g)).toHaveLength(2);
+    expect(css).toMatch(/\.kimix-app-shell-toolbar\s+\.kimix-toolbar-compound-control\s*\{[^}]*border-radius:\s*var\(--ui-role-control-radius\);/s);
+    expect(css).toMatch(/\.kimix-form-field-state-button\s*\{[^}]*border-radius:\s*var\(--ui-role-field-radius\);/s);
+    expect(css).toMatch(/\.kimix-dialog-footer-action\s*\{[^}]*border-radius:\s*var\(--ui-role-primary-action-radius\);/s);
+    expect(css).toMatch(/\.kimix-control-button\[aria-expanded="true"\]\s*\{[^}]*border-radius:\s*var\(--ui-role-control-radius\);/s);
+  });
   it("侧栏随行显形操作静止透明，仅单按钮交互时消费自定义材质", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");

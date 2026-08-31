@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-31 修复：自定义风格同排同级控件几何专项收敛（v2.21.161）
+
+- 扫描范围：复核 UI Style v1 的 control/toggle/compoundControl/menuTrigger/roomChoice/field/primaryAction radius consumers，以及全部 state/control/split/room 角色和 `aria-expanded` 触点。
+- 确认遗漏：control 展开时误从 control radius 跳为 menuTrigger radius；顶部启动/打开 split control 与同行 toolbar control 分别消费 compound/control radius；Add/Edit Room Agent footer 的取消与主操作分别消费 compound/primary radius；添加 MCP 表单的 OAuth 状态字段与同级输入字段分别消费 toggle/field radius。
+- 修复：保留各角色的边框、背景、阴影和状态矩阵，只用局部几何标记让同行控件分别对齐 control、primaryAction 或 field radius；顶部 split 内部 part 由外壳统一裁切，不再保留另一套子圆角。
+- 排除：FileCard 独立 split、弹层 Swarm/Tower 垂直配置项、同角色选择组、独立 header action、Composer 圆形发送/停止按钮均有明确结构或层级语义，不做全局圆角抹平。
+- 验证：定向、typecheck、全量测试、知识校验、构建与实机 computed style 见收尾。
+
 ## 2026-08-31 修复：Composer 模式按钮自定义风格圆角与同行不一致（v2.21.160）
 
 - 现象：启用允许 toggle 使用胶囊圆角的自定义界面风格后，Composer 同排的 Swarm、Plan、Tower 呈 999px 圆角，而思考强度按钮呈 4px 圆角，工具行出现两套轮廓。

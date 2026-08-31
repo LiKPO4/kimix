@@ -504,7 +504,7 @@ export function SessionToolbar({
           </button>
         ) : (
           <div ref={launchMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={`kimix-split-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : ""}`}>
+            <div className={`kimix-split-control kimix-toolbar-compound-control flex h-9 w-14 items-center ${launchMenuOpen ? "is-expanded" : ""}`}>
               <button
                 onClick={() => void launchExecutable()}
                 className="kimix-style-exempt kimix-split-control-part flex h-full flex-1 items-center justify-center"
@@ -578,7 +578,7 @@ export function SessionToolbar({
           </div>
         )}
         <div ref={projectMenuRef} className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <div className={`kimix-split-control flex h-9 w-14 items-center ${projectMenuOpen ? "is-expanded" : ""} ${!projectPath ? "opacity-45" : ""}`}>
+          <div className={`kimix-split-control kimix-toolbar-compound-control flex h-9 w-14 items-center ${projectMenuOpen ? "is-expanded" : ""} ${!projectPath ? "opacity-45" : ""}`}>
             <button
               onClick={openProjectPath}
               disabled={!projectPath}

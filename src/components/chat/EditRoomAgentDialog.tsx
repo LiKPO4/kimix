@@ -118,13 +118,13 @@ export function EditRoomAgentDialog({
           className="flex items-center justify-end border-t border-[var(--kimix-panel-divider)]"
           style={{ gap: 10, padding: "14px 20px" }}
         >
-          <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
+          <button type="button" onClick={onClose} disabled={busy} className="kimix-icon-text-button kimix-muted-action kimix-room-secondary-action kimix-dialog-footer-action" style={{ height: 34, paddingLeft: 14, paddingRight: 14 }}>
             取消
           </button>
           <button
             type="submit"
             disabled={busy || !displayName.trim() || !mentionName.trim()}
-            className="kimix-icon-text-button kimix-room-primary-action bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+            className="kimix-icon-text-button kimix-room-primary-action kimix-dialog-footer-action bg-accent-primary text-white hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
             style={{ height: 34, minWidth: 86, justifyContent: "center", paddingLeft: 14, paddingRight: 14 }}
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : null}

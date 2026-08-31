@@ -4321,6 +4321,25 @@ button.bg-accent-primary:disabled:hover,
   border-radius: var(--ui-role-control-radius);
 }
 
+/* 同一顶栏中的分段控件与普通工具键共享外轮廓；compound 仍只负责材质与分隔线。 */
+:root[data-ui-style-contract="v1"] .kimix-app-shell-toolbar .kimix-toolbar-compound-control {
+  border-radius: var(--ui-role-control-radius);
+}
+
+:root[data-ui-style-contract="v1"] .kimix-app-shell-toolbar .kimix-toolbar-compound-control > .kimix-split-control-part {
+  border-radius: 0;
+}
+
+/* 表单矩阵中的状态字段与输入字段共享几何，状态反馈仍由 toggle 角色负责。 */
+:root[data-ui-style-contract="v1"] .kimix-form-field-state-button {
+  border-radius: var(--ui-role-field-radius);
+}
+
+/* 同一弹窗 footer 的主次操作共享 primary action 几何，强调层级仍由各自材质表达。 */
+:root[data-ui-style-contract="v1"] .kimix-dialog-footer-action {
+  border-radius: var(--ui-role-primary-action-radius);
+}
+
 /* 工作区设置把权限项组织为一个分段容器：外层拥有边界，内项只消费状态表面。 */
 :root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission {
   border: 0;
@@ -4527,7 +4546,7 @@ button.bg-accent-primary:disabled:hover,
    menu-open state; map aria-expanded to the same selected menu material. */
 :root[data-ui-style-contract="v1"] .kimix-control-button[aria-expanded="true"] {
   border: var(--ui-role-menu-trigger-selected-border);
-  border-radius: var(--ui-role-menu-trigger-radius);
+  border-radius: var(--ui-role-control-radius);
   background: var(--ui-role-menu-trigger-selected-background);
   box-shadow: var(--ui-role-menu-trigger-selected-shadow);
 }
