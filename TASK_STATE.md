@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-08-31 修复：文件变更卡片底部黑线（v2.21.162）
+
+- 现象：文件超过三项并折叠时，底部「再显示 N 个文件」行在部分自定义风格、尤其悬停状态下出现一条突兀黑线。
+- 根因：该按钮已经是卡片最后一行，却额外携带 `border-b border-border-subtle`；自定义风格的 `.kimix-muted-action:hover` 交互桥接会重写边框颜色，使这条本无结构意义的末行分隔线随 control hover 边框加深。卡片外壳自身已有完整边界，错误不是 sectionCard shadow。
+- 修复：移除末行按钮的底边及 hover 透明覆盖技巧；有错误内容跟随时，错误块自身的 `border-t` 继续负责真实分隔。新增四文件折叠 DOM 回归，确保末行操作不再声明 divider。
+- 实机取证：`custom:win11-fluent-light` 下强制 hover 前按钮 bottom border 为 `1px #CDCECA`，hover 后变为 `1px #777876`；卡片 outer border 始终为 `1px #CDCECA`、shadow 为 none。
+- 验证：定向、typecheck、全量测试、知识校验、构建与实机 computed style 见收尾。
+
 ## 2026-08-31 修复：自定义风格同排同级控件几何专项收敛（v2.21.161）
 
 - 扫描范围：复核 UI Style v1 的 control/toggle/compoundControl/menuTrigger/roomChoice/field/primaryAction radius consumers，以及全部 state/control/split/room 角色和 `aria-expanded` 触点。

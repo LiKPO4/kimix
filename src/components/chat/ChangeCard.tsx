@@ -573,7 +573,7 @@ export const ChangeCard = memo(function ChangeCard({ changes, event }: ChangeCar
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="kimix-muted-action kimix-row-action flex min-h-8 w-full items-center border-b border-border-subtle text-left text-[13px] text-text-secondary transition-colors hover:border-b-transparent"
+            className="kimix-muted-action kimix-row-action flex min-h-8 w-full items-center text-left text-[13px] text-text-secondary transition-colors"
             style={{ paddingLeft: 26, paddingRight: 18, gap: 8 }}
           >
             <ChevronDown size={14} />

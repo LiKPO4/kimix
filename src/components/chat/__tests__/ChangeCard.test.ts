@@ -36,6 +36,29 @@ describe("ChangeCard", () => {
     await act(async () => root.unmount());
   });
 
+  it("does not render a terminal divider on the collapsed overflow action", async () => {
+    useAppStore.setState({ currentProject: project, currentSession: null });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(createElement(ChangeCard, {
+      changes: Array.from({ length: 4 }, (_, index) => ({
+        path: `src/example-${index}.ts`,
+        oldText: "before",
+        newText: "after",
+      })),
+    })));
+
+    const overflowAction = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("再显示 1 个文件"));
+    expect(overflowAction).toBeDefined();
+    expect(overflowAction?.classList.contains("border-b")).toBe(false);
+    expect(overflowAction?.classList.contains("hover:border-b-transparent")).toBe(false);
+
+    await act(async () => root.unmount());
+  });
+
   it("loads and expands an immutable commit preview when the file row is clicked", async () => {
     const event: Extract<TimelineEvent, { type: "change_summary" }> = {
       id: "change",
