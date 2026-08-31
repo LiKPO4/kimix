@@ -5223,7 +5223,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 type="button"
                 disabled={!canConfigureNextTurn || (towerModeEnabled && !swarmModeEnabled)}
                 onClick={() => void setSwarmModeForCurrentSession(!swarmModeEnabled, { feedback: "toast" })}
-                className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-state-button kimix-composer-mode-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: 84,
                   minWidth: 84,
@@ -5250,7 +5250,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             <button
               disabled={!canTogglePlanMode || (towerModeEnabled && !mutationPlanMode)}
               onClick={() => void handleTogglePlanMode()}
-              className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
+              className="kimix-icon-text-button kimix-state-button kimix-composer-mode-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
               style={{
                 width: 72,
                 minWidth: 72,
@@ -5271,7 +5271,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                 type="button"
                 disabled={towerMutationBusy || (!towerModeEnabled && !towerModeDesired && !canToggleTowerMode)}
                 onClick={() => void requestTowerMode()}
-                className="kimix-icon-text-button kimix-state-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
+                className="kimix-icon-text-button kimix-state-button kimix-composer-mode-button is-compact disabled:cursor-not-allowed disabled:opacity-35"
                 style={{
                   width: 80,
                   minWidth: 80,

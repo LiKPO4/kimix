@@ -413,6 +413,14 @@ describe("UI_STYLES", () => {
     expect(composer).toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*32,[\s\S]*?minHeight:\s*32,/s);
     expect(composer).not.toMatch(/ref=\{thinkingBtnRef\}[\s\S]*?height:\s*34,[\s\S]*?minHeight:\s*34,/s);
   });
+  it("Composer 同排模式键保留 toggle 状态材质并对齐 control 圆角", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+    const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+
+    expect(composer.match(/kimix-state-button kimix-composer-mode-button/g)).toHaveLength(3);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-composer-toolbar-secondary\s+\.kimix-composer-mode-button\s*\{[^}]*border-radius:\s*var\(--ui-role-control-radius\);/s);
+    expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\(\.kimix-state-button,\s*\.kimix-settings-permission\)[\s\S]*?background:\s*var\(--ui-role-toggle-selected-background\);/s);
+  });
   it("侧栏随行显形操作静止透明，仅单按钮交互时消费自定义材质", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");

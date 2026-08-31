@@ -4314,6 +4314,13 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-toggle-selected-shadow);
 }
 
+/* Composer 同排模式键保留 toggle 的状态材质，但几何要与相邻 control 一致。
+   自定义 toggle 可使用 pill；若直接消费其 radius，Swarm/Plan/Tower 会与思考强度
+   在同一工具行形成两套轮廓。弹层和设置页 toggle 不受此局部几何约束。 */
+:root[data-ui-style-contract="v1"] .kimix-composer-toolbar-secondary .kimix-composer-mode-button {
+  border-radius: var(--ui-role-control-radius);
+}
+
 /* 工作区设置把权限项组织为一个分段容器：外层拥有边界，内项只消费状态表面。 */
 :root[data-ui-style-contract="v1"] .kimix-settings-panel.is-workspace .kimix-settings-permission {
   border: 0;

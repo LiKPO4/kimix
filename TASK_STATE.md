@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-08-31 修复：Composer 模式按钮自定义风格圆角与同行不一致（v2.21.160）
+
+- 现象：启用允许 toggle 使用胶囊圆角的自定义界面风格后，Composer 同排的 Swarm、Plan、Tower 呈 999px 圆角，而思考强度按钮呈 4px 圆角，工具行出现两套轮廓。
+- 根因：三个模式按钮正确使用 `.kimix-state-button` 获取 toggle 的完整状态材质，但也无差别消费了 `--ui-role-toggle-radius`；思考强度属于普通 control，消费 `--ui-role-control-radius`。该自定义风格恰好把两者配置为 999px 与 4px，暴露了状态语义与同行几何被同一角色绑定的问题。
+- 修复：为工具行内三个模式按钮增加局部 `.kimix-composer-mode-button` 几何角色，仅在自定义契约下把圆角切到 control radius；边框、背景、阴影、颜色和 `aria-pressed` 选中态仍全部由 toggle 状态矩阵负责。弹层与设置页 toggle 不受影响。
+- 验证：定向 UI Style 回归 52 项和 typecheck 已通过；全量测试、知识校验、构建与实机 computed style 见收尾。
+
 ## 2026-08-31 修复：旧会话重开后误显示数百分钟“执行中”（v2.21.159）
 
 - 现象：已于前一日结束的会话，重开 Kimix 后仍显示 `执行中 913分+`，时间持续增长。
