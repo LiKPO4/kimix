@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：折叠侧栏导航图标与展开态不一致（v2.21.169）
+
+- 根因：折叠态导航图标未显式声明颜色、依赖按钮层叠继承，而 Tailwind v4 下无层自定义 CSS（.kimix-sidebar-nav-item 的 color: text-primary）胜过 utility 层的 text-text-secondary，图标变深；设置入口类无 color 声明不受影响，导致折叠列内部上深下浅；is-active 时折叠图标还会随按钮变成选中色，与展开态（图标恒定次要色）不一致。设置图标 18px vs 17px 差 1px；折叠列 padding 10/2 让 40px 按钮在 52px 列内左偏 4px。
+- 修复：折叠 4 个导航图标与设置图标全部显式 text-text-secondary（与展开同源），设置图标对齐 18px，折叠列 padding 改 6/6 使按钮水平居中。高度（导航 40、设置 36）与间距（4px）两种形态本就一致，未动。
+
 ## 2026-09-03 修复：自定义风格 hover 描边撑开布局（v2.21.168）
 
 - 根因：契约编译按状态独立生成边框宽度，border:none 状态输出 0px、可见边框状态输出 N px；canonicalization 又把多数角色 resting 归一成 flatTreatment（border:none），导致导入风格几乎必然出现 resting 0px → hover N px 跳变，定高控件内容盒被挤压、自适应行撑高推挤兄弟内容。

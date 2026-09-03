@@ -624,7 +624,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     return (
       <aside
         className="kimix-sidebar shrink-0 bg-surface-ground"
-        style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 10, paddingRight: 2, paddingTop: 0, paddingBottom: 18 }}
+        style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 6, paddingRight: 6, paddingTop: 0, paddingBottom: 18 }}
       >
         <div className="flex flex-col" style={{ gap: 4 }}>
           <button
@@ -640,7 +640,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title={creatingSessionProjectPath ? "创建中" : "新对话"}
             aria-label={creatingSessionProjectPath ? "创建中" : "新对话"}
           >
-            {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin" /> : <SquarePen size={17} />}
+            {creatingSessionProjectPath ? <Loader2 size={17} className="kimix-spin text-text-secondary" /> : <SquarePen size={17} className="text-text-secondary" />}
           </button>
           <button
             onClick={() => setSearchOpen(true)}
@@ -649,7 +649,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title="搜索"
             aria-label="搜索"
           >
-            <Search size={17} />
+            <Search size={17} className="text-text-secondary" />
           </button>
           <button
             onClick={() => void openPlugins()}
@@ -658,7 +658,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title="插件"
             aria-label="插件"
           >
-            <LayoutGrid size={17} />
+            <LayoutGrid size={17} className="text-text-secondary" />
           </button>
           <button
             onClick={() => toggleWorkspaceView("hooks")}
@@ -667,7 +667,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title="Hooks"
             aria-label="Hooks"
           >
-            <Webhook size={17} />
+            <Webhook size={17} className="text-text-secondary" />
           </button>
         </div>
         <div style={{ marginTop: "auto", height: 36 }}>
@@ -678,7 +678,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title="设置"
             aria-label="设置"
           >
-            <Settings size={17} />
+            <Settings size={18} className="text-text-secondary" />
           </button>
         </div>
       </aside>
