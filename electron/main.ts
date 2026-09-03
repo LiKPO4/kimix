@@ -6666,11 +6666,15 @@ ipcMain.handle("kimi-code:towerSnapshot", async (_, request: unknown) => {
 ipcMain.handle("kimi-code:setTowerMode", async (_, request: unknown) => {
   try {
     const req = KimiCodeTowerSetModeSchema.parse(request);
-    const preflight = await kimiCodeHost.preflightTower({ sessionId: req.sessionId });
-    if (req.enabled && !preflight.canEnable) {
-      return { success: false, error: preflight.warnings[0] ?? "当前工作区未通过 Tower 预检。" };
+    let base: string | undefined;
+    if (req.enabled) {
+      const preflight = await kimiCodeHost.preflightTower({ sessionId: req.sessionId });
+      if (!preflight.canEnable) {
+        return { success: false, error: preflight.warnings[0] ?? "当前工作区未通过 Tower 预检。" };
+      }
+      base = preflight.branch;
     }
-    await kimiCodeHost.setTowerMode(req.sessionId, req.enabled);
+    await kimiCodeHost.setTowerMode(req.sessionId, req.enabled, base);
     return { success: true, data: { enabled: req.enabled } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

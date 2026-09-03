@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   extractPendingServerQuestionIds,
+  buildTowerModeServerProfilePatch,
   resolveEngineStatusAfterPromptCompleted,
   resolveEffectiveServerEngineStatus,
   resolveExternalApprovalSettleStatus,
@@ -37,6 +38,15 @@ import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../ele
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
+  it("forwards the selected Tower base only when enabling the mode", () => {
+    expect(buildTowerModeServerProfilePatch(true, "release/next")).toEqual({
+      tower_mode: true,
+      tower_base: "release/next",
+    });
+    expect(buildTowerModeServerProfilePatch(false, "release/next")).toEqual({ tower_mode: false });
+    expect(buildTowerModeServerProfilePatch(true)).toEqual({ tower_mode: true });
+  });
+
   it("defaults to server host and reserves the environment override for diagnostics", () => {
     expect(isKimiCodeServerExperimentEnabled({})).toBe(true);
     expect(isKimiCodeServerExperimentEnabled({ KIMIX_EXPERIMENTAL_KIMI_SERVER: "1" })).toBe(true);

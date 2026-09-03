@@ -5533,7 +5533,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
               {towerPreflightDialog.dirty && towerPreflightDialog.allowed && (
                 <div className="flex rounded-lg bg-accent-warning-light text-[12.5px] leading-5 text-accent-warning" style={{ gap: 8, marginTop: 14, padding: "11px 12px" }}>
                   <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-                  <span>当前工作区有未提交改动。Tower 可以继续启动，但这些改动不会自动进入任何任务分支。</span>
+                  <span>当前工作区有未提交改动。首次创建任务分支时会把它们作为基础快照带入；若主工作区仍有与待合并文件重叠的改动，TowerMerge 会拒绝合并。</span>
                 </div>
               )}
               {(swarmModeEnabled || mutationPlanMode) && towerPreflightDialog.allowed && (

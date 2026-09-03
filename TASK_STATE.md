@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 对齐：Kimi Code 0.40 Tower 基础分支与恢复回归（v2.21.166）
+
+- 差异：0.40 的 `setTowerMode(enabled, base)` 与 Server profile `tower_base` 已支持显式基础分支，但 Kimix 仍只传布尔值；同时预检弹窗沿用 0.39 文案，错误声称 dirty checkout 不会进入任务分支。
+- 修复：开启时主进程以预检确认的当前分支作为 base，SDK 与 Server 两条链路统一转发；关闭时跳过启用预检且不携带旧 base，避免仓库状态变化后反而无法退出。dirty 文案更新为 0.40 的真实行为：首次 spawn 会创建基础快照，主 checkout 中与待合并文件重叠的改动会让 TowerMerge 拒绝合并。
+- 回归：锁定 Server profile patch、主进程预检 base 转发、SDK 调用签名和 dirty 文案；同时重跑旧会话 idle 收敛、快照恢复、官方/本地 prompt 队列、压缩事件映射与 Tower 测试组。
+
 ## 2026-09-03 修复：Kimi config.toml 改为原子替换（v2.21.165）
 
 - 根因：Kimix 的 TOML fallback 写入虽有读后比较保护，但最终使用 `writeFileSync(configPath, ...)` 直接截断目标文件；Kimi daemon 的文件监控可能在截断与写完之间读到空文件或半文件，正是 0.40 上游配置监控修复所规避的瞬态。

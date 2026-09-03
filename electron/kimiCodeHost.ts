@@ -138,7 +138,7 @@ type KimiCodeSessionLike = {
   steer(input: string | KimiCodePromptPart[]): Promise<void>;
   swarm?(input: string | KimiCodePromptPart[]): Promise<void>;
   setSwarmMode?(enabled: boolean, trigger?: "manual" | "task"): Promise<void>;
-  setTowerMode?(enabled: boolean): Promise<void>;
+  setTowerMode?(enabled: boolean, base?: string): Promise<void>;
   reloadSession?(options?: { forcePluginSessionStartReminder?: boolean }): Promise<unknown>;
   undoHistory?(count: number): Promise<void>;
   cancel(): Promise<void>;
@@ -1719,13 +1719,20 @@ function assertTowerSessionIsIdle(status: KimiCodeEngineStatus | undefined): voi
   }
 }
 
-export async function setTowerMode(sessionId: string, enabled: boolean): Promise<void> {
+export function buildTowerModeServerProfilePatch(enabled: boolean, base?: string): Record<string, unknown> {
+  return {
+    tower_mode: enabled,
+    ...(enabled && base ? { tower_base: base } : {}),
+  };
+}
+
+export async function setTowerMode(sessionId: string, enabled: boolean, base?: string): Promise<void> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
     assertTowerSessionIsIdle(serverManaged.status);
     try {
-      await getServerClient().updateSession(sessionId, { tower_mode: enabled });
+      await getServerClient().updateSession(sessionId, buildTowerModeServerProfilePatch(enabled, base));
       const status = await refreshServerSessionStatus(sessionId, true);
       serverManaged.towerMode = status.tower_mode === true;
       assertTowerModeEffective(enabled, serverManaged.towerMode);
@@ -1741,7 +1748,7 @@ export async function setTowerMode(sessionId: string, enabled: boolean): Promise
     throw new Error("当前 Kimi Code 兼容链路不支持 Tower；请升级到 0.39 或更高版本并重启。");
   }
   try {
-    await managed.session.setTowerMode(enabled);
+    await managed.session.setTowerMode(enabled, enabled ? base : undefined);
     const status = normalizeSdkSessionStatus(await managed.session.getStatus(), managed.status);
     assertTowerModeEffective(enabled, status.towerMode);
   } catch (error) {

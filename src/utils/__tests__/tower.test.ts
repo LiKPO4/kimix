@@ -61,6 +61,8 @@ describe("Tower renderer projection", () => {
   it("keeps the setting and Composer mode guards wired to the Tower contract", () => {
     const settings = readFileSync(resolve(process.cwd(), "src/components/settings/SettingsPanel.tsx"), "utf8");
     const composer = readFileSync(resolve(process.cwd(), "src/components/chat/Composer.tsx"), "utf8");
+    const host = readFileSync(resolve(process.cwd(), "electron/kimiCodeHost.ts"), "utf8");
+    const main = readFileSync(resolve(process.cwd(), "electron/main.ts"), "utf8");
     expect(settings).toContain('id: "tower"');
     expect(settings).toContain("重启 Kimix 或托管 Kimi Server");
     expect(composer).toContain("preflightKimiCodeTower");
@@ -68,5 +70,13 @@ describe("Tower renderer projection", () => {
     expect(composer).toContain("不能与多 Agent 房间协作同时使用");
     expect(composer).toContain("请先退出 Tower 后再开启 Plan");
     expect(composer).toContain("请先退出 Tower 后再使用 Swarm");
+    expect(composer).toContain("首次创建任务分支时会把它们作为基础快照带入");
+    expect(composer).toContain("与待合并文件重叠的改动");
+    expect(composer).toContain("TowerMerge 会拒绝合并");
+    expect(composer).not.toContain("这些改动不会自动进入任何任务分支");
+    expect(main).toContain("if (req.enabled) {");
+    expect(main).toContain("base = preflight.branch");
+    expect(main).toContain("setTowerMode(req.sessionId, req.enabled, base)");
+    expect(host).toContain("managed.session.setTowerMode(enabled, enabled ? base : undefined)");
   });
 });
