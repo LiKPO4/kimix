@@ -10,6 +10,8 @@ import {
   inFlightPromptMessagesToServerFrames,
   isKimiCodeServerSessionRoutingEnabled,
   isServerStreamProgressFrame,
+  isSystemTaskTurnTriggerFrame,
+  pollSystemTurnUntilSettled,
   KimiCodeServerClient,
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
@@ -2239,5 +2241,85 @@ describe("frame queue overflow protection", () => {
     expect(internals.queued[0]?.payload?.prompt_id).toBe("p-802");
     expect(internals.queued.at(-1)?.payload?.prompt_id).toBe("p-2001");
     warn.mockRestore();
+  });
+});
+
+describe("isSystemTaskTurnTriggerFrame", () => {
+  // 实测（issue-background-notification-turn-events-snapshot）：server 在后台任务终止时
+  // 双发 task.terminated + background.task.terminated，随后 task.notified 与
+  // turn.started(origin.kind=task)。
+  it("matches task terminal and notification frames", () => {
+    expect(isSystemTaskTurnTriggerFrame({ type: "background.task.terminated" })).toBe(true);
+    expect(isSystemTaskTurnTriggerFrame({ type: "task.terminated" })).toBe(true);
+    expect(isSystemTaskTurnTriggerFrame({ type: "task.notified" })).toBe(true);
+  });
+
+  it("matches task-origin turn.started only", () => {
+    expect(isSystemTaskTurnTriggerFrame({ type: "turn.started", payload: { origin: { kind: "task" } } })).toBe(true);
+    expect(isSystemTaskTurnTriggerFrame({ type: "turn.started", payload: { origin: { kind: "background_task" } } })).toBe(true);
+    expect(isSystemTaskTurnTriggerFrame({ type: "turn.started", payload: { origin: { kind: "user" } } })).toBe(false);
+    expect(isSystemTaskTurnTriggerFrame({ type: "turn.started", payload: {} })).toBe(false);
+    expect(isSystemTaskTurnTriggerFrame({ type: "assistant.delta" })).toBe(false);
+  });
+});
+
+describe("pollSystemTurnUntilSettled", () => {
+  const sleep = () => Promise.resolve();
+
+  it("keeps polling while the system turn is in flight and settles when it disappears", async () => {
+    let tick = 0;
+    const states = [{ inFlight: true }, { inFlight: true }, { inFlight: false }];
+    const result = await pollSystemTurnUntilSettled({
+      recover: async () => states[Math.min(tick++, states.length - 1)],
+      shouldAbort: () => false,
+      intervalMs: 1,
+      sleep,
+      now: (() => { let t = 0; return () => (t += 500); })(),
+    });
+    expect(result).toBe("settled");
+    expect(tick).toBe(3);
+  });
+
+  it("settles after the grace window when no in-flight turn ever materializes", async () => {
+    let tick = 0;
+    let t = 0;
+    const result = await pollSystemTurnUntilSettled({
+      recover: async () => { tick++; return { inFlight: false }; },
+      shouldAbort: () => false,
+      intervalMs: 1,
+      graceMs: 1_000,
+      sleep,
+      now: () => (t += 400),
+    });
+    expect(result).toBe("settled");
+    expect(tick).toBeGreaterThan(1);
+  });
+
+  it("aborts as soon as shouldAbort flips", async () => {
+    let aborted = false;
+    const result = await pollSystemTurnUntilSettled({
+      recover: async () => {
+        aborted = true;
+        return { inFlight: true };
+      },
+      shouldAbort: () => aborted,
+      intervalMs: 1,
+      sleep,
+      now: (() => { let t = 0; return () => (t += 100); })(),
+    });
+    expect(result).toBe("aborted");
+  });
+
+  it("expires past the ttl while the turn never settles", async () => {
+    let t = 0;
+    const result = await pollSystemTurnUntilSettled({
+      recover: async () => ({ inFlight: true }),
+      shouldAbort: () => false,
+      intervalMs: 1,
+      ttlMs: 2_000,
+      sleep,
+      now: () => (t += 700),
+    });
+    expect(result).toBe("expired");
   });
 });

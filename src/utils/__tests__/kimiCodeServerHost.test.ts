@@ -33,6 +33,7 @@ import {
   toKimiCodeMcpServerInfo,
   isTurnCompletionEventType,
   isSnapshotReplayFrame,
+  isLiveMainTurnActivityFrame,
 } from "../../../electron/kimiCodeHost";
 import { resolveRuntimeModelPolicy, resolveRuntimeThinkingEffort } from "../../../electron/kimiCodeRuntimePolicy";
 import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../electron/kimiCodeServerClient";
@@ -581,5 +582,28 @@ describe("isTurnCompletionEventType / isSnapshotReplayFrame（缓存提示活动
     expect(isSnapshotReplayFrame({ payload: { type: "turn.ended", snapshotReplay: "in_flight" } })).toBe(true);
     expect(isSnapshotReplayFrame({ payload: { type: "turn.ended" } })).toBe(false);
     expect(isSnapshotReplayFrame({})).toBe(false);
+  });
+});
+
+describe("isLiveMainTurnActivityFrame", () => {
+  // issue-background-notification-turn：快照重放的是已落库历史，不得据它提升
+  // mainTurnActive / 重开 running，否则无实况终态帧的系统轮（后台通知轮）补全后
+  // 会话永久卡 running（footer 永「消息处理中」）。
+  it("treats live activity frames as main-turn activity", () => {
+    expect(isLiveMainTurnActivityFrame({ type: "assistant.delta" })).toBe(true);
+    expect(isLiveMainTurnActivityFrame({ type: "thinking.delta" })).toBe(true);
+    expect(isLiveMainTurnActivityFrame({ type: "tool.call.started" })).toBe(true);
+    expect(isLiveMainTurnActivityFrame({ type: "tool.call.delta" })).toBe(true);
+  });
+
+  it("rejects snapshot replay frames even when they carry delta types", () => {
+    expect(isLiveMainTurnActivityFrame({ type: "assistant.delta", payload: { snapshotReplay: "history" } })).toBe(false);
+    expect(isLiveMainTurnActivityFrame({ type: "thinking.delta", payload: { snapshotReplay: "in_flight" } })).toBe(false);
+    expect(isLiveMainTurnActivityFrame({ type: "tool.call.started", payload: { snapshotReplay: "history" } })).toBe(false);
+  });
+
+  it("rejects non-activity frames", () => {
+    expect(isLiveMainTurnActivityFrame({ type: "turn.started" })).toBe(false);
+    expect(isLiveMainTurnActivityFrame({ type: "prompt.completed" })).toBe(false);
   });
 });

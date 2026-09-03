@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：后台任务完成通知轮正文丢失/卡「消息处理中」（v2.21.172）
+
+- 快照（docs/issue-background-notification-turn-events-snapshot.md，探针 scripts/probe-kimi-code-background-notification.mjs 实测）定案：Server 的 prompt 交付屏障只覆盖客户端 prompt 轮；后台任务终止后系统通知轮只有 task.terminated/turn.started(origin=task)/task.notified/turn.step.started 四个实况帧，assistant.delta/turn.ended/prompt.completed 均不广播，内容只能经快照拉取。`/status` busy 在仅后台任务运行时也为 true，收敛只能看 in_flight_turn。
+- 三处修复：① Server 客户端新增有界系统轮快照追踪（pollSystemTurnUntilSettled，3s 轮询至 in_flight 消失，20s 宽限/10min TTL/退订或本地新 prompt 中止，recoverSnapshot 改为返回 { inFlight }）；② 主进程快照重放帧不再提升 mainTurnActive、不再重开 running（isLiveMainTurnActivityFrame），根治状态永卡 running；③ 渲染层通知类 status_update 在前轮 assistant 全部完结时切出新轮（官方 activeOrNewTurn 语义），通知卡折进新轮过程链，正文归属新轮。
+- 知识库：runtime-routing.md 新增不变量 105。
+
 ## 2026-09-03 修复：右侧会话侧栏/Diff 面板圆角与主区域同源（v2.21.171）
 
 - 实机取证（CDP computed style，custom:win11-fluent-light）：面板 12px（inspector 角色半径）、主区域 8px（shell 角色半径），用户感知为"没吃到圆角"。

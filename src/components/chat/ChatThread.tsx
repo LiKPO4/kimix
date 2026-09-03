@@ -1397,6 +1397,18 @@ export function buildRenderItems(
       currentTurnUserEvent = event;
       continue;
     }
+    // 后台任务/定时任务等系统通知（官方 role=user 信封折叠成的 status_update）：
+    // 官方 admission=activeOrNewTurn——前轮 assistant 已全部完结（无活跃轮）时通知
+    // 自己开新轮，切分让后续正文归属新轮（官方 web：通知卡 + 新 assistant 轮）；
+    // 前轮仍在进行（assistant 未完结）或还没有 assistant 时保持折进当前轮。
+    // （issue-background-notification-turn：不切分会把通知轮正文并进上一轮气泡。）
+    if (event.type === "status_update" && event.notification) {
+      const bodyAssistants = turnBody.filter((candidate) => candidate.type === "assistant_message");
+      const previousTurnComplete = bodyAssistants.length > 0 && bodyAssistants.every((candidate) => candidate.isComplete);
+      if (previousTurnComplete) flushTurn(false, true);
+      turnBody.push(event);
+      continue;
+    }
     // steer_message 的 turn 边界语义是「条件化」的（v2.20.244）：
     // 官方 steer 注入后 turnId 不变（同一 turn 继续），但官方把 steered user
     // 作为轮间边界（kimi-web 显示「user → 工作轮 1 → steer → 工作轮 2」两个

@@ -895,6 +895,18 @@ export function isSnapshotReplayFrame(frame: { payload?: unknown }): boolean {
     typeof (payload as { snapshotReplay?: unknown }).snapshotReplay === "string";
 }
 
+/**
+ * live 活动帧才可能证明主轮仍在工作；快照重放帧重放的是已落库历史（含后台通知轮
+ * 的事后补全），不得据它提升 mainTurnActive 或把 completed 重开成 running——否则
+ * 无实况终态帧的系统轮（后台任务通知轮）在快照补全后会把会话永久卡在 running，
+ * footer 永「消息处理中」（issue-background-notification-turn-events-snapshot）。
+ */
+export function isLiveMainTurnActivityFrame(frame: { type: string; payload?: unknown }): boolean {
+  const isActivityType = frame.type === "thinking.delta" || frame.type === "assistant.delta" ||
+    frame.type === "tool.call.started" || frame.type === "tool.call.delta";
+  return isActivityType && !isSnapshotReplayFrame(frame);
+}
+
 function recordTurnCompletion(sessionId: string): void {
   const now = Date.now();
   const previous = lastTurnCompletedAt.get(sessionId) ?? 0;
@@ -3721,9 +3733,10 @@ function handleServerFrame(frame: ServerFrame) {
   // while tools continue (diag: settled_complete then tool.call.started via
   // watchdog recoverSnapshot, tool counts still climbing).
   const turnTrack = serverSessions.get(sessionId);
-  if (turnTrack && (frame.type === "thinking.delta" || frame.type === "assistant.delta")) turnTrack.mainTurnActive = true;
+  const liveMainTurnActivity = isLiveMainTurnActivityFrame(frame);
+  if (turnTrack && liveMainTurnActivity && (frame.type === "thinking.delta" || frame.type === "assistant.delta")) turnTrack.mainTurnActive = true;
   if (
-    (frame.type === "tool.call.started" || frame.type === "tool.call.delta" || frame.type === "thinking.delta" || frame.type === "assistant.delta")
+    liveMainTurnActivity
     && serverSessions.get(sessionId)?.status === "completed"
     && serverSessions.get(sessionId)?.mainTurnActive !== false
   ) {

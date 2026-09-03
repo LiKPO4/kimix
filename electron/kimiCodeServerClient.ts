@@ -188,7 +188,7 @@ export type ServerPromptIdleResolution =
  */
 export async function resolveServerPromptIdleTimeout(
   readStatus: () => Promise<ServerSessionActivityStatus>,
-  recoverSnapshot: () => Promise<void>,
+  recoverSnapshot: () => Promise<unknown>,
 ): Promise<ServerPromptIdleResolution> {
   let status: ServerSessionActivityStatus;
   try {
@@ -422,6 +422,16 @@ const POST_TERMINAL_EXTERNAL_PROMPT_PROBE_INTERVAL_MS = 4_000;
 // snapshot 恢复（重新查看/重连对账）会重新 arm，不会永久失守。
 const POST_TERMINAL_EXTERNAL_WATCH_TTL_MS = 30 * 60_000;
 
+// 系统任务轮（后台任务终止触发的通知轮）没有任何实况增量/终态帧（server 的 prompt 交付
+// 屏障只覆盖客户端 prompt 轮，实测见 docs/issue-background-notification-turn-events-snapshot.md），
+// 只能靠快照轮询把进度与终态拉齐。收到任务终态/通知帧后启动有界追踪：每 3s 拉一次快照，
+// 直到 in_flight_turn 消失（终态已随该次快照重放送达）。
+const SYSTEM_TURN_SNAPSHOT_POLL_INTERVAL_MS = 3_000;
+// task.terminated 先于通知落库/开轮到达（实测间隔仅毫秒级，但快照可见性无保证）；
+// 宽限期内未见在飞轮则视为通知折进了活跃轮或无需新轮，收敛退出。
+const SYSTEM_TURN_TRACK_GRACE_MS = 20_000;
+const SYSTEM_TURN_TRACK_TTL_MS = 10 * 60_000;
+
 export function serverMessageProgressMarker(
   message: ServerMessageSummary | null | undefined,
 ): string | null {
@@ -481,6 +491,59 @@ export function shouldReconnectForFixedSilenceLimit(input: {
 }): boolean {
   if (!input.hasPendingPrompts) return false;
   return input.silenceMs >= (input.limitMs ?? WS_SILENCE_LIMIT_MS);
+}
+
+/**
+ * 系统任务轮触发帧：后台任务终态/通知广播，或以任务为 origin 的新轮开始。
+ * 这些帧之后 Server 不再广播该轮的增量与终态，调用方应启动快照追踪。
+ */
+export function isSystemTaskTurnTriggerFrame(frame: { type: string; payload?: unknown }): boolean {
+  if (
+    frame.type === "background.task.terminated" ||
+    frame.type === "task.terminated" ||
+    frame.type === "task.notified" ||
+    frame.type === "background.task.notified"
+  ) return true;
+  if (frame.type !== "turn.started") return false;
+  const payload = isRecord(frame.payload) ? frame.payload : {};
+  const origin = isRecord(payload.origin) ? payload.origin : undefined;
+  const kind = typeof origin?.kind === "string" ? origin.kind : "";
+  return kind === "task" || kind === "background_task" || kind === "task_notification";
+}
+
+/**
+ * 有界系统轮快照追踪：每 intervalMs 拉一次快照（recover 负责广播重放），
+ * 见过在飞轮后等它消失即收敛（终态随该次快照送达）；宽限期内从未见过在飞轮
+ * 说明通知折进了活跃轮或无需新轮，同样收敛。返回收敛/中止/超时原因。
+ */
+export async function pollSystemTurnUntilSettled(options: {
+  recover: () => Promise<{ inFlight: boolean }>;
+  shouldAbort: () => boolean;
+  intervalMs?: number;
+  graceMs?: number;
+  ttlMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}): Promise<"settled" | "aborted" | "expired"> {
+  const intervalMs = options.intervalMs ?? SYSTEM_TURN_SNAPSHOT_POLL_INTERVAL_MS;
+  const graceMs = options.graceMs ?? SYSTEM_TURN_TRACK_GRACE_MS;
+  const ttlMs = options.ttlMs ?? SYSTEM_TURN_TRACK_TTL_MS;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const now = options.now ?? Date.now;
+  const startedAt = now();
+  let sawInFlight = false;
+  for (;;) {
+    await sleep(intervalMs);
+    if (options.shouldAbort()) return "aborted";
+    if (now() - startedAt > ttlMs) return "expired";
+    const state = await options.recover();
+    if (state.inFlight) {
+      sawInFlight = true;
+      continue;
+    }
+    if (sawInFlight) return "settled";
+    if (now() - startedAt > graceMs) return "settled";
+  }
 }
 
 class ServerSessionIdleTimeoutError extends Error {
@@ -962,7 +1025,9 @@ export class KimiCodeServerClient {
   private readonly listeners = new Set<FrameListener>();
   private readonly subscribed = new Set<string>();
   private readonly cursors = new Map<string, ServerCursor>();
-  private readonly recoveringSnapshots = new Map<string, Promise<void>>();
+  private readonly recoveringSnapshots = new Map<string, Promise<{ inFlight: boolean }>>();
+  // 系统任务轮快照追踪：每个会话同时最多一条（后台任务可能接连终止，快照本身全覆盖）。
+  private readonly systemTurnTrackers = new Set<string>();
   private readonly promptCompletionBarriers = new Map<string, Promise<void>>();
   private readonly queued: ServerFrame[] = [];
   private lastOverflowLogAt = 0;
@@ -1112,6 +1177,19 @@ export class KimiCodeServerClient {
     this.postTerminalExternalWatch.set(sessionId, { terminalAt, lastProbeAt: 0, armedAt: Date.now() });
   }
 
+  // 系统任务轮追踪：每会话一条，中止于取消订阅/本地新 prompt（live 流接管）/TTL。
+  private trackSystemTurnUntilSettled(sessionId: string): void {
+    if (this.systemTurnTrackers.has(sessionId) || !this.subscribed.has(sessionId)) return;
+    this.systemTurnTrackers.add(sessionId);
+    void pollSystemTurnUntilSettled({
+      recover: () => this.recoverSnapshot(sessionId),
+      shouldAbort: () => !this.subscribed.has(sessionId) || this.pendingPrompts.has(sessionId),
+    }).catch(() => {
+      // 追踪失败不影响主链路；轮末观察窗与静默探针仍兜底。
+    }).finally(() => {
+      this.systemTurnTrackers.delete(sessionId);
+    });
+  }
   // live 轮末帧路径的基线校准：探针把官方时间戳的 userAt 与本地时间的 terminalAt 直接比较，
   // 两端时钟偏差会漏检（本地钟偏快时轮末后的新消息被误判为旧消息）。取「时间戳最大的一条」
   // 作为官方基线（与列表顺序无关），校准后探针为纯顺序比较；失败保持本地时间基线（等效旧行为）。
@@ -2117,6 +2195,12 @@ export class KimiCodeServerClient {
         }
       }
     }
+    // 系统任务轮（后台任务终止触发的通知轮）没有任何实况增量/终态帧，只能靠快照
+    // 轮询拉齐（docs/issue-background-notification-turn-events-snapshot.md）：收到触发帧
+    // 即启动有界追踪，否则通知轮正文与终态永远不会到达渲染层（正文丢失 + 状态卡 running）。
+    if (frame.session_id && isSystemTaskTurnTriggerFrame(frame)) {
+      this.trackSystemTurnUntilSettled(frame.session_id);
+    }
     if (frame.type === "resync_required") {
       const sessionId = (frame.payload as { session_id?: unknown } | undefined)?.session_id;
       if (typeof sessionId === "string") void this.recoverSnapshot(sessionId).catch(() => undefined);
@@ -2210,13 +2294,13 @@ export class KimiCodeServerClient {
     for (const sessionId of payload?.resync_required ?? []) await this.recoverSnapshot(sessionId);
   }
 
-  private async recoverSnapshot(sessionId: string, options?: { resubCursor?: { seq: number; epoch?: string } }) {
+  private async recoverSnapshot(sessionId: string, options?: { resubCursor?: { seq: number; epoch?: string } }): Promise<{ inFlight: boolean }> {
     if (!this.subscribed.has(sessionId)) {
       throw new Error(`Kimi Server snapshot 恢复失败：会话 ${sessionId} 未订阅。`);
     }
     const inFlight = this.recoveringSnapshots.get(sessionId);
     if (inFlight) return inFlight;
-    const recovery = (async () => {
+    const recovery = (async (): Promise<{ inFlight: boolean }> => {
       sdiag(`[wssnap] start ${sessionId.slice(-8)}`);
       const snapshot = await this.request<ServerSnapshot>(
         `/api/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
@@ -2240,7 +2324,8 @@ export class KimiCodeServerClient {
         payload: snapshot,
       };
       for (const listener of this.listeners) listener(frame);
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+      const recoveryState = { inFlight: Boolean(snapshot.in_flight_turn) };
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return recoveryState;
 // resubCursor 显式传入轮前 cursor：server 回放新轮早到帧；调用方须保证边界已先挂载。
 // 无显式 cursor 时按 snapshot as_of_seq 续订。
       const ack = await this.sendControl("subscribe", {
@@ -2251,10 +2336,11 @@ export class KimiCodeServerClient {
       });
       sdiag(`[wssnap] resub ${sessionId.slice(-8)} ack=${ack.code}`);
       if (ack.code !== 0) throw new Error(`Kimi Server snapshot 重订阅失败：${ack.msg ?? ack.code}`);
+      return recoveryState;
     })();
     this.recoveringSnapshots.set(sessionId, recovery);
     try {
-      await recovery;
+      return await recovery;
     } finally {
       if (this.recoveringSnapshots.get(sessionId) === recovery) {
         this.recoveringSnapshots.delete(sessionId);

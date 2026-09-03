@@ -1671,3 +1671,55 @@ describe("buildRenderItems steer boundary", () => {
     expect(header.event.isComplete).toBe(true);
   });
 });
+
+describe("buildRenderItems background notification turn boundary", () => {
+  const notificationDetail = {
+    kind: "notification" as const,
+    type: "task.completed",
+    category: "task",
+    sourceKind: "background_task",
+    sourceId: "bash-xrcnk1a1",
+    title: "Background process completed",
+    raw: "<notification id=\"task:bash-xrcnk1a1:completed\" type=\"task.completed\">Title: Background process completed</notification>",
+  };
+
+  it("starts a new turn at a background-task notification once the previous turn is fully complete", () => {
+    // 实机场景（issue-background-notification-turn）：主轮已 prompt.completed，
+    // 后台 bash 结束后官方把 <notification> 作为新轮 user 信封落库；快照重放把它
+    // 映射为 status_update，其后跟着通知轮的 assistant 正文。两者必须切出独立轮，
+    // 否则正文并入上一轮气泡（官方 web：通知卡 + 新 assistant 轮）。
+    const events: TimelineEvent[] = [{
+      id: "user", type: "user_message", timestamp: 1, content: "修复圆角",
+    }, {
+      id: "assistant", type: "assistant_message", timestamp: 2, content: "修复完成。", isThinking: false, isComplete: true,
+    }, {
+      id: "notify", type: "status_update", timestamp: 3, message: "后台任务已完成：启动 Kimix dev 实例",
+      source: "runtime", tone: "success", notification: notificationDetail,
+    }, {
+      id: "assistant-2", type: "assistant_message", timestamp: 4, content: "刚收到通知，实例已退出。", isThinking: false, isComplete: true,
+    }];
+    const items = buildRenderItems(events, "kimi-code");
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants.map((item) => (item.type === "event" && item.event.type === "assistant_message" ? item.event.content : ""))).toEqual([
+      "修复完成。",
+      "刚收到通知，实例已退出。",
+    ]);
+  });
+
+  it("folds a background-task notification into the current turn while it is still active", () => {
+    // 官方 admission=activeOrNewTurn：有活跃轮时通知折进当前轮，不切分。
+    const events: TimelineEvent[] = [{
+      id: "user", type: "user_message", timestamp: 1, content: "继续处理",
+    }, {
+      id: "assistant", type: "assistant_message", timestamp: 2, content: "正在处理…", isThinking: false, isComplete: false,
+    }, {
+      id: "notify", type: "status_update", timestamp: 3, message: "后台任务已完成：xxx",
+      source: "runtime", tone: "success", notification: notificationDetail,
+    }, {
+      id: "assistant-2", type: "assistant_message", timestamp: 4, content: "处理完毕。", isThinking: false, isComplete: true,
+    }];
+    const items = buildRenderItems(events, "kimi-code");
+    const assistants = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistants).toHaveLength(1);
+  });
+});

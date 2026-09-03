@@ -300,10 +300,12 @@ describe("buildRenderItems notification cards", () => {
     },
   } as TimelineEvent);
 
-  it("轮内通知折进 assistant 过程链（turnBlocks），不再独立渲染、不进 footer", () => {
+  it("进行中轮次的通知折进 assistant 过程链（turnBlocks），不再独立渲染、不进 footer", () => {
+    // 官方 admission=activeOrNewTurn：有活跃轮（assistant 未完结）时通知折进当前轮。
+    // （已完结轮后的通知会切出新轮，见 chatRenderItems.test.ts 的边界用例。）
     const items = buildRenderItems([
       { id: "user", type: "user_message", timestamp: 1, content: "跑测试" } as TimelineEvent,
-      assistantEvent("完成", { timestamp: 2 }),
+      assistantEvent("完成", { timestamp: 2, isComplete: false }),
       notificationStatus("n1", 3),
     ], "kimi-code");
     const standalone = items.filter((item) => item.type === "event" && item.event.type === "status_update" && (item.event as { notification?: unknown }).notification);
@@ -315,10 +317,10 @@ describe("buildRenderItems notification cards", () => {
     expect(trailing?.some((status) => status.id === "n1")).toBeFalsy();
   });
 
-  it("连续 3 条通知全部折进过程链，不产生 notification_group 渲染项", () => {
+  it("进行中轮次连续 3 条通知全部折进过程链，不产生 notification_group 渲染项", () => {
     const items = buildRenderItems([
       { id: "user", type: "user_message", timestamp: 1, content: "跑测试" } as TimelineEvent,
-      assistantEvent("完成", { timestamp: 2 }),
+      assistantEvent("完成", { timestamp: 2, isComplete: false }),
       notificationStatus("n1", 3),
       notificationStatus("n2", 4),
       notificationStatus("n3", 5),
