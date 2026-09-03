@@ -123,7 +123,7 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
   { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
-  { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。" },
+  { value: "yolo", label: "自动通过", desc: "自动批准普通工具；危险命令和敏感操作仍会确认", tooltip: "自动通过：普通工具自动批准；危险命令、敏感操作和关键问题仍会确认。" },
   { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
 ];
 

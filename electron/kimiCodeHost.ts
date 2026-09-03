@@ -3660,14 +3660,9 @@ function handleServerFrame(frame: ServerFrame) {
   if (frame.type === "event.approval.requested") {
     const requestId = typeof payload.approval_id === "string" ? payload.approval_id : undefined;
     if (!requestId) return;
-    if (serverSessions.get(sessionId)?.permission === "yolo") {
-      setStatus(sessionId, "running");
-      void getServerClient().resolveApproval(sessionId, requestId, {
-        decision: "approved",
-        scope: "session",
-      }).catch((error) => emitServerError(sessionId, error));
-      return;
-    }
+    // Upstream already auto-approves ordinary YOLO actions before this boundary.
+    // Any approval request that still reaches the host is an intentional forced ask
+    // (for example a dangerous command or sensitive operation) and must be surfaced.
     serverApprovalIds.add(pendingKey(sessionId, requestId));
     setStatus(sessionId, "waiting_approval");
     eventSink?.({ sessionId, event: { type: "kimix.approval.request", requestId, request: payload } });
@@ -4252,12 +4247,8 @@ async function waitForOfficialSteerRecord(
 
 function attachInteractionHandlers(session: KimiCodeSessionLike) {
   session.setApprovalHandler?.(async (request) => {
-    // Full-access (yolo) bound: never bother the user with an approval card when
-    // the session is in full-access mode, even if the SDK still routes the
-    // request here (e.g. permission drift). Auto-approve for the whole session.
-    if (sessions.get(session.id)?.permission === "yolo") {
-      return { decision: "approved", scope: "session", selectedLabel: "Allow for session" };
-    }
+    // The SDK consumes ordinary YOLO approvals internally. Reaching this handler
+    // means upstream intentionally requires a user decision, regardless of mode.
     const requestId = getRequestId(request, "approval");
     const key = pendingKey(session.id, requestId);
     setStatus(session.id, "waiting_approval");

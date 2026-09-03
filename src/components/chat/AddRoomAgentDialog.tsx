@@ -8,7 +8,7 @@ import type { RoomAgentDraft } from "@/utils/roomAgentProvisioning";
 
 const PERMISSIONS: Array<{ value: PermissionMode; label: string; description: string }> = [
   { value: "manual", label: "逐条确认", description: "每个工具操作都需手动确认" },
-  { value: "yolo", label: "自动通过", description: "自动批工具，关键问题仍询问" },
+  { value: "yolo", label: "自动通过", description: "普通工具自动批，危险或敏感操作仍确认" },
   { value: "auto", label: "完全自主", description: "完全自主运行，不再询问" },
 ];
 

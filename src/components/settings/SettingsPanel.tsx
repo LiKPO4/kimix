@@ -1723,7 +1723,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
     { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", icon: Shield, tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
-    { value: "yolo", label: "自动通过", desc: "自动批准工具操作，但遇到关键问题仍会询问", icon: GitBranch, tooltip: "自动通过：自动批准工具操作，但遇到关键问题仍会询问。谨慎使用。" },
+    { value: "yolo", label: "自动通过", desc: "自动批准普通工具；危险命令和敏感操作仍会确认", icon: GitBranch, tooltip: "自动通过：普通工具自动批准；危险命令、敏感操作和关键问题仍会确认。谨慎使用。" },
     { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
   ];
   // 设置面板路径：有 runtime 时权限调整「立即写 server」（写后回读校准），
