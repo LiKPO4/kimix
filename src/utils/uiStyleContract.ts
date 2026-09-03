@@ -256,10 +256,13 @@ function treatmentVariables(
   state: "resting" | "hover" | "active" | "selected" | "focus",
   treatment: UiStyleTreatment,
   document: UiStyleDocumentV1,
+  reservedBorderWidth: number,
 ) {
   const prefix = `--ui-role-${kebabCase(roleId)}-${state}` as const;
+  // 边框宽度按角色跨状态恒定：border 为 none 的状态也预留角色宽度（透明色），
+  // 否则 hover/active 从 0 跳到 N px 会撑开盒模型、推挤兄弟内容。
   const borderWidth = treatment.border === "none"
-    ? 0
+    ? reservedBorderWidth
     : roleId === "field"
       ? document.primitives.border.controlWidth
       : document.primitives.border.surfaceWidth;
@@ -314,9 +317,14 @@ export function compileUiStyleVariables(document: UiStyleDocumentV1): UiStyleCss
     variables[`${rolePrefix}-radius`] = radiusMax >= 999
       ? radiusReference
       : `min(${radiusReference}, ${radiusMax}px)`;
-    treatmentVariables(variables, roleKey, "resting", role.resting, document);
+    // 该角色任一状态声明了可见边框时，所有状态（含 border:none）都按角色宽度预留，
+    // 让交互态只改颜色不改几何。field 用 controlWidth，其余角色用 surfaceWidth。
+    const roleBorderWidth = roleKey === "field" ? border.controlWidth : border.surfaceWidth;
+    const reservedBorderWidth = [role.resting, role.hover ?? role.resting, role.active ?? role.resting, role.selected ?? role.resting, role.focus ?? role.resting]
+      .some((treatment) => treatment.border !== "none") ? roleBorderWidth : 0;
+    treatmentVariables(variables, roleKey, "resting", role.resting, document, reservedBorderWidth);
     for (const state of ["hover", "active", "selected", "focus"] as const) {
-      treatmentVariables(variables, roleKey, state, role[state] ?? role.resting, document);
+      treatmentVariables(variables, roleKey, state, role[state] ?? role.resting, document, reservedBorderWidth);
     }
   }
   return variables;

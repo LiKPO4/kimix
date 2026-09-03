@@ -268,6 +268,25 @@ describe("compileUiStyleVariables", () => {
     expect(variables["--ui-role-shell-selected-shadow"]).toBe(variables["--ui-role-shell-resting-shadow"]);
   });
 
+  it("角色边框宽度跨状态恒定：任一状态有可见边框时 none 状态预留宽度，交互态不再改变几何", () => {
+    const document = documentFixture();
+    document.primitives.border.controlWidth = 2;
+    document.primitives.border.surfaceWidth = 1;
+    // fixture：所有角色 resting border:none、hover subtle、active default。
+    const variables = compileUiStyleVariables(document);
+    expect(variables["--ui-role-control-resting-border"]).toBe("1px solid transparent");
+    expect(variables["--ui-role-control-hover-border"]).toBe("1px solid var(--border-subtle)");
+    expect(variables["--ui-role-control-active-border"]).toBe("1px solid var(--border-default)");
+    // field 角色按 controlWidth 预留。
+    expect(variables["--ui-role-field-resting-border"]).toBe("2px solid transparent");
+    expect(variables["--ui-role-field-hover-border"]).toBe("2px solid var(--border-subtle)");
+    // 全部状态 border:none 的角色不预留，保持 0px。
+    document.roles.statusSurface = { radius: "pill", resting: flatTreatment };
+    const flatVariables = compileUiStyleVariables(document);
+    expect(flatVariables["--ui-role-status-surface-resting-border"]).toBe("0px solid transparent");
+    expect(flatVariables["--ui-role-status-surface-hover-border"]).toBe("0px solid transparent");
+  });
+
   it("内容承载角色硬限制超大圆角，紧凑控件仍允许 pill", () => {
     const document = documentFixture();
     document.roles.shell!.radius = "pill";

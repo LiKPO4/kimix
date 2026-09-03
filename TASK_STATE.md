@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：自定义风格 hover 描边撑开布局（v2.21.168）
+
+- 根因：契约编译按状态独立生成边框宽度，border:none 状态输出 0px、可见边框状态输出 N px；canonicalization 又把多数角色 resting 归一成 flatTreatment（border:none），导致导入风格几乎必然出现 resting 0px → hover N px 跳变，定高控件内容盒被挤压、自适应行撑高推挤兄弟内容。
+- 修复：compileUiStyleVariables 按角色跨状态归一边框宽度——任一状态有可见边框时，none 状态也输出 `Npx <style> transparent` 预留宽度（field 用 controlWidth，其余 surfaceWidth）；全 none 角色保持 0px。消费层 14 处 `border: var(--ui-role-X-<state>-border)` 无需改动即免疫任意导入 JSON。
+- 顺带清理：index.css 遗留 muted-action 桥接里 `border-color: var(--ui-role-control-hover-border)` 把完整 shorthand 赋给 border-color，属非法声明从未生效；移除并注释说明该桥接只画背景+阴影。
+- 参考：VS Code ux-css-layout（透明边框预留宽度）与 Tailwind ring 官方讨论（box-shadow 不在文档流）；方案对比与选型见当日审查记录。
+- 已知代价：有可见边框状态的角色，静止态内容盒恒定小 2N px（透明边框占位，不可见）；实机视觉验收待用户截图回传。
+
 ## 2026-09-03 审查：0.39.0 → 0.40.1 跟进质量复核与收尾修复（无版本 bump）
 
 - 审查结论：0.40.1 确为上游最新；逐条核对 0.39.1/0.40.0/0.40.1 changelog，需 Kimix 配合的变化（危险命令审批 #3290、配置原子保存 #3348、Tower base #3346/#3399、suggestFiles）均已落地，无版本遗漏；typecheck + 全量 2130 测试通过。

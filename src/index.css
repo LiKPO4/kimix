@@ -4569,14 +4569,15 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: var(--ui-role-menu-item-selected-shadow);
 }
 
-/* 遗留的上下文动作没有稳定的静态表面角色；只桥接交互态，避免整行被误画成凸起按钮。 */
+/* 遗留的上下文动作没有稳定的静态表面角色；只桥接交互态的背景与阴影，避免整行被误画成凸起按钮。
+   不桥接描边：旧代码把完整 border shorthand 赋给 border-color，属非法声明从未生效；
+   而 hover 临时加边框会撑开行高推挤兄弟内容。真实控件的边框宽度由契约按角色跨状态恒定预留。 */
 :root[data-ui-style-contract="v1"] :where(
   .kimix-muted-action,
   .kimix-settings-palette-action,
   button.kimix-chat-collapse-row,
   button.kimix-chat-process-row
 ):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):hover:not(:disabled) {
-  border-color: var(--ui-role-control-hover-border);
   border-radius: var(--ui-role-control-radius, inherit);
   background: var(--ui-role-control-hover-background);
   box-shadow: var(--ui-role-control-hover-shadow);
@@ -4588,7 +4589,6 @@ button.bg-accent-primary:disabled:hover,
   button.kimix-chat-collapse-row,
   button.kimix-chat-process-row
 ):not([class^="bg-accent-"]):not([class*=" bg-accent-"]):active:not(:disabled) {
-  border-color: var(--ui-role-control-active-border);
   border-radius: var(--ui-role-control-radius, inherit);
   background: var(--ui-role-control-active-background);
   box-shadow: var(--ui-role-control-active-shadow);
