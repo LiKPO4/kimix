@@ -18,6 +18,7 @@ import path from "node:path";
 import {
   extractPendingServerQuestionIds,
   buildTowerModeServerProfilePatch,
+  normalizeKimiFileSuggestions,
   resolveEngineStatusAfterPromptCompleted,
   resolveEffectiveServerEngineStatus,
   resolveExternalApprovalSettleStatus,
@@ -38,6 +39,15 @@ import { isKimiCodeSessionMissingError, toServerConfigPatch } from "../../../ele
 import { getKimiCodeSessionAlreadyExistsId, isKimiCodeSessionAlreadyExistsError } from "../../../electron/kimiCodeServerClient";
 
 describe("kimiCodeServerHost", () => {
+  it("normalizes Server and SDK file suggestions while excluding directories and malformed rows", () => {
+    expect(normalizeKimiFileSuggestions({ items: [
+      { path: "src/App.tsx", name: "App.tsx", kind: "file" },
+      { path: "src", name: "src", kind: "directory" },
+      { path: 42, name: "bad", kind: "file" },
+    ] })).toEqual([{ path: "src/App.tsx", name: "App.tsx" }]);
+    expect(normalizeKimiFileSuggestions(undefined)).toBeUndefined();
+  });
+
   it("forwards the selected Tower base only when enabling the mode", () => {
     expect(buildTowerModeServerProfilePatch(true, "release/next")).toEqual({
       tower_mode: true,

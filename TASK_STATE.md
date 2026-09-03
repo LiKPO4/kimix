@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 对齐：SDK fallback 接入 0.40 文件建议（v2.21.167）
+
+- 差异：Composer 的 `@文件` 搜索已优先使用官方 Server `fs:search`，但会话落在 vendored SDK 时直接退回 Kimix 本地递归搜索，没有使用 0.40 / SDK 0.20 新增的 `suggestFiles(workDir, { query, limit })`。
+- 修复：统一会话文件搜索入口；Server 会话继续走 Server，SDK 会话改走官方 `suggestFiles`，旧 SDK/v1 返回 undefined 时仍使用现有本地兜底。两条路径都校验会话工作目录并只投影 file 行。
+- 回归：新增统一结果规范化测试，覆盖目录项、畸形项和能力缺失；vendor 契约继续锁定 v2 暴露、v1 缺失的边界。
+
 ## 2026-09-03 对齐：Kimi Code 0.40 Tower 基础分支与恢复回归（v2.21.166）
 
 - 差异：0.40 的 `setTowerMode(enabled, base)` 与 Server profile `tower_base` 已支持显式基础分支，但 Kimix 仍只传布尔值；同时预检弹窗沿用 0.39 文案，错误声称 dirty checkout 不会进入任务分支。

@@ -5075,10 +5075,10 @@ ipcMain.handle("project:searchFiles", async (_, request: unknown) => {
     try {
       if (sessionId && query.trim()) {
         try {
-          const official = await kimiCodeHost.searchServerSessionFiles(sessionId, req.projectPath, query, limit);
+          const official = await kimiCodeHost.searchKimiCodeSessionFiles(sessionId, req.projectPath, query, limit);
           if (official && official.length > 0) return { success: true, data: official };
         } catch (error) {
-          console.warn("[KimiCodeServerHost] official file search failed; using local fallback:", error);
+          console.warn("[KimiCodeHost] official file search failed; using local fallback:", error);
         }
       }
       const data = await searchProjectFiles(req.projectPath, query, limit, additionalWorkDirs, controller.signal);

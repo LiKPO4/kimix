@@ -123,6 +123,10 @@ type KimiHarnessLike = {
   // 官方内置能力（kimi-cu / kimi-webbridge）：仅 v2 引擎提供，v1 抛 TypeError。
   listCapabilities?(): Promise<readonly KimiCodeCapabilityStatus[]>;
   installCapability?(id: string): Promise<KimiCodeCapabilityStatus>;
+  suggestFiles?(workDir: string, input: { query: string; limit?: number }): Promise<{
+    items: ReadonlyArray<{ path: string; name: string; kind: string }>;
+    truncated: boolean;
+  } | undefined>;
   close(): Promise<void>;
 };
 
@@ -2465,21 +2469,39 @@ export async function getPromptQueueState(sessionId: string): Promise<{
   };
 }
 
-export async function searchServerSessionFiles(
+export function normalizeKimiFileSuggestions(
+  result: { items?: ReadonlyArray<{ path?: unknown; name?: unknown; kind?: unknown }> } | undefined,
+): Array<{ path: string; name: string }> | undefined {
+  if (!result) return undefined;
+  return (result.items ?? [])
+    .filter((item): item is { path: string; name: string; kind?: unknown } => (
+      item.kind === "file" && typeof item.path === "string" && typeof item.name === "string"
+    ))
+    .map((item) => ({ path: item.path, name: item.name }));
+}
+
+export async function searchKimiCodeSessionFiles(
   sessionId: string,
   workDir: string,
   query: string,
   limit: number,
 ): Promise<Array<{ path: string; name: string }> | undefined> {
+  sessionId = resolveMigratedSessionId(sessionId);
   const managed = serverSessions.get(sessionId);
-  if (!managed) return undefined;
   const expectedRoot = normalizePathForComparison(path.resolve(workDir));
-  const sessionRoot = normalizePathForComparison(path.resolve(managed.workDir));
+  if (managed) {
+    const sessionRoot = normalizePathForComparison(path.resolve(managed.workDir));
+    if (expectedRoot !== sessionRoot) return undefined;
+    return normalizeKimiFileSuggestions(await getServerClient().searchFiles(sessionId, query, limit));
+  }
+
+  const sdkManaged = sessions.get(sessionId);
+  if (!sdkManaged) return undefined;
+  const sessionRoot = normalizePathForComparison(path.resolve(sdkManaged.session.workDir));
   if (expectedRoot !== sessionRoot) return undefined;
-  const result = await getServerClient().searchFiles(sessionId, query, limit);
-  return result.items
-    .filter((item) => item.kind === "file")
-    .map((item) => ({ path: item.path, name: item.name }));
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.suggestFiles) return undefined;
+  return normalizeKimiFileSuggestions(await sdkHarness.suggestFiles(workDir, { query, limit }));
 }
 
 export async function readServerSessionTextFile(
