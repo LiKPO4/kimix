@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：折叠栏水平居中 + 旧轮错误状态收敛（v2.21.174）
+
+- 折叠栏根因：Sidebar 本体 52px 之外还有右侧 12px layout spacer；旧布局只在 52px 内居中，视觉上的 64px 窄栏形成左 6px/右 18px。普通与设置折叠栏统一为左 12px + 40px 热区 + 右 12px spacer。
+- 错误状态根因：ContextBar 从全历史无条件取最后一个 error，点击只复制文本，既不看后续轮次也不确认提示。现在按每个 Agent 自己的时间线选择尚未被后续用户/steer/Assistant 推进覆盖的错误；Room Agent 互不代为清错；点击当前错误会复制详情并关闭底栏提示，历史错误卡不删除。
+- 验证：新增 ContextBar 纯函数测试覆盖当前错误、跨轮收敛、后续回复、乱序时间和 Room Agent 隔离；typecheck、全量 197 文件/2147 测试、knowledge:validate 与 pnpm build 均通过。
+- 知识库：interface-style-system.md 补充完整可见窄栏的居中规则；project/kimix.md 补充 ContextBar actionable-tail 不变量。
+
 ## 2026-09-03 修复：折叠侧栏图标逐行下移累积 + Hooks 字形归一（v2.21.173）
 
 - 根因（CDP 实测）：折叠栏容器 gap:4，展开态导航行是 40px 无间距连排——第 N 个图标比展开态同行低 4×(N-1)px，累积到 Hooks 低 12px，正是用户看到的"每个都往下偏一点、Hooks 最明显"。叠加 lucide Webhook 字形墨迹 20×19、中心偏高 0.5 viewBox 单位（getBBox 实测），与其余 18×18 居中图标不一致。

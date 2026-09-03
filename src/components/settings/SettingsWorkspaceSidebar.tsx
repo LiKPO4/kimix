@@ -89,7 +89,8 @@ export function SettingsWorkspaceSidebar({ width, collapsed }: { width: number; 
           minHeight: 0,
           flexDirection: "column",
           alignItems: "center",
-          padding: "0 2px 18px 10px",
+          // 与普通折叠侧栏共用 64px 可见槽位：本体 52px + 右侧 12px spacer。
+          padding: "0 0 18px 12px",
         }}
         aria-label="设置导航"
       >

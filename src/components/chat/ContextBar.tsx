@@ -5,7 +5,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import type { ExtraUsageInfo, KimiCodeServerModelCatalog, KimiModelConfigSummary, KimiMonthlyQuotaInfo, KimiUsageResponse, UsagePeriod } from "../../../electron/types/ipc";
-import type { Session } from "@/types/ui";
+import type { Session, TimelineEvent } from "@/types/ui";
 import { compactModelDisplayName, getSessionModelForDisplay } from "@/utils/modelDisplay";
 import { sessionToMarkdown } from "@/utils/markdownExport";
 import { displayProjectName } from "@/utils/projectDisplay";
@@ -42,6 +42,43 @@ export function computeContextBarPopoverLeft(input: {
     : input.anchorLeft;
   const maxLeft = Math.max(margin, input.viewportWidth - input.panelWidth - margin);
   return Math.min(Math.max(preferredLeft, margin), maxLeft);
+}
+
+/**
+ * ContextBar 只提示当前尚未被后续对话推进覆盖的错误。错误卡仍保留在历史中，
+ * 但一旦出现更晚的用户/steer 边界或 Assistant 正文，就不再把旧轮错误挂在底栏。
+ */
+export function selectContextBarError(events: TimelineEvent[]): Extract<TimelineEvent, { type: "error" }> | undefined {
+  const ordered = events
+    .map((event, index) => ({ event, index }))
+    .sort((left, right) => left.event.timestamp - right.event.timestamp || left.index - right.index);
+  let candidate: Extract<TimelineEvent, { type: "error" }> | undefined;
+  for (const { event } of ordered) {
+    if (event.type === "error") {
+      candidate = event;
+      continue;
+    }
+    if (
+      candidate && (
+        event.type === "user_message" ||
+        event.type === "steer_message" ||
+        (event.type === "assistant_message" && event.content.trim().length > 0)
+      )
+    ) {
+      candidate = undefined;
+    }
+  }
+  return candidate;
+}
+
+/** Room 中每个 Agent 有独立轮次；一个 Agent 的后续回复不能替另一个 Agent 清错。 */
+export function selectContextBarErrorAcrossTimelines(
+  timelines: TimelineEvent[][],
+): Extract<TimelineEvent, { type: "error" }> | undefined {
+  return timelines
+    .map(selectContextBarError)
+    .filter((event): event is Extract<TimelineEvent, { type: "error" }> => Boolean(event))
+    .sort((left, right) => right.timestamp - left.timestamp)[0];
 }
 
 function ContextBarPopover({
@@ -345,6 +382,7 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const [serverModelCatalog, setServerModelCatalog] = useState<KimiCodeServerModelCatalog | null>(null);
   const [modelSearch, setModelSearch] = useState("");
   const [switchingModel, setSwitchingModel] = useState<string | null>(null);
+  const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(null);
   const usageMenuRef = useRef<HTMLDivElement>(null);
   const usagePanelRef = useRef<HTMLDivElement>(null);
   const usageRequestIdRef = useRef(0);
@@ -407,7 +445,17 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
   const pendingQuestionCount = statusEvents.filter((event) => event.type === "question_request" && event.status === "pending").length;
   const firstPendingApproval = statusEvents.find((event) => event.type === "approval_request" && event.status === "pending");
   const firstPendingQuestion = statusEvents.find((event) => event.type === "question_request" && event.status === "pending");
-  const latestError = [...statusEvents].sort((left, right) => right.timestamp - left.timestamp).find((event) => event.type === "error");
+  const latestError = activeSession?.collaboration
+    ? selectContextBarErrorAcrossTimelines(
+        activeSession.collaboration.agents
+          .filter((agent) => !agent.removedAt)
+          .map((agent) => activeSession.collaboration?.agentEvents[agent.id] ?? []),
+      )
+    : selectContextBarError(statusEvents);
+  const latestErrorKey = latestError
+    ? `${activeSession?.id ?? "unknown"}:${latestError.id}:${latestError.timestamp}`
+    : null;
+  const visibleLatestError = latestErrorKey !== dismissedErrorKey ? latestError : undefined;
   const isSessionRunning = Boolean(activeSession?.collaboration
     ? roomHasExecutingAgentWork(activeSession, Object.values(roomAgentActivities))
     : isSessionRuntimeTracked(activeSession ?? undefined, runningSessionId));
@@ -438,8 +486,8 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       ? { label: "待回答", tone: "warning" as const, icon: PauseCircle, detail: `${pendingQuestionCount} 个问题等待回答` }
       : isSessionRunning
         ? { label: "运行中", tone: "active" as const, icon: Loader2, detail: `Kimi Code 正在执行当前轮次` }
-        : latestError
-          ? { label: "有错误", tone: "danger" as const, icon: AlertCircle, detail: latestError.message }
+        : visibleLatestError
+          ? { label: "有错误", tone: "danger" as const, icon: AlertCircle, detail: visibleLatestError.message }
           : activeSession?.collaboration
             ? (() => {
                 const activeAgents = activeSession.collaboration.agents.filter((agent) => !agent.removedAt && !agent.archivedAt);
@@ -818,13 +866,14 @@ export function ContextBar({ onOpenGitGraph }: { onOpenGitGraph?: () => void }) 
       scrollToStatusEvent(`kimix-question-${firstPendingQuestion.id}`, `${pendingQuestionCount} 个问题等待回答`);
       return;
     }
-    if (latestError) {
-      const message = latestError.message || String(latestError);
+    if (visibleLatestError) {
+      const message = visibleLatestError.message || String(visibleLatestError);
+      setDismissedErrorKey(latestErrorKey);
       try {
         await navigator.clipboard.writeText(message);
-        showToast("错误信息已复制到剪贴板");
+        showToast("错误信息已复制，状态提示已关闭");
       } catch {
-        showToast(`错误：${message}`);
+        showToast("错误状态提示已关闭");
       }
       return;
     }

@@ -628,7 +628,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     return (
       <aside
         className="kimix-sidebar shrink-0 bg-surface-ground"
-        style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 6, paddingRight: 6, paddingTop: 0, paddingBottom: 18 }}
+        // 折叠态右侧还有 AppShell 的 12px layout spacer；把它计入可见窄栏后，
+        // 40px 热区应为左 12px + 按钮 40px + 右 spacer 12px，视觉轴才在 64px 中央。
+        style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 12, paddingRight: 0, paddingTop: 0, paddingBottom: 18 }}
       >
         <div className="flex flex-col" style={{ gap: 0 }}>
           {/* 折叠栏行距必须与展开态导航行（40px 无间距）完全一致：gap 4 会让
