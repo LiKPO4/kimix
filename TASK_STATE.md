@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：折叠侧栏图标逐行下移累积 + Hooks 字形归一（v2.21.173）
+
+- 根因（CDP 实测）：折叠栏容器 gap:4，展开态导航行是 40px 无间距连排——第 N 个图标比展开态同行低 4×(N-1)px，累积到 Hooks 低 12px，正是用户看到的"每个都往下偏一点、Hooks 最明显"。叠加 lucide Webhook 字形墨迹 20×19、中心偏高 0.5 viewBox 单位（getBBox 实测），与其余 18×18 居中图标不一致。
+- 修复：折叠栏 gap 改 0（两态行几何逐行对齐）；Webhook 改 size 15 + strokeWidth 2.27 + translateY(0.3px)（折叠/展开两处共用 webhookNavIconProps）。
+- 验证：CDP 实测折叠/展开两态 新对话/搜索/插件/Hooks 逐行 y 完全一致（dy=0）；Hooks 墨迹中心偏差从 -0.35px 收敛到 -0.01px。
+- 知识库：interface-style-system.md 不变量 58 扩展。
+
 ## 2026-09-03 修复：后台任务完成通知轮正文丢失/卡「消息处理中」（v2.21.172）
 
 - 快照（docs/issue-background-notification-turn-events-snapshot.md，探针 scripts/probe-kimi-code-background-notification.mjs 实测）定案：Server 的 prompt 交付屏障只覆盖客户端 prompt 轮；后台任务终止后系统通知轮只有 task.terminated/turn.started(origin=task)/task.notified/turn.step.started 四个实况帧，assistant.delta/turn.ended/prompt.completed 均不广播，内容只能经快照拉取。`/status` busy 在仅后台任务运行时也为 true，收敛只能看 in_flight_turn。

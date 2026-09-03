@@ -34,6 +34,10 @@ const collapsedNavItemClass = "kimix-sidebar-nav-item flex items-center justify-
 const collapsedSettingsItemClass = "kimix-settings-entry flex items-center justify-center rounded-lg text-text-secondary";
 const collapsedNavButtonStyle = { width: 40, height: 40, minWidth: 40, minHeight: 40, padding: 0 } as const;
 const collapsedSettingsButtonStyle = { width: 40, height: 36, minWidth: 40, minHeight: 36, padding: 0 } as const;
+// lucide Webhook 字形墨迹为 20×19 且中心偏高 0.5 viewBox 单位（CDP getBBox 实测），
+// 其余导航图标均为 18×18 居中。缩小到 15 并等比补描边保持视觉重量，0.3px 位移把
+// 墨迹中心压回几何中心；折叠/展开两处 Hooks 入口共用。
+const webhookNavIconProps = { size: 15, strokeWidth: 2.27, style: { transform: "translateY(0.3px)" } } as const;
 // 官方 Server 不广播「其他客户端新建会话」，侧栏目录原本只在展开集合/最近项目变化时
 // 刷新，Web 侧新对话永远不被发现。周期 + 焦点/可见性回归刷新让双端目录收敛
 // （reconcileOfficialSessionCatalog 幂等，无变化不写状态）。
@@ -626,7 +630,9 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         className="kimix-sidebar shrink-0 bg-surface-ground"
         style={{ display: "flex", flexDirection: "column", width: 52, height: "100%", minHeight: 0, paddingLeft: 6, paddingRight: 6, paddingTop: 0, paddingBottom: 18 }}
       >
-        <div className="flex flex-col" style={{ gap: 4 }}>
+        <div className="flex flex-col" style={{ gap: 0 }}>
+          {/* 折叠栏行距必须与展开态导航行（40px 无间距）完全一致：gap 4 会让
+              第 N 个图标比展开态同行低 4×(N-1)px，累积到 Hooks 低 12px。 */}
           <button
             onClick={async () => {
               if (currentProject) {
@@ -667,7 +673,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
             title="Hooks"
             aria-label="Hooks"
           >
-            <Webhook size={17} className="text-text-secondary" />
+            <Webhook {...webhookNavIconProps} className="text-text-secondary" />
           </button>
         </div>
         <div style={{ marginTop: "auto", height: 36 }}>
@@ -901,7 +907,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           className={`${navItemClass} ${workspaceView === "hooks" ? "is-active" : ""}`}
           title="Hooks"
         >
-          <Webhook size={17} className="shrink-0 text-text-secondary" />
+          <Webhook {...webhookNavIconProps} className="shrink-0 text-text-secondary" />
           <span>Hooks</span>
         </button>
       </div>
