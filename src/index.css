@@ -664,7 +664,7 @@
 [data-ui-style="modern"] .kimix-longtask-inspector,
 [data-ui-style="modern"] .kimix-diff-panel {
   border-color: var(--border-subtle) !important;
-  border-radius: var(--kimix-modern-panel-radius) !important;
+  border-radius: var(--kimix-window-corner-radius) !important;
   box-shadow: var(--shadow-hover);
 }
 
@@ -4678,7 +4678,7 @@ button.bg-accent-primary:disabled:hover,
    overflow:hidden 裁切圆角；不套用 inspector 独立卡角色，否则双层边框+圆角错位。 */
 :root[data-ui-style-contract="v1"] :where(.kimix-longtask-inspector, .kimix-diff-panel) {
   border: var(--ui-role-inspector-resting-border);
-  border-radius: var(--ui-role-inspector-radius);
+  /* 圆角不属于 inspector 角色：右侧独立面板始终与主区域同源（shell 半径），见基础规则。 */
   background: var(--ui-role-inspector-resting-background);
   box-shadow: var(--ui-role-inspector-resting-shadow);
 }
@@ -5860,7 +5860,7 @@ button.bg-accent-primary:disabled:hover,
   border: var(--ui-role-inspector-resting-border, 1px solid var(--border-subtle)) !important;
   background: var(--ui-role-inspector-resting-background, var(--surface-base)) !important;
   color: var(--text-primary) !important;
-  border-radius: var(--ui-role-inspector-radius, var(--radius-lg)) !important;
+  border-radius: var(--ui-role-shell-radius, var(--kimix-window-corner-radius)) !important;
   box-shadow: var(--ui-role-inspector-resting-shadow, 0 1px 2px rgba(25, 23, 20, 0.04));
 }
 
@@ -5879,7 +5879,7 @@ button.bg-accent-primary:disabled:hover,
   border: var(--ui-role-inspector-resting-border, 1px solid var(--border-subtle)) !important;
   background: var(--ui-role-inspector-resting-background, var(--surface-base)) !important;
   color: var(--text-primary) !important;
-  border-radius: var(--ui-role-inspector-radius, var(--radius-lg)) !important;
+  border-radius: var(--ui-role-shell-radius, var(--kimix-window-corner-radius)) !important;
   box-shadow: var(--ui-role-inspector-resting-shadow, 0 1px 2px rgba(25, 23, 20, 0.04));
 }
 

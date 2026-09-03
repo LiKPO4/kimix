@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：右侧会话侧栏/Diff 面板圆角与主区域同源（v2.21.171）
+
+- 实机取证（CDP computed style，custom:win11-fluent-light）：面板 12px（inspector 角色半径）、主区域 8px（shell 角色半径），用户感知为"没吃到圆角"。
+- 修复：`.kimix-longtask-inspector` / `.kimix-diff-panel` 圆角改为 `var(--ui-role-shell-radius, var(--kimix-window-corner-radius))`，契约下跟随 shell 角色、内置风格跟随窗口圆角；Modern 覆盖从 18px panel-radius 改为窗口圆角 20px；Retro 6px / Nostalgia 0 本就一致未动。inspector 角色的边框/背景/阴影归属不变。
+- 验证：CDP 复验面板=主区=8px；契约测试断言同步更新。
+- 附带工具：`.tmp-cdp-radius.mjs` 为本次诊断临时脚本，已删除；诊断方法（9222 端口 CDP evaluate computed style）可复用。
+
 ## 2026-09-03 修复：会话侧栏开关按钮补齐两态（v2.21.170）
 
 - 左上角侧栏开关一直是两态（PanelLeft/PanelLeftOpen + 动态文案），右上角会话侧栏开关只有静态 PanelRight 图标和固定文案。
