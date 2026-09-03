@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 审查：0.39.0 → 0.40.1 跟进质量复核与收尾修复（无版本 bump）
+
+- 审查结论：0.40.1 确为上游最新；逐条核对 0.39.1/0.40.0/0.40.1 changelog，需 Kimix 配合的变化（危险命令审批 #3290、配置原子保存 #3348、Tower base #3346/#3399、suggestFiles）均已落地，无版本遗漏；typecheck + 全量 2130 测试通过。
+- 本轮修复（文档/注释级，不影响产物，未递增版本）：清理 kimiCodeHost.ts resumeSession 处描述已删除的 yolo auto-approve guard 的过时注释；knowledge/log.md 追加澄清条目，声明旧的 `yolo=自动通过` 措辞约束已被 v2.21.164 的两段式文案取代；kimi-code-subagent-model-pool.md 补记 env 注入会压过 config.toml 显式关闭的托管策略；新增 docs/release-notes/v2.21.167.md 覆盖 163–167 五版变动（均未打 tag，按发布流程从上个实际发布版本算起）。
+- 已知边界（记录在案，暂不修）：Tower 预检→开启存在 TOCTOU 小窗口，base 以预检时分支为准；原子写入 rename 失败时原始系统错误直抛；官方 suggestFiles 返回空数组时静默落到本地搜索结果；上游 #3377 transcript 去重修复对 Kimix 的影响建议实机抽验。
+- 测试债务：kimiApprovalPolicy.test.ts 与 tower.test.ts 新增部分为源码 grep 边界测试，缺"yolo 审批 → ApprovalCard"端到端行为测试与 searchKimiCodeSessionFiles 路由单测。
+
 ## 2026-09-03 对齐：SDK fallback 接入 0.40 文件建议（v2.21.167）
 
 - 差异：Composer 的 `@文件` 搜索已优先使用官方 Server `fs:search`，但会话落在 vendored SDK 时直接退回 Kimix 本地递归搜索，没有使用 0.40 / SDK 0.20 新增的 `suggestFiles(workDir, { query, limit })`。

@@ -1011,7 +1011,7 @@ export async function resumeSession(sessionId: string, options: { additionalDirs
   const sdkHarness = await getHarness();
   const session = await sdkHarness.resumeSession({ id: sessionId, additionalDirs: options.additionalDirs });
   // The resumed session keeps whatever permission it was persisted with; read it
-  // back from the SDK so the yolo auto-approve guard reflects reality until the
+  // back from the SDK so the tracked session permission reflects reality until the
   // caller re-applies the UI permission mode via setPermission().
   let resumedStatus: KimiCodeSessionStatus | undefined;
   let resumedPermission: KimiCodePermissionMode = "manual";

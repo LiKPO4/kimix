@@ -3,7 +3,7 @@ type: Standard
 title: Kimi Code Subagent Model Pool
 description: Pinned facts about the official declarative subagent model pool ([secondary_model] config), its validation rules, and Kimix integration caveats through 0.40.1.
 tags: [kimi-code, secondary-model, subagent, config, upstream]
-timestamp: "2026-09-03T09:45:00+08:00"
+timestamp: "2026-09-03T11:35:00+08:00"
 ---
 
 # Kimi Code Subagent Model Pool
@@ -29,6 +29,7 @@ Official Kimi Code 0.36.0 (PR #2700) replaces the experimental single secondary 
 ## Kimix Integration Notes
 
 - Kimix already injects `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1` for managed Servers and wires the pre-pool single secondary model (`saveKimiSecondaryModel`). Since v2.21.66 the settings Subagents page carries a pool editor (default model, force lock, alias+hint entries) writing `[secondary_model]` directly; provider/model deletion in Kimix applies the product safety cascade described above so a broken pool cannot block every session lifecycle.
+- Upstream 0.40 (PR #3427) honors explicit `[experimental] secondary-model = false` over the master experimental flag, but per-feature `KIMI_CODE_EXPERIMENTAL_<NAME>` variables still override both config and master switch. Kimix's managed-process injection of `KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1` therefore wins over a user's config-level opt-out; this is a deliberate managed-runtime policy (the pool editor is a Kimix feature and must stay live), not an oversight.
 - The vendored SDK first moved to the 0.36.0 tag in v2.21.68 (`b6144f94`, node-sdk 0.17.0), making the pool live. It advanced to 0.38.0 / SDK 0.19.1 in v2.21.101, 0.39.0 / SDK 0.19.2 in v2.21.126 (`52e8d19d`), and official 0.40.1 / SDK 0.20.0 in v2.21.163 (`0d45dddc`); the pool remains active, with the 0.39 deletion-policy difference documented rather than hidden by bundle patches.
 
 # Sources
