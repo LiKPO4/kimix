@@ -16,6 +16,7 @@ import {
   Link,
   MessageSquarePlus,
   PanelRight,
+  PanelRightOpen,
   Pencil,
   Pin,
   Play,
@@ -650,11 +651,11 @@ export function SessionToolbar({
         <button
           onClick={onToggleLongTaskInspector}
           className="kimix-toolbar-button flex h-9 w-9 items-center justify-center text-[var(--kimix-panel-text-secondary)]"
-          title="会话侧栏"
-          aria-label="会话侧栏"
+          title={longTaskInspectorOpen ? "收起会话侧栏" : "展开会话侧栏"}
+          aria-label={longTaskInspectorOpen ? "收起会话侧栏" : "展开会话侧栏"}
           aria-pressed={longTaskInspectorOpen}
         >
-          <PanelRight size={15} />
+          {longTaskInspectorOpen ? <PanelRight size={15} /> : <PanelRightOpen size={15} />}
         </button>
       </div>
     </div>

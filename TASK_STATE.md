@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：会话侧栏开关按钮补齐两态（v2.21.170）
+
+- 左上角侧栏开关一直是两态（PanelLeft/PanelLeftOpen + 动态文案），右上角会话侧栏开关只有静态 PanelRight 图标和固定文案。
+- 修复：对齐左侧范式——开启时 PanelRight，关闭时 PanelRightOpen，title/aria-label 动态切换「收起/展开会话侧栏」；aria-pressed 原有语义不变。
+
 ## 2026-09-03 修复：折叠侧栏导航图标与展开态不一致（v2.21.169）
 
 - 根因：折叠态导航图标未显式声明颜色、依赖按钮层叠继承，而 Tailwind v4 下无层自定义 CSS（.kimix-sidebar-nav-item 的 color: text-primary）胜过 utility 层的 text-text-secondary，图标变深；设置入口类无 color 声明不受影响，导致折叠列内部上深下浅；is-active 时折叠图标还会随按钮变成选中色，与展开态（图标恒定次要色）不一致。设置图标 18px vs 17px 差 1px；折叠列 padding 10/2 让 40px 按钮在 52px 列内左偏 4px。
