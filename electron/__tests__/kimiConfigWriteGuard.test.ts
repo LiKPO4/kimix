@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { writeKimiConfigTomlIfUnchanged } from "../kimiConfigWriteGuard";
 
 const tempDirs: string[] = [];
@@ -21,8 +21,14 @@ afterEach(() => {
 describe("writeKimiConfigTomlIfUnchanged", () => {
   it("仅在磁盘内容仍等于读取基线时写入", () => {
     const configPath = tempConfig('default_model = "old"\n');
+    const rename = vi.spyOn(fs, "renameSync");
     writeKimiConfigTomlIfUnchanged(configPath, 'default_model = "old"\n', 'default_model = "new"\n');
     expect(fs.readFileSync(configPath, "utf-8")).toBe('default_model = "new"\n');
+    expect(rename).toHaveBeenCalledOnce();
+    expect(path.dirname(String(rename.mock.calls[0]?.[0]))).toBe(path.dirname(configPath));
+    expect(rename.mock.calls[0]?.[1]).toBe(configPath);
+    expect(fs.readdirSync(path.dirname(configPath)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    rename.mockRestore();
   });
 
   it("外部修改后拒绝覆盖并保留外部内容", () => {
@@ -44,5 +50,21 @@ describe("writeKimiConfigTomlIfUnchanged", () => {
     expect(() => writeKimiConfigTomlIfUnchanged(configPath, "", "default_model = \"kimix\"\n"))
       .toThrow("配置已被其他程序修改");
     expect(fs.readFileSync(configPath, "utf-8")).toBe("invalid = [\n");
+  });
+
+  it("原子替换失败时保留旧配置并清理同目录临时文件", () => {
+    const configPath = tempConfig('default_model = "old"\n');
+    const rename = vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw new Error("rename failed");
+    });
+
+    expect(() => writeKimiConfigTomlIfUnchanged(
+      configPath,
+      'default_model = "old"\n',
+      'default_model = "new"\n',
+    )).toThrow("rename failed");
+    expect(fs.readFileSync(configPath, "utf-8")).toBe('default_model = "old"\n');
+    expect(fs.readdirSync(path.dirname(configPath)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    rename.mockRestore();
   });
 });
