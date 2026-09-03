@@ -41,6 +41,13 @@ describe("UI_STYLES", () => {
     }
   });
 
+  it("折叠设置导航覆盖整行 grid 几何并锁定等宽高图标", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
+
+    expect(css).toMatch(/\.kimix-settings-navigation-item\.kimix-settings-sidebar-icon-button\s*\{[^}]*display:\s*flex;[^}]*width:\s*40px;[^}]*height:\s*40px;[^}]*grid-template-columns:\s*none;[^}]*padding:\s*0;/s);
+    expect(css).toMatch(/\.kimix-settings-navigation-item\.kimix-settings-sidebar-icon-button\s*>\s*svg\s*\{[^}]*width:\s*17px;[^}]*height:\s*17px;[^}]*flex:\s*0 0 17px;/s);
+  });
+
   it("最外应用壳消费窗口圆角并在最大化时归零", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 

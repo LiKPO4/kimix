@@ -3569,6 +3569,29 @@ button.bg-accent-primary:disabled:hover,
   font-weight: 500;
 }
 
+/* 折叠设置栏复用 navigation-item 的材质角色，但不是「图标 + 文本」整行。
+   双类选择器必须压过上面的通用 grid/全宽/padding，保持 40×40 方形热区；
+   SVG 同时锁定等宽高，避免空文本列把 lucide 图标挤压成异常比例。 */
+.kimix-settings-navigation-item.kimix-settings-sidebar-icon-button {
+  display: flex;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  grid-template-columns: none;
+  gap: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.kimix-settings-navigation-item.kimix-settings-sidebar-icon-button > svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
 .kimix-settings-navigation-item:hover,
 .kimix-settings-search-result:hover {
   border-color: var(--ui-nav-list-hover-border-color);

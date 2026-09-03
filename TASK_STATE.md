@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 修复：折叠设置导航图标被整行样式挤压（v2.21.175）
+
+- 根因：折叠设置按钮同时使用 `.kimix-settings-sidebar-icon-button`（40×40 flex）和 `.kimix-settings-navigation-item`（展开态全宽双列 grid）；后者声明更晚，把折叠按钮改回全宽 grid、补左右 16px padding 和空文本列，导致选中面板变宽并挤压 lucide 图标。
+- 修复：新增双类几何覆盖，锁定 40×40 flex 居中热区、清除 grid/padding/gap，并把直接 SVG 固定为 17×17 非伸缩图标。
+- 验证：新增 CSS 契约测试锁定折叠按钮和 SVG 几何；typecheck、全量 197 文件/2148 测试、knowledge:validate 与 pnpm build 均通过。
+- 知识库：interface-style-system.md 新增 icon-only 控件只复用语义材质、不继承展开行几何的不变量。
+
 ## 2026-09-03 修复：折叠栏水平居中 + 旧轮错误状态收敛（v2.21.174）
 
 - 折叠栏根因：Sidebar 本体 52px 之外还有右侧 12px layout spacer；旧布局只在 52px 内居中，视觉上的 64px 窄栏形成左 6px/右 18px。普通与设置折叠栏统一为左 12px + 40px 热区 + 右 12px spacer。
