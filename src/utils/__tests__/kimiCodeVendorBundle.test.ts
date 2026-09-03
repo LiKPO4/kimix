@@ -96,7 +96,7 @@ describe("vendored Kimi Code 0.38", () => {
   });
 });
 
-describe("vendored Kimi Code 0.39", () => {
+describe("vendored Kimi Code runtime", () => {
   it("恢复 v2 实时 Context 状态快照", () => {
     const snapshot = section("function withStatusSnapshot", "function createKimiHarnessV2");
     expect(snapshot).toContain("tokenCounting.statusSize(context)");
@@ -114,9 +114,21 @@ describe("vendored Kimi Code 0.39", () => {
     expect(management).toContain("{ cwd: options2.cwd }");
   });
 
-  it("暴露 Tower 模式，并按官方 0.39 语义保留失效的 secondary_model 配置", () => {
-    expect(bundle).toContain("async setTowerMode(enabled)");
+  it("暴露 Tower 模式，并按官方语义保留失效的 secondary_model 配置", () => {
+    expect(bundle).toContain("async setTowerMode(enabled, base)");
+    expect(bundle).toContain("Session tower mode base must be a string");
     expect(bundle).toContain("towerMode: external_exports.boolean().optional()");
     expect(bundle).not.toContain("cascadeSubagentModelPool");
+  });
+});
+
+describe("vendored Kimi Code 0.40", () => {
+  it("提供无会话的 v2 文件模糊搜索，并让 v1 引擎返回 undefined", () => {
+    const v2Harness = section("async suggestFiles(workDir, input)", "async listMcpServers(options2 = {})");
+    expect(v2Harness).toContain("this.rpc.suggestFiles(workDir, input)");
+
+    const v1Harness = section("* no equivalent capability, so the base reports `undefined`; the v2 client", "async listBackgroundTasks(input)");
+    expect(v1Harness).toContain("async suggestFiles(workDir, input)");
+    expect(v1Harness).not.toContain("return this.rpc.suggestFiles(workDir, input)");
   });
 });

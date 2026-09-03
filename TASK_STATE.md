@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 更新：内置 Kimi Code 运行时升级至 0.40.1（v2.21.163）
+
+- 基线：vendored fallback 从官方 `@moonshot-ai/kimi-code@0.39.0` / Node SDK `0.19.2` 升级至 `0.40.1` / SDK `0.20.0`，固定上游提交 `0d45dddc57510e6b1306dd12c0b0703c37b8c63a`。
+- 覆盖边界：继续只保留 Kimix 的 MCP 启动超时 4 秒 overlay；新 SDK 原生带入危险命令审批、Tower checkout/merge 修正、配置监控稳健性与 `suggestFiles(workDir, { query, limit })`。
+- 兼容性：vendor 契约测试同步至 `setTowerMode(enabled, base)` 和 `suggestFiles`；现有 Server 优先、vendored SDK fallback 的路由不变。
+- 验证：vendor 契约 16 项通过；真实 fallback host 的 Prompt、Steer、Cancel 探针通过。
+
 ## 2026-08-31 修复：文件变更卡片底部黑线（v2.21.162）
 
 - 现象：文件超过三项并折叠时，底部「再显示 N 个文件」行在部分自定义风格、尤其悬停状态下出现一条突兀黑线。
