@@ -6,13 +6,17 @@ import type {
   LocalThinkingTranslationModelStatus,
   ThinkingTranslationResponse,
 } from "./types/ipc";
+import { LocalThinkingRuntimeDownloader } from "./localThinkingRuntimeDownloader";
+import { LOCAL_THINKING_RUNTIME_TOTAL_BYTES } from "./localThinkingRuntimeManifest";
 
 export const LOCAL_THINKING_TRANSLATION_MODEL_ID = "Xenova/opus-mt-en-zh";
 export const LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES = 121_000_000;
+export const LOCAL_THINKING_TRANSLATION_TOTAL_ESTIMATED_BYTES =
+  LOCAL_THINKING_RUNTIME_TOTAL_BYTES + LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES;
 
 type WorkerRequest =
-  | { type: "load"; id: string; cacheDir: string }
-  | { type: "translate"; id: string; cacheDir: string; text: string };
+  | { type: "load"; id: string; cacheDir: string; runtimeDir?: string }
+  | { type: "translate"; id: string; cacheDir: string; runtimeDir?: string; text: string };
 
 type WorkerMessage =
   | { type: "progress"; loadedBytes: number; totalBytes?: number; file?: string }
@@ -34,13 +38,19 @@ export function isPathInside(parentPath: string, candidatePath: string): boolean
 export class LocalThinkingTranslator {
   private child: UtilityProcess | null = null;
   private readonly pending = new Map<string, PendingRequest>();
+  private readonly downloader: LocalThinkingRuntimeDownloader;
+  private readonly runtimeRequired: boolean;
+  private runtimeBytesInCurrentDownload = 0;
   private status: LocalThinkingTranslationModelStatus;
 
   constructor(
     private readonly userDataDir: string,
     private readonly workerPath: string,
     private readonly onStatus: (status: LocalThinkingTranslationModelStatus) => void,
+    options?: { runtimeRequired?: boolean },
   ) {
+    this.runtimeRequired = options?.runtimeRequired ?? true;
+    this.downloader = new LocalThinkingRuntimeDownloader(this.runtimeDir);
     this.status = this.readInitialStatus();
   }
 
@@ -48,8 +58,26 @@ export class LocalThinkingTranslator {
     return path.join(this.userDataDir, "thinking-translation-models", "opus-mt-en-zh");
   }
 
+  get runtimeDir(): string {
+    return path.join(this.userDataDir, "thinking-translation-runtime");
+  }
+
   private get readyMarkerPath(): string {
     return path.join(this.modelDir, ".kimix-ready.json");
+  }
+
+  private get estimatedBytes(): number {
+    return this.runtimeRequired
+      ? LOCAL_THINKING_TRANSLATION_TOTAL_ESTIMATED_BYTES
+      : LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES;
+  }
+
+  private isModelReady(): boolean {
+    return fs.existsSync(this.readyMarkerPath);
+  }
+
+  private isRuntimeReady(): boolean {
+    return !this.runtimeRequired || this.downloader.isReady();
   }
 
   getStatus(): LocalThinkingTranslationModelStatus {
@@ -57,11 +85,11 @@ export class LocalThinkingTranslator {
   }
 
   private readInitialStatus(): LocalThinkingTranslationModelStatus {
-    const ready = fs.existsSync(path.join(this.userDataDir, "thinking-translation-models", "opus-mt-en-zh", ".kimix-ready.json"));
+    const ready = this.isModelReady() && this.isRuntimeReady();
     return {
       state: ready ? "ready" : "not_downloaded",
       modelId: LOCAL_THINKING_TRANSLATION_MODEL_ID,
-      estimatedBytes: LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES,
+      estimatedBytes: this.estimatedBytes,
     };
   }
 
@@ -108,17 +136,15 @@ export class LocalThinkingTranslator {
     if (!message || typeof message !== "object" || !("type" in message)) return;
     const typed = message as WorkerMessage;
     if (typed.type === "progress") {
-      const totalBytes = Math.max(
-        LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES,
-        typed.totalBytes ?? 0,
-      );
+      const loadedBytes = this.runtimeBytesInCurrentDownload + Math.max(0, typed.loadedBytes);
+      const totalBytes = Math.max(this.estimatedBytes, typed.totalBytes ?? 0);
       this.publish({
         state: "downloading",
         modelId: LOCAL_THINKING_TRANSLATION_MODEL_ID,
-        estimatedBytes: LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES,
-        downloadedBytes: Math.max(0, typed.loadedBytes),
+        estimatedBytes: this.estimatedBytes,
+        downloadedBytes: loadedBytes,
         totalBytes,
-        progress: Math.max(0, Math.min(1, typed.loadedBytes / totalBytes)),
+        progress: Math.max(0, Math.min(1, loadedBytes / totalBytes)),
         currentFile: typed.file,
       });
       return;
@@ -148,22 +174,43 @@ export class LocalThinkingTranslator {
 
   async download(): Promise<LocalThinkingTranslationModelStatus> {
     if (this.status.state === "downloading") return this.getStatus();
-    if (fs.existsSync(this.readyMarkerPath)) {
+    if (this.isModelReady() && this.isRuntimeReady()) {
       this.publish(this.readInitialStatus());
       return this.getStatus();
     }
     fs.mkdirSync(this.modelDir, { recursive: true });
+    this.runtimeBytesInCurrentDownload = 0;
     this.publish({
       state: "downloading",
       modelId: LOCAL_THINKING_TRANSLATION_MODEL_ID,
-      estimatedBytes: LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES,
+      estimatedBytes: this.estimatedBytes,
       downloadedBytes: 0,
-      totalBytes: LOCAL_THINKING_TRANSLATION_MODEL_ESTIMATED_BYTES,
+      totalBytes: this.estimatedBytes,
       progress: 0,
     });
     try {
+      if (!this.isRuntimeReady()) {
+        await this.downloader.ensureInstalled((progress) => {
+          const totalBytes = Math.max(this.estimatedBytes, progress.totalBytes);
+          this.publish({
+            state: "downloading",
+            modelId: LOCAL_THINKING_TRANSLATION_MODEL_ID,
+            estimatedBytes: this.estimatedBytes,
+            downloadedBytes: progress.downloadedBytes,
+            totalBytes,
+            progress: Math.max(0, Math.min(1, progress.downloadedBytes / totalBytes)),
+            currentFile: progress.currentFile,
+          });
+        });
+        this.runtimeBytesInCurrentDownload = LOCAL_THINKING_RUNTIME_TOTAL_BYTES;
+      }
       const id = randomUUID();
-      await this.request({ type: "load", id, cacheDir: this.modelDir });
+      await this.request({
+        type: "load",
+        id,
+        cacheDir: this.modelDir,
+        runtimeDir: this.runtimeRequired ? this.runtimeDir : undefined,
+      });
       const marker = JSON.stringify({
         modelId: LOCAL_THINKING_TRANSLATION_MODEL_ID,
         readyAt: new Date().toISOString(),
@@ -178,11 +225,13 @@ export class LocalThinkingTranslator {
         message: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    } finally {
+      this.runtimeBytesInCurrentDownload = 0;
     }
   }
 
   async translate(text: string, requestId?: string): Promise<ThinkingTranslationResponse> {
-    if (!fs.existsSync(this.readyMarkerPath)) {
+    if (!this.isModelReady() || !this.isRuntimeReady()) {
       return {
         success: false,
         error: { code: "model_not_downloaded", message: "本地翻译模型尚未下载。" },
@@ -190,7 +239,16 @@ export class LocalThinkingTranslator {
     }
     try {
       const id = randomUUID();
-      const message = await this.request({ type: "translate", id, cacheDir: this.modelDir, text }, 90_000);
+      const message = await this.request(
+        {
+          type: "translate",
+          id,
+          cacheDir: this.modelDir,
+          runtimeDir: this.runtimeRequired ? this.runtimeDir : undefined,
+          text,
+        },
+        90_000,
+      );
       if (message.type !== "translated") throw new Error("本地翻译进程返回了无效结果。");
       return {
         success: true,
@@ -218,6 +276,9 @@ export class LocalThinkingTranslator {
       throw new Error("拒绝删除超出本地翻译模型目录的路径。");
     }
     fs.rmSync(this.modelDir, { recursive: true, force: true });
+    if (isPathInside(this.userDataDir, this.runtimeDir)) {
+      await this.downloader.remove();
+    }
     this.publish(this.readInitialStatus());
     return this.getStatus();
   }

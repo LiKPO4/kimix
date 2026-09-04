@@ -22,8 +22,6 @@ extraResources:
 asar: true
 asarUnpack:
   - "**/*.node"
-  - "node_modules/onnxruntime-node/**"
-afterPack: build/afterPack.cjs
 mac:
   files:
     - out/**/*
@@ -33,8 +31,6 @@ mac:
     - "!electron"
     - "!**/*.map"
     - "!**/dev.cjs"
-    - "!**/onnxruntime-node/bin/napi-v3/{linux,win32}/**"
-    - "!**/onnxruntime-web/**"
   category: public.app-category.developer-tools
   artifactName: "${productName}-${version}-${arch}.${ext}"
   target:
@@ -56,10 +52,6 @@ win:
     - "!electron"
     - "!**/*.map"
     - "!**/dev.cjs"
-    - "!**/onnxruntime-node/bin/napi-v3/{darwin,linux}/**"
-    - "!**/onnxruntime-node/bin/napi-v3/win32/arm64/**"
-    - "!**/onnxruntime-node/bin/napi-v3/win32/x64/DirectML.dll"
-    - "!**/onnxruntime-web/**"
   target:
     - target: nsis
       arch: [x64]
@@ -75,9 +67,6 @@ linux:
     - "!electron"
     - "!**/*.map"
     - "!**/dev.cjs"
-    - "!**/onnxruntime-node/bin/napi-v3/{darwin,win32}/**"
-    - "!**/onnxruntime-node/bin/napi-v3/linux/arm64/**"
-    - "!**/onnxruntime-web/**"
   target:
     - target: AppImage
       arch: [x64]

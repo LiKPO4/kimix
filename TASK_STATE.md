@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 优化：本地翻译运行时改按需下载（v2.21.177）
+
+- 做法：@huggingface/transformers 移出生产依赖（留 devDependencies 供类型与开发），新增 electron/localThinkingRuntimeManifest.ts（31 包闭包、版本/integrity 与 pnpm-lock 一致并有测试锁定）+ localThinkingRuntimeDownloader.ts（npmmirror 优先/npmjs 兜底、sha512 校验、按平台+架构过滤提取、剔除 DirectML.dll、断点按包续装）；worker 经 pathToFileURL 加载运行时 ESM 入口；就绪=运行时+模型双 marker；删除模型时连带清运行时。
+- 关键坑（冒烟实测）：transformers.node.mjs 顶层静态 import "sharp"，而 sharp 原生库从未随安装包发布——打包版的本地翻译从 8 月 16 日上线起就是潜在坏掉的；本次用桩模块满足加载（翻译不触发图像路径），顺带根治该隐患。worker 不能走 CJS 入口（无原生库时直接抛错）。
+- 验证：真实下载冒烟全链路 OK（87.2MB 镜像下载→校验→过滤解包→transformers/onnxruntime 原生绑定加载成功）；typecheck + 全量 198 文件 2165 测试通过；pnpm dist:win Setup 122.7→108.2MB（本轮两提交累计 137→108.2，对比线上 143MB 约 -24%）。
+- 知识库：operations/release-process.md 的 onnxruntime 打包条目改写为按需下载范式与 sharp 桩边界。
+
+
 ## 2026-09-03 优化：安装包裁剪 onnxruntime 死重（v2.21.176）
 
 - 背景：安装包从 6 月 87MB 涨到 143MB，根因是 88ac17a6「本地思考翻译模型」引入 @huggingface/transformers + onnxruntime-node（合计解压 98.6MB），模型权重本身已是按需下载，但运行时全员强制打包。

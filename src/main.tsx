@@ -571,7 +571,7 @@ function installBrowserPreviewApi() {
       data: {
         state: "not_downloaded",
         modelId: "Xenova/opus-mt-en-zh",
-        estimatedBytes: 121_000_000,
+        estimatedBytes: 212_651_779,
       },
     }),
     downloadLocalThinkingTranslationModel: (): Promise<LocalThinkingTranslationModelStatusResponse> => Promise.resolve({

@@ -2355,7 +2355,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                   <div className="kimix-settings-permissions" style={{ marginTop: 14 }}>
                     {([
                       ["off", "不启用翻译", "始终显示原始思考内容，不调用任何翻译服务。"],
-                      ["local", "本地轻量翻译", "约 120 MB，下载一次后离线运行；速度快，译文以可读为主。"],
+                      ["local", "本地轻量翻译", "约 210 MB（推理运行时 + 模型），下载一次后离线运行；速度快，译文以可读为主。"],
                       ["azure", "Microsoft 云端翻译", "使用你自己的 Translator Key；原文会发送到 Microsoft。"],
                     ] as const).map(([provider, label, desc]) => (
                       <button
@@ -2427,7 +2427,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                             <div className="min-w-0">
                               <div className="kimix-settings-permission-label">本地轻量翻译模型</div>
                               <div className="kimix-settings-permission-desc" style={{ marginTop: 6 }}>
-                                Xenova/opus-mt-en-zh 量化版，约 {formatModelBytes(localThinkingTranslationStatus?.estimatedBytes ?? 121_000_000)}。下载后无需账号、Key 或网络。
+                                Xenova/opus-mt-en-zh 量化版 + 本地推理运行时，约 {formatModelBytes(localThinkingTranslationStatus?.estimatedBytes ?? 212_651_779)}。下载后无需账号、Key 或网络。
                               </div>
                             </div>
                             <HardDrive size={18} className="text-text-muted" />

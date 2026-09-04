@@ -7613,6 +7613,8 @@ function getLocalThinkingTranslator(): LocalThinkingTranslator {
           mainWindow.webContents.send("thinking-translation:localModelStatus", status);
         }
       },
+      // 开发环境直接用项目 node_modules 里的 transformers；打包环境按需下载运行时。
+      { runtimeRequired: app.isPackaged },
     );
   }
   return localThinkingTranslator;
