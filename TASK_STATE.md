@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-03 优化：安装包裁剪 onnxruntime 死重（v2.21.176）
+
+- 背景：安装包从 6 月 87MB 涨到 143MB，根因是 88ac17a6「本地思考翻译模型」引入 @huggingface/transformers + onnxruntime-node（合计解压 98.6MB），模型权重本身已是按需下载，但运行时全员强制打包。
+- 本轮（打包期裁剪）：win 排除 onnxruntime win32/arm64 全套（~32MB 死重，Windows 只发 x64）与 win32/x64/DirectML.dll（~18MB，实测删除后 binding 正常加载、CPU provider 正常初始化——DML 是延迟加载）；linux 排除 linux/arm64；mac 双架构 dmg 经新增 build/afterPack.cjs 按目标架构删除另一套 darwin 二进制。
+- 验证：本地 pnpm dist:win，Setup 137→122.7MB、portable 122.4MB；app.asar.unpacked 67.2→35MB，win32 下仅剩 x64/onnxruntime.dll + binding。
+- 后续：本地翻译运行时整体改按需下载（运行时 ~49MB 进一步移出安装包）待实现；mac/linux 裁剪只能等 CI 验证。
+
+
 ## 2026-09-03 修复：折叠设置导航图标被整行样式挤压（v2.21.175）
 
 - 根因：折叠设置按钮同时使用 `.kimix-settings-sidebar-icon-button`（40×40 flex）和 `.kimix-settings-navigation-item`（展开态全宽双列 grid）；后者声明更晚，把折叠按钮改回全宽 grid、补左右 16px padding 和空文本列，导致选中面板变宽并挤压 lucide 图标。
