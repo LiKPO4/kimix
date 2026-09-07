@@ -23,12 +23,12 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Official base | `0d45dddc57510e6b1306dd12c0b0703c37b8c63a` (tag `@moonshot-ai/kimi-code@0.40.1`) |
+| Official base | `95478e8c7ba248fd2470d5bb151555ec7fedd19d` (tag `@moonshot-ai/kimi-code@0.41.0`) |
 | Feature overlay | None; custom Agents, plugin Agents/system prompts, and secondary-model routing are upstream |
 | Kimix overlay | MCP fallback startup timeout only, applied by the vendor script |
 | node-sdk version | `0.20.0` |
-| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.40.1` |
-| Bundled on | 2026-09-03 |
+| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.41.0` |
+| Bundled on | 2026-09-07 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
@@ -53,6 +53,14 @@ bundled SDK to `0.20.0`, which adds session-less `suggestFiles(workDir, { query,
 through the v2 workspace file-service (the v1 engine returns `undefined`). Tower mode is
 available through the SDK session contract and is surfaced by Kimix's existing desktop
 control; Kimix receives live context snapshots through its existing status path.
+
+Kimi Code `0.41.0` keeps node-sdk at `0.20.0` with no breaking contract change: tower
+enablement failures now name the actual blocker (`towerEnterFailureMessage`), engine
+telemetry forwarding uses the appender-record shape with the engine's own
+`session_started` suppressed under the harness, and the v2 engine stops blocking
+dangerous or unanalyzable commands in Auto permission mode (they now approve
+silently; Manual/YOLO still ask). Kimix's approval boundary only surfaces requests
+that reach it, so no host-side change is required for the Auto-mode relaxation.
 
 The `0.31.0` host-identity contract requires `productName`, `version`, and `platform`.
 Kimix identifies itself as the desktop host rather than impersonating the CLI.

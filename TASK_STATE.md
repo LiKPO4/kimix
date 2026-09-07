@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-07 跟进：vendored SDK 升级官方 0.41.0（v2.21.178）
+
+- 做法：浅克隆 `@moonshot-ai/kimi-code@0.41.0`（`95478e8c`）到 `.kimix-upstream-kimi-code/`，pnpm install + node-sdk build，重跑 vendor-kimi-code-sdk.mjs 重新打包（13.6MB）；MCP 超时 overlay marker `DEFAULT_STARTUP_TIMEOUT_MS = 3e4;` 在 0.41 dist 中原样保留，补丁照旧套用。README provenance 同步。
+- 0.40.1→0.41.0 差异核对结论（代码级 diff 实测）：① Auto 模式危险命令守卫反转——`dangerous-command-ask.ts` 新增 auto 直接跳过，危险/无法静态分析命令在 auto 下静默 approve 不再 deny；Manual/YOLO 仍强制询问；宿主审批请求流形状零 diff，Kimix 审批边界（kimiCodeHost.ts:3704 注释、grep 边界测试）依然成立，无需改动。② 后台提问改 detached 直投（origin.turnId 置空，回合结束不再取消；答案不再经输出文件），宿主侧 question.requested 协议形状不变；0.41.0 官方 Server 实测通知轮帧契约不变（任务终止后仍无 assistant.delta/turn.ended/prompt.completed 广播），v2.21.172 快照追踪逻辑继续有效。③ 子代理 <200 字符最终消息不再打回（distillSummary/summaryPolicy 移除，空消息抛 AGENT_NO_FINAL_MESSAGE）。④ Tower：enter 失败经 towerEnterFailureMessage 指名真实阻塞，Kimix 的「设置 Tower 失败：detail」包装自动透传；非 git 目录支持与 config.toml 启用修复是上游自家语义，Kimix 的 git worktree 方案不受影响。⑤ node-sdk 仍 0.20.0，无破坏契约（telemetry appender 形状、suppressEngineSessionStarted 为内部变化）。
+- 验证：probe-kimi-code-host.mjs ok；probe-kimi-code-background-notification.mjs 对 0.41.0 Server 实测通过（快照文档已刷新为 0.41.0 证据）；typecheck、198 文件 2165 测试、pnpm build 全通过。
+- 知识库：runtime-routing.md 不变量 39（auto 语义修正）/95、subagent-model-pool.md、references/index.md、log.md 同步。
+- 已知边界：权限模式改名（Always Ask / Ask When Needed / Never Ask）与选区标注是上游 web 特性，Kimix 自有 UI 未对齐，属可选新需求；上游 tower 非 git 目录支持不适用于 Kimix 的 worktree 方案。
+
 ## 2026-09-03 优化：本地翻译运行时改按需下载（v2.21.177）
 
 - 做法：@huggingface/transformers 移出生产依赖（留 devDependencies 供类型与开发），新增 electron/localThinkingRuntimeManifest.ts（31 包闭包、版本/integrity 与 pnpm-lock 一致并有测试锁定）+ localThinkingRuntimeDownloader.ts（npmmirror 优先/npmjs 兜底、sha512 校验、按平台+架构过滤提取、剔除 DirectML.dll、断点按包续装）；worker 经 pathToFileURL 加载运行时 ESM 入口；就绪=运行时+模型双 marker；删除模型时连带清运行时。

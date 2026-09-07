@@ -38,7 +38,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
   function init2(inst, def) {
@@ -98,7 +98,7 @@ function config(newConfig) {
 }
 var NEVER, $brand, $ZodAsyncError, $ZodEncodeError, globalConfig;
 var init_core = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js"() {
     NEVER = Object.freeze({
       status: "aborted"
     });
@@ -118,7 +118,7 @@ var init_core = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -722,7 +722,7 @@ function uint8ArrayToHex(bytes) {
 }
 var EVALUATING, captureStackTrace, allowsEval, getParsedType, propertyKeyTypes, primitiveTypes, NUMBER_FORMAT_RANGES, BIGINT_FORMAT_RANGES, Class;
 var init_util = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js"() {
     EVALUATING = /* @__PURE__ */ Symbol("evaluating");
     captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace : (..._args) => {
     };
@@ -802,7 +802,7 @@ var init_util = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js
 function flattenError(error48, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
@@ -921,7 +921,7 @@ function prettifyError(error48) {
 }
 var initializer, $ZodError, $ZodRealError;
 var init_errors = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js"() {
     init_core();
     init_util();
     initializer = (inst, def) => {
@@ -945,10 +945,10 @@ var init_errors = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js
 var _parse, parse, _parseAsync, parseAsync, _safeParse, safeParse, _safeParseAsync, safeParseAsync, _encode, encode, _decode, decode, _encodeAsync, encodeAsync, _decodeAsync, decodeAsync, _safeEncode, safeEncode, _safeDecode, safeDecode, _safeEncodeAsync, safeEncodeAsync, _safeDecodeAsync, safeDecodeAsync;
 var init_parse = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js"() {
     init_core();
     init_errors();
     init_util();
@@ -1041,7 +1041,7 @@ var init_parse = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   base64: () => base64,
@@ -1132,7 +1132,7 @@ function fixedBase64url(length) {
 }
 var cuid, cuid2, ulid, xid, ksuid, nanoid, duration, extendedDuration, guid, uuid, uuid4, uuid6, uuid7, email, html5Email, rfc5322Email, unicodeEmail, idnEmail, browserEmail, _emoji, ipv4, ipv6, mac, cidrv4, cidrv6, base64, base64url, hostname, domain, e164, dateSource, date, string, bigint, integer, number, boolean, _null, _undefined, lowercase, uppercase, hex, md5_hex, md5_base64, md5_base64url, sha1_hex, sha1_base64, sha1_base64url, sha256_hex, sha256_base64, sha256_base64url, sha384_hex, sha384_base64, sha384_base64url, sha512_hex, sha512_base64, sha512_base64url;
 var init_regexes = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js"() {
     init_util();
     cuid = /^[cC][^\s-]{8,}$/;
     cuid2 = /^[0-9a-z]+$/;
@@ -1204,7 +1204,7 @@ var init_regexes = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js
 function handleCheckPropertyResult(result, payload, property) {
   if (result.issues.length) {
     payload.issues.push(...prefixIssues(property, result.issues));
@@ -1212,7 +1212,7 @@ function handleCheckPropertyResult(result, payload, property) {
 }
 var $ZodCheck, numericOriginMap, $ZodCheckLessThan, $ZodCheckGreaterThan, $ZodCheckMultipleOf, $ZodCheckNumberFormat, $ZodCheckBigIntFormat, $ZodCheckMaxSize, $ZodCheckMinSize, $ZodCheckSizeEquals, $ZodCheckMaxLength, $ZodCheckMinLength, $ZodCheckLengthEquals, $ZodCheckStringFormat, $ZodCheckRegex, $ZodCheckLowerCase, $ZodCheckUpperCase, $ZodCheckIncludes, $ZodCheckStartsWith, $ZodCheckEndsWith, $ZodCheckProperty, $ZodCheckMimeType, $ZodCheckOverwrite;
 var init_checks = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js"() {
     init_core();
     init_regexes();
     init_util();
@@ -1760,10 +1760,10 @@ var init_checks = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js
 var Doc;
 var init_doc = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js"() {
     Doc = class {
       constructor(args = []) {
         this.content = [];
@@ -1801,10 +1801,10 @@ var init_doc = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js
 var version;
 var init_versions = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js"() {
     version = {
       major: 4,
       minor: 3,
@@ -1813,7 +1813,7 @@ var init_versions = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js
 function isValidBase64(data) {
   if (data === "")
     return true;
@@ -2173,7 +2173,7 @@ function handleRefineResult(result, payload, input, inst) {
 }
 var $ZodType, $ZodString, $ZodStringFormat, $ZodGUID, $ZodUUID, $ZodEmail, $ZodURL, $ZodEmoji, $ZodNanoID, $ZodCUID, $ZodCUID2, $ZodULID, $ZodXID, $ZodKSUID, $ZodISODateTime, $ZodISODate, $ZodISOTime, $ZodISODuration, $ZodIPv4, $ZodIPv6, $ZodMAC, $ZodCIDRv4, $ZodCIDRv6, $ZodBase64, $ZodBase64URL, $ZodE164, $ZodJWT, $ZodCustomStringFormat, $ZodNumber, $ZodNumberFormat, $ZodBoolean, $ZodBigInt, $ZodBigIntFormat, $ZodSymbol, $ZodUndefined, $ZodNull, $ZodAny, $ZodUnknown, $ZodNever, $ZodVoid, $ZodDate, $ZodArray, $ZodObject, $ZodObjectJIT, $ZodUnion, $ZodXor, $ZodDiscriminatedUnion, $ZodIntersection, $ZodTuple, $ZodRecord, $ZodMap, $ZodSet, $ZodEnum, $ZodLiteral, $ZodFile, $ZodTransform, $ZodOptional, $ZodExactOptional, $ZodNullable, $ZodDefault, $ZodPrefault, $ZodNonOptional, $ZodSuccess, $ZodCatch, $ZodNaN, $ZodPipe, $ZodCodec, $ZodReadonly, $ZodTemplateLiteral, $ZodFunction, $ZodPromise, $ZodLazy, $ZodCustom;
 var init_schemas = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js"() {
     init_checks();
     init_core();
     init_doc();
@@ -3797,7 +3797,7 @@ var init_schemas = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js
 function ar_default() {
   return {
     localeError: error()
@@ -3805,7 +3805,7 @@ function ar_default() {
 }
 var error;
 var init_ar = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js"() {
     init_util();
     error = () => {
       const Sizable = {
@@ -3910,7 +3910,7 @@ var init_ar = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js
 function az_default() {
   return {
     localeError: error2()
@@ -3918,7 +3918,7 @@ function az_default() {
 }
 var error2;
 var init_az = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js"() {
     init_util();
     error2 = () => {
       const Sizable = {
@@ -4022,7 +4022,7 @@ var init_az = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -4045,7 +4045,7 @@ function be_default() {
 }
 var error3;
 var init_be = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js"() {
     init_util();
     error3 = () => {
       const Sizable = {
@@ -4185,7 +4185,7 @@ var init_be = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js
 function bg_default() {
   return {
     localeError: error4()
@@ -4193,7 +4193,7 @@ function bg_default() {
 }
 var error4;
 var init_bg = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js"() {
     init_util();
     error4 = () => {
       const Sizable = {
@@ -4312,7 +4312,7 @@ var init_bg = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js
 function ca_default() {
   return {
     localeError: error5()
@@ -4320,7 +4320,7 @@ function ca_default() {
 }
 var error5;
 var init_ca = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js"() {
     init_util();
     error5 = () => {
       const Sizable = {
@@ -4427,7 +4427,7 @@ var init_ca = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js
 function cs_default() {
   return {
     localeError: error6()
@@ -4435,7 +4435,7 @@ function cs_default() {
 }
 var error6;
 var init_cs = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js"() {
     init_util();
     error6 = () => {
       const Sizable = {
@@ -4545,7 +4545,7 @@ var init_cs = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js
 function da_default() {
   return {
     localeError: error7()
@@ -4553,7 +4553,7 @@ function da_default() {
 }
 var error7;
 var init_da = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js"() {
     init_util();
     error7 = () => {
       const Sizable = {
@@ -4667,7 +4667,7 @@ var init_da = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js
 function de_default() {
   return {
     localeError: error8()
@@ -4675,7 +4675,7 @@ function de_default() {
 }
 var error8;
 var init_de = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js"() {
     init_util();
     error8 = () => {
       const Sizable = {
@@ -4782,7 +4782,7 @@ var init_de = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js
 function en_default() {
   return {
     localeError: error9()
@@ -4790,7 +4790,7 @@ function en_default() {
 }
 var error9;
 var init_en = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js"() {
     init_util();
     error9 = () => {
       const Sizable = {
@@ -4897,7 +4897,7 @@ var init_en = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js
 function eo_default() {
   return {
     localeError: error10()
@@ -4905,7 +4905,7 @@ function eo_default() {
 }
 var error10;
 var init_eo = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js"() {
     init_util();
     error10 = () => {
       const Sizable = {
@@ -5013,7 +5013,7 @@ var init_eo = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js
 function es_default() {
   return {
     localeError: error11()
@@ -5021,7 +5021,7 @@ function es_default() {
 }
 var error11;
 var init_es = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js"() {
     init_util();
     error11 = () => {
       const Sizable = {
@@ -5152,7 +5152,7 @@ var init_es = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js
 function fa_default() {
   return {
     localeError: error12()
@@ -5160,7 +5160,7 @@ function fa_default() {
 }
 var error12;
 var init_fa = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js"() {
     init_util();
     error12 = () => {
       const Sizable = {
@@ -5273,7 +5273,7 @@ var init_fa = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js
 function fi_default() {
   return {
     localeError: error13()
@@ -5281,7 +5281,7 @@ function fi_default() {
 }
 var error13;
 var init_fi = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js"() {
     init_util();
     error13 = () => {
       const Sizable = {
@@ -5392,7 +5392,7 @@ var init_fi = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js
 function fr_default() {
   return {
     localeError: error14()
@@ -5400,7 +5400,7 @@ function fr_default() {
 }
 var error14;
 var init_fr = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js"() {
     init_util();
     error14 = () => {
       const Sizable = {
@@ -5507,7 +5507,7 @@ var init_fr = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js
 function fr_CA_default() {
   return {
     localeError: error15()
@@ -5515,7 +5515,7 @@ function fr_CA_default() {
 }
 var error15;
 var init_fr_CA = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js"() {
     init_util();
     error15 = () => {
       const Sizable = {
@@ -5621,7 +5621,7 @@ var init_fr_CA = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js
 function he_default() {
   return {
     localeError: error16()
@@ -5629,7 +5629,7 @@ function he_default() {
 }
 var error16;
 var init_he = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js"() {
     init_util();
     error16 = () => {
       const TypeNames = {
@@ -5822,7 +5822,7 @@ var init_he = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js
 function hu_default() {
   return {
     localeError: error17()
@@ -5830,7 +5830,7 @@ function hu_default() {
 }
 var error17;
 var init_hu = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js"() {
     init_util();
     error17 = () => {
       const Sizable = {
@@ -5937,7 +5937,7 @@ var init_hu = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -5955,7 +5955,7 @@ function hy_default() {
 }
 var error18;
 var init_hy = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js"() {
     init_util();
     error18 = () => {
       const Sizable = {
@@ -6091,7 +6091,7 @@ var init_hy = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js
 function id_default() {
   return {
     localeError: error19()
@@ -6099,7 +6099,7 @@ function id_default() {
 }
 var error19;
 var init_id = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js"() {
     init_util();
     error19 = () => {
       const Sizable = {
@@ -6204,7 +6204,7 @@ var init_id = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js
 function is_default() {
   return {
     localeError: error20()
@@ -6212,7 +6212,7 @@ function is_default() {
 }
 var error20;
 var init_is = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js"() {
     init_util();
     error20 = () => {
       const Sizable = {
@@ -6320,7 +6320,7 @@ var init_is = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js
 function it_default() {
   return {
     localeError: error21()
@@ -6328,7 +6328,7 @@ function it_default() {
 }
 var error21;
 var init_it = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js"() {
     init_util();
     error21 = () => {
       const Sizable = {
@@ -6435,7 +6435,7 @@ var init_it = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js
 function ja_default() {
   return {
     localeError: error22()
@@ -6443,7 +6443,7 @@ function ja_default() {
 }
 var error22;
 var init_ja = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js"() {
     init_util();
     error22 = () => {
       const Sizable = {
@@ -6549,7 +6549,7 @@ var init_ja = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js
 function ka_default() {
   return {
     localeError: error23()
@@ -6557,7 +6557,7 @@ function ka_default() {
 }
 var error23;
 var init_ka = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js"() {
     init_util();
     error23 = () => {
       const Sizable = {
@@ -6668,7 +6668,7 @@ var init_ka = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js
 function km_default() {
   return {
     localeError: error24()
@@ -6676,7 +6676,7 @@ function km_default() {
 }
 var error24;
 var init_km = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js"() {
     init_util();
     error24 = () => {
       const Sizable = {
@@ -6785,17 +6785,17 @@ var init_km = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 var init_kh = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js"() {
     init_km();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js
 function ko_default() {
   return {
     localeError: error25()
@@ -6803,7 +6803,7 @@ function ko_default() {
 }
 var error25;
 var init_ko = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js"() {
     init_util();
     error25 = () => {
       const Sizable = {
@@ -6913,7 +6913,7 @@ var init_ko = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
   const last = abs % 10;
@@ -6931,7 +6931,7 @@ function lt_default() {
 }
 var capitalizeFirstCharacter, error26;
 var init_lt = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js"() {
     init_util();
     capitalizeFirstCharacter = (text) => {
       return text.charAt(0).toUpperCase() + text.slice(1);
@@ -7123,7 +7123,7 @@ var init_lt = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js
 function mk_default() {
   return {
     localeError: error27()
@@ -7131,7 +7131,7 @@ function mk_default() {
 }
 var error27;
 var init_mk = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js"() {
     init_util();
     error27 = () => {
       const Sizable = {
@@ -7239,7 +7239,7 @@ var init_mk = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js
 function ms_default() {
   return {
     localeError: error28()
@@ -7247,7 +7247,7 @@ function ms_default() {
 }
 var error28;
 var init_ms = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js"() {
     init_util();
     error28 = () => {
       const Sizable = {
@@ -7353,7 +7353,7 @@ var init_ms = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js
 function nl_default() {
   return {
     localeError: error29()
@@ -7361,7 +7361,7 @@ function nl_default() {
 }
 var error29;
 var init_nl = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js"() {
     init_util();
     error29 = () => {
       const Sizable = {
@@ -7470,7 +7470,7 @@ var init_nl = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js
 function no_default() {
   return {
     localeError: error30()
@@ -7478,7 +7478,7 @@ function no_default() {
 }
 var error30;
 var init_no = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js"() {
     init_util();
     error30 = () => {
       const Sizable = {
@@ -7585,7 +7585,7 @@ var init_no = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js
 function ota_default() {
   return {
     localeError: error31()
@@ -7593,7 +7593,7 @@ function ota_default() {
 }
 var error31;
 var init_ota = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js"() {
     init_util();
     error31 = () => {
       const Sizable = {
@@ -7701,7 +7701,7 @@ var init_ota = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js
 function ps_default() {
   return {
     localeError: error32()
@@ -7709,7 +7709,7 @@ function ps_default() {
 }
 var error32;
 var init_ps = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js"() {
     init_util();
     error32 = () => {
       const Sizable = {
@@ -7822,7 +7822,7 @@ var init_ps = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js
 function pl_default() {
   return {
     localeError: error33()
@@ -7830,7 +7830,7 @@ function pl_default() {
 }
 var error33;
 var init_pl = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js"() {
     init_util();
     error33 = () => {
       const Sizable = {
@@ -7938,7 +7938,7 @@ var init_pl = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js
 function pt_default() {
   return {
     localeError: error34()
@@ -7946,7 +7946,7 @@ function pt_default() {
 }
 var error34;
 var init_pt = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js"() {
     init_util();
     error34 = () => {
       const Sizable = {
@@ -8053,7 +8053,7 @@ var init_pt = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -8076,7 +8076,7 @@ function ru_default() {
 }
 var error35;
 var init_ru = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js"() {
     init_util();
     error35 = () => {
       const Sizable = {
@@ -8216,7 +8216,7 @@ var init_ru = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js
 function sl_default() {
   return {
     localeError: error36()
@@ -8224,7 +8224,7 @@ function sl_default() {
 }
 var error36;
 var init_sl = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js"() {
     init_util();
     error36 = () => {
       const Sizable = {
@@ -8332,7 +8332,7 @@ var init_sl = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js
 function sv_default() {
   return {
     localeError: error37()
@@ -8340,7 +8340,7 @@ function sv_default() {
 }
 var error37;
 var init_sv = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js"() {
     init_util();
     error37 = () => {
       const Sizable = {
@@ -8449,7 +8449,7 @@ var init_sv = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js
 function ta_default() {
   return {
     localeError: error38()
@@ -8457,7 +8457,7 @@ function ta_default() {
 }
 var error38;
 var init_ta = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js"() {
     init_util();
     error38 = () => {
       const Sizable = {
@@ -8566,7 +8566,7 @@ var init_ta = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js
 function th_default() {
   return {
     localeError: error39()
@@ -8574,7 +8574,7 @@ function th_default() {
 }
 var error39;
 var init_th = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js"() {
     init_util();
     error39 = () => {
       const Sizable = {
@@ -8683,7 +8683,7 @@ var init_th = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js
 function tr_default() {
   return {
     localeError: error40()
@@ -8691,7 +8691,7 @@ function tr_default() {
 }
 var error40;
 var init_tr = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js"() {
     init_util();
     error40 = () => {
       const Sizable = {
@@ -8795,7 +8795,7 @@ var init_tr = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js
 function uk_default() {
   return {
     localeError: error41()
@@ -8803,7 +8803,7 @@ function uk_default() {
 }
 var error41;
 var init_uk = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js"() {
     init_util();
     error41 = () => {
       const Sizable = {
@@ -8910,17 +8910,17 @@ var init_uk = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 var init_ua = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js"() {
     init_uk();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js
 function ur_default() {
   return {
     localeError: error42()
@@ -8928,7 +8928,7 @@ function ur_default() {
 }
 var error42;
 var init_ur = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js"() {
     init_util();
     error42 = () => {
       const Sizable = {
@@ -9037,7 +9037,7 @@ var init_ur = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js
 function uz_default() {
   return {
     localeError: error43()
@@ -9045,7 +9045,7 @@ function uz_default() {
 }
 var error43;
 var init_uz = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js"() {
     init_util();
     error43 = () => {
       const Sizable = {
@@ -9153,7 +9153,7 @@ var init_uz = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js
 function vi_default() {
   return {
     localeError: error44()
@@ -9161,7 +9161,7 @@ function vi_default() {
 }
 var error44;
 var init_vi = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js"() {
     init_util();
     error44 = () => {
       const Sizable = {
@@ -9268,7 +9268,7 @@ var init_vi = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js
 function zh_CN_default() {
   return {
     localeError: error45()
@@ -9276,7 +9276,7 @@ function zh_CN_default() {
 }
 var error45;
 var init_zh_CN = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js"() {
     init_util();
     error45 = () => {
       const Sizable = {
@@ -9384,7 +9384,7 @@ var init_zh_CN = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js
 function zh_TW_default() {
   return {
     localeError: error46()
@@ -9392,7 +9392,7 @@ function zh_TW_default() {
 }
 var error46;
 var init_zh_TW = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js"() {
     init_util();
     error46 = () => {
       const Sizable = {
@@ -9498,7 +9498,7 @@ var init_zh_TW = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js
 function yo_default() {
   return {
     localeError: error47()
@@ -9506,7 +9506,7 @@ function yo_default() {
 }
 var error47;
 var init_yo = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js"() {
     init_util();
     error47 = () => {
       const Sizable = {
@@ -9612,7 +9612,7 @@ var init_yo = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -9666,7 +9666,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 var init_locales = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js"() {
     init_ar();
     init_az();
     init_be();
@@ -9719,13 +9719,13 @@ var init_locales = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js
 function registry() {
   return new $ZodRegistry();
 }
 var _a, $output, $input, $ZodRegistry, globalRegistry;
 var init_registries = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js"() {
     $output = /* @__PURE__ */ Symbol("ZodOutput");
     $input = /* @__PURE__ */ Symbol("ZodInput");
     $ZodRegistry = class {
@@ -9773,7 +9773,7 @@ var init_registries = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
 function _string(Class2, params) {
   return new Class2({
@@ -10806,7 +10806,7 @@ function _stringFormat(Class2, format2, fnOrRegex, _params = {}) {
 }
 var TimePrecision;
 var init_api = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js"() {
     init_checks();
     init_registries();
     init_schemas();
@@ -10821,7 +10821,7 @@ var init_api = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -11161,7 +11161,7 @@ function isTransforming(_schema, _ctx) {
 }
 var createToJSONSchemaMethod, createStandardJSONSchemaMethod;
 var init_to_json_schema = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js"() {
     init_registries();
     createToJSONSchemaMethod = (schema, processors = {}) => (params) => {
       const ctx = initializeContext({ ...params, processors });
@@ -11179,7 +11179,7 @@ var init_to_json_schema = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js
 function toJSONSchema(input, params) {
   if ("_idmap" in input) {
     const registry2 = input;
@@ -11216,7 +11216,7 @@ function toJSONSchema(input, params) {
 }
 var formatMap, stringProcessor, numberProcessor, booleanProcessor, bigintProcessor, symbolProcessor, nullProcessor, undefinedProcessor, voidProcessor, neverProcessor, anyProcessor, unknownProcessor, dateProcessor, enumProcessor, literalProcessor, nanProcessor, templateLiteralProcessor, fileProcessor, successProcessor, customProcessor, functionProcessor, transformProcessor, mapProcessor, setProcessor, arrayProcessor, objectProcessor, unionProcessor, intersectionProcessor, tupleProcessor, recordProcessor, nullableProcessor, nonoptionalProcessor, defaultProcessor, prefaultProcessor, catchProcessor, pipeProcessor, readonlyProcessor, promiseProcessor, optionalProcessor, lazyProcessor, allProcessors;
 var init_json_schema_processors = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js"() {
     init_to_json_schema();
     init_util();
     formatMap = {
@@ -11737,10 +11737,10 @@ var init_json_schema_processors = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator;
 var init_json_schema_generator = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js"() {
     init_json_schema_processors();
     init_to_json_schema();
     JSONSchemaGenerator = class {
@@ -11819,14 +11819,14 @@ var init_json_schema_generator = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 var init_json_schema = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js"() {
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -12104,7 +12104,7 @@ __export(core_exports2, {
   version: () => version
 });
 var init_core2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js"() {
     init_core();
     init_parse();
     init_errors();
@@ -12124,7 +12124,7 @@ var init_core2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -12158,12 +12158,12 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 var init_checks2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js"() {
     init_core2();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -12189,7 +12189,7 @@ function duration2(params) {
 }
 var ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration;
 var init_iso = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js"() {
     init_core2();
     init_schemas2();
     ZodISODateTime = /* @__PURE__ */ $constructor("ZodISODateTime", (inst, def) => {
@@ -12211,10 +12211,10 @@ var init_iso = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js
 var initializer2, ZodError, ZodRealError;
 var init_errors2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js"() {
     init_core2();
     init_core2();
     init_util();
@@ -12259,10 +12259,10 @@ var init_errors2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js
 var parse2, parseAsync2, safeParse2, safeParseAsync2, encode2, decode2, encodeAsync2, decodeAsync2, safeEncode2, safeDecode2, safeEncodeAsync2, safeDecodeAsync2;
 var init_parse2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js"() {
     init_core2();
     init_errors2();
     parse2 = /* @__PURE__ */ _parse(ZodRealError);
@@ -12280,7 +12280,7 @@ var init_parse2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -12904,7 +12904,7 @@ function preprocess(fn2, schema) {
 }
 var ZodType, _ZodString, ZodString, ZodStringFormat, ZodEmail, ZodGUID, ZodUUID, ZodURL, ZodEmoji, ZodNanoID, ZodCUID, ZodCUID2, ZodULID, ZodXID, ZodKSUID, ZodIPv4, ZodMAC, ZodIPv6, ZodCIDRv4, ZodCIDRv6, ZodBase64, ZodBase64URL, ZodE164, ZodJWT, ZodCustomStringFormat, ZodNumber, ZodNumberFormat, ZodBoolean, ZodBigInt, ZodBigIntFormat, ZodSymbol, ZodUndefined, ZodNull, ZodAny, ZodUnknown, ZodNever, ZodVoid, ZodDate, ZodArray, ZodObject, ZodUnion, ZodXor, ZodDiscriminatedUnion, ZodIntersection, ZodTuple, ZodRecord, ZodMap, ZodSet, ZodEnum, ZodLiteral, ZodFile, ZodTransform, ZodOptional, ZodExactOptional, ZodNullable, ZodDefault, ZodPrefault, ZodNonOptional, ZodSuccess, ZodCatch, ZodNaN, ZodPipe, ZodCodec, ZodReadonly, ZodTemplateLiteral, ZodLazy, ZodPromise, ZodFunction, ZodCustom, describe2, meta2, stringbool;
 var init_schemas2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js"() {
     init_core2();
     init_core2();
     init_json_schema_processors();
@@ -13538,7 +13538,7 @@ var init_schemas2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js
 function setErrorMap(map2) {
   config({
     customError: map2
@@ -13549,7 +13549,7 @@ function getErrorMap() {
 }
 var ZodIssueCode, ZodFirstPartyTypeKind;
 var init_compat = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js"() {
     init_core2();
     init_core2();
     ZodIssueCode = {
@@ -13570,7 +13570,7 @@ var init_compat = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js
 function detectVersion(schema, defaultTarget) {
   const $schema = schema.$schema;
   if ($schema === "https://json-schema.org/draft/2020-12/schema") {
@@ -13969,7 +13969,7 @@ function fromJSONSchema(schema, params) {
 }
 var z, RECOGNIZED_KEYS;
 var init_from_json_schema = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js"() {
     init_registries();
     init_checks2();
     init_iso();
@@ -14053,7 +14053,7 @@ var init_from_json_schema = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -14078,13 +14078,13 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 var init_coerce = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js"() {
     init_core2();
     init_schemas2();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -14325,7 +14325,7 @@ __export(external_exports, {
   xor: () => xor
 });
 var init_external = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js"() {
     init_core2();
     init_schemas2();
     init_checks2();
@@ -14345,17 +14345,17 @@ var init_external = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js
 var zod_default;
 var init_zod = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js"() {
     init_external();
     init_external();
     zod_default = external_exports;
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/error.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/error.js
 function getLineColFromPtr(string4, ptr) {
   let lines = string4.slice(0, ptr).split(/\r\n|\n|\r/g);
   return [lines.length, lines.pop().length + 1];
@@ -14381,7 +14381,7 @@ function makeCodeBlock(string4, line, column) {
 }
 var TomlError;
 var init_error = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/error.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/error.js"() {
     TomlError = class extends Error {
       line;
       column;
@@ -14400,7 +14400,7 @@ ${codeblock}`, options2);
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/util.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/util.js
 function isEscaped(str, ptr) {
   let i2 = 0;
   while (str[ptr - ++i2] === "\\")
@@ -14479,15 +14479,15 @@ function getStringEnd(str, seek) {
   return seek;
 }
 var init_util2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/util.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/util.js"() {
     init_error();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/date.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/date.js
 var DATE_TIME_RE, TomlDate;
 var init_date = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/date.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/date.js"() {
     DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})?[T ]?(?:(\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?)?(Z|[-+]\d{2}:\d{2})?$/i;
     TomlDate = class _TomlDate extends Date {
       #hasDate = false;
@@ -14581,7 +14581,7 @@ var init_date = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/primitive.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/primitive.js
 function parseString(str, ptr = 0, endPtr = str.length) {
   let isLiteral = str[ptr] === "'";
   let isMultiline = str[ptr++] === str[ptr] && str[ptr] === str[ptr + 1];
@@ -14707,7 +14707,7 @@ function parseValue(value, toml, ptr, integersAsBigInt) {
 }
 var INT_REGEX, FLOAT_REGEX, LEADING_ZERO, ESCAPE_REGEX, ESC_MAP;
 var init_primitive = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/primitive.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/primitive.js"() {
     init_util2();
     init_date();
     init_error();
@@ -14728,7 +14728,7 @@ var init_primitive = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/extract.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/extract.js
 function sliceAndTrimEndOf(str, startPtr, endPtr) {
   let value = str.slice(startPtr, endPtr);
   let commentIdx = value.indexOf("#");
@@ -14795,7 +14795,7 @@ function extractValue(str, ptr, end, depth, integersAsBigInt) {
   ];
 }
 var init_extract = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/extract.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/extract.js"() {
     init_primitive();
     init_struct();
     init_util2();
@@ -14803,7 +14803,7 @@ var init_extract = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/struct.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/struct.js
 function parseKey(str, ptr, end = "=") {
   let dot = ptr - 1;
   let parsed2 = [];
@@ -14951,7 +14951,7 @@ function parseArray(str, ptr, depth, integersAsBigInt) {
 }
 var KEY_PART_RE;
 var init_struct = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/struct.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/struct.js"() {
     init_primitive();
     init_extract();
     init_util2();
@@ -14960,7 +14960,7 @@ var init_struct = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/parse.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/parse.js
 function peekTable(key2, table, meta3, type2) {
   let t2 = table;
   let m3 = meta3;
@@ -15085,7 +15085,7 @@ function parse3(toml, { maxDepth = 1e3, integersAsBigInt } = {}) {
   return res;
 }
 var init_parse3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/parse.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/parse.js"() {
     init_struct();
     init_extract();
     init_util2();
@@ -15093,7 +15093,7 @@ var init_parse3 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/stringify.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/stringify.js
 function extendedTypeOf(obj) {
   let type2 = typeof obj;
   if (type2 === "object") {
@@ -15234,14 +15234,14 @@ function stringify(obj, { maxDepth = 1e3, numbersAsFloat = false } = {}) {
 }
 var BARE_KEY;
 var init_stringify = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/stringify.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/stringify.js"() {
     BARE_KEY = /^[a-z0-9-_]+$/i;
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/index.js
 var init_dist = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/smol-toml@1.6.1/node_modules/smol-toml/dist/index.js"() {
     init_parse3();
     init_stringify();
     init_date();
@@ -15249,7 +15249,7 @@ var init_dist = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/@antfu+utils@9.3.0/node_modules/@antfu/utils/dist/index.mjs
+// .kimix-upstream-kimi-code/node_modules/.pnpm/@antfu+utils@9.3.0/node_modules/@antfu/utils/dist/index.mjs
 function uniq(array2) {
   return Array.from(new Set(array2));
 }
@@ -15280,30 +15280,30 @@ function createControlledPromise() {
   return promise2;
 }
 var init_dist2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/@antfu+utils@9.3.0/node_modules/@antfu/utils/dist/index.mjs"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/@antfu+utils@9.3.0/node_modules/@antfu/utils/dist/index.mjs"() {
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/index.js
 var init_classic = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/index.js"() {
     init_external();
     init_external();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/index.js
 var init_v4 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/index.js"() {
     init_classic();
     init_classic();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/util.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/util.js
 var util, objectUtil, ZodParsedType, getParsedType2;
 var init_util3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/util.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/util.js"() {
     (function(util2) {
       util2.assertEqual = (_2) => {
       };
@@ -15437,10 +15437,10 @@ var init_util3 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/ZodError.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/ZodError.js
 var ZodIssueCode2, ZodError2;
 var init_ZodError = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/ZodError.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/ZodError.js"() {
     init_util3();
     ZodIssueCode2 = util.arrayToEnum([
       "invalid_type",
@@ -15557,10 +15557,10 @@ var init_ZodError = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/locales/en.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/locales/en.js
 var errorMap, en_default2;
 var init_en2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/locales/en.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/locales/en.js"() {
     init_ZodError();
     init_util3();
     errorMap = (issue2, _ctx) => {
@@ -15667,19 +15667,19 @@ var init_en2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/errors.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/errors.js
 function getErrorMap2() {
   return overrideErrorMap;
 }
 var overrideErrorMap;
 var init_errors3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/errors.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/errors.js"() {
     init_en2();
     overrideErrorMap = en_default2;
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/parseUtil.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/parseUtil.js
 function addIssueToContext(ctx, issueData) {
   const overrideMap = getErrorMap2();
   const issue2 = makeIssue({
@@ -15701,7 +15701,7 @@ function addIssueToContext(ctx, issueData) {
 }
 var makeIssue, ParseStatus, INVALID, DIRTY, OK, isAborted, isDirty, isValid, isAsync;
 var init_parseUtil = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/parseUtil.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/parseUtil.js"() {
     init_errors3();
     init_en2();
     makeIssue = (params) => {
@@ -15795,16 +15795,16 @@ var init_parseUtil = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/typeAliases.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/typeAliases.js
 var init_typeAliases = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/typeAliases.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/typeAliases.js"() {
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/errorUtil.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 var init_errorUtil = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/errorUtil.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/errorUtil.js"() {
     (function(errorUtil2) {
       errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
       errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
@@ -15812,7 +15812,7 @@ var init_errorUtil = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/types.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/types.js
 function processCreateParams(params) {
   if (!params)
     return {};
@@ -15979,7 +15979,7 @@ function createZodEnum(values, params) {
 }
 var ParseInputLazyPath, handleResult, ZodType2, cuidRegex, cuid2Regex, ulidRegex, uuidRegex, nanoidRegex, jwtRegex, durationRegex, emailRegex, _emojiRegex, emojiRegex, ipv4Regex, ipv4CidrRegex, ipv6Regex, ipv6CidrRegex, base64Regex, base64urlRegex, dateRegexSource, dateRegex, ZodString2, ZodNumber2, ZodBigInt2, ZodBoolean2, ZodDate2, ZodSymbol2, ZodUndefined2, ZodNull2, ZodAny2, ZodUnknown2, ZodNever2, ZodVoid2, ZodArray2, ZodObject2, ZodUnion2, getDiscriminator, ZodDiscriminatedUnion2, ZodIntersection2, ZodTuple2, ZodRecord2, ZodMap2, ZodSet2, ZodFunction2, ZodLazy2, ZodLiteral2, ZodEnum2, ZodNativeEnum, ZodPromise2, ZodEffects, ZodOptional2, ZodNullable2, ZodDefault2, ZodCatch2, ZodNaN2, ZodBranded, ZodPipeline, ZodReadonly2, late, ZodFirstPartyTypeKind2, stringType, numberType, nanType, bigIntType, booleanType, dateType, symbolType, undefinedType, nullType, anyType, unknownType, neverType, voidType, arrayType, objectType, strictObjectType, unionType, discriminatedUnionType, intersectionType, tupleType, recordType, mapType, setType, functionType, lazyType, literalType, enumType, nativeEnumType, promiseType, effectsType, optionalType, nullableType, preprocessType, pipelineType;
 var init_types = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/types.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/types.js"() {
     init_ZodError();
     init_errors3();
     init_errorUtil();
@@ -19223,9 +19223,9 @@ var init_types = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/external.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/external.js
 var init_external2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/external.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/external.js"() {
     init_errors3();
     init_parseUtil();
     init_typeAliases();
@@ -19235,56 +19235,56 @@ var init_external2 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/index.js
 var init_v3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/index.js"() {
     init_external2();
     init_external2();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/parse.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/parse.js
 var init_parse4 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/parse.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/parse.js"() {
     init_core2();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/schemas.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/schemas.js
 var init_schemas3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/schemas.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/schemas.js"() {
     init_core2();
     init_util();
     init_parse4();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/checks.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/checks.js
 var init_checks3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/checks.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/checks.js"() {
     init_core2();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/iso.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/iso.js
 var init_iso2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/iso.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/iso.js"() {
     init_core2();
     init_schemas3();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/coerce.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/coerce.js
 var init_coerce2 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/coerce.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/coerce.js"() {
     init_core2();
     init_schemas3();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/external.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/external.js
 var init_external3 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/external.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/mini/external.js"() {
     init_core2();
     init_parse4();
     init_schemas3();
@@ -19298,17 +19298,17 @@ var init_external3 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4-mini/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4-mini/index.js
 var init_v4_mini = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4-mini/index.js"() {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4-mini/index.js"() {
     init_external3();
     init_external3();
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/buffer-crc32@1.0.0/node_modules/buffer-crc32/dist/index.cjs
+// .kimix-upstream-kimi-code/node_modules/.pnpm/buffer-crc32@1.0.0/node_modules/buffer-crc32/dist/index.cjs
 var require_dist = __commonJS({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/buffer-crc32@1.0.0/node_modules/buffer-crc32/dist/index.cjs"(exports, module) {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/buffer-crc32@1.0.0/node_modules/buffer-crc32/dist/index.cjs"(exports, module) {
     "use strict";
     function getDefaultExportFromCjs(x3) {
       return x3 && x3.__esModule && Object.prototype.hasOwnProperty.call(x3, "default") ? x3["default"] : x3;
@@ -19614,9 +19614,9 @@ var require_dist = __commonJS({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/yazl@3.3.1/node_modules/yazl/index.js
+// .kimix-upstream-kimi-code/node_modules/.pnpm/yazl@3.3.1/node_modules/yazl/index.js
 var require_yazl = __commonJS({
-  ".kimix-upstream-kimi-code-0.18.0/node_modules/.pnpm/yazl@3.3.1/node_modules/yazl/index.js"(exports) {
+  ".kimix-upstream-kimi-code/node_modules/.pnpm/yazl@3.3.1/node_modules/yazl/index.js"(exports) {
     var fs2 = __require("fs");
     var Transform2 = __require("stream").Transform;
     var PassThrough3 = __require("stream").PassThrough;
@@ -20254,12 +20254,12 @@ var require_yazl = __commonJS({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/src-BWgKgh2g.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/src-BWgKgh2g.mjs
 import { fileURLToPath as __cjsShimFileURLToPath } from "node:url";
 import { dirname as __cjsShimDirname } from "node:path";
 var __filename, __dirname, require_ms, require_common, require_browser, require_has_flag, require_supports_color, require_node, require_src;
 var init_src_BWgKgh2g = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/src-BWgKgh2g.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/src-BWgKgh2g.mjs"() {
     "use strict";
     init_index();
     __filename = __cjsShimFileURLToPath(import.meta.url);
@@ -20885,7 +20885,7 @@ var init_src_BWgKgh2g = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/dist-mgEigvs-.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/dist-mgEigvs-.mjs
 var dist_mgEigvs_exports = {};
 __export(dist_mgEigvs_exports, {
   default: () => dist_mgEigvs_default
@@ -20894,7 +20894,7 @@ import { fileURLToPath as __cjsShimFileURLToPath2 } from "node:url";
 import { dirname as __cjsShimDirname2 } from "node:path";
 var __filename2, __dirname2, require_helpers, require_dist$1, require_parse_proxy_response, require_dist2, dist_mgEigvs_default;
 var init_dist_mgEigvs = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/dist-mgEigvs-.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/dist-mgEigvs-.mjs"() {
     "use strict";
     init_index();
     init_src_BWgKgh2g();
@@ -21313,7 +21313,7 @@ var init_dist_mgEigvs = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/from-GZssoc5G.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/from-GZssoc5G.mjs
 import { fileURLToPath as __cjsShimFileURLToPath3 } from "node:url";
 import { dirname as __cjsShimDirname3 } from "node:path";
 import { promises } from "node:fs";
@@ -21353,7 +21353,7 @@ Content-Type: ${v.type || "application/octet-stream"}\r
 }
 var __filename3, __dirname3, require_ponyfill_es2018, require_streams, POOL_SIZE, _Blob, Blob2, init_fetch_blob, _File, File2, init_file, t, i, h, r, m, f, e, x, FormData2, init_esm_min, require_node_domexception, stat, init_from;
 var init_from_GZssoc5G = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/from-GZssoc5G.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/from-GZssoc5G.mjs"() {
     "use strict";
     init_index();
     __filename3 = __cjsShimFileURLToPath3(import.meta.url);
@@ -25066,7 +25066,7 @@ var init_from_GZssoc5G = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/multipart-parser-DZ9MRKrm.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/multipart-parser-DZ9MRKrm.mjs
 var multipart_parser_DZ9MRKrm_exports = {};
 __export(multipart_parser_DZ9MRKrm_exports, {
   toFormData: () => toFormData
@@ -25150,7 +25150,7 @@ async function toFormData(Body2, ct2) {
 }
 var __filename4, __dirname4, s, S, f2, F, LF, CR, SPACE, HYPHEN, COLON, A, Z, lower, noop, MultipartParser;
 var init_multipart_parser_DZ9MRKrm = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/multipart-parser-DZ9MRKrm.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/multipart-parser-DZ9MRKrm.mjs"() {
     "use strict";
     init_index();
     init_from_GZssoc5G();
@@ -25375,7 +25375,7 @@ var init_multipart_parser_DZ9MRKrm = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/src-D90PhWCf.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/src-D90PhWCf.mjs
 var src_D90PhWCf_exports = {};
 __export(src_D90PhWCf_exports, {
   default: () => fetch2
@@ -25762,7 +25762,7 @@ function fixResponseChunkedTransferBadEnding(request, errorCallback) {
 }
 var __filename5, __dirname5, init_dist3, FetchBaseError, init_base, FetchError, init_fetch_error, NAME, isURLSearchParameters, isBlob, isAbortSignal, isDomainOrSubdomain, isSameProtocol, init_is2, pipeline$1, INTERNALS$2, Body, clone2, getNonSpecFormDataBoundary, extractContentType, getTotalBytes, writeToStream, init_body, validateHeaderName, validateHeaderValue, Headers2, init_headers, redirectStatus, isRedirect, init_is_redirect, INTERNALS$1, Response2, init_response, getSearch, init_get_search, ReferrerPolicy, DEFAULT_REFERRER_POLICY, init_referrer, INTERNALS, isRequest, doBadDataWarn, Request, getNodeRequestOptions, init_request, AbortError, init_abort_error, supportedSchemas;
 var init_src_D90PhWCf = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/src-D90PhWCf.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/src-D90PhWCf.mjs"() {
     "use strict";
     init_index();
     init_from_GZssoc5G();
@@ -26432,7 +26432,7 @@ var init_src_D90PhWCf = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/decode-P3VnPoF0.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/decode-P3VnPoF0.mjs
 var decode_P3VnPoF0_exports = {};
 __export(decode_P3VnPoF0_exports, {
   default: () => decode3,
@@ -26470,7 +26470,7 @@ async function decode3(buffer) {
 }
 var __filename6, __dirname6, Module, emscriptenModule;
 var init_decode_P3VnPoF0 = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/decode-P3VnPoF0.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/decode-P3VnPoF0.mjs"() {
     "use strict";
     __filename6 = __cjsShimFileURLToPath6(import.meta.url);
     __dirname6 = __cjsShimDirname6(__filename6);
@@ -27668,7 +27668,7 @@ var init_decode_P3VnPoF0 = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/webp-dec-wasm-yepct7VZ.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/webp-dec-wasm-yepct7VZ.mjs
 var webp_dec_wasm_yepct7VZ_exports = {};
 __export(webp_dec_wasm_yepct7VZ_exports, {
   WEBP_DECODER_WASM_BASE64: () => WEBP_DECODER_WASM_BASE64
@@ -27677,7 +27677,7 @@ import { fileURLToPath as __cjsShimFileURLToPath7 } from "node:url";
 import { dirname as __cjsShimDirname7 } from "node:path";
 var __filename7, __dirname7, WEBP_DECODER_WASM_BASE64;
 var init_webp_dec_wasm_yepct7VZ = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/webp-dec-wasm-yepct7VZ.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/webp-dec-wasm-yepct7VZ.mjs"() {
     "use strict";
     __filename7 = __cjsShimFileURLToPath7(import.meta.url);
     __dirname7 = __cjsShimDirname7(__filename7);
@@ -27685,7 +27685,7 @@ var init_webp_dec_wasm_yepct7VZ = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/file-type-B5x3GGOC.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/file-type-B5x3GGOC.mjs
 var file_type_B5x3GGOC_exports = {};
 __export(file_type_B5x3GGOC_exports, {
   fileTypeFromBuffer: () => fileTypeFromBuffer
@@ -28388,7 +28388,7 @@ function getOpenXmlMimeTypeFromContentTypesXml(xmlContent) {
 }
 var __filename8, __dirname8, defaultMessages, EndOfStreamError, AbortError2, AbstractStreamReader, WebStreamReader, WebStreamByobReader, WebStreamDefaultReader, AbstractTokenizer, maxBufferSize, ReadStreamTokenizer, BufferTokenizer, BlobTokenizer, WINDOWS_1252_EXTRA, WINDOWS_1252_REVERSE, _utf8Decoder, CHUNK, REPLACEMENT, UINT8, UINT16_LE, UINT16_BE, UINT32_LE, UINT32_BE, INT32_BE, UINT64_LE, StringType, import_src, Signature, DataDescriptor, LocalFileHeaderToken, EndOfCentralDirectoryRecordToken, FileHeader, debug, syncBufferSize, ddSignatureArray, eocdSignatureBytes, ZipHandler, GzipHandler, uint32SyncSafeToken, extensions, mimeTypes, reasonableDetectionSizeInBytes, maximumMpegOffsetTolerance, maximumZipEntrySizeInBytes, maximumZipEntryCount, maximumZipBufferedReadSizeInBytes, maximumUntrustedSkipSizeInBytes, maximumUnknownSizePayloadProbeSizeInBytes, maximumZipTextEntrySizeInBytes, maximumNestedGzipDetectionSizeInBytes, maximumNestedGzipProbeDepth, unknownSizeGzipProbeTimeoutInMilliseconds, maximumId3HeaderSizeInBytes, maximumEbmlDocumentTypeSizeInBytes, maximumEbmlElementPayloadSizeInBytes, maximumEbmlElementCount, maximumPngChunkCount, maximumPngStreamScanBudgetInBytes, maximumAsfHeaderObjectCount, maximumTiffTagCount, maximumDetectionReentryCount, maximumPngChunkSizeInBytes, maximumAsfHeaderPayloadSizeInBytes, maximumTiffStreamIfdOffsetInBytes, maximumTiffIfdOffsetInBytes, recoverableZipErrorMessages, recoverableZipErrorMessagePrefixes, recoverableZipErrorCodes, ParserHardLimitError, zipDataDescriptorSignature, zipDataDescriptorLengthInBytes, zipDataDescriptorOverlapLengthInBytes, FileTypeParser;
 var init_file_type_B5x3GGOC = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/file-type-B5x3GGOC.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/file-type-B5x3GGOC.mjs"() {
     "use strict";
     init_index();
     init_src_BWgKgh2g();
@@ -31588,7 +31588,7 @@ var init_file_type_B5x3GGOC = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/esm-LczVAVJI.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/esm-LczVAVJI.mjs
 var esm_LczVAVJI_exports = {};
 __export(esm_LczVAVJI_exports, {
   Jimp: () => Jimp
@@ -33659,7 +33659,7 @@ function paletteQuantizationToPaletteQuantizer(distanceCalculator, paletteQuanti
 }
 var __filename9, __dirname9, HeaderTypes, header_types_default, BmpCompression, BmpDecoder, BmpEncoder, trimLeft, trimRight, names$1, hexNames, matchers, require_omggif, require_bitmapimage, require_gif, require_image_q, require_gifframe, require_gifutil, require_gifcodec, require_src2, import_omggif, import_src2, require_encoder, require_decoder, import_jpeg_js, require_chunkstream, require_interlace, require_paeth_predictor, require_filter_parse, require_filter_parse_async, require_constants$1, require_crc, require_parser$1, require_bitmapper, require_format_normaliser, require_parser_async, require_bitpacker, require_filter_pack, require_packer, require_packer_async, require_sync_inflate, require_sync_reader, require_filter_parse_sync, require_parser_sync, require_packer_sync, require_png_sync, import_png, PNGFilterType, PNGColorType, require_common2, require_trees, require_adler32, require_crc32, require_messages, require_deflate$1, require_strings, require_zstream, require_deflate, require_inffast, require_inftrees, require_inflate$1, require_constants, require_gzheader, require_inflate, require_pako, import_UTIF, Edge, JimpClassSchema, BlitOptionsSchemaComplex, BlitOptionsSchema, methods$17, mulTable, shgTable, methods$16, CircleOptionsSchema, methods$15, ConvolutionMatrixSchema, ConvolutionComplexOptionsSchema, ConvolutionOptionsSchema, ConvoluteComplexOptionsSchema, ConvoluteOptionsSchema, PixelateSize, PixelateComplexOptionsSchema, PixelateOptionsSchema, HueActionSchema, SpinActionSchema, LightenActionSchema, RGBColorSchema, MixActionSchema, TintActionSchema, ShadeActionSchema, XorActionSchema, RedActionSchema, GreenActionSchema, BlueActionSchema, BrightenActionSchema, DarkenActionSchema, DesaturateActionSchema, SaturateActionSchema, GrayscaleActionSchema, ColorActionNameSchema, normalizeValue, getBounds, methods$14, import_await_to_js_umd, readFile, writeFile, require_Mime, require_standard, import_lite, HorizontalAlign, VerticalAlign, BlendMode, composite_modes_exports, names, require_jpeg, require_exif, require_date, require_simplify, require_exif_tags, require_parser, require_dom_bufferstream, require_bufferstream, import_exif_parser, emptyBitmap, ResizeStrategy, operations, ResizeOptionsSchema, ScaleToFitOptionsSchema, ScaleComplexOptionsSchema, methods$13, ContainOptionsSchema, methods$12, CropOptionsSchema, AutocropComplexOptionsSchema, methods$11, CoverOptionsSchema, methods$10, DisplaceOptionsSchema, methods$9, methods$8, FisheyeOptionsSchema, methods$7, FlipOptionsSchema, methods$6, require_converter, import_any_base, ImagePHash, c, alphabet, maxHashLength, methods$5, MaskOptionsObjectSchema, MaskOptionsSchema, methods$4, PrintOptionsSchema, methods$3, RotateOptionsSchema, methods$2, ThresholdOptionsSchema, methods$1, __defProp2, __defNormalProp, __export2, __publicField, bt709_exports, Y, x2, y, arithmetic_exports, refX, refY, refZ, refX2, refY2, refZ2, AbstractDistanceCalculator, AbstractCIE94, CIE94Textiles, CIE94GraphicArts, _CIEDE2000, CIEDE2000, CMetric, AbstractEuclidean, Euclidean, EuclideanBT709, EuclideanBT709NoAlpha, AbstractManhattan, Manhattan, ManhattanNommyde, ManhattanBT709, PNGQuant, AbstractPaletteQuantizer, Point, PointContainer, hueGroups, Palette, utils_exports, HueGroup, HueStatistics, _ProgressTracker, ProgressTracker, networkBiasShift, Neuron, _NeuQuant, NeuQuant, networkBiasShift2, NeuronFloat, _NeuQuantFloat, NeuQuantFloat, _ColorHistogram, ColorHistogram, RemovedColor, RGBQuant, WuColorCube, _WuQuant, WuQuant, AbstractImageQuantizer, NearestColor, ErrorDiffusionArrayKernel, ErrorDiffusionArray, ErrorDiffusionRiemersma, K1, K2, QuantizeOptionsSchema, defaultPlugins, defaultFormats, Jimp;
 var init_esm_LczVAVJI = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/esm-LczVAVJI.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/esm-LczVAVJI.mjs"() {
     "use strict";
     init_index();
     init_zod();
@@ -57845,7 +57845,7 @@ var init_esm_LczVAVJI = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/lib-BkpBiFzR.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/lib-BkpBiFzR.mjs
 var lib_BkpBiFzR_exports = {};
 __export(lib_BkpBiFzR_exports, {
   default: () => lib_BkpBiFzR_default
@@ -57854,7 +57854,7 @@ import { fileURLToPath as __cjsShimFileURLToPath10 } from "node:url";
 import { dirname as __cjsShimDirname10 } from "node:path";
 var __filename10, __dirname10, require_utils, require_eventEmitter2, require_terminal, require_conout, require_windowsConoutConnection, require_windowsPtyAgent, require_windowsTerminal, require_unixTerminal, require_lib, lib_BkpBiFzR_default;
 var init_lib_BkpBiFzR = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/lib-BkpBiFzR.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/lib-BkpBiFzR.mjs"() {
     "use strict";
     init_index();
     __filename10 = __cjsShimFileURLToPath10(import.meta.url);
@@ -58292,7 +58292,7 @@ var init_lib_BkpBiFzR = __esm({
       exports.argsToCommandLine = exports.WindowsPtyAgent = void 0;
       var fs$1 = __require2("fs");
       var os2 = __require2("os");
-      var path$1 = __require2("path");
+      var path$13 = __require2("path");
       var child_process_1 = __require2("child_process");
       var net_1 = __require2("net");
       var windowsConoutConnection_1 = require_windowsConoutConnection();
@@ -58314,7 +58314,7 @@ var init_lib_BkpBiFzR = __esm({
             if (!conptyNative) conptyNative = utils_1.loadNativeModule("conpty").module;
           } else if (!winptyNative) winptyNative = utils_1.loadNativeModule("pty").module;
           this._ptyNative = this._useConpty ? conptyNative : winptyNative;
-          cwd2 = path$1.resolve(cwd2);
+          cwd2 = path$13.resolve(cwd2);
           var commandLine = argsToCommandLine(file2, args);
           var term;
           if (this._useConpty) term = this._ptyNative.startProcess(file2, cols, rows, debug2, this._generatePipeName(), conptyInheritCursor, this._useConptyDll);
@@ -58430,7 +58430,7 @@ var init_lib_BkpBiFzR = __esm({
         WindowsPtyAgent.prototype._getConsoleProcessList = function() {
           var _this = this;
           return new Promise(function(resolve3) {
-            var agent = child_process_1.fork(path$1.join(__dirname10, "conpty_console_list_agent"), [_this._innerPid.toString()]);
+            var agent = child_process_1.fork(path$13.join(__dirname10, "conpty_console_list_agent"), [_this._innerPid.toString()]);
             agent.on("message", function(message) {
               clearTimeout(timeout);
               resolve3(message.consoleProcessList);
@@ -58988,7 +58988,7 @@ var init_lib_BkpBiFzR = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/webp-dec-wasm-CreaaWkS.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/webp-dec-wasm-CreaaWkS.mjs
 var webp_dec_wasm_CreaaWkS_exports = {};
 __export(webp_dec_wasm_CreaaWkS_exports, {
   WEBP_DECODER_WASM_BASE64: () => WEBP_DECODER_WASM_BASE642
@@ -58997,7 +58997,7 @@ import { fileURLToPath as __cjsShimFileURLToPath11 } from "node:url";
 import { dirname as __cjsShimDirname11 } from "node:path";
 var __filename11, __dirname11, WEBP_DECODER_WASM_BASE642;
 var init_webp_dec_wasm_CreaaWkS = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/webp-dec-wasm-CreaaWkS.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/webp-dec-wasm-CreaaWkS.mjs"() {
     "use strict";
     __filename11 = __cjsShimFileURLToPath11(import.meta.url);
     __dirname11 = __cjsShimDirname11(__filename11);
@@ -59005,7 +59005,7 @@ var init_webp_dec_wasm_CreaaWkS = __esm({
   }
 });
 
-// .kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/index.mjs
+// .kimix-upstream-kimi-code/packages/node-sdk/dist/index.mjs
 import { fileURLToPath as __cjsShimFileURLToPath12 } from "node:url";
 import { dirname as __cjsShimDirname12 } from "node:path";
 import { createRequire } from "node:module";
@@ -59014,7 +59014,7 @@ import I, { createWriteStream, stat as stat2, unwatchFile, watch, watchFile } fr
 import { type } from "os";
 import Kr, { EventEmitter } from "events";
 import * as path$1$1 from "path";
-import $s, { dirname as dirname2, parse as parse4 } from "path";
+import path, { dirname as dirname2, parse as parse4 } from "path";
 import { Buffer as Buffer$12 } from "buffer";
 import * as fs$11 from "fs/promises";
 import { lstat, open as open3, readdir, realpath, stat as stat$1, writeFile as writeFile2 } from "fs/promises";
@@ -59024,8 +59024,8 @@ import * as ks from "zlib";
 import qr from "zlib";
 import * as fs$10 from "node:fs";
 import fsSync, { appendFileSync, chmodSync, closeSync, constants, createReadStream, createWriteStream as createWriteStream$1, existsSync as existsSync3, fsyncSync, mkdirSync, openSync, promises as promises$1, readFileSync, readSync, readdirSync, renameSync, unlinkSync, watch as watch$1, writeFileSync, writeSync } from "node:fs";
-import * as path$9 from "node:path";
-import path, { basename as basename3, dirname as dirname$1, extname as extname2, isAbsolute as isAbsolute2, join as join2, posix as posix2, relative as relative2, resolve as resolve2, sep, win32 as win322 } from "node:path";
+import * as path$10 from "node:path";
+import path$1, { basename as basename3, dirname as dirname$1, extname as extname2, isAbsolute as isAbsolute2, join as join2, posix as posix2, relative as relative2, resolve as resolve2, sep, win32 as win322 } from "node:path";
 import { Blob as Blob$1, File as File$1 } from "node:buffer";
 import * as nodeOs from "node:os";
 import os, { arch, homedir as homedir2, hostname as hostname3, release as release2, tmpdir, type as type$1, userInfo } from "node:os";
@@ -72974,7 +72974,7 @@ function parseCommandText$1(input) {
   const { text, commandPath, pluginId } = input;
   const parsed2 = parseFrontmatter$2(text);
   const frontmatter = isRecord$16(parsed2.data) ? parsed2.data : {};
-  const baseName = input.fallbackName ?? path.basename(commandPath).replace(/\.md$/i, "");
+  const baseName = input.fallbackName ?? path$1.basename(commandPath).replace(/\.md$/i, "");
   const name = nonEmptyString$9(frontmatter["name"]) ?? baseName;
   const body = parsed2.body.trim();
   return {
@@ -72982,7 +72982,7 @@ function parseCommandText$1(input) {
     name,
     description: nonEmptyString$9(frontmatter["description"]) ?? descriptionFromBody$2(body),
     body,
-    path: path.resolve(commandPath)
+    path: path$1.resolve(commandPath)
   };
 }
 async function loadPluginCommand$1(input) {
@@ -76937,14 +76937,14 @@ async function readGitExecPath$1(deps, gitExe) {
   }
 }
 function gitBashCandidatesFromGitExe$1(gitExe) {
-  const normalizedGitExe = path$9.win32.normalize(normalizeWindowsPath$1(gitExe));
-  const gitDir = path$9.win32.dirname(normalizedGitExe);
-  const gitDirName = path$9.win32.basename(gitDir).toLowerCase();
+  const normalizedGitExe = path$10.win32.normalize(normalizeWindowsPath$1(gitExe));
+  const gitDir = path$10.win32.dirname(normalizedGitExe);
+  const gitDirName = path$10.win32.basename(gitDir).toLowerCase();
   if (gitDirName !== "cmd" && gitDirName !== "bin") return;
-  return gitBashCandidatesFromGitRoot$1(path$9.win32.dirname(gitDir));
+  return gitBashCandidatesFromGitRoot$1(path$10.win32.dirname(gitDir));
 }
 function gitBashCandidatesFromGitExecPath$1(execPath) {
-  const normalized = path$9.win32.normalize(normalizeWindowsPath$1(execPath));
+  const normalized = path$10.win32.normalize(normalizeWindowsPath$1(execPath));
   const parts = normalized.split("\\");
   for (let i2 = parts.length - 1; i2 >= 0; i2 -= 1) {
     const segment = parts[i2]?.toLowerCase();
@@ -76953,16 +76953,16 @@ function gitBashCandidatesFromGitExecPath$1(execPath) {
       if (root.length > 0) return gitBashCandidatesFromGitRoot$1(root);
     }
   }
-  return gitBashCandidatesFromGitRoot$1(path$9.win32.join(normalized, "..", ".."));
+  return gitBashCandidatesFromGitRoot$1(path$10.win32.join(normalized, "..", ".."));
 }
 function gitBashCandidatesFromGitRoot$1(root) {
-  return [path$9.win32.normalize(path$9.win32.join(root, "bin", "bash.exe")), path$9.win32.normalize(path$9.win32.join(root, "usr", "bin", "bash.exe"))];
+  return [path$10.win32.normalize(path$10.win32.join(root, "bin", "bash.exe")), path$10.win32.normalize(path$10.win32.join(root, "usr", "bin", "bash.exe"))];
 }
 function normalizeWindowsPath$1(path2) {
   return path2.replaceAll("/", "\\");
 }
 function isAbsoluteWindowsPath$1(path2) {
-  return path$9.win32.isAbsolute(normalizeWindowsPath$1(path2));
+  return path$10.win32.isAbsolute(normalizeWindowsPath$1(path2));
 }
 function dedupeWindowsPaths$1(paths) {
   const deduped = [];
@@ -77045,9 +77045,9 @@ function createShellPathBridge$1(env2, deps) {
   const segmentCache = /* @__PURE__ */ new Map();
   function locateCygpath() {
     if (cygpathExe !== void 0) return cygpathExe;
-    const shellDir = path$9.win32.dirname(env2.shellPath);
-    const candidates = [path$9.win32.join(shellDir, "cygpath.exe")];
-    if (path$9.win32.basename(shellDir).toLowerCase() === "bin") candidates.push(path$9.win32.join(shellDir, "..", "usr", "bin", "cygpath.exe"));
+    const shellDir = path$10.win32.dirname(env2.shellPath);
+    const candidates = [path$10.win32.join(shellDir, "cygpath.exe")];
+    if (path$10.win32.basename(shellDir).toLowerCase() === "bin") candidates.push(path$10.win32.join(shellDir, "..", "usr", "bin", "cygpath.exe"));
     cygpathExe = candidates.find((candidate) => deps.isFile(candidate)) ?? null;
     return cygpathExe;
   }
@@ -77077,7 +77077,7 @@ function createShellPathBridge$1(env2, deps) {
     if (!enabled) return path2;
     if (path2.startsWith("//")) return path2;
     if (path2.startsWith("/")) {
-      const normalized = path$9.posix.normalize(path2);
+      const normalized = path$10.posix.normalize(path2);
       const lexical = translateShellDrivePath$1(normalized);
       if (lexical !== normalized) return lexical;
       if (normalized === "/") return normalized;
@@ -85958,8 +85958,8 @@ function parseIndexLine(line) {
 }
 function isPathInside(parent, child) {
   if (isWindowsAbsolutePath$2(parent) || isWindowsAbsolutePath$2(child)) {
-    const rel2 = path$9.win32.relative(path$9.win32.resolve(parent), path$9.win32.resolve(child));
-    return rel2 !== "" && rel2 !== ".." && !rel2.startsWith(`..${path$9.win32.sep}`) && !path$9.win32.isAbsolute(rel2);
+    const rel2 = path$10.win32.relative(path$10.win32.resolve(parent), path$10.win32.resolve(child));
+    return rel2 !== "" && rel2 !== ".." && !rel2.startsWith(`..${path$10.win32.sep}`) && !path$10.win32.isAbsolute(rel2);
   }
   const rel = relative$1(resolve$2(parent), resolve$2(child));
   return rel !== "" && !rel.startsWith("..") && !isAbsolute$1(rel);
@@ -86334,7 +86334,7 @@ function isRecord$9(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function areSameFsPath(left, right) {
-  if (isWindowsAbsolutePath$1(left) || isWindowsAbsolutePath$1(right)) return path$9.win32.resolve(left).toLowerCase() === path$9.win32.resolve(right).toLowerCase();
+  if (isWindowsAbsolutePath$1(left) || isWindowsAbsolutePath$1(right)) return path$10.win32.resolve(left).toLowerCase() === path$10.win32.resolve(right).toLowerCase();
   return resolve$2(left) === resolve$2(right);
 }
 function isWindowsAbsolutePath$1(value) {
@@ -86458,8 +86458,8 @@ function normalizePluginId$1(name) {
   return name.toLowerCase();
 }
 async function parseManifest$1(pluginRoot) {
-  const rootJsonPath = path.join(pluginRoot, KIMI_PLUGIN_ROOT_PATH$1);
-  const dirJsonPath = path.join(pluginRoot, KIMI_PLUGIN_DIR_PATH$1);
+  const rootJsonPath = path$1.join(pluginRoot, KIMI_PLUGIN_ROOT_PATH$1);
+  const dirJsonPath = path$1.join(pluginRoot, KIMI_PLUGIN_DIR_PATH$1);
   const rootJsonExists = await isFile$5(rootJsonPath);
   const dirJsonExists = await isFile$5(dirJsonPath);
   if (!rootJsonExists && !dirJsonExists) return { diagnostics: [{
@@ -86479,7 +86479,7 @@ async function parseManifest$1(pluginRoot) {
       shadowedManifestPath,
       diagnostics: [{
         severity: "error",
-        message: `Failed to parse ${path.relative(pluginRoot, manifestPath)}: ${error48.message}`
+        message: `Failed to parse ${path$1.relative(pluginRoot, manifestPath)}: ${error48.message}`
       }]
     };
   }
@@ -86521,14 +86521,14 @@ async function parseManifest$1(pluginRoot) {
   let skills = await resolveDirListField$1(pluginRoot, "skills", raw["skills"], diagnostics);
   let rootSkillFallback;
   if (raw["skills"] === void 0) {
-    if (await isFile$5(path.join(pluginRoot, "SKILL.md"))) {
+    if (await isFile$5(path$1.join(pluginRoot, "SKILL.md"))) {
       skills = [pluginRoot];
       rootSkillFallback = true;
     }
   }
   let agents = await resolveDirListField$1(pluginRoot, "agents", raw["agents"], diagnostics);
   if (raw["agents"] === void 0) {
-    const agentsDir = path.join(pluginRoot, "agents");
+    const agentsDir = path$1.join(pluginRoot, "agents");
     if (await isDir$3(agentsDir)) agents = [agentsDir];
   }
   const skillInstructions = typeof raw["skillInstructions"] === "string" ? raw["skillInstructions"] : void 0;
@@ -86590,7 +86590,7 @@ async function resolveDirListField$1(pluginRoot, field, raw, diagnostics) {
       });
       continue;
     }
-    const absolute = path.resolve(pluginRoot, entry);
+    const absolute = path$1.resolve(pluginRoot, entry);
     let real;
     try {
       real = await realpath$1(absolute);
@@ -86624,7 +86624,7 @@ async function resolvePluginPathField$1(input) {
     });
     return;
   }
-  const absolute = path.resolve(input.pluginRoot, input.value);
+  const absolute = path$1.resolve(input.pluginRoot, input.value);
   let real;
   try {
     real = await realpath$1(absolute);
@@ -86795,7 +86795,7 @@ async function readCommands$1(pluginRoot, raw, diagnostics) {
     if (await isDir$3(resolved)) files.push(...await listMarkdownFilesRecursive$1(resolved));
     else if (await isFile$5(resolved) && resolved.endsWith(".md")) files.push({
       path: resolved,
-      name: commandNameFromFile$1(resolved, path.dirname(resolved))
+      name: commandNameFromFile$1(resolved, path$1.dirname(resolved))
     });
     else diagnostics.push({
       severity: "warn",
@@ -86817,7 +86817,7 @@ async function walkMarkdown$1(root, dir, out) {
     return;
   }
   for (const entry of entries2) {
-    const full = path.join(dir, entry.name);
+    const full = path$1.join(dir, entry.name);
     if (entry.isDirectory()) await walkMarkdown$1(root, full, out);
     else if (entry.isFile() && entry.name.endsWith(".md")) out.push({
       path: full,
@@ -86826,7 +86826,7 @@ async function walkMarkdown$1(root, dir, out) {
   }
 }
 function commandNameFromFile$1(file2, root) {
-  return path.relative(root, file2).replace(/\.md$/i, "").split(path.sep).join("/");
+  return path$1.relative(root, file2).replace(/\.md$/i, "").split(path$1.sep).join("/");
 }
 async function normalizePluginMcpServer$1(input) {
   const { config: config2 } = input;
@@ -86841,7 +86841,7 @@ async function normalizePluginMcpServer$1(input) {
     });
     if (resolvedCommand === void 0) return void 0;
     command = resolvedCommand;
-  } else if (command.includes("/") || path.isAbsolute(command)) {
+  } else if (command.includes("/") || path$1.isAbsolute(command)) {
     input.diagnostics.push({
       severity: "warn",
       message: `"mcpServers.${input.name}.command" must be a PATH command or start with "./"`
@@ -86902,8 +86902,8 @@ function isObject$1(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isWithin$1(child, parent) {
-  const relative3 = path.relative(parent, child);
-  return relative3 === "" || !relative3.startsWith("..") && !path.isAbsolute(relative3);
+  const relative3 = path$1.relative(parent, child);
+  return relative3 === "" || !relative3.startsWith("..") && !path$1.isAbsolute(relative3);
 }
 async function isFile$5(p2) {
   try {
@@ -86920,7 +86920,7 @@ async function isDir$3(p2) {
   }
 }
 async function readInstalled$1(kimiHomeDir) {
-  const filePath = path.join(kimiHomeDir, INSTALLED_REL$1);
+  const filePath = path$1.join(kimiHomeDir, INSTALLED_REL$1);
   let text;
   try {
     text = await readFile2(filePath, "utf8");
@@ -86937,9 +86937,9 @@ async function readInstalled$1(kimiHomeDir) {
   }
 }
 async function writeInstalled$1(kimiHomeDir, data) {
-  const dir = path.join(kimiHomeDir, "plugins");
+  const dir = path$1.join(kimiHomeDir, "plugins");
   await mkdir(dir, { recursive: true });
-  const final = path.join(dir, "installed.json");
+  const final = path$1.join(dir, "installed.json");
   const tmp = `${final}.tmp`;
   await writeFile$1(tmp, JSON.stringify(data, null, 2), "utf8");
   await rename(tmp, final);
@@ -86959,7 +86959,7 @@ async function downloadZip$1(url2, signal) {
 }
 async function extractZip$1(buffer, destDir) {
   await mkdir(destDir, { recursive: true });
-  const destDirResolved = path.resolve(destDir);
+  const destDirResolved = path$1.resolve(destDir);
   let settled = false;
   await new Promise((resolve3, reject) => {
     (0, import_yauzl.fromBuffer)(buffer, { lazyEntries: true }, (openErr, zipfile) => {
@@ -86969,8 +86969,8 @@ async function extractZip$1(buffer, destDir) {
       }
       const onEntry = (entry) => {
         const fileName = entry.fileName;
-        const destPath = path.resolve(destDir, fileName);
-        if (destPath !== destDirResolved && !destPath.startsWith(destDirResolved + path.sep)) {
+        const destPath = path$1.resolve(destDir, fileName);
+        if (destPath !== destDirResolved && !destPath.startsWith(destDirResolved + path$1.sep)) {
           if (!settled) {
             settled = true;
             reject(/* @__PURE__ */ new Error(`Path traversal detected in zip entry: ${fileName}`));
@@ -86999,7 +86999,7 @@ async function extractZip$1(buffer, destDir) {
             zipfile.close();
             return;
           }
-          mkdir(path.dirname(destPath), { recursive: true }).then(() => pipeline$12(stream, createWriteStream$1(destPath))).then(() => restoreFilePermissions$1(destPath, entry)).then(() => {
+          mkdir(path$1.dirname(destPath), { recursive: true }).then(() => pipeline$12(stream, createWriteStream$1(destPath))).then(() => restoreFilePermissions$1(destPath, entry)).then(() => {
             zipfile.readEntry();
           }).catch((error48) => {
             if (!settled) {
@@ -87040,14 +87040,14 @@ async function detectPluginRoot$1(dir) {
   const childDirs = (await readdir$1(dir, { withFileTypes: true })).filter((entry) => entry.isDirectory());
   const childDir = childDirs.length === 1 ? childDirs[0] : void 0;
   if (childDir !== void 0) {
-    const child = path.join(dir, childDir.name);
+    const child = path$1.join(dir, childDir.name);
     if (await hasManifest$1(child)) return child;
   }
   return dir;
 }
 async function hasManifest$1(dir) {
-  const rootManifest = path.join(dir, "kimi.plugin.json");
-  const dirManifest = path.join(dir, ".kimi-plugin", "plugin.json");
+  const rootManifest = path$1.join(dir, "kimi.plugin.json");
+  const dirManifest = path$1.join(dir, ".kimi-plugin", "plugin.json");
   return await isFile$4(rootManifest) || await isFile$4(dirManifest);
 }
 async function isFile$4(p2) {
@@ -87124,7 +87124,7 @@ function resolveInstallSource$1(source) {
     kind: "zip-url",
     path: trimmed2
   };
-  if (!path.isAbsolute(trimmed2)) throw new Error(`Plugin root must be an absolute path (got "${source}")`);
+  if (!path$1.isAbsolute(trimmed2)) throw new Error(`Plugin root must be an absolute path (got "${source}")`);
   return {
     kind: "local-path",
     path: trimmed2
@@ -87194,7 +87194,7 @@ function decodeRefSegments$1(segments) {
 }
 async function normalizeInstallRoot$1(rootPath) {
   const trimmed2 = rootPath.trim();
-  if (!path.isAbsolute(trimmed2)) throw new Error(`Plugin root must be an absolute path (got "${rootPath}")`);
+  if (!path$1.isAbsolute(trimmed2)) throw new Error(`Plugin root must be an absolute path (got "${rootPath}")`);
   let resolved;
   try {
     resolved = await realpath$1(trimmed2);
@@ -87205,10 +87205,10 @@ async function normalizeInstallRoot$1(rootPath) {
   return resolved;
 }
 async function copyPluginToManagedRoot$1(kimiHomeDir, id, sourceRoot) {
-  const managedRoot = path.join(kimiHomeDir, "plugins", "managed", id);
-  const managedDir = path.dirname(managedRoot);
+  const managedRoot = path$1.join(kimiHomeDir, "plugins", "managed", id);
+  const managedDir = path$1.dirname(managedRoot);
   await mkdir(managedDir, { recursive: true });
-  const stagingRoot = await mkdtemp(path.join(managedDir, `${id}-`));
+  const stagingRoot = await mkdtemp(path$1.join(managedDir, `${id}-`));
   try {
     await cp(sourceRoot, stagingRoot, { recursive: true });
     await rm(managedRoot, {
@@ -87349,7 +87349,7 @@ function withPluginMcpRuntime$1(config2, pluginRoot, kimiHomeDir) {
   };
 }
 function isKimiNativeBinary$1() {
-  return !path.basename(process.execPath).toLowerCase().startsWith("node");
+  return !path$1.basename(process.execPath).toLowerCase().startsWith("node");
 }
 function replaceCodePoint(codePoint) {
   var _a3;
@@ -89247,10 +89247,10 @@ function toProtocolSession(summary, meta3, workspaceIdOverride) {
 }
 async function resolveSafePath(cwd2, inputPath) {
   if (inputPath === "" || inputPath === "/") throw new FsPathEscapesError(inputPath, "empty");
-  if (path.isAbsolute(inputPath)) throw new FsPathEscapesError(inputPath, "absolute");
+  if (path$1.isAbsolute(inputPath)) throw new FsPathEscapesError(inputPath, "absolute");
   if (inputPath.split(/[/\\]+/).some((s4) => s4 === "..")) throw new FsPathEscapesError(inputPath, "dotdot_segment");
   const realCwd = await promises$1.realpath(cwd2);
-  const candidate = path.resolve(realCwd, inputPath);
+  const candidate = path$1.resolve(realCwd, inputPath);
   const resolved = await realpathLongestExistingPrefix(candidate);
   if (!isInsideOrEqual$1(resolved, realCwd)) throw new FsPathEscapesError(inputPath, isInsideOrEqual$1(candidate, realCwd) ? "symlink_outside_cwd" : "resolved_outside_cwd", resolved);
   return {
@@ -89259,10 +89259,10 @@ async function resolveSafePath(cwd2, inputPath) {
   };
 }
 function isInsideOrEqual$1(child, parent) {
-  const rel = path.relative(parent, child);
+  const rel = path$1.relative(parent, child);
   if (rel === "") return true;
   if (rel.startsWith("..")) return false;
-  if (path.isAbsolute(rel)) return false;
+  if (path$1.isAbsolute(rel)) return false;
   return true;
 }
 async function realpathLongestExistingPrefix(target) {
@@ -89271,22 +89271,22 @@ async function realpathLongestExistingPrefix(target) {
   for (let i2 = 0; i2 < 4096; i2++) try {
     const real = await promises$1.realpath(current2);
     tailSegments.reverse();
-    return tailSegments.length === 0 ? real : path.join(real, ...tailSegments);
+    return tailSegments.length === 0 ? real : path$1.join(real, ...tailSegments);
   } catch (err) {
     const code = err.code;
     if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
-    const parent = path.dirname(current2);
+    const parent = path$1.dirname(current2);
     if (parent === current2) return target;
-    tailSegments.push(path.basename(current2));
+    tailSegments.push(path$1.basename(current2));
     current2 = parent;
   }
   return target;
 }
 function toPosixRelative$1(cwd2, absolute) {
   if (absolute === cwd2) return ".";
-  const rel = path.relative(cwd2, absolute);
+  const rel = path$1.relative(cwd2, absolute);
   if (rel === "") return ".";
-  return rel.split(path.sep).join("/");
+  return rel.split(path$1.sep).join("/");
 }
 function isHidden$1(name) {
   return HIDDEN_NAME_RE$1.test(name) || MACOS_NOISE$1.has(name);
@@ -89410,12 +89410,12 @@ async function readFileRange(absPath, start, end) {
   }
 }
 function guessMime$1(relPath, isBinary2) {
-  const mapped = EXT_TO_MIME$2[path.extname(relPath).toLowerCase()];
+  const mapped = EXT_TO_MIME$2[path$1.extname(relPath).toLowerCase()];
   if (mapped !== void 0) return mapped;
   return isBinary2 ? "application/octet-stream" : "text/plain";
 }
 function guessLanguageId$1(relPath) {
-  return EXT_TO_LANGUAGE$1[path.extname(relPath).toLowerCase()];
+  return EXT_TO_LANGUAGE$1[path$1.extname(relPath).toLowerCase()];
 }
 function countLines$2(text) {
   if (text.length === 0) return 0;
@@ -89560,7 +89560,7 @@ async function whichBinary(name) {
   for (const dir of PATH.split(sep2)) {
     if (dir === "") continue;
     for (const ext of PATHEXT) {
-      const candidate = path.join(dir, name + ext);
+      const candidate = path$1.join(dir, name + ext);
       try {
         if ((await promises$1.stat(candidate)).isFile()) return candidate;
       } catch {
@@ -89670,7 +89670,7 @@ function collapseXY$1(xy) {
   return "clean";
 }
 function posix$1(p2) {
-  return p2.split(path.sep).join("/");
+  return p2.split(path$1.sep).join("/");
 }
 async function runCommand$2(cmd, args, cwd2, options2 = {}) {
   return new Promise((resolve3) => {
@@ -89888,7 +89888,7 @@ function mapChokidarEventToKind(name) {
 function isUnderAny$1(absPath, parents) {
   for (const parent of parents) {
     if (absPath === parent) return true;
-    const sep2 = path.sep;
+    const sep2 = path$1.sep;
     if (absPath.startsWith(parent + sep2)) return true;
     if (sep2 !== "/" && absPath.startsWith(parent + "/")) return true;
   }
@@ -89896,21 +89896,21 @@ function isUnderAny$1(absPath, parents) {
 }
 function toPosixRelative(cwd2, abs) {
   if (abs === cwd2) return ".";
-  const rel = path.relative(cwd2, abs);
+  const rel = path$1.relative(cwd2, abs);
   if (rel === "") return ".";
-  return rel.split(path.sep).join("/");
+  return rel.split(path$1.sep).join("/");
 }
 function deriveSharedCwd(absPaths) {
   if (absPaths.length === 0) return "/";
-  if (absPaths.length === 1) return path.dirname(absPaths[0]);
-  let prefix = absPaths[0].split(path.sep);
+  if (absPaths.length === 1) return path$1.dirname(absPaths[0]);
+  let prefix = absPaths[0].split(path$1.sep);
   for (let i2 = 1; i2 < absPaths.length; i2++) {
-    const segs = absPaths[i2].split(path.sep);
+    const segs = absPaths[i2].split(path$1.sep);
     let j2 = 0;
     while (j2 < prefix.length && j2 < segs.length && prefix[j2] === segs[j2]) j2++;
     prefix = prefix.slice(0, j2);
   }
-  return prefix.length === 0 ? "/" : prefix.join(path.sep) || path.sep;
+  return prefix.length === 0 ? "/" : prefix.join(path$1.sep) || path$1.sep;
 }
 function findRegisteredIdByRootKey(workspaces, rootKey, preferredId) {
   let first;
@@ -90421,9 +90421,9 @@ async function readWireRecords(wirePath) {
   return records;
 }
 async function readWireTranscript(sessionDir, agentId) {
-  const agentDir = path.join(sessionDir, "agents", agentId);
-  const { entries: entries2, foldedLength } = reduceWireRecords(await readWireRecords(path.join(agentDir, "wire.jsonl")));
-  await rehydrateBlobRefs(entries2, path.join(agentDir, "blobs"));
+  const agentDir = path$1.join(sessionDir, "agents", agentId);
+  const { entries: entries2, foldedLength } = reduceWireRecords(await readWireRecords(path$1.join(agentDir, "wire.jsonl")));
+  await rehydrateBlobRefs(entries2, path$1.join(agentDir, "blobs"));
   return {
     entries: entries2,
     foldedLength
@@ -90447,7 +90447,7 @@ async function resolveBlobRef(url2, blobsDir, cache2) {
     const mimeType = rest.slice(0, semiIdx);
     const hash2 = rest.slice(semiIdx + 1);
     if (/^[0-9a-f]{16,}$/i.test(hash2)) {
-      const payload = await readFile2(path.join(blobsDir, hash2)).catch(() => void 0);
+      const payload = await readFile2(path$1.join(blobsDir, hash2)).catch(() => void 0);
       if (payload !== void 0) resolved = `data:${mimeType};base64,${payload.toString("base64")}`;
     }
   }
@@ -92475,15 +92475,15 @@ function isWindowsAbsolutePath(value) {
   return /^[A-Za-z]:[\\/]/.test(value) || /^[\\/]{2}[^\\/]+[\\/][^\\/]+/.test(value);
 }
 function resolvePath(base, value) {
-  if (isWindowsAbsolutePath(base)) return path.win32.resolve(base, value).replaceAll("\\", "/");
-  if (isWindowsAbsolutePath(value)) return path.win32.resolve(value).replaceAll("\\", "/");
+  if (isWindowsAbsolutePath(base)) return path$1.win32.resolve(base, value).replaceAll("\\", "/");
+  if (isWindowsAbsolutePath(value)) return path$1.win32.resolve(value).replaceAll("\\", "/");
   return isAbsolute$1(value) ? normalize2(value) : resolve$2(base, value);
 }
 function canonicalWorkspaceRoot(cwd2) {
-  const resolved = isWindowsAbsolutePath(cwd2) ? path.win32.resolve(cwd2).replaceAll("\\", "/") : resolve$2(cwd2);
+  const resolved = isWindowsAbsolutePath(cwd2) ? path$1.win32.resolve(cwd2).replaceAll("\\", "/") : resolve$2(cwd2);
   return workspaceRootKey(resolved) || resolved;
 }
-async function findUpwardRoot(workDir, markerName, hasMarker, pathApi = path) {
+async function findUpwardRoot(workDir, markerName, hasMarker, pathApi = path$1) {
   const start = pathApi.resolve(workDir);
   let current2 = start;
   while (true) {
@@ -92652,9 +92652,9 @@ function createShellPathBridge(env2, deps) {
   const segmentCache = /* @__PURE__ */ new Map();
   function locateCygpath() {
     if (cygpathExe !== void 0) return cygpathExe;
-    const shellDir = path$9.win32.dirname(env2.shellPath);
-    const candidates = [path$9.win32.join(shellDir, "cygpath.exe")];
-    if (path$9.win32.basename(shellDir).toLowerCase() === "bin") candidates.push(path$9.win32.join(shellDir, "..", "usr", "bin", "cygpath.exe"));
+    const shellDir = path$10.win32.dirname(env2.shellPath);
+    const candidates = [path$10.win32.join(shellDir, "cygpath.exe")];
+    if (path$10.win32.basename(shellDir).toLowerCase() === "bin") candidates.push(path$10.win32.join(shellDir, "..", "usr", "bin", "cygpath.exe"));
     cygpathExe = candidates.find((candidate) => deps.isFile(candidate)) ?? null;
     return cygpathExe;
   }
@@ -92684,7 +92684,7 @@ function createShellPathBridge(env2, deps) {
     if (!enabled) return path2;
     if (path2.startsWith("//")) return path2;
     if (path2.startsWith("/")) {
-      const normalized = path$9.posix.normalize(path2);
+      const normalized = path$10.posix.normalize(path2);
       const lexical = translateShellDrivePath(normalized);
       if (lexical !== normalized) return lexical;
       if (normalized === "/") return normalized;
@@ -96207,12 +96207,6 @@ async function touchForkedFileHistory(input) {
     continue;
   }
 }
-function registerFlagDefinition(definition) {
-  contributedFlags.push(definition);
-}
-function getContributedFlags() {
-  return contributedFlags;
-}
 function isWindowsPath(value) {
   return /^[a-zA-Z]:[\\/]/.test(value) || /^[\\/]{2}[^\\/]+[\\/][^\\/]+/.test(value);
 }
@@ -96530,6 +96524,32 @@ async function scanSessionsMaxMtime(storage, sessionsScope) {
   }
   return max;
 }
+function applyPatch(target, patch) {
+  for (const [key2, value] of Object.entries(patch)) if (value === void 0) delete target[key2];
+  else target[key2] = value;
+  return target;
+}
+function composeTelemetryProperties(ambient, explicit) {
+  const properties = {};
+  for (const [key2, value] of Object.entries(ambient)) {
+    if (key2 === "session_id" || value === void 0) continue;
+    properties[key2] = value;
+  }
+  if (ambient["session_id"] !== void 0) properties[WIRE_SESSION_ID_PROPERTY] = ambient["session_id"];
+  if (explicit !== void 0) {
+    for (const [key2, value] of Object.entries(explicit)) if (value !== void 0) properties[key2] = value;
+  }
+  return properties;
+}
+function bindTelemetryScope(parent, seed) {
+  const host = parent;
+  if (host.createScopeBinding !== void 0) return host.createScopeBinding(seed);
+  return {
+    telemetry: parent.withContext(seed),
+    dispose: () => {
+    }
+  };
+}
 async function ensureMainAgent(session, opts) {
   return session.accessor.get(IAgentLifecycleService).create({
     ...opts,
@@ -96540,6 +96560,13 @@ function subagentLabels(parentAgentId, options2 = {}) {
   const labels = { parentAgentId };
   if (options2.swarmItem !== void 0) labels["swarmItem"] = options2.swarmItem;
   return labels;
+}
+function withSubagentProfile(labels, profileName) {
+  if (profileName === void 0 || profileName.length === 0) return labels;
+  return {
+    ...labels,
+    profileName
+  };
 }
 function labelsFromAgentMeta(meta3) {
   const labels = { ...meta3.labels };
@@ -96561,6 +96588,10 @@ function subagentParentAgentId(meta3) {
 function subagentSwarmItem(meta3) {
   if (meta3 === void 0) return void 0;
   return firstNonEmpty(meta3.labels?.["swarmItem"], meta3.swarmItem);
+}
+function subagentProfileName(meta3) {
+  if (meta3 === void 0) return void 0;
+  return firstNonEmpty(meta3.labels?.["profileName"]);
 }
 function firstNonEmpty(...values) {
   return values.find((value) => value !== void 0 && value.length > 0);
@@ -97192,7 +97223,7 @@ async function compressImageForModel$1(bytes, mimeType, options2 = {}) {
     finalByteLength: bytes.length
   });
   const finish = (outcome, result) => {
-    reportCompressEvent(options2.telemetry, {
+    reportCompressEvent(options2.telemetry, options2.telemetrySource, {
       outcome,
       startedAt,
       inputMime: normalizedMime,
@@ -97253,7 +97284,7 @@ async function compressBase64ForModel$1(base643, mimeType, options2 = {}) {
       originalByteLength: approxBytes,
       finalByteLength: approxBytes
     };
-    reportCompressEvent(options2.telemetry, {
+    reportCompressEvent(options2.telemetry, options2.telemetrySource, {
       outcome: "passthrough_guard",
       startedAt,
       inputMime: normalizeImageMime$1(mimeType),
@@ -97277,7 +97308,7 @@ async function compressBase64ForModel$1(base643, mimeType, options2 = {}) {
       originalByteLength: 0,
       finalByteLength: 0
     };
-    reportCompressEvent(options2.telemetry, {
+    reportCompressEvent(options2.telemetry, options2.telemetrySource, {
       outcome: "passthrough_error",
       startedAt,
       inputMime: normalizeImageMime$1(mimeType),
@@ -97416,7 +97447,7 @@ async function cropImageForModel(bytes, mimeType, region, options2 = {}) {
   const maxDecodeBytes = options2.maxDecodeBytes ?? 67108864;
   const normalizedMime = normalizeImageMime$1(mimeType);
   const fail2 = (errorKind, error48) => {
-    reportCropEvent(options2.telemetry, {
+    reportCropEvent(options2.telemetry, options2.telemetrySource, {
       startedAt,
       ok: false,
       errorKind
@@ -97427,7 +97458,7 @@ async function cropImageForModel(bytes, mimeType, region, options2 = {}) {
     };
   };
   const succeed = (result) => {
-    reportCropEvent(options2.telemetry, {
+    reportCropEvent(options2.telemetry, options2.telemetrySource, {
       startedAt,
       ok: true,
       result
@@ -97611,11 +97642,11 @@ function fitWithinEdge(image, edge) {
   });
   return true;
 }
-function reportCompressEvent(telemetry, input) {
-  if (telemetry === void 0) return;
+function reportCompressEvent(telemetry, source, input) {
+  if (telemetry === void 0 || source === void 0) return;
   try {
-    telemetry.client.track("image_compress", {
-      source: telemetry.source,
+    const event = {
+      source,
       outcome: input.outcome,
       input_mime: input.inputMime,
       output_mime: normalizeImageMime$1(input.result.mimeType),
@@ -97627,17 +97658,18 @@ function reportCompressEvent(telemetry, input) {
       final_height: input.result.height,
       exif_transposed: input.exifTransposed,
       duration_ms: Date.now() - input.startedAt
-    });
+    };
+    telemetry.track2("image_compress", event);
   } catch {
   }
 }
-function reportCropEvent(telemetry, input) {
-  if (telemetry === void 0) return;
+function reportCropEvent(telemetry, source, input) {
+  if (telemetry === void 0 || source === void 0) return;
   try {
     const { result } = input;
     const originalPixels = result === void 0 ? 0 : result.originalWidth * result.originalHeight;
-    telemetry.client.track("image_crop", {
-      source: telemetry.source,
+    const event = {
+      source,
       ok: input.ok,
       error_kind: input.errorKind,
       resized: result?.resized,
@@ -97646,7 +97678,8 @@ function reportCropEvent(telemetry, input) {
       region_area_ratio: result === void 0 || originalPixels === 0 ? void 0 : result.region.width * result.region.height / originalPixels,
       final_bytes: result?.finalByteLength,
       duration_ms: Date.now() - input.startedAt
-    });
+    };
+    telemetry.track2("image_crop", event);
   } catch {
   }
 }
@@ -97861,6 +97894,9 @@ function withoutGoal(value) {
   const { goal: _drop, ...rest } = value;
   return rest;
 }
+function lastContextClearLineOf(records) {
+  for (let index = records.length - 1; index >= 0; index -= 1) if (records[index].type === "context.clear") return index + 1;
+}
 function extractLegacyPlanRevisionKey(path2, agentId) {
   if (path2.includes("\\")) return void 0;
   const segments = path2.split("/");
@@ -97976,14 +98012,14 @@ async function readGitExecPath(deps, gitExe) {
   }
 }
 function gitBashCandidatesFromGitExe(gitExe) {
-  const normalizedGitExe = path$9.win32.normalize(normalizeWindowsPath(gitExe));
-  const gitDir = path$9.win32.dirname(normalizedGitExe);
-  const gitDirName = path$9.win32.basename(gitDir).toLowerCase();
+  const normalizedGitExe = path$10.win32.normalize(normalizeWindowsPath(gitExe));
+  const gitDir = path$10.win32.dirname(normalizedGitExe);
+  const gitDirName = path$10.win32.basename(gitDir).toLowerCase();
   if (gitDirName !== "cmd" && gitDirName !== "bin") return;
-  return gitBashCandidatesFromGitRoot(path$9.win32.dirname(gitDir));
+  return gitBashCandidatesFromGitRoot(path$10.win32.dirname(gitDir));
 }
 function gitBashCandidatesFromGitExecPath(execPath) {
-  const normalized = path$9.win32.normalize(normalizeWindowsPath(execPath));
+  const normalized = path$10.win32.normalize(normalizeWindowsPath(execPath));
   const parts = normalized.split("\\");
   for (let i2 = parts.length - 1; i2 >= 0; i2 -= 1) {
     const segment = parts[i2]?.toLowerCase();
@@ -97992,16 +98028,16 @@ function gitBashCandidatesFromGitExecPath(execPath) {
       if (root.length > 0) return gitBashCandidatesFromGitRoot(root);
     }
   }
-  return gitBashCandidatesFromGitRoot(path$9.win32.join(normalized, "..", ".."));
+  return gitBashCandidatesFromGitRoot(path$10.win32.join(normalized, "..", ".."));
 }
 function gitBashCandidatesFromGitRoot(root) {
-  return [path$9.win32.normalize(path$9.win32.join(root, "bin", "bash.exe")), path$9.win32.normalize(path$9.win32.join(root, "usr", "bin", "bash.exe"))];
+  return [path$10.win32.normalize(path$10.win32.join(root, "bin", "bash.exe")), path$10.win32.normalize(path$10.win32.join(root, "usr", "bin", "bash.exe"))];
 }
 function normalizeWindowsPath(path2) {
   return path2.replaceAll("/", "\\");
 }
 function isAbsoluteWindowsPath(path2) {
-  return path$9.win32.isAbsolute(normalizeWindowsPath(path2));
+  return path$10.win32.isAbsolute(normalizeWindowsPath(path2));
 }
 function dedupeWindowsPaths(paths) {
   const deduped = [];
@@ -99526,6 +99562,9 @@ function splitLinesKeepingTerminator(text) {
   if (start < text.length) lines.push(text.slice(start));
   return lines;
 }
+function lineLengthLimit(eventLog) {
+  return eventLog ? EVENT_LOG_MAX_LINE_LENGTH : MAX_LINE_LENGTH;
+}
 function truncateLine(line, maxLength) {
   if (line.length <= maxLength) return line;
   const marker = "...";
@@ -99550,9 +99589,9 @@ function lineEndingStyleFromFlags(flags) {
   if (flags.hasCrLf) return "crlf";
   return "lf";
 }
-function renderLine(entry, lineEndingStyle) {
+function renderLine(entry, lineEndingStyle, maxLineLength) {
   const modelContent = lineEndingStyle === "crlf" && entry.rawContent.endsWith("\r") ? entry.rawContent.slice(0, -1) : entry.rawContent;
-  const truncated = truncateLine(modelContent, MAX_LINE_LENGTH);
+  const truncated = truncateLine(modelContent, maxLineLength);
   const renderedContent = lineEndingStyle === "mixed" ? makeCarriageReturnsVisible(truncated) : truncated;
   return {
     line: `${String(entry.lineNo)}	${renderedContent}`,
@@ -99562,13 +99601,13 @@ function renderLine(entry, lineEndingStyle) {
 function renderedLineBytes(renderedLine, isFirst) {
   return (isFirst ? 0 : 1) + Buffer.byteLength(renderedLine, "utf8");
 }
-function renderEntries(entries2, lineEndingStyle) {
+function renderEntries(entries2, lineEndingStyle, maxLineLength) {
   const renderedLines = [];
   const truncatedLineNumbers = [];
   let bytes = 0;
   let maxBytesReached = false;
   for (const entry of entries2) {
-    const rendered = renderLine(entry, lineEndingStyle);
+    const rendered = renderLine(entry, lineEndingStyle, maxLineLength);
     const lineBytes = renderedLineBytes(rendered.line, renderedLines.length === 0);
     if (renderedLines.length > 0 && bytes + lineBytes > 102400) {
       maxBytesReached = true;
@@ -101491,6 +101530,11 @@ function setup({ schemas, actors, actions, guards, delays }) {
     })
   };
 }
+function isInteractionCancellation(response) {
+  if (typeof response !== "object" || response === null) return false;
+  const value = response;
+  return value.cancelled === true && (value.reason === "turn_ended" || value.reason === "agent_closed");
+}
 function rememberResolved(effects, id) {
   const now = Date.now();
   for (const [key2, resolvedAt] of effects.recentlyResolved) if (now - resolvedAt > RECENTLY_RESOLVED_TTL_MS) effects.recentlyResolved.delete(key2);
@@ -102438,6 +102482,12 @@ function firstEnvHit(names2, env2) {
       value
     };
   }
+}
+function registerFlagDefinition(definition) {
+  contributedFlags.push(definition);
+}
+function getContributedFlags() {
+  return contributedFlags;
 }
 function titleInputFromPrompts(prompts) {
   if (prompts.length === 0) return void 0;
@@ -106593,7 +106643,7 @@ function parseCommandText(input) {
   const { text, commandPath, pluginId } = input;
   const parsed2 = parseFrontmatter$1(text);
   const frontmatter = isRecord$1(parsed2.data) ? parsed2.data : {};
-  const baseName = input.fallbackName ?? path.basename(commandPath).replace(/\.md$/i, "");
+  const baseName = input.fallbackName ?? path$1.basename(commandPath).replace(/\.md$/i, "");
   const name = nonEmptyString$2(frontmatter["name"]) ?? baseName;
   const body = parsed2.body.trim();
   return {
@@ -106601,7 +106651,7 @@ function parseCommandText(input) {
     name,
     description: nonEmptyString$2(frontmatter["description"]) ?? descriptionFromBody(body),
     body,
-    path: path.resolve(commandPath)
+    path: path$1.resolve(commandPath)
   };
 }
 async function loadPluginCommand(input) {
@@ -106635,8 +106685,8 @@ function isRecord$1(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function parseManifest(pluginRoot) {
-  const rootJsonPath = path.join(pluginRoot, KIMI_PLUGIN_ROOT_PATH);
-  const dirJsonPath = path.join(pluginRoot, KIMI_PLUGIN_DIR_PATH);
+  const rootJsonPath = path$1.join(pluginRoot, KIMI_PLUGIN_ROOT_PATH);
+  const dirJsonPath = path$1.join(pluginRoot, KIMI_PLUGIN_DIR_PATH);
   const rootJsonExists = await isFile$1(rootJsonPath);
   const dirJsonExists = await isFile$1(dirJsonPath);
   if (!rootJsonExists && !dirJsonExists) return { diagnostics: [{
@@ -106656,7 +106706,7 @@ async function parseManifest(pluginRoot) {
       shadowedManifestPath,
       diagnostics: [{
         severity: "error",
-        message: `Failed to parse ${path.relative(pluginRoot, manifestPath)}: ${error48.message}`
+        message: `Failed to parse ${path$1.relative(pluginRoot, manifestPath)}: ${error48.message}`
       }]
     };
   }
@@ -106698,14 +106748,14 @@ async function parseManifest(pluginRoot) {
   let skills = await resolveDirListField(pluginRoot, "skills", raw["skills"], diagnostics);
   let rootSkillFallback;
   if (raw["skills"] === void 0) {
-    if (await isFile$1(path.join(pluginRoot, "SKILL.md"))) {
+    if (await isFile$1(path$1.join(pluginRoot, "SKILL.md"))) {
       skills = [pluginRoot];
       rootSkillFallback = true;
     }
   }
   let agents = await resolveDirListField(pluginRoot, "agents", raw["agents"], diagnostics);
   if (raw["agents"] === void 0) {
-    const agentsDir = path.join(pluginRoot, "agents");
+    const agentsDir = path$1.join(pluginRoot, "agents");
     if (await isDir(agentsDir)) agents = [agentsDir];
   }
   const skillInstructions = typeof raw["skillInstructions"] === "string" ? raw["skillInstructions"] : void 0;
@@ -106767,7 +106817,7 @@ async function resolveDirListField(pluginRoot, field, raw, diagnostics) {
       });
       continue;
     }
-    const absolute = path.resolve(pluginRoot, entry);
+    const absolute = path$1.resolve(pluginRoot, entry);
     let real;
     try {
       real = await realpath$1(absolute);
@@ -106801,7 +106851,7 @@ async function resolvePluginPathField(input) {
     });
     return;
   }
-  const absolute = path.resolve(input.pluginRoot, input.value);
+  const absolute = path$1.resolve(input.pluginRoot, input.value);
   let real;
   try {
     real = await realpath$1(absolute);
@@ -106972,7 +107022,7 @@ async function readCommands(pluginRoot, raw, diagnostics) {
     if (await isDir(resolved)) files.push(...await listMarkdownFilesRecursive(resolved));
     else if (await isFile$1(resolved) && resolved.endsWith(".md")) files.push({
       path: resolved,
-      name: commandNameFromFile(resolved, path.dirname(resolved))
+      name: commandNameFromFile(resolved, path$1.dirname(resolved))
     });
     else diagnostics.push({
       severity: "warn",
@@ -106994,7 +107044,7 @@ async function walkMarkdown(root, dir, out) {
     return;
   }
   for (const entry of entries2) {
-    const full = path.join(dir, entry.name);
+    const full = path$1.join(dir, entry.name);
     if (entry.isDirectory()) await walkMarkdown(root, full, out);
     else if (entry.isFile() && entry.name.endsWith(".md")) out.push({
       path: full,
@@ -107003,7 +107053,7 @@ async function walkMarkdown(root, dir, out) {
   }
 }
 function commandNameFromFile(file2, root) {
-  return path.relative(root, file2).replace(/\.md$/i, "").split(path.sep).join("/");
+  return path$1.relative(root, file2).replace(/\.md$/i, "").split(path$1.sep).join("/");
 }
 async function normalizePluginMcpServer(input) {
   const { config: config2 } = input;
@@ -107018,7 +107068,7 @@ async function normalizePluginMcpServer(input) {
     });
     if (resolvedCommand === void 0) return void 0;
     command = resolvedCommand;
-  } else if (command.includes("/") || path.isAbsolute(command)) {
+  } else if (command.includes("/") || path$1.isAbsolute(command)) {
     input.diagnostics.push({
       severity: "warn",
       message: `"mcpServers.${input.name}.command" must be a PATH command or start with "./"`
@@ -107079,8 +107129,8 @@ function isObject2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isWithin(child, parent) {
-  const relative3 = path.relative(parent, child);
-  return relative3 === "" || !relative3.startsWith("..") && !path.isAbsolute(relative3);
+  const relative3 = path$1.relative(parent, child);
+  return relative3 === "" || !relative3.startsWith("..") && !path$1.isAbsolute(relative3);
 }
 async function isFile$1(p2) {
   try {
@@ -107097,7 +107147,7 @@ async function isDir(p2) {
   }
 }
 async function readInstalled(kimiHomeDir) {
-  const filePath = path.join(kimiHomeDir, INSTALLED_REL);
+  const filePath = path$1.join(kimiHomeDir, INSTALLED_REL);
   let text;
   try {
     text = await readFile2(filePath, "utf8");
@@ -107118,9 +107168,9 @@ async function readInstalled(kimiHomeDir) {
   return parsed2;
 }
 async function writeInstalled(kimiHomeDir, data) {
-  const dir = path.join(kimiHomeDir, "plugins");
+  const dir = path$1.join(kimiHomeDir, "plugins");
   await mkdir(dir, { recursive: true });
-  const final = path.join(dir, "installed.json");
+  const final = path$1.join(dir, "installed.json");
   const tmp = `${final}.tmp`;
   await writeFile$1(tmp, JSON.stringify(data, null, 2), "utf8");
   await rename(tmp, final);
@@ -107133,7 +107183,7 @@ function resolveInstallSource(source) {
     kind: "zip-url",
     path: trimmed2
   };
-  if (!path.isAbsolute(trimmed2)) throw new Error2(ErrorCodes$1.VALIDATION_FAILED, `Plugin root must be an absolute path (got "${source}")`, { details: { source } });
+  if (!path$1.isAbsolute(trimmed2)) throw new Error2(ErrorCodes$1.VALIDATION_FAILED, `Plugin root must be an absolute path (got "${source}")`, { details: { source } });
   return {
     kind: "local-path",
     path: trimmed2
@@ -107320,7 +107370,7 @@ async function downloadZip(url2, signal) {
 }
 async function extractZip(buffer, destDir) {
   await mkdir(destDir, { recursive: true });
-  const destDirResolved = path.resolve(destDir);
+  const destDirResolved = path$1.resolve(destDir);
   let settled = false;
   await new Promise((resolve3, reject) => {
     (0, import_yauzl.fromBuffer)(buffer, { lazyEntries: true }, (openErr, zipfile) => {
@@ -107330,8 +107380,8 @@ async function extractZip(buffer, destDir) {
       }
       const onEntry = (entry) => {
         const fileName = entry.fileName;
-        const destPath = path.resolve(destDir, fileName);
-        if (destPath !== destDirResolved && !destPath.startsWith(destDirResolved + path.sep)) {
+        const destPath = path$1.resolve(destDir, fileName);
+        if (destPath !== destDirResolved && !destPath.startsWith(destDirResolved + path$1.sep)) {
           if (!settled) {
             settled = true;
             reject(new Error2(ErrorCodes$1.PLUGIN_LOAD_FAILED, `Path traversal detected in zip entry: ${fileName}`, { details: { entry: fileName } }));
@@ -107363,7 +107413,7 @@ async function extractZip(buffer, destDir) {
             zipfile.close();
             return;
           }
-          mkdir(path.dirname(destPath), { recursive: true }).then(() => pipeline$12(stream, createWriteStream$1(destPath))).then(() => restoreFilePermissions(destPath, entry)).then(() => {
+          mkdir(path$1.dirname(destPath), { recursive: true }).then(() => pipeline$12(stream, createWriteStream$1(destPath))).then(() => restoreFilePermissions(destPath, entry)).then(() => {
             zipfile.readEntry();
           }).catch((error48) => {
             if (!settled) {
@@ -107404,14 +107454,14 @@ async function detectPluginRoot(dir) {
   const childDirs = (await readdir$1(dir, { withFileTypes: true })).filter((entry) => entry.isDirectory());
   const childDir = childDirs.length === 1 ? childDirs[0] : void 0;
   if (childDir !== void 0) {
-    const child = path.join(dir, childDir.name);
+    const child = path$1.join(dir, childDir.name);
     if (await hasManifest(child)) return child;
   }
   return dir;
 }
 async function hasManifest(dir) {
-  const rootManifest = path.join(dir, "kimi.plugin.json");
-  const dirManifest = path.join(dir, ".kimi-plugin", "plugin.json");
+  const rootManifest = path$1.join(dir, "kimi.plugin.json");
+  const dirManifest = path$1.join(dir, ".kimi-plugin", "plugin.json");
   return await isFile(rootManifest) || await isFile(dirManifest);
 }
 async function isFile(p2) {
@@ -107483,7 +107533,7 @@ function pluginNotFound(id) {
 }
 async function normalizeInstallRoot(rootPath) {
   const trimmed2 = rootPath.trim();
-  if (!path.isAbsolute(trimmed2)) throw new Error2(ErrorCodes$1.VALIDATION_FAILED, `Plugin root must be an absolute path (got "${rootPath}")`, { details: { path: rootPath } });
+  if (!path$1.isAbsolute(trimmed2)) throw new Error2(ErrorCodes$1.VALIDATION_FAILED, `Plugin root must be an absolute path (got "${rootPath}")`, { details: { path: rootPath } });
   let resolved;
   try {
     resolved = await realpath$1(trimmed2);
@@ -107497,10 +107547,10 @@ async function normalizeInstallRoot(rootPath) {
   return resolved;
 }
 async function copyPluginToManagedRoot(kimiHomeDir, id, sourceRoot) {
-  const managedRoot = path.join(kimiHomeDir, "plugins", "managed", id);
-  const managedDir = path.dirname(managedRoot);
+  const managedRoot = path$1.join(kimiHomeDir, "plugins", "managed", id);
+  const managedDir = path$1.dirname(managedRoot);
   await mkdir(managedDir, { recursive: true });
-  const stagingRoot = await mkdtemp(path.join(managedDir, `${id}-`));
+  const stagingRoot = await mkdtemp(path$1.join(managedDir, `${id}-`));
   const previousRoot = `${stagingRoot}-previous`;
   let movedPreviousRoot = false;
   let published = false;
@@ -107658,7 +107708,7 @@ function isElectron() {
   return typeof process.versions["electron"] === "string";
 }
 function isKimiNativeBinary() {
-  return !path.basename(process.execPath).toLowerCase().startsWith("node");
+  return !path$1.basename(process.execPath).toLowerCase().startsWith("node");
 }
 async function countDiscoveredPluginSkills(pluginId, manifest, discoverSkills2) {
   const dirs = manifest?.skills ?? [];
@@ -107764,7 +107814,7 @@ async function downloadToFile(url2, destPath, onPercent, fetchImpl2 = fetch, opt
   }
   if (!resp.ok || resp.body === null) throw new Error(`Failed to download ${url2}: HTTP ${resp.status}`);
   const total = Number(resp.headers.get("content-length") ?? 0);
-  await mkdir(path.dirname(destPath), { recursive: true });
+  await mkdir(path$1.dirname(destPath), { recursive: true });
   let received = 0;
   let idleTimer;
   const meter = new Transform({ transform(chunk, _encoding, callback) {
@@ -107821,12 +107871,12 @@ function parseWindowsDoctorOutput(output) {
   return version2 === void 0 ? {} : { version: version2 };
 }
 function windowsPowerShellPath(systemRoot = process.env["SystemRoot"] ?? DEFAULT_WINDOWS_SYSTEM_ROOT) {
-  const root = path.win32.isAbsolute(systemRoot) ? systemRoot : DEFAULT_WINDOWS_SYSTEM_ROOT;
-  return path.win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const root = path$1.win32.isAbsolute(systemRoot) ? systemRoot : DEFAULT_WINDOWS_SYSTEM_ROOT;
+  return path$1.win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 function windowsPowerShell7Path(programFiles = process.env["ProgramW6432"] ?? process.env["ProgramFiles"] ?? DEFAULT_WINDOWS_PROGRAM_FILES) {
-  const root = path.win32.isAbsolute(programFiles) ? programFiles : DEFAULT_WINDOWS_PROGRAM_FILES;
-  return path.win32.join(root, "PowerShell", "7", "pwsh.exe");
+  const root = path$1.win32.isAbsolute(programFiles) ? programFiles : DEFAULT_WINDOWS_PROGRAM_FILES;
+  return path$1.win32.join(root, "PowerShell", "7", "pwsh.exe");
 }
 async function readAppBundleVersion(infoPlistPath) {
   try {
@@ -107909,13 +107959,13 @@ function elevatedDittoScript(from, to) {
 }
 function createMacKimiCuEntry(ctx) {
   const applicationsDir = ctx.applicationsDir ?? "/Applications";
-  const appPath = path.join(applicationsDir, APP_BUNDLE);
-  const appBin = path.join(appPath, "Contents", "MacOS", "kimi-cu");
-  const infoPlist = path.join(appPath, "Contents", "Info.plist");
+  const appPath = path$1.join(applicationsDir, APP_BUNDLE);
+  const appBin = path$1.join(appPath, "Contents", "MacOS", "kimi-cu");
+  const infoPlist = path$1.join(appPath, "Contents", "Info.plist");
   const probeTimeoutMs = ctx.detectProbeTimeoutMs ?? DETECT_PROBE_TIMEOUT_MS;
   const commandTimeoutMs = ctx.commandTimeoutMs ?? COMMAND_TIMEOUT_MS;
   const supported = ctx.platform === "darwin";
-  const userMcpConfigPath = path.join(ctx.kimiHomeDir, "mcp.json");
+  const userMcpConfigPath = path$1.join(ctx.kimiHomeDir, "mcp.json");
   async function exists2(p2) {
     return access(p2).then(() => true, () => false);
   }
@@ -108052,15 +108102,15 @@ function createMacKimiCuEntry(ctx) {
     if (await removeLegacyMcpRegistration(legacyMcpBefore).catch(() => false)) report("mcp-config");
     const installApp = stepStates.get("app") !== "ok" || readyBefore;
     if (installApp) {
-      const workDir = await mkdtemp(path.join(tmpdir(), "kimi-cu-install-"));
+      const workDir = await mkdtemp(path$1.join(tmpdir(), "kimi-cu-install-"));
       try {
         report("download", 0);
-        const zipPath = path.join(workDir, "KimiCU.app.zip");
-        await downloadToFile(kimiCdnContentUrl("kimi-computer-use/latest/KimiCU.app.zip"), zipPath, (percent) => {
-          report("download", percent);
+        const zipPath = path$1.join(workDir, "KimiCU.app.zip");
+        await downloadToFile(kimiCdnContentUrl("kimi-computer-use/latest/KimiCU.app.zip"), zipPath, (percent2) => {
+          report("download", percent2);
         }, ctx.fetchImpl);
         report("app");
-        const unzipDir = path.join(workDir, "unzipped");
+        const unzipDir = path$1.join(workDir, "unzipped");
         const unzipped = await runCommand(ctx.hostProcess, "ditto", [
           "-x",
           "-k",
@@ -108069,7 +108119,7 @@ function createMacKimiCuEntry(ctx) {
         ], { timeout: 12e4 });
         if (unzipped.code !== 0) throw new Error(`Failed to unzip KimiCU.app: ${unzipped.stderr || unzipped.stdout}`);
         await stopOldProcesses();
-        await moveAppIntoPlace(path.join(unzipDir, APP_BUNDLE));
+        await moveAppIntoPlace(path$1.join(unzipDir, APP_BUNDLE));
         await runCommand(ctx.hostProcess, "xattr", [
           "-dr",
           "com.apple.quarantine",
@@ -108212,12 +108262,12 @@ function createWindowsKimiCuEntry(ctx) {
       }
     }
     if (installPowerShell !== void 0) {
-      const workDir = await mkdtemp(path.join(tmpdir(), "kimi-cu-windows-install-"));
+      const workDir = await mkdtemp(path$1.join(tmpdir(), "kimi-cu-windows-install-"));
       try {
-        const setupPath = path.join(workDir, "setup_windows.ps1");
+        const setupPath = path$1.join(workDir, "setup_windows.ps1");
         report("download", 0);
-        await downloadToFile(kimiCdnContentUrl("kimi-computer-use-windows/latest/setup_windows.ps1"), setupPath, (percent) => {
-          report("download", percent);
+        await downloadToFile(kimiCdnContentUrl("kimi-computer-use-windows/latest/setup_windows.ps1"), setupPath, (percent2) => {
+          report("download", percent2);
         }, ctx.fetchImpl);
         report("runtime");
         const installed = await runCommand(ctx.hostProcess, installPowerShell, [
@@ -108267,17 +108317,17 @@ function binaryAssetName(platform, arch2) {
 }
 function createKimiWebbridgeEntry(ctx) {
   const baseUrl = ctx.webbridgeBaseUrl ?? DEFAULT_DAEMON_BASE_URL;
-  const binDir = path.join(ctx.userHomeDir, ".kimi-webbridge", "bin");
+  const binDir = path$1.join(ctx.userHomeDir, ".kimi-webbridge", "bin");
   const binName = ctx.platform === "win32" ? "kimi-webbridge.exe" : "kimi-webbridge";
-  const binPath = path.join(binDir, binName);
+  const binPath = path$1.join(binDir, binName);
   const userSourceSkillDirs = [{
     label: "kimi-code",
-    path: path.join(ctx.kimiHomeDir, "skills", "kimi-webbridge")
+    path: path$1.join(ctx.kimiHomeDir, "skills", "kimi-webbridge")
   }, {
     label: "agents",
-    path: path.join(ctx.userHomeDir, ".agents", "skills", "kimi-webbridge")
+    path: path$1.join(ctx.userHomeDir, ".agents", "skills", "kimi-webbridge")
   }];
-  const standaloneSkillBackupDir = path.join(ctx.kimiHomeDir, "backups", "kimi-webbridge-skills");
+  const standaloneSkillBackupDir = path$1.join(ctx.kimiHomeDir, "backups", "kimi-webbridge-skills");
   const supported = binaryAssetName(ctx.platform, ctx.arch) !== void 0;
   let standaloneSkillBackupPath;
   let standaloneSkillMigrationError;
@@ -108307,8 +108357,8 @@ function createKimiWebbridgeEntry(ctx) {
     const skills = await standaloneSkillDirs();
     if (skills.length === 0) return void 0;
     await mkdir(standaloneSkillBackupDir, { recursive: true });
-    const backupRoot = await mkdtemp(path.join(standaloneSkillBackupDir, "migration-"));
-    for (const skill of skills) await rename(skill.path, path.join(backupRoot, skill.label));
+    const backupRoot = await mkdtemp(path$1.join(standaloneSkillBackupDir, "migration-"));
+    for (const skill of skills) await rename(skill.path, path$1.join(backupRoot, skill.label));
     return backupRoot;
   }
   async function detect() {
@@ -108401,10 +108451,10 @@ function createKimiWebbridgeEntry(ctx) {
   async function installBinary(report, asset) {
     report("download", 0);
     const url2 = kimiCdnContentUrl(`${BINARY_CDN_PATH}/${asset}`);
-    const staging = path.join(tmpdir(), `kimi-webbridge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ctx.platform === "win32" ? ".exe" : ""}`);
+    const staging = path$1.join(tmpdir(), `kimi-webbridge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ctx.platform === "win32" ? ".exe" : ""}`);
     try {
-      await downloadToFile(url2, staging, (percent) => {
-        report("download", percent);
+      await downloadToFile(url2, staging, (percent2) => {
+        report("download", percent2);
       }, ctx.fetchImpl);
       await mkdir(binDir, { recursive: true });
       await rename(staging, binPath).catch(async (error48) => {
@@ -108602,6 +108652,21 @@ function activityEqual(a, b2) {
   if (a.background.length !== b2.background.length) return false;
   for (let i2 = 0; i2 < a.background.length; i2++) if (a.background[i2].id !== b2.background[i2].id || a.background[i2].kind !== b2.background[i2].kind) return false;
   return true;
+}
+function hasPinnedPermissionMode(profileName) {
+  return profileName === TOWER_WORKER_PROFILE;
+}
+function towerEnterFailureMessage(failure) {
+  switch (failure.reason) {
+    case "not-main-agent":
+      return "tower mode is only supported by the main agent";
+    case "experiment-off":
+      return "the tower experiment is disabled; enable it with KIMI_CODE_EXPERIMENTAL_TOWER=1 or `[experimental] tower = true` in config.toml";
+    case "feature-not-assembled":
+      return "the tower feature is not assembled in this process; a restart is required";
+    case "owned-by-live-session":
+      return `another live session owns the workspace tower (session ${failure.ownerTitle === void 0 ? failure.owner : `${failure.ownerTitle} (${failure.owner})`})`;
+  }
 }
 function actorContext(runtime) {
   return runtime.getLogicState();
@@ -109617,7 +109682,7 @@ function renderSwarmResults(results) {
   const completed = results.filter((result) => result.status === "completed").length;
   const failed = results.filter((result) => result.status === "failed").length;
   const aborted2 = results.filter((result) => result.status === "aborted").length;
-  const shouldRenderResumeHint = results.some((result) => result.status !== "completed") && results.some((result) => result.agentId !== void 0);
+  const shouldRenderResumeHint = results.some((result) => result.status !== "completed" || result.stopReason !== void 0) && results.some((result) => result.agentId !== void 0);
   const lines = ["<agent_swarm_result>", `<summary>${renderSwarmSummary(completed, failed, aborted2)}</summary>`];
   if (shouldRenderResumeHint) lines.push("<resume_hint>Call AgentSwarm with resume_agent_ids using the agent_id values in this result to continue unfinished work.</resume_hint>");
   for (const result of results) {
@@ -109625,8 +109690,9 @@ function renderSwarmResults(results) {
     const mode = result.spec.kind === "resume" ? ' mode="resume"' : "";
     const item = result.spec.item === void 0 ? "" : ` item="${escapeXmlAttribute(result.spec.item)}"`;
     const state = result.state === void 0 ? "" : ` state="${result.state}"`;
+    const stopReason = result.stopReason === void 0 ? "" : ` stop_reason="${escapeXmlAttribute(result.stopReason)}"`;
     const body = result.status === "completed" ? result.result ?? "" : result.error ?? "unknown error";
-    lines.push(`<subagent${mode}${agentId}${item}${state} outcome="${result.status}">${body}</subagent>`);
+    lines.push(`<subagent${mode}${agentId}${item}${state} outcome="${result.status}"${stopReason}>${body}</subagent>`);
   }
   lines.push("</agent_swarm_result>");
   return lines.join("\n");
@@ -110528,29 +110594,6 @@ function changedGoalOutput(status) {
   if (status === "complete") return "Goal not completed: the current goal changed.";
   return "Goal not blocked: the current goal changed.";
 }
-function accessedFilePath(accesses, operations2) {
-  for (const access2 of accesses ?? []) if (access2.kind === "file" && operations2.includes(access2.operation)) return access2.path;
-}
-function stringArg$1(args, key2) {
-  if (typeof args !== "object" || args === null) return void 0;
-  const value = args[key2];
-  return typeof value === "string" ? value : void 0;
-}
-function callPathArg(call) {
-  if (typeof call.arguments !== "string") return void 0;
-  try {
-    return stringArg$1(JSON.parse(call.arguments), "path");
-  } catch {
-    return;
-  }
-}
-function coveredByEarlierRead(event, rawPath) {
-  for (const call of event.toolCalls) {
-    if (call.id === event.toolCall.id) return false;
-    if (call.name === "Read" && callPathArg(call) === rawPath) return true;
-  }
-  return false;
-}
 async function git(cwd2, args, options2 = {}) {
   return new Promise((resolve3, reject) => {
     execFile("git", [...args], {
@@ -110608,11 +110651,36 @@ async function branchExists(cwd2, branch) {
     `refs/heads/${branch}`
   ]) !== null;
 }
+async function initRepository(cwd2) {
+  await git(cwd2, ["init"]);
+}
+async function gitCommit(cwd2, args) {
+  try {
+    await git(cwd2, args);
+  } catch (error48) {
+    if (!(error48 instanceof GitError) || !/identity unknown/.test(error48.stderr)) throw error48;
+    await git(cwd2, [
+      "-c",
+      "user.name=Kimi Tower",
+      "-c",
+      "user.email=kimi-tower@localhost",
+      ...args
+    ]);
+  }
+}
 async function checkoutNewLocalBranch(cwd2, branch) {
   await git(cwd2, [
     "checkout",
     "-b",
     branch
+  ]);
+}
+async function commitAllowEmpty(cwd2, message) {
+  await gitCommit(cwd2, [
+    "commit",
+    "--allow-empty",
+    "-m",
+    message
   ]);
 }
 async function commitPaths(cwd2, paths, message) {
@@ -110622,7 +110690,7 @@ async function commitPaths(cwd2, paths, message) {
     "--",
     ...paths.slice(i2, i2 + ADD_PATHS_CHUNK$1)
   ]);
-  await git(cwd2, [
+  await gitCommit(cwd2, [
     "commit",
     "-m",
     message
@@ -110972,10 +111040,46 @@ function emptyOutputSnapshot() {
     preview: ""
   };
 }
-function agentTaskNotificationChildren(output) {
+function agentTaskNotificationChildren(info, output) {
+  if (output === void 0) return void 0;
+  if (inlinesQuestionAnswer(info, output)) return output.preview.length === 0 ? void 0 : [renderAnswerBlock(output.preview)];
   if (output.fullOutputAvailable && output.outputPath !== void 0) return [renderOutputFileBlock(output.outputPath, output.outputSizeBytes)];
   if (output.preview.length === 0) return void 0;
   return [renderOutputPreviewBlock(output)];
+}
+function inlinesQuestionAnswer(info, output) {
+  return info.kind === "question" && !output.truncated;
+}
+function renderAnswerBlock(answer) {
+  return [
+    "<answer>",
+    escapeXmlTags(answer),
+    "</answer>"
+  ].join("\n");
+}
+function questionNotificationText(info, output) {
+  if (info.status !== "completed" || output === void 0 || !inlinesQuestionAnswer(info, output)) return;
+  const outcome = questionOutcome(output.preview);
+  if (outcome === "answered") return {
+    title: "Background question answered",
+    body: `The user answered "${info.description}".`
+  };
+  if (outcome === "dismissed") return {
+    title: "Background question dismissed",
+    body: `The user dismissed "${info.description}" without answering.`
+  };
+}
+function questionOutcome(output) {
+  let parsed2;
+  try {
+    parsed2 = JSON.parse(output);
+  } catch {
+    return;
+  }
+  if (typeof parsed2 !== "object" || parsed2 === null) return void 0;
+  const answers = parsed2.answers;
+  if (typeof answers !== "object" || answers === null || Array.isArray(answers)) return void 0;
+  return Object.keys(answers).length > 0 ? "answered" : "dismissed";
 }
 function renderOutputFileBlock(outputPath, outputSizeBytes) {
   return [
@@ -111040,7 +111144,8 @@ function buildAgentTaskNotificationBody(info) {
     "The subagent retains its full prior context across the restart, but any in-flight tool call lost its result and may need to be redone."
   ].join("\n")}`;
 }
-function buildAgentTaskNotification(info, children) {
+function buildAgentTaskNotification(info, output) {
+  const question = questionNotificationText(info, output);
   return {
     id: taskNotificationId(info.taskId, info.status),
     category: "task",
@@ -111048,10 +111153,10 @@ function buildAgentTaskNotification(info, children) {
     source_kind: "background_task",
     source_id: info.taskId,
     agent_id: info.kind === "agent" ? info.agentId : void 0,
-    title: `Background ${info.kind} ${info.status}`,
+    title: question?.title ?? `Background ${info.kind} ${info.status}`,
     severity: info.status === "completed" ? "info" : "warning",
-    body: buildAgentTaskNotificationBody(info),
-    children
+    body: question?.body ?? buildAgentTaskNotificationBody(info),
+    children: agentTaskNotificationChildren(info, output)
   };
 }
 function generateTaskId(kind) {
@@ -111090,6 +111195,17 @@ function isPreviousSessionTermination(info) {
 }
 function errorMessage$3(err) {
   return err instanceof Error ? err.message : String(err);
+}
+function stopCodeOf(error48) {
+  if (!isError2(error48)) return void 0;
+  if (error48.code === ErrorCodes$1.AGENT_NO_FINAL_MESSAGE) {
+    const stopReason = error48.details?.["stopReason"];
+    if (typeof stopReason === "string") return stopReason;
+  }
+  return error48.code;
+}
+function completedSettleReason(stopReason) {
+  return stopReason === "repeat_breaker" ? REPEAT_BREAKER_SETTLE_REASON : void 0;
 }
 function renderConcurrency(snapshot2) {
   const parts = [`budget: ${String(snapshot2.budget)} agent(s) \xB7 inflight: ${String(snapshot2.inflight)}`];
@@ -111236,7 +111352,8 @@ function appendReminder(result, reminderText2) {
 function forceStopResult(result, reminderText2) {
   return {
     ...appendReminder(result, reminderText2),
-    stopTurn: true
+    stopTurn: true,
+    stopTurnReason: REPEAT_BREAKER_STOP_REASON
   };
 }
 function stringArrayEqual(a, b2) {
@@ -112388,26 +112505,27 @@ async function awaitRun(target, turn, options2) {
   const controller = new AbortController();
   const unlink2 = linkAbortSignal(options2.signal, controller);
   const loop = target.accessor.get(IAgentLoopService);
-  const cancelTurn = (turnToCancel, reason) => {
-    loop.cancel(turnToCancel.id, reason);
+  const cancelTurn = (reason) => {
+    loop.cancel(turn.id, reason);
   };
-  let turnRef = turn;
   try {
-    classifyTurnResult(await awaitTurn(turnRef, controller, cancelTurn));
+    const result = classifyTurnResult(await awaitTurn(turn, controller, cancelTurn));
+    const summary = latestAssistantText(target.accessor.get(IAgentContextMemoryService).get());
+    const stopReason = result.stopReason;
+    if (summary.trim().length === 0) throw new Error2(ErrorCodes$1.AGENT_NO_FINAL_MESSAGE, noFinalMessageError(stopReason), stopReason === void 0 ? void 0 : { details: { stopReason } });
     return {
-      summary: await distillSummary(target, controller, options2.summaryPolicy, (t2) => {
-        turnRef = t2;
-      }, cancelTurn),
-      usage: target.accessor.get(ISessionUsageService)?.status(agentContextOf(target)).total
+      summary,
+      usage: target.accessor.get(ISessionUsageService)?.status(agentContextOf(target)).total,
+      stopReason
     };
   } finally {
     unlink2();
-    if (controller.signal.aborted) cancelTurn(turnRef, controller.signal.reason);
+    if (controller.signal.aborted) cancelTurn(controller.signal.reason);
   }
 }
 async function awaitTurn(turn, controller, cancelTurn) {
   const cancelOnAbort = () => {
-    cancelTurn(turn, controller.signal.reason);
+    cancelTurn(controller.signal.reason);
   };
   controller.signal.addEventListener("abort", cancelOnAbort, { once: true });
   try {
@@ -112419,49 +112537,31 @@ async function awaitTurn(turn, controller, cancelTurn) {
     controller.signal.removeEventListener("abort", cancelOnAbort);
   }
 }
-async function distillSummary(target, controller, policy, setTurn, cancelTurn) {
-  const memory = target.accessor.get(IAgentContextMemoryService);
-  let summary = latestAssistantText(memory.get());
-  if (policy === void 0) return summary;
-  if (isSummaryAdequate(summary, policy)) return summary;
-  const promptService = target.accessor.get(IAgentPromptService);
-  for (let attempt = 0; attempt < policy.retries; attempt++) {
-    const turn = await (await promptService.enqueue({ message: {
-      role: "user",
-      content: [{
-        type: "text",
-        text: policy.continuationPrompt
-      }],
-      toolCalls: [],
-      origin: AGENT_RUN_PROMPT_ORIGIN
-    } })).launched;
-    if (turn === void 0) break;
-    setTurn(turn);
-    classifyTurnResult(await awaitTurn(turn, controller, cancelTurn));
-    const continued = latestAssistantText(memory.get());
-    if (continued.trim().length > 0) summary = continued;
-    if (isSummaryAdequate(summary, policy)) break;
-  }
-  return summary;
-}
-function isSummaryAdequate(summary, policy) {
-  return summary.trim().length >= policy.minChars;
-}
 function classifyTurnResult(result) {
   switch (result.type) {
     case "completed":
       if (result.truncated) throw new Error2(ErrorCodes$1.AGENT_MAX_TOKENS_EXCEEDED, SUBAGENT_MAX_TOKENS_ERROR);
-      return;
+      return result;
     case "failed": {
       const error48 = result.error;
       if (isProviderRateLimitError(error48)) throw error48;
       const payload = toKimiErrorPayload$1(error48);
       if (payload.code === ErrorCodes$1.PROVIDER_RATE_LIMIT) throw providerRateLimitErrorFromPayload(payload);
+      if (isMaxStepsExceededError(error48)) throw maxStepsErrorFromPayload(payload);
       throw toRunError(error48);
     }
     case "cancelled":
       throw toRunError(result.reason ?? userCancellationReason());
   }
+}
+function noFinalMessageError(stopReason) {
+  const base = "Subagent turn ended without a final message";
+  return stopReason === void 0 ? `${base}.` : `${base} (stop reason: ${stopReason}).`;
+}
+function maxStepsErrorFromPayload(payload) {
+  const maxSteps = payload.details?.["maxSteps"];
+  const cap = typeof maxSteps === "number" ? ` (maxSteps=${String(maxSteps)})` : "";
+  return new Error2(ErrorCodes$1.LOOP_MAX_STEPS_EXCEEDED, `Subagent hit the per-turn step cap${cap} before finishing its handoff.`, typeof maxSteps === "number" ? { details: { maxSteps } } : void 0);
 }
 function toRunError(error48) {
   if (error48 instanceof Error) return error48;
@@ -112488,6 +112588,22 @@ function contentText(content) {
   if (typeof content === "string") return content;
   return content.filter((part) => part.type === "text").map((part) => part.text).join("");
 }
+function resumeHint(agentId, prompt) {
+  return `resume_hint: Continue with Agent(resume="${agentId}", prompt="${prompt}"). Use agent_id only; do not set subagent_type. The subagent retains its prior context; redo any unfinished tool call if its result was lost.`;
+}
+function nextStep(reason) {
+  return NEXT_STEP_BY_REASON[reason];
+}
+function failureStopReason(info, stopCode) {
+  if (info?.status === "timed_out") return "timed_out";
+  if (info?.status === "killed") return info.stopReason?.trim() === userCancellationReason().message ? "cancelled" : "stopped";
+  if (stopCode === void 0) return "error";
+  return STOP_REASON_BY_CODE[stopCode] ?? "error";
+}
+function truncateReason(reason) {
+  if (reason.length <= REASON_MAX_CHARS) return reason;
+  return `${reason.slice(0, REASON_MAX_CHARS)}\u2026 [truncated]`;
+}
 function buildProfileDescriptions(profiles, tools, isToolActive$1) {
   return profiles.map((profile) => {
     const details = [profile.description, profile.whenToUse].filter((part) => part !== void 0 && part.length > 0);
@@ -112513,7 +112629,7 @@ function buildProfileDescriptions(profiles, tools, isToolActive$1) {
   }).join("\n");
 }
 function formatBackgroundAgentResult(taskId, handle, description, allowBackground, detachedByUser) {
-  const nextStep = allowBackground ? `next_step: The completion arrives automatically in a later turn \u2014 do NOT wait, poll, or call TaskOutput on it; continue with other work or hand back to the user. (If you have nothing to do until it finishes, run such tasks in the foreground next time.)` : "next_step: The completion arrives automatically in a later turn.";
+  const nextStep2 = allowBackground ? `next_step: The completion arrives automatically in a later turn \u2014 do NOT wait, poll, or call TaskOutput on it; continue with other work or hand back to the user. (If you have nothing to do until it finishes, run such tasks in the foreground next time.)` : "next_step: The completion arrives automatically in a later turn.";
   return [
     `task_id: ${taskId}`,
     "status: running",
@@ -112524,29 +112640,36 @@ function formatBackgroundAgentResult(taskId, handle, description, allowBackgroun
     `description: ${description}`,
     "",
     detachedByUser ? `note: The user moved this subagent to the background.
-${nextStep}` : nextStep,
+${nextStep2}` : nextStep2,
     `resume_hint: To continue or recover this same subagent later, call Agent(resume="${handle.agentId}", prompt="..."). The parameter is agent_id ("${handle.agentId}"), NOT task_id ("${taskId}") or source_id from a later <notification>. Recovery cases: a later <notification type="task.lost" | "task.failed" | "task.killed"> for this subagent \u2014 its conversation history is preserved across session restarts and resume will pick it up.`
   ].join("\n");
 }
-function formatForegroundAgentSuccess(handle, result) {
-  return [
+function formatForegroundAgentSuccess(handle, result, stopCode) {
+  const reason = stopCode === "repeat_breaker" ? "repeat_breaker" : "completed";
+  const lines = [
     `agent_id: ${handle.agentId}`,
     `actual_subagent_type: ${handle.profileName}`,
     "status: completed",
-    "",
-    "[summary]",
-    result
-  ].join("\n");
+    `stop_reason: ${reason}`
+  ];
+  if (reason === "repeat_breaker") lines.push(REPEAT_BREAKER_NOTICE);
+  lines.push("", "[summary]", result, "", resumeHint(handle.agentId, "..."));
+  const next = nextStep(reason);
+  if (next !== void 0) lines.push(next);
+  return lines.join("\n");
 }
-function formatForegroundAgentFailure(handle, message, timedOut) {
+function formatForegroundAgentFailure(handle, message, reason) {
   const lines = [
     `agent_id: ${handle.agentId}`,
     `actual_subagent_type: ${handle.profileName}`,
     "status: failed",
+    `stop_reason: ${reason}`,
     "",
     `subagent error: ${message}`
   ];
-  if (timedOut) lines.push(`resume_hint: Continue with Agent(resume="${handle.agentId}", prompt="continue"). Use agent_id only; do not set subagent_type. The subagent retains its prior context; redo any unfinished tool call if its result was lost.`);
+  if (reason !== "cancelled") lines.push(resumeHint(handle.agentId, "continue"));
+  const next = nextStep(reason);
+  if (next !== void 0) lines.push(next);
   return lines.join("\n");
 }
 function launchErrorMessage(error48, signal) {
@@ -112558,7 +112681,7 @@ function formatSubagentStoppedMessage(reason) {
   const normalized = reason?.trim();
   if (normalized === userCancellationReason().message) return USER_INTERRUPTED_SUBAGENT_MESSAGE;
   if (normalized === void 0 || normalized.length === 0) return SUBAGENT_STOPPED_MESSAGE;
-  return `${SUBAGENT_STOPPED_MESSAGE} Reason: ${normalized}`;
+  return `${SUBAGENT_STOPPED_MESSAGE} Reason: ${truncateReason(normalized)}`;
 }
 function errorMessage$2(error48) {
   if (typeof error48 === "string") return error48;
@@ -112581,7 +112704,7 @@ async function resumeSessionById(accessor, sessionId, opts) {
   try {
     return await accessor.get(ISessionManager).resume(sessionId, opts);
   } catch (error48) {
-    accessor.get(ITelemetryService).withContext({ sessionId }).track2("session_load_failed", { reason: isError2(error48) ? error48.code : error48 instanceof Error ? error48.name : "unknown" });
+    accessor.get(ITelemetryService).withContext({ session_id: sessionId }).track2("session_load_failed", { reason: isError2(error48) ? error48.code : error48 instanceof Error ? error48.name : "unknown" });
     throw error48;
   }
 }
@@ -113444,6 +113567,7 @@ function scanBalancedStatements(source, budget, i2, end, depth = 0) {
   };
   let nesting = 0;
   const caseDepths = [];
+  const pendingHeredocs = [];
   let j2 = i2;
   let previous = "start";
   let sinceTick = 0;
@@ -113476,7 +113600,16 @@ function scanBalancedStatements(source, budget, i2, end, depth = 0) {
       j2++;
       continue;
     }
-    if (ch === "\n" || ch === ";" || ch === "&" || ch === "|") {
+    if (ch === "\n") {
+      j2++;
+      if (pendingHeredocs.length > 0) {
+        j2 = skipHeredocBodies(source, budget, j2, end, pendingHeredocs);
+        pendingHeredocs.length = 0;
+      }
+      previous = "sep";
+      continue;
+    }
+    if (ch === ";" || ch === "&" || ch === "|") {
       previous = "sep";
       j2++;
       continue;
@@ -113486,7 +113619,51 @@ function scanBalancedStatements(source, budget, i2, end, depth = 0) {
       j2++;
       continue;
     }
+    if (ch === "#") {
+      let p2 = j2 - 1;
+      while (p2 - 1 >= i2 && source[p2] === "\n" && source[p2 - 1] === "\\") p2 -= 2;
+      const prev = p2 >= i2 ? source[p2] : void 0;
+      if (prev === void 0 || isBlank(prev) || prev === "\n" || prev === ";" || prev === "&" || prev === "|" || prev === "(") {
+        while (j2 < end && source[j2] !== "\n") j2++;
+        continue;
+      }
+    }
+    if (ch === "$" && (source[j2 + 1] === "{" || source[j2 + 1] === "[")) {
+      const open4 = source[j2 + 1];
+      j2 = scanBalanced(source, budget, j2 + 1, end, open4, open4 === "{" ? "}" : "]", depth + 1).end;
+      previous = "word";
+      continue;
+    }
+    if (ch === "[" && source[j2 + 1] === "[" && previous !== "word") {
+      j2 = scanBalanced(source, budget, j2, end, "[", "]", depth + 1).end;
+      previous = "word";
+      continue;
+    }
+    if (ch === "[" && j2 > i2 && isWordChar(source[j2 - 1])) {
+      j2 = scanBalanced(source, budget, j2, end, "[", "]", depth + 1).end;
+      previous = "word";
+      continue;
+    }
+    if (ch === "<") {
+      const heredoc = scanHeredocDelimiter(source, budget, j2, end, depth);
+      if (heredoc !== null) {
+        pendingHeredocs.push(heredoc);
+        j2 = heredoc.end;
+      } else j2++;
+      previous = "word";
+      continue;
+    }
     if (ch === "(") {
+      if (source[j2 + 1] === "(") {
+        const arith = scanBalanced(source, budget, j2, end, "(", ")", depth + 1);
+        if (j2 === i2) return {
+          end: arith.end,
+          balanced: arith.balanced
+        };
+        j2 = arith.end;
+        previous = "word";
+        continue;
+      }
       nesting++;
       previous = "sep";
       j2++;
@@ -113528,6 +113705,117 @@ function scanBalancedStatements(source, budget, i2, end, depth = 0) {
     end,
     balanced: false
   };
+}
+function scanHeredocDelimiter(source, budget, i2, end, depth) {
+  if (source[i2 + 1] !== "<") return null;
+  let j2 = i2 + 2;
+  if (source[j2] === "<") return null;
+  let stripTabs = false;
+  if (source[j2] === "-") {
+    stripTabs = true;
+    j2++;
+  }
+  while (j2 < end && (source[j2] === " " || source[j2] === "	" || source[j2] === "\r")) j2++;
+  let raw = "";
+  while (j2 < end) {
+    const ch = source[j2];
+    if (ch === " " || ch === "	" || ch === "\r" || ch === "\n") break;
+    if (ch === "&" || ch === "|" || ch === ";" || ch === "(" || ch === ")" || ch === "<" || ch === ">") break;
+    if (ch === "$" && (source[j2 + 1] === "(" || source[j2 + 1] === "{" || source[j2 + 1] === "[")) {
+      const open4 = source[j2 + 1];
+      const region = open4 === "(" ? scanBalancedStatements(source, budget, j2 + 1, end, depth + 1) : scanBalanced(source, budget, j2 + 1, end, open4, open4 === "{" ? "}" : "]", depth + 1);
+      if (!region.balanced) return null;
+      raw += source.slice(j2, region.end);
+      j2 = region.end;
+      continue;
+    }
+    if (ch === "`") {
+      const backtickEnd = skipBacktick(source, budget, j2, end);
+      if (backtickEnd >= end) return null;
+      raw += source.slice(j2, backtickEnd);
+      j2 = backtickEnd;
+      continue;
+    }
+    if (ch === "\\") {
+      if (j2 + 1 >= end || source[j2 + 1] === "\n") return null;
+      raw += ch + source[j2 + 1];
+      j2 += 2;
+      continue;
+    }
+    if (ch === "'") {
+      const close = source.indexOf("'", j2 + 1);
+      if (close === -1 || close >= end) return null;
+      raw += source.slice(j2, close + 1);
+      j2 = close + 1;
+      continue;
+    }
+    if (ch === '"') {
+      let k = j2 + 1;
+      for (; ; ) {
+        if (k >= end) return null;
+        if (source[k] === "\\") {
+          k += 2;
+          continue;
+        }
+        if (source[k] === '"') break;
+        k++;
+      }
+      raw += source.slice(j2, k + 1);
+      j2 = k + 1;
+      continue;
+    }
+    raw += ch;
+    j2++;
+  }
+  let delimiter2 = "";
+  for (let k = 0; k < raw.length; k++) {
+    const ch = raw[k];
+    if (ch === "\\" && k + 1 < raw.length) {
+      delimiter2 += raw[k + 1];
+      k++;
+    } else if (ch !== '"' && ch !== "'") delimiter2 += ch;
+  }
+  if (delimiter2.length === 0) return null;
+  return {
+    delimiter: delimiter2,
+    stripTabs,
+    end: j2
+  };
+}
+function skipHeredocBodies(source, budget, i2, end, specs) {
+  let j2 = i2;
+  for (const spec of specs) {
+    let lineStart = j2;
+    let closed = false;
+    while (lineStart < end) {
+      budget.progress();
+      let marker = lineStart;
+      if (spec.stripTabs) while (marker < end && source[marker] === "	") marker++;
+      if (source.startsWith(spec.delimiter, marker)) {
+        const after2 = marker + spec.delimiter.length;
+        if (after2 >= end) {
+          j2 = end;
+          closed = true;
+          break;
+        }
+        if (source[after2] === "\n") {
+          j2 = after2 + 1;
+          closed = true;
+          break;
+        }
+        if (source[after2] === ")") {
+          j2 = after2;
+          closed = true;
+          break;
+        }
+      }
+      const newline = source.indexOf("\n", lineStart);
+      if (newline === -1 || newline >= end) break;
+      lineStart = newline + 1;
+    }
+    if (!closed) return end;
+  }
+  return j2;
 }
 function skipDollar(source, budget, i2, end) {
   const next = source[i2 + 1];
@@ -114328,8 +114616,8 @@ function resetStore(store) {
   for (const k of store.map.keys()) store.del(k);
 }
 async function recover({ dir, store, mode = "resync", truncate: truncate2 = true, valueMode = "memory", maxGenerationRetries = 4, attachValueReader, signal, timings }) {
-  const snapPath = path.join(dir, SNAPSHOT_FILE);
-  const walPath = path.join(dir, WAL_FILE);
+  const snapPath = path$1.join(dir, SNAPSHOT_FILE);
+  const walPath = path$1.join(dir, WAL_FILE);
   let delay = GENERATION_RETRY_BASE_MS;
   for (let attempt = 0; ; attempt++) {
     let pass;
@@ -114721,9 +115009,9 @@ async function compact(db) {
   return db._compactDone;
 }
 async function runCompaction(db) {
-  const tmp = path.join(db.dir, "db.snapshot.tmp");
-  const snap = path.join(db.dir, "db.snapshot");
-  const walTmp = path.join(db.dir, "db.wal.tmp");
+  const tmp = path$1.join(db.dir, "db.snapshot.tmp");
+  const snap = path$1.join(db.dir, "db.snapshot");
+  const walTmp = path$1.join(db.dir, "db.wal.tmp");
   await db.wal.flush();
   const baseOffset = db.wal.size;
   const snapT0 = performance.now();
@@ -115238,7 +115526,7 @@ async function writeFileAtomic(file2, data, opts = {}) {
     await fs.rm(tmp, { force: true }).catch(() => {
     });
   }
-  await fsyncDir(path.dirname(file2), {
+  await fsyncDir(path$1.dirname(file2), {
     strict: true,
     stats: opts.stats
   });
@@ -115246,7 +115534,7 @@ async function writeFileAtomic(file2, data, opts = {}) {
 async function resolveValueMode(mode, dir, maxMemoryBytes) {
   if (mode !== "auto") return mode;
   if (maxMemoryBytes === null) return "memory";
-  return await fileSize(path.join(dir, "db.snapshot")) + await fileSize(path.join(dir, "db.wal")) > maxMemoryBytes ? "disk" : "memory";
+  return await fileSize(path$1.join(dir, "db.snapshot")) + await fileSize(path$1.join(dir, "db.wal")) > maxMemoryBytes ? "disk" : "memory";
 }
 function createSerializer() {
   let chain = Promise.resolve();
@@ -115303,12 +115591,12 @@ async function backup(deps, destDir, opts = {}) {
   }
 }
 async function copyBackupAtomic(deps, destDir) {
-  const parent = path.dirname(destDir);
-  const base = path.basename(destDir);
-  const tmp = path.join(parent, `.${base}.backup-tmp-${process.pid}-${++backupTmpSeq}`);
-  const aside = path.join(parent, `.${base}.backup-old-${process.pid}-${++backupTmpSeq}`);
+  const parent = path$1.dirname(destDir);
+  const base = path$1.basename(destDir);
+  const tmp = path$1.join(parent, `.${base}.backup-tmp-${process.pid}-${++backupTmpSeq}`);
+  const aside = path$1.join(parent, `.${base}.backup-old-${process.pid}-${++backupTmpSeq}`);
   await fs.mkdir(parent, { recursive: true });
-  for (const name of await fs.readdir(parent)) if (name.startsWith(`.${base}.backup-tmp-`) || name.startsWith(`.${base}.backup-old-`)) await fs.rm(path.join(parent, name), {
+  for (const name of await fs.readdir(parent)) if (name.startsWith(`.${base}.backup-tmp-`) || name.startsWith(`.${base}.backup-old-`)) await fs.rm(path$1.join(parent, name), {
     recursive: true,
     force: true
   });
@@ -115318,14 +115606,14 @@ async function copyBackupAtomic(deps, destDir) {
     const copied = [];
     for (const name of files) if (await copyIfExists(deps.dir(), name, tmp)) copied.push(name);
     for (const name of copied) {
-      const h2 = await fs.open(path.join(tmp, name), "r");
+      const h2 = await fs.open(path$1.join(tmp, name), "r");
       try {
         await h2.sync();
       } finally {
         await h2.close();
       }
     }
-    const manifest = path.join(tmp, "backup.manifest.json");
+    const manifest = path$1.join(tmp, "backup.manifest.json");
     await fs.writeFile(manifest, JSON.stringify({
       version: 1,
       createdAt: Date.now(),
@@ -115376,9 +115664,9 @@ async function persistentFiles(dir) {
 }
 async function copyIfExists(dir, name, destDir) {
   try {
-    const src = path.join(dir, name);
-    if ((await fs.stat(src)).isDirectory()) await fs.cp(src, path.join(destDir, name), { recursive: true });
-    else await fs.copyFile(src, path.join(destDir, name));
+    const src = path$1.join(dir, name);
+    if ((await fs.stat(src)).isDirectory()) await fs.cp(src, path$1.join(destDir, name), { recursive: true });
+    else await fs.copyFile(src, path$1.join(destDir, name));
     return true;
   } catch (e2) {
     if (e2.code === "ENOENT") return false;
@@ -115861,14 +116149,14 @@ async function readTextDocsImageAsync(r2, yieldEvery = 32768) {
   };
 }
 function generationsDir(dir) {
-  return path.join(dir, GENERATIONS_DIR);
+  return path$1.join(dir, GENERATIONS_DIR);
 }
 function generationDir(dir, id) {
-  return path.join(dir, GENERATIONS_DIR, id);
+  return path$1.join(dir, GENERATIONS_DIR, id);
 }
 async function readCurrent(dir) {
   try {
-    const id = (await fs.readFile(path.join(dir, CURRENT_FILE), "utf8")).trim();
+    const id = (await fs.readFile(path$1.join(dir, CURRENT_FILE), "utf8")).trim();
     return parseGenerationId(id) === null ? null : id;
   } catch {
     return null;
@@ -115906,7 +116194,7 @@ async function listGenerations(dir) {
 async function readManifest(dir, id) {
   let parsed2;
   try {
-    const raw = await fs.readFile(path.join(generationDir(dir, id), MANIFEST_FILE), "utf8");
+    const raw = await fs.readFile(path$1.join(generationDir(dir, id), MANIFEST_FILE), "utf8");
     parsed2 = JSON.parse(raw);
   } catch (e2) {
     if (e2.code === "ENOENT") throw new GenerationCorruptError(`generation ${id}: manifest missing`);
@@ -115922,7 +116210,7 @@ async function readManifest(dir, id) {
   return parsed2;
 }
 async function writeManifest(tmpDir, manifest) {
-  const p2 = path.join(tmpDir, MANIFEST_FILE);
+  const p2 = path$1.join(tmpDir, MANIFEST_FILE);
   const h2 = await fs.open(p2, "w");
   try {
     await h2.writeFile(JSON.stringify(manifest, null, 1), "utf8");
@@ -115934,12 +116222,12 @@ async function writeManifest(tmpDir, manifest) {
 }
 async function publishGeneration(dir, tmpName, id, opts = {}) {
   const gens = generationsDir(dir);
-  await renameReplace(path.join(gens, tmpName), path.join(gens, id));
+  await renameReplace(path$1.join(gens, tmpName), path$1.join(gens, id));
   await fsyncDir(gens, {
     strict: true,
     stats: opts.stats
   });
-  const currentTmp = path.join(dir, `${CURRENT_FILE}.tmp-${process.pid}-${Date.now()}`);
+  const currentTmp = path$1.join(dir, `${CURRENT_FILE}.tmp-${process.pid}-${Date.now()}`);
   try {
     const h2 = await fs.open(currentTmp, "w");
     try {
@@ -115950,7 +116238,7 @@ async function publishGeneration(dir, tmpName, id, opts = {}) {
       await h2.close().catch(() => {
       });
     }
-    await renameReplace(currentTmp, path.join(dir, CURRENT_FILE));
+    await renameReplace(currentTmp, path$1.join(dir, CURRENT_FILE));
   } finally {
     await fs.rm(currentTmp, { force: true }).catch(() => {
     });
@@ -115968,7 +116256,7 @@ async function cleanupGenerations(dir, keep) {
   for (const g2 of await listGenerations(dir)) {
     if (keepAll.has(g2.id)) continue;
     try {
-      await fs.rm(path.join(generationsDir(dir), g2.id), {
+      await fs.rm(path$1.join(generationsDir(dir), g2.id), {
         recursive: true,
         force: true
       });
@@ -115979,7 +116267,7 @@ async function cleanupGenerations(dir, keep) {
   return errors2;
 }
 async function sweepGenerationTemps(dir) {
-  for (const g2 of await listGenerations(dir)) if (g2.tmp) await fs.rm(path.join(generationsDir(dir), g2.id), {
+  for (const g2 of await listGenerations(dir)) if (g2.tmp) await fs.rm(path$1.join(generationsDir(dir), g2.id), {
     recursive: true,
     force: true
   }).catch(() => {
@@ -116670,9 +116958,9 @@ async function openMiniDb(db, opts, hooks) {
   const openT0 = performance.now();
   if (!opts || !opts.dir) throw new TypeError("MiniDb.open: opts.dir is required");
   db.dir = opts.dir;
-  db.walPath = path.join(db.dir, WAL_FILE);
-  db.indexPath = path.join(db.dir, SECONDARY_INDEXES_FILE);
-  db.compoundIndexPath = path.join(db.dir, COMPOUND_INDEXES_FILE);
+  db.walPath = path$1.join(db.dir, WAL_FILE);
+  db.indexPath = path$1.join(db.dir, SECONDARY_INDEXES_FILE);
+  db.compoundIndexPath = path$1.join(db.dir, COMPOUND_INDEXES_FILE);
   db.fsyncPolicy = opts.fsyncPolicy ?? "everysec";
   db.syncIntervalMs = opts.syncIntervalMs ?? 1e3;
   db.codecName = opts.valueCodec ?? "buffer";
@@ -116697,7 +116985,7 @@ async function openMiniDb(db, opts, hooks) {
   db.maintenance = new MaintenanceScheduler({
     dir: db.dir,
     estimateBytes: async (kind) => {
-      const dataBytes = await fileSize(path.join(db.dir, SNAPSHOT_FILE)) + (db.wal?.size ?? 0);
+      const dataBytes = await fileSize(path$1.join(db.dir, SNAPSHOT_FILE)) + (db.wal?.size ?? 0);
       if (kind === "compact") return dataBytes;
       if (kind === "text-build") return dataBytes;
       let derived = 0;
@@ -116712,7 +117000,7 @@ async function openMiniDb(db, opts, hooks) {
     }
   });
   if (!db.readOnly) {
-    db.lock = new LockFile(path.join(db.dir, "db.lock"));
+    db.lock = new LockFile(path$1.join(db.dir, "db.lock"));
     if (!await db.lock.acquire()) if (opts.onLockFail === "readonly") {
       db.readOnly = true;
       db.lock = null;
@@ -116726,13 +117014,13 @@ async function openMiniDb(db, opts, hooks) {
     }
   }
   if (!db.readOnly) {
-    for (const tmp of STALE_TMP_FILES) await fs.rm(path.join(db.dir, tmp), { force: true });
+    for (const tmp of STALE_TMP_FILES) await fs.rm(path$1.join(db.dir, tmp), { force: true });
     for (const f4 of await fs.readdir(db.dir)) {
       if (isStaleTmpFile(f4)) {
-        await fs.rm(path.join(db.dir, f4), { force: true });
+        await fs.rm(path$1.join(db.dir, f4), { force: true });
         continue;
       }
-      if (STALE_POSTINGS_TMP_PATTERN.test(f4)) await fs.rm(path.join(db.dir, f4), { force: true });
+      if (STALE_POSTINGS_TMP_PATTERN.test(f4)) await fs.rm(path$1.join(db.dir, f4), { force: true });
     }
     await sweepGenerationTemps(db.dir);
   }
@@ -116907,8 +117195,8 @@ async function openOrRebuildMiniDb(opts, hooks, open4) {
     if (hooks.onRebuild) hooks.onRebuild(err);
     if (err instanceof SyntaxError) try {
       for (const f4 of SIDECAR_FILES) {
-        await fs.rm(path.join(opts.dir, f4), { force: true });
-        await fs.rm(path.join(opts.dir, `${f4}.tmp`), { force: true });
+        await fs.rm(path$1.join(opts.dir, f4), { force: true });
+        await fs.rm(path$1.join(opts.dir, `${f4}.tmp`), { force: true });
       }
       return await open4(opts);
     } catch {
@@ -117065,7 +117353,7 @@ async function statFingerprint(file2) {
   }
 }
 async function shardFingerprint(dir) {
-  return Promise.all(FINGERPRINT_FILES.map((f4) => statFingerprint(path.join(dir, f4))));
+  return Promise.all(FINGERPRINT_FILES.map((f4) => statFingerprint(path$1.join(dir, f4))));
 }
 function readerWalMark(handle) {
   const ri2 = handle.db.recoveryInfo;
@@ -118034,6 +118322,106 @@ ${items}`;
 function renderTodoItems(todos) {
   return todos.map((todo, index) => `${index + 1}. [${todo.status}] ${todo.title}`).join("\n");
 }
+function contextBudgetBucket(budget) {
+  if (!Number.isFinite(budget.triggerTokens) || budget.triggerTokens <= 0) return void 0;
+  const share = budget.used / budget.triggerTokens;
+  for (const [bucket, threshold] of BUCKET_THRESHOLDS) if (share >= threshold) return bucket;
+}
+function compactionAheadLeadTokens(budget) {
+  return Math.ceil(budget.maxSize * COMPACTION_AHEAD_LEAD_RATIO);
+}
+function shouldRemindCompactionAhead(budget) {
+  if (!Number.isFinite(budget.triggerTokens) || budget.maxSize <= 0) return false;
+  if (budget.used >= budget.triggerTokens) return false;
+  return budget.triggerTokens - budget.used <= compactionAheadLeadTokens(budget);
+}
+function renderContextBudgetReminder(budget) {
+  return renderPrompt(context_budget_default, {
+    used_pct: percent(budget.used, budget.maxSize),
+    max_k: thousands(budget.maxSize),
+    trigger_k: thousands(budget.triggerTokens),
+    trigger_pct: percent(budget.triggerTokens, budget.maxSize),
+    kept_k: thousands(COMPACT_USER_MESSAGE_MAX_TOKENS)
+  }).trimEnd();
+}
+function renderCompactionAheadReminder(budget) {
+  return renderPrompt(compaction_ahead_default, {
+    used_pct: percent(budget.used, budget.maxSize),
+    trigger_pct: percent(budget.triggerTokens, budget.maxSize),
+    remaining_k: thousands(Math.max(0, budget.triggerTokens - budget.used)),
+    kept_k: thousands(COMPACT_USER_MESSAGE_MAX_TOKENS)
+  }).trimEnd();
+}
+function isContextBudgetReminder(message) {
+  return message.origin?.kind === "injection" && (message.origin.variant === "context_budget" || message.origin.variant === "compaction_ahead");
+}
+function isCompactionAheadReminder(message) {
+  return message.origin?.kind === "injection" && message.origin.variant === "compaction_ahead";
+}
+function summarizeCompactionAheadFollowUp(history) {
+  let reminderIndex = -1;
+  for (let index = history.length - 1; index >= 0; index -= 1) if (isCompactionAheadReminder(history[index])) {
+    reminderIndex = index;
+    break;
+  }
+  if (reminderIndex < 0) return void 0;
+  let stepCount = 0;
+  let writeCallCount = 0;
+  let bashCallCount = 0;
+  let todoCallCount = 0;
+  for (const message of history.slice(reminderIndex + 1)) {
+    if (message.role !== "assistant") continue;
+    stepCount += 1;
+    for (const toolCall of message.toolCalls) if (WRITE_TOOL_NAMES.has(toolCall.name)) writeCallCount += 1;
+    else if (BASH_TOOL_NAMES.has(toolCall.name)) bashCallCount += 1;
+    else if (TODO_TOOL_NAMES.has(toolCall.name)) todoCallCount += 1;
+  }
+  return {
+    stepCount,
+    writeCallCount,
+    bashCallCount,
+    todoCallCount
+  };
+}
+function percent(part, whole) {
+  if (whole <= 0) return 0;
+  return Math.round(part / whole * 100);
+}
+function thousands(tokens) {
+  return Math.round(tokens / 1e3);
+}
+function renderCompactionInstruction(input) {
+  const customInstruction = input.customInstruction?.trim() ?? "";
+  return renderPrompt(compaction_instruction_default, { custom_instruction_block: customInstruction.length > 0 ? `
+Optional user instruction:
+${customInstruction}
+` : "" }).trimEnd();
+}
+function renderContextRecoveryPointer(pointer) {
+  const windows = pointer.windows;
+  const summarized = windows.length - 1;
+  const lines = windows.map((range, index) => {
+    const label = `window ${String(index + 1)}: lines ${String(range.start)}\u2013${String(range.end)}`;
+    return index === summarized ? `${label}   \u2190 the conversation this note summarizes` : label;
+  });
+  const nextStart = windows[summarized].end + 1;
+  lines.push(`window ${String(windows.length + 1)} (the one you are in now) starts at line ${String(nextStart)} with the \`context.apply_compaction\` record that carries this note \u2014 it is already in your context; no need to read it.`);
+  return renderPrompt(context_recovery_footer_default, {
+    wire_path: pointer.journalPath,
+    window_lines: lines.map((line) => `  ${line}`).join("\n")
+  }).trimEnd();
+}
+function aheadReminderTelemetry(history) {
+  const followUp = summarizeCompactionAheadFollowUp(history);
+  if (followUp === void 0) return { ahead_reminder_delivered: false };
+  return {
+    ahead_reminder_delivered: true,
+    ahead_steps_count: followUp.stepCount,
+    ahead_write_calls_count: followUp.writeCallCount,
+    ahead_bash_calls_count: followUp.bashCallCount,
+    ahead_todo_calls_count: followUp.todoCallCount
+  };
+}
 function findAPIStatusError(error48) {
   let current2 = error48;
   const seen = /* @__PURE__ */ new Set();
@@ -118421,10 +118809,8 @@ ${serialized}
     });
   }
   const compressed = await compressImageContentParts(wrapped, {
-    telemetry: options2.telemetry === void 0 ? void 0 : {
-      client: options2.telemetry,
-      source: "mcp_tool_result"
-    },
+    telemetry: options2.telemetry,
+    telemetrySource: "mcp_tool_result",
     annotate: { persistOriginal: (bytes, mimeType) => persistOriginalImage$1(bytes, mimeType, options2.originalsDir === void 0 ? {} : { dir: options2.originalsDir }) }
   });
   const capped = applyBinaryPartCap(compressed.parts);
@@ -119222,6 +119608,7 @@ function normalizeToolResult(result) {
     spill: result.spill,
     spillExempt: result.spillExempt
   };
+  if (result.stopTurnReason !== void 0) base.stopTurnReason = result.stopTurnReason;
   if (result.truncated === true) base.truncated = true;
   if (typeof result.note === "string" && result.note.length > 0) base.note = result.note;
   if (result.isError === true) return {
@@ -120304,6 +120691,7 @@ function withStatusSnapshot(agent, event) {
 }
 function createKimiHarnessV2(options2) {
   const rpc = new SDKRpcClientV2(options2);
+  rpc.suppressEngineSessionStarted();
   return new KimiHarness(rpc, {
     identity: rpc.identity,
     uiMode: options2.uiMode,
@@ -120443,9 +120831,9 @@ function applyCatalogProvider(config2, options2) {
   };
   return { defaultModel };
 }
-var import_yazl, __filename12, __dirname12, __create2, __defProp3, __getOwnPropDesc2, __getOwnPropNames2, __getProtoOf2, __hasOwnProp2, __esmMin, __commonJSMin, __exportAll, __copyProps2, __toESM2, __require2, _lazyMatch, _match, zeptomatch, _DRIVE_LETTER_START_RE, _UNC_REGEX, _IS_ABSOLUTE_RE, _DRIVE_LETTER_RE, _ROOT_FOLDER_RE, _EXTNAME_RE, _PATH_ROOT_RE, normalize2, join$1, resolve$2, isAbsolute$1, toNamespacedPath, extname$1, relative$1, dirname$3, format$1, basename$1, parse$8, matchesGlob, _path, delimiter, _platforms, mix2, posix$2, win32$1, ErrorCodes, KIMI_ERROR_INFO, KimiError, UNKNOWN_CAPABILITY_MARKER$1, UNKNOWN_CAPABILITY$1, ChatProviderError$1, APIConnectionError$4, APITimeoutError$1, APIStatusError$1, APIContextOverflowError$1, APIRequestTooLargeError$1, APIProviderRateLimitError$1, APIProviderQuotaExhaustedError$1, APIEmptyResponseError$1, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS$1, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS$1, MEDIA_TYPE_FIELD_PATTERN$1, NETWORK_RE$3, TIMEOUT_RE$3, CONTEXT_OVERFLOW_MESSAGE_PATTERNS$1, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS$1, REQUEST_TOO_LARGE_MESSAGE_PATTERNS$1, THINKING_EFFORT_CONFIG_DOCS_URL$1, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS$1, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS$1, STRUCTURAL_REQUEST_MESSAGE_PATTERNS$1, uuid4$2, castToError$2, AnthropicError, APIError$2, APIUserAbortError$2, APIConnectionError$3, APIConnectionTimeoutError$2, BadRequestError$2, AuthenticationError$2, PermissionDeniedError$2, NotFoundError$2, ConflictError$2, UnprocessableEntityError$2, RateLimitError$2, InternalServerError$2, startsWithSchemeRegexp$2, isAbsoluteURL$2, isArray$4, isReadonlyArray$2, validatePositiveInteger$2, safeJSON$2, sleep$7, VERSION$2, isRunningInBrowser$1, getPlatformProperties$1, normalizeArch$1, normalizePlatform$1, _platformHeaders$1, getPlatformHeaders$1, FallbackEncoder$2, default_format$1, default_formatter$1, formatters$1, has$2, hex_table$1, limit$1, encode$12, array_prefix_generators$1, push_to_array$1, toISOString$1, defaults$1, sentinel$1, GRANT_TYPE_JWT_BEARER, GRANT_TYPE_REFRESH_TOKEN, TOKEN_ENDPOINT, OAUTH_API_BETA_HEADER, FEDERATION_BETA_HEADER, MAX_TOKEN_RESPONSE_BYTES, MAX_ERROR_BODY_CHARS, SAFE_ERROR_KEYS, WorkloadIdentityError, TokenCache, readEnv$2, encodeUTF8_$2, decodeUTF8_$2, levelNumbers$2, parseLogLevel$2, noopLogger$2, cachedLoggers$2, formatRequestDetails$2, PROFILE_NAME_PATTERN, loadConfigWithSource, getCredentialsPath, getRootConfigPath, supportsLocalConfigFiles, getActiveProfileName, _LineDecoder_buffer$1, _LineDecoder_carriageReturnIndex$1, LineDecoder$2, _Stream_client$1, Stream$6, SSEDecoder$2, _APIPromise_client$1, APIPromise$2, _AbstractPage_client$1, AbstractPage$1, PagePromise$1, Page$1, PageCursor, checkFileSupport$2, isAsyncIterable$3, multipartFormRequestOptions$1, supportsFormDataMap$1, createForm$1, isNamedBlob$1, addFormValue$1, isBlobLike$2, isFileLike$2, isResponseLike$2, APIResource$2, brand_privateNullableHeaders$2, buildHeaders$2, EMPTY$5, createPathTagFunction$2, path$15, Environments, SDK_HELPER_SYMBOL, Files$4, Models$3, UserProfiles, require_timing_safe_equal, require_base64, require_sha256, import_dist$1, Webhooks$1, Versions$2, Agents, Memories, MemoryVersions, MemoryStores, JSONLDecoder, Batches$3, MODEL_NONSTREAMING_TOKENS, tokenize$1, strip, unstrip, generate$2, partialParse$1, _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY$1, BetaMessageStream, ToolError, DEFAULT_SUMMARY_PROMPT, _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner, DEPRECATED_MODELS$1, MODELS_TO_WARN_WITH_THINKING_ENABLED$1, Messages$3, Events$1, Resources, Events, Threads$2, Sessions$2, Versions$1, Skills$1, Credentials, Vaults, Beta$1, Completions$2, _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY, MessageStream, Batches$2, Messages$2, DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Models$2, _BaseAnthropic_instances, _a$4, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic, BUDGET_THINKING_EFFORTS$1, ADAPTIVE_MAX_EFFORTS$1, LATEST_OPUS_THINKING_EFFORTS$1, BUDGET_PROFILE$1, OPUS_45_PROFILE$1, ADAPTIVE_MAX_PROFILE$1, LATEST_OPUS_PROFILE$1, ALWAYS_ADAPTIVE_PROFILE$1, ALWAYS_ADAPTIVE_MAX_PROFILE$1, FAMILY_FIRST_RE$1, VERSION_FIRST_RE$1, BARE_FAMILY_RE$1, CLAUDE_FAMILY_WORD_RE$1, EMPTY_TOOL_CALL_ID$1, TOOL_CALL_ID_SAFE_CHARS$1, INTERLEAVED_THINKING_BETA$2, CONTEXT_MANAGEMENT_BETA$1, CLEAR_THINKING_EDIT$1, ANTHROPIC_TOOL_CALL_ID_POLICY$1, CEILING_BY_FAMILY_VERSION$1, FALLBACK_MAX_TOKENS$1, CACHE_CONTROL$1, CACHEABLE_TYPES$1, OMITTED_MEDIA_PLACEHOLDER$1, SUPPORTED_B64_MEDIA_TYPES$1, SUPPORTED_B64_VIDEO_TYPES$1, AnthropicStreamedMessage$1, AnthropicChatProvider$1, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS$1, OPENAI_VISION_TOOL_PREFIXES$1, CLAUDE_VISION_TOOL_PREFIXES$1, CLAUDE_THINKING_VISION_TOOL_PREFIXES$1, GEMINI_CATALOGUED_PREFIXES$1, OPENAI_REASONING_CAPABILITY$1, OPENAI_VISION_TOOL_CAPABILITY$1, OPENAI_TEXT_TOOL_CAPABILITY$1, ANTHROPIC_VISION_TOOL_CAPABILITY$1, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY$1, GEMINI_MULTIMODAL_TOOL_CAPABILITY$1, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY$1, OPENAI_LEGACY_CAPABILITY_CATALOG, OPENAI_RESPONSES_CAPABILITY_CATALOG, ANTHROPIC_CAPABILITY_CATALOG, require_retry_operation$1, require_retry$5, require_retry$4, require_p_retry, require_extend, require_package$1, require_util$9, require_common$1, require_retry$3, require_interceptor, require_gaxios, require_src$3, require_bignumber, require_stringify$1, require_parse$6, require_json_bigint, require_gcp_residency, require_colours, require_logging_utils, require_src$2, require_src$1, require_base64_js, require_shared$1, require_crypto$2, require_crypto$1, require_crypto, require_safe_buffer, require_param_bytes_for_alg, require_ecdsa_sig_formatter, require_util$8, require_package, require_shared, require_authclient, require_loginticket, require_oauth2client, require_computeclient, require_idtokenclient, require_envDetect, require_data_stream, require_buffer_equal_constant_time, require_jwa, require_tostring, require_sign_stream, require_verify_stream, require_jws, require_jwsSign, require_getToken, require_errorWithCode, require_getCredentials, require_tokenHandler, require_revokeToken, require_googleToken, require_jwtaccess, require_jwtclient, require_refreshclient, require_impersonated, require_oauth2common, require_stscredentials, require_baseexternalclient, require_filesubjecttokensupplier, require_urlsubjecttokensupplier, require_certificatesubjecttokensupplier, require_identitypoolclient, require_awsrequestsigner, require_defaultawssecuritycredentialssupplier, require_awsclient, require_executable_response, require_pluggable_auth_handler, require_pluggable_auth_client, require_externalclient, require_externalAccountAuthorizedUserClient, require_googleauth, require_iam, require_downscopedclient, require_passthrough, require_src3, require_constants$10, require_buffer_util, require_limiter, require_permessage_deflate$1, require_validation$3, require_receiver$1, require_sender$1, require_event_target, require_extension, require_websocket$1, require_stream, require_subprotocol, require_websocket_server, import_p_retry, import_src3, import_websocket, _defaultBaseGeminiUrl, _defaultBaseVertexUrl, BaseModule, Language, Outcome, FunctionResponseScheduling, Type, Environment, AuthType, HttpElementLocation, ApiSpec, PhishBlockThreshold, Behavior, DynamicRetrievalConfigMode, FunctionCallingConfigMode, ThinkingLevel, PersonGeneration, ProminentPeople, HarmCategory, HarmBlockMethod, HarmBlockThreshold, FinishReason, HarmProbability, HarmSeverity, UrlRetrievalStatus, BlockedReason, TrafficType, Modality, ModelStage, MediaResolution, TuningMode, AdapterSize, JobState, TuningJobState, AggregationMetric, PairwiseChoice, TuningTask, DocumentState, PartMediaResolutionLevel, ToolType, ResourceScope, ServiceTier, FeatureSelectionPreference, EmbeddingApiType, SafetyFilterLevel, ImagePromptLanguage, MaskReferenceMode, ControlReferenceType, SubjectReferenceType, EditMode, SegmentMode, VideoGenerationReferenceType, VideoGenerationMaskMode, VideoCompressionQuality, TuningMethod, FileState, FileSource, TurnCompleteReason, MediaModality, VadSignalType, VoiceActivityType, StartSensitivity, EndSensitivity, ActivityHandling, TurnCoverage, Scale, MusicGenerationMode, LiveMusicPlaybackControl, HttpResponse, GenerateContentResponse, EmbedContentResponse, GenerateImagesResponse, EditImageResponse, UpscaleImageResponse, RecontextImageResponse, SegmentImageResponse, ListModelsResponse, DeleteModelResponse, CountTokensResponse, ComputeTokensResponse, GenerateVideosOperation, ListTuningJobsResponse, CancelTuningJobResponse, DeleteCachedContentResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, UploadToFileSearchStoreResumableResponse, ImportFileOperation, ListFilesResponse, CreateFileResponse, DeleteFileResponse, RegisterFilesResponse, ListBatchJobsResponse, LiveServerMessage, LiveMusicServerMessage, UploadToFileSearchStoreOperation, PagedItem, Pager, Batches$1, Caches, Chats, Chat$1, ApiError, Files$3, CONTENT_TYPE_HEADER, SERVER_TIMEOUT_HEADER, USER_AGENT_HEADER, GOOGLE_API_CLIENT_HEADER, LIBRARY_LABEL, VERTEX_AI_API_DEFAULT_VERSION, GOOGLE_AI_API_DEFAULT_VERSION, DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_HTTP_STATUS_CODES, ApiClient, MCP_LABEL, hasMcpToolUsageFromMcpToTool, McpCallableTool, LiveMusic, LiveMusicSession, FUNCTION_RESPONSE_REQUIRES_ID, Live, defaultLiveSendClientContentParamerters, Session$2, DEFAULT_MAX_REMOTE_CALLS, Models$1, Operations, Tokens, Documents, FileSearchStores, uuid4Internal, uuid4$1, castToError$1, GeminiNextGenAPIClientError, APIError$1, APIUserAbortError$1, APIConnectionError$2, APIConnectionTimeoutError$1, BadRequestError$1, AuthenticationError$1, PermissionDeniedError$1, NotFoundError$1, ConflictError$1, UnprocessableEntityError$1, RateLimitError$1, InternalServerError$1, startsWithSchemeRegexp$1, isAbsoluteURL$1, isArrayInternal, isReadonlyArray$1, validatePositiveInteger$1, safeJSON$1, sleep$1$1, FallbackEncoder$1, VERSION$1, checkFileSupport$1, isAsyncIterable$2, isBlobLike$1, isFileLike$1, isResponseLike$1, APIResource$1, EMPTY$4, createPathTagFunction$1, path$11, BaseInteractions, Interactions, encodeUTF8_$1, decodeUTF8_$1, LineDecoder$1, levelNumbers$1, parseLogLevel$1, noopLogger$1, cachedLoggers$1, formatRequestDetails$1, Stream$2, SSEDecoder$1, APIPromise$1, brand_privateNullableHeaders$1, buildHeaders$1, readEnv$1, _a$3, BaseGeminiNextGenAPIClient, GeminiNextGenAPIClient, GOOGLE_API_KEY_HEADER, REQUIRED_VERTEX_AI_SCOPE, NodeAuth, NodeDownloader, NodeWebSocketFactory, NodeWebSocket, Tunings, MAX_CHUNK_SIZE, MAX_RETRY_COUNT, INITIAL_RETRY_DELAY_MS, DELAY_MULTIPLIER, X_GOOG_UPLOAD_STATUS_HEADER_FIELD, NodeUploader, NodeFiles, LANGUAGE_LABEL_PREFIX, GoogleGenAI, GoogleGenAIStreamedMessage$1, NETWORK_RE$2, TIMEOUT_RE$2, GoogleGenAIChatProvider$1, TYPE_COMPLETION_SKIP_KEYS$1, CHILD_SCHEMA_SLOTS$1, OBJECT_STRUCTURE_KEYS$1, ARRAY_STRUCTURE_KEYS$1, STRING_STRUCTURE_KEYS$1, NUMERIC_STRUCTURE_KEYS$1, uuid42, castToError, OpenAIError, APIError, APIUserAbortError, APIConnectionError$1, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError, LengthFinishReasonError, ContentFilterFinishReasonError, InvalidWebhookSignatureError, OAuthError$2, SubjectTokenProviderError, startsWithSchemeRegexp, isAbsoluteURL, isArray$3, isReadonlyArray, validatePositiveInteger, safeJSON, sleep$5, VERSION, isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders, FallbackEncoder, default_format, default_formatter, formatters, has$1, hex_table, limit, encode4, array_prefix_generators, push_to_array, toISOString, defaults, sentinel, encodeUTF8_, decodeUTF8_, _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder, levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails, _Stream_client, Stream$1, SSEDecoder, _APIPromise_client, APIPromise, _AbstractPage_client, AbstractPage, PagePromise, Page, CursorPage, ConversationCursorPage, SUBJECT_TOKEN_TYPES, TOKEN_EXCHANGE_GRANT_TYPE, WorkloadIdentityAuth, checkFileSupport, isAsyncIterable$1, maybeMultipartFormRequestOptions, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, isUploadable, hasUploadableValue, addFormValue, isBlobLike, isFileLike, isResponseLike, APIResource, EMPTY$3, createPathTagFunction, path$10, Messages$1, isAssistantMessage, isToolMessage, _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_handleError, EventStream, _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult, DEFAULT_MAX_CHAT_COMPLETIONS, AbstractChatCompletionRunner, ChatCompletionRunner, STR, NUM, ARR, OBJ, NULL, BOOL, NAN, INFINITY, MINUS_INFINITY, INF, SPECIAL, ATOM, COLLECTION, Allow, PartialJSON, MalformedJSON, _parseJSON, partialParse, _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_getAutoParseableResponseFormat, _ChatCompletionStream_accumulateChatCompletion, ChatCompletionStream, ChatCompletionStreamingRunner, Completions$1, Chat, brand_privateNullableHeaders, buildHeaders, Speech, Transcriptions, Translations, Audio, Batches, Assistants, Sessions$1, TranscriptionSessions, Realtime$1, Sessions, Threads$1, ChatKit, Messages, Steps, toFloat32Array, readEnv, _AssistantStream_instances, _a$2, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun, AssistantStream, Runs$1, Threads, Beta, Completions, Content$2, Files$2, Containers, Items, Conversations, Embeddings, OutputItems, Runs, Evals, Files$1, Methods, Graders$1, Alpha, Permissions, Checkpoints$1, Checkpoints, Jobs, FineTuning, GraderModels, Graders, Images, Models, Moderations, Calls, ClientSecrets, Realtime, _ResponseStream_instances, _ResponseStream_params, _ResponseStream_currentResponseSnapshot, _ResponseStream_finalResponse, _ResponseStream_beginRequest, _ResponseStream_addEvent, _ResponseStream_endRequest, _ResponseStream_accumulateResponse, ResponseStream, InputItems, InputTokens, Responses, Content$1, Content, Versions, Skills, Parts, Uploads, allSettledWithThrow, FileBatches, Files, VectorStores, Videos, _Webhooks_instances, _Webhooks_validateSecret, _Webhooks_getRequiredHeader, Webhooks, _OpenAI_instances, _a$1, _OpenAI_encoder, _OpenAI_baseURLOverridden, WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER, OpenAI, KIMI_QUOTA_EXHAUSTED_ERROR_CODES$1, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS$1, TOOL_RESULT_MEDIA_PROMPT$1, TOOL_RESULT_MEDIA_PLACEHOLDER$1, KimiFiles$1, MIME_TO_EXT$1, EXT_TO_MIME$3, KNOWN_REASONING_KEYS$1, DEFAULT_REASONING_KEY$1, ReasoningKeyDialect$1, KIMI_TOOL_CALL_ID_POLICY, KimiStreamedMessage, KimiChatProvider, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING$1, OPENAI_CHAT_TOOL_CALL_ID_POLICY$1, OMITTED_AUDIO_PLACEHOLDER$3, OMITTED_VIDEO_PLACEHOLDER$3, OpenAILegacyStreamedMessage$1, OpenAILegacyChatProvider$1, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY$1, EMBEDDED_STATUS_CODE_RE$1, OMITTED_AUDIO_PLACEHOLDER$2, OMITTED_VIDEO_PLACEHOLDER$2, OpenAIResponsesStreamedMessage$1, OpenAIResponsesChatProvider$1, KNOWN_WIRE_TYPES$1, defaultHandler$1, currentHandler$1, HOOK_EVENT_TYPES$1, require_constants$9, require_utils$3, require_scan, require_parse$5, require_picomatch$1, import_picomatch, ProviderTypeSchema$1, OAuthRefSchema$2, StringRecordSchema$3, ProviderConfigSchema$1, ModelAliasBaseSchema, ModelAliasOverrideSchema, ModelAliasSchema, SecondaryModelConfigSchema$1, ThinkingConfigSchema$1, PermissionModeSchema, PermissionRuleDecisionSchema$1, PermissionRuleScopeSchema$1, PermissionRuleSchema$1, PermissionConfigSchema$1, LoopControlSchema$1, BackgroundConfigSchema, SubagentConfigSchema$1, McpTimeoutMsSchema$1, McpConfigSchema, ImageConfigSchema$1, ModelCatalogConfigSchema$1, ExperimentalConfigSchema$1, HookDefSchema$1, MoonshotServiceConfigSchema$1, ServicesConfigSchema$1, McpServerCommonFields$1, McpServerStdioConfigSchema$1, McpServerHttpConfigSchema$1, McpServerSseConfigSchema$1, McpServerConfigDiscriminatedSchema$1, McpServerConfigSchema$1, KimiConfigSchema, ProviderConfigPatchSchema, ModelAliasPatchSchema, ThinkingConfigPatchSchema, PermissionConfigPatchSchema, LoopControlPatchSchema, BackgroundConfigPatchSchema, SubagentConfigPatchSchema, SecondaryModelConfigPatchSchema, McpConfigPatchSchema, ImageConfigPatchSchema, ModelCatalogConfigPatchSchema, ExperimentalConfigPatchSchema, MoonshotServiceConfigPatchSchema, ServicesConfigPatchSchema, KimiConfigPatchSchema, TRUE_BOOLEAN_ENV_VALUES$1, FALSE_BOOLEAN_ENV_VALUES$1, ENV_MODEL_PROVIDER_KEY$1, ENV_MODEL_ALIAS_KEY$1, ALLOWED_TYPES, DEFAULT_BASE_URL, DEFAULT_MAX_CONTEXT_SIZE$1, DEFAULT_CAPABILITIES$1, SECONDARY_DERIVED_MODEL_ALIAS, SECONDARY_MODEL_ENV, SECONDARY_MODEL_EFFORT_ENV, DEFAULT_CONFIG_FILE_TEXT, ENTRY_KEYED_SECTIONS, MIGRATIONS_FILE$1, THINKING_EFFORT_MAX_TO_HIGH$1, S_IFMT$5, S_IFDIR$3, WorkspaceLocalTomlSchema, CTX_VALUE_MAX_CHARS$1, STACK_MAX_BYTES$1, ENTRY_MAX_BYTES$1, REDACTED_KEYS$1, SAFE_KEY_RE$1, ELLIPSIS$1, TRUNCATED_TAIL$1, REDACTED$1, RAW_SECRET_PATTERNS$1, LEVEL_LABEL$1, ANSI_LEVEL$1, ANSI_RESET$1, PENDING_MAX$1, STDERR_NOTICE_INTERVAL_MS$1, AsyncSerialQueue$1, RotatingFileSink, LOG_LEVEL_RANK, ROOT_SYMBOL, SESSION_LOG_ID, LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, MAIN_LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, nextSessionLogId, RootLoggerImpl, LoggerImpl, log, common, exception, snippet, TYPE_CONSTRUCTOR_OPTIONS, YAML_NODE_KINDS, type$2, failsafe, _null4, bool, int2, YAML_FLOAT_PATTERN, SCIENTIFIC_WITHOUT_DOT, float, core, YAML_DATE_REGEXP, YAML_TIMESTAMP_REGEXP, timestamp, merge2, BASE64_MAP, binary, _hasOwnProperty$3, _toString$2, omap, _toString$1, pairs, _hasOwnProperty$2, set$1, _default3, _hasOwnProperty$1, CONTEXT_FLOW_IN, CONTEXT_FLOW_OUT, CONTEXT_BLOCK_IN, CONTEXT_BLOCK_OUT, CHOMPING_CLIP, CHOMPING_STRIP, CHOMPING_KEEP, PATTERN_NON_PRINTABLE, PATTERN_NON_ASCII_LINE_BREAKS, PATTERN_FLOW_INDICATORS, PATTERN_TAG_HANDLE, PATTERN_TAG_URI, simpleEscapeCheck, simpleEscapeMap, i2, directiveHandlers, loader, _toString, _hasOwnProperty, CHAR_BOM, CHAR_TAB, CHAR_LINE_FEED, CHAR_CARRIAGE_RETURN, CHAR_SPACE, CHAR_EXCLAMATION, CHAR_DOUBLE_QUOTE, CHAR_SHARP, CHAR_PERCENT, CHAR_AMPERSAND, CHAR_SINGLE_QUOTE, CHAR_ASTERISK, CHAR_COMMA, CHAR_MINUS, CHAR_COLON, CHAR_EQUALS, CHAR_GREATER_THAN, CHAR_QUESTION, CHAR_COMMERCIAL_AT, CHAR_LEFT_SQUARE_BRACKET, CHAR_RIGHT_SQUARE_BRACKET, CHAR_GRAVE_ACCENT, CHAR_LEFT_CURLY_BRACKET, CHAR_VERTICAL_LINE, CHAR_RIGHT_CURLY_BRACKET, ESCAPE_SEQUENCES, DEPRECATED_BOOLEANS_SYNTAX, DEPRECATED_BASE60_SYNTAX, QUOTING_TYPE_SINGLE, QUOTING_TYPE_DOUBLE, STYLE_PLAIN, STYLE_SINGLE, STYLE_LITERAL, STYLE_FOLDED, STYLE_DOUBLE, dumper, load$2, require_isArguments, require_implementation$2, require_object_keys, require_es_define_property, require_syntax, require_type, require_gOPD, require_gopd, require_define_data_property, require_has_property_descriptors, require_define_properties, require_es_object_atoms, require_es_errors, require_eval, require_range$1, require_ref$1, require_uri$1, require_abs, require_floor$1, require_max, require_min, require_pow, require_round, require_isNaN, require_sign, require_shams$1, require_has_symbols, require_Reflect_getPrototypeOf, require_Object_getPrototypeOf, require_implementation$1, require_function_bind, require_functionCall, require_functionApply, require_reflectApply, require_actualApply, require_call_bind_apply_helpers, require_get, require_get_proto, require_hasown, require_get_intrinsic, require_set_function_length, require_applyBind, require_call_bind, require_call_bound, require_isFinite, require_isInteger, require_toString, require_StringIndexOf, require_StringPad, require_UnicodeEscape, require_floor, require_math_intrinsics, require_helpers$2, require_modulo, require_isCodePoint, require_UTF16EncodeCodePoint, require_isLeadingSurrogate, require_isTrailingSurrogate, require_is_callable, require_for_each, require_shams, require_is_regex, require_safe_regex_test, require_EncodeForRegExpEscape, require_UTF16SurrogatePairToCodePoint, require_CodePointAt, require_StringToCodePoints, require_callBound, require_implementation, require_polyfill, require_shim, import_regexp_escape, FrontmatterError$1, SkillParseError$1, UnsupportedSkillTypeError$1, FENCE$3, METADATA_ALIASES$1, FLAG_DEFINITIONS, FlagResolver, IMAGE_MIME_BY_SUFFIX$1, VIDEO_MIME_BY_SUFFIX$1, TEXT_MIME_BY_SUFFIX$1, NON_TEXT_SUFFIXES$1, ASF_HEADER$1, FTYP_IMAGE_BRANDS$1, FTYP_VIDEO_BRANDS$1, MODEL_ACCEPTED_IMAGE_MIMES$1, ACCEPTED_FORMATS_TEXT$1, UNSUPPORTED_IMAGE_FORMATS$1, BASE64_SNIFF_CHARS$1, decoderReady$1, MAX_IMAGE_EDGE_PX, MAX_IMAGE_EDGE_ENV, IMAGE_BYTE_BUDGET, READ_IMAGE_BYTE_BUDGET_ENV, JPEG_QUALITY_STEPS$1, FALLBACK_EDGES_PX$1, PNG_RESCALE_FLOOR_PX$1, MAX_DECODE_PIXELS$1, MAX_IMAGE_DECODE_BYTES$1, RECODABLE_MIME$1, CAPTION_OPENING$1, CAPTION_PATTERN$1, ImageLimits, RawSubagentProfileSchema, AgentModelPreferenceSchema, RawAgentProfileSchema, AGENTS_MD_RECOMMENDED_MAX_BYTES$1, S_IFMT$4, S_IFREG$2, require_lib$1, require_raw, require_asap, require_a_sync_waterfall, require_lexer, require_object, require_nodes, require_parser2, require_transformer, require_runtime, require_compiler, require_filters, require_loader, require_precompiled_loader, require_readdirp, require_handler, require_chokidar, require_node_loaders, require_loaders, require_tests, require_globals, require_express_app, require_environment, require_precompile_global, require_precompile, require_jinja_compat, env, WINDOWS_NOTES$1, ADDITIONAL_DIRS_SECTION_PROSE$1, SKILLS_SECTION_PROSE$1, agent_default$2, coder_default, explore_default, init_default$2, PROFILE_SOURCES, DEFAULT_INIT_PROMPT$1, DEFAULT_AGENT_PROFILES, AgentProfileSnapshotSchema, AgentProfileCatalogSnapshotSchema, AgentFileParseError$1, AGENT_NAME_PATTERN$1, USER_BRAND_DIRS$3, USER_GENERIC_DIRS$3, PROJECT_BRAND_DIRS$3, PROJECT_GENERIC_DIRS$3, MAX_AGENT_SCAN_DEPTH$1, MAX_SKIP_WARNINGS$1, PROMPT_VARIABLE$1, SYSTEM_MD_FILENAME$1, MCP_NAME_PREFIX$2, MCP_NAME_SEPARATOR$1, MAX_QUALIFIED_LENGTH$1, GLOB_MAGIC$1, SOURCE_PRIORITY, DEFAULT_AGENT_PROFILE_NAME$1, KNOWN_BUILTIN_TOOL_NAMES, SessionAgentProfileCatalog, PLUGIN_SECTIONS_MAX_BYTES$1, noopTelemetryClient, NEVER$1, MAX_TIMER_DELAY_MS$4, VALID_TASK_ID$1, BackgroundTaskPersistence, TERMINAL_STATUSES$1, AgentBackgroundTask, STREAM_DRAIN_GRACE_MS$1, ProcessBackgroundTask, QuestionBackgroundTask$1, MAX_RUNNING_TASKS_ENV$1, MAX_OUTPUT_BYTES$3, NOTIFICATION_FALLBACK_PREVIEW_BYTES$1, MAX_TASK_OUTPUT_BYTES$1, SIGTERM_GRACE_MS$3, USER_INTERRUPT_REASON$1, _ALPHABET, BackgroundManager, DYNAMIC_TOOL_SCHEMA_VARIANT$1, LOADABLE_TOOLS_TRIGGER, TOOLS_ADDED_BLOCK$1, TOOLS_REMOVED_BLOCK$1, UserCancellationError$1, BASE_DELAY_MS$1, MAX_DELAY_MS$1, RETRY_FACTOR$1, JITTER_FACTOR$1, LLMRequestTraceState, todo_list_default$1, TODO_LIST_TOOL_NAME$1, TODO_STORE_KEY, TODO_LIST_WRITE_REMINDER, TodoItemSchema$1, TodoListInputSchema$1, TodoListTool$1, messageTokenEstimateCache$1, MEDIA_TOKEN_ESTIMATE$1, MIN_FLOOR$1, DEFAULT_UNKNOWN_CONTEXT_FALLBACK$1, compaction_instruction_default$1, DEFAULT_COMPACTION_CONFIG$1, DefaultCompactionStrategy$1, COMPACTION_SUMMARY_PREFIX$1, COMPACT_USER_MESSAGE_MAX_TOKENS$1, COMPACT_USER_MESSAGE_HEAD_TOKENS$1, COMPACTION_ELISION_VARIANT$1, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS$1, OVERFLOW_CONTEXT_SAFETY_RATIO$1, OVERFLOW_STATUS_RECOVERY_RATIO$1, CompactionTruncatedError$1, FullCompaction, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS$1, COMPACTION_OVERFLOW_SHRINK_RATIOS$1, MEDIA_PART_MARKERS, DEFAULT_CONFIG, MicroCompaction, systemMonoNowMs$1, SYSTEM_CLOCKS$1, MAX_CLOCK_FILE_BYTES$1, CRON_ID_REGEX$1, ID_REGEX, MAX_ID_ATTEMPTS$1, SessionCronStore, import_retry, MINUTE_RANGE$1, HOUR_RANGE$1, DOM_RANGE$1, MONTH_RANGE$1, DOW_RANGE$1, MS_PER_MINUTE$3, DIGIT_ONLY$1, MONTH_NAMES$1, DAY_NAMES$1, DEFAULT_CRON_JITTER_CONFIG$1, MS_PER_DAY$3, MS_PER_MINUTE$2, DEFAULT_POLL_INTERVAL_MS$1, MAX_COALESCE_ITERATIONS$1, CRON_SCHEDULED$1, CRON_FIRED$1, CRON_MISSED$1, CRON_DELETED$1, STALE_THRESHOLD_MS$1, CronManager, KEEP_OFF_VALUES$1, ConfigState, TOOL_ERROR_STATUS$1, TOOL_EMPTY_STATUS$1, TOOL_EMPTY_ERROR_STATUS$1, TOOL_OUTPUT_EMPTY_TEXT$1, SYNTHETIC_TOOL_RESULT_TEXT, MEDIA_DEGRADED_PLACEHOLDERS$1, MEDIA_STRIPPED_PLACEHOLDERS$1, MEDIA_CONTAINER_KEY_CACHE$1, USER_PROMPT_ORIGIN$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$2, IMPORT_CONTEXT_GUIDANCE$1, ContextMemory, MAX_GOAL_OBJECTIVE_LENGTH$1, MAX_GOAL_COMPLETION_CRITERION_LENGTH$1, GOAL_CANCELLED_REMINDER$1, GOAL_FORK_CLEARED_REMINDER$1, GoalMode, DEFAULT_TIMEOUT_SECONDS$1, KILL_GRACE_MS$1, OptionalStringSchema$1, HookSpecificOutputSchema$1, HookJsonOutputSchema$1, DEFAULT_HOOK_TIMEOUT_SECONDS$1, HookEngine, KaosError, KaosFileExistsError, KaosShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS$1, MINGW_PREFIX_SET$1, detectedEnvironment, CYGPATH_TIMEOUT_MS$1, DRIVE_COLON_RE$1, CYGDRIVE_RE$1, DRIVE_RE$1, VIRTUAL_FS_PREFIXES$1, WIN32_DRIVE_ABSOLUTE_RE$1, bridgeCache$1, BufferedReadable$1, LOGIN_SHELL_ENV_TIMEOUT_MS$1, appliedLoginShellPath$1, isWindows$2, READ_CHUNK_SIZE$1, LocalProcess, LocalKaos, SENSITIVE_BASENAMES$1, SENSITIVE_PATH_SUFFIXES$1, ENV_PREFIX$1, ENV_EXEMPTIONS$1, SENSITIVE_BASENAME_PREFIXES$1, PUBLIC_KEY_BASENAMES$1, SENSITIVE_DOT_VARIANT_SUFFIXES$1, SENSITIVE_DOT_VARIANT_SUFFIX_SET$1, DEFAULT_WORKSPACE_ACCESS_POLICY$1, PathSecurityError$1, DEFAULT_PATH_CLASS$1, GLOB_LITERAL_SPECIAL$1, task_list_default$1, TaskListInputSchema$1, TaskListTool$1, DynamicInjector, GoalInjector, AUTO_MODE_ENTER_REMINDER, AUTO_MODE_EXIT_REMINDER, PermissionModeInjector, PluginSessionStartInjector, PLAN_MODE_DEDUP_MIN_TURNS$1, PLAN_MODE_FULL_REFRESH_TURNS$1, PlanModeInjector, TODO_LIST_REMINDER_VARIANT$1, TODO_LIST_REMINDER_TURNS_SINCE_WRITE$1, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS$1, TodoListReminderInjector, ToolsDiffInjector, ACTIVE_BACKGROUND_TASK_GUIDANCE$1, InjectionManager, AgentSwarmExclusiveDenyPermissionPolicy, AutoModeApprovePermissionPolicy, AutoModeAskUserQuestionDenyPermissionPolicy, DEFAULT_APPROVE_TOOLS$1, DefaultToolApprovePermissionPolicy, ExitPlanModeReviewAskPermissionPolicy, FallbackAskPermissionPolicy, S_IFMT$3, S_IFDIR$2, S_IFREG$1, SensitiveFileAccessAskPermissionPolicy, GitControlPathAccessAskPermissionPolicy, GitCwdWriteApprovePermissionPolicy, GoalStartReviewAskPermissionPolicy, PlanModeGuardDenyPermissionPolicy, PlanModeToolApprovePermissionPolicy, PreToolCallHookPermissionPolicy, SessionApprovalHistoryPermissionPolicy, SwarmModeAgentSwarmApprovePermissionPolicy, USER_CONFIGURED_SCOPES$1, UserConfiguredPermissionPolicy, UserConfiguredDenyPermissionPolicy, UserConfiguredAllowPermissionPolicy, UserConfiguredAskPermissionPolicy, YoloModeApprovePermissionPolicy, PermissionManager, HERO_NAMES$1, MAX_ATTEMPTS$1, PlanMode, migrateV1_0ToV1_1$1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN$1, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS$1, migrateV1_1ToV1_2$1, migrateV1_2ToV1_3$1, migrateV1_3ToV1_4$1, MIGRATIONS$1, InMemoryAgentRecordPersistence, FileSystemAgentRecordPersistence, DEFAULT_THRESHOLD$1, DEFAULT_MAX_CACHE_SIZE$1, BLOBREF_PROTOCOL$2, DATA_URI_HEADER_RE$1, MISSING_MEDIA_PLACEHOLDER$2, BlobStore, AgentRecords, UNDO_BOUNDARY_RECORD_TYPES, ReplayBuilder, check_kimi_code_docs_default$1, PSEUDO_PATH$11, parsed$11, CHECK_KIMI_CODE_DOCS_SKILL$1, custom_theme_default$1, PSEUDO_PATH$10, parsed$10, CUSTOM_THEME_SKILL$1, import_from_cc_codex_default$1, PSEUDO_PATH$9, parsed$9, IMPORT_FROM_CC_CODEX_SKILL$1, mcp_config_default$1, PSEUDO_PATH$8, parsed$8, MCP_CONFIG_SKILL$1, SKILL_default$5, SKILL_default$4, SKILL_default$3, SUB_SKILL_PARENT$1, SUB_SKILL_REVIEW$1, SUB_SKILL_CONSOLIDATE$1, update_config_default$1, PSEUDO_PATH$7, parsed$7, UPDATE_CONFIG_SKILL$1, write_goal_default$1, PSEUDO_PATH$6, parsed$6, WRITE_GOAL_SKILL$1, USER_BRAND_DIRS$2, USER_GENERIC_DIRS$2, PROJECT_BRAND_DIRS$2, PROJECT_GENERIC_DIRS$2, MAX_SKILL_SCAN_DEPTH$2, LISTING_DESC_MAX$1, SessionSkillRegistry, SOURCE_GROUPS$1, graphemeSegmenter$1, SkillManager, enter_reminder_default$1, exit_reminder_default$1, SwarmMode, ToolAccesses$1, require_code$1, require_scope, require_codegen, require_util$7, require_names, require_errors$1, require_boolSchema, require_rules, require_applicability, require_dataType, require_defaults, require_code, require_keyword, require_subschema, require_fast_deep_equal, require_json_schema_traverse, require_resolve, require_validate, require_validation_error, require_ref_error, require_compile, require_data, require_utils$2, require_schemes, require_fast_uri, require_uri, require_core$3, require_id, require_ref, require_core$2, require_limitNumber, require_multipleOf, require_ucs2length, require_limitLength, require_pattern, require_limitProperties, require_required, require_limitItems, require_equal, require_uniqueItems, require_const, require_enum, require_validation$2, require_additionalItems, require_items, require_prefixItems, require_items2020, require_contains, require_dependencies, require_propertyNames, require_additionalProperties, require_properties, require_patternProperties, require_not, require_anyOf, require_oneOf, require_allOf, require_if, require_thenElse, require_applicator$2, require_format$2, require_format$1, require_metadata, require_draft7, require_types$1, require_discriminator, require_json_schema_draft_07, require_ajv, require_dynamicAnchor, require_dynamicRef, require_recursiveAnchor, require_recursiveRef, require_dynamic, require_dependentRequired, require_dependentSchemas, require_limitContains, require_next, require_unevaluatedProperties, require_unevaluatedItems, require_unevaluated$1, require_schema$1, require_applicator$1, require_content$1, require_core$1, require_format, require_meta_data$1, require_validation$1, require_json_schema_2019_09, require__2019, require_draft2020, require_schema, require_applicator, require_unevaluated, require_content, require_core, require_format_annotation, require_meta_data, require_validation, require_json_schema_2020_12, require__2020, require_formats, require_limit, require_dist3, import_ajv, import__2019, import__2020, import_dist, DRAFT_07_AJV$1, DRAFT_2019_AJV$1, DRAFT_2020_AJV$1, DRAFT_2019_KEYWORDS$1, DRAFT_2020_KEYWORDS$1, ToolScheduler$1, GRACE_TIMEOUT_MS, TOOL_OUTPUT_EMPTY$1, TOOL_OUTPUT_NON_TEXT$1, UNEXECUTED_TOOL_CALL_OUTPUT, validators$1, ErrorCode$1, cursorQuerySchema, pageResponseSchema, ISO_8601_REGEX$1, isoDateTimeSchema$1, ENCODING, ENCODING_LEN, RANDOM_LEN, TIME_MAX, ULIDErrorCode, ULIDError, ToolInputDisplaySchema, messageRoleSchema, textContentSchema, toolUseContentSchema, toolResultContentSchema, imageSourceSchema, imageContentSchema, videoContentSchema, fileContentSchema, thinkingContentSchema, messageContentSchema, messageSchema, promptThinkingSchema, promptPermissionModeSchema, promptStatusSchema, promptItemSchema, workspaceIdSchema, workspaceSchema$1, sessionUsageSchema, permissionRuleMatcherSchema, permissionRuleSchema, sessionAgentConfigSchema, sessionAgentConfigPartialSchema, sessionMetadataSchema, sessionPendingInteractionSchema, sessionSchema, providerConfigResponseSchema, configResponseSchema, modelCatalogItemSchema$2, providerCatalogStatusSchema$2, providerCatalogItemSchema$2, providerRefreshChangeSchema$1, providerRefreshFailureSchema$1, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE, tokenUsageSchema$1, finishReasonSchema, usageStatusSchema$1, permissionModeSchema$1, skillSourceSchema, bundledSkillActivationSchema, userPromptOriginSchema, skillActivationOriginSchema, pluginCommandOriginSchema, injectionOriginSchema, shellCommandOriginSchema, compactionSummaryOriginSchema, systemTriggerOriginSchema, taskLifecycleStatusSchema$1, taskOriginSchema, backgroundTaskOriginSchema, cronJobOriginSchema, cronMissedOriginSchema, hookResultOriginSchema, retryOriginSchema, promptOriginSchema, goalStatusSchema, goalActorSchema, goalBudgetReportSchema, goalSnapshotSchema, goalChangeStatsSchema, goalChangeKindSchema, goalChangeSchema, kimiErrorCodeSchema, kimiErrorPayloadSchema, kimiErrorPayloadObjectSchema, taskInfoBaseSchema, processTaskInfoSchema, agentTaskInfoSchema$1, questionTaskInfoSchema, taskInfoSchema, compactionResultSchema, toolUpdateSchema, turnEndReasonSchema$1, turnInterruptReasonSchema, agentPhaseSchema, agentStatusUpdatedEventSchema$1, sessionMetaUpdatedEventSchema, sessionCreatedEventSchema, workspaceCreatedEventSchema, workspaceUpdatedEventSchema, workspaceDeletedEventSchema, sessionWorkChangedEventSchema, sessionStatusChangedEventSchema, configChangedEventSchema, configWarningEventSchema, modelCatalogChangedEventSchema, pluginChangedEventSchema, capabilityChangedEventSchema, goalUpdatedEventSchema, skillActivatedEventSchema, pluginCommandActivatedEventSchema, errorEventSchema$1, warningEventSchema$1, turnStartedEventSchema$1, turnEndedEventSchema$1, turnStepStartedEventSchema, turnStepCompletedEventSchema, turnStepRetryingEventSchema, turnStepInterruptedEventSchema, assistantDeltaEventSchema$1, hookResultEventSchema, thinkingDeltaEventSchema$1, toolCallDeltaEventSchema$1, toolCallStartedEventSchema$1, toolProgressEventSchema$1, shellOutputEventSchema, shellStartedEventSchema, shellCompletedEventSchema, toolResultEventSchema$1, subagentSpawnedEventSchema, subagentStartedEventSchema, subagentSuspendedEventSchema, subagentCompletedEventSchema, subagentFailedEventSchema, compactionStartedEventSchema$1, compactionBlockedEventSchema$1, compactionCancelledEventSchema$1, compactionCompletedEventSchema$1, taskStartedEventSchema, taskTerminatedEventSchema, backgroundTaskStartedEventSchema, backgroundTaskTerminatedEventSchema, cronFiredEventSchema, promptSubmittedEventSchema, promptCompletedEventSchema$1, promptAbortedEventSchema$1, promptSteeredEventSchema, toolListUpdatedReasonSchema, toolListUpdatedEventSchema, mcpServerStatusPayloadSchema, mcpServerStatusEventSchema, eventSchema, sessionCursorSchema, cursorsBySessionSchema, wsEventEnvelopeSchema, wsAckEnvelopeSchema, serverHelloPayloadSchema, serverHelloMessageSchema, agentFilterSchema, clientHelloPayloadSchema, clientHelloMessageSchema, clientHelloAckMessageSchema, watchFsConfigSchema, subscribePayloadSchema, subscribeMessageSchema, subscribeAckPayloadSchema, subscribeAckMessageSchema, unsubscribePayloadSchema, unsubscribeMessageSchema, unsubscribeAckMessageSchema, watchFsAddPayloadSchema, watchFsAddMessageSchema, watchFsRemovePayloadSchema, watchFsRemoveMessageSchema, watchFsAckMessageSchema, abortPayloadSchema, abortMessageSchema, abortAckMessageSchema, terminalAttachPayloadSchema, terminalAttachMessageSchema, terminalAttachAckMessageSchema, terminalDetachPayloadSchema, terminalDetachMessageSchema, terminalDetachAckMessageSchema, terminalInputPayloadSchema, terminalInputMessageSchema, terminalInputAckMessageSchema, terminalResizePayloadSchema, terminalResizeMessageSchema, terminalResizeAckMessageSchema, terminalClosePayloadSchema, terminalCloseMessageSchema, terminalCloseAckMessageSchema, pingPayloadSchema, pingMessageSchema, pongPayloadSchema, pongMessageSchema, resyncRequiredPayloadSchema, resyncRequiredMessageSchema, wsErrorPayloadSchema, wsErrorMessageSchema, terminalOutputPayloadSchema, terminalExitPayloadSchema, clientControlOperations, serverSystemOperations, approvalDecisionSchema, approvalScopeSchema, approvalRequestSchema$1, questionOptionSchema$1, questionItemSchema$1, questionRequestSchema$1, questionAnswerSchema, questionAnswerMethodSchema, toolSourceSchema, toolDescriptorSchema, mcpServerStatusSchema, mcpServerTransportSchema, mcpServerSchema, skillDescriptorSchema, taskKindSchema, taskStatusSchema, taskSchema, fsKindSchema$1, fsGitStatusSchema$1, fsEntrySchema$1, fsSearchHitSchema$1, fsSuggestItemSchema$1, fsGrepMatchSchema$1, fsGrepFileHitSchema$1, fsChangeKindSchema, fsChangeActionSchema, fsChangeEntrySchema, fsListSortSchema$1, fsReadEncodingRequestSchema$1, fsReadEncodingResponseSchema$1, fsOpenInAppIdSchema, fsListManyPartialErrorSchema$1, fsPullRequestSchema$1, metaCapabilitiesSchema, managedProviderStatusSchema$1, managedProviderSummarySchema$1, oauthFlowStatusEnum, oauthFlowStartPendingSchema, oauthFlowStartAuthenticatedSchema, booleanQueryParam, MAX_SESSION_EXPORT_WEB_LOG_BYTES, sessionStatusResponseSchema, sessionWarningSchema, inFlightToolCallSchema, inFlightTurnSchema, snapshotSubagentSchema, fsBrowseEntrySchema$2, activateSkillAttachmentSchema, relativeCwdSchema$1, terminalStatusSchema$1, terminalSchema$1, connectionSchema, keySchema, OAuthCallbackClosedError$1, SUCCESS_HTML$1, ERROR_HTML$1, SafeUrlSchema, OAuthProtectedResourceMetadataSchema, OAuthMetadataSchema, OpenIdProviderMetadataSchema, OpenIdProviderDiscoveryMetadataSchema, OAuthTokensSchema, OAuthErrorResponseSchema, OptionalSafeUrlSchema, OAuthClientMetadataSchema, OAuthClientInformationSchema, OAuthClientInformationFullSchema, OAuthError$1, OAuthUnauthorizedError, OAuthAccessDeniedError, OAuthConnectionError, DeviceCodeTimeoutError, RetryableRefreshError, FileTokenStorage, DIRECT_ERROR_KEYS, NESTED_ERROR_KEYS, RETRYABLE_STATUSES, DEFAULT_HTTP_TIMEOUT_MS, require_polyfills, require_legacy_streams, require_clone$1, require_graceful_fs, require_retry_operation, require_retry$2, require_retry$1, require_signals, require_signal_exit, require_mtime_precision, require_lockfile, require_adapter, import_proper_lockfile, MIN_REFRESH_THRESHOLD_SECONDS, REFRESH_THRESHOLD_RATIO, DEFAULT_DEVICE_CODE_TIMEOUT_MS, defaultSleep, OAuthManager, KIMI_CODE_CUSTOM_HEADERS_ENV, DEFAULT_KIMI_CODE_OAUTH_HOST, KIMI_CODE_FLOW_CONFIG, DEFAULT_KIMI_CODE_BASE_URL, FIXED_POINT_CENTS, MANAGED_KIMI_MODEL_FIELDS, CUSTOM_REGISTRY_MODEL_FIELDS, KIMI_CODE_PLATFORM_ID, KIMI_CODE_PROVIDER_NAME$1, KIMI_CODE_OAUTH_KEY, KIMI_CODE_SCOPED_OAUTH_KEY_PREFIX, ManagedKimiCodeModelsAuthError, SHARED_DEFAULT_BASE_URLS, KIMI_REGION_PROFILES, KIMI_REGION_MARKER_FILENAME, managedUserInfoPhoneSchema, managedUserInfoSchema, managedUserInfoOkSchema, managedUserInfoErrorSchema, OPEN_PLATFORMS, OpenPlatformApiError, CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT, CUSTOM_REGISTRY_DEFAULT_CAPABILITIES, ALLOWED_PROVIDER_TYPES, CustomRegistryApiError, KimiOAuthToolkit, REQUEST_TIMEOUT_MS, OAuthTokenTransaction, TransactionLock, transactionLock, JsonFileStore, TOKENS_SUFFIX$1, CLIENT_SUFFIX$1, DISCOVERY_SUFFIX$1, META_SUFFIX$1, PASSIVE_REDIRECT_URI$1, McpOAuthClientProvider$1, crypto$4, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, RELATED_TASK_META_KEY, AssertObjectSchema, ProgressTokenSchema, CursorSchema, TaskMetadataSchema, RelatedTaskMetadataSchema, RequestMetaSchema, BaseRequestParamsSchema, TaskAugmentedRequestParamsSchema, isTaskAugmentedRequestParams, RequestSchema, NotificationsParamsSchema, NotificationSchema, ResultSchema, RequestIdSchema, JSONRPCRequestSchema, isJSONRPCRequest, JSONRPCNotificationSchema, isJSONRPCNotification, JSONRPCResultResponseSchema, isJSONRPCResultResponse, ErrorCode, JSONRPCErrorResponseSchema, isJSONRPCErrorResponse, JSONRPCMessageSchema, EmptyResultSchema, CancelledNotificationParamsSchema, CancelledNotificationSchema, IconSchema, IconsSchema, BaseMetadataSchema, ImplementationSchema, FormElicitationCapabilitySchema, ElicitationCapabilitySchema, ClientTasksCapabilitySchema, ServerTasksCapabilitySchema, ClientCapabilitiesSchema, InitializeRequestParamsSchema, InitializeRequestSchema, ServerCapabilitiesSchema, InitializeResultSchema, InitializedNotificationSchema, isInitializedNotification, PingRequestSchema, ProgressSchema, ProgressNotificationParamsSchema, ProgressNotificationSchema, PaginatedRequestParamsSchema, PaginatedRequestSchema, PaginatedResultSchema, TaskStatusSchema, TaskSchema, CreateTaskResultSchema, TaskStatusNotificationParamsSchema, TaskStatusNotificationSchema, GetTaskRequestSchema, GetTaskResultSchema, GetTaskPayloadRequestSchema, ListTasksRequestSchema, ListTasksResultSchema, CancelTaskRequestSchema, CancelTaskResultSchema, ResourceContentsSchema, TextResourceContentsSchema, Base64Schema, BlobResourceContentsSchema, RoleSchema, AnnotationsSchema, ResourceSchema, ResourceTemplateSchema, ListResourcesRequestSchema, ListResourcesResultSchema, ListResourceTemplatesRequestSchema, ListResourceTemplatesResultSchema, ResourceRequestParamsSchema, ReadResourceRequestParamsSchema, ReadResourceRequestSchema, ReadResourceResultSchema, ResourceListChangedNotificationSchema, SubscribeRequestParamsSchema, SubscribeRequestSchema, UnsubscribeRequestParamsSchema, UnsubscribeRequestSchema, ResourceUpdatedNotificationParamsSchema, ResourceUpdatedNotificationSchema, PromptArgumentSchema, PromptSchema, ListPromptsRequestSchema, ListPromptsResultSchema, GetPromptRequestParamsSchema, GetPromptRequestSchema, TextContentSchema, ImageContentSchema, AudioContentSchema, ToolUseContentSchema, EmbeddedResourceSchema, ResourceLinkSchema, ContentBlockSchema, PromptMessageSchema, GetPromptResultSchema, PromptListChangedNotificationSchema, ToolAnnotationsSchema, ToolExecutionSchema, ToolSchema, ListToolsRequestSchema, ListToolsResultSchema, CallToolResultSchema, CallToolRequestParamsSchema, CallToolRequestSchema, ToolListChangedNotificationSchema, ListChangedOptionsBaseSchema, LoggingLevelSchema, SetLevelRequestParamsSchema, SetLevelRequestSchema, LoggingMessageNotificationParamsSchema, LoggingMessageNotificationSchema, ModelHintSchema, ModelPreferencesSchema, ToolChoiceSchema, ToolResultContentSchema, SamplingContentSchema, SamplingMessageContentBlockSchema, SamplingMessageSchema, CreateMessageRequestParamsSchema, CreateMessageRequestSchema, CreateMessageResultSchema, CreateMessageResultWithToolsSchema, BooleanSchemaSchema, StringSchemaSchema, NumberSchemaSchema, UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema, LegacyTitledEnumSchemaSchema, SingleSelectEnumSchemaSchema, UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema, MultiSelectEnumSchemaSchema, EnumSchemaSchema, PrimitiveSchemaDefinitionSchema, ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema, ElicitRequestParamsSchema, ElicitRequestSchema, ElicitationCompleteNotificationParamsSchema, ElicitationCompleteNotificationSchema, ElicitResultSchema, ResourceTemplateReferenceSchema, PromptReferenceSchema, CompleteRequestParamsSchema, CompleteRequestSchema, CompleteResultSchema, RootSchema, ListRootsRequestSchema, ListRootsResultSchema, RootsListChangedNotificationSchema, McpError, UrlElicitationRequiredError, OAuthError, InvalidRequestError, InvalidClientError, InvalidGrantError, UnauthorizedClientError, UnsupportedGrantTypeError, InvalidScopeError, AccessDeniedError, ServerError, TemporarilyUnavailableError, UnsupportedResponseTypeError, UnsupportedTokenTypeError, InvalidTokenError, MethodNotAllowedError, TooManyRequestsError, InvalidClientMetadataError, InsufficientScopeError, InvalidTargetError, OAUTH_ERRORS, UnauthorizedError, AUTHORIZATION_CODE_RESPONSE_TYPE, AUTHORIZATION_CODE_CHALLENGE_METHOD, REFRESH_AHEAD_MS$1, MAX_TIMER_DELAY_MS$3, McpOAuthService$1, AlreadyAuthorizedError$1, DEFAULT_AUTH_TIMEOUT_MS$3, AUTH_TOOL_TOOL_NAME$1, DESCRIPTION_TEMPLATE$1, DEFAULT_MAX_TOTAL_BYTES$1, MIME_EXTENSION$1, MCP_MAX_OUTPUT_CHARS, MCP_OUTPUT_TRUNCATED_TEXT, MCP_MAX_BINARY_PART_BYTES$1, MCP_MAX_BINARY_PART_CHARS$1, DenyAllPermissionPolicy, GIT_TIMEOUT_MS$2, MAX_DIRTY_FILES$1, MAX_COMMIT_LINE_LENGTH$1, ALLOWED_HOSTS$1, INITIAL_LAUNCH_LIMIT$1, INITIAL_LAUNCH_INTERVAL_MS$1, RATE_LIMIT_RETRY_BASE_MS$1, RATE_LIMIT_RETRY_FACTOR$1, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$2, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$2, RATE_LIMIT_SUSPENDED_REASON$1, AGENT_SWARM_MAX_CONCURRENCY_ENV$1, SubagentBatch, summary_continuation_default$1, DEFAULT_SUBAGENT_TIMEOUT_MS$1, SUBAGENT_TIMEOUT_ENV$1, SUMMARY_MIN_LENGTH, SUMMARY_CONTINUATION_ATTEMPTS, HOOK_TEXT_PREVIEW_LENGTH, SUBAGENT_MAX_TOKENS_ERROR$1, TOOL_CALL_DISABLED_MESSAGE$1, SUBAGENT_PROMPT_ORIGIN, SIDE_QUESTION_SYSTEM_REMINDER$1, SessionSubagentHost, LlmRequestLogger, task_output_default$1, OUTPUT_PREVIEW_BYTES$2, PAGING_HINT_LINES$2, TaskOutputInputSchema$1, TaskOutputTool$1, task_stop_default$1, TaskStopInputSchema$1, TaskStopTool$1, cron_create_default$1, MAX_PROMPT_BYTES$1, ONE_SHOT_MAX_FUTURE_MS$1, CronCreateInputSchema$1, CronCreateTool$1, cron_delete_default$1, ID_PATTERN$1, CronDeleteInputSchema$1, CronDeleteTool$1, cron_list_default$1, CronListInputSchema$1, MS_PER_DAY$2, PROMPT_PREVIEW_BYTES$1, CronListTool$1, agent_background_disabled_default$1, agent_background_enabled_default$1, agent_default$1, AgentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE$1, AGENT_TOOL_PARAMETERS, AGENT_TOOL_PARAMETERS_NO_MODEL, AgentTool, USER_INTERRUPTED_SUBAGENT_MESSAGE$1, agent_swarm_default$1, DEFAULT_SUBAGENT_TYPE$1, PROMPT_TEMPLATE_PLACEHOLDER$1, MAX_AGENT_SWARM_SUBAGENTS$1, AGENT_SWARM_PARAMETERS$1, AGENT_SWARM_PARAMETERS_NO_MODEL$1, AgentSwarmTool$1, ask_user_default$1, QuestionOptionSchema$1, QuestionItemSchema$1, QUESTION_UNIQUENESS_MESSAGE$1, AskUserQuestionInputBaseSchema$1, AskUserQuestionInputSchemaWithBackground$1, AskUserQuestionInputSchema$1, QUESTION_DISMISSED_MESSAGE$1, QUESTION_UNSUPPORTED_FAILURE_MESSAGE$1, BACKGROUND_DESCRIPTION$1, BACKGROUND_UNAVAILABLE_MESSAGE$1, PARAMETERS_WITH_BACKGROUND$1, PARAMETERS_FOREGROUND_ONLY$1, AskUserQuestionTool$1, skill_tool_default, NestedSkillTooDeepError$1, SkillToolInputSchema$1, SkillTool$1, edit_default$1, EditInputSchema$1, EditTool$1, kr, vr, Os, Br, Pr, zr, q, j, rt, Le, jt, Ne, Ts, Ae, xs, z$2, Mt, b, Qt, Bt, _, A2, g, yi, De, L, w, Ri, bi, Ls, _i, Z2, gi, Ie, Jt, yt, C, te, Ur, Hr, Wr, Gr, Ce, Oi, Zr, Yr, D, Vr, ot, H, ee, m2, xi, J, Li, Ii, Ci, se, Fe, Ut, Ht, Ni, Pt, ht, U, nt, Y2, zt, Ai, Q, ie, Di, ke, Rt, ve, bt, _t, Me, tt, Wt, $r, As, Ds, Is, Cs, Fs, Xr, re, K, jr, M, Qr, vs, Jr, ki, Ot, Gt, vi, ne, Be, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ms, en, sn, Bs, rn, nn, Ps, zs, oe, hn, he, Ke, F2, an, Tt, Pi, ln, at, cn, fn, dn, lt, un, mn, pn, zi, En, xt, ct, Sn, yn, Rn, f3, Yt, Lt, gn, Zi, Yi, On, B, Nt, et, Ui, Us, V, ae, ft, Hs, p, it, dt, Hi, At, y2, Ve, $e, Wi, Ws, Gs, le, Gi, Xe, Kt, ut, qe, Dt, je, Qe, Zs, Tn, st, mt, Nn, Ki, An, Dn, It, Vi, Cn, Ys, ce, Je, $i, Fn, kn, Xi, Ks, Js, vn, Xs, qs, js, ji, Qs, fe, ti, Qi, ei, Ji, ts, es, is$3, pt, ii, ss, qi, X, de, si, ri, Mn, ni, ue, di, tr, oi, me, W, Ct, Ft, pe$1, rs, G, ns, hi, er, as, ls, ai, li, ir, os$1, ci, rr, hs, Et, kt, Un, Hn, or, hr, Wn, Gn, fr, dr, ar, ur, mr, pr, Kn, Vn, $n, lr, cs, fs$6, ui, Xn, ds, qn, us, we, wt, Qn, Er, ms, wr, Jn, Sr, ps, yr, $t, Rr, eo, io, Ei, _r, gr, ys, Or, Rs, P$1, bs, _s, Si, Tr, xr, ye, Lr, Nr, Es, St, O$1, wi, Ar, Xt, ws, Ss, gs, Re, be, _e, ge, Oe, no, oo, ho, Dr, qt, Se, Te, ao, lo, co, fo, uo, mo, po, Eo, vt, So, require_pend, require_fd_slicer, require_buffer_crc32, import_yauzl, RG_VERSION$1, DOWNLOAD_TIMEOUT_MS$1, RG_ARCHIVE_SHA256$1, downloadPromise$1, DEFAULT_TIMEOUT_MS$2, MAX_OUTPUT_BYTES$2, VCS_DIRECTORIES_TO_EXCLUDE$2, SENSITIVE_GLOBS_TO_EXCLUDE$2, glob_default$1, GlobInputSchema$1, WINDOWS_PATH_HINT$1, S_IFMT$2, S_IFDIR$1, GlobTool$1, DEFAULT_MAX_CHARS, DEFAULT_MAX_LINE_LENGTH, TRUNCATION_MARKER$1, TRUNCATION_MESSAGE, ToolResultBuilder, grep_default$1, GrepInputSchema$1, RG_MAX_COLUMNS$1, DEFAULT_HEAD_LIMIT$1, MTIME_STAT_CONCURRENCY$1, CONTENT_LINE_RE$1, GrepTool$1, GrepAbortedError$1, read_default$1, MAX_LINES$1, MAX_LINE_LENGTH$1, MAX_BYTES$1, S_IFMT$1, S_IFREG, PositiveLineOffsetSchema$1, TailLineOffsetSchema$1, ReadInputSchema$1, READ_DESCRIPTION$1, ReadTool$1, read_media_default$1, MAX_MEDIA_MEGABYTES$1, ReadMediaFileInputSchema$1, ReadMediaFileTool$1, write_default$1, S_IFMT, S_IFDIR, WriteInputSchema$1, WriteTool$1, create_goal_default$1, CreateGoalToolInputSchema$1, CreateGoalTool$1, get_goal_default$1, GetGoalToolInputSchema$1, GetGoalTool$1, set_goal_budget_default$1, MIN_REASONABLE_TIME_BUDGET_MS$1, MAX_REASONABLE_TIME_BUDGET_MS$1, SetGoalBudgetToolInputSchema$1, SetGoalBudgetTool$1, update_goal_default$1, UpdateGoalToolInputSchema$1, UpdateGoalTool$1, enter_plan_mode_default$1, EnterPlanModeInputSchema$1, EnterPlanModeTool$1, exit_plan_mode_default$1, RESERVED_OPTION_LABELS$1, ExitPlanModeOptionSchema$1, ExitPlanModeInputSchema$1, ExitPlanModeTool$1, SELECT_TOOLS_TOOL_NAME$1, SelectToolsInputSchema$1, DESCRIPTION$1, SelectToolsTool$1, bash_default$1, MS_PER_SECOND$1, DEFAULT_TIMEOUT_S$1, MAX_TIMEOUT_S$1, DEFAULT_BACKGROUND_TIMEOUT_S$1, MAX_BACKGROUND_TIMEOUT_S$1, USER_INTERRUPT_REASON, BashInputSchema$1, SHELL_TIMEOUT_VARS$1, BashTool$1, WINDOWS_NUL_REDIRECT$1, fetch_url_default$1, HttpFetchError$1, FetchURLInputSchema$1, FetchURLTool$1, web_search_default$1, WebSearchInputSchema$1, WebSearchTool$1, SHELL_FOREGROUND_TIMEOUT_S$1, ToolManager, REMINDER_TEXT_1$1, REMINDER_TEXT_3$1, REPEAT_REMINDER_1_START$1, REPEAT_REMINDER_2_START$1, REPEAT_REMINDER_3_START$1, REPEAT_FORCE_STOP_STREAK$1, DEDUP_PLACEHOLDER_RESULT, ToolCallDeduplicator, TOOL_RESULT_MAX_CHARS, TOOL_RESULT_PREVIEW_CHARS, LLM_NOT_SET_MESSAGE$1, GOAL_CONTINUATION_ORIGIN$1, GOAL_RATE_LIMIT_PAUSE_REASON$1, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX$1, GOAL_PROVIDER_AUTH_PAUSE_PREFIX$1, GOAL_PROVIDER_API_PAUSE_PREFIX$1, GOAL_MODEL_CONFIG_PAUSE_PREFIX$1, GOAL_RUNTIME_PAUSE_PREFIX$1, GOAL_PROVIDER_FILTERED_PAUSE_REASON$1, GOAL_CONTINUATION_PROMPT$1, GOAL_STEP_CAP_CONTINUATION_PROMPT$1, TurnFlow, MAX_STEPS_PER_TURN_ENV, MAX_RETRIES_PER_STEP_ENV, KosongLLM, UsageRecorder, LlmRequestRecorder, Agent$4, Protocol, AjvJsonSchemaValidator, ExperimentalClientTasks, Client, ParseError, EventSourceParserStream, DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS, StreamableHTTPError, StreamableHTTPClientTransport, KIMI_MCP_CLIENT_VERSION$1, HttpMcpClient$1, ErrorEvent, __typeError, __accessCheck, __privateGet, __privateAdd, __privateSet, __privateMethod, _readyState, _url2, _redirectUrl, _withCredentials, _fetch, _reconnectInterval, _reconnectTimer, _lastEventId, _controller, _parser, _onError, _onMessage, _onOpen, _EventSource_instances, connect_fn, _onFetchResponse, _onFetchError, getRequestOptions_fn, _onEvent, _onRetryChange, failConnection_fn, scheduleReconnect_fn, _reconnect, EventSource, SseError, SSEClientTransport, SseMcpClient$1, require_symbols, require_timers, require_errors, require_constants$8, require_tree, require_util$6, require_stats, require_diagnostics, require_request$1, require_wrap_handler, require_dispatcher, require_unwrap_handler, require_dispatcher_base, require_connect, require_utils$1, require_constants$7, require_llhttp_wasm, require_llhttp_simd_wasm, require_constants$6, require_global$1, require_encoding, require_infra, require_data_url, require_runtime_features, require_webidl, require_util$5, require_formdata, require_formdata_parser, require_promise, require_body, require_client_h1, require_client_h2, require_client, require_fixed_queue, require_pool_base, require_pool, require_balanced_pool, require_round_robin_pool, require_agent, require_socks5_utils, require_socks5_client, require_socks5_proxy_agent, require_proxy_agent, require_env_http_proxy_agent, require_retry_handler, require_retry_agent, require_h2c_client, require_readable, require_api_request, require_abort_signal, require_api_stream, require_api_pipeline, require_api_upgrade, require_api_connect, require_api, require_mock_errors, require_mock_symbols, require_mock_utils, require_mock_interceptor, require_mock_client, require_mock_call_history, require_mock_pool, require_pending_interceptors_formatter, require_mock_agent, require_snapshot_utils, require_snapshot_recorder, require_snapshot_agent, require_global, require_decorator_handler, require_redirect_handler, require_redirect, require_response_error, require_retry, require_dump, require_dns, require_cache$2, require_date2, require_cache_handler, require_memory_cache_store, require_cache_revalidation_handler, require_cache$1, require_decompress, require_deduplication_handler, require_deduplicate, require_sqlite_cache_store, require_headers, require_response, require_request, require_subresource_integrity, require_fetch, require_util$4, require_cache, require_cachestorage, require_constants$5, require_util$3, require_parse$4, require_cookies, require_events, require_constants$4, require_util$2, require_frame, require_connection, require_permessage_deflate, require_receiver, require_sender, require_websocket, require_websocketerror, require_websocketstream, require_util$1, require_eventsource_stream, require_eventsource, require_undici, require_utils2, require_smartbuffer, require_constants$3, require_util, require_address_error, require_common3, require_constants$2, require_ipv4, require_constants$12, require_helpers$1, require_regular_expressions, require_ipv6, require_ip_address, require_helpers2, require_receivebuffer, require_socksclient, require_build, import_undici, import_build, LOOPBACK_NO_PROXY$1, SOCKS_SCHEMES$1, defaultMakeHttpAgent, defaultMakeSocksAgent, defaultInstallProxyDeps, require_windows, require_mode, require_isexe, require_which, require_path_key, require_resolveCommand, require_escape, require_shebang_regex, require_shebang_command, require_readShebang, require_parse$3, require_enoent, import_cross_spawn, ReadBuffer, DEFAULT_INHERITED_ENV_VARS, StdioClientTransport, STDERR_BUFFER_CAPACITY$1, StdioMcpClient$1, BoundedTail$1, DEFAULT_STARTUP_TIMEOUT_MS$1, MCP_STARTUP_TIMEOUT_ENV$1, MCP_TOOL_TIMEOUT_ENV$1, McpConnectionManager$1, GlobalMcpConfigStore, McpServerRegistry, MAX_WORKDIR_SLUG_LENGTH$1, WORKDIR_KEY_PREFIX$1, HASH_LENGTH$1, WIN_SHAPED$1, appendQueues, MAX_TITLE_LENGTH$1, MAX_LAST_PROMPT_LENGTH$1, SessionSummaryStateSchema, FORKED_SESSION_DROPPED_FILES, SessionStore, BACKGROUND_KEEP_ALIVE_ON_EXIT_ENV, ACTIVE_TURN_CLOSE_TIMEOUT_MS, Session$1, PLUGIN_NAME_REGEX$1, KIMI_PLUGIN_ROOT_PATH$1, KIMI_PLUGIN_DIR_PATH$1, PLUGIN_SYSTEM_PROMPT_MAX_BYTES$1, UNSUPPORTED_RUNTIME_FIELDS$1, INSTALLED_REL$1, EMPTY$2, SHA_RE$1, KIMI_NODE_FALLBACK_SUBCOMMAND$1, PluginManager$1, require_Readability, require_Readability_readerable, import_readability, CHANGED, CLASS_LIST, CUSTOM_ELEMENTS, CONTENT, DATASET, DOCTYPE, DOM_PARSER, END, EVENT_TARGET, GLOBALS, IMAGE, MIME, MUTATION_OBSERVER, NEXT, OWNER_ELEMENT, PREV, PRIVATE, SHEET, START, STYLE, UPGRADE, VALUE$1, _a2, decodeMap, fromCodePoint, htmlDecodeTree, xmlDecodeTree, BinTrieFlags, CharCodes$1, TO_LOWER_BIT, EntityDecoderState, DecodingMode, EntityDecoder, CharCodes, State, QuoteType, Sequences, Tokenizer, formTags, pTag, tableSectionTags, ddtTags, rtpTags, openImpliesClose, voidElements$1, foreignContextElements, htmlIntegrationElements, reNameEnd, Parser$2, esm_exports$2, ElementType, Root, Text$3, Directive, Comment$3, Script, Style, Tag, CDATA$1, Doctype, Node$5, DataNode, Text$2, Comment$2, ProcessingInstruction, NodeWithChildren, CDATA, Document$2, Element$2, defaultOpts, DomHandler, xmlReplacer, xmlCodeMap, getCodePoint, escapeAttribute, escapeText, elementNames, attributeNames, unencodedElements, singleTag, foreignModeIntegrationPoints, foreignElements, Checks, DocumentPosition, MEDIA_KEYS_STRING, MEDIA_KEYS_INT, esm_exports$1, esm_exports, parseFeedDefaultOptions, BLOCK_ELEMENTS, SVG_NAMESPACE, assign$1, create$1, defineProperties, entries, getOwnPropertyDescriptors, keys, setPrototypeOf, $String, getEnd, ignoreCase, knownAdjacent, knownBoundaries, knownSegment, knownSiblings, localCase, setAdjacent, htmlToFragment, shadowRoots, reactive, Classes, customElements, attributeChangedCallback$1, createTrigger, triggerConnected, connectedCallback, triggerDisconnected, disconnectedCallback, CustomElementRegistry, Parser$1, append, attribute, parseFromString, htmlClasses, registerHTMLClass, loopSegment, attrAsJSON, characterDataAsJSON, nonElementAsJSON, documentTypeAsJSON, elementAsJSON, createRecord, queueAttribute, attributeChangedCallback, moCallback, MutationObserverClass, emptyAttributes, setAttribute, removeAttribute, booleanAttribute, numericAttribute, stringAttribute, wm, DOMEventTarget, NodeList, getParentNodeCount, Node$4, replace, ca, esca, pe, escape$1, QUOTE, Attr$1, isConnected, parentElement, previousSibling, nextSibling, nextElementSibling, previousElementSibling, asFragment, before, after, replaceWith, remove, CharacterData$1, CDATASection$1, Comment$1, require_boolbase, require_types, require_parse$2, require_stringify, require_commonjs, import_boolbase, import_commonjs, procedure, attributes, reChars, caseInsensitiveAttributes, attributeRules, whitespace, ZERO, NINE, filters, pseudos, aliases, PLACEHOLDER_ELEMENT, is$2, subselects, DESCENDANT_TOKEN, FLEXIBLE_DESCENDANT_TOKEN, SCOPE_TOKEN, defaultEquals, defaultOptions$2, compile, isArray$2, isTag, existsOne, getAttributeValue, getChildren$1, getName, getParent, getSiblings, getText, hasAttrib, removeSubsets, findAll, findOne, adapter, prepareMatch, matches$1, Text$1, isNode, insert, ParentNode, NonElementParentNode, DocumentFragment$1, DocumentType$1, getInnerHtml, setInnerHtml, esm_default, refs$1, key, prop, handler$2, DOMStringMap, add2, addTokens, update, DOMTokenList, refs, getKeys, updateKeys, handler$1, CSSStyleDeclaration, prototype, BUBBLING_PHASE, AT_TARGET, CAPTURING_PHASE, NONE, GlobalEvent, NamedNodeMap, ShadowRoot$1, attributesHandler, create, isVoid, Element$1, classNames, handler, SVGElement$1, illegalConstructor, Facades, Level0, level0, HTMLElement, tagName$17, HTMLTemplateElement, HTMLHtmlElement, toString3, TextElement, tagName$16, HTMLScriptElement, HTMLFrameElement, tagName$15, HTMLIFrameElement, HTMLObjectElement, HTMLHeadElement, HTMLBodyElement, require_StyleSheet, require_CSSRule, require_CSSStyleRule, require_CSSStyleSheet, require_MediaList, require_CSSImportRule, require_CSSGroupingRule, require_CSSConditionRule, require_CSSMediaRule, require_CSSSupportsRule, require_CSSFontFaceRule, require_CSSHostRule, require_CSSKeyframeRule, require_CSSKeyframesRule, require_CSSValue, require_CSSValueExpression, require_MatcherList, require_CSSDocumentRule, require_parse$1, require_CSSStyleDeclaration, require_clone, import_lib, tagName$14, HTMLStyleElement, HTMLTimeElement, HTMLFieldSetElement, HTMLEmbedElement, HTMLHRElement, HTMLProgressElement, HTMLParagraphElement, HTMLTableElement, HTMLFrameSetElement, HTMLLIElement, HTMLBaseElement, HTMLDataListElement, tagName$13, HTMLInputElement, HTMLParamElement, HTMLMediaElement, HTMLAudioElement, tagName$12, HTMLHeadingElement, HTMLDirectoryElement, HTMLQuoteElement, require_canvas_shim, createCanvas, tagName$11, HTMLCanvasElement, HTMLLegendElement, tagName$10, HTMLOptionElement, HTMLSpanElement, HTMLMeterElement, HTMLVideoElement, HTMLTableCellElement, tagName$9, HTMLTitleElement, HTMLOutputElement, HTMLTableRowElement, HTMLDataElement, HTMLMenuElement, tagName$8, HTMLSelectElement, HTMLBRElement, tagName$7, HTMLButtonElement, HTMLMapElement, HTMLOptGroupElement, HTMLDListElement, tagName$6, HTMLTextAreaElement, HTMLFontElement, HTMLDivElement, tagName$5, HTMLLinkElement, tagName$4, HTMLSlotElement, HTMLFormElement, tagName$3, HTMLImageElement, HTMLPreElement, HTMLUListElement, tagName$2, HTMLMetaElement, HTMLPictureElement, HTMLAreaElement, HTMLOListElement, HTMLTableCaptionElement, tagName$1, HTMLAnchorElement, HTMLLabelElement, HTMLUnknownElement, HTMLModElement, HTMLDetailsElement, tagName, HTMLSourceElement, HTMLTrackElement, HTMLMarqueeElement, HTMLClasses, voidElements, Mime, CustomEvent, InputEvent, ImageClass, deleteContents, Range, isOK, TreeWalker, query, globalExports, window$1, Document$1, createHTMLElement, HTMLDocument, SVGDocument, XMLDocument, DOMParser, parse$3, parseHTML$2, parseHTML$1, DEFAULT_USER_AGENT$1, DEFAULT_MAX_BYTES$1, MAX_REDIRECT_HOPS$1, REDIRECT_STATUSES$1, PRIVATE_ADDRESS_BLOCKLIST$1, LocalFetchURLProvider$1, MoonshotFetchURLProvider$1, MoonshotWebSearchProvider$1, WIRE_PROTOCOL_VERSION$1, SESSION_LOG_REL$1, GLOBAL_LOG_REL$1, ProviderManager, SessionAPIImpl, WORKSPACE_REGISTRY_FILE, WORKSPACE_REGISTRY_VERSION, KIMI_CODE_PROVIDER_NAME, KIMI_CODE_BASE_URL_ENV$1, KIMI_CODE_OAUTH_HOST_ENV$1, KIMI_OAUTH_HOST_ENV$1, WEB_SEARCH_BASE_URL_ENV$1, WEB_SEARCH_API_KEY_ENV$1, WEB_FETCH_BASE_URL_ENV$1, WEB_FETCH_API_KEY_ENV$1, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS, KimiCore, _util$1, IInstantiationService$1, SyncDescriptor$1, disposableTracker$1, FunctionDisposable$1, DisposableStore$1, Disposable$1, ReferenceCollection, DisposableMap, _registry, Emitter$1, Event$2, BridgeClientAPI, ICoreProcessService, ServicesManagedAuthFacade, IApprovalService, IEnvironmentService, IEventService$1, ILogService$1, IQuestionService, WorkspaceNotFoundError, WorkspaceRootNotFoundError, IWorkspaceRegistry, _CoreProcessService, CoreProcessService, EventService$1, DEFAULT_MAX_UPLOAD_BYTES, FileNotFoundError, FileTooLargeError, IFileStore, FileStore, FsPathNotFoundError, FsIsDirectoryError, FsIsBinaryError, FsTooLargeError, FsTooManyResultsError, FsAlreadyExistsError, IFsService, import_ignore, ISessionService, SessionUndoUnavailableError, SessionNotFoundError, FsPathEscapesError, FS_READ_MAX_BYTES$1, FS_BINARY_SAMPLE_BYTES$1, FS_BINARY_NONPRINTABLE_FRACTION$1, HIDDEN_NAME_RE$1, MACOS_NOISE$1, FsService, EXT_TO_MIME$2, EXT_TO_LANGUAGE$1, FsGrepTimeoutError, IFsSearchService, SEARCH_HARD_CAP$1, GREP_TIMEOUT_MS$1, WALK_MAX_DEPTH$1, FsSearchService, FsGitUnavailableError, IFsGitService, DIFF_MAX_BYTES$1, PR_SPAWN_TIMEOUT_MS$1, PULL_REQUEST_TTL_MS$1, FsGitService, FsWatchLimitError, EntryTypes, defaultOptions$1, RECURSIVE_ERROR_CODE, NORMAL_FLOW_ERRORS, ALL_TYPES, DIR_TYPES, FILE_TYPES, isNormalFlowError, wantBigintFsStats, emptyFn, normalizeFilter, ReaddirpStream, STR_DATA, STR_CLOSE, EMPTY_FN, pl, isWindows$1, isMacos, isLinux, isFreeBSD, isIBMi, EVENTS, EV, THROTTLE_MODE_WATCH, statMethods, KEY_LISTENERS, KEY_ERR, KEY_RAW, HANDLER_KEYS, binaryExtensions, isBinaryPath, foreach, addAndConvert, clearItem, delFromSet, isEmptySet, FsWatchInstances, fsWatchBroadcast, setFsWatchListener, FsWatchFileInstances, setFsWatchFileListener, NodeFsHandler, SLASH, SLASH_SLASH, ONE_DOT, TWO_DOTS, STRING_TYPE, BACK_SLASH_RE, DOUBLE_SLASH_RE, DOT_RE, REPLACER_RE, isMatcherObject, unifyPaths, toUnix, normalizePathToUnix, normalizeIgnored, getAbsolutePath, EMPTY_SET, DirEntry, STAT_METHOD_F, STAT_METHOD_L, WatchHelper, FSWatcher, DEFAULT_DEBOUNCE_MS$1, DEFAULT_MAX_CHANGES_PER_WINDOW$1, DEFAULT_MAX_PATHS_PER_CONNECTION, PathReferenceCollection, SessionEntry, FsWatcherService, WorkspaceRegistryService, WorkspaceFsNotAbsoluteError, WorkspaceFsNotFoundError, WorkspaceFsPermissionError, IWorkspaceFsService$1, WorkspaceFsService$1, IAuthSummaryService$1, AuthProvisioningRequiredError$1, AuthTokenMissingError$1, AuthModelNotResolvedError$1, MANAGED_PROVIDER_NAME$1, AuthSummaryService$1, IOAuthService$1, _OAuthService, FlowState, TERMINAL_RETENTION_MS$1, OAuthService$1, IModelCatalogService, ProviderNotFoundError, ModelNotFoundError, _ModelCatalogService, ModelCatalogService, noopEventService, IConfigService$1, ConfigService$1, IMessageService, MessageNotFoundError, IPromptService, PromptNotFoundError, PromptAlreadyCompletedError, DEFAULT_PAGE_SIZE$1, MAX_PAGE_SIZE$1, DEFAULT_UNDO_MESSAGE_PAGE_SIZE, MAX_UNDO_MESSAGE_PAGE_SIZE, CHILD_SESSION_KIND$1, SessionService, BLOBREF_PROTOCOL$1, MISSING_MEDIA_PLACEHOLDER$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$1, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAIN_AGENT_ID$8, TRANSCRIPT_CACHE_LIMIT, MessageService, MAIN_AGENT_ID$7, DISPATCH_LOG_CAP, PromptService, IToolService, MAIN_AGENT_ID$6, ToolService, IMcpService, McpServerNotFoundError, McpService, ISkillService, SkillNotFoundError, SkillNotActivatableError, MAIN_AGENT_ID$5, SkillService, TERMINAL_WIRE_STATUSES, ITaskService$1, TaskNotFoundError, TaskAlreadyFinishedError, MAIN_AGENT_ID$4, DEFAULT_TASK_OUTPUT_PREVIEW_BYTES, TaskService$1, ITerminalService, TerminalNotFoundError, DEFAULT_COLS$1, DEFAULT_ROWS$1, DEFAULT_MAX_BUFFERED_FRAMES$1, TerminalService, NodePtyTerminalBackend, MAIN_AGENT_ID$3, Session, KimiHarness, DEFAULT_SESSION_STARTED_UI_MODE, KimiAuthFacade, MAIN_AGENT_ID$2, SDKRpcClientBase, ClientAPI, SDKRpcClient, MAX_WORKDIR_SLUG_LENGTH, WORKDIR_KEY_PREFIX, HASH_LENGTH, WIN_SHAPED, registeredCodes, retryableCodes, infoOverrides, CoreErrors, AgentLifecycleErrors, AuthErrors, TaskErrors, BugIndicatingError, Error2, CONFIG_INVALID_ERROR_CODE, PROVIDER_API_ERROR_CODE, PROVIDER_FILTERED_ERROR_CODE, PROVIDER_RATE_LIMIT_ERROR_CODE, PROVIDER_AUTH_ERROR_CODE, PROVIDER_CONNECTION_ERROR_CODE, PROVIDER_OVERLOADED_ERROR_CODE, CONTEXT_OVERFLOW_ERROR_CODE, ChatProviderError, APIConnectionError, VideoUploadUnsupportedError, APITimeoutError, APIStatusError, APIContextOverflowError, APIRequestTooLargeError, APIProviderRateLimitError, APIProviderQuotaExhaustedError, APIProviderOverloadedError, APIEmptyResponseError, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS, MEDIA_TYPE_FIELD_PATTERN, NETWORK_RE$1, TIMEOUT_RE$1, CONTEXT_OVERFLOW_MESSAGE_PATTERNS, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS, PROVIDER_OVERLOAD_MESSAGE_PATTERNS, REQUEST_TOO_LARGE_MESSAGE_PATTERNS, THINKING_EFFORT_CONFIG_DOCS_URL, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS, STRUCTURAL_REQUEST_MESSAGE_PATTERNS, ProtocolErrors, ConfigErrors, CapabilityErrors, CronErrors, DebugErrors, EventErrors, EventError, _util, SERVICE_IDENTIFIER_MARK, IInstantiationService, ISO_8601_REGEX, isoDateTimeSchema, IFileService, FILE_ID_REGEX, FileErrors, FileError, FsErrors, FullCompactionErrors, GoalErrors, LoopErrors, McpErrors, ModelCatalogErrors, OsFsErrors, HostFsError, REASONS$1, IHostProcessService, OsProcessErrors, HostProcessErrorCode, HostProcessError, PluginErrors, ProfileErrors, PromptErrors, ModelsDevImportErrors, SessionExportErrors, SessionErrors, SkillErrors, StateErrors, StateError, StorageErrors, StorageError, REASONS, IFileSystemStorageService, TerminalErrors, UsageErrors, WebErrors, WireErrors, WireError, WorkspaceErrors, MAX_CAUSE_DEPTH, toKimiErrorPayload$1, defaultHandler, currentHandler, ErrorCodes$1, UserCancellationError, KIMI_MCP_CLIENT_VERSION, MCP_LIVENESS_PROBE_TIMEOUT_MS, TOKENS_SUFFIX, CLIENT_SUFFIX, DISCOVERY_SUFFIX, META_SUFFIX, PASSIVE_REDIRECT_URI, McpOAuthClientProvider, HttpMcpClient, SseMcpClient, LOOPBACK_NO_PROXY, SOCKS_SCHEMES, STDERR_BUFFER_CAPACITY, StdioMcpClient, RuntimeStdioTransport, BoundedTail, DEFAULT_STARTUP_TIMEOUT_MS, defaultLog$1, McpConnectionManager, SyncDescriptor, LedgerDisposedError, Ledger, disposableTracker, FunctionDisposable, DisposableStore, Disposable, MutableDisposable, Node$1, LinkedList, EventSubscription, Emitter, AsyncEmitter, Event$1, PairIndex, DependencyGraph, CyclicDependencyError, CascadeConflictError, DEFAULT_ABORT_WAIT_MS, DEFAULT_RESOLVE_TIMEOUT_MS, DEFAULT_HISTORY_CAPACITY, CascadeTree, CascadeEngine, _collectionTokens, _collectionTokenSet, _definitionTokenSet, _collectionValidators, CollectionStore, CollectionViewImpl, FiberProtocolError, ServiceRecipeError, _constructionStack, SERVICE_MARK, _eventResolver, FiberRuntime, BasicFiberHandle, PendingFiberHandle, _scopeUnitsTokens, Node, Graph, ServiceCollection, Trace, InstantiationService, _scopeTopology, _scopedRegistry, Scope, WATCH_DEBOUNCE_MS$5, TORN_READ_RETRIES, TORN_READ_RETRY_DELAY_MS, FileStorageService, ILogService, LEVEL_ORDER, FrontmatterError, FENCE$2, SkillParseError, UnsupportedSkillTypeError, FENCE$1, METADATA_ALIASES, FileSkillDiscovery, ISkillDiscovery, IBootstrapOptions, IBootstrapService, StringRecordSchema$2, McpTimeoutMsSchema, McpServerCommonFields, McpServerStdioConfigSchema, McpServerHttpConfigSchema, McpServerSseConfigSchema, McpServerConfigDiscriminatedSchema, McpServerConfigSchema, fsGitStatusSchema, fsPullRequestSchema, IGitService, fsKindSchema, fsEntrySchema, fsSearchHitSchema, fsGrepMatchSchema, fsGrepFileHitSchema, fsListSortSchema, fsReadEncodingRequestSchema, fsReadEncodingResponseSchema, fsListManyPartialErrorSchema, fsSuggestItemSchema, fsSuggestRequestSchema, AppendLogCorruptedError, IAppendLogStore, Service, RUNTIME_DRAIN_TIMEOUT_MS, RuntimeError, RuntimeRegistry, CYGPATH_TIMEOUT_MS, DRIVE_COLON_RE, CYGDRIVE_RE, DRIVE_RE, VIRTUAL_FS_PREFIXES, WIN32_DRIVE_ABSOLUTE_RE, bridgeCache, RuntimeWorkspaceView, SharedRuntimeUnitHostFactory, SharedRuntimeUnitHost, IHostEnvironment, IHostFileSystem, IHostFsWatchService, relativeCwdSchema, terminalStatusSchema, IHostTerminalService, nextGeneration, LocalRuntime, LocalRuntimeProviderFactory, IStandaloneRuntimeFactory, StandaloneRuntimeFactory, IConfigRegistry, IConfigService, TRUE_BOOLEAN_ENV_VALUES, FALSE_BOOLEAN_ENV_VALUES, ConfigSectionContribution, _contributions, BUILTIN_PRODUCT_SKILLS_SECTION, BuiltinProductSkillsConfigSchema, builtinProductSkillsEnvBindings, stripBuiltinProductSkillsEnv, USER_BRAND_DIRS$1, USER_GENERIC_DIRS$1, PROJECT_BRAND_DIRS$1, PROJECT_GENERIC_DIRS$1, SKILL_SOURCE_PRIORITY, PLUGIN_SKILL_SOURCE_ID, BUILTIN_SKILL_SOURCE_ID, IUserFileSkillSource, UserFileSkillSource, IProjectLocalConfigService, ProjectLocalTomlSchema, FileProjectLocalConfigService, StateRegistry, IAppStateService, IWorkspaceStateService, WorkspaceStateService, NOTHING, DRAFTABLE, DRAFT_STATE, errors, O, getPrototypeOf, CONSTRUCTOR, PROTOTYPE, CONFIGURABLE, ENUMERABLE, WRITABLE, VALUE, isDraft, objectCtorString, cachedCtorStrings, has, get, set2, isArray$1, isMap, isSet, isObjectish, isFunction, isBoolean, getProxyDraft, latest, getValue, getFinalValue, dontMutateMethodOverride, PluginMapSet, PluginPatches, PluginArrayMethods, plugins, isPluginLoaded, currentScope, getCurrentScope, createScope, enterScope, isSameScope, EMPTY_LOCATIONS_RESULT, objectTraps, arrayTraps, Immer2, immer, produceWithPatches, applyPatches, DuplicateEventError, Event2, AgentEvent2, EVENT2_REGISTRY, ReplayableStateKeyImpl, StateKeyBuilderImpl, undoableProtocol, MAX_TIMER_DELAY_MS$2, IntervalTimer, TimeoutTimer, IWorkspaceContext, IWorkspaceDirs, WATCH_DEBOUNCE_MS$4, workspaceDirsFileDirsKey, workspaceDirsEphemeralDirsKey, WorkspaceDirsService, MIN_ZERO_BYTES_FOR_UTF16, UTF16BE_BOM, UTF16LE_BOM, UTF8_BOM, FS_BINARY_SAMPLE_BYTES, EXT_TO_MIME$1, EXT_TO_LANGUAGE, nullTelemetryAppender, noopTelemetryService, ITelemetryService, IWorkspaceInstanceManager, IRuntimeResolver, IWorkspaceGitService, VCS_METADATA_DIRS, SuggestTopHeap, FsWireErrorCode, SEARCH_HARD_CAP, GREP_TIMEOUT_MS, SUGGEST_TIMEOUT_MS, SUGGEST_WALK_ABORTED, WALK_MAX_DEPTH, FS_READ_MAX_BYTES, HIDDEN_NAME_RE, MACOS_NOISE, WorkspaceFsService2, RgJsonAccumulator, DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_CHANGES_PER_WINDOW, WorkspaceFsWatchService, WorkspaceFsWatchSubscription, WorkspaceGitService, AGENTS_MD_RECOMMENDED_MAX_BYTES, AGENTS_MD_PLAIN_NAMES, IWorkspaceInstructionsService, WATCH_DEBOUNCE_MS$3, workspaceInstructionsCurrentKey, WorkspaceInstructionsService, DEFAULT_IDENTITY_SLUG, IAgentIdentity, OAuthCallbackClosedError, SUCCESS_HTML, ERROR_HTML, defaultLog, REFRESH_AHEAD_MS, MAX_TIMER_DELAY_MS$1, DEFAULT_AUTH_REQUEST_TIMEOUT_MS, DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS, defaultScheduler, McpOAuthService, AlreadyAuthorizedError, IAtomicDocumentStore, IAtomicTomlDocumentStore, IMcpOAuthStore, CREDENTIALS_SCOPE, McpOAuthStoreAdapter, IMcpOAuthService, AppMcpOAuthService, ISessionManager, ISessionEphemeralMcpServers, MergedMcpConnectionView, ISessionMcpHandle, ISessionContext, IWorkspaceMcpConfigService, IWorkspaceMcpService, WorkspaceMcpService, McpSectionSchema, MCP_STARTUP_TIMEOUT_ENV, MCP_TOOL_TIMEOUT_ENV, mcpEnvBindings, IMcpConfigStore, CONFIG_SCOPE$2, MCP_CONFIG_KEY, textEncoder$6, textDecoder$6, McpConfigStore, NO_ABORT$5, IPluginService, IWorkspaceTrust, WATCH_DEBOUNCE_MS$2, WorkspaceMcpConfigService, NO_ABORT$4, TRUST_SCOPE, workspaceTrustTrustedKey, WorkspaceTrustService, AgentFileParseError, AGENT_NAME_PATTERN, MAX_AGENT_SCAN_DEPTH, MAX_SKIP_WARNINGS, AgentProfileContribution, AGENT_PROFILE_SOURCE_PRIORITY, AgentProfileLoaderBase, DEFAULT_AGENT_PROFILE_NAME, PROMPT_VARIABLE, BUILTIN_AGENT_PROFILE_SOURCE_ID, IBuiltinAgentProfileLoader, system_default, TASK_AGENT_ROLE_PREFIX, WINDOWS_NOTES, ADDITIONAL_DIRS_SECTION_PROSE, SKILLS_SECTION_PROSE, PLUGIN_SECTIONS_PROSE, USER_BRAND_DIRS, USER_GENERIC_DIRS, PROJECT_BRAND_DIRS, PROJECT_GENERIC_DIRS, IUserAgentProfileLoader, IExtraAgentProfileLoader, ExtraAgentProfileLoaderService, IExplicitAgentProfileLoader, ExplicitAgentProfileLoaderService, IPluginAgentProfileLoader, PluginAgentProfileLoaderService, SYSTEM_MD_FILENAME, UserAgentProfileLoaderService, IWorkspaceAgentProfileLoader, WATCH_DEBOUNCE_MS$1, WorkspaceAgentProfileLoaderService, IExplicitFileSkillSource, ExplicitFileSkillSource, IExtraFileSkillSource, ExtraFileSkillSource, IPluginSkillSource, PluginSkillSource, WORKSPACE_ROOT_SKILL_SOURCE_ID, WATCH_DEBOUNCE_MS, IWorkspaceRootSkillSource, WorkspaceRootSkillSource, MAX_SKILL_SCAN_DEPTH, RuntimeSkillDiscovery, EXPERIMENTAL_SECTION, ExperimentalConfigSchema, experimentalFromToml, experimentalToToml, IFlagService, check_kimi_code_docs_default, PSEUDO_PATH$5, parsed$5, CHECK_KIMI_CODE_DOCS_SKILL, custom_theme_default, PSEUDO_PATH$4, parsed$4, CUSTOM_THEME_SKILL, import_from_cc_codex_default, PSEUDO_PATH$3, parsed$3, IMPORT_FROM_CC_CODEX_SKILL, mcp_config_default, PSEUDO_PATH$2, parsed$2, MCP_CONFIG_SKILL, _builtinSkillContributions, SKILL_default$2, SKILL_default$1, SKILL_default, SUB_SKILL_PARENT, SUB_SKILL_REVIEW, SUB_SKILL_CONSOLIDATE, update_config_default, PSEUDO_PATH$1, parsed$1, UPDATE_CONFIG_SKILL, write_goal_default, PSEUDO_PATH, parsed, BUILTIN_SKILLS, IBuiltinSkillSource, BuiltinSkillSource, LISTING_DESC_MAX, InMemorySkillCatalog, SOURCE_GROUPS, graphemeSegmenter, IWorkspaceSkillCatalog, workspaceSkillCatalogContributionsKey, workspaceSkillCatalogMergedKey, WorkspaceSkillCatalogService, PROGRAM_CAPABILITIES, Program, WorkspaceInstance, IAgentProfileRegistry, IEventService, PARENT_SESSION_ID_KEY, CHILD_SESSION_KIND_KEY, CHILD_SESSION_KIND, ISessionIndex, ISessionIndexMirror, IWorkspaceService, IModelService, IProviderService, CTX_VALUE_MAX_CHARS, STACK_MAX_BYTES, ENTRY_MAX_BYTES, REDACTED_KEYS, SAFE_KEY_RE, ELLIPSIS, TRUNCATED_TAIL, REDACTED, RAW_SECRET_PATTERNS, LEVEL_LABEL, ANSI_LEVEL, ANSI_RESET, PENDING_MAX, STDERR_NOTICE_INTERVAL_MS, AsyncSerialQueue, RotatingFileWriter, FileLogWriter, ILogOptions, pendingLogCloses, BoundLogger, AppLogService, IAgentFileHistoryService, FILE_HISTORY_BLOB_PREFIX, IAgentRuntimeBindingService, IAgentRuntimeBindingSeed, IAgentRuntimeService, AgentRuntimeService, AgentModel, AGENT_MODEL_DEFINITIONS, AgentModelContribution, SessionModelContribution, AgentSpaceImpl, IAgentScopeContext, IAgentStateService, IAgentToolExecutorService, IMAGE_MIME_BY_SUFFIX, VIDEO_MIME_BY_SUFFIX, AUDIO_MIME_BY_SUFFIX, IMAGE_EXT_BY_MIME, VIDEO_EXT_BY_MIME, AUDIO_EXT_BY_MIME, KIMI_FILE_SCHEME, MEDIA_PATH_TAG_RE, TurnStarted, TurnStepStarted, TurnStepCompleted, turnStepInterruptedSchema, TurnStepInterrupted, AssistantDelta, ThinkingDelta, ToolCallDelta, contextMessageSchema, loopRecordedEventSchema, contextAppendMessageSchema, ContextAppendMessage, contextAppendLoopEventSchema, ContextAppendLoopEvent, contextClearSchema, ContextClear, contextCompactionBaseShape, contextApplyCompactionSchema, ContextApplyCompaction, contextUndoSchema, ContextUndo, ContextSpliced, turnInputShape, turnPromptSchema, TurnPrompt, turnSteerSchema, TurnSteer, turnCancelSchema, TurnCancel, turnEndedSchema, TurnEnded, turnKey, IEventBus, ISessionEventBus, IBlobStore, MAIN_AGENT_ID$1, IAgentLifecycleService, ISessionWorkspaceContext, IEventDispatcher, backupEntrySchema, fileHistoryTrackedSchema, FileHistoryTracked, fileHistoryCheckpointedSchema, FileHistoryCheckpointed, fileHistoryKey, RETENTION_DOC_SCOPE, touchQueues, contributedFlags, IFlagRegistry, FILE_HISTORY_FLAG_ID, AgentFileHistoryService, LCS_CELL_BUDGET, LCS_AGGREGATE_CELL_BUDGET, LoopError, IAgentLoopService, IAgentPlanService, SESSION_INDEX_KEY, textDecoder$5, META_SCOPE, META_KEY$1, MTIME_SCAN_CONCURRENCY, ISessionAgentProfileCatalogSeed, ISessionMetadata, ISessionSkillCatalogData, ISessionInstructionsProvider, ISessionWorkspaceInfo, ISessionStateService, META_KEY, pendingWrites, sessionMetadataDataKey, SessionMetadata, ISessionToolPolicy, migrateV1_0ToV1_1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS, migrateV1_1ToV1_2, migrateV1_2ToV1_3, migrateV1_3ToV1_4, migrateV1_4ToV1_5, MIGRATIONS, AGENT_WIRE_RECORD_KEY, IAgentActivityView, AgentActivityUpdated, SessionArchived, TEXT_MIME_BY_SUFFIX, NON_TEXT_SUFFIXES, ASF_HEADER, FTYP_IMAGE_BRANDS, FTYP_VIDEO_BRANDS, MODEL_ACCEPTED_IMAGE_MIMES, ACCEPTED_FORMATS_TEXT, UNSUPPORTED_IMAGE_FORMATS, BASE64_SNIFF_CHARS, decoderReady, configuredMaxImageEdgePx, IMAGE_BYTE_BUDGET$1, configuredReadImageByteBudget, JPEG_QUALITY_STEPS, FALLBACK_EDGES_PX, PNG_RESCALE_FLOOR_PX, MAX_DECODE_PIXELS, MAX_IMAGE_DECODE_BYTES, RECODABLE_MIME, CAPTION_OPENING, CAPTION_PATTERN, MAX_TITLE_LENGTH, MAX_LAST_PROMPT_LENGTH, NO_ABORT$3, SESSION_CREATE_RELOAD_SKILL_SOURCES, SessionLifecycleService, WorkspaceInstanceManager, RuntimeResolver, runtimeSetBindingSchema, RuntimeSetBinding, runtimeBindingKey, agentRuntimeBindingKey, AgentRuntimeBindingService, SessionManager, IWireService, BLOBREF_PROTOCOL, IAgentBlobService, WireService, sessionLogRootLevelKey, SessionLogService, TelemetryService, TelemetryContextView, IAgentTelemetryContextService, AgentTelemetryContextService, BootstrapService, IHostClock, HostClockService, ProbeShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS, MINGW_PREFIX_SET, cachedProbe, LOGIN_SHELL_ENV_TIMEOUT_MS, appliedLoginShellPath, HostEnvironmentService, READ_CHUNK_SIZE, HostFileSystem, DEFAULT_IGNORED, NATIVE_RETRY_BASE_MS, NATIVE_RETRY_MAX_MS, NODE_HOST_FS_WATCH_RUNTIME, HostFsWatchHandle, SignalWatchHandle, HostFsWatchService, BufferedReadable, isWindows, HostProcess, HostProcessService, HostTerminalService, DEFAULT_TOOL_RESULT_MAX_CHARS, DEFAULT_TOOL_RESULT_MAX_RETAINED_CHARS, ToolAccesses, MCP_NAME_PREFIX$1, MAX_BACKGROUND_TIMEOUT_S, BashInputSchema, IBashTool, VALID_TASK_ID, TASKS_SCOPE, OUTPUT_LOG_KEY, JSON_SUFFIX, textEncoder$4, textDecoder$3, AgentTaskPersistence, IAgentTaskService, TASK_SECTION, LEGACY_BACKGROUND_SECTION, PrintBackgroundModeSchema, AgentTaskConfigSchema, KEEP_ALIVE_ON_EXIT_ENV, MAX_RUNNING_TASKS_ENV, taskEnvBindings, stripTaskEnv, IAgentToolPolicyService, ToolOutputAccumulator, AgentToolContribution, _agentToolContributions, SENSITIVE_BASENAMES, SENSITIVE_PATH_SUFFIXES, ENV_PREFIX, ENV_EXEMPTIONS, SENSITIVE_BASENAME_PREFIXES, PUBLIC_KEY_BASENAMES, SENSITIVE_DOT_VARIANT_SUFFIXES, SENSITIVE_DOT_VARIANT_SUFFIX_SET, DEFAULT_WORKSPACE_ACCESS_POLICY, PathSecurityError, DEFAULT_PATH_CLASS, GLOB_LITERAL_SPECIAL, bash_default, STREAM_DRAIN_GRACE_MS, ProcessTask, MS_PER_SECOND, SHELL_TIMEOUT_VARS, BashTool, WINDOWS_NUL_REDIRECT, GlobInputSchema, WINDOWS_PATH_HINT, IGlobTool, RG_VERSION, DOWNLOAD_TIMEOUT_MS, RG_ARCHIVE_SHA256, downloadPromise, DEFAULT_TIMEOUT_MS$1, MAX_OUTPUT_BYTES$1, ISessionSkillCatalog, glob_default, VCS_DIRECTORIES_TO_EXCLUDE$1, SENSITIVE_GLOBS_TO_EXCLUDE$1, GlobTool, GrepInputSchema, IGrepTool, grep_default, RG_MAX_COLUMNS, DEFAULT_HEAD_LIMIT, MTIME_STAT_CONCURRENCY, VCS_DIRECTORIES_TO_EXCLUDE, SENSITIVE_GLOBS_TO_EXCLUDE, CONTENT_LINE_RE, GrepTool, GrepAbortedError, MAX_LINES, MAX_LINE_LENGTH, MAX_BYTES, TRANSCODE_MAX_BYTES, PositiveLineOffsetSchema, TailLineOffsetSchema, ReadInputSchema, IReadTool, IAgentToolResultTruncationService, read_default, READ_DESCRIPTION, ReadTool, WriteInputSchema, IWriteTool, write_default, WriteTool, DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_BUFFERED_FRAMES, ISessionTerminalService, SessionTerminalService, TERMINAL_TASK_STATES, TaskCancelledError, ITaskService, RunHandle, DeferHandle, TaskService2, EventBusService, AgentEventBusView, EventService, EventStateContribution, OrderedHookSlot, MAX_DRAIN, HISTORY_TAIL, CycleError, FoldContextImpl, EventDispatcherService, AppStateService, SessionStateService, AgentStateService, UNKNOWN_CAPABILITY, IQueryStore, SESSION_INDEX_MANIFEST, PARENT_INDEX_NAME, WRITE_CHUNK, SCAN_CONCURRENCY, SHARED_SCAN_REUSE_MS, SessionIndexProjector, READ_MODEL_FLAG$1, RECONCILE_INTERVAL_MS, DEGRADED_RETRY_MS, TIE_REPAIR_LIMIT, UNBOUNDED, FileSessionIndex, READ_MODEL_FLAG, FLUSH_INTERVAL_MS, FLUSH_BATCH_SIZE, MAX_PENDING, MAX_CONSECUTIVE_FAILURES, pendingDrains, SessionIndexMirror, SessionMetaUpdated, ISessionActivityView, devToolsAdapter, Mailbox, TARGETLESS_KEY, STATE_IDENTIFIER, WILDCARD, XSTATE_INIT, XSTATE_STOP, symbolObservable, idCounter, executingCustomAction, ProcessingStatus, defaultOptions, Actor, isStateId, machineSnapshotMatches, machineSnapshotHasTag, machineSnapshotCan, machineSnapshotToJSON, machineSnapshotGetMeta, instanceStates, cache$1, EMPTY_OBJECT, toSerializableAction, StateNode, StateMachine, SpecialTargets, AgentActorService, interactionRequestSchema, InteractionRequestEvent, interactionResolvedSchema, InteractionResolvedEvent, RECENTLY_RESOLVED_TTL_MS, RECENTLY_RESOLVED_MAX, interactionActorLogic, IAgentInteractionService, AgentInteractionService, sessionActivityFoldsKey, sessionActivityCurrentKey, SessionActivityView, ISessionOutcomeMirror, IAgentContextMemoryService, IAgentConversationUndoParticipantRegistry, AgentConversationUndoParticipantRegistry, messageTokenEstimateCache, MEDIA_TOKEN_ESTIMATE, SYSTEM_REMINDER_PREFIX, SYSTEM_REMINDER_SUFFIX, COMPACTION_SUMMARY_PREFIX, COMPACT_USER_MESSAGE_MAX_TOKENS, COMPACT_USER_MESSAGE_HEAD_TOKENS, COMPACTION_ELISION_VARIANT, defaultTokenEstimate, TOOL_INTERRUPTED_ON_RESUME_OUTPUT, boundFoldMap, contextMemoryKey, IAgentFullCompactionService, promptAdmission, IAgentPromptService, IAgentConversationUndoService, ContextUndone, AgentConversationUndoService, SessionOutcomeMirror, IAgentTitlePromptSource, AgentTitlePromptSourceService, ISessionTitleService, IOAuthService, IOAuthToolkit, IAuthSummaryService, AuthProvisioningRequiredError, AuthTokenMissingError, AuthModelNotResolvedError, IHostRequestHeaders, providerDefinitions, MAX_GENERATED_TITLE_LENGTH, MAX_TITLE_INPUT_LENGTH, MAX_TITLE_PROMPTS, MAX_TITLE_USER_SEGMENT, MAX_TITLE_FIRST_TURN_ASSISTANT, MAX_TITLE_DIGEST_USER_SEGMENT, MAX_TITLE_DIGEST_ASSISTANT, MAX_TITLE_DIGEST_INPUT_LENGTH, SessionTitleService, TITLE_DIGEST_ELISION_MARKER, sessionToolPolicyStateKey, STATE_KEY, SessionToolPolicyService, _overlays, KEY_VALUE_LINE_PATTERN, BARE_KEY_CHAR_PATTERN, MIGRATIONS_FILE, THINKING_EFFORT_MAX_TO_HIGH, CONFIG_SCOPE$1, CONFIG_SCOPE, ConfigRegistry, ConfigService2, ProtocolSchema, IProtocolAdapterRegistry, PROVIDERS_SECTION, DEFAULT_PROVIDER_SECTION, ENV_MODEL_PROVIDER_KEY, ProviderTypeSchema, OAuthRefSchema$1, ModelSourceSchema, StringRecordSchema$1, ProviderConfigSchema, ProvidersSectionSchema, providersEnvBindings, stripProvidersEnv, providersFromToml, providersToToml, MODELS_SECTION, DEFAULT_MODEL_SECTION, ModelBaseSchema, ModelOverrideSchema, ModelRecordSchema, ModelsSectionSchema, modelsFromToml, modelsToToml, THINKING_SECTION, ThinkingConfigSchema, thinkingEnvBindings, stripThinkingEnv, NO_ABORT$2, ProviderService, protocolBases, CONFIG_DEFAULT_HEADERS_TRAIT, ProtocolAdapterRegistry, IDENTITY_SECTION, IdentityConfigSchema, IDENTITY_NAME_ENV, IDENTITY_SLUG_ENV, identityEnvBindings, AgentIdentityService, ENV_MODEL_ALIAS_KEY, DEFAULT_MAX_CONTEXT_SIZE, DEFAULT_CAPABILITIES, kimiModelEnvOverlay, MIN_FLOOR, DEFAULT_UNKNOWN_CONTEXT_FALLBACK, NO_ABORT$1, ModelService, KEEP_OFF_VALUES, BUDGET_THINKING_EFFORTS, ADAPTIVE_MAX_EFFORTS, LATEST_OPUS_THINKING_EFFORTS, BUDGET_PROFILE, OPUS_45_PROFILE, ADAPTIVE_MAX_PROFILE, LATEST_OPUS_PROFILE, ALWAYS_ADAPTIVE_PROFILE, ALWAYS_ADAPTIVE_MAX_PROFILE, FAMILY_FIRST_RE, VERSION_FIRST_RE, BARE_FAMILY_RE, CLAUDE_FAMILY_WORD_RE, StaticAuthProvider, modelCatalogItemSchema$1, providerCatalogStatusSchema$1, IModelCatalog, TRACE, ResolutionTraceCollector, SECRET_KEY_RE, PROVIDER_OPTION_FIELD, CAPABILITY_KEYS, IModelOAuthTokens, AsyncEventQueue, ModelRequesterImpl, ModelCatalog, IKosongConfigService, BASE_DELAY_MS, MAX_DELAY_MS, RETRY_FACTOR, JITTER_FACTOR, PERSIST_MAX_ATTEMPTS, KosongConfigService, ModelOAuthTokenAdapter, HostRequestHeadersAdapter, providerRefreshChangeSchema, providerRefreshFailureSchema, ModelCatalogChanged, IProviderDiscoveryService, EMPTY_EXCLUSION, ProviderDiscoveryService, PROVIDER_ID_PATTERN, IModelsDevImportService, KNOWN_WIRE_TYPES, BUILT_IN_MODELS_DEV_JSON, MODELS_DEV_URL, CACHE_TTL_MS, UPSTREAM_FETCH_TIMEOUT_MS, cache, inFlight, builtInMemo, fetchImpl, nowImpl, codes, ModelsDevImportService, EMPTY_TOOL_CALL_ID, TOOL_CALL_ID_SAFE_CHARS, INTERLEAVED_THINKING_BETA$1, CONTEXT_MANAGEMENT_BETA, CLEAR_THINKING_EDIT, ANTHROPIC_TOOL_CALL_ID_POLICY, CEILING_BY_FAMILY_VERSION, FALLBACK_MAX_TOKENS, CACHE_CONTROL, CACHEABLE_TYPES, OMITTED_MEDIA_PLACEHOLDER, SUPPORTED_B64_MEDIA_TYPES, SUPPORTED_B64_VIDEO_TYPES, AnthropicStreamedMessage, AnthropicChatProvider, CLAUDE_VISION_TOOL_PREFIXES, CLAUDE_THINKING_VISION_TOOL_PREFIXES, ANTHROPIC_VISION_TOOL_CAPABILITY, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY, GoogleGenAIStreamedMessage, NETWORK_RE, TIMEOUT_RE, GoogleGenAIChatProvider, GEMINI_CATALOGUED_PREFIXES, GEMINI_MULTIMODAL_TOOL_CAPABILITY, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY, TOOL_RESULT_MEDIA_PROMPT, TOOL_RESULT_MEDIA_PLACEHOLDER, OPENAI_REASONING_CAPABILITY, OPENAI_VISION_TOOL_CAPABILITY, OPENAI_TEXT_TOOL_CAPABILITY, OPENAI_VISION_TOOL_PREFIXES, KNOWN_REASONING_KEYS, DEFAULT_REASONING_KEY, ReasoningKeyDialect, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING, OPENAI_CHAT_TOOL_CALL_ID_POLICY, OMITTED_AUDIO_PLACEHOLDER$1, OMITTED_VIDEO_PLACEHOLDER$1, OpenAILegacyStreamedMessage, OpenAILegacyChatProvider, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY, EMBEDDED_STATUS_CODE_RE, OMITTED_AUDIO_PLACEHOLDER, OMITTED_VIDEO_PLACEHOLDER, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS, OpenAIResponsesStreamedMessage, OpenAIResponsesChatProvider, KIMI_QUOTA_EXHAUSTED_ERROR_CODES, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS, KimiFiles, MIME_TO_EXT, EXT_TO_MIME, TYPE_COMPLETION_SKIP_KEYS, CHILD_SCHEMA_SLOTS, OBJECT_STRUCTURE_KEYS, ARRAY_STRUCTURE_KEYS, STRING_STRUCTURE_KEYS, NUMERIC_STRUCTURE_KEYS, KIMI_API_KEY_ENV, KIMI_BASE_URL_ENV, KIMI_DEFAULT_BASE_URL, INTERLEAVED_THINKING_BETA, filesByContext, kimiOpenAITrait, kimiAnthropicTrait, kimiEndpoint, kimiResponsesTrait, AgentProfileRegistryService, _profileContributions, BuiltinAgentProfileLoaderService, BuiltinAgentProfileContributionUnit, PLUGIN_NAME_REGEX, HOOK_EVENT_TYPES, HOOKS_SECTION, HookDefSchema, HooksConfigSchema, hooksFromToml, hooksToToml, KIMI_PLUGIN_ROOT_PATH, KIMI_PLUGIN_DIR_PATH, PLUGIN_SYSTEM_PROMPT_MAX_BYTES, UNSUPPORTED_RUNTIME_FIELDS, INSTALLED_REL, EMPTY$1, SHA_RE, PluginManager, KIMI_NODE_FALLBACK_SUBCOMMAND, require_constants2, require_debug, require_re, require_parse_options, require_identifiers, require_semver$1, require_parse, require_valid$1, require_clean, require_inc, require_diff, require_major, require_minor, require_patch, require_prerelease, require_compare, require_rcompare, require_compare_loose, require_compare_build, require_sort, require_rsort, require_gt, require_lt, require_eq, require_neq, require_gte, require_lte, require_cmp, require_coerce, require_lrucache, require_range, require_comparator, require_satisfies, require_to_comparators, require_max_satisfying, require_min_satisfying, require_min_version, require_valid, require_outside, require_gtr, require_ltr, require_intersects, require_simplify2, require_subset, KIMI_CODE_BASE_URL_ENV, KIMI_CODE_OAUTH_HOST_ENV, KIMI_OAUTH_HOST_ENV, NO_ABORT, PluginService, ICapabilityService, DOWNLOAD_IDLE_TIMEOUT_MS, MAC_PLUGIN_ID, WINDOWS_PLUGIN_ID, APP_BUNDLE, LAUNCHD_LABEL, COMMAND_TIMEOUT_MS, PERMISSIONS_TIMEOUT_MS, DETECT_PROBE_TIMEOUT_MS, WINDOWS_INSTALLER_PROBE_TIMEOUT_MS, WINDOWS_INSTALL_TIMEOUT_MS, DEFAULT_WINDOWS_SYSTEM_ROOT, DEFAULT_WINDOWS_PROGRAM_FILES, WINDOWS_INSTALLER_PROBE_SCRIPT, WINDOWS_DOCTOR_SCRIPT, PLUGIN_ID, PLUGIN_ZIP_PATH, BINARY_CDN_PATH, DEFAULT_DAEMON_BASE_URL, STATUS_TIMEOUT_MS, START_TIMEOUT_MS, START_POLL_INTERVAL_MS, START_POLL_ATTEMPTS, IDLE_PROGRESS, CapabilityService, IFeatureManager, FeatureServiceContribution, FeatureManagerService, CommandContribution, Feature, IFeatureAssemblyService, _featureRecipes, FeatureAssemblyService, IAgentCommandService, AgentCommandService, IDebugLedgerService, IDebugGraphService, DiUnitChanged, IDebugCascadeService, DebugLedgerService, DebugGraphService, DebugCascadeService, NestedSkillTooDeepError, SkillToolInputSchema, ISkillTool, SkillActivated, IAgentSkillService, AgentSkillService, skill_default, _SkillTool, SkillTool, SkillFeature, InMemorySkillDiscovery, skillCatalogContributionsKey, skillCatalogMergedKey, SessionSkillCatalogService, ISessionAgentProfileCatalog, SessionAgentProfileCatalogService, IAgentPermissionGate, IAgentPermissionModeService, IAgentPermissionPolicyService, IAgentPermissionRulesService, IAgentToolApprovalService, AgentPermissionGate, BeforeToolExecuteEventImpl, BeforeToolExecuteEmitter, ISessionApprovalService, PermissionApprovalRequested, PermissionApprovalResolved, AgentToolApprovalService, FlagRegistryService, FlagService, LOOP_CONTROL_SECTION, LOOP_MAX_STEPS_PER_TURN_ENV, LOOP_MAX_ATTEMPTS_PER_STEP_ENV, LOOP_MAX_RETRIES_PER_STEP_ENV, LoopControlSchema, loopControlEnvBindings, stripLoopControlEnv, loopControlToToml, IAgentStepRetryService, turnStepRetryingSchema, TurnStepRetrying, stepRetryLastFailedDriverIdKey, stepRetryFailedAttemptsKey, AgentStepRetryService, ToolCallStarted, ToolProgress, ToolResultEvent, taskStartedSchema, TaskStarted, taskTerminatedSchema, TaskTerminated, TaskTerminatedNotice, TaskNotified, taskWaitDeliveredSchema, TaskWaitDelivered, taskKey, fullCompactionBeginSchema, FullCompactionBegin, fullCompactionCancelSchema, FullCompactionCancel, fullCompactionCompleteSchema, FullCompactionComplete, CompactionStarted, CompactionBlocked, CompactionCancelled, CompactionCompleted, fullCompactionKey, USER_PROMPT_ORIGIN, FULL_COMPACTION_BACKGROUND_ID, activityViewLifecycleKey, activityViewTurnKey, activityViewLastTurnKey, activityViewBackgroundKey, activityViewCurrentKey, AgentActivityView, MutableTurn, IAgentModeMutexService, AgentStatusUpdated, planModeEnterSchema, PlanModeEnter, planModeCancelSchema, PlanModeCancel, planModeExitSchema, PlanModeExit, planRevisionSchema, PlanRevision, planKey, IAgentSwarmService, swarmModeEnterSchema, SwarmModeEnter, swarmModeExitSchema, SwarmModeExit, swarmKey, TOWER_TOOL_NAMES, TOWER_WORKER_PROFILE, TOWER_FLAG_ID, IAgentTowerService, towerModeEnterSchema, TowerModeEnter, towerModeExitSchema, TowerModeExit, towerKey, towerOwnerKey, towerBaseKey, AgentModeMutexService, SIDE_QUESTION_SYSTEM_REMINDER, ISessionBtwService, REMINDER_VARIANT_PRIORITY, reminderActorLogic, IAgentReminderService, AgentReminderService, SessionBtwService, BtwFeature, PLAN_TOOLS, PLAN_ROLE, EnterPlanModeInputSchema, IEnterPlanModeTool, enter_plan_mode_default, EnterPlanModeTool, RESERVED_OPTION_LABELS, ExitPlanModeOptionSchema, ExitPlanModeInputSchema, IExitPlanModeTool, exit_plan_mode_default, ExitPlanModeTool, HERO_NAMES, MAX_ATTEMPTS, plan_mode_exit_reminder_default, plan_mode_full_reminder_default, plan_mode_inline_full_reminder_default, plan_mode_inline_reentry_reminder_default, plan_mode_inline_sparse_reminder_default, plan_mode_reentry_reminder_default, plan_mode_sparse_reminder_default, PLAN_MODE_DEDUP_MIN_TURNS, PLAN_MODE_FULL_REFRESH_TURNS, PLAN_MODE_INJECTION_VARIANT, planWasActiveKey, PlanModeInjection, ExitPlanModeReview, AgentPlanService, ProfileError, IAgentProfileService, DATE_CHANGE_INJECTION_VARIANT, dateChangeActorLogic, IAgentDateChangeService, AgentDateChangeService, DateChangeFeature, PlanFeature, FileHistoryFeature, IExternalHooksRunnerService, DEFAULT_TIMEOUT_SECONDS, KILL_GRACE_MS, OptionalStringSchema, HookSpecificOutputSchema, HookJsonOutputSchema, DEFAULT_HOOK_TIMEOUT_SECONDS, ExternalHooksRunnerService, ISessionExternalHooksService, ISessionSubagentService, HEARTBEAT_INTERVAL_MS, SessionExternalHooksService, IAgentExternalHooksService, StepRequest, MessageStepRequest, ContinuationStepRequest, UserMessageStepRequest, PromptStepRequest, SteerStepRequest, RetryStepRequest, promptAcceptedSchema, PromptAccepted, promptAdmissionKey, ISessionMediaStore, promptCompletedSchema, PromptCompleted, promptAbortedSchema, PromptAborted, promptSteeredSchema, PromptSteered, promptResolutionKey, PromptQueued, PromptSubmitted, PromptStarted, promptLaunchingKey, AgentPromptService, HookResult, externalHooksStopHookContinuationUsedKey, AgentExternalHooksService, ExternalHooksFeature, IDebugEventsService, DebugEventsService, DebugEventsFeature, SWARM_SECTION, SwarmConfigSchema, DEFAULT_SWARM_TIMEOUT_MS, SWARM_TIMEOUT_ENV, swarmEnvBindings, stripSwarmEnv, enter_reminder_default, exit_reminder_default, SWARM_MODE_INJECTION_VARIANT, LEGACY_SWARM_MODE_EXIT_VARIANT, SwarmInjection, AgentSwarmService, ISessionSwarmService, ISessionTokenCountingService, SubagentSpawned, SubagentStarted, SubagentCompleted, SubagentFailed, INITIAL_LAUNCH_LIMIT, INITIAL_LAUNCH_INTERVAL_MS, RATE_LIMIT_RETRY_BASE_MS, RATE_LIMIT_RETRY_FACTOR, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$1, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$1, RATE_LIMIT_SUSPENDED_REASON, AGENT_SWARM_MAX_CONCURRENCY_ENV, AgentRunBatch, SubagentSuspended, RESUMED_PROFILE_FALLBACK, SessionSwarmService, PROMPT_TEMPLATE_PLACEHOLDER, AgentSwarmToolInputSchema, IAgentSwarmTool, SECONDARY_MODEL_FLAG_ID, SUBAGENT_SECTION, SECONDARY_MODEL_SECTION, SubagentConfigSchema, SecondaryModelConfigSchema, DEFAULT_SUBAGENT_TIMEOUT_MS, SUBAGENT_TIMEOUT_ENV, subagentEnvBindings, stripSubagentEnv, PRIMARY_SUBAGENT_MODEL_CHOICE, SECONDARY_MODEL_FORCE_REQUIRES_DEFAULT_MESSAGE, SECONDARY_MODEL_FORCE_EXCLUDES_MODELS_MESSAGE, SECONDARY_MODEL_DEFAULT_MODEL_REQUIRED_MESSAGE, SECONDARY_MODEL_PRIMARY_MODEL_RESERVED_MESSAGE, DEFAULT_PROFILE_NAME, FORK_WITH_RESUME_UNAVAILABLE, FORK_WITH_TYPE_UNAVAILABLE, FORK_WITH_MODEL_UNAVAILABLE, FORK_EXPERIMENTAL_UNAVAILABLE, FORK_CONTEXT_NOTICE, agent_swarm_default, agent_swarm_fork_default, DEFAULT_SUBAGENT_TYPE, AGENT_SWARM_PARAMETERS, AGENT_SWARM_PARAMETERS_NO_MODEL, AgentSwarmTool, SwarmFeature, CreateGoalToolInputSchema, ICreateGoalTool, CRON_MAIN_AGENT_ONLY, GOAL_MAIN_AGENT_ONLY, goal_active_reminder_default, goal_blocked_reminder_default, goal_paused_reminder_default, GOAL_WAIT_FOR_GUIDANCE, GoalInjection, BUDGET_GUIDANCE_NEARING, BUDGET_GUIDANCE_WITHIN, IAgentToolRegistryService, WAIT_FOR_FLAG_ID, ISessionUsageService, IGoalDeadlineScheduler, GoalStatusSchema, GoalActorSchema, GoalBudgetLimitsSchema, goalCreateSchema, GoalCreate, goalUpdateSchema, GoalUpdate, goalClearSchema, GoalClear, goalForkedSchema, GoalForked, GoalUpdated, MAX_GOAL_OBJECTIVE_LENGTH, MAX_GOAL_COMPLETION_CRITERION_LENGTH, GOAL_CANCELLED_REMINDER, GOAL_FORK_CLEARED_REMINDER, GOAL_FORK_CLEARED_REMINDER_NAME, GOAL_CONTINUATION_ORIGIN, GOAL_RATE_LIMIT_PAUSE_REASON, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX, GOAL_PROVIDER_AUTH_PAUSE_PREFIX, GOAL_PROVIDER_API_PAUSE_PREFIX, GOAL_MODEL_CONFIG_PAUSE_PREFIX, GOAL_RUNTIME_PAUSE_PREFIX, GOAL_CONTINUATION_FAILURE_PAUSE_PREFIX, GOAL_PROVIDER_FILTERED_PAUSE_REASON, GOAL_BUDGET_BLOCK_PREFIX, LLM_NOT_SET_MESSAGE, GOAL_BUDGET_STOP_REMINDER_NAME, GOAL_BUDGET_STOP_REMINDER, GOAL_BUDGET_TOOLS_REJECTED_MESSAGE, GOAL_STALE_TOOL_RESULT, GOAL_CONTINUATION_PROMPT, GOAL_STEP_CAP_CONTINUATION_PROMPT, goalActorLogic, IAgentGoalService, AgentGoalService, create_goal_default, CreateGoalTool, GetGoalToolInputSchema, IGetGoalTool, get_goal_default, GetGoalTool, SetGoalBudgetToolInputSchema, ISetGoalBudgetTool, set_goal_budget_default, MIN_REASONABLE_TIME_BUDGET_MS, MAX_REASONABLE_TIME_BUDGET_MS, SetGoalBudgetTool, UpdateGoalToolInputSchema, IUpdateGoalTool, update_goal_default, UpdateGoalTool, GoalDeadlineSchedulerService, GoalFeature, IStaleGuardService, staleGuardRecordedSchema, StaleGuardRecorded, staleGuardClearedSchema, StaleGuardCleared, staleGuardKey, WRITE_OPERATIONS, READ_OPERATIONS, StaleGuardService, StaleGuardFeature, ITowerRateLimitService, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS, TOWER_SPAWN_PAUSE_MS, RateLimitCapacityGovernor, TowerRateLimitService, TowerFindingToolInputSchema, ITowerFindingTool, GIT_TIMEOUT_MS$1, GitError, ADD_PATHS_CHUNK$1, TOWER_ROOT, COMMS_DIR, INBOX_DIR, FINDINGS_DIR, REVIEWS_DIR, MISSIONS_DIR, LOG_DIR, WORKTREES_DIR, STATE_FILE, ACTIVITY_LOG, MISSIONS_INDEX, TOWER_NAME, UNMERGED_CODES, ADD_PATHS_CHUNK, FENCE, TowerProtocolError, FINDING_TYPES, STATUS_EMOJI$1, TowerStore, TOWER_MAIN_AGENT_ONLY, TOWER_MODE_USER_ENABLED_ONLY, finding_default, TowerFindingTool, TowerInboxToolInputSchema, ITowerInboxTool, inbox_default, DEFAULT_LIMIT, TowerInboxTool, TowerInitToolInputSchema, ITowerInitTool, init_default$1, TowerInitTool, TowerMergeToolInputSchema, ITowerMergeTool, merge_default, TowerMergeTool, TowerMissionToolInputSchema, ITowerMissionTool, mission_default, TowerMissionTool, TowerPlanToolInputSchema, ITowerPlanTool, plan_default, TowerPlanTool, TowerReviewToolInputSchema, ITowerReviewTool, review_default, TowerReviewTool, TowerSendToolInputSchema, ITowerSendTool, send_default, TowerSendTool, TowerSpawnToolInputSchema, ITowerSpawnTool, TERMINAL_STATUSES, TaskListInputSchema, ITaskListTool, task_list_default, TaskListTool, TaskOutputInputSchema, ITaskOutputTool, task_output_default, OUTPUT_PREVIEW_BYTES$1, PAGING_HINT_LINES$1, TaskOutputTool, TaskStopInputSchema, ITaskStopTool, task_stop_default, TaskStopTool, WAIT_FOR_MAX_TIMEOUT_S, WaitForInputSchema, IWaitForTool, task_wait_default, OUTPUT_PREVIEW_BYTES, PAGING_HINT_LINES, PROGRESS_INTERVAL_MS, WaitForTool, taskNotificationDeliveryKey, MAX_OUTPUT_BYTES, TERMINAL_OUTPUT_TAIL_BYTES, MAX_TASK_OUTPUT_BYTES, SIGTERM_GRACE_MS, TASK_ID_ALPHABET, SESSION_CLOSED_REASON, NOTIFICATION_FALLBACK_PREVIEW_BYTES, ACTIVE_BACKGROUND_TASK_INJECTION_VARIANT, TASK_RESUME_TERMINATION_VARIANT, ACTIVE_BACKGROUND_TASK_GUIDANCE, TaskNotificationStepRequest, taskGhostsKey, taskScheduledNotificationKeysKey, taskDeliveredNotificationKeysKey, taskActiveTaskReminderPendingKey, AgentTaskService, SubagentTask, spawn_default, TowerSpawnTool, TowerStatusToolInputSchema, ITowerStatusTool, status_default, STATUS_EMOJI, INBOX_COUNT_LIMIT, RECENT_LOG_LINES, TowerStatusTool, TowerTeardownToolInputSchema, ITowerTeardownTool, teardown_default, TowerTeardownTool, summary_continuation_default, tower_worker_overlay_default, TOWER_WORKER_TOOLS, TOWER_WORKER_ROLE, TOWER_WORKER_PROFILE_DEF, TOWER_TOOL_CONTRIBUTIONS, TowerFeature, assembledFlagServices, assembledOverrideForTests, tower_mode_exit_reminder_default, tower_mode_full_reminder_default, tower_mode_sparse_reminder_default, TOWER_MODE_DEDUP_MIN_TURNS, TOWER_MODE_FULL_REFRESH_TURNS, TOWER_MODE_INJECTION_VARIANT, TOWER_MODE_EXIT_DISCLOSURE, TowerModeInjection, TOWER_MODE_TOOLS, AgentTowerService, IAgentCacheProbeService, AgentCacheProbeService, usageRecordSchema, UsageRecord, UsageAgentModel, UsageAgentModelDefinition, SessionUsageService, UsageFeature, IAgentToolDedupeService, REMINDER_TEXT_1, REMINDER_TEXT_3, REPEAT_REMINDER_1_START, REPEAT_REMINDER_2_START, REPEAT_REMINDER_3_START, REPEAT_FORCE_STOP_STREAK, DEDUPE_PLACEHOLDER_RESULT, toolDedupeStepCallsKey, toolDedupeOriginalCallIndexKey, toolDedupeSyntheticCallIdsKey, toolDedupeCallKeyByCallIdKey, toolDedupeConsecutiveKeyKey, toolDedupeConsecutiveCountKey, toolDedupeActiveTurnIdKey, toolDedupeActiveStepKey, toolDedupeTurnCallRecordsKey, toolDedupeTurnRepeatCountKey, AgentToolDedupeService, IAgentAgentsMdReminderService, IBashParserService, profileBindSchema, ProfileBind, configUpdateSchema, ConfigUpdate, toolsSetActiveToolsSchema, ToolsSetActiveTools, toolsResetActiveToolsSchema, ToolsResetActiveTools, WarningIssued, profileKey, profileActiveToolsKey, LISTING_COMMANDS, TRANSPARENT_WRAPPERS, LS_ARG_TAKING_OPTIONS, TREE_LIKE_ARG_TAKING_OPTIONS, FIND_GLOBAL_OPTIONS, UNSAFE_OPERAND$1, AGENTS_MD_BASENAMES, BASH_PARSE_OPTIONS, DISCOVERY_REMINDER_VARIANT, agentsMdReminderKnownKey, agentsMdReminderCwdKey, agentsMdReminderSeededKey, AgentAgentsMdReminderService, SelectToolsInputSchema, ISelectToolsTool, SELECT_TOOLS_TOOL_NAME, IAgentToolSelectService, DESCRIPTION, SelectToolsTool, DYNAMIC_TOOL_SCHEMA_VARIANT, LOADABLE_TOOLS_VARIANT, TOOLS_ADDED_BLOCK, TOOLS_REMOVED_BLOCK, toolSelectPendingLoadedKey, AgentToolSelectService, IAgentToolSelectAnnouncementsService, AgentToolSelectAnnouncementsService, IAgentToolSelectSchemasService, AgentToolSelectSchemasService, TOOLS_SECTION, GLOB_MAGIC, ISessionToolPolicyGate, AgentToolPolicyService, PRINT_WAIT_CEILING_S_DEFAULT, CRON_SECTION, DEFAULT_CRON_CONFIG, cronConfigSchema, on, cronEnvBindings, stripCronEnv, systemMonoNowMs, SYSTEM_CLOCKS, MAX_CLOCK_FILE_BYTES, MINUTE_RANGE, HOUR_RANGE, DOM_RANGE, MONTH_RANGE, DOW_RANGE, MS_PER_MINUTE$1, DIGIT_ONLY, MONTH_NAMES, DAY_NAMES, DEFAULT_CRON_JITTER_CONFIG, MS_PER_DAY$1, MS_PER_MINUTE, cronTaskSchema, cronAddSchema, cronDeleteSchema, cronCursorSchema, CronAdd, CronDelete, CronCursor, CronFired, STALE_THRESHOLD_MS, DEFAULT_POLL_INTERVAL_MS, MAX_COALESCE_ITERATIONS, CRON_ID_REGEX, MAX_ID_ATTEMPTS, CRON_SCHEDULED, CRON_FIRED, CRON_MISSED, CRON_DELETED, cronEffects, cronActorLogic, IAgentCronService, AgentCronService, MAX_PROMPT_BYTES, CronCreateInputSchema, ICronCreateTool, cron_create_default, ONE_SHOT_MAX_FUTURE_MS, CronCreateTool, CronDeleteInputSchema, ICronDeleteTool, cron_delete_default, ID_PATTERN, CronDeleteTool, CronListInputSchema, ICronListTool, cron_list_default, MS_PER_DAY, PROMPT_PREVIEW_BYTES, CronListTool, CronFeature, GIT_TIMEOUT_MS, MAX_DIRTY_FILES, MAX_COMMIT_LINE_LENGTH, ALLOWED_HOSTS, explore_overlay_default, AGENT_TOOLS, CODER_TOOLS, EXPLORE_TOOLS, CODER_ROLE, DEFAULT_SUMMARY_POLICY, DEFAULT_PERMISSION_MODE_SECTION, permissionSetModeSchema, PermissionSetMode, permissionModeKey, permissionModeConfiguredKey, INHERITED_IN_FLIGHT_TOOL_OUTPUT, IAgentToolActivationService, ManagedAgent, nextAgentId, AgentLifecycleService, IMcpRegistryService, McpRegistryService, IMcpManagementService, DEFAULT_AUTH_TIMEOUT_MS$2, AUTH_FLOW_IDLE_TIMEOUT_MS, MAX_AUTH_TIMEOUT_MS, McpManagementService, IAgentUserToolService, AGENT_RUN_PROMPT_ORIGIN, SUBAGENT_MAX_TOKENS_ERROR, SessionSubagentService, ISessionSubagentModelsValidationService, SessionSubagentModelsValidationService, SubagentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE, RESUME_WITH_TYPE_UNAVAILABLE, USER_INTERRUPTED_SUBAGENT_MESSAGE, SUBAGENT_STOPPED_MESSAGE, ISubagentTool, agent_background_disabled_default, agent_background_enabled_default, agent_default, agent_fork_default, SUBAGENT_TOOL_PARAMETERS, SUBAGENT_TOOL_PARAMETERS_NO_MODEL, SubagentTool, ISessionExportService, WIRE_FILENAME, SESSION_LOG_REL, GLOBAL_LOG_REL, WEB_LOG_REL, DESKTOP_LOG_REL, SessionExportService, ISessionLegacyService, SessionLegacyService, InteractionFeature, SessionApprovalService, ISessionQuestionService, SessionQuestionService, QuestionOptionSchema, QuestionItemSchema, QUESTION_UNIQUENESS_MESSAGE, AskUserQuestionInputBaseSchema, AskUserQuestionInputSchemaWithBackground, AskUserQuestionInputSchema, IAskUserQuestionTool, ask_user_default, QuestionBackgroundTask, QUESTION_DISMISSED_MESSAGE, QUESTION_UNSUPPORTED_FAILURE_MESSAGE, BACKGROUND_DESCRIPTION, BACKGROUND_UNAVAILABLE_MESSAGE, PARAMETERS_WITH_BACKGROUND, PARAMETERS_FOREGROUND_ONLY, AskUserQuestionTool, IRestGateway, IWSGateway, RestGateway, WSGateway, workspaceContextWorkDirKey, workspaceContextAdditionalDirsKey, SessionWorkspaceContextService, WorkspaceCreated, WorkspaceUpdated, WorkspaceDeleted, IWorkspacePersistence, WorkspaceService, WORKSPACE_CATALOG_VERSION, WORKSPACE_CATALOG_SCOPE, WORKSPACE_CATALOG_KEY, FileWorkspacePersistence, IWorkspaceAliases, WorkspaceAliasesService, IWorkspaceSessions, WorkspaceSessionsService, DIFF_MAX_BYTES, PR_SPAWN_TIMEOUT_MS, PULL_REQUEST_TTL_MS, GitService, SyntaxNodeBuilder, Aborted, ParseBudget, SPECIAL_VARIABLE_CHARS, FILE_REDIRECT_OPERATORS, DECLARATION_COMMAND_KEYWORDS, UNSET_COMMAND_KEYWORDS, RESERVED_WORDS, EXPRESSION_PRECEDENCE, EXPRESSION_OPERATORS, SCAN_TICK_INTERVAL$1, MAX_SCAN_DEPTH, CONTROL_OPERATORS, REDIRECT_OPERATORS, CASE_ENABLING_WORDS, Lexer, FILE_REDIRECT_OP_SET, DECLARATION_COMMAND_SET, UNSET_COMMAND_SET, RESERVED_WORD_SET, NUMBER_RE, ASSIGNMENT_RE, ASSIGNMENT_SPLIT_RE, SUBSCRIPT_ASSIGNMENT_RE, IDENTIFIER_RE, FUNCTION_NAME_RE, BRACE_EXPRESSION_RE, PAREN_TEST_RE, STOP_THEN, STOP_DO, STOP_DONE, STOP_IF_BODY, STOP_FI, STOP_CLOSE_BRACE, STOP_ESAC, CASE_TERMINATION_OPS, SCAN_TICK_INTERVAL, PREC_TERNARY, PREC_TEST, PREC_UNARY, PREC_PREFIX, PREC_POSTFIX, Parser, BashParserService, NoopSessionToolPolicyGate, fsBrowseEntrySchema$1, HostFolderNotAbsoluteError, HostFolderNotFoundError, HostFolderPermissionError, IHostFolderBrowser, HostFolderBrowser, textEncoder$3, pendingRetirements, AppendLogStore, textEncoder$2, textDecoder$2, jsonDocumentCodec, tomlDocumentCodec, AtomicDocumentStoreBase, JsonAtomicDocumentStore, TomlAtomicDocumentStore, BlobStoreService, MAX_LEVEL, P, cmpNumber, cmpString, SkipNode, SkipList, toKStr$1, fromKStr$1, DISK_REF_BYTES, MinHeap, Store, OpTracker, POLICIES, WAL, ValueReader, POLY, TABLE, MAGIC, EMPTY, SUB_HEADER, CRC_CHUNK, DEFAULT_RESYNC_CANDIDATE_BUDGET, ASYNC_SCAN_WINDOW, SCAN_YIELD_BYTES, yieldToLoop$3, SNAPSHOT_FILE, WAL_FILE, SECONDARY_INDEXES_FILE, COMPOUND_INDEXES_FILE, TEXT_INDEXES_FILE, SIDECAR_FILES, POSTINGS_PATTERN, GENERATIONS_DIR, CURRENT_FILE, MANIFEST_FILE, STORE_IMAGE_FILE, DT_INDEX_FILE, SECONDARY_INDEX_FILE, COMPOUND_INDEX_FILE, GEN_SNAPSHOT_FILE, GEN_ID_PATTERN, GEN_TMP_PATTERN, FINGERPRINT_FILES, STALE_TMP_FILES, STALE_POSTINGS_TMP_PATTERN, LATIN, CJK, MAX_TERM_CHARS, MAX_TERM_BYTES, yieldToLoop$2, RecoveryGenerationChurnError, GENERATION_RETRY_BASE_MS, sleep$3, sleep$2, yieldToLoop$1, FLUSH_BYTES$3, DEFAULT_READ_CONCURRENCY, DEFAULT_SLICE_BYTES, COPY_CHUNK, SMALL_DELTA, rotateReplace, MAX_PRECOPY_PASSES, CONVERGE_RATIO, UniqueViolationError, IndexManager, DtIndex, HEADER_LEN, CRC_LEN, FLUSH_BYTES$2, PostingsFile, EMPTY_MAP, TopK, BUILD_YIELD_DOCS, BUILD_YIELD_TOKENS, StagedBuild, TextIndexBuildingError, TextIndex, CompoundIndexManager, CODECS, sidecarTmpSeq, LockError, HELD, sidecarSeq, nextSidecarSeq, exitHooked, TAKEOVER_SETTLE_BASE_MS, TAKEOVER_SETTLE_MAX_MS, LockFile, MaintenanceBackpressureError, MaintenanceClosedError, MaintenanceCancelledError, HISTORY_LIMIT, MaintenanceScheduler, WorkerSlots, defaultWorkerSlots, TEXT_BUILD_SLOT_WAIT_MS, MemoryGuard, backupTmpSeq, QueryEngine, GenerationCorruptError, ByteWriter, ByteReader, FLUSH_BYTES$1, GenFileWriter, yieldToLoop, VERIFY_CHUNK_BYTES, STORE_MAGIC, TAG_INLINE, TAG_SNAPSHOT_LOC, TAG_WAL_LOC, DT_MAGIC, DT_VERSION, SECONDARY_MAGIC, SECONDARY_VERSION, COMPOUND_MAGIC, COMPOUND_VERSION, GTAG_NUMBER, GTAG_STRING, GTAG_FALSE, GTAG_TRUE, GTAG_NULL, TEXT_DICT_MAGIC, TEXT_DICT_VERSION, TEXT_DOCS_MAGIC, TEXT_DOCS_VERSION, HASH_MASK, TextRegistry, configuredEntry, PROGRESS_DOCS, FLUSH_BYTES, AGG_ENTRY_BYTES, AGG_TERM_BYTES, SegmentReader, RawPostingsWriter, BASE_DOCS_MAGIC, WorkerTextBuildError, DEFAULT_ABORT_POLL_MS, DEFAULT_MAX_OLD_SPACE_MB, STORE_IMAGE_RECORDS_PER_SLICE, GenerationLoader, GenerationBuildAborted, GenerationBuilder, WalGroupTracker, WritePath, IndexAdmin, ReadPath, LifecycleTracker, MiniDb, Coordinator, ShardHandle, CLUSTER_META_FILE, CLUSTER_INDEX_FILE, SHARD_DIR_PREFIX, ShardLockPool, Router, META_VERSION, DEFAULT_SHARD_COUNT, Topology, ClusterDb, SEP, CHECKPOINT_COLLECTION, STORE_SUBDIR, SHARD_COUNT, LOCK_ACQUIRE_TIMEOUT_MS, DROP_BATCH_SIZE, pendingDisposals, MiniDbQueryStore, MiniDbQuery, WebSearchInputSchema, IWebSearchTool, IWebSearchProviderService, web_search_default, WebSearchTool, TERMINAL_RETENTION_MS, DEFAULT_DEVICE_EXPIRES_IN_SEC, SERVICES_SECTION$1, OAuthService2, AuthSummaryService2, OAuthToolkitService, SERVICES_SECTION, StringRecordSchema, OAuthRefSchema, MoonshotServiceConfigSchema, ServicesConfigSchema, WEB_SEARCH_BASE_URL_ENV, WEB_SEARCH_API_KEY_ENV, WEB_FETCH_BASE_URL_ENV, WEB_FETCH_API_KEY_ENV, nonBlankEnv, moonshotSearchEnvBindings, moonshotFetchEnvBindings, servicesEnvBindings, servicesCredentialEnvOverlay, stripMoonshotSearchEnv, stripMoonshotFetchEnv, stripServicesEnv, servicesFromToml, servicesToToml, MoonshotWebSearchProvider, WebSearchProviderService, managedProviderStatusSchema, managedProviderSummarySchema, IAuthLegacyService, MANAGED_PROVIDER_NAME, AuthLegacyService, BLOB_SCOPE, INDEX_SCOPE, INDEX_KEY, textEncoder$1, textDecoder$1, FileServiceImpl, DEFAULT_MAX_TOTAL_BYTES, MIME_EXTENSION, IFileEditService, EditService, TextModel, FileEditService, EditInputSchema, IEditTool, edit_default, EditTool, FetchURLInputSchema, IFetchURLTool, HttpFetchError, IWebFetchService, fetch_url_default, FetchURLTool, parseHTML, DEFAULT_USER_AGENT, DEFAULT_MAX_BYTES, MAX_REDIRECT_HOPS, REDIRECT_STATUSES, LocalFetchURLProvider, PRIVATE_ADDRESS_BLOCKLIST, MoonshotFetchURLProvider, WebFetchService, ByteLruCache, DEFAULT_THRESHOLD, DEFAULT_MAX_CACHE_SIZE, DATA_URI_HEADER_RE, AgentBlobServiceImpl, AgentContextMemoryService, ReminderFeature, IAgentContextProjectorService, MEDIA_DEGRADED_PLACEHOLDERS, MEDIA_STRIPPED_PLACEHOLDERS, MEDIA_CONTAINER_KEY_CACHE, TOOL_ERROR_STATUS, TOOL_EMPTY_STATUS, TOOL_EMPTY_ERROR_STATUS, TOOL_OUTPUT_EMPTY_TEXT, INTERRUPTED_RESULT, TOOL_INTERRUPTED_TEXT, contextProjectorLastRepairSignatureKey, AgentContextProjectorService, sizeSchema, TokenCountingMeasured, TokenCountingTruncated, rebaseSchema, TokenCountingRebased, turnRecordedSchema, TokenCountingTurnRecorded, ZERO_ANCHOR, TokenCountingAgentModel, TokenCountingAgentModelDefinition, TOKEN_COUNTING_SECTION, TOKEN_COUNTING_STRATEGY_ENV, TOKEN_COUNTING_STRATEGIES, TokenCountingConfigSchema, tokenCountingEnvBindings, SessionTokenCountingService, TokenCountingFeature, IAgentPluginService, pluginSessionStartSchema$1, PluginSessionStartEvent, pluginSessionStartSnapshotKey, SESSION_START_INJECTION_VARIANT, PLUGIN_CHANGE_INJECTION_VARIANT, PLUGIN_CHANGE_VERBS, MAIN_AGENT_ID, SUPERSEDES_SUFFIX, NO_ACTIVE_SESSION_STARTS, pluginSessionStartRefreshPendingKey, AgentPluginService, DEFAULT_COMPACTION_CONFIG, RuntimeCompactionStrategy, DefaultCompactionStrategy, IAgentLLMRequesterService, TODO_LIST_TOOL_NAME, TODO_LIST_REMINDER_VARIANT, TODO_LIST_REMINDER_TURNS_SINCE_WRITE, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS, toolsUpdateStoreSchema, ToolsUpdateStore, todoActorLogic, IAgentTodoService, AgentTodoService, McpServerStatus, ToolListUpdated, AgentErrorEvent, compaction_instruction_default, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS, OVERFLOW_CONTEXT_SAFETY_RATIO, OVERFLOW_STATUS_RECOVERY_RATIO, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS, COMPACTION_OVERFLOW_SHRINK_RATIOS, EMPTY_TOOL_PARAMETERS$1, CompactionTruncatedError, fullCompactionCompactionCountInTurnKey, fullCompactionObservedMaxContextTokensByModelKey, fullCompactionLastCompactedTokenCountKey, fullCompactionConsecutiveOverflowCompactionsKey, fullCompactionActiveTurnIdKey, AgentFullCompactionService, IAgentMediaResolverService, ToolCallIdNormalizer, ToolCallIdResponseNormalizer, llmToolEntrySchema, llmToolsSnapshotSchema, LlmToolsSnapshot, llmRequestSchema, LlmRequest, llmRequestTraceKey, EMPTY_TOOL_PARAMETERS, noopOnPart, KIMI_CODE_INFINITE_RETRY_ENV, llmRequesterLastConfigLogSignatureKey, llmRequesterTurnConfigsKey, llmRequesterMediaDegradedTurnsKey, llmRequesterMediaStrippedTurnsKey, llmRequesterEmittedThinkingEffortWarningsKey, AgentLLMRequesterService, MutableLLMRequestTrace, StepRequestQueue, loopNextReservedTurnIdKey, loopLastRequestTraceIdKey, loopDisposingKey, MAX_STEP_SIGNAL_LISTENERS, AgentLoopService, IAgentLoopContinuationService, AgentLoopContinuationService, IAgentInterruptionReminderService, INTERRUPTION_REMINDER_VARIANT, interruptionReminderRecordedSchema, InterruptionReminderRecorded, interruptionReminderKey, INTERRUPTION_REMINDER, AgentInterruptionReminderService, IAgentMcpService, MCP_NAME_PREFIX, MCP_NAME_SEPARATOR, MAX_QUALIFIED_LENGTH, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE$1, DEFAULT_AUTH_TIMEOUT_MS$1, AUTH_TOOL_TOOL_NAME, DESCRIPTION_TEMPLATE, MCP_MAX_BINARY_PART_BYTES, MCP_MAX_BINARY_PART_CHARS, mcpToolCollisionSchema, mcpToolsDiscoveredSchema, McpToolsDiscovered, mcpDiscoveryKey, mcpMcpToolsByServerKey, mcpDiscoveryWritesReadyKey, AgentMcpService, IAgentMediaToolsRegistrar, ReadMediaFileInputSchema, read_media_default, ReadMediaFileTool, mediaRegisteredKeyKey, AgentMediaToolsRegistrar, SessionMediaStoreService, CACHE_SCOPE, PROVIDER_ID_RE, VIDEO_UNAVAILABLE_TEXT, IMAGE_UNAVAILABLE_TEXT, IMAGE_MEMO_MAX_BYTES, IMAGE_MEMO_MAX_TOTAL_BYTES, textEncoder, textDecoder, mediaResolvedKey, AgentMediaResolverService, IMAGE_SECTION, IMAGE_MAX_EDGE_ENV, IMAGE_READ_BYTE_BUDGET_ENV, ImageConfigSchema, imageEnvBindings, IImageConfigBridge, ImageConfigBridge, permission_mode_auto_enter_reminder_default, permission_mode_auto_exit_reminder_default, PERMISSION_MODE_INJECTION_VARIANT, permissionModeLastModeKey, PermissionModeInjection, AgentPermissionModeService, AutoModeApprovePermissionPolicyService, AutoModeAskUserQuestionDenyPermissionPolicyService, parsePermissionPattern, PERMISSION_SECTION, PermissionRuleDecisionSchema, PermissionRuleScopeSchema, PermissionRuleSchema, PermissionConfigSchema, DANGEROUS_COMMAND_GUARD_ENV, permissionEnvBindings, stripPermissionEnv, permissionFromToml, permissionToToml, PARSE_OPTIONS, MAX_NESTED_SHELL_DEPTH, UNSAFE_OPERAND, SKIPPED_COMMAND_CHILDREN, SIMPLE_DANGEROUS_COMMANDS, PRIVILEGE_WRAPPERS, PRIVILEGE_VALUE_OPTIONS, NESTED_SHELLS, LAUNCH_WRAPPERS, WRAPPER_VALUE_OPTIONS, SYSTEMCTL_DANGEROUS_SUBCOMMANDS, SYSTEMCTL_VALUE_OPTIONS, DD_SAFE_DEVICE_TARGETS, DangerousCommandAskPermissionPolicyService, DEFAULT_APPROVE_TOOLS, DefaultToolApprovePermissionPolicyService, FallbackAskPermissionPolicyService, GitControlPathAccessAskPermissionPolicyService, GitCwdWriteApprovePermissionPolicyService, SensitiveFileAccessAskPermissionPolicyService, SessionApprovalHistoryPermissionPolicyService, USER_CONFIGURED_SCOPES, UserConfiguredAllowPermissionPolicyService, UserConfiguredAskPermissionPolicyService, UserConfiguredDenyPermissionPolicyService, YoloModeApprovePermissionPolicyService, AgentPermissionPolicyService, PermissionRulesAdd, permissionRecordApprovalResultSchema, PermissionRecordApprovalResult, permissionRulesKey, AgentPermissionRulesService, PluginCommandActivated, IAgentPluginCommandService, AgentPluginCommandService, PLUGIN_SECTIONS_MAX_BYTES, profileActiveToolNamesOverlayKey, profileAgentsMdWarningKey, profileEmittedThinkingEffortWarningsKey, profileEmittedToolPatternWarningsKey, profileEmittedPluginBudgetWarningsKey, AgentProfileService, IAgentShellCommandService, ShellOutput, ShellStarted, ShellCompleted, SHELL_FOREGROUND_TIMEOUT_S, shellCommandTasksKey, AgentShellCommandService, ISessionInitService, DEFAULT_INIT_PROMPT, INIT_PROFILE_NAME, INIT_PARENT_TOOL_CALL_ID, INIT_DESCRIPTION, SessionInitService, SessionInitFeature, TodoItemSchema, TodoListInputSchema, ITodoListTool, todo_list_default, todo_list_write_reminder_default, TodoListTool, TodoFeature, DRAFT_07_AJV, DRAFT_2019_AJV, DRAFT_2020_AJV, DRAFT_2019_KEYWORDS, DRAFT_2020_KEYWORDS, ToolScheduler, ABORT_GRACE_MS, TOOL_OUTPUT_EMPTY, TOOL_OUTPUT_NON_TEXT, validators, toolExecutorToolCallDupTypesKey, toolExecutorDupTypeTurnIdKey, AgentToolExecutorService, TOOL_RESULT_PREVIEW_HEAD_CHARS, TOOL_RESULT_PREVIEW_TAIL_CHARS, TOOL_RESULT_MAX_LINE_CHARS, TRUNCATION_MARKER, encoder, ToolResultTruncationService, AgentToolActivationService, IBuiltinToolAssemblyService, BuiltinToolAssemblyService, AgentToolRegistryService, toolsRegisterUserToolSchema, ToolsRegisterUserTool, toolsUnregisterUserToolSchema, ToolsUnregisterUserTool, userToolKey, AgentUserToolService, turnPhaseSchema, approvalRefSchema, toolCallRefSchema, activityRetryStateSchema, activityTurnStateSchema, turnEndReasonSchema, activityLastTurnStateSchema, backgroundRefSchema, activityViewLifecycleSchema, agentActivityStateSchema, agentActivityViewContract, pageOf, maybe, noResult, stringDeltaSchema, textPartSchema, imageUrlPartSchema, videoUrlPartSchema, promptPartSchema, promptPayloadSchema, promptSkillActivationSchema, promptWithSkillsPayloadSchema, promptWithSkillsResultSchema, steerPayloadSchema, activateSkillPayloadSchema, promptLaunchResultSchema, runShellCommandPayloadSchema, shellCommandResultSchema, setModelResultSchema, runtimeBindingSchema, permissionModeSchema, tokenUsageSchema, usageStatusSchema, agentCommandInfoSchema, planDataSchema, taskLifecycleStatusSchema, taskInfoBaseFields, agentTaskInfoSchema, agentPromptContract, agentSkillContract, agentLoopContract, agentPermissionModeContract, agentCommandContract, agentRuntimeBindingContract, agentContextMemoryContract, agentTokenCountingContract, agentShellCommandContract, agentProfileContract, agentUsageContract, agentPlanContract, mcpServerEntrySchema, agentMcpContract, fullCompactionInputSchema, agentFullCompactionContract, agentTaskContract, oAuthFlowStatusSchema, oAuthFlowStartSchema, oAuthFlowSnapshotSchema, oAuthLoginCancelResponseSchema, oAuthLogoutResponseSchema, authStatusSchema, refreshOAuthProviderModelsResponseSchema, oAuthLoginOptionsSchema, authContract, authSummaryContract, capabilityStepSchema, capabilityInstallProgressSchema, capabilityStatusSchema, capabilitiesContract, modelCatalogItemSchema, providerCatalogStatusSchema, providerCatalogItemSchema, setDefaultModelResponseSchema, generateInputSchema, generateParamsSchema, generateEventSchema, catalogContract, refreshProviderModelsOptionsSchema, refreshProviderModelsResponseSchema, providerDiscoveryContract, configTargetSchema, configInspectValueSchema, configDiagnosticSchema, configContract, stringRead, envContract, fileMetaSchema, fileSaveOptionsSchema, fileGetResultSchema, filesContract, experimentalFeatureStateSchema, flagsContract, fsBrowseEntrySchema, fsBrowseResponseSchema, fsHomeResponseSchema, hostFsContract, protocolSchema, oAuthRefSchema$1, modelBaseSchema, modelOverrideSchema, modelConfigSchema, modelsContract, stringRecordSchema$1, mcpTimeoutMsSchema, mcpServerCommonFields, mcpServerStdioConfigSchema, mcpServerHttpConfigSchema, mcpServerSseConfigSchema, mcpServerConfigSchema, mcpServerSourceSchema, mcpRegistryPluginOriginSchema, mcpRegistryQuerySchema, mcpAuthStatusQuerySchema, globalMcpServerConfigSchema, mcpServerConfigDataSchema, mcpManagedServerSchema, mcpServerTestTargetSchema, mcpServerTestResultSchema, mcpServerLocatorSchema, mcpServerAuthStateSchema, mcpServerInspectionSchema, mcpServerAuthStatusSchema, mcpServerAuthBeginResultSchema, mcpServerAuthFlowHandleSchema, mcpManagementContract, pluginDiagnosticSchema, pluginAuthorSchema, pluginSessionStartSchema, pluginInterfaceSchema, hookDefSchema, pluginCommandEntrySchema, pluginManifestKindSchema, pluginSourceSchema, pluginStateSchema, pluginGithubRefSchema, pluginManifestSchema, pluginMcpServerInfoSchema, pluginGithubMetadataSchema, pluginSummarySchema, pluginInfoSchema, reloadSummarySchema$1, pluginUpdateStatusSchema, pluginCommandDefSchema, installPluginInputSchema, setPluginEnabledInputSchema, setPluginMcpServerEnabledInputSchema, removePluginInputSchema, getPluginInfoInputSchema, pluginsContract, providerTypeSchema, oAuthRefSchema, stringRecordSchema, modelSourceSchema, providerConfigSchema, providersContract, sessionSummarySchema, sessionListQuerySchema, sessionCountQuerySchema, sessionsContract, workspaceSchema, workspaceUpdateSchema, workspacesContract, approvalRequestSchema, approvalResponseSchema, sessionApprovalContract, interactionKindSchema, interactionOriginSchema, interactionSchema, interactionResolutionSchema, sessionInteractionContract, agentMetaSchema, sessionMetaSchema, sessionMetaPatchSchema, sessionMetaKeySchema, sessionMetadataChangedEventSchema, sessionMetadataContract, createSessionOptionsSchema, resumeSessionOptionsSchema, forkSessionOptionsSchema, createChildSessionOptionsSchema, handleWireSchema, sessionManagerContract, questionOptionSchema, questionItemSchema, questionAnswersSchema, questionResponseSchema, questionResultSchema, questionRequestSchema, sessionQuestionContract, skillSummarySchema, sessionSkillCatalogContract, sessionTitleContract, globalContract, configChangedSchema, reloadSummarySchema, sessionMetaUpdatedSchema, catalogChangedSchema, globalEvents, sessionEvents, turnStartedEventSchema, turnEndedEventSchema, assistantDeltaEventSchema, thinkingDeltaEventSchema, toolCallStartedEventSchema, toolCallDeltaEventSchema, toolProgressEventSchema, toolResultEventSchema, promptCompletedEventSchema, promptAbortedEventSchema, compactionStartedEventSchema, compactionBlockedEventSchema, compactionCancelledEventSchema, compactionCompletedEventSchema, permissionApprovalRequestedEventSchema, permissionApprovalResolvedEventSchema, errorEventSchema, warningEventSchema, agentStatusUpdatedEventSchema, agentEvents, KlientValidationError, EventHub, ENV_SCALAR_PROPERTIES, DEFAULT_AUTH_TIMEOUT_MS, AUTH_COMPLETION_MARGIN_MS, RPCError, serviceTokens, REQUEST_INVALID, NOT_FOUND, MCP_SERVER_NOT_FOUND, MCP_OAUTH_FAILED, PROMPT_ID_CONFLICT, MCP_MANAGEMENT_SERVICE, AGENT_CONTEXT_SERVICES, MemoryChannel, KIMI_CONFIG_DOMAINS, DROPPED_DOMAIN_EVENT_TYPES, RENAMED_DOMAIN_EVENT_TYPES, IMPORT_CONTEXT_GUIDANCE, EMPTY_FOLD, ReadOnlyAgentRecordPersistence, SessionEventWiring, MAX_TIMER_DELAY_MS, SDKRpcClientV2, KimiConfigCoreRpcImpl, KimiConfigRpcClient, KimiForCodingProvider, DEFAULT_CATALOG_URL, CatalogFetchError;
+var import_yazl, __filename12, __dirname12, __create2, __defProp3, __getOwnPropDesc2, __getOwnPropNames2, __getProtoOf2, __hasOwnProp2, __esmMin, __commonJSMin, __exportAll, __copyProps2, __toESM2, __require2, _lazyMatch, _match, zeptomatch, _DRIVE_LETTER_START_RE, _UNC_REGEX, _IS_ABSOLUTE_RE, _DRIVE_LETTER_RE, _ROOT_FOLDER_RE, _EXTNAME_RE, _PATH_ROOT_RE, normalize2, join$1, resolve$2, isAbsolute$1, toNamespacedPath, extname$1, relative$1, dirname$3, format$1, basename$1, parse$8, matchesGlob, _path, delimiter, _platforms, mix2, posix$2, win32$1, ErrorCodes, KIMI_ERROR_INFO, KimiError, UNKNOWN_CAPABILITY_MARKER$1, UNKNOWN_CAPABILITY$1, ChatProviderError$1, APIConnectionError$4, APITimeoutError$1, APIStatusError$1, APIContextOverflowError$1, APIRequestTooLargeError$1, APIProviderRateLimitError$1, APIProviderQuotaExhaustedError$1, APIEmptyResponseError$1, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS$1, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS$1, MEDIA_TYPE_FIELD_PATTERN$1, NETWORK_RE$3, TIMEOUT_RE$3, CONTEXT_OVERFLOW_MESSAGE_PATTERNS$1, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS$1, REQUEST_TOO_LARGE_MESSAGE_PATTERNS$1, THINKING_EFFORT_CONFIG_DOCS_URL$1, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS$1, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS$1, STRUCTURAL_REQUEST_MESSAGE_PATTERNS$1, uuid4$2, castToError$2, AnthropicError, APIError$2, APIUserAbortError$2, APIConnectionError$3, APIConnectionTimeoutError$2, BadRequestError$2, AuthenticationError$2, PermissionDeniedError$2, NotFoundError$2, ConflictError$2, UnprocessableEntityError$2, RateLimitError$2, InternalServerError$2, startsWithSchemeRegexp$2, isAbsoluteURL$2, isArray$4, isReadonlyArray$2, validatePositiveInteger$2, safeJSON$2, sleep$7, VERSION$2, isRunningInBrowser$1, getPlatformProperties$1, normalizeArch$1, normalizePlatform$1, _platformHeaders$1, getPlatformHeaders$1, FallbackEncoder$2, default_format$1, default_formatter$1, formatters$1, has$2, hex_table$1, limit$1, encode$12, array_prefix_generators$1, push_to_array$1, toISOString$1, defaults$1, sentinel$1, GRANT_TYPE_JWT_BEARER, GRANT_TYPE_REFRESH_TOKEN, TOKEN_ENDPOINT, OAUTH_API_BETA_HEADER, FEDERATION_BETA_HEADER, MAX_TOKEN_RESPONSE_BYTES, MAX_ERROR_BODY_CHARS, SAFE_ERROR_KEYS, WorkloadIdentityError, TokenCache, readEnv$2, encodeUTF8_$2, decodeUTF8_$2, levelNumbers$2, parseLogLevel$2, noopLogger$2, cachedLoggers$2, formatRequestDetails$2, PROFILE_NAME_PATTERN, loadConfigWithSource, getCredentialsPath, getRootConfigPath, supportsLocalConfigFiles, getActiveProfileName, _LineDecoder_buffer$1, _LineDecoder_carriageReturnIndex$1, LineDecoder$2, _Stream_client$1, Stream$6, SSEDecoder$2, _APIPromise_client$1, APIPromise$2, _AbstractPage_client$1, AbstractPage$1, PagePromise$1, Page$1, PageCursor, checkFileSupport$2, isAsyncIterable$3, multipartFormRequestOptions$1, supportsFormDataMap$1, createForm$1, isNamedBlob$1, addFormValue$1, isBlobLike$2, isFileLike$2, isResponseLike$2, APIResource$2, brand_privateNullableHeaders$2, buildHeaders$2, EMPTY$5, createPathTagFunction$2, path$16, Environments, SDK_HELPER_SYMBOL, Files$4, Models$3, UserProfiles, require_timing_safe_equal, require_base64, require_sha256, import_dist$1, Webhooks$1, Versions$2, Agents, Memories, MemoryVersions, MemoryStores, JSONLDecoder, Batches$3, MODEL_NONSTREAMING_TOKENS, tokenize$1, strip, unstrip, generate$2, partialParse$1, _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY$1, BetaMessageStream, ToolError, DEFAULT_SUMMARY_PROMPT, _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner, DEPRECATED_MODELS$1, MODELS_TO_WARN_WITH_THINKING_ENABLED$1, Messages$3, Events$1, Resources, Events, Threads$2, Sessions$2, Versions$1, Skills$1, Credentials, Vaults, Beta$1, Completions$2, _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY, MessageStream, Batches$2, Messages$2, DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Models$2, _BaseAnthropic_instances, _a$4, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic, BUDGET_THINKING_EFFORTS$1, ADAPTIVE_MAX_EFFORTS$1, LATEST_OPUS_THINKING_EFFORTS$1, BUDGET_PROFILE$1, OPUS_45_PROFILE$1, ADAPTIVE_MAX_PROFILE$1, LATEST_OPUS_PROFILE$1, ALWAYS_ADAPTIVE_PROFILE$1, ALWAYS_ADAPTIVE_MAX_PROFILE$1, FAMILY_FIRST_RE$1, VERSION_FIRST_RE$1, BARE_FAMILY_RE$1, CLAUDE_FAMILY_WORD_RE$1, EMPTY_TOOL_CALL_ID$1, TOOL_CALL_ID_SAFE_CHARS$1, INTERLEAVED_THINKING_BETA$2, CONTEXT_MANAGEMENT_BETA$1, CLEAR_THINKING_EDIT$1, ANTHROPIC_TOOL_CALL_ID_POLICY$1, CEILING_BY_FAMILY_VERSION$1, FALLBACK_MAX_TOKENS$1, CACHE_CONTROL$1, CACHEABLE_TYPES$1, OMITTED_MEDIA_PLACEHOLDER$1, SUPPORTED_B64_MEDIA_TYPES$1, SUPPORTED_B64_VIDEO_TYPES$1, AnthropicStreamedMessage$1, AnthropicChatProvider$1, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS$1, OPENAI_VISION_TOOL_PREFIXES$1, CLAUDE_VISION_TOOL_PREFIXES$1, CLAUDE_THINKING_VISION_TOOL_PREFIXES$1, GEMINI_CATALOGUED_PREFIXES$1, OPENAI_REASONING_CAPABILITY$1, OPENAI_VISION_TOOL_CAPABILITY$1, OPENAI_TEXT_TOOL_CAPABILITY$1, ANTHROPIC_VISION_TOOL_CAPABILITY$1, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY$1, GEMINI_MULTIMODAL_TOOL_CAPABILITY$1, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY$1, OPENAI_LEGACY_CAPABILITY_CATALOG, OPENAI_RESPONSES_CAPABILITY_CATALOG, ANTHROPIC_CAPABILITY_CATALOG, require_retry_operation$1, require_retry$5, require_retry$4, require_p_retry, require_extend, require_package$1, require_util$9, require_common$1, require_retry$3, require_interceptor, require_gaxios, require_src$3, require_bignumber, require_stringify$1, require_parse$6, require_json_bigint, require_gcp_residency, require_colours, require_logging_utils, require_src$2, require_src$1, require_base64_js, require_shared$1, require_crypto$2, require_crypto$1, require_crypto, require_safe_buffer, require_param_bytes_for_alg, require_ecdsa_sig_formatter, require_util$8, require_package, require_shared, require_authclient, require_loginticket, require_oauth2client, require_computeclient, require_idtokenclient, require_envDetect, require_data_stream, require_buffer_equal_constant_time, require_jwa, require_tostring, require_sign_stream, require_verify_stream, require_jws, require_jwsSign, require_getToken, require_errorWithCode, require_getCredentials, require_tokenHandler, require_revokeToken, require_googleToken, require_jwtaccess, require_jwtclient, require_refreshclient, require_impersonated, require_oauth2common, require_stscredentials, require_baseexternalclient, require_filesubjecttokensupplier, require_urlsubjecttokensupplier, require_certificatesubjecttokensupplier, require_identitypoolclient, require_awsrequestsigner, require_defaultawssecuritycredentialssupplier, require_awsclient, require_executable_response, require_pluggable_auth_handler, require_pluggable_auth_client, require_externalclient, require_externalAccountAuthorizedUserClient, require_googleauth, require_iam, require_downscopedclient, require_passthrough, require_src3, require_constants$10, require_buffer_util, require_limiter, require_permessage_deflate$1, require_validation$3, require_receiver$1, require_sender$1, require_event_target, require_extension, require_websocket$1, require_stream, require_subprotocol, require_websocket_server, import_p_retry, import_src3, import_websocket, _defaultBaseGeminiUrl, _defaultBaseVertexUrl, BaseModule, Language, Outcome, FunctionResponseScheduling, Type, Environment, AuthType, HttpElementLocation, ApiSpec, PhishBlockThreshold, Behavior, DynamicRetrievalConfigMode, FunctionCallingConfigMode, ThinkingLevel, PersonGeneration, ProminentPeople, HarmCategory, HarmBlockMethod, HarmBlockThreshold, FinishReason, HarmProbability, HarmSeverity, UrlRetrievalStatus, BlockedReason, TrafficType, Modality, ModelStage, MediaResolution, TuningMode, AdapterSize, JobState, TuningJobState, AggregationMetric, PairwiseChoice, TuningTask, DocumentState, PartMediaResolutionLevel, ToolType, ResourceScope, ServiceTier, FeatureSelectionPreference, EmbeddingApiType, SafetyFilterLevel, ImagePromptLanguage, MaskReferenceMode, ControlReferenceType, SubjectReferenceType, EditMode, SegmentMode, VideoGenerationReferenceType, VideoGenerationMaskMode, VideoCompressionQuality, TuningMethod, FileState, FileSource, TurnCompleteReason, MediaModality, VadSignalType, VoiceActivityType, StartSensitivity, EndSensitivity, ActivityHandling, TurnCoverage, Scale, MusicGenerationMode, LiveMusicPlaybackControl, HttpResponse, GenerateContentResponse, EmbedContentResponse, GenerateImagesResponse, EditImageResponse, UpscaleImageResponse, RecontextImageResponse, SegmentImageResponse, ListModelsResponse, DeleteModelResponse, CountTokensResponse, ComputeTokensResponse, GenerateVideosOperation, ListTuningJobsResponse, CancelTuningJobResponse, DeleteCachedContentResponse, ListCachedContentsResponse, ListDocumentsResponse, ListFileSearchStoresResponse, UploadToFileSearchStoreResumableResponse, ImportFileOperation, ListFilesResponse, CreateFileResponse, DeleteFileResponse, RegisterFilesResponse, ListBatchJobsResponse, LiveServerMessage, LiveMusicServerMessage, UploadToFileSearchStoreOperation, PagedItem, Pager, Batches$1, Caches, Chats, Chat$1, ApiError, Files$3, CONTENT_TYPE_HEADER, SERVER_TIMEOUT_HEADER, USER_AGENT_HEADER, GOOGLE_API_CLIENT_HEADER, LIBRARY_LABEL, VERTEX_AI_API_DEFAULT_VERSION, GOOGLE_AI_API_DEFAULT_VERSION, DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_HTTP_STATUS_CODES, ApiClient, MCP_LABEL, hasMcpToolUsageFromMcpToTool, McpCallableTool, LiveMusic, LiveMusicSession, FUNCTION_RESPONSE_REQUIRES_ID, Live, defaultLiveSendClientContentParamerters, Session$2, DEFAULT_MAX_REMOTE_CALLS, Models$1, Operations, Tokens, Documents, FileSearchStores, uuid4Internal, uuid4$1, castToError$1, GeminiNextGenAPIClientError, APIError$1, APIUserAbortError$1, APIConnectionError$2, APIConnectionTimeoutError$1, BadRequestError$1, AuthenticationError$1, PermissionDeniedError$1, NotFoundError$1, ConflictError$1, UnprocessableEntityError$1, RateLimitError$1, InternalServerError$1, startsWithSchemeRegexp$1, isAbsoluteURL$1, isArrayInternal, isReadonlyArray$1, validatePositiveInteger$1, safeJSON$1, sleep$1$1, FallbackEncoder$1, VERSION$1, checkFileSupport$1, isAsyncIterable$2, isBlobLike$1, isFileLike$1, isResponseLike$1, APIResource$1, EMPTY$4, createPathTagFunction$1, path$12, BaseInteractions, Interactions, encodeUTF8_$1, decodeUTF8_$1, LineDecoder$1, levelNumbers$1, parseLogLevel$1, noopLogger$1, cachedLoggers$1, formatRequestDetails$1, Stream$2, SSEDecoder$1, APIPromise$1, brand_privateNullableHeaders$1, buildHeaders$1, readEnv$1, _a$3, BaseGeminiNextGenAPIClient, GeminiNextGenAPIClient, GOOGLE_API_KEY_HEADER, REQUIRED_VERTEX_AI_SCOPE, NodeAuth, NodeDownloader, NodeWebSocketFactory, NodeWebSocket, Tunings, MAX_CHUNK_SIZE, MAX_RETRY_COUNT, INITIAL_RETRY_DELAY_MS, DELAY_MULTIPLIER, X_GOOG_UPLOAD_STATUS_HEADER_FIELD, NodeUploader, NodeFiles, LANGUAGE_LABEL_PREFIX, GoogleGenAI, GoogleGenAIStreamedMessage$1, NETWORK_RE$2, TIMEOUT_RE$2, GoogleGenAIChatProvider$1, TYPE_COMPLETION_SKIP_KEYS$1, CHILD_SCHEMA_SLOTS$1, OBJECT_STRUCTURE_KEYS$1, ARRAY_STRUCTURE_KEYS$1, STRING_STRUCTURE_KEYS$1, NUMERIC_STRUCTURE_KEYS$1, uuid42, castToError, OpenAIError, APIError, APIUserAbortError, APIConnectionError$1, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError, LengthFinishReasonError, ContentFilterFinishReasonError, InvalidWebhookSignatureError, OAuthError$2, SubjectTokenProviderError, startsWithSchemeRegexp, isAbsoluteURL, isArray$3, isReadonlyArray, validatePositiveInteger, safeJSON, sleep$5, VERSION, isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders, FallbackEncoder, default_format, default_formatter, formatters, has$1, hex_table, limit, encode4, array_prefix_generators, push_to_array, toISOString, defaults, sentinel, encodeUTF8_, decodeUTF8_, _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder, levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails, _Stream_client, Stream$1, SSEDecoder, _APIPromise_client, APIPromise, _AbstractPage_client, AbstractPage, PagePromise, Page, CursorPage, ConversationCursorPage, SUBJECT_TOKEN_TYPES, TOKEN_EXCHANGE_GRANT_TYPE, WorkloadIdentityAuth, checkFileSupport, isAsyncIterable$1, maybeMultipartFormRequestOptions, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, isUploadable, hasUploadableValue, addFormValue, isBlobLike, isFileLike, isResponseLike, APIResource, EMPTY$3, createPathTagFunction, path$11, Messages$1, isAssistantMessage, isToolMessage, _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_handleError, EventStream, _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult, DEFAULT_MAX_CHAT_COMPLETIONS, AbstractChatCompletionRunner, ChatCompletionRunner, STR, NUM, ARR, OBJ, NULL, BOOL, NAN, INFINITY, MINUS_INFINITY, INF, SPECIAL, ATOM, COLLECTION, Allow, PartialJSON, MalformedJSON, _parseJSON, partialParse, _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_getAutoParseableResponseFormat, _ChatCompletionStream_accumulateChatCompletion, ChatCompletionStream, ChatCompletionStreamingRunner, Completions$1, Chat, brand_privateNullableHeaders, buildHeaders, Speech, Transcriptions, Translations, Audio, Batches, Assistants, Sessions$1, TranscriptionSessions, Realtime$1, Sessions, Threads$1, ChatKit, Messages, Steps, toFloat32Array, readEnv, _AssistantStream_instances, _a$2, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun, AssistantStream, Runs$1, Threads, Beta, Completions, Content$2, Files$2, Containers, Items, Conversations, Embeddings, OutputItems, Runs, Evals, Files$1, Methods, Graders$1, Alpha, Permissions, Checkpoints$1, Checkpoints, Jobs, FineTuning, GraderModels, Graders, Images, Models, Moderations, Calls, ClientSecrets, Realtime, _ResponseStream_instances, _ResponseStream_params, _ResponseStream_currentResponseSnapshot, _ResponseStream_finalResponse, _ResponseStream_beginRequest, _ResponseStream_addEvent, _ResponseStream_endRequest, _ResponseStream_accumulateResponse, ResponseStream, InputItems, InputTokens, Responses, Content$1, Content, Versions, Skills, Parts, Uploads, allSettledWithThrow, FileBatches, Files, VectorStores, Videos, _Webhooks_instances, _Webhooks_validateSecret, _Webhooks_getRequiredHeader, Webhooks, _OpenAI_instances, _a$1, _OpenAI_encoder, _OpenAI_baseURLOverridden, WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER, OpenAI, KIMI_QUOTA_EXHAUSTED_ERROR_CODES$1, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS$1, TOOL_RESULT_MEDIA_PROMPT$1, TOOL_RESULT_MEDIA_PLACEHOLDER$1, KimiFiles$1, MIME_TO_EXT$1, EXT_TO_MIME$3, KNOWN_REASONING_KEYS$1, DEFAULT_REASONING_KEY$1, ReasoningKeyDialect$1, KIMI_TOOL_CALL_ID_POLICY, KimiStreamedMessage, KimiChatProvider, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING$1, OPENAI_CHAT_TOOL_CALL_ID_POLICY$1, OMITTED_AUDIO_PLACEHOLDER$3, OMITTED_VIDEO_PLACEHOLDER$3, OpenAILegacyStreamedMessage$1, OpenAILegacyChatProvider$1, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY$1, EMBEDDED_STATUS_CODE_RE$1, OMITTED_AUDIO_PLACEHOLDER$2, OMITTED_VIDEO_PLACEHOLDER$2, OpenAIResponsesStreamedMessage$1, OpenAIResponsesChatProvider$1, KNOWN_WIRE_TYPES$1, defaultHandler$1, currentHandler$1, HOOK_EVENT_TYPES$1, require_constants$9, require_utils$3, require_scan, require_parse$5, require_picomatch$1, import_picomatch, ProviderTypeSchema$1, OAuthRefSchema$2, StringRecordSchema$3, ProviderConfigSchema$1, ModelAliasBaseSchema, ModelAliasOverrideSchema, ModelAliasSchema, SecondaryModelConfigSchema$1, ThinkingConfigSchema$1, PermissionModeSchema, PermissionRuleDecisionSchema$1, PermissionRuleScopeSchema$1, PermissionRuleSchema$1, PermissionConfigSchema$1, LoopControlSchema$1, BackgroundConfigSchema, SubagentConfigSchema$1, McpTimeoutMsSchema$1, McpConfigSchema, ImageConfigSchema$1, ModelCatalogConfigSchema$1, ExperimentalConfigSchema$1, HookDefSchema$1, MoonshotServiceConfigSchema$1, ServicesConfigSchema$1, McpServerCommonFields$1, McpServerStdioConfigSchema$1, McpServerHttpConfigSchema$1, McpServerSseConfigSchema$1, McpServerConfigDiscriminatedSchema$1, McpServerConfigSchema$1, KimiConfigSchema, ProviderConfigPatchSchema, ModelAliasPatchSchema, ThinkingConfigPatchSchema, PermissionConfigPatchSchema, LoopControlPatchSchema, BackgroundConfigPatchSchema, SubagentConfigPatchSchema, SecondaryModelConfigPatchSchema, McpConfigPatchSchema, ImageConfigPatchSchema, ModelCatalogConfigPatchSchema, ExperimentalConfigPatchSchema, MoonshotServiceConfigPatchSchema, ServicesConfigPatchSchema, KimiConfigPatchSchema, TRUE_BOOLEAN_ENV_VALUES$1, FALSE_BOOLEAN_ENV_VALUES$1, ENV_MODEL_PROVIDER_KEY$1, ENV_MODEL_ALIAS_KEY$1, ALLOWED_TYPES, DEFAULT_BASE_URL, DEFAULT_MAX_CONTEXT_SIZE$1, DEFAULT_CAPABILITIES$1, SECONDARY_DERIVED_MODEL_ALIAS, SECONDARY_MODEL_ENV, SECONDARY_MODEL_EFFORT_ENV, DEFAULT_CONFIG_FILE_TEXT, ENTRY_KEYED_SECTIONS, MIGRATIONS_FILE$1, THINKING_EFFORT_MAX_TO_HIGH$1, S_IFMT$5, S_IFDIR$3, WorkspaceLocalTomlSchema, CTX_VALUE_MAX_CHARS$1, STACK_MAX_BYTES$1, ENTRY_MAX_BYTES$1, REDACTED_KEYS$1, SAFE_KEY_RE$1, ELLIPSIS$1, TRUNCATED_TAIL$1, REDACTED$1, RAW_SECRET_PATTERNS$1, LEVEL_LABEL$1, ANSI_LEVEL$1, ANSI_RESET$1, PENDING_MAX$1, STDERR_NOTICE_INTERVAL_MS$1, AsyncSerialQueue$1, RotatingFileSink, LOG_LEVEL_RANK, ROOT_SYMBOL, SESSION_LOG_ID, LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, MAIN_LLM_REQUEST_SESSION_LOG_OMITTED_CONTEXT_KEYS, nextSessionLogId, RootLoggerImpl, LoggerImpl, log, common, exception, snippet, TYPE_CONSTRUCTOR_OPTIONS, YAML_NODE_KINDS, type$2, failsafe, _null4, bool, int2, YAML_FLOAT_PATTERN, SCIENTIFIC_WITHOUT_DOT, float, core, YAML_DATE_REGEXP, YAML_TIMESTAMP_REGEXP, timestamp, merge2, BASE64_MAP, binary, _hasOwnProperty$3, _toString$2, omap, _toString$1, pairs, _hasOwnProperty$2, set$1, _default3, _hasOwnProperty$1, CONTEXT_FLOW_IN, CONTEXT_FLOW_OUT, CONTEXT_BLOCK_IN, CONTEXT_BLOCK_OUT, CHOMPING_CLIP, CHOMPING_STRIP, CHOMPING_KEEP, PATTERN_NON_PRINTABLE, PATTERN_NON_ASCII_LINE_BREAKS, PATTERN_FLOW_INDICATORS, PATTERN_TAG_HANDLE, PATTERN_TAG_URI, simpleEscapeCheck, simpleEscapeMap, i2, directiveHandlers, loader, _toString, _hasOwnProperty, CHAR_BOM, CHAR_TAB, CHAR_LINE_FEED, CHAR_CARRIAGE_RETURN, CHAR_SPACE, CHAR_EXCLAMATION, CHAR_DOUBLE_QUOTE, CHAR_SHARP, CHAR_PERCENT, CHAR_AMPERSAND, CHAR_SINGLE_QUOTE, CHAR_ASTERISK, CHAR_COMMA, CHAR_MINUS, CHAR_COLON, CHAR_EQUALS, CHAR_GREATER_THAN, CHAR_QUESTION, CHAR_COMMERCIAL_AT, CHAR_LEFT_SQUARE_BRACKET, CHAR_RIGHT_SQUARE_BRACKET, CHAR_GRAVE_ACCENT, CHAR_LEFT_CURLY_BRACKET, CHAR_VERTICAL_LINE, CHAR_RIGHT_CURLY_BRACKET, ESCAPE_SEQUENCES, DEPRECATED_BOOLEANS_SYNTAX, DEPRECATED_BASE60_SYNTAX, QUOTING_TYPE_SINGLE, QUOTING_TYPE_DOUBLE, STYLE_PLAIN, STYLE_SINGLE, STYLE_LITERAL, STYLE_FOLDED, STYLE_DOUBLE, dumper, load$2, require_isArguments, require_implementation$2, require_object_keys, require_es_define_property, require_syntax, require_type, require_gOPD, require_gopd, require_define_data_property, require_has_property_descriptors, require_define_properties, require_es_object_atoms, require_es_errors, require_eval, require_range$1, require_ref$1, require_uri$1, require_abs, require_floor$1, require_max, require_min, require_pow, require_round, require_isNaN, require_sign, require_shams$1, require_has_symbols, require_Reflect_getPrototypeOf, require_Object_getPrototypeOf, require_implementation$1, require_function_bind, require_functionCall, require_functionApply, require_reflectApply, require_actualApply, require_call_bind_apply_helpers, require_get, require_get_proto, require_hasown, require_get_intrinsic, require_set_function_length, require_applyBind, require_call_bind, require_call_bound, require_isFinite, require_isInteger, require_toString, require_StringIndexOf, require_StringPad, require_UnicodeEscape, require_floor, require_math_intrinsics, require_helpers$2, require_modulo, require_isCodePoint, require_UTF16EncodeCodePoint, require_isLeadingSurrogate, require_isTrailingSurrogate, require_is_callable, require_for_each, require_shams, require_is_regex, require_safe_regex_test, require_EncodeForRegExpEscape, require_UTF16SurrogatePairToCodePoint, require_CodePointAt, require_StringToCodePoints, require_callBound, require_implementation, require_polyfill, require_shim, import_regexp_escape, FrontmatterError$1, SkillParseError$1, UnsupportedSkillTypeError$1, FENCE$3, METADATA_ALIASES$1, FLAG_DEFINITIONS, FlagResolver, IMAGE_MIME_BY_SUFFIX$1, VIDEO_MIME_BY_SUFFIX$1, TEXT_MIME_BY_SUFFIX$1, NON_TEXT_SUFFIXES$1, ASF_HEADER$1, FTYP_IMAGE_BRANDS$1, FTYP_VIDEO_BRANDS$1, MODEL_ACCEPTED_IMAGE_MIMES$1, ACCEPTED_FORMATS_TEXT$1, UNSUPPORTED_IMAGE_FORMATS$1, BASE64_SNIFF_CHARS$1, decoderReady$1, MAX_IMAGE_EDGE_PX, MAX_IMAGE_EDGE_ENV, IMAGE_BYTE_BUDGET, READ_IMAGE_BYTE_BUDGET_ENV, JPEG_QUALITY_STEPS$1, FALLBACK_EDGES_PX$1, PNG_RESCALE_FLOOR_PX$1, MAX_DECODE_PIXELS$1, MAX_IMAGE_DECODE_BYTES$1, RECODABLE_MIME$1, CAPTION_OPENING$1, CAPTION_PATTERN$1, ImageLimits, RawSubagentProfileSchema, AgentModelPreferenceSchema, RawAgentProfileSchema, AGENTS_MD_RECOMMENDED_MAX_BYTES$1, S_IFMT$4, S_IFREG$2, require_lib$1, require_raw, require_asap, require_a_sync_waterfall, require_lexer, require_object, require_nodes, require_parser2, require_transformer, require_runtime, require_compiler, require_filters, require_loader, require_precompiled_loader, require_readdirp, require_handler, require_chokidar, require_node_loaders, require_loaders, require_tests, require_globals, require_express_app, require_environment, require_precompile_global, require_precompile, require_jinja_compat, env, WINDOWS_NOTES$1, ADDITIONAL_DIRS_SECTION_PROSE$1, SKILLS_SECTION_PROSE$1, agent_default$2, coder_default, explore_default, init_default$2, PROFILE_SOURCES, DEFAULT_INIT_PROMPT$1, DEFAULT_AGENT_PROFILES, AgentProfileSnapshotSchema, AgentProfileCatalogSnapshotSchema, AgentFileParseError$1, AGENT_NAME_PATTERN$1, USER_BRAND_DIRS$3, USER_GENERIC_DIRS$3, PROJECT_BRAND_DIRS$3, PROJECT_GENERIC_DIRS$3, MAX_AGENT_SCAN_DEPTH$1, MAX_SKIP_WARNINGS$1, PROMPT_VARIABLE$1, SYSTEM_MD_FILENAME$1, MCP_NAME_PREFIX$2, MCP_NAME_SEPARATOR$1, MAX_QUALIFIED_LENGTH$1, GLOB_MAGIC$1, SOURCE_PRIORITY, DEFAULT_AGENT_PROFILE_NAME$1, KNOWN_BUILTIN_TOOL_NAMES, SessionAgentProfileCatalog, PLUGIN_SECTIONS_MAX_BYTES$1, noopTelemetryClient, NEVER$1, MAX_TIMER_DELAY_MS$4, VALID_TASK_ID$1, BackgroundTaskPersistence, TERMINAL_STATUSES$1, AgentBackgroundTask, STREAM_DRAIN_GRACE_MS$1, ProcessBackgroundTask, QuestionBackgroundTask$1, MAX_RUNNING_TASKS_ENV$1, MAX_OUTPUT_BYTES$3, NOTIFICATION_FALLBACK_PREVIEW_BYTES$1, MAX_TASK_OUTPUT_BYTES$1, SIGTERM_GRACE_MS$3, USER_INTERRUPT_REASON$1, _ALPHABET, BackgroundManager, DYNAMIC_TOOL_SCHEMA_VARIANT$1, LOADABLE_TOOLS_TRIGGER, TOOLS_ADDED_BLOCK$1, TOOLS_REMOVED_BLOCK$1, UserCancellationError$1, BASE_DELAY_MS$1, MAX_DELAY_MS$1, RETRY_FACTOR$1, JITTER_FACTOR$1, LLMRequestTraceState, todo_list_default$1, TODO_LIST_TOOL_NAME$1, TODO_STORE_KEY, TODO_LIST_WRITE_REMINDER, TodoItemSchema$1, TodoListInputSchema$1, TodoListTool$1, messageTokenEstimateCache$1, MEDIA_TOKEN_ESTIMATE$1, MIN_FLOOR$1, DEFAULT_UNKNOWN_CONTEXT_FALLBACK$1, compaction_instruction_default$1, DEFAULT_COMPACTION_CONFIG$1, DefaultCompactionStrategy$1, COMPACTION_SUMMARY_PREFIX$1, COMPACT_USER_MESSAGE_MAX_TOKENS$1, COMPACT_USER_MESSAGE_HEAD_TOKENS$1, COMPACTION_ELISION_VARIANT$1, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS$1, OVERFLOW_CONTEXT_SAFETY_RATIO$1, OVERFLOW_STATUS_RECOVERY_RATIO$1, CompactionTruncatedError$1, FullCompaction, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS$1, COMPACTION_OVERFLOW_SHRINK_RATIOS$1, MEDIA_PART_MARKERS, DEFAULT_CONFIG, MicroCompaction, systemMonoNowMs$1, SYSTEM_CLOCKS$1, MAX_CLOCK_FILE_BYTES$1, CRON_ID_REGEX$1, ID_REGEX, MAX_ID_ATTEMPTS$1, SessionCronStore, import_retry, MINUTE_RANGE$1, HOUR_RANGE$1, DOM_RANGE$1, MONTH_RANGE$1, DOW_RANGE$1, MS_PER_MINUTE$3, DIGIT_ONLY$1, MONTH_NAMES$1, DAY_NAMES$1, DEFAULT_CRON_JITTER_CONFIG$1, MS_PER_DAY$3, MS_PER_MINUTE$2, DEFAULT_POLL_INTERVAL_MS$1, MAX_COALESCE_ITERATIONS$1, CRON_SCHEDULED$1, CRON_FIRED$1, CRON_MISSED$1, CRON_DELETED$1, STALE_THRESHOLD_MS$1, CronManager, KEEP_OFF_VALUES$1, ConfigState, TOOL_ERROR_STATUS$1, TOOL_EMPTY_STATUS$1, TOOL_EMPTY_ERROR_STATUS$1, TOOL_OUTPUT_EMPTY_TEXT$1, SYNTHETIC_TOOL_RESULT_TEXT, MEDIA_DEGRADED_PLACEHOLDERS$1, MEDIA_STRIPPED_PLACEHOLDERS$1, MEDIA_CONTAINER_KEY_CACHE$1, USER_PROMPT_ORIGIN$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$2, IMPORT_CONTEXT_GUIDANCE$1, ContextMemory, MAX_GOAL_OBJECTIVE_LENGTH$1, MAX_GOAL_COMPLETION_CRITERION_LENGTH$1, GOAL_CANCELLED_REMINDER$1, GOAL_FORK_CLEARED_REMINDER$1, GoalMode, DEFAULT_TIMEOUT_SECONDS$1, KILL_GRACE_MS$1, OptionalStringSchema$1, HookSpecificOutputSchema$1, HookJsonOutputSchema$1, DEFAULT_HOOK_TIMEOUT_SECONDS$1, HookEngine, KaosError, KaosFileExistsError, KaosShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS$1, MINGW_PREFIX_SET$1, detectedEnvironment, CYGPATH_TIMEOUT_MS$1, DRIVE_COLON_RE$1, CYGDRIVE_RE$1, DRIVE_RE$1, VIRTUAL_FS_PREFIXES$1, WIN32_DRIVE_ABSOLUTE_RE$1, bridgeCache$1, BufferedReadable$1, LOGIN_SHELL_ENV_TIMEOUT_MS$1, appliedLoginShellPath$1, isWindows$2, READ_CHUNK_SIZE$1, LocalProcess, LocalKaos, SENSITIVE_BASENAMES$1, SENSITIVE_PATH_SUFFIXES$1, ENV_PREFIX$1, ENV_EXEMPTIONS$1, SENSITIVE_BASENAME_PREFIXES$1, PUBLIC_KEY_BASENAMES$1, SENSITIVE_DOT_VARIANT_SUFFIXES$1, SENSITIVE_DOT_VARIANT_SUFFIX_SET$1, DEFAULT_WORKSPACE_ACCESS_POLICY$1, PathSecurityError$1, DEFAULT_PATH_CLASS$1, GLOB_LITERAL_SPECIAL$1, task_list_default$1, TaskListInputSchema$1, TaskListTool$1, DynamicInjector, GoalInjector, AUTO_MODE_ENTER_REMINDER, AUTO_MODE_EXIT_REMINDER, PermissionModeInjector, PluginSessionStartInjector, PLAN_MODE_DEDUP_MIN_TURNS$1, PLAN_MODE_FULL_REFRESH_TURNS$1, PlanModeInjector, TODO_LIST_REMINDER_VARIANT$1, TODO_LIST_REMINDER_TURNS_SINCE_WRITE$1, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS$1, TodoListReminderInjector, ToolsDiffInjector, ACTIVE_BACKGROUND_TASK_GUIDANCE$1, InjectionManager, AgentSwarmExclusiveDenyPermissionPolicy, AutoModeApprovePermissionPolicy, AutoModeAskUserQuestionDenyPermissionPolicy, DEFAULT_APPROVE_TOOLS$1, DefaultToolApprovePermissionPolicy, ExitPlanModeReviewAskPermissionPolicy, FallbackAskPermissionPolicy, S_IFMT$3, S_IFDIR$2, S_IFREG$1, SensitiveFileAccessAskPermissionPolicy, GitControlPathAccessAskPermissionPolicy, GitCwdWriteApprovePermissionPolicy, GoalStartReviewAskPermissionPolicy, PlanModeGuardDenyPermissionPolicy, PlanModeToolApprovePermissionPolicy, PreToolCallHookPermissionPolicy, SessionApprovalHistoryPermissionPolicy, SwarmModeAgentSwarmApprovePermissionPolicy, USER_CONFIGURED_SCOPES$1, UserConfiguredPermissionPolicy, UserConfiguredDenyPermissionPolicy, UserConfiguredAllowPermissionPolicy, UserConfiguredAskPermissionPolicy, YoloModeApprovePermissionPolicy, PermissionManager, HERO_NAMES$1, MAX_ATTEMPTS$1, PlanMode, migrateV1_0ToV1_1$1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN$1, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS$1, migrateV1_1ToV1_2$1, migrateV1_2ToV1_3$1, migrateV1_3ToV1_4$1, MIGRATIONS$1, InMemoryAgentRecordPersistence, FileSystemAgentRecordPersistence, DEFAULT_THRESHOLD$1, DEFAULT_MAX_CACHE_SIZE$1, BLOBREF_PROTOCOL$2, DATA_URI_HEADER_RE$1, MISSING_MEDIA_PLACEHOLDER$2, BlobStore, AgentRecords, UNDO_BOUNDARY_RECORD_TYPES, ReplayBuilder, check_kimi_code_docs_default$1, PSEUDO_PATH$11, parsed$11, CHECK_KIMI_CODE_DOCS_SKILL$1, custom_theme_default$1, PSEUDO_PATH$10, parsed$10, CUSTOM_THEME_SKILL$1, import_from_cc_codex_default$1, PSEUDO_PATH$9, parsed$9, IMPORT_FROM_CC_CODEX_SKILL$1, mcp_config_default$1, PSEUDO_PATH$8, parsed$8, MCP_CONFIG_SKILL$1, SKILL_default$5, SKILL_default$4, SKILL_default$3, SUB_SKILL_PARENT$1, SUB_SKILL_REVIEW$1, SUB_SKILL_CONSOLIDATE$1, update_config_default$1, PSEUDO_PATH$7, parsed$7, UPDATE_CONFIG_SKILL$1, write_goal_default$1, PSEUDO_PATH$6, parsed$6, WRITE_GOAL_SKILL$1, USER_BRAND_DIRS$2, USER_GENERIC_DIRS$2, PROJECT_BRAND_DIRS$2, PROJECT_GENERIC_DIRS$2, MAX_SKILL_SCAN_DEPTH$2, LISTING_DESC_MAX$1, SessionSkillRegistry, SOURCE_GROUPS$1, graphemeSegmenter$1, SkillManager, enter_reminder_default$1, exit_reminder_default$1, SwarmMode, ToolAccesses$1, require_code$1, require_scope, require_codegen, require_util$7, require_names, require_errors$1, require_boolSchema, require_rules, require_applicability, require_dataType, require_defaults, require_code, require_keyword, require_subschema, require_fast_deep_equal, require_json_schema_traverse, require_resolve, require_validate, require_validation_error, require_ref_error, require_compile, require_data, require_utils$2, require_schemes, require_fast_uri, require_uri, require_core$3, require_id, require_ref, require_core$2, require_limitNumber, require_multipleOf, require_ucs2length, require_limitLength, require_pattern, require_limitProperties, require_required, require_limitItems, require_equal, require_uniqueItems, require_const, require_enum, require_validation$2, require_additionalItems, require_items, require_prefixItems, require_items2020, require_contains, require_dependencies, require_propertyNames, require_additionalProperties, require_properties, require_patternProperties, require_not, require_anyOf, require_oneOf, require_allOf, require_if, require_thenElse, require_applicator$2, require_format$2, require_format$1, require_metadata, require_draft7, require_types$1, require_discriminator, require_json_schema_draft_07, require_ajv, require_dynamicAnchor, require_dynamicRef, require_recursiveAnchor, require_recursiveRef, require_dynamic, require_dependentRequired, require_dependentSchemas, require_limitContains, require_next, require_unevaluatedProperties, require_unevaluatedItems, require_unevaluated$1, require_schema$1, require_applicator$1, require_content$1, require_core$1, require_format, require_meta_data$1, require_validation$1, require_json_schema_2019_09, require__2019, require_draft2020, require_schema, require_applicator, require_unevaluated, require_content, require_core, require_format_annotation, require_meta_data, require_validation, require_json_schema_2020_12, require__2020, require_formats, require_limit, require_dist3, import_ajv, import__2019, import__2020, import_dist, DRAFT_07_AJV$1, DRAFT_2019_AJV$1, DRAFT_2020_AJV$1, DRAFT_2019_KEYWORDS$1, DRAFT_2020_KEYWORDS$1, ToolScheduler$1, GRACE_TIMEOUT_MS, TOOL_OUTPUT_EMPTY$1, TOOL_OUTPUT_NON_TEXT$1, UNEXECUTED_TOOL_CALL_OUTPUT, validators$1, ErrorCode$1, cursorQuerySchema, pageResponseSchema, ISO_8601_REGEX$1, isoDateTimeSchema$1, ENCODING, ENCODING_LEN, RANDOM_LEN, TIME_MAX, ULIDErrorCode, ULIDError, ToolInputDisplaySchema, messageRoleSchema, textContentSchema, toolUseContentSchema, toolResultContentSchema, imageSourceSchema, imageContentSchema, videoContentSchema, fileContentSchema, thinkingContentSchema, messageContentSchema, messageSchema, promptThinkingSchema, promptPermissionModeSchema, promptStatusSchema, promptItemSchema, workspaceIdSchema, workspaceSchema$1, sessionUsageSchema, permissionRuleMatcherSchema, permissionRuleSchema, sessionAgentConfigSchema, sessionAgentConfigPartialSchema, sessionMetadataSchema, sessionPendingInteractionSchema, sessionSchema, providerConfigResponseSchema, configResponseSchema, modelCatalogItemSchema$2, providerCatalogStatusSchema$2, providerCatalogItemSchema$2, providerRefreshChangeSchema$1, providerRefreshFailureSchema$1, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE, tokenUsageSchema$1, finishReasonSchema, usageStatusSchema$1, permissionModeSchema$1, skillSourceSchema, bundledSkillActivationSchema, userPromptOriginSchema, skillActivationOriginSchema, pluginCommandOriginSchema, injectionOriginSchema, shellCommandOriginSchema, compactionSummaryOriginSchema, systemTriggerOriginSchema, taskLifecycleStatusSchema$1, taskOriginSchema, backgroundTaskOriginSchema, cronJobOriginSchema, cronMissedOriginSchema, hookResultOriginSchema, retryOriginSchema, promptOriginSchema, goalStatusSchema, goalActorSchema, goalBudgetReportSchema, goalSnapshotSchema, goalChangeStatsSchema, goalChangeKindSchema, goalChangeSchema, kimiErrorCodeSchema, kimiErrorPayloadSchema, kimiErrorPayloadObjectSchema, taskInfoBaseSchema, processTaskInfoSchema, agentTaskInfoSchema$1, questionTaskInfoSchema, taskInfoSchema, compactionResultSchema, toolUpdateSchema, turnEndReasonSchema$1, turnInterruptReasonSchema, agentPhaseSchema, agentStatusUpdatedEventSchema$1, sessionMetaUpdatedEventSchema, sessionCreatedEventSchema, workspaceCreatedEventSchema, workspaceUpdatedEventSchema, workspaceDeletedEventSchema, sessionWorkChangedEventSchema, sessionStatusChangedEventSchema, configChangedEventSchema, configWarningEventSchema, modelCatalogChangedEventSchema, pluginChangedEventSchema, capabilityChangedEventSchema, goalUpdatedEventSchema, skillActivatedEventSchema, pluginCommandActivatedEventSchema, errorEventSchema$1, warningEventSchema$1, turnStartedEventSchema$1, turnEndedEventSchema$1, turnStepStartedEventSchema, turnStepCompletedEventSchema, turnStepRetryingEventSchema, turnStepInterruptedEventSchema, assistantDeltaEventSchema$1, hookResultEventSchema, thinkingDeltaEventSchema$1, toolCallDeltaEventSchema$1, toolCallStartedEventSchema$1, toolProgressEventSchema$1, shellOutputEventSchema, shellStartedEventSchema, shellCompletedEventSchema, toolResultEventSchema$1, subagentSpawnedEventSchema, subagentStartedEventSchema, subagentSuspendedEventSchema, subagentCompletedEventSchema, subagentFailedEventSchema, compactionStartedEventSchema$1, compactionBlockedEventSchema$1, compactionCancelledEventSchema$1, compactionCompletedEventSchema$1, taskStartedEventSchema, taskTerminatedEventSchema, backgroundTaskStartedEventSchema, backgroundTaskTerminatedEventSchema, cronFiredEventSchema, promptSubmittedEventSchema, promptCompletedEventSchema$1, promptAbortedEventSchema$1, promptSteeredEventSchema, toolListUpdatedReasonSchema, toolListUpdatedEventSchema, mcpServerStatusPayloadSchema, mcpServerStatusEventSchema, eventSchema, sessionCursorSchema, cursorsBySessionSchema, wsEventEnvelopeSchema, wsAckEnvelopeSchema, serverHelloPayloadSchema, serverHelloMessageSchema, agentFilterSchema, clientHelloPayloadSchema, clientHelloMessageSchema, clientHelloAckMessageSchema, watchFsConfigSchema, subscribePayloadSchema, subscribeMessageSchema, subscribeAckPayloadSchema, subscribeAckMessageSchema, unsubscribePayloadSchema, unsubscribeMessageSchema, unsubscribeAckMessageSchema, watchFsAddPayloadSchema, watchFsAddMessageSchema, watchFsRemovePayloadSchema, watchFsRemoveMessageSchema, watchFsAckMessageSchema, abortPayloadSchema, abortMessageSchema, abortAckMessageSchema, terminalAttachPayloadSchema, terminalAttachMessageSchema, terminalAttachAckMessageSchema, terminalDetachPayloadSchema, terminalDetachMessageSchema, terminalDetachAckMessageSchema, terminalInputPayloadSchema, terminalInputMessageSchema, terminalInputAckMessageSchema, terminalResizePayloadSchema, terminalResizeMessageSchema, terminalResizeAckMessageSchema, terminalClosePayloadSchema, terminalCloseMessageSchema, terminalCloseAckMessageSchema, pingPayloadSchema, pingMessageSchema, pongPayloadSchema, pongMessageSchema, resyncRequiredPayloadSchema, resyncRequiredMessageSchema, wsErrorPayloadSchema, wsErrorMessageSchema, terminalOutputPayloadSchema, terminalExitPayloadSchema, clientControlOperations, serverSystemOperations, approvalDecisionSchema, approvalScopeSchema, approvalRequestSchema$1, questionOptionSchema$1, questionItemSchema$1, questionRequestSchema$1, questionAnswerSchema, questionAnswerMethodSchema, toolSourceSchema, toolDescriptorSchema, mcpServerStatusSchema, mcpServerTransportSchema, mcpServerSchema, skillDescriptorSchema, taskKindSchema, taskStatusSchema, taskSchema, fsKindSchema$1, fsGitStatusSchema$1, fsEntrySchema$1, fsSearchHitSchema$1, fsSuggestItemSchema$1, fsGrepMatchSchema$1, fsGrepFileHitSchema$1, fsChangeKindSchema, fsChangeActionSchema, fsChangeEntrySchema, fsListSortSchema$1, fsReadEncodingRequestSchema$1, fsReadEncodingResponseSchema$1, fsOpenInAppIdSchema, fsListManyPartialErrorSchema$1, fsPullRequestSchema$1, metaCapabilitiesSchema, managedProviderStatusSchema$1, managedProviderSummarySchema$1, oauthFlowStatusEnum, oauthFlowStartPendingSchema, oauthFlowStartAuthenticatedSchema, booleanQueryParam, MAX_SESSION_EXPORT_WEB_LOG_BYTES, sessionStatusResponseSchema, sessionWarningSchema, inFlightToolCallSchema, inFlightTurnSchema, snapshotSubagentSchema, fsBrowseEntrySchema$2, activateSkillAttachmentSchema, relativeCwdSchema$1, terminalStatusSchema$1, terminalSchema$1, connectionSchema, keySchema, OAuthCallbackClosedError$1, SUCCESS_HTML$1, ERROR_HTML$1, SafeUrlSchema, OAuthProtectedResourceMetadataSchema, OAuthMetadataSchema, OpenIdProviderMetadataSchema, OpenIdProviderDiscoveryMetadataSchema, OAuthTokensSchema, OAuthErrorResponseSchema, OptionalSafeUrlSchema, OAuthClientMetadataSchema, OAuthClientInformationSchema, OAuthClientInformationFullSchema, OAuthError$1, OAuthUnauthorizedError, OAuthAccessDeniedError, OAuthConnectionError, DeviceCodeTimeoutError, RetryableRefreshError, FileTokenStorage, DIRECT_ERROR_KEYS, NESTED_ERROR_KEYS, RETRYABLE_STATUSES, DEFAULT_HTTP_TIMEOUT_MS, require_polyfills, require_legacy_streams, require_clone$1, require_graceful_fs, require_retry_operation, require_retry$2, require_retry$1, require_signals, require_signal_exit, require_mtime_precision, require_lockfile, require_adapter, import_proper_lockfile, MIN_REFRESH_THRESHOLD_SECONDS, REFRESH_THRESHOLD_RATIO, DEFAULT_DEVICE_CODE_TIMEOUT_MS, defaultSleep, OAuthManager, KIMI_CODE_CUSTOM_HEADERS_ENV, DEFAULT_KIMI_CODE_OAUTH_HOST, KIMI_CODE_FLOW_CONFIG, DEFAULT_KIMI_CODE_BASE_URL, FIXED_POINT_CENTS, MANAGED_KIMI_MODEL_FIELDS, CUSTOM_REGISTRY_MODEL_FIELDS, KIMI_CODE_PLATFORM_ID, KIMI_CODE_PROVIDER_NAME$1, KIMI_CODE_OAUTH_KEY, KIMI_CODE_SCOPED_OAUTH_KEY_PREFIX, ManagedKimiCodeModelsAuthError, SHARED_DEFAULT_BASE_URLS, KIMI_REGION_PROFILES, KIMI_REGION_MARKER_FILENAME, managedUserInfoPhoneSchema, managedUserInfoSchema, managedUserInfoOkSchema, managedUserInfoErrorSchema, OPEN_PLATFORMS, OpenPlatformApiError, CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT, CUSTOM_REGISTRY_DEFAULT_CAPABILITIES, ALLOWED_PROVIDER_TYPES, CustomRegistryApiError, KimiOAuthToolkit, REQUEST_TIMEOUT_MS, OAuthTokenTransaction, TransactionLock, transactionLock, JsonFileStore, TOKENS_SUFFIX$1, CLIENT_SUFFIX$1, DISCOVERY_SUFFIX$1, META_SUFFIX$1, PASSIVE_REDIRECT_URI$1, McpOAuthClientProvider$1, crypto$4, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, RELATED_TASK_META_KEY, AssertObjectSchema, ProgressTokenSchema, CursorSchema, TaskMetadataSchema, RelatedTaskMetadataSchema, RequestMetaSchema, BaseRequestParamsSchema, TaskAugmentedRequestParamsSchema, isTaskAugmentedRequestParams, RequestSchema, NotificationsParamsSchema, NotificationSchema, ResultSchema, RequestIdSchema, JSONRPCRequestSchema, isJSONRPCRequest, JSONRPCNotificationSchema, isJSONRPCNotification, JSONRPCResultResponseSchema, isJSONRPCResultResponse, ErrorCode, JSONRPCErrorResponseSchema, isJSONRPCErrorResponse, JSONRPCMessageSchema, EmptyResultSchema, CancelledNotificationParamsSchema, CancelledNotificationSchema, IconSchema, IconsSchema, BaseMetadataSchema, ImplementationSchema, FormElicitationCapabilitySchema, ElicitationCapabilitySchema, ClientTasksCapabilitySchema, ServerTasksCapabilitySchema, ClientCapabilitiesSchema, InitializeRequestParamsSchema, InitializeRequestSchema, ServerCapabilitiesSchema, InitializeResultSchema, InitializedNotificationSchema, isInitializedNotification, PingRequestSchema, ProgressSchema, ProgressNotificationParamsSchema, ProgressNotificationSchema, PaginatedRequestParamsSchema, PaginatedRequestSchema, PaginatedResultSchema, TaskStatusSchema, TaskSchema, CreateTaskResultSchema, TaskStatusNotificationParamsSchema, TaskStatusNotificationSchema, GetTaskRequestSchema, GetTaskResultSchema, GetTaskPayloadRequestSchema, ListTasksRequestSchema, ListTasksResultSchema, CancelTaskRequestSchema, CancelTaskResultSchema, ResourceContentsSchema, TextResourceContentsSchema, Base64Schema, BlobResourceContentsSchema, RoleSchema, AnnotationsSchema, ResourceSchema, ResourceTemplateSchema, ListResourcesRequestSchema, ListResourcesResultSchema, ListResourceTemplatesRequestSchema, ListResourceTemplatesResultSchema, ResourceRequestParamsSchema, ReadResourceRequestParamsSchema, ReadResourceRequestSchema, ReadResourceResultSchema, ResourceListChangedNotificationSchema, SubscribeRequestParamsSchema, SubscribeRequestSchema, UnsubscribeRequestParamsSchema, UnsubscribeRequestSchema, ResourceUpdatedNotificationParamsSchema, ResourceUpdatedNotificationSchema, PromptArgumentSchema, PromptSchema, ListPromptsRequestSchema, ListPromptsResultSchema, GetPromptRequestParamsSchema, GetPromptRequestSchema, TextContentSchema, ImageContentSchema, AudioContentSchema, ToolUseContentSchema, EmbeddedResourceSchema, ResourceLinkSchema, ContentBlockSchema, PromptMessageSchema, GetPromptResultSchema, PromptListChangedNotificationSchema, ToolAnnotationsSchema, ToolExecutionSchema, ToolSchema, ListToolsRequestSchema, ListToolsResultSchema, CallToolResultSchema, CallToolRequestParamsSchema, CallToolRequestSchema, ToolListChangedNotificationSchema, ListChangedOptionsBaseSchema, LoggingLevelSchema, SetLevelRequestParamsSchema, SetLevelRequestSchema, LoggingMessageNotificationParamsSchema, LoggingMessageNotificationSchema, ModelHintSchema, ModelPreferencesSchema, ToolChoiceSchema, ToolResultContentSchema, SamplingContentSchema, SamplingMessageContentBlockSchema, SamplingMessageSchema, CreateMessageRequestParamsSchema, CreateMessageRequestSchema, CreateMessageResultSchema, CreateMessageResultWithToolsSchema, BooleanSchemaSchema, StringSchemaSchema, NumberSchemaSchema, UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema, LegacyTitledEnumSchemaSchema, SingleSelectEnumSchemaSchema, UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema, MultiSelectEnumSchemaSchema, EnumSchemaSchema, PrimitiveSchemaDefinitionSchema, ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema, ElicitRequestParamsSchema, ElicitRequestSchema, ElicitationCompleteNotificationParamsSchema, ElicitationCompleteNotificationSchema, ElicitResultSchema, ResourceTemplateReferenceSchema, PromptReferenceSchema, CompleteRequestParamsSchema, CompleteRequestSchema, CompleteResultSchema, RootSchema, ListRootsRequestSchema, ListRootsResultSchema, RootsListChangedNotificationSchema, McpError, UrlElicitationRequiredError, OAuthError, InvalidRequestError, InvalidClientError, InvalidGrantError, UnauthorizedClientError, UnsupportedGrantTypeError, InvalidScopeError, AccessDeniedError, ServerError, TemporarilyUnavailableError, UnsupportedResponseTypeError, UnsupportedTokenTypeError, InvalidTokenError, MethodNotAllowedError, TooManyRequestsError, InvalidClientMetadataError, InsufficientScopeError, InvalidTargetError, OAUTH_ERRORS, UnauthorizedError, AUTHORIZATION_CODE_RESPONSE_TYPE, AUTHORIZATION_CODE_CHALLENGE_METHOD, REFRESH_AHEAD_MS$1, MAX_TIMER_DELAY_MS$3, McpOAuthService$1, AlreadyAuthorizedError$1, DEFAULT_AUTH_TIMEOUT_MS$3, AUTH_TOOL_TOOL_NAME$1, DESCRIPTION_TEMPLATE$1, DEFAULT_MAX_TOTAL_BYTES$1, MIME_EXTENSION$1, MCP_MAX_OUTPUT_CHARS, MCP_OUTPUT_TRUNCATED_TEXT, MCP_MAX_BINARY_PART_BYTES$1, MCP_MAX_BINARY_PART_CHARS$1, DenyAllPermissionPolicy, GIT_TIMEOUT_MS$2, MAX_DIRTY_FILES$1, MAX_COMMIT_LINE_LENGTH$1, ALLOWED_HOSTS$1, INITIAL_LAUNCH_LIMIT$1, INITIAL_LAUNCH_INTERVAL_MS$1, RATE_LIMIT_RETRY_BASE_MS$1, RATE_LIMIT_RETRY_FACTOR$1, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$2, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$2, RATE_LIMIT_SUSPENDED_REASON$1, AGENT_SWARM_MAX_CONCURRENCY_ENV$1, SubagentBatch, summary_continuation_default, DEFAULT_SUBAGENT_TIMEOUT_MS$1, SUBAGENT_TIMEOUT_ENV$1, SUMMARY_MIN_LENGTH, SUMMARY_CONTINUATION_ATTEMPTS, HOOK_TEXT_PREVIEW_LENGTH, SUBAGENT_MAX_TOKENS_ERROR$1, TOOL_CALL_DISABLED_MESSAGE$1, SUBAGENT_PROMPT_ORIGIN, SIDE_QUESTION_SYSTEM_REMINDER$1, SessionSubagentHost, LlmRequestLogger, task_output_default$1, OUTPUT_PREVIEW_BYTES$2, PAGING_HINT_LINES$2, TaskOutputInputSchema$1, TaskOutputTool$1, task_stop_default$1, TaskStopInputSchema$1, TaskStopTool$1, cron_create_default$1, MAX_PROMPT_BYTES$1, ONE_SHOT_MAX_FUTURE_MS$1, CronCreateInputSchema$1, CronCreateTool$1, cron_delete_default$1, ID_PATTERN$1, CronDeleteInputSchema$1, CronDeleteTool$1, cron_list_default$1, CronListInputSchema$1, MS_PER_DAY$2, PROMPT_PREVIEW_BYTES$1, CronListTool$1, agent_background_disabled_default$1, agent_background_enabled_default$1, agent_default$1, AgentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE$1, AGENT_TOOL_PARAMETERS, AGENT_TOOL_PARAMETERS_NO_MODEL, AgentTool, USER_INTERRUPTED_SUBAGENT_MESSAGE$1, agent_swarm_default$1, DEFAULT_SUBAGENT_TYPE$1, PROMPT_TEMPLATE_PLACEHOLDER$1, MAX_AGENT_SWARM_SUBAGENTS$1, AGENT_SWARM_PARAMETERS$1, AGENT_SWARM_PARAMETERS_NO_MODEL$1, AgentSwarmTool$1, ask_user_default$1, QuestionOptionSchema$1, QuestionItemSchema$1, QUESTION_UNIQUENESS_MESSAGE$1, AskUserQuestionInputBaseSchema$1, AskUserQuestionInputSchemaWithBackground$1, AskUserQuestionInputSchema$1, QUESTION_DISMISSED_MESSAGE$1, QUESTION_UNSUPPORTED_FAILURE_MESSAGE$1, BACKGROUND_DESCRIPTION$1, BACKGROUND_UNAVAILABLE_MESSAGE$1, PARAMETERS_WITH_BACKGROUND$1, PARAMETERS_FOREGROUND_ONLY$1, AskUserQuestionTool$1, skill_tool_default, NestedSkillTooDeepError$1, SkillToolInputSchema$1, SkillTool$1, edit_default$1, EditInputSchema$1, EditTool$1, kr, vr, Os, Br, Pr, zr, q, j, rt, Le, jt, Ne, Ts, Ae, xs, z$2, Mt, b, Qt, Bt, _, A2, g, yi, De, L, w, Ri, bi, Ls, _i, Z2, gi, Ie, Jt, yt, C, te, Ur, Hr, Wr, Gr, Ce, Oi, Zr, Yr, D, Vr, ot, H, ee, m2, xi, J, Li, Ii, Ci, se, Fe, Ut, Ht, Ni, Pt, ht, U, nt, Y2, zt, Ai, Q, ie, Di, ke, Rt, ve, bt, _t, Me, tt, Wt, $r, As, Ds, Is, Cs, Fs, Xr, re, K, jr, M, Qr, vs, Jr, ki, Ot, Gt, vi, ne, Be, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ms, en, sn, Bs, rn, nn, Ps, zs, oe, hn, he, Ke, F2, an, Tt, Pi, ln, at, cn, fn, dn, lt, un, mn, pn, zi, En, xt, ct, Sn, yn, Rn, f3, Yt, Lt, gn, Zi, Yi, On, B, Nt, et, Ui, Us, V, ae, ft, Hs, p, it, dt, Hi, At, y2, Ve, $e, Wi, Ws, Gs, le, Gi, Xe, Kt, ut, qe, Dt, je, Qe, Zs, Tn, st, mt, Nn, Ki, An, Dn, It, Vi, Cn, Ys, ce, Je, $i, Fn, kn, Xi, Ks, Js, vn, Xs, qs, js, ji, Qs, fe, ti, Qi, ei, Ji, ts, es, is$3, pt, ii, ss, qi, X, de, si, ri, Mn, ni, ue, di, tr, oi, me, W, Ct, Ft, pe$1, rs, G, ns, hi, er, as, ls, ai, li, ir, os$1, ci, rr, hs, Et, kt, Un, Hn, or, hr, Wn, Gn, fr, dr, ar, ur, mr, pr, Kn, Vn, $n, lr, cs, fs$6, ui, Xn, ds, qn, us, we, wt, Qn, Er, ms, wr, Jn, Sr, ps, yr, $t, Rr, eo, io, Ei, _r, gr, ys, Or, Rs, P$1, bs, _s, Si, Tr, xr, ye, Lr, Nr, Es, St, O$1, wi, Ar, Xt, ws, Ss, gs, Re, be, _e, ge, Oe, no, oo, ho, Dr, qt, Se, Te, ao, lo, co, fo, uo, mo, po, Eo, vt, So, require_pend, require_fd_slicer, require_buffer_crc32, import_yauzl, RG_VERSION$1, DOWNLOAD_TIMEOUT_MS$1, RG_ARCHIVE_SHA256$1, downloadPromise$1, DEFAULT_TIMEOUT_MS$2, MAX_OUTPUT_BYTES$2, VCS_DIRECTORIES_TO_EXCLUDE$2, SENSITIVE_GLOBS_TO_EXCLUDE$2, glob_default$1, GlobInputSchema$1, WINDOWS_PATH_HINT$1, S_IFMT$2, S_IFDIR$1, GlobTool$1, DEFAULT_MAX_CHARS, DEFAULT_MAX_LINE_LENGTH, TRUNCATION_MARKER$1, TRUNCATION_MESSAGE, ToolResultBuilder, grep_default$1, GrepInputSchema$1, RG_MAX_COLUMNS$1, DEFAULT_HEAD_LIMIT$1, MTIME_STAT_CONCURRENCY$1, CONTENT_LINE_RE$1, GrepTool$1, GrepAbortedError$1, read_default$1, MAX_LINES$1, MAX_LINE_LENGTH$1, MAX_BYTES$1, S_IFMT$1, S_IFREG, PositiveLineOffsetSchema$1, TailLineOffsetSchema$1, ReadInputSchema$1, READ_DESCRIPTION$1, ReadTool$1, read_media_default$1, MAX_MEDIA_MEGABYTES$1, ReadMediaFileInputSchema$1, ReadMediaFileTool$1, write_default$1, S_IFMT, S_IFDIR, WriteInputSchema$1, WriteTool$1, create_goal_default$1, CreateGoalToolInputSchema$1, CreateGoalTool$1, get_goal_default$1, GetGoalToolInputSchema$1, GetGoalTool$1, set_goal_budget_default$1, MIN_REASONABLE_TIME_BUDGET_MS$1, MAX_REASONABLE_TIME_BUDGET_MS$1, SetGoalBudgetToolInputSchema$1, SetGoalBudgetTool$1, update_goal_default$1, UpdateGoalToolInputSchema$1, UpdateGoalTool$1, enter_plan_mode_default$1, EnterPlanModeInputSchema$1, EnterPlanModeTool$1, exit_plan_mode_default$1, RESERVED_OPTION_LABELS$1, ExitPlanModeOptionSchema$1, ExitPlanModeInputSchema$1, ExitPlanModeTool$1, SELECT_TOOLS_TOOL_NAME$1, SelectToolsInputSchema$1, DESCRIPTION$1, SelectToolsTool$1, bash_default$1, MS_PER_SECOND$1, DEFAULT_TIMEOUT_S$1, MAX_TIMEOUT_S$1, DEFAULT_BACKGROUND_TIMEOUT_S$1, MAX_BACKGROUND_TIMEOUT_S$1, USER_INTERRUPT_REASON, BashInputSchema$1, SHELL_TIMEOUT_VARS$1, BashTool$1, WINDOWS_NUL_REDIRECT$1, fetch_url_default$1, HttpFetchError$1, FetchURLInputSchema$1, FetchURLTool$1, web_search_default$1, WebSearchInputSchema$1, WebSearchTool$1, SHELL_FOREGROUND_TIMEOUT_S$1, ToolManager, REMINDER_TEXT_1$1, REMINDER_TEXT_3$1, REPEAT_REMINDER_1_START$1, REPEAT_REMINDER_2_START$1, REPEAT_REMINDER_3_START$1, REPEAT_FORCE_STOP_STREAK$1, DEDUP_PLACEHOLDER_RESULT, ToolCallDeduplicator, TOOL_RESULT_MAX_CHARS, TOOL_RESULT_PREVIEW_CHARS, LLM_NOT_SET_MESSAGE$1, GOAL_CONTINUATION_ORIGIN$1, GOAL_RATE_LIMIT_PAUSE_REASON$1, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX$1, GOAL_PROVIDER_AUTH_PAUSE_PREFIX$1, GOAL_PROVIDER_API_PAUSE_PREFIX$1, GOAL_MODEL_CONFIG_PAUSE_PREFIX$1, GOAL_RUNTIME_PAUSE_PREFIX$1, GOAL_PROVIDER_FILTERED_PAUSE_REASON$1, GOAL_CONTINUATION_PROMPT$1, GOAL_STEP_CAP_CONTINUATION_PROMPT$1, TurnFlow, MAX_STEPS_PER_TURN_ENV, MAX_RETRIES_PER_STEP_ENV, KosongLLM, UsageRecorder, LlmRequestRecorder, Agent$4, Protocol, AjvJsonSchemaValidator, ExperimentalClientTasks, Client, ParseError, EventSourceParserStream, DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS, StreamableHTTPError, StreamableHTTPClientTransport, KIMI_MCP_CLIENT_VERSION$1, HttpMcpClient$1, ErrorEvent, __typeError, __accessCheck, __privateGet, __privateAdd, __privateSet, __privateMethod, _readyState, _url2, _redirectUrl, _withCredentials, _fetch, _reconnectInterval, _reconnectTimer, _lastEventId, _controller, _parser, _onError, _onMessage, _onOpen, _EventSource_instances, connect_fn, _onFetchResponse, _onFetchError, getRequestOptions_fn, _onEvent, _onRetryChange, failConnection_fn, scheduleReconnect_fn, _reconnect, EventSource, SseError, SSEClientTransport, SseMcpClient$1, require_symbols, require_timers, require_errors, require_constants$8, require_tree, require_util$6, require_stats, require_diagnostics, require_request$1, require_wrap_handler, require_dispatcher, require_unwrap_handler, require_dispatcher_base, require_connect, require_utils$1, require_constants$7, require_llhttp_wasm, require_llhttp_simd_wasm, require_constants$6, require_global$1, require_encoding, require_infra, require_data_url, require_runtime_features, require_webidl, require_util$5, require_formdata, require_formdata_parser, require_promise, require_body, require_client_h1, require_client_h2, require_client, require_fixed_queue, require_pool_base, require_pool, require_balanced_pool, require_round_robin_pool, require_agent, require_socks5_utils, require_socks5_client, require_socks5_proxy_agent, require_proxy_agent, require_env_http_proxy_agent, require_retry_handler, require_retry_agent, require_h2c_client, require_readable, require_api_request, require_abort_signal, require_api_stream, require_api_pipeline, require_api_upgrade, require_api_connect, require_api, require_mock_errors, require_mock_symbols, require_mock_utils, require_mock_interceptor, require_mock_client, require_mock_call_history, require_mock_pool, require_pending_interceptors_formatter, require_mock_agent, require_snapshot_utils, require_snapshot_recorder, require_snapshot_agent, require_global, require_decorator_handler, require_redirect_handler, require_redirect, require_response_error, require_retry, require_dump, require_dns, require_cache$2, require_date2, require_cache_handler, require_memory_cache_store, require_cache_revalidation_handler, require_cache$1, require_decompress, require_deduplication_handler, require_deduplicate, require_sqlite_cache_store, require_headers, require_response, require_request, require_subresource_integrity, require_fetch, require_util$4, require_cache, require_cachestorage, require_constants$5, require_util$3, require_parse$4, require_cookies, require_events, require_constants$4, require_util$2, require_frame, require_connection, require_permessage_deflate, require_receiver, require_sender, require_websocket, require_websocketerror, require_websocketstream, require_util$1, require_eventsource_stream, require_eventsource, require_undici, require_utils2, require_smartbuffer, require_constants$3, require_util, require_address_error, require_common3, require_constants$2, require_ipv4, require_constants$12, require_helpers$1, require_regular_expressions, require_ipv6, require_ip_address, require_helpers2, require_receivebuffer, require_socksclient, require_build, import_undici, import_build, LOOPBACK_NO_PROXY$1, SOCKS_SCHEMES$1, defaultMakeHttpAgent, defaultMakeSocksAgent, defaultInstallProxyDeps, require_windows, require_mode, require_isexe, require_which, require_path_key, require_resolveCommand, require_escape, require_shebang_regex, require_shebang_command, require_readShebang, require_parse$3, require_enoent, import_cross_spawn, ReadBuffer, DEFAULT_INHERITED_ENV_VARS, StdioClientTransport, STDERR_BUFFER_CAPACITY$1, StdioMcpClient$1, BoundedTail$1, DEFAULT_STARTUP_TIMEOUT_MS$1, MCP_STARTUP_TIMEOUT_ENV$1, MCP_TOOL_TIMEOUT_ENV$1, McpConnectionManager$1, GlobalMcpConfigStore, McpServerRegistry, MAX_WORKDIR_SLUG_LENGTH$1, WORKDIR_KEY_PREFIX$1, HASH_LENGTH$1, WIN_SHAPED$1, appendQueues, MAX_TITLE_LENGTH$1, MAX_LAST_PROMPT_LENGTH$1, SessionSummaryStateSchema, FORKED_SESSION_DROPPED_FILES, SessionStore, BACKGROUND_KEEP_ALIVE_ON_EXIT_ENV, ACTIVE_TURN_CLOSE_TIMEOUT_MS, Session$1, PLUGIN_NAME_REGEX$1, KIMI_PLUGIN_ROOT_PATH$1, KIMI_PLUGIN_DIR_PATH$1, PLUGIN_SYSTEM_PROMPT_MAX_BYTES$1, UNSUPPORTED_RUNTIME_FIELDS$1, INSTALLED_REL$1, EMPTY$2, SHA_RE$1, KIMI_NODE_FALLBACK_SUBCOMMAND$1, PluginManager$1, require_Readability, require_Readability_readerable, import_readability, CHANGED, CLASS_LIST, CUSTOM_ELEMENTS, CONTENT, DATASET, DOCTYPE, DOM_PARSER, END, EVENT_TARGET, GLOBALS, IMAGE, MIME, MUTATION_OBSERVER, NEXT, OWNER_ELEMENT, PREV, PRIVATE, SHEET, START, STYLE, UPGRADE, VALUE$1, _a2, decodeMap, fromCodePoint, htmlDecodeTree, xmlDecodeTree, BinTrieFlags, CharCodes$1, TO_LOWER_BIT, EntityDecoderState, DecodingMode, EntityDecoder, CharCodes, State, QuoteType, Sequences, Tokenizer, formTags, pTag, tableSectionTags, ddtTags, rtpTags, openImpliesClose, voidElements$1, foreignContextElements, htmlIntegrationElements, reNameEnd, Parser$2, esm_exports$2, ElementType, Root, Text$3, Directive, Comment$3, Script, Style, Tag, CDATA$1, Doctype, Node$5, DataNode, Text$2, Comment$2, ProcessingInstruction, NodeWithChildren, CDATA, Document$2, Element$2, defaultOpts, DomHandler, xmlReplacer, xmlCodeMap, getCodePoint, escapeAttribute, escapeText, elementNames, attributeNames, unencodedElements, singleTag, foreignModeIntegrationPoints, foreignElements, Checks, DocumentPosition, MEDIA_KEYS_STRING, MEDIA_KEYS_INT, esm_exports$1, esm_exports, parseFeedDefaultOptions, BLOCK_ELEMENTS, SVG_NAMESPACE, assign$1, create$1, defineProperties, entries, getOwnPropertyDescriptors, keys, setPrototypeOf, $String, getEnd, ignoreCase, knownAdjacent, knownBoundaries, knownSegment, knownSiblings, localCase, setAdjacent, htmlToFragment, shadowRoots, reactive, Classes, customElements, attributeChangedCallback$1, createTrigger, triggerConnected, connectedCallback, triggerDisconnected, disconnectedCallback, CustomElementRegistry, Parser$1, append, attribute, parseFromString, htmlClasses, registerHTMLClass, loopSegment, attrAsJSON, characterDataAsJSON, nonElementAsJSON, documentTypeAsJSON, elementAsJSON, createRecord, queueAttribute, attributeChangedCallback, moCallback, MutationObserverClass, emptyAttributes, setAttribute, removeAttribute, booleanAttribute, numericAttribute, stringAttribute, wm, DOMEventTarget, NodeList, getParentNodeCount, Node$4, replace, ca, esca, pe, escape$1, QUOTE, Attr$1, isConnected, parentElement, previousSibling, nextSibling, nextElementSibling, previousElementSibling, asFragment, before, after, replaceWith, remove, CharacterData$1, CDATASection$1, Comment$1, require_boolbase, require_types, require_parse$2, require_stringify, require_commonjs, import_boolbase, import_commonjs, procedure, attributes, reChars, caseInsensitiveAttributes, attributeRules, whitespace, ZERO, NINE, filters, pseudos, aliases, PLACEHOLDER_ELEMENT, is$2, subselects, DESCENDANT_TOKEN, FLEXIBLE_DESCENDANT_TOKEN, SCOPE_TOKEN, defaultEquals, defaultOptions$2, compile, isArray$2, isTag, existsOne, getAttributeValue, getChildren$1, getName, getParent, getSiblings, getText, hasAttrib, removeSubsets, findAll, findOne, adapter, prepareMatch, matches$1, Text$1, isNode, insert, ParentNode, NonElementParentNode, DocumentFragment$1, DocumentType$1, getInnerHtml, setInnerHtml, esm_default, refs$1, key, prop, handler$2, DOMStringMap, add2, addTokens, update, DOMTokenList, refs, getKeys, updateKeys, handler$1, CSSStyleDeclaration, prototype, BUBBLING_PHASE, AT_TARGET, CAPTURING_PHASE, NONE, GlobalEvent, NamedNodeMap, ShadowRoot$1, attributesHandler, create, isVoid, Element$1, classNames, handler, SVGElement$1, illegalConstructor, Facades, Level0, level0, HTMLElement, tagName$17, HTMLTemplateElement, HTMLHtmlElement, toString3, TextElement, tagName$16, HTMLScriptElement, HTMLFrameElement, tagName$15, HTMLIFrameElement, HTMLObjectElement, HTMLHeadElement, HTMLBodyElement, require_StyleSheet, require_CSSRule, require_CSSStyleRule, require_CSSStyleSheet, require_MediaList, require_CSSImportRule, require_CSSGroupingRule, require_CSSConditionRule, require_CSSMediaRule, require_CSSSupportsRule, require_CSSFontFaceRule, require_CSSHostRule, require_CSSKeyframeRule, require_CSSKeyframesRule, require_CSSValue, require_CSSValueExpression, require_MatcherList, require_CSSDocumentRule, require_parse$1, require_CSSStyleDeclaration, require_clone, import_lib, tagName$14, HTMLStyleElement, HTMLTimeElement, HTMLFieldSetElement, HTMLEmbedElement, HTMLHRElement, HTMLProgressElement, HTMLParagraphElement, HTMLTableElement, HTMLFrameSetElement, HTMLLIElement, HTMLBaseElement, HTMLDataListElement, tagName$13, HTMLInputElement, HTMLParamElement, HTMLMediaElement, HTMLAudioElement, tagName$12, HTMLHeadingElement, HTMLDirectoryElement, HTMLQuoteElement, require_canvas_shim, createCanvas, tagName$11, HTMLCanvasElement, HTMLLegendElement, tagName$10, HTMLOptionElement, HTMLSpanElement, HTMLMeterElement, HTMLVideoElement, HTMLTableCellElement, tagName$9, HTMLTitleElement, HTMLOutputElement, HTMLTableRowElement, HTMLDataElement, HTMLMenuElement, tagName$8, HTMLSelectElement, HTMLBRElement, tagName$7, HTMLButtonElement, HTMLMapElement, HTMLOptGroupElement, HTMLDListElement, tagName$6, HTMLTextAreaElement, HTMLFontElement, HTMLDivElement, tagName$5, HTMLLinkElement, tagName$4, HTMLSlotElement, HTMLFormElement, tagName$3, HTMLImageElement, HTMLPreElement, HTMLUListElement, tagName$2, HTMLMetaElement, HTMLPictureElement, HTMLAreaElement, HTMLOListElement, HTMLTableCaptionElement, tagName$1, HTMLAnchorElement, HTMLLabelElement, HTMLUnknownElement, HTMLModElement, HTMLDetailsElement, tagName, HTMLSourceElement, HTMLTrackElement, HTMLMarqueeElement, HTMLClasses, voidElements, Mime, CustomEvent, InputEvent, ImageClass, deleteContents, Range, isOK, TreeWalker, query, globalExports, window$1, Document$1, createHTMLElement, HTMLDocument, SVGDocument, XMLDocument, DOMParser, parse$3, parseHTML$2, parseHTML$1, DEFAULT_USER_AGENT$1, DEFAULT_MAX_BYTES$1, MAX_REDIRECT_HOPS$1, REDIRECT_STATUSES$1, PRIVATE_ADDRESS_BLOCKLIST$1, LocalFetchURLProvider$1, MoonshotFetchURLProvider$1, MoonshotWebSearchProvider$1, WIRE_PROTOCOL_VERSION$1, SESSION_LOG_REL$1, GLOBAL_LOG_REL$1, ProviderManager, SessionAPIImpl, WORKSPACE_REGISTRY_FILE, WORKSPACE_REGISTRY_VERSION, KIMI_CODE_PROVIDER_NAME, KIMI_CODE_BASE_URL_ENV$1, KIMI_CODE_OAUTH_HOST_ENV$1, KIMI_OAUTH_HOST_ENV$1, WEB_SEARCH_BASE_URL_ENV$1, WEB_SEARCH_API_KEY_ENV$1, WEB_FETCH_BASE_URL_ENV$1, WEB_FETCH_API_KEY_ENV$1, DEFAULT_GLOBAL_MCP_AUTH_TIMEOUT_MS, KimiCore, _util$1, IInstantiationService$1, SyncDescriptor$1, disposableTracker$1, FunctionDisposable$1, DisposableStore$1, Disposable$1, ReferenceCollection, DisposableMap, _registry, Emitter$1, Event$2, BridgeClientAPI, ICoreProcessService, ServicesManagedAuthFacade, IApprovalService, IEnvironmentService, IEventService$1, ILogService$1, IQuestionService, WorkspaceNotFoundError, WorkspaceRootNotFoundError, IWorkspaceRegistry, _CoreProcessService, CoreProcessService, EventService$1, DEFAULT_MAX_UPLOAD_BYTES, FileNotFoundError, FileTooLargeError, IFileStore, FileStore, FsPathNotFoundError, FsIsDirectoryError, FsIsBinaryError, FsTooLargeError, FsTooManyResultsError, FsAlreadyExistsError, IFsService, import_ignore, ISessionService, SessionUndoUnavailableError, SessionNotFoundError, FsPathEscapesError, FS_READ_MAX_BYTES$1, FS_BINARY_SAMPLE_BYTES$1, FS_BINARY_NONPRINTABLE_FRACTION$1, HIDDEN_NAME_RE$1, MACOS_NOISE$1, FsService, EXT_TO_MIME$2, EXT_TO_LANGUAGE$1, FsGrepTimeoutError, IFsSearchService, SEARCH_HARD_CAP$1, GREP_TIMEOUT_MS$1, WALK_MAX_DEPTH$1, FsSearchService, FsGitUnavailableError, IFsGitService, DIFF_MAX_BYTES$1, PR_SPAWN_TIMEOUT_MS$1, PULL_REQUEST_TTL_MS$1, FsGitService, FsWatchLimitError, EntryTypes, defaultOptions$1, RECURSIVE_ERROR_CODE, NORMAL_FLOW_ERRORS, ALL_TYPES, DIR_TYPES, FILE_TYPES, isNormalFlowError, wantBigintFsStats, emptyFn, normalizeFilter, ReaddirpStream, STR_DATA, STR_CLOSE, EMPTY_FN, pl, isWindows$1, isMacos, isLinux, isFreeBSD, isIBMi, EVENTS, EV, THROTTLE_MODE_WATCH, statMethods, KEY_LISTENERS, KEY_ERR, KEY_RAW, HANDLER_KEYS, binaryExtensions, isBinaryPath, foreach, addAndConvert, clearItem, delFromSet, isEmptySet, FsWatchInstances, fsWatchBroadcast, setFsWatchListener, FsWatchFileInstances, setFsWatchFileListener, NodeFsHandler, SLASH, SLASH_SLASH, ONE_DOT, TWO_DOTS, STRING_TYPE, BACK_SLASH_RE, DOUBLE_SLASH_RE, DOT_RE, REPLACER_RE, isMatcherObject, unifyPaths, toUnix, normalizePathToUnix, normalizeIgnored, getAbsolutePath, EMPTY_SET, DirEntry, STAT_METHOD_F, STAT_METHOD_L, WatchHelper, FSWatcher, DEFAULT_DEBOUNCE_MS$1, DEFAULT_MAX_CHANGES_PER_WINDOW$1, DEFAULT_MAX_PATHS_PER_CONNECTION, PathReferenceCollection, SessionEntry, FsWatcherService, WorkspaceRegistryService, WorkspaceFsNotAbsoluteError, WorkspaceFsNotFoundError, WorkspaceFsPermissionError, IWorkspaceFsService$1, WorkspaceFsService$1, IAuthSummaryService$1, AuthProvisioningRequiredError$1, AuthTokenMissingError$1, AuthModelNotResolvedError$1, MANAGED_PROVIDER_NAME$1, AuthSummaryService$1, IOAuthService$1, _OAuthService, FlowState, TERMINAL_RETENTION_MS$1, OAuthService$1, IModelCatalogService, ProviderNotFoundError, ModelNotFoundError, _ModelCatalogService, ModelCatalogService, noopEventService, IConfigService$1, ConfigService$1, IMessageService, MessageNotFoundError, IPromptService, PromptNotFoundError, PromptAlreadyCompletedError, DEFAULT_PAGE_SIZE$1, MAX_PAGE_SIZE$1, DEFAULT_UNDO_MESSAGE_PAGE_SIZE, MAX_UNDO_MESSAGE_PAGE_SIZE, CHILD_SESSION_KIND$1, SessionService, BLOBREF_PROTOCOL$1, MISSING_MEDIA_PLACEHOLDER$1, TOOL_INTERRUPTED_ON_RESUME_OUTPUT$1, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAIN_AGENT_ID$8, TRANSCRIPT_CACHE_LIMIT, MessageService, MAIN_AGENT_ID$7, DISPATCH_LOG_CAP, PromptService, IToolService, MAIN_AGENT_ID$6, ToolService, IMcpService, McpServerNotFoundError, McpService, ISkillService, SkillNotFoundError, SkillNotActivatableError, MAIN_AGENT_ID$5, SkillService, TERMINAL_WIRE_STATUSES, ITaskService$1, TaskNotFoundError, TaskAlreadyFinishedError, MAIN_AGENT_ID$4, DEFAULT_TASK_OUTPUT_PREVIEW_BYTES, TaskService$1, ITerminalService, TerminalNotFoundError, DEFAULT_COLS$1, DEFAULT_ROWS$1, DEFAULT_MAX_BUFFERED_FRAMES$1, TerminalService, NodePtyTerminalBackend, MAIN_AGENT_ID$3, Session, KimiHarness, DEFAULT_SESSION_STARTED_UI_MODE, KimiAuthFacade, MAIN_AGENT_ID$2, SDKRpcClientBase, ClientAPI, SDKRpcClient, MAX_WORKDIR_SLUG_LENGTH, WORKDIR_KEY_PREFIX, HASH_LENGTH, WIN_SHAPED, registeredCodes, retryableCodes, infoOverrides, CoreErrors, AgentLifecycleErrors, AuthErrors, TaskErrors, BugIndicatingError, Error2, CONFIG_INVALID_ERROR_CODE, PROVIDER_API_ERROR_CODE, PROVIDER_FILTERED_ERROR_CODE, PROVIDER_RATE_LIMIT_ERROR_CODE, PROVIDER_AUTH_ERROR_CODE, PROVIDER_CONNECTION_ERROR_CODE, PROVIDER_OVERLOADED_ERROR_CODE, CONTEXT_OVERFLOW_ERROR_CODE, ChatProviderError, APIConnectionError, VideoUploadUnsupportedError, APITimeoutError, APIStatusError, APIContextOverflowError, APIRequestTooLargeError, APIProviderRateLimitError, APIProviderQuotaExhaustedError, APIProviderOverloadedError, APIEmptyResponseError, IMAGE_FORMAT_PROVIDER_MESSAGE_PATTERNS, IMAGE_FORMAT_STATUS_MESSAGE_PATTERNS, MEDIA_TYPE_FIELD_PATTERN, NETWORK_RE$1, TIMEOUT_RE$1, CONTEXT_OVERFLOW_MESSAGE_PATTERNS, PROVIDER_RATE_LIMIT_MESSAGE_PATTERNS, PROVIDER_OVERLOAD_MESSAGE_PATTERNS, REQUEST_TOO_LARGE_MESSAGE_PATTERNS, THINKING_EFFORT_CONFIG_DOCS_URL, THINKING_EFFORT_STATUS_MESSAGE_PATTERNS, TOOL_EXCHANGE_ADJACENCY_MESSAGE_PATTERNS, STRUCTURAL_REQUEST_MESSAGE_PATTERNS, ProtocolErrors, ConfigErrors, CapabilityErrors, CronErrors, DebugErrors, EventErrors, EventError, _util, SERVICE_IDENTIFIER_MARK, IInstantiationService, ISO_8601_REGEX, isoDateTimeSchema, IFileService, FILE_ID_REGEX, FileErrors, FileError, FsErrors, FullCompactionErrors, GoalErrors, LoopErrors, McpErrors, ModelCatalogErrors, OsFsErrors, HostFsError, REASONS$1, IHostProcessService, OsProcessErrors, HostProcessErrorCode, HostProcessError, PluginErrors, ProfileErrors, PromptErrors, ModelsDevImportErrors, SessionExportErrors, SessionErrors, SkillErrors, StateErrors, StateError, StorageErrors, StorageError, REASONS, IFileSystemStorageService, TerminalErrors, UsageErrors, WebErrors, WireErrors, WireError, WorkspaceErrors, MAX_CAUSE_DEPTH, toKimiErrorPayload$1, defaultHandler, currentHandler, ErrorCodes$1, UserCancellationError, KIMI_MCP_CLIENT_VERSION, MCP_LIVENESS_PROBE_TIMEOUT_MS, TOKENS_SUFFIX, CLIENT_SUFFIX, DISCOVERY_SUFFIX, META_SUFFIX, PASSIVE_REDIRECT_URI, McpOAuthClientProvider, HttpMcpClient, SseMcpClient, LOOPBACK_NO_PROXY, SOCKS_SCHEMES, STDERR_BUFFER_CAPACITY, StdioMcpClient, RuntimeStdioTransport, BoundedTail, DEFAULT_STARTUP_TIMEOUT_MS, defaultLog$1, McpConnectionManager, SyncDescriptor, LedgerDisposedError, Ledger, disposableTracker, FunctionDisposable, DisposableStore, Disposable, MutableDisposable, Node$1, LinkedList, EventSubscription, Emitter, AsyncEmitter, Event$1, PairIndex, DependencyGraph, CyclicDependencyError, CascadeConflictError, DEFAULT_ABORT_WAIT_MS, DEFAULT_RESOLVE_TIMEOUT_MS, DEFAULT_HISTORY_CAPACITY, CascadeTree, CascadeEngine, _collectionTokens, _collectionTokenSet, _definitionTokenSet, _collectionValidators, CollectionStore, CollectionViewImpl, FiberProtocolError, ServiceRecipeError, _constructionStack, SERVICE_MARK, _eventResolver, FiberRuntime, BasicFiberHandle, PendingFiberHandle, _scopeUnitsTokens, Node, Graph, ServiceCollection, Trace, InstantiationService, _scopeTopology, _scopedRegistry, Scope, WATCH_DEBOUNCE_MS$5, TORN_READ_RETRIES, TORN_READ_RETRY_DELAY_MS, FileStorageService, ILogService, LEVEL_ORDER, FrontmatterError, FENCE$2, SkillParseError, UnsupportedSkillTypeError, FENCE$1, METADATA_ALIASES, FileSkillDiscovery, ISkillDiscovery, IBootstrapOptions, IBootstrapService, StringRecordSchema$2, McpTimeoutMsSchema, McpServerCommonFields, McpServerStdioConfigSchema, McpServerHttpConfigSchema, McpServerSseConfigSchema, McpServerConfigDiscriminatedSchema, McpServerConfigSchema, fsGitStatusSchema, fsPullRequestSchema, IGitService, fsKindSchema, fsEntrySchema, fsSearchHitSchema, fsGrepMatchSchema, fsGrepFileHitSchema, fsListSortSchema, fsReadEncodingRequestSchema, fsReadEncodingResponseSchema, fsListManyPartialErrorSchema, fsSuggestItemSchema, fsSuggestRequestSchema, AppendLogCorruptedError, IAppendLogStore, Service, RUNTIME_DRAIN_TIMEOUT_MS, RuntimeError, RuntimeRegistry, CYGPATH_TIMEOUT_MS, DRIVE_COLON_RE, CYGDRIVE_RE, DRIVE_RE, VIRTUAL_FS_PREFIXES, WIN32_DRIVE_ABSOLUTE_RE, bridgeCache, RuntimeWorkspaceView, SharedRuntimeUnitHostFactory, SharedRuntimeUnitHost, IHostEnvironment, IHostFileSystem, IHostFsWatchService, relativeCwdSchema, terminalStatusSchema, IHostTerminalService, nextGeneration, LocalRuntime, LocalRuntimeProviderFactory, IStandaloneRuntimeFactory, StandaloneRuntimeFactory, IConfigRegistry, IConfigService, TRUE_BOOLEAN_ENV_VALUES, FALSE_BOOLEAN_ENV_VALUES, ConfigSectionContribution, _contributions, BUILTIN_PRODUCT_SKILLS_SECTION, BuiltinProductSkillsConfigSchema, builtinProductSkillsEnvBindings, stripBuiltinProductSkillsEnv, USER_BRAND_DIRS$1, USER_GENERIC_DIRS$1, PROJECT_BRAND_DIRS$1, PROJECT_GENERIC_DIRS$1, SKILL_SOURCE_PRIORITY, PLUGIN_SKILL_SOURCE_ID, BUILTIN_SKILL_SOURCE_ID, IUserFileSkillSource, UserFileSkillSource, IProjectLocalConfigService, ProjectLocalTomlSchema, FileProjectLocalConfigService, StateRegistry, IAppStateService, IWorkspaceStateService, WorkspaceStateService, NOTHING, DRAFTABLE, DRAFT_STATE, errors, O, getPrototypeOf, CONSTRUCTOR, PROTOTYPE, CONFIGURABLE, ENUMERABLE, WRITABLE, VALUE, isDraft, objectCtorString, cachedCtorStrings, has, get, set2, isArray$1, isMap, isSet, isObjectish, isFunction, isBoolean, getProxyDraft, latest, getValue, getFinalValue, dontMutateMethodOverride, PluginMapSet, PluginPatches, PluginArrayMethods, plugins, isPluginLoaded, currentScope, getCurrentScope, createScope, enterScope, isSameScope, EMPTY_LOCATIONS_RESULT, objectTraps, arrayTraps, Immer2, immer, produceWithPatches, applyPatches, DuplicateEventError, Event2, AgentEvent2, EVENT2_REGISTRY, ReplayableStateKeyImpl, StateKeyBuilderImpl, undoableProtocol, MAX_TIMER_DELAY_MS$2, IntervalTimer, TimeoutTimer, IWorkspaceContext, IWorkspaceDirs, WATCH_DEBOUNCE_MS$4, workspaceDirsFileDirsKey, workspaceDirsEphemeralDirsKey, WorkspaceDirsService, MIN_ZERO_BYTES_FOR_UTF16, UTF16BE_BOM, UTF16LE_BOM, UTF8_BOM, FS_BINARY_SAMPLE_BYTES, EXT_TO_MIME$1, EXT_TO_LANGUAGE, nullTelemetryAppender, EMPTY_CONTEXT, noopTelemetryService, ITelemetryService, IWorkspaceInstanceManager, IRuntimeResolver, IWorkspaceGitService, VCS_METADATA_DIRS, SuggestTopHeap, FsWireErrorCode, SEARCH_HARD_CAP, GREP_TIMEOUT_MS, SUGGEST_TIMEOUT_MS, SUGGEST_WALK_ABORTED, WALK_MAX_DEPTH, FS_READ_MAX_BYTES, HIDDEN_NAME_RE, MACOS_NOISE, WorkspaceFsService2, RgJsonAccumulator, DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_CHANGES_PER_WINDOW, WorkspaceFsWatchService, WorkspaceFsWatchSubscription, WorkspaceGitService, AGENTS_MD_RECOMMENDED_MAX_BYTES, AGENTS_MD_PLAIN_NAMES, IWorkspaceInstructionsService, WATCH_DEBOUNCE_MS$3, workspaceInstructionsCurrentKey, WorkspaceInstructionsService, DEFAULT_IDENTITY_SLUG, IAgentIdentity, OAuthCallbackClosedError, SUCCESS_HTML, ERROR_HTML, defaultLog, REFRESH_AHEAD_MS, MAX_TIMER_DELAY_MS$1, DEFAULT_AUTH_REQUEST_TIMEOUT_MS, DEFAULT_SHUTDOWN_DRAIN_TIMEOUT_MS, defaultScheduler, McpOAuthService, AlreadyAuthorizedError, IAtomicDocumentStore, IAtomicTomlDocumentStore, IMcpOAuthStore, CREDENTIALS_SCOPE, McpOAuthStoreAdapter, IMcpOAuthService, AppMcpOAuthService, ISessionManager, ISessionEphemeralMcpServers, MergedMcpConnectionView, ISessionMcpHandle, ISessionContext, IWorkspaceMcpConfigService, IWorkspaceMcpService, WorkspaceMcpService, McpSectionSchema, MCP_STARTUP_TIMEOUT_ENV, MCP_TOOL_TIMEOUT_ENV, mcpEnvBindings, IMcpConfigStore, CONFIG_SCOPE$2, MCP_CONFIG_KEY, textEncoder$6, textDecoder$6, McpConfigStore, NO_ABORT$5, IPluginService, IWorkspaceTrust, WATCH_DEBOUNCE_MS$2, WorkspaceMcpConfigService, NO_ABORT$4, TRUST_SCOPE, workspaceTrustTrustedKey, WorkspaceTrustService, AgentFileParseError, AGENT_NAME_PATTERN, MAX_AGENT_SCAN_DEPTH, MAX_SKIP_WARNINGS, AgentProfileContribution, AGENT_PROFILE_SOURCE_PRIORITY, AgentProfileLoaderBase, DEFAULT_AGENT_PROFILE_NAME, PROMPT_VARIABLE, BUILTIN_AGENT_PROFILE_SOURCE_ID, IBuiltinAgentProfileLoader, system_default, TASK_AGENT_ROLE_PREFIX, WINDOWS_NOTES, ADDITIONAL_DIRS_SECTION_PROSE, SKILLS_SECTION_PROSE, PLUGIN_SECTIONS_PROSE, USER_BRAND_DIRS, USER_GENERIC_DIRS, PROJECT_BRAND_DIRS, PROJECT_GENERIC_DIRS, IUserAgentProfileLoader, IExtraAgentProfileLoader, ExtraAgentProfileLoaderService, IExplicitAgentProfileLoader, ExplicitAgentProfileLoaderService, IPluginAgentProfileLoader, PluginAgentProfileLoaderService, SYSTEM_MD_FILENAME, UserAgentProfileLoaderService, IWorkspaceAgentProfileLoader, WATCH_DEBOUNCE_MS$1, WorkspaceAgentProfileLoaderService, IExplicitFileSkillSource, ExplicitFileSkillSource, IExtraFileSkillSource, ExtraFileSkillSource, IPluginSkillSource, PluginSkillSource, WORKSPACE_ROOT_SKILL_SOURCE_ID, WATCH_DEBOUNCE_MS, IWorkspaceRootSkillSource, WorkspaceRootSkillSource, MAX_SKILL_SCAN_DEPTH, RuntimeSkillDiscovery, EXPERIMENTAL_SECTION, ExperimentalConfigSchema, experimentalFromToml, experimentalToToml, IFlagService, check_kimi_code_docs_default, PSEUDO_PATH$5, parsed$5, CHECK_KIMI_CODE_DOCS_SKILL, custom_theme_default, PSEUDO_PATH$4, parsed$4, CUSTOM_THEME_SKILL, import_from_cc_codex_default, PSEUDO_PATH$3, parsed$3, IMPORT_FROM_CC_CODEX_SKILL, mcp_config_default, PSEUDO_PATH$2, parsed$2, MCP_CONFIG_SKILL, _builtinSkillContributions, SKILL_default$2, SKILL_default$1, SKILL_default, SUB_SKILL_PARENT, SUB_SKILL_REVIEW, SUB_SKILL_CONSOLIDATE, update_config_default, PSEUDO_PATH$1, parsed$1, UPDATE_CONFIG_SKILL, write_goal_default, PSEUDO_PATH, parsed, BUILTIN_SKILLS, IBuiltinSkillSource, BuiltinSkillSource, LISTING_DESC_MAX, InMemorySkillCatalog, SOURCE_GROUPS, graphemeSegmenter, IWorkspaceSkillCatalog, workspaceSkillCatalogContributionsKey, workspaceSkillCatalogMergedKey, WorkspaceSkillCatalogService, PROGRAM_CAPABILITIES, Program, WorkspaceInstance, IAgentProfileRegistry, IEventService, PARENT_SESSION_ID_KEY, CHILD_SESSION_KIND_KEY, CHILD_SESSION_KIND, ISessionIndex, ISessionIndexMirror, IWorkspaceService, IModelService, IProviderService, CTX_VALUE_MAX_CHARS, STACK_MAX_BYTES, ENTRY_MAX_BYTES, REDACTED_KEYS, SAFE_KEY_RE, ELLIPSIS, TRUNCATED_TAIL, REDACTED, RAW_SECRET_PATTERNS, LEVEL_LABEL, ANSI_LEVEL, ANSI_RESET, PENDING_MAX, STDERR_NOTICE_INTERVAL_MS, AsyncSerialQueue, RotatingFileWriter, FileLogWriter, ILogOptions, pendingLogCloses, BoundLogger, AppLogService, IAgentFileHistoryService, FILE_HISTORY_BLOB_PREFIX, IAgentRuntimeBindingService, IAgentRuntimeBindingSeed, IAgentRuntimeService, AgentRuntimeService, AgentModel, AGENT_MODEL_DEFINITIONS, AgentModelContribution, SessionModelContribution, AgentSpaceImpl, IAgentScopeContext, IAgentStateService, IAgentToolExecutorService, IMAGE_MIME_BY_SUFFIX, VIDEO_MIME_BY_SUFFIX, AUDIO_MIME_BY_SUFFIX, IMAGE_EXT_BY_MIME, VIDEO_EXT_BY_MIME, AUDIO_EXT_BY_MIME, KIMI_FILE_SCHEME, MEDIA_PATH_TAG_RE, TurnStarted, TurnStepStarted, TurnStepCompleted, turnStepInterruptedSchema, TurnStepInterrupted, AssistantDelta, ThinkingDelta, ToolCallDelta, contextMessageSchema, loopRecordedEventSchema, contextAppendMessageSchema, ContextAppendMessage, contextAppendLoopEventSchema, ContextAppendLoopEvent, contextClearSchema, ContextClear, contextCompactionBaseShape, contextApplyCompactionSchema, ContextApplyCompaction, contextUndoSchema, ContextUndo, ContextSpliced, turnInputShape, turnPromptSchema, TurnPrompt, turnSteerSchema, TurnSteer, turnCancelSchema, TurnCancel, turnEndedSchema, TurnEnded, turnKey, IEventBus, ISessionEventBus, IBlobStore, MAIN_AGENT_ID$1, IAgentLifecycleService, ISessionWorkspaceContext, IEventDispatcher, backupEntrySchema, fileHistoryTrackedSchema, FileHistoryTracked, fileHistoryCheckpointedSchema, FileHistoryCheckpointed, fileHistoryKey, RETENTION_DOC_SCOPE, touchQueues, AgentFileHistoryService, LCS_CELL_BUDGET, LCS_AGGREGATE_CELL_BUDGET, LoopError, IAgentLoopService, IAgentPlanService, SESSION_INDEX_KEY, textDecoder$5, META_SCOPE, META_KEY$1, MTIME_SCAN_CONCURRENCY, WIRE_SESSION_ID_PROPERTY, TelemetryService, BoundTelemetryService, TelemetrySnapshotView, ISessionAgentProfileCatalogSeed, ISessionMetadata, ISessionSkillCatalogData, ISessionInstructionsProvider, ISessionWorkspaceInfo, ISessionStateService, META_KEY, pendingWrites, sessionMetadataDataKey, SessionMetadata, ISessionToolPolicy, migrateV1_0ToV1_1, LEGACY_SESSION_APPROVAL_ACTION_TO_PATTERN, LEGACY_SESSION_APPROVAL_UNRESTORABLE_ACTIONS, migrateV1_1ToV1_2, migrateV1_2ToV1_3, migrateV1_3ToV1_4, migrateV1_4ToV1_5, MIGRATIONS, AGENT_WIRE_RECORD_KEY, IAgentActivityView, AgentActivityUpdated, SessionArchived, TEXT_MIME_BY_SUFFIX, NON_TEXT_SUFFIXES, ASF_HEADER, FTYP_IMAGE_BRANDS, FTYP_VIDEO_BRANDS, MODEL_ACCEPTED_IMAGE_MIMES, ACCEPTED_FORMATS_TEXT, UNSUPPORTED_IMAGE_FORMATS, BASE64_SNIFF_CHARS, decoderReady, configuredMaxImageEdgePx, IMAGE_BYTE_BUDGET$1, configuredReadImageByteBudget, JPEG_QUALITY_STEPS, FALLBACK_EDGES_PX, PNG_RESCALE_FLOOR_PX, MAX_DECODE_PIXELS, MAX_IMAGE_DECODE_BYTES, RECODABLE_MIME, CAPTION_OPENING, CAPTION_PATTERN, MAX_TITLE_LENGTH, MAX_LAST_PROMPT_LENGTH, NO_ABORT$3, SESSION_CREATE_RELOAD_SKILL_SOURCES, SessionLifecycleService, WorkspaceInstanceManager, RuntimeResolver, runtimeSetBindingSchema, RuntimeSetBinding, runtimeBindingKey, agentRuntimeBindingKey, AgentRuntimeBindingService, SessionManager, IWireService, BLOBREF_PROTOCOL, IAgentBlobService, WireService, sessionLogRootLevelKey, SessionLogService, BootstrapService, IHostClock, HostClockService, ProbeShellNotFoundError, GIT_EXEC_PATH_TIMEOUT_MS, MINGW_PREFIX_SET, cachedProbe, LOGIN_SHELL_ENV_TIMEOUT_MS, appliedLoginShellPath, HostEnvironmentService, READ_CHUNK_SIZE, HostFileSystem, DEFAULT_IGNORED, NATIVE_RETRY_BASE_MS, NATIVE_RETRY_MAX_MS, NODE_HOST_FS_WATCH_RUNTIME, HostFsWatchHandle, SignalWatchHandle, HostFsWatchService, BufferedReadable, isWindows, HostProcess, HostProcessService, HostTerminalService, DEFAULT_TOOL_RESULT_MAX_CHARS, DEFAULT_TOOL_RESULT_MAX_RETAINED_CHARS, ToolAccesses, MCP_NAME_PREFIX$1, MAX_BACKGROUND_TIMEOUT_S, BashInputSchema, IBashTool, VALID_TASK_ID, TASKS_SCOPE, OUTPUT_LOG_KEY, JSON_SUFFIX, textEncoder$4, textDecoder$3, AgentTaskPersistence, IAgentTaskService, TASK_SECTION, LEGACY_BACKGROUND_SECTION, PrintBackgroundModeSchema, AgentTaskConfigSchema, KEEP_ALIVE_ON_EXIT_ENV, MAX_RUNNING_TASKS_ENV, taskEnvBindings, stripTaskEnv, IAgentToolPolicyService, ToolOutputAccumulator, AgentToolContribution, _agentToolContributions, SENSITIVE_BASENAMES, SENSITIVE_PATH_SUFFIXES, ENV_PREFIX, ENV_EXEMPTIONS, SENSITIVE_BASENAME_PREFIXES, PUBLIC_KEY_BASENAMES, SENSITIVE_DOT_VARIANT_SUFFIXES, SENSITIVE_DOT_VARIANT_SUFFIX_SET, DEFAULT_WORKSPACE_ACCESS_POLICY, PathSecurityError, DEFAULT_PATH_CLASS, GLOB_LITERAL_SPECIAL, bash_default, STREAM_DRAIN_GRACE_MS, ProcessTask, MS_PER_SECOND, SHELL_TIMEOUT_VARS, BashTool, WINDOWS_NUL_REDIRECT, GlobInputSchema, WINDOWS_PATH_HINT, IGlobTool, RG_VERSION, DOWNLOAD_TIMEOUT_MS, RG_ARCHIVE_SHA256, downloadPromise, DEFAULT_TIMEOUT_MS$1, MAX_OUTPUT_BYTES$1, ISessionSkillCatalog, glob_default, VCS_DIRECTORIES_TO_EXCLUDE$1, SENSITIVE_GLOBS_TO_EXCLUDE$1, GlobTool, GrepInputSchema, IGrepTool, grep_default, RG_MAX_COLUMNS, DEFAULT_HEAD_LIMIT, MTIME_STAT_CONCURRENCY, VCS_DIRECTORIES_TO_EXCLUDE, SENSITIVE_GLOBS_TO_EXCLUDE, CONTENT_LINE_RE, GrepTool, GrepAbortedError, MAX_LINES, MAX_LINE_LENGTH, MAX_BYTES, EVENT_LOG_MAX_LINE_LENGTH, TRANSCODE_MAX_BYTES, PositiveLineOffsetSchema, TailLineOffsetSchema, ReadInputSchema, IReadTool, IAgentToolResultTruncationService, read_default, READ_DESCRIPTION, ReadTool, WriteInputSchema, IWriteTool, write_default, WriteTool, DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_BUFFERED_FRAMES, ISessionTerminalService, SessionTerminalService, TERMINAL_TASK_STATES, TaskCancelledError, ITaskService, RunHandle, DeferHandle, TaskService2, EventBusService, AgentEventBusView, EventService, EventStateContribution, OrderedHookSlot, MAX_DRAIN, HISTORY_TAIL, RETIRED_WIRE_RECORD_TYPES, CycleError, FoldContextImpl, EventDispatcherService, AppStateService, SessionStateService, AgentStateService, UNKNOWN_CAPABILITY, IQueryStore, SESSION_INDEX_MANIFEST, PARENT_INDEX_NAME, WRITE_CHUNK, SCAN_CONCURRENCY, SHARED_SCAN_REUSE_MS, SessionIndexProjector, READ_MODEL_FLAG$1, RECONCILE_INTERVAL_MS, DEGRADED_RETRY_MS, TIE_REPAIR_LIMIT, UNBOUNDED, FileSessionIndex, READ_MODEL_FLAG, FLUSH_INTERVAL_MS, FLUSH_BATCH_SIZE, MAX_PENDING, MAX_CONSECUTIVE_FAILURES, pendingDrains, SessionIndexMirror, SessionMetaUpdated, ISessionActivityView, devToolsAdapter, Mailbox, TARGETLESS_KEY, STATE_IDENTIFIER, WILDCARD, XSTATE_INIT, XSTATE_STOP, symbolObservable, idCounter, executingCustomAction, ProcessingStatus, defaultOptions, Actor, isStateId, machineSnapshotMatches, machineSnapshotHasTag, machineSnapshotCan, machineSnapshotToJSON, machineSnapshotGetMeta, instanceStates, cache$1, EMPTY_OBJECT, toSerializableAction, StateNode, StateMachine, SpecialTargets, AgentActorService, interactionRequestSchema, InteractionRequestEvent, interactionResolvedSchema, InteractionResolvedEvent, RECENTLY_RESOLVED_TTL_MS, RECENTLY_RESOLVED_MAX, interactionActorLogic, IAgentInteractionService, AgentInteractionService, sessionActivityFoldsKey, sessionActivityCurrentKey, SessionActivityView, ISessionOutcomeMirror, IAgentContextMemoryService, IAgentConversationUndoParticipantRegistry, AgentConversationUndoParticipantRegistry, messageTokenEstimateCache, MEDIA_TOKEN_ESTIMATE, SYSTEM_REMINDER_PREFIX, SYSTEM_REMINDER_SUFFIX, COMPACTION_SUMMARY_PREFIX, COMPACT_USER_MESSAGE_MAX_TOKENS, COMPACT_USER_MESSAGE_HEAD_TOKENS, COMPACTION_ELISION_VARIANT, defaultTokenEstimate, TOOL_INTERRUPTED_ON_RESUME_OUTPUT, boundFoldMap, contextMemoryKey, IAgentFullCompactionService, promptAdmission, IAgentPromptService, IAgentConversationUndoService, ContextUndone, AgentConversationUndoService, SessionOutcomeMirror, IAgentTitlePromptSource, AgentTitlePromptSourceService, ISessionTitleService, IOAuthService, IOAuthToolkit, IAuthSummaryService, AuthProvisioningRequiredError, AuthTokenMissingError, AuthModelNotResolvedError, IHostRequestHeaders, providerDefinitions, contributedFlags, IFlagRegistry, MAX_GENERATED_TITLE_LENGTH, MAX_TITLE_INPUT_LENGTH, MAX_TITLE_PROMPTS, MAX_TITLE_USER_SEGMENT, MAX_TITLE_FIRST_TURN_ASSISTANT, MAX_TITLE_DIGEST_USER_SEGMENT, MAX_TITLE_DIGEST_ASSISTANT, MAX_TITLE_DIGEST_INPUT_LENGTH, SessionTitleService, TITLE_DIGEST_ELISION_MARKER, sessionToolPolicyStateKey, STATE_KEY, SessionToolPolicyService, _overlays, KEY_VALUE_LINE_PATTERN, BARE_KEY_CHAR_PATTERN, MIGRATIONS_FILE, THINKING_EFFORT_MAX_TO_HIGH, CONFIG_SCOPE$1, CONFIG_SCOPE, ConfigRegistry, ConfigService2, ProtocolSchema, IProtocolAdapterRegistry, PROVIDERS_SECTION, DEFAULT_PROVIDER_SECTION, ENV_MODEL_PROVIDER_KEY, ProviderTypeSchema, OAuthRefSchema$1, ModelSourceSchema, StringRecordSchema$1, ProviderConfigSchema, ProvidersSectionSchema, providersEnvBindings, stripProvidersEnv, providersFromToml, providersToToml, MODELS_SECTION, DEFAULT_MODEL_SECTION, ModelBaseSchema, ModelOverrideSchema, ModelRecordSchema, ModelsSectionSchema, modelsFromToml, modelsToToml, THINKING_SECTION, ThinkingConfigSchema, thinkingEnvBindings, stripThinkingEnv, NO_ABORT$2, ProviderService, protocolBases, CONFIG_DEFAULT_HEADERS_TRAIT, ProtocolAdapterRegistry, IDENTITY_SECTION, IdentityConfigSchema, IDENTITY_NAME_ENV, IDENTITY_SLUG_ENV, identityEnvBindings, AgentIdentityService, ENV_MODEL_ALIAS_KEY, DEFAULT_MAX_CONTEXT_SIZE, DEFAULT_CAPABILITIES, kimiModelEnvOverlay, MIN_FLOOR, DEFAULT_UNKNOWN_CONTEXT_FALLBACK, NO_ABORT$1, ModelService, KEEP_OFF_VALUES, BUDGET_THINKING_EFFORTS, ADAPTIVE_MAX_EFFORTS, LATEST_OPUS_THINKING_EFFORTS, BUDGET_PROFILE, OPUS_45_PROFILE, ADAPTIVE_MAX_PROFILE, LATEST_OPUS_PROFILE, ALWAYS_ADAPTIVE_PROFILE, ALWAYS_ADAPTIVE_MAX_PROFILE, FAMILY_FIRST_RE, VERSION_FIRST_RE, BARE_FAMILY_RE, CLAUDE_FAMILY_WORD_RE, StaticAuthProvider, modelCatalogItemSchema$1, providerCatalogStatusSchema$1, IModelCatalog, TRACE, ResolutionTraceCollector, SECRET_KEY_RE, PROVIDER_OPTION_FIELD, CAPABILITY_KEYS, IModelOAuthTokens, AsyncEventQueue, ModelRequesterImpl, ModelCatalog, IKosongConfigService, BASE_DELAY_MS, MAX_DELAY_MS, RETRY_FACTOR, JITTER_FACTOR, PERSIST_MAX_ATTEMPTS, KosongConfigService, ModelOAuthTokenAdapter, HostRequestHeadersAdapter, providerRefreshChangeSchema, providerRefreshFailureSchema, ModelCatalogChanged, IProviderDiscoveryService, EMPTY_EXCLUSION, ProviderDiscoveryService, PROVIDER_ID_PATTERN, IModelsDevImportService, KNOWN_WIRE_TYPES, BUILT_IN_MODELS_DEV_JSON, MODELS_DEV_URL, CACHE_TTL_MS, UPSTREAM_FETCH_TIMEOUT_MS, cache, inFlight, builtInMemo, fetchImpl, nowImpl, codes, ModelsDevImportService, EMPTY_TOOL_CALL_ID, TOOL_CALL_ID_SAFE_CHARS, INTERLEAVED_THINKING_BETA$1, CONTEXT_MANAGEMENT_BETA, CLEAR_THINKING_EDIT, ANTHROPIC_TOOL_CALL_ID_POLICY, CEILING_BY_FAMILY_VERSION, FALLBACK_MAX_TOKENS, CACHE_CONTROL, CACHEABLE_TYPES, OMITTED_MEDIA_PLACEHOLDER, SUPPORTED_B64_MEDIA_TYPES, SUPPORTED_B64_VIDEO_TYPES, AnthropicStreamedMessage, AnthropicChatProvider, CLAUDE_VISION_TOOL_PREFIXES, CLAUDE_THINKING_VISION_TOOL_PREFIXES, ANTHROPIC_VISION_TOOL_CAPABILITY, ANTHROPIC_THINKING_VISION_TOOL_CAPABILITY, GoogleGenAIStreamedMessage, NETWORK_RE, TIMEOUT_RE, GoogleGenAIChatProvider, GEMINI_CATALOGUED_PREFIXES, GEMINI_MULTIMODAL_TOOL_CAPABILITY, GEMINI_THINKING_MULTIMODAL_TOOL_CAPABILITY, TOOL_RESULT_MEDIA_PROMPT, TOOL_RESULT_MEDIA_PLACEHOLDER, OPENAI_REASONING_CAPABILITY, OPENAI_VISION_TOOL_CAPABILITY, OPENAI_TEXT_TOOL_CAPABILITY, OPENAI_VISION_TOOL_PREFIXES, KNOWN_REASONING_KEYS, DEFAULT_REASONING_KEY, ReasoningKeyDialect, CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING, OPENAI_CHAT_TOOL_CALL_ID_POLICY, OMITTED_AUDIO_PLACEHOLDER$1, OMITTED_VIDEO_PLACEHOLDER$1, OpenAILegacyStreamedMessage, OpenAILegacyChatProvider, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY, EMBEDDED_STATUS_CODE_RE, OMITTED_AUDIO_PLACEHOLDER, OMITTED_VIDEO_PLACEHOLDER, OPENAI_RESPONSES_DEVELOPER_ROLE_MODELS, OpenAIResponsesStreamedMessage, OpenAIResponsesChatProvider, KIMI_QUOTA_EXHAUSTED_ERROR_CODES, KIMI_QUOTA_EXHAUSTED_MESSAGE_PATTERNS, KimiFiles, MIME_TO_EXT, EXT_TO_MIME, TYPE_COMPLETION_SKIP_KEYS, CHILD_SCHEMA_SLOTS, OBJECT_STRUCTURE_KEYS, ARRAY_STRUCTURE_KEYS, STRING_STRUCTURE_KEYS, NUMERIC_STRUCTURE_KEYS, KIMI_API_KEY_ENV, KIMI_BASE_URL_ENV, KIMI_DEFAULT_BASE_URL, INTERLEAVED_THINKING_BETA, filesByContext, kimiOpenAITrait, kimiAnthropicTrait, kimiEndpoint, kimiResponsesTrait, AgentProfileRegistryService, _profileContributions, BuiltinAgentProfileLoaderService, BuiltinAgentProfileContributionUnit, PLUGIN_NAME_REGEX, HOOK_EVENT_TYPES, HOOKS_SECTION, HookDefSchema, HooksConfigSchema, hooksFromToml, hooksToToml, KIMI_PLUGIN_ROOT_PATH, KIMI_PLUGIN_DIR_PATH, PLUGIN_SYSTEM_PROMPT_MAX_BYTES, UNSUPPORTED_RUNTIME_FIELDS, INSTALLED_REL, EMPTY$1, SHA_RE, PluginManager, KIMI_NODE_FALLBACK_SUBCOMMAND, require_constants2, require_debug, require_re, require_parse_options, require_identifiers, require_semver$1, require_parse, require_valid$1, require_clean, require_inc, require_diff, require_major, require_minor, require_patch, require_prerelease, require_compare, require_rcompare, require_compare_loose, require_compare_build, require_sort, require_rsort, require_gt, require_lt, require_eq, require_neq, require_gte, require_lte, require_cmp, require_coerce, require_lrucache, require_range, require_comparator, require_satisfies, require_to_comparators, require_max_satisfying, require_min_satisfying, require_min_version, require_valid, require_outside, require_gtr, require_ltr, require_intersects, require_simplify2, require_subset, KIMI_CODE_BASE_URL_ENV, KIMI_CODE_OAUTH_HOST_ENV, KIMI_OAUTH_HOST_ENV, NO_ABORT, PluginService, ICapabilityService, DOWNLOAD_IDLE_TIMEOUT_MS, MAC_PLUGIN_ID, WINDOWS_PLUGIN_ID, APP_BUNDLE, LAUNCHD_LABEL, COMMAND_TIMEOUT_MS, PERMISSIONS_TIMEOUT_MS, DETECT_PROBE_TIMEOUT_MS, WINDOWS_INSTALLER_PROBE_TIMEOUT_MS, WINDOWS_INSTALL_TIMEOUT_MS, DEFAULT_WINDOWS_SYSTEM_ROOT, DEFAULT_WINDOWS_PROGRAM_FILES, WINDOWS_INSTALLER_PROBE_SCRIPT, WINDOWS_DOCTOR_SCRIPT, PLUGIN_ID, PLUGIN_ZIP_PATH, BINARY_CDN_PATH, DEFAULT_DAEMON_BASE_URL, STATUS_TIMEOUT_MS, START_TIMEOUT_MS, START_POLL_INTERVAL_MS, START_POLL_ATTEMPTS, IDLE_PROGRESS, CapabilityService, IFeatureManager, FeatureServiceContribution, FeatureManagerService, CommandContribution, Feature, IFeatureAssemblyService, _featureRecipes, FeatureAssemblyService, IAgentCommandService, AgentCommandService, IDebugLedgerService, IDebugGraphService, DiUnitChanged, IDebugCascadeService, DebugLedgerService, DebugGraphService, DebugCascadeService, NestedSkillTooDeepError, SkillToolInputSchema, ISkillTool, SkillActivated, IAgentSkillService, AgentSkillService, skill_default, _SkillTool, SkillTool, SkillFeature, InMemorySkillDiscovery, skillCatalogContributionsKey, skillCatalogMergedKey, SessionSkillCatalogService, ISessionAgentProfileCatalog, SessionAgentProfileCatalogService, IAgentPermissionGate, IAgentPermissionModeService, IAgentPermissionPolicyService, IAgentPermissionRulesService, IAgentToolApprovalService, AgentPermissionGate, BeforeToolExecuteEventImpl, BeforeToolExecuteEmitter, ISessionApprovalService, PermissionApprovalRequested, PermissionApprovalResolved, AgentToolApprovalService, FlagRegistryService, FlagService, LOOP_CONTROL_SECTION, LOOP_MAX_STEPS_PER_TURN_ENV, LOOP_MAX_ATTEMPTS_PER_STEP_ENV, LOOP_MAX_RETRIES_PER_STEP_ENV, LoopControlSchema, loopControlEnvBindings, stripLoopControlEnv, loopControlToToml, IAgentStepRetryService, turnStepRetryingSchema, TurnStepRetrying, stepRetryLastFailedDriverIdKey, stepRetryFailedAttemptsKey, AgentStepRetryService, ToolCallStarted, ToolProgress, ToolResultEvent, taskStartedSchema, TaskStarted, taskTerminatedSchema, TaskTerminated, TaskTerminatedNotice, TaskNotified, taskWaitDeliveredSchema, TaskWaitDelivered, taskKey, fullCompactionBeginSchema, FullCompactionBegin, fullCompactionCancelSchema, FullCompactionCancel, fullCompactionCompleteSchema, FullCompactionComplete, CompactionStarted, CompactionBlocked, CompactionCancelled, CompactionCompleted, fullCompactionKey, fullCompactionWireRangesKey, USER_PROMPT_ORIGIN, FULL_COMPACTION_BACKGROUND_ID, activityViewLifecycleKey, activityViewTurnKey, activityViewLastTurnKey, activityViewBackgroundKey, activityViewCurrentKey, AgentActivityView, MutableTurn, IAgentModeMutexService, AgentStatusUpdated, planModeEnterSchema, PlanModeEnter, planModeCancelSchema, PlanModeCancel, planModeExitSchema, PlanModeExit, planRevisionSchema, PlanRevision, planKey, IAgentSwarmService, swarmModeEnterSchema, SwarmModeEnter, swarmModeExitSchema, SwarmModeExit, swarmKey, TOWER_TOOL_NAMES, TOWER_WORKER_PROFILE, TOWER_FLAG_ID, IAgentTowerService, towerModeEnterSchema, TowerModeEnter, towerModeExitSchema, TowerModeExit, towerKey, towerOwnerKey, towerBaseKey, AgentModeMutexService, SIDE_QUESTION_SYSTEM_REMINDER, ISessionBtwService, REMINDER_VARIANT_PRIORITY, reminderActorLogic, IAgentReminderService, AgentReminderService, SessionBtwService, BtwFeature, PLAN_TOOLS, PLAN_ROLE, EnterPlanModeInputSchema, IEnterPlanModeTool, enter_plan_mode_default, EnterPlanModeTool, RESERVED_OPTION_LABELS, ExitPlanModeOptionSchema, ExitPlanModeInputSchema, IExitPlanModeTool, exit_plan_mode_default, ExitPlanModeTool, HERO_NAMES, MAX_ATTEMPTS, plan_mode_exit_reminder_default, plan_mode_full_reminder_default, plan_mode_inline_full_reminder_default, plan_mode_inline_reentry_reminder_default, plan_mode_inline_sparse_reminder_default, plan_mode_reentry_reminder_default, plan_mode_sparse_reminder_default, PLAN_MODE_DEDUP_MIN_TURNS, PLAN_MODE_FULL_REFRESH_TURNS, PLAN_MODE_INJECTION_VARIANT, planWasActiveKey, PlanModeInjection, ExitPlanModeReview, AgentPlanService, ProfileError, IAgentProfileService, DATE_CHANGE_INJECTION_VARIANT, dateChangeActorLogic, IAgentDateChangeService, AgentDateChangeService, DateChangeFeature, PlanFeature, FileHistoryFeature, IExternalHooksRunnerService, DEFAULT_TIMEOUT_SECONDS, KILL_GRACE_MS, OptionalStringSchema, HookSpecificOutputSchema, HookJsonOutputSchema, DEFAULT_HOOK_TIMEOUT_SECONDS, ExternalHooksRunnerService, ISessionExternalHooksService, ISessionSubagentService, HEARTBEAT_INTERVAL_MS, SessionExternalHooksService, IAgentExternalHooksService, StepRequest, MessageStepRequest, ContinuationStepRequest, UserMessageStepRequest, PromptStepRequest, SteerStepRequest, RetryStepRequest, promptAcceptedSchema, PromptAccepted, promptAdmissionKey, ISessionMediaStore, promptCompletedSchema, PromptCompleted, promptAbortedSchema, PromptAborted, promptSteeredSchema, PromptSteered, promptResolutionKey, PromptQueued, PromptSubmitted, PromptStarted, promptLaunchingKey, AgentPromptService, HookResult, externalHooksStopHookContinuationUsedKey, AgentExternalHooksService, ExternalHooksFeature, IDebugEventsService, DebugEventsService, DebugEventsFeature, SWARM_SECTION, SwarmConfigSchema, DEFAULT_SWARM_TIMEOUT_MS, SWARM_TIMEOUT_ENV, swarmEnvBindings, stripSwarmEnv, enter_reminder_default, exit_reminder_default, SWARM_MODE_INJECTION_VARIANT, LEGACY_SWARM_MODE_EXIT_VARIANT, SwarmInjection, AgentSwarmService, ISessionSwarmService, ISessionTokenCountingService, SubagentSpawned, SubagentStarted, SubagentCompleted, SubagentFailed, INITIAL_LAUNCH_LIMIT, INITIAL_LAUNCH_INTERVAL_MS, RATE_LIMIT_RETRY_BASE_MS, RATE_LIMIT_RETRY_FACTOR, RATE_LIMIT_CAPACITY_SHRINK_INTERVAL_MS$1, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS$1, RATE_LIMIT_SUSPENDED_REASON, AGENT_SWARM_MAX_CONCURRENCY_ENV, AgentRunBatch, SubagentSuspended, RESUMED_PROFILE_FALLBACK, SessionSwarmService, PROMPT_TEMPLATE_PLACEHOLDER, AgentSwarmToolInputSchema, IAgentSwarmTool, SECONDARY_MODEL_FLAG_ID, SUBAGENT_SECTION, SECONDARY_MODEL_SECTION, SubagentConfigSchema, SecondaryModelConfigSchema, DEFAULT_SUBAGENT_TIMEOUT_MS, SUBAGENT_TIMEOUT_ENV, subagentEnvBindings, stripSubagentEnv, PRIMARY_SUBAGENT_MODEL_CHOICE, SECONDARY_MODEL_FORCE_REQUIRES_DEFAULT_MESSAGE, SECONDARY_MODEL_FORCE_EXCLUDES_MODELS_MESSAGE, SECONDARY_MODEL_DEFAULT_MODEL_REQUIRED_MESSAGE, SECONDARY_MODEL_PRIMARY_MODEL_RESERVED_MESSAGE, DEFAULT_PROFILE_NAME, FORK_WITH_RESUME_UNAVAILABLE, FORK_WITH_TYPE_UNAVAILABLE, FORK_WITH_MODEL_UNAVAILABLE, FORK_EXPERIMENTAL_UNAVAILABLE, FORK_CONTEXT_NOTICE, agent_swarm_default, agent_swarm_fork_default, DEFAULT_SUBAGENT_TYPE, AGENT_SWARM_PARAMETERS, AGENT_SWARM_PARAMETERS_NO_MODEL, AgentSwarmTool, SwarmFeature, CreateGoalToolInputSchema, ICreateGoalTool, CRON_MAIN_AGENT_ONLY, GOAL_MAIN_AGENT_ONLY, goal_active_reminder_default, goal_blocked_reminder_default, goal_paused_reminder_default, GOAL_WAIT_FOR_GUIDANCE, GoalInjection, BUDGET_GUIDANCE_NEARING, BUDGET_GUIDANCE_WITHIN, IAgentToolRegistryService, WAIT_FOR_FLAG_ID, ISessionUsageService, IGoalDeadlineScheduler, GoalStatusSchema, GoalActorSchema, GoalBudgetLimitsSchema, goalCreateSchema, GoalCreate, goalUpdateSchema, GoalUpdate, goalClearSchema, GoalClear, goalForkedSchema, GoalForked, GoalUpdated, MAX_GOAL_OBJECTIVE_LENGTH, MAX_GOAL_COMPLETION_CRITERION_LENGTH, GOAL_CANCELLED_REMINDER, GOAL_FORK_CLEARED_REMINDER, GOAL_FORK_CLEARED_REMINDER_NAME, GOAL_CONTINUATION_ORIGIN, GOAL_RATE_LIMIT_PAUSE_REASON, GOAL_PROVIDER_CONNECTION_PAUSE_PREFIX, GOAL_PROVIDER_AUTH_PAUSE_PREFIX, GOAL_PROVIDER_API_PAUSE_PREFIX, GOAL_MODEL_CONFIG_PAUSE_PREFIX, GOAL_RUNTIME_PAUSE_PREFIX, GOAL_CONTINUATION_FAILURE_PAUSE_PREFIX, GOAL_PROVIDER_FILTERED_PAUSE_REASON, GOAL_BUDGET_BLOCK_PREFIX, LLM_NOT_SET_MESSAGE, GOAL_BUDGET_STOP_REMINDER_NAME, GOAL_BUDGET_STOP_REMINDER, GOAL_BUDGET_TOOLS_REJECTED_MESSAGE, GOAL_STALE_TOOL_RESULT, GOAL_CONTINUATION_PROMPT, GOAL_STEP_CAP_CONTINUATION_PROMPT, goalActorLogic, IAgentGoalService, AgentGoalService, create_goal_default, CreateGoalTool, GetGoalToolInputSchema, IGetGoalTool, get_goal_default, GetGoalTool, SetGoalBudgetToolInputSchema, ISetGoalBudgetTool, set_goal_budget_default, MIN_REASONABLE_TIME_BUDGET_MS, MAX_REASONABLE_TIME_BUDGET_MS, SetGoalBudgetTool, UpdateGoalToolInputSchema, IUpdateGoalTool, update_goal_default, UpdateGoalTool, GoalDeadlineSchedulerService, GoalFeature, ITowerRateLimitService, RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS, TOWER_SPAWN_PAUSE_MS, RateLimitCapacityGovernor, TowerRateLimitService, TowerFindingToolInputSchema, ITowerFindingTool, GIT_TIMEOUT_MS$1, GitError, ADD_PATHS_CHUNK$1, TOWER_ROOT, COMMS_DIR, INBOX_DIR, FINDINGS_DIR, REVIEWS_DIR, MISSIONS_DIR, LOG_DIR, WORKTREES_DIR, STATE_FILE, ACTIVITY_LOG, MISSIONS_INDEX, TOWER_NAME, UNMERGED_CODES, ADD_PATHS_CHUNK, FENCE, TowerProtocolError, FINDING_TYPES, STATUS_EMOJI$1, TowerStore, TOWER_MAIN_AGENT_ONLY, TOWER_MODE_USER_ENABLED_ONLY, finding_default, TowerFindingTool, TowerInboxToolInputSchema, ITowerInboxTool, inbox_default, DEFAULT_LIMIT, TowerInboxTool, TowerInitToolInputSchema, ITowerInitTool, init_default$1, TowerInitTool, TowerMergeToolInputSchema, ITowerMergeTool, merge_default, TowerMergeTool, TowerMissionToolInputSchema, ITowerMissionTool, mission_default, TowerMissionTool, TowerPlanToolInputSchema, ITowerPlanTool, plan_default, TowerPlanTool, TowerReviewToolInputSchema, ITowerReviewTool, review_default, TowerReviewTool, TowerSendToolInputSchema, ITowerSendTool, send_default, TowerSendTool, TowerSpawnToolInputSchema, ITowerSpawnTool, TERMINAL_STATUSES, TaskListInputSchema, ITaskListTool, task_list_default, TaskListTool, TaskOutputInputSchema, ITaskOutputTool, task_output_default, OUTPUT_PREVIEW_BYTES$1, PAGING_HINT_LINES$1, TaskOutputTool, TaskStopInputSchema, ITaskStopTool, task_stop_default, TaskStopTool, WAIT_FOR_MAX_TIMEOUT_S, WaitForInputSchema, IWaitForTool, task_wait_default, OUTPUT_PREVIEW_BYTES, PAGING_HINT_LINES, PROGRESS_INTERVAL_MS, WaitForTool, taskNotificationDeliveryKey, MAX_OUTPUT_BYTES, TERMINAL_OUTPUT_TAIL_BYTES, MAX_TASK_OUTPUT_BYTES, SIGTERM_GRACE_MS, TASK_ID_ALPHABET, SESSION_CLOSED_REASON, NOTIFICATION_FALLBACK_PREVIEW_BYTES, QUESTION_ANSWER_INLINE_BYTES, ACTIVE_BACKGROUND_TASK_INJECTION_VARIANT, TASK_RESUME_TERMINATION_VARIANT, ACTIVE_BACKGROUND_TASK_GUIDANCE, TaskNotificationStepRequest, taskGhostsKey, taskScheduledNotificationKeysKey, taskDeliveredNotificationKeysKey, taskActiveTaskReminderPendingKey, AgentTaskService, REPEAT_BREAKER_STOP_REASON, IAgentToolDedupeService, REPEAT_BREAKER_SETTLE_REASON, SubagentTask, spawn_default, TowerSpawnTool, TowerStatusToolInputSchema, ITowerStatusTool, status_default, STATUS_EMOJI, INBOX_COUNT_LIMIT, RECENT_LOG_LINES, TowerStatusTool, TowerTeardownToolInputSchema, ITowerTeardownTool, teardown_default, TowerTeardownTool, tower_worker_overlay_default, TOWER_WORKER_TOOLS, TOWER_WORKER_ROLE, TOWER_WORKER_PROFILE_DEF, TOWER_TOOL_CONTRIBUTIONS, TowerFeature, assembledFlagServices, assembledOverrideForTests, tower_mode_exit_reminder_default, tower_mode_full_reminder_default, tower_mode_sparse_reminder_default, TOWER_MODE_DEDUP_MIN_TURNS, TOWER_MODE_FULL_REFRESH_TURNS, TOWER_MODE_INJECTION_VARIANT, TOWER_MODE_EXIT_DISCLOSURE, TowerModeInjection, TOWER_MODE_TOOLS, AgentTowerService, IAgentCacheProbeService, AgentCacheProbeService, usageRecordSchema, UsageRecord, UsageAgentModel, UsageAgentModelDefinition, SessionUsageService, UsageFeature, HANDOFF_STEP_KIND, HandoffStepRequest, REMINDER_TEXT_1, REMINDER_TEXT_3, REPEAT_REMINDER_1_START, REPEAT_REMINDER_2_START, REPEAT_REMINDER_3_START, REPEAT_FORCE_STOP_STREAK, HANDOFF_VETO_RESULT, DEDUPE_PLACEHOLDER_RESULT, toolDedupeStepCallsKey, toolDedupeOriginalCallIndexKey, toolDedupeSyntheticCallIdsKey, toolDedupeCallKeyByCallIdKey, toolDedupeConsecutiveKeyKey, toolDedupeConsecutiveCountKey, toolDedupeActiveTurnIdKey, toolDedupeActiveStepKey, toolDedupeTurnCallRecordsKey, toolDedupeTurnRepeatCountKey, toolDedupeHandoffPhaseKey, AgentToolDedupeService, IAgentAgentsMdReminderService, IBashParserService, profileBindSchema, ProfileBind, configUpdateSchema, ConfigUpdate, toolsSetActiveToolsSchema, ToolsSetActiveTools, toolsResetActiveToolsSchema, ToolsResetActiveTools, WarningIssued, profileKey, profileActiveToolsKey, LISTING_COMMANDS, TRANSPARENT_WRAPPERS, LS_ARG_TAKING_OPTIONS, TREE_LIKE_ARG_TAKING_OPTIONS, FIND_GLOBAL_OPTIONS, UNSAFE_OPERAND$1, AGENTS_MD_BASENAMES, BASH_PARSE_OPTIONS, DISCOVERY_REMINDER_VARIANT, agentsMdReminderKnownKey, agentsMdReminderCwdKey, agentsMdReminderSeededKey, AgentAgentsMdReminderService, SelectToolsInputSchema, ISelectToolsTool, SELECT_TOOLS_TOOL_NAME, IAgentToolSelectService, DESCRIPTION, SelectToolsTool, DYNAMIC_TOOL_SCHEMA_VARIANT, LOADABLE_TOOLS_VARIANT, TOOLS_ADDED_BLOCK, TOOLS_REMOVED_BLOCK, toolSelectPendingLoadedKey, AgentToolSelectService, IAgentToolSelectAnnouncementsService, AgentToolSelectAnnouncementsService, IAgentToolSelectSchemasService, AgentToolSelectSchemasService, TOOLS_SECTION, GLOB_MAGIC, ISessionToolPolicyGate, AgentToolPolicyService, PRINT_WAIT_CEILING_S_DEFAULT, CRON_SECTION, DEFAULT_CRON_CONFIG, cronConfigSchema, on, cronEnvBindings, stripCronEnv, systemMonoNowMs, SYSTEM_CLOCKS, MAX_CLOCK_FILE_BYTES, MINUTE_RANGE, HOUR_RANGE, DOM_RANGE, MONTH_RANGE, DOW_RANGE, MS_PER_MINUTE$1, DIGIT_ONLY, MONTH_NAMES, DAY_NAMES, DEFAULT_CRON_JITTER_CONFIG, MS_PER_DAY$1, MS_PER_MINUTE, cronTaskSchema, cronAddSchema, cronDeleteSchema, cronCursorSchema, CronAdd, CronDelete, CronCursor, CronFired, STALE_THRESHOLD_MS, DEFAULT_POLL_INTERVAL_MS, MAX_COALESCE_ITERATIONS, CRON_ID_REGEX, MAX_ID_ATTEMPTS, CRON_SCHEDULED, CRON_FIRED, CRON_MISSED, CRON_DELETED, cronEffects, cronActorLogic, IAgentCronService, AgentCronService, MAX_PROMPT_BYTES, CronCreateInputSchema, ICronCreateTool, cron_create_default, ONE_SHOT_MAX_FUTURE_MS, CronCreateTool, CronDeleteInputSchema, ICronDeleteTool, cron_delete_default, ID_PATTERN, CronDeleteTool, CronListInputSchema, ICronListTool, cron_list_default, MS_PER_DAY, PROMPT_PREVIEW_BYTES, CronListTool, CronFeature, GIT_TIMEOUT_MS, MAX_DIRTY_FILES, MAX_COMMIT_LINE_LENGTH, ALLOWED_HOSTS, explore_overlay_default, AGENT_TOOLS, CODER_TOOLS, EXPLORE_TOOLS, CODER_ROLE, DEFAULT_PERMISSION_MODE_SECTION, permissionSetModeSchema, PermissionSetMode, permissionModeKey, permissionModeConfiguredKey, INHERITED_IN_FLIGHT_TOOL_OUTPUT, IAgentToolActivationService, ManagedAgent, nextAgentId, REMOVE_PROMPT_QUIESCE_TIMEOUT_MS, REMOVE_PROMPT_QUIESCE_POLL_MS, AgentLifecycleService, IMcpRegistryService, McpRegistryService, IMcpManagementService, DEFAULT_AUTH_TIMEOUT_MS$2, AUTH_FLOW_IDLE_TIMEOUT_MS, MAX_AUTH_TIMEOUT_MS, McpManagementService, IAgentUserToolService, AGENT_RUN_PROMPT_ORIGIN, SUBAGENT_MAX_TOKENS_ERROR, SessionSubagentService, ISessionSubagentModelsValidationService, SessionSubagentModelsValidationService, SubagentToolInputSchema, BACKGROUND_AGENT_UNAVAILABLE, RESUME_WITH_TYPE_UNAVAILABLE, USER_INTERRUPTED_SUBAGENT_MESSAGE, SUBAGENT_STOPPED_MESSAGE, ISubagentTool, agent_background_disabled_default, agent_background_enabled_default, agent_default, agent_fork_default, SUBAGENT_TOOL_PARAMETERS, SUBAGENT_TOOL_PARAMETERS_NO_MODEL, SubagentTool, REASON_MAX_CHARS, REPEAT_BREAKER_NOTICE, RESUME_NEXT_STEP, NEXT_STEP_BY_REASON, STOP_REASON_BY_CODE, ISessionExportService, WIRE_FILENAME, SESSION_LOG_REL, GLOBAL_LOG_REL, WEB_LOG_REL, DESKTOP_LOG_REL, SessionExportService, ISessionLegacyService, SessionLegacyService, InteractionFeature, SessionApprovalService, ISessionQuestionService, SessionQuestionService, QuestionOptionSchema, QuestionItemSchema, QUESTION_UNIQUENESS_MESSAGE, AskUserQuestionInputBaseSchema, AskUserQuestionInputSchemaWithBackground, AskUserQuestionInputSchema, IAskUserQuestionTool, ask_user_default, QuestionBackgroundTask, QUESTION_DISMISSED_MESSAGE, QUESTION_UNSUPPORTED_FAILURE_MESSAGE, BACKGROUND_DESCRIPTION, BACKGROUND_UNAVAILABLE_MESSAGE, PARAMETERS_WITH_BACKGROUND, PARAMETERS_FOREGROUND_ONLY, AskUserQuestionTool, IRestGateway, IWSGateway, RestGateway, WSGateway, workspaceContextWorkDirKey, workspaceContextAdditionalDirsKey, SessionWorkspaceContextService, WorkspaceCreated, WorkspaceUpdated, WorkspaceDeleted, IWorkspacePersistence, WorkspaceService, WORKSPACE_CATALOG_VERSION, WORKSPACE_CATALOG_SCOPE, WORKSPACE_CATALOG_KEY, FileWorkspacePersistence, IWorkspaceAliases, WorkspaceAliasesService, IWorkspaceSessions, WorkspaceSessionsService, DIFF_MAX_BYTES, PR_SPAWN_TIMEOUT_MS, PULL_REQUEST_TTL_MS, GitService, SyntaxNodeBuilder, Aborted, ParseBudget, SPECIAL_VARIABLE_CHARS, FILE_REDIRECT_OPERATORS, DECLARATION_COMMAND_KEYWORDS, UNSET_COMMAND_KEYWORDS, RESERVED_WORDS, EXPRESSION_PRECEDENCE, EXPRESSION_OPERATORS, SCAN_TICK_INTERVAL$1, MAX_SCAN_DEPTH, CONTROL_OPERATORS, REDIRECT_OPERATORS, CASE_ENABLING_WORDS, Lexer, FILE_REDIRECT_OP_SET, DECLARATION_COMMAND_SET, UNSET_COMMAND_SET, RESERVED_WORD_SET, NUMBER_RE, ASSIGNMENT_RE, ASSIGNMENT_SPLIT_RE, SUBSCRIPT_ASSIGNMENT_RE, IDENTIFIER_RE, FUNCTION_NAME_RE, BRACE_EXPRESSION_RE, PAREN_TEST_RE, STOP_THEN, STOP_DO, STOP_DONE, STOP_IF_BODY, STOP_FI, STOP_CLOSE_BRACE, STOP_ESAC, CASE_TERMINATION_OPS, SCAN_TICK_INTERVAL, PREC_TERNARY, PREC_TEST, PREC_UNARY, PREC_PREFIX, PREC_POSTFIX, Parser, BashParserService, NoopSessionToolPolicyGate, fsBrowseEntrySchema$1, HostFolderNotAbsoluteError, HostFolderNotFoundError, HostFolderPermissionError, IHostFolderBrowser, HostFolderBrowser, textEncoder$3, pendingRetirements, AppendLogStore, textEncoder$2, textDecoder$2, jsonDocumentCodec, tomlDocumentCodec, AtomicDocumentStoreBase, JsonAtomicDocumentStore, TomlAtomicDocumentStore, BlobStoreService, MAX_LEVEL, P, cmpNumber, cmpString, SkipNode, SkipList, toKStr$1, fromKStr$1, DISK_REF_BYTES, MinHeap, Store, OpTracker, POLICIES, WAL, ValueReader, POLY, TABLE, MAGIC, EMPTY, SUB_HEADER, CRC_CHUNK, DEFAULT_RESYNC_CANDIDATE_BUDGET, ASYNC_SCAN_WINDOW, SCAN_YIELD_BYTES, yieldToLoop$3, SNAPSHOT_FILE, WAL_FILE, SECONDARY_INDEXES_FILE, COMPOUND_INDEXES_FILE, TEXT_INDEXES_FILE, SIDECAR_FILES, POSTINGS_PATTERN, GENERATIONS_DIR, CURRENT_FILE, MANIFEST_FILE, STORE_IMAGE_FILE, DT_INDEX_FILE, SECONDARY_INDEX_FILE, COMPOUND_INDEX_FILE, GEN_SNAPSHOT_FILE, GEN_ID_PATTERN, GEN_TMP_PATTERN, FINGERPRINT_FILES, STALE_TMP_FILES, STALE_POSTINGS_TMP_PATTERN, LATIN, CJK, MAX_TERM_CHARS, MAX_TERM_BYTES, yieldToLoop$2, RecoveryGenerationChurnError, GENERATION_RETRY_BASE_MS, sleep$3, sleep$2, yieldToLoop$1, FLUSH_BYTES$3, DEFAULT_READ_CONCURRENCY, DEFAULT_SLICE_BYTES, COPY_CHUNK, SMALL_DELTA, rotateReplace, MAX_PRECOPY_PASSES, CONVERGE_RATIO, UniqueViolationError, IndexManager, DtIndex, HEADER_LEN, CRC_LEN, FLUSH_BYTES$2, PostingsFile, EMPTY_MAP, TopK, BUILD_YIELD_DOCS, BUILD_YIELD_TOKENS, StagedBuild, TextIndexBuildingError, TextIndex, CompoundIndexManager, CODECS, sidecarTmpSeq, LockError, HELD, sidecarSeq, nextSidecarSeq, exitHooked, TAKEOVER_SETTLE_BASE_MS, TAKEOVER_SETTLE_MAX_MS, LockFile, MaintenanceBackpressureError, MaintenanceClosedError, MaintenanceCancelledError, HISTORY_LIMIT, MaintenanceScheduler, WorkerSlots, defaultWorkerSlots, TEXT_BUILD_SLOT_WAIT_MS, MemoryGuard, backupTmpSeq, QueryEngine, GenerationCorruptError, ByteWriter, ByteReader, FLUSH_BYTES$1, GenFileWriter, yieldToLoop, VERIFY_CHUNK_BYTES, STORE_MAGIC, TAG_INLINE, TAG_SNAPSHOT_LOC, TAG_WAL_LOC, DT_MAGIC, DT_VERSION, SECONDARY_MAGIC, SECONDARY_VERSION, COMPOUND_MAGIC, COMPOUND_VERSION, GTAG_NUMBER, GTAG_STRING, GTAG_FALSE, GTAG_TRUE, GTAG_NULL, TEXT_DICT_MAGIC, TEXT_DICT_VERSION, TEXT_DOCS_MAGIC, TEXT_DOCS_VERSION, HASH_MASK, TextRegistry, configuredEntry, PROGRESS_DOCS, FLUSH_BYTES, AGG_ENTRY_BYTES, AGG_TERM_BYTES, SegmentReader, RawPostingsWriter, BASE_DOCS_MAGIC, WorkerTextBuildError, DEFAULT_ABORT_POLL_MS, DEFAULT_MAX_OLD_SPACE_MB, STORE_IMAGE_RECORDS_PER_SLICE, GenerationLoader, GenerationBuildAborted, GenerationBuilder, WalGroupTracker, WritePath, IndexAdmin, ReadPath, LifecycleTracker, MiniDb, Coordinator, ShardHandle, CLUSTER_META_FILE, CLUSTER_INDEX_FILE, SHARD_DIR_PREFIX, ShardLockPool, Router, META_VERSION, DEFAULT_SHARD_COUNT, Topology, ClusterDb, SEP, CHECKPOINT_COLLECTION, STORE_SUBDIR, SHARD_COUNT, LOCK_ACQUIRE_TIMEOUT_MS, DROP_BATCH_SIZE, pendingDisposals, MiniDbQueryStore, MiniDbQuery, WebSearchInputSchema, IWebSearchTool, IWebSearchProviderService, web_search_default, WebSearchTool, TERMINAL_RETENTION_MS, DEFAULT_DEVICE_EXPIRES_IN_SEC, SERVICES_SECTION$1, OAuthService2, AuthSummaryService2, OAuthToolkitService, SERVICES_SECTION, StringRecordSchema, OAuthRefSchema, MoonshotServiceConfigSchema, ServicesConfigSchema, WEB_SEARCH_BASE_URL_ENV, WEB_SEARCH_API_KEY_ENV, WEB_FETCH_BASE_URL_ENV, WEB_FETCH_API_KEY_ENV, nonBlankEnv, moonshotSearchEnvBindings, moonshotFetchEnvBindings, servicesEnvBindings, servicesCredentialEnvOverlay, stripMoonshotSearchEnv, stripMoonshotFetchEnv, stripServicesEnv, servicesFromToml, servicesToToml, MoonshotWebSearchProvider, WebSearchProviderService, managedProviderStatusSchema, managedProviderSummarySchema, IAuthLegacyService, MANAGED_PROVIDER_NAME, AuthLegacyService, BLOB_SCOPE, INDEX_SCOPE, INDEX_KEY, textEncoder$1, textDecoder$1, FileServiceImpl, DEFAULT_MAX_TOTAL_BYTES, MIME_EXTENSION, IFileEditService, EditService, TextModel, FileEditService, EditInputSchema, IEditTool, edit_default, EditTool, FetchURLInputSchema, IFetchURLTool, HttpFetchError, IWebFetchService, fetch_url_default, FetchURLTool, parseHTML, DEFAULT_USER_AGENT, DEFAULT_MAX_BYTES, MAX_REDIRECT_HOPS, REDIRECT_STATUSES, LocalFetchURLProvider, PRIVATE_ADDRESS_BLOCKLIST, MoonshotFetchURLProvider, WebFetchService, ByteLruCache, DEFAULT_THRESHOLD, DEFAULT_MAX_CACHE_SIZE, DATA_URI_HEADER_RE, AgentBlobServiceImpl, AgentContextMemoryService, ReminderFeature, IAgentContextProjectorService, MEDIA_DEGRADED_PLACEHOLDERS, MEDIA_STRIPPED_PLACEHOLDERS, MEDIA_CONTAINER_KEY_CACHE, TOOL_ERROR_STATUS, TOOL_EMPTY_STATUS, TOOL_EMPTY_ERROR_STATUS, TOOL_OUTPUT_EMPTY_TEXT, INTERRUPTED_RESULT, TOOL_INTERRUPTED_TEXT, contextProjectorLastRepairSignatureKey, AgentContextProjectorService, sizeSchema, TokenCountingMeasured, TokenCountingTruncated, rebaseSchema, TokenCountingRebased, turnRecordedSchema, TokenCountingTurnRecorded, ZERO_ANCHOR, TokenCountingAgentModel, TokenCountingAgentModelDefinition, TOKEN_COUNTING_SECTION, TOKEN_COUNTING_STRATEGY_ENV, TOKEN_COUNTING_STRATEGIES, TokenCountingConfigSchema, tokenCountingEnvBindings, SessionTokenCountingService, TokenCountingFeature, IAgentPluginService, pluginSessionStartSchema$1, PluginSessionStartEvent, pluginSessionStartSnapshotKey, SESSION_START_INJECTION_VARIANT, PLUGIN_CHANGE_INJECTION_VARIANT, PLUGIN_CHANGE_VERBS, MAIN_AGENT_ID, SUPERSEDES_SUFFIX, NO_ACTIVE_SESSION_STARTS, pluginSessionStartRefreshPendingKey, AgentPluginService, DEFAULT_COMPACTION_CONFIG, RuntimeCompactionStrategy, DefaultCompactionStrategy, IAgentLLMRequesterService, TODO_LIST_TOOL_NAME, TODO_LIST_REMINDER_VARIANT, TODO_LIST_REMINDER_TURNS_SINCE_WRITE, TODO_LIST_REMINDER_TURNS_BETWEEN_REMINDERS, toolsUpdateStoreSchema, ToolsUpdateStore, todoActorLogic, IAgentTodoService, AgentTodoService, compaction_ahead_default, context_budget_default, CONTEXT_BUDGET_REMINDER_VARIANT, COMPACTION_AHEAD_REMINDER_VARIANT, COMPACTION_AHEAD_LEAD_RATIO, BUCKET_THRESHOLDS, WRITE_TOOL_NAMES, BASH_TOOL_NAMES, TODO_TOOL_NAMES, McpServerStatus, ToolListUpdated, AgentErrorEvent, compaction_instruction_default, context_recovery_footer_default, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS, OVERFLOW_CONTEXT_SAFETY_RATIO, OVERFLOW_STATUS_RECOVERY_RATIO, MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS, COMPACTION_OVERFLOW_SHRINK_RATIOS, EMPTY_TOOL_PARAMETERS$1, CompactionTruncatedError, fullCompactionCompactionCountInTurnKey, fullCompactionObservedMaxContextTokensByModelKey, fullCompactionLastCompactedTokenCountKey, fullCompactionConsecutiveOverflowCompactionsKey, fullCompactionActiveTurnIdKey, AgentFullCompactionService, contextBudgetActorLogic, IAgentContextBudgetService, AgentContextBudgetService, ContextBudgetFeature, IAgentMediaResolverService, ToolCallIdNormalizer, ToolCallIdResponseNormalizer, llmToolEntrySchema, llmToolsSnapshotSchema, LlmToolsSnapshot, llmRequestSchema, LlmRequest, llmRequestTraceKey, EMPTY_TOOL_PARAMETERS, noopOnPart, KIMI_CODE_INFINITE_RETRY_ENV, llmRequesterLastConfigLogSignatureKey, llmRequesterTurnConfigsKey, llmRequesterMediaDegradedTurnsKey, llmRequesterMediaStrippedTurnsKey, llmRequesterEmittedThinkingEffortWarningsKey, AgentLLMRequesterService, MutableLLMRequestTrace, StepRequestQueue, loopNextReservedTurnIdKey, loopLastRequestTraceIdKey, loopDisposingKey, MAX_STEP_SIGNAL_LISTENERS, AgentLoopService, IAgentLoopContinuationService, AgentLoopContinuationService, IAgentInterruptionReminderService, INTERRUPTION_REMINDER_VARIANT, interruptionReminderRecordedSchema, InterruptionReminderRecorded, interruptionReminderKey, INTERRUPTION_REMINDER, AgentInterruptionReminderService, IAgentMcpService, MCP_NAME_PREFIX, MCP_NAME_SEPARATOR, MAX_QUALIFIED_LENGTH, MCP_OAUTH_AUTHORIZATION_URL_TOOL_UPDATE$1, DEFAULT_AUTH_TIMEOUT_MS$1, AUTH_TOOL_TOOL_NAME, DESCRIPTION_TEMPLATE, MCP_MAX_BINARY_PART_BYTES, MCP_MAX_BINARY_PART_CHARS, mcpToolCollisionSchema, mcpToolsDiscoveredSchema, McpToolsDiscovered, mcpDiscoveryKey, mcpMcpToolsByServerKey, mcpDiscoveryWritesReadyKey, AgentMcpService, IAgentMediaToolsRegistrar, ReadMediaFileInputSchema, read_media_default, ReadMediaFileTool, mediaRegisteredKeyKey, AgentMediaToolsRegistrar, SessionMediaStoreService, CACHE_SCOPE, PROVIDER_ID_RE, VIDEO_UNAVAILABLE_TEXT, IMAGE_UNAVAILABLE_TEXT, IMAGE_MEMO_MAX_BYTES, IMAGE_MEMO_MAX_TOTAL_BYTES, textEncoder, textDecoder, mediaResolvedKey, AgentMediaResolverService, IMAGE_SECTION, IMAGE_MAX_EDGE_ENV, IMAGE_READ_BYTE_BUDGET_ENV, ImageConfigSchema, imageEnvBindings, IImageConfigBridge, ImageConfigBridge, permission_mode_auto_enter_reminder_default, permission_mode_auto_exit_reminder_default, PERMISSION_MODE_INJECTION_VARIANT, permissionModeLastModeKey, PermissionModeInjection, AgentPermissionModeService, AutoModeApprovePermissionPolicyService, AutoModeAskUserQuestionDenyPermissionPolicyService, parsePermissionPattern, PERMISSION_SECTION, PermissionRuleDecisionSchema, PermissionRuleScopeSchema, PermissionRuleSchema, PermissionConfigSchema, DANGEROUS_COMMAND_GUARD_ENV, permissionEnvBindings, stripPermissionEnv, permissionFromToml, permissionToToml, PARSE_OPTIONS, MAX_NESTED_SHELL_DEPTH, UNSAFE_OPERAND, SKIPPED_COMMAND_CHILDREN, SIMPLE_DANGEROUS_COMMANDS, PRIVILEGE_WRAPPERS, PRIVILEGE_VALUE_OPTIONS, NESTED_SHELLS, LAUNCH_WRAPPERS, WRAPPER_VALUE_OPTIONS, SYSTEMCTL_DANGEROUS_SUBCOMMANDS, SYSTEMCTL_VALUE_OPTIONS, DD_SAFE_DEVICE_TARGETS, DangerousCommandAskPermissionPolicyService, DEFAULT_APPROVE_TOOLS, DefaultToolApprovePermissionPolicyService, FallbackAskPermissionPolicyService, GitControlPathAccessAskPermissionPolicyService, GitCwdWriteApprovePermissionPolicyService, SensitiveFileAccessAskPermissionPolicyService, SessionApprovalHistoryPermissionPolicyService, USER_CONFIGURED_SCOPES, UserConfiguredAllowPermissionPolicyService, UserConfiguredAskPermissionPolicyService, UserConfiguredDenyPermissionPolicyService, YoloModeApprovePermissionPolicyService, AgentPermissionPolicyService, PermissionRulesAdd, permissionRecordApprovalResultSchema, PermissionRecordApprovalResult, permissionRulesKey, AgentPermissionRulesService, PluginCommandActivated, IAgentPluginCommandService, AgentPluginCommandService, PLUGIN_SECTIONS_MAX_BYTES, profileActiveToolNamesOverlayKey, profileAgentsMdWarningKey, profileEmittedThinkingEffortWarningsKey, profileEmittedToolPatternWarningsKey, profileEmittedPluginBudgetWarningsKey, AgentProfileService, IAgentShellCommandService, ShellOutput, ShellStarted, ShellCompleted, SHELL_FOREGROUND_TIMEOUT_S, shellCommandTasksKey, AgentShellCommandService, ISessionInitService, DEFAULT_INIT_PROMPT, INIT_PROFILE_NAME, INIT_PARENT_TOOL_CALL_ID, INIT_DESCRIPTION, SessionInitService, SessionInitFeature, TodoItemSchema, TodoListInputSchema, ITodoListTool, todo_list_default, todo_list_write_reminder_default, TodoListTool, TodoFeature, DRAFT_07_AJV, DRAFT_2019_AJV, DRAFT_2020_AJV, DRAFT_2019_KEYWORDS, DRAFT_2020_KEYWORDS, ToolScheduler, ABORT_GRACE_MS, TOOL_OUTPUT_EMPTY, TOOL_OUTPUT_NON_TEXT, validators, toolExecutorToolCallDupTypesKey, toolExecutorDupTypeTurnIdKey, AgentToolExecutorService, TOOL_RESULT_PREVIEW_HEAD_CHARS, TOOL_RESULT_PREVIEW_TAIL_CHARS, TOOL_RESULT_MAX_LINE_CHARS, TRUNCATION_MARKER, encoder, ToolResultTruncationService, AgentToolActivationService, IBuiltinToolAssemblyService, BuiltinToolAssemblyService, AgentToolRegistryService, toolsRegisterUserToolSchema, ToolsRegisterUserTool, toolsUnregisterUserToolSchema, ToolsUnregisterUserTool, userToolKey, AgentUserToolService, turnPhaseSchema, approvalRefSchema, toolCallRefSchema, activityRetryStateSchema, activityTurnStateSchema, turnEndReasonSchema, activityLastTurnStateSchema, backgroundRefSchema, activityViewLifecycleSchema, agentActivityStateSchema, agentActivityViewContract, pageOf, maybe, noResult, stringDeltaSchema, textPartSchema, imageUrlPartSchema, videoUrlPartSchema, promptPartSchema, promptPayloadSchema, promptSkillActivationSchema, promptWithSkillsPayloadSchema, promptWithSkillsResultSchema, steerPayloadSchema, activateSkillPayloadSchema, promptLaunchResultSchema, runShellCommandPayloadSchema, shellCommandResultSchema, setModelResultSchema, runtimeBindingSchema, permissionModeSchema, tokenUsageSchema, usageStatusSchema, agentCommandInfoSchema, planDataSchema, taskLifecycleStatusSchema, taskInfoBaseFields, agentTaskInfoSchema, agentPromptContract, agentSkillContract, agentLoopContract, agentPermissionModeContract, agentCommandContract, agentRuntimeBindingContract, agentContextMemoryContract, agentTokenCountingContract, agentShellCommandContract, agentProfileContract, agentUsageContract, agentPlanContract, mcpServerEntrySchema, agentMcpContract, fullCompactionInputSchema, agentFullCompactionContract, agentTaskContract, oAuthFlowStatusSchema, oAuthFlowStartSchema, oAuthFlowSnapshotSchema, oAuthLoginCancelResponseSchema, oAuthLogoutResponseSchema, authStatusSchema, refreshOAuthProviderModelsResponseSchema, oAuthLoginOptionsSchema, authContract, authSummaryContract, capabilityStepSchema, capabilityInstallProgressSchema, capabilityStatusSchema, capabilitiesContract, modelCatalogItemSchema, providerCatalogStatusSchema, providerCatalogItemSchema, setDefaultModelResponseSchema, generateInputSchema, generateParamsSchema, generateEventSchema, catalogContract, refreshProviderModelsOptionsSchema, refreshProviderModelsResponseSchema, providerDiscoveryContract, configTargetSchema, configInspectValueSchema, configDiagnosticSchema, configContract, stringRead, envContract, fileMetaSchema, fileSaveOptionsSchema, fileGetResultSchema, filesContract, experimentalFeatureStateSchema, flagsContract, fsBrowseEntrySchema, fsBrowseResponseSchema, fsHomeResponseSchema, hostFsContract, protocolSchema, oAuthRefSchema$1, modelBaseSchema, modelOverrideSchema, modelConfigSchema, modelsContract, stringRecordSchema$1, mcpTimeoutMsSchema, mcpServerCommonFields, mcpServerStdioConfigSchema, mcpServerHttpConfigSchema, mcpServerSseConfigSchema, mcpServerConfigSchema, mcpServerSourceSchema, mcpRegistryPluginOriginSchema, mcpRegistryQuerySchema, mcpAuthStatusQuerySchema, globalMcpServerConfigSchema, mcpServerConfigDataSchema, mcpManagedServerSchema, mcpServerTestTargetSchema, mcpServerTestResultSchema, mcpServerLocatorSchema, mcpServerAuthStateSchema, mcpServerInspectionSchema, mcpServerAuthStatusSchema, mcpServerAuthBeginResultSchema, mcpServerAuthFlowHandleSchema, mcpManagementContract, pluginDiagnosticSchema, pluginAuthorSchema, pluginSessionStartSchema, pluginInterfaceSchema, hookDefSchema, pluginCommandEntrySchema, pluginManifestKindSchema, pluginSourceSchema, pluginStateSchema, pluginGithubRefSchema, pluginManifestSchema, pluginMcpServerInfoSchema, pluginGithubMetadataSchema, pluginSummarySchema, pluginInfoSchema, reloadSummarySchema$1, pluginUpdateStatusSchema, pluginCommandDefSchema, installPluginInputSchema, setPluginEnabledInputSchema, setPluginMcpServerEnabledInputSchema, removePluginInputSchema, getPluginInfoInputSchema, pluginsContract, providerTypeSchema, oAuthRefSchema, stringRecordSchema, modelSourceSchema, providerConfigSchema, providersContract, sessionSummarySchema, sessionListQuerySchema, sessionCountQuerySchema, sessionsContract, workspaceSchema, workspaceUpdateSchema, workspacesContract, approvalRequestSchema, approvalResponseSchema, sessionApprovalContract, interactionKindSchema, interactionOriginSchema, interactionSchema, interactionResolutionSchema, sessionInteractionContract, agentMetaSchema, sessionMetaSchema, sessionMetaPatchSchema, sessionMetaKeySchema, sessionMetadataChangedEventSchema, sessionMetadataContract, createSessionOptionsSchema, resumeSessionOptionsSchema, forkSessionOptionsSchema, createChildSessionOptionsSchema, handleWireSchema, sessionManagerContract, questionOptionSchema, questionItemSchema, questionAnswersSchema, questionResponseSchema, questionResultSchema, questionRequestSchema, sessionQuestionContract, skillSummarySchema, sessionSkillCatalogContract, sessionTitleContract, globalContract, configChangedSchema, reloadSummarySchema, sessionMetaUpdatedSchema, catalogChangedSchema, globalEvents, sessionEvents, turnStartedEventSchema, turnEndedEventSchema, assistantDeltaEventSchema, thinkingDeltaEventSchema, toolCallStartedEventSchema, toolCallDeltaEventSchema, toolProgressEventSchema, toolResultEventSchema, promptCompletedEventSchema, promptAbortedEventSchema, compactionStartedEventSchema, compactionBlockedEventSchema, compactionCancelledEventSchema, compactionCompletedEventSchema, permissionApprovalRequestedEventSchema, permissionApprovalResolvedEventSchema, errorEventSchema, warningEventSchema, agentStatusUpdatedEventSchema, agentEvents, KlientValidationError, EventHub, ENV_SCALAR_PROPERTIES, DEFAULT_AUTH_TIMEOUT_MS, AUTH_COMPLETION_MARGIN_MS, RPCError, serviceTokens, REQUEST_INVALID, NOT_FOUND, MCP_SERVER_NOT_FOUND, MCP_OAUTH_FAILED, PROMPT_ID_CONFLICT, MCP_MANAGEMENT_SERVICE, AGENT_CONTEXT_SERVICES, MemoryChannel, KIMI_CONFIG_DOMAINS, DROPPED_DOMAIN_EVENT_TYPES, RENAMED_DOMAIN_EVENT_TYPES, IMPORT_CONTEXT_GUIDANCE, EMPTY_FOLD, ReadOnlyAgentRecordPersistence, SessionEventWiring, MAX_TIMER_DELAY_MS, SDKRpcClientV2, KimiConfigCoreRpcImpl, KimiConfigRpcClient, KimiForCodingProvider, DEFAULT_CATALOG_URL, CatalogFetchError;
 var init_index = __esm({
-  ".kimix-upstream-kimi-code-0.18.0/packages/node-sdk/dist/index.mjs"() {
+  ".kimix-upstream-kimi-code/packages/node-sdk/dist/index.mjs"() {
     init_zod();
     init_dist();
     init_dist2();
@@ -122459,7 +122847,7 @@ ${underline}`);
       }
       return path3;
     };
-    path$15 = /* @__PURE__ */ createPathTagFunction$2(encodeURIPath$2);
+    path$16 = /* @__PURE__ */ createPathTagFunction$2(encodeURIPath$2);
     Environments = class extends APIResource$2 {
       /**
       * Create a new environment with the specified configuration.
@@ -122493,7 +122881,7 @@ ${underline}`);
       */
       retrieve(environmentID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/environments/${environmentID}?beta=true`, {
+        return this._client.get(path$16`/v1/environments/${environmentID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -122511,7 +122899,7 @@ ${underline}`);
       */
       update(environmentID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/environments/${environmentID}?beta=true`, {
+        return this._client.post(path$16`/v1/environments/${environmentID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -122549,7 +122937,7 @@ ${underline}`);
       */
       delete(environmentID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/environments/${environmentID}?beta=true`, {
+        return this._client.delete(path$16`/v1/environments/${environmentID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -122568,7 +122956,7 @@ ${underline}`);
       */
       archive(environmentID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/environments/${environmentID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/environments/${environmentID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -122607,7 +122995,7 @@ ${underline}`);
       */
       delete(fileID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/files/${fileID}?beta=true`, {
+        return this._client.delete(path$16`/v1/files/${fileID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() }, options2?.headers])
         });
@@ -122627,7 +123015,7 @@ ${underline}`);
       */
       download(fileID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/files/${fileID}/content?beta=true`, {
+        return this._client.get(path$16`/v1/files/${fileID}/content?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{
             "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString(),
@@ -122647,7 +123035,7 @@ ${underline}`);
       */
       retrieveMetadata(fileID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/files/${fileID}?beta=true`, {
+        return this._client.get(path$16`/v1/files/${fileID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() }, options2?.headers])
         });
@@ -122691,7 +123079,7 @@ ${underline}`);
       */
       retrieve(modelID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/models/${modelID}?beta=true`, {
+        return this._client.get(path$16`/v1/models/${modelID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 }, options2?.headers])
         });
@@ -122750,7 +123138,7 @@ ${underline}`);
       */
       retrieve(userProfileID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/user_profiles/${userProfileID}?beta=true`, {
+        return this._client.get(path$16`/v1/user_profiles/${userProfileID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "user-profiles-2026-03-24"].toString() }, options2?.headers])
         });
@@ -122768,7 +123156,7 @@ ${underline}`);
       */
       update(userProfileID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/user_profiles/${userProfileID}?beta=true`, {
+        return this._client.post(path$16`/v1/user_profiles/${userProfileID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "user-profiles-2026-03-24"].toString() }, options2?.headers])
@@ -122806,7 +123194,7 @@ ${underline}`);
       */
       createEnrollmentURL(userProfileID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/user_profiles/${userProfileID}/enrollment_url?beta=true`, {
+        return this._client.post(path$16`/v1/user_profiles/${userProfileID}/enrollment_url?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "user-profiles-2026-03-24"].toString() }, options2?.headers])
         });
@@ -123475,7 +123863,7 @@ ${underline}`);
       */
       list(agentID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/agents/${agentID}/versions?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/agents/${agentID}/versions?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123520,7 +123908,7 @@ ${underline}`);
       */
       retrieve(agentID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.get(path$15`/v1/agents/${agentID}?beta=true`, {
+        return this._client.get(path$16`/v1/agents/${agentID}?beta=true`, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123540,7 +123928,7 @@ ${underline}`);
       */
       update(agentID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/agents/${agentID}?beta=true`, {
+        return this._client.post(path$16`/v1/agents/${agentID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123578,7 +123966,7 @@ ${underline}`);
       */
       archive(agentID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/agents/${agentID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/agents/${agentID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -123600,7 +123988,7 @@ ${underline}`);
       */
       create(memoryStoreID, params, options2) {
         const { view, betas, ...body } = params;
-        return this._client.post(path$15`/v1/memory_stores/${memoryStoreID}/memories?beta=true`, {
+        return this._client.post(path$16`/v1/memory_stores/${memoryStoreID}/memories?beta=true`, {
           query: { view },
           body,
           ...options2,
@@ -123621,7 +124009,7 @@ ${underline}`);
       */
       retrieve(memoryID, params, options2) {
         const { memory_store_id, betas, ...query2 } = params;
-        return this._client.get(path$15`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
+        return this._client.get(path$16`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123641,7 +124029,7 @@ ${underline}`);
       */
       update(memoryID, params, options2) {
         const { memory_store_id, view, betas, ...body } = params;
-        return this._client.post(path$15`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
+        return this._client.post(path$16`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
           query: { view },
           body,
           ...options2,
@@ -123663,7 +124051,7 @@ ${underline}`);
       */
       list(memoryStoreID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/memory_stores/${memoryStoreID}/memories?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/memory_stores/${memoryStoreID}/memories?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123683,7 +124071,7 @@ ${underline}`);
       */
       delete(memoryID, params, options2) {
         const { memory_store_id, expected_content_sha256, betas } = params;
-        return this._client.delete(path$15`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
+        return this._client.delete(path$16`/v1/memory_stores/${memory_store_id}/memories/${memoryID}?beta=true`, {
           query: { expected_content_sha256 },
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123705,7 +124093,7 @@ ${underline}`);
       */
       retrieve(memoryVersionID, params, options2) {
         const { memory_store_id, betas, ...query2 } = params;
-        return this._client.get(path$15`/v1/memory_stores/${memory_store_id}/memory_versions/${memoryVersionID}?beta=true`, {
+        return this._client.get(path$16`/v1/memory_stores/${memory_store_id}/memory_versions/${memoryVersionID}?beta=true`, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123726,7 +124114,7 @@ ${underline}`);
       */
       list(memoryStoreID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/memory_stores/${memoryStoreID}/memory_versions?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/memory_stores/${memoryStoreID}/memory_versions?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123746,7 +124134,7 @@ ${underline}`);
       */
       redact(memoryVersionID, params, options2) {
         const { memory_store_id, betas } = params;
-        return this._client.post(path$15`/v1/memory_stores/${memory_store_id}/memory_versions/${memoryVersionID}/redact?beta=true`, {
+        return this._client.post(path$16`/v1/memory_stores/${memory_store_id}/memory_versions/${memoryVersionID}/redact?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -123788,7 +124176,7 @@ ${underline}`);
       */
       retrieve(memoryStoreID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/memory_stores/${memoryStoreID}?beta=true`, {
+        return this._client.get(path$16`/v1/memory_stores/${memoryStoreID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -123804,7 +124192,7 @@ ${underline}`);
       */
       update(memoryStoreID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/memory_stores/${memoryStoreID}?beta=true`, {
+        return this._client.post(path$16`/v1/memory_stores/${memoryStoreID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -123840,7 +124228,7 @@ ${underline}`);
       */
       delete(memoryStoreID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/memory_stores/${memoryStoreID}?beta=true`, {
+        return this._client.delete(path$16`/v1/memory_stores/${memoryStoreID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -123856,7 +124244,7 @@ ${underline}`);
       */
       archive(memoryStoreID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/memory_stores/${memoryStoreID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/memory_stores/${memoryStoreID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -123942,7 +124330,7 @@ ${underline}`);
       */
       retrieve(messageBatchID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.get(path$16`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() }, options2?.headers])
         });
@@ -123989,7 +124377,7 @@ ${underline}`);
       */
       delete(messageBatchID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.delete(path$16`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() }, options2?.headers])
         });
@@ -124018,7 +124406,7 @@ ${underline}`);
       */
       cancel(messageBatchID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
+        return this._client.post(path$16`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() }, options2?.headers])
         });
@@ -125162,7 +125550,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(sessionID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/sessions/${sessionID}/events?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/sessions/${sessionID}/events?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125194,7 +125582,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       send(sessionID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/sessions/${sessionID}/events?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${sessionID}/events?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125213,7 +125601,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       stream(sessionID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/sessions/${sessionID}/events/stream?beta=true`, {
+        return this._client.get(path$16`/v1/sessions/${sessionID}/events/stream?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers]),
           stream: true
@@ -125235,7 +125623,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(resourceID, params, options2) {
         const { session_id, betas } = params;
-        return this._client.get(path$15`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
+        return this._client.get(path$16`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125257,7 +125645,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       update(resourceID, params, options2) {
         const { session_id, betas, ...body } = params;
-        return this._client.post(path$15`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125278,7 +125666,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(sessionID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/sessions/${sessionID}/resources?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/sessions/${sessionID}/resources?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125298,7 +125686,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(resourceID, params, options2) {
         const { session_id, betas } = params;
-        return this._client.delete(path$15`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
+        return this._client.delete(path$16`/v1/sessions/${session_id}/resources/${resourceID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125320,7 +125708,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       add(sessionID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/sessions/${sessionID}/resources?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${sessionID}/resources?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125344,7 +125732,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(threadID, params, options2) {
         const { session_id, betas, ...query2 } = params;
-        return this._client.getAPIList(path$15`/v1/sessions/${session_id}/threads/${threadID}/events?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/sessions/${session_id}/threads/${threadID}/events?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125364,7 +125752,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       stream(threadID, params, options2) {
         const { session_id, betas } = params;
-        return this._client.get(path$15`/v1/sessions/${session_id}/threads/${threadID}/stream?beta=true`, {
+        return this._client.get(path$16`/v1/sessions/${session_id}/threads/${threadID}/stream?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers]),
           stream: true
@@ -125390,7 +125778,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(threadID, params, options2) {
         const { session_id, betas } = params;
-        return this._client.get(path$15`/v1/sessions/${session_id}/threads/${threadID}?beta=true`, {
+        return this._client.get(path$16`/v1/sessions/${session_id}/threads/${threadID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125410,7 +125798,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(sessionID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/sessions/${sessionID}/threads?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/sessions/${sessionID}/threads?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125430,7 +125818,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       archive(threadID, params, options2) {
         const { session_id, betas } = params;
-        return this._client.post(path$15`/v1/sessions/${session_id}/threads/${threadID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${session_id}/threads/${threadID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125477,7 +125865,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(sessionID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/sessions/${sessionID}?beta=true`, {
+        return this._client.get(path$16`/v1/sessions/${sessionID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125495,7 +125883,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       update(sessionID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/sessions/${sessionID}?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${sessionID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125533,7 +125921,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(sessionID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/sessions/${sessionID}?beta=true`, {
+        return this._client.delete(path$16`/v1/sessions/${sessionID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125551,7 +125939,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       archive(sessionID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/sessions/${sessionID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/sessions/${sessionID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125573,7 +125961,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       create(skillID, params = {}, options2) {
         const { betas, ...body } = params ?? {};
-        return this._client.post(path$15`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions$1({
+        return this._client.post(path$16`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions$1({
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
@@ -125592,7 +125980,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(version2, params, options2) {
         const { skill_id, betas } = params;
-        return this._client.get(path$15`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.get(path$16`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
         });
@@ -125612,7 +126000,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(skillID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
@@ -125631,7 +126019,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(version2, params, options2) {
         const { skill_id, betas } = params;
-        return this._client.delete(path$15`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.delete(path$16`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
         });
@@ -125668,7 +126056,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(skillID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/skills/${skillID}?beta=true`, {
+        return this._client.get(path$16`/v1/skills/${skillID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
         });
@@ -125702,7 +126090,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(skillID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/skills/${skillID}?beta=true`, {
+        return this._client.delete(path$16`/v1/skills/${skillID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() }, options2?.headers])
         });
@@ -125731,7 +126119,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       create(vaultID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/vaults/${vaultID}/credentials?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vaultID}/credentials?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125751,7 +126139,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(credentialID, params, options2) {
         const { vault_id, betas } = params;
-        return this._client.get(path$15`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
+        return this._client.get(path$16`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125770,7 +126158,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       update(credentialID, params, options2) {
         const { vault_id, betas, ...body } = params;
-        return this._client.post(path$15`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125791,7 +126179,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       list(vaultID, params = {}, options2) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path$15`/v1/vaults/${vaultID}/credentials?beta=true`, PageCursor, {
+        return this._client.getAPIList(path$16`/v1/vaults/${vaultID}/credentials?beta=true`, PageCursor, {
           query: query2,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125811,7 +126199,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(credentialID, params, options2) {
         const { vault_id, betas } = params;
-        return this._client.delete(path$15`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
+        return this._client.delete(path$16`/v1/vaults/${vault_id}/credentials/${credentialID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125830,7 +126218,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       archive(credentialID, params, options2) {
         const { vault_id, betas } = params;
-        return this._client.post(path$15`/v1/vaults/${vault_id}/credentials/${credentialID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vault_id}/credentials/${credentialID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125849,7 +126237,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       mcpOAuthValidate(credentialID, params, options2) {
         const { vault_id, betas } = params;
-        return this._client.post(path$15`/v1/vaults/${vault_id}/credentials/${credentialID}/mcp_oauth_validate?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vault_id}/credentials/${credentialID}/mcp_oauth_validate?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125892,7 +126280,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(vaultID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/vaults/${vaultID}?beta=true`, {
+        return this._client.get(path$16`/v1/vaults/${vaultID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125910,7 +126298,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       update(vaultID, params, options2) {
         const { betas, ...body } = params;
-        return this._client.post(path$15`/v1/vaults/${vaultID}?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vaultID}?beta=true`, {
           body,
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
@@ -125948,7 +126336,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       delete(vaultID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.delete(path$15`/v1/vaults/${vaultID}?beta=true`, {
+        return this._client.delete(path$16`/v1/vaults/${vaultID}?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -125966,7 +126354,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       archive(vaultID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.post(path$15`/v1/vaults/${vaultID}/archive?beta=true`, {
+        return this._client.post(path$16`/v1/vaults/${vaultID}/archive?beta=true`, {
           ...options2,
           headers: buildHeaders$2([{ "anthropic-beta": [...betas ?? [], "managed-agents-2026-04-01"].toString() }, options2?.headers])
         });
@@ -126553,7 +126941,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       * ```
       */
       retrieve(messageBatchID, options2) {
-        return this._client.get(path$15`/v1/messages/batches/${messageBatchID}`, options2);
+        return this._client.get(path$16`/v1/messages/batches/${messageBatchID}`, options2);
       }
       /**
       * List all Message Batches within a Workspace. Most recently created batches are
@@ -126592,7 +126980,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       * ```
       */
       delete(messageBatchID, options2) {
-        return this._client.delete(path$15`/v1/messages/batches/${messageBatchID}`, options2);
+        return this._client.delete(path$16`/v1/messages/batches/${messageBatchID}`, options2);
       }
       /**
       * Batches may be canceled any time before processing ends. Once cancellation is
@@ -126616,7 +127004,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       * ```
       */
       cancel(messageBatchID, options2) {
-        return this._client.post(path$15`/v1/messages/batches/${messageBatchID}/cancel`, options2);
+        return this._client.post(path$16`/v1/messages/batches/${messageBatchID}/cancel`, options2);
       }
       /**
       * Streams the results of a Message Batch as a `.jsonl` file.
@@ -126768,7 +127156,7 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
       */
       retrieve(modelID, params = {}, options2) {
         const { betas } = params ?? {};
-        return this._client.get(path$15`/v1/models/${modelID}`, {
+        return this._client.get(path$16`/v1/models/${modelID}`, {
           ...options2,
           headers: buildHeaders$2([{ ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 }, options2?.headers])
         });
@@ -131713,7 +132101,7 @@ Content-Type: ${currentPart.headers.get("Content-Type") || "application/octet-st
       exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocation;
       const fs$17 = __require2("fs");
       const os$3 = __require2("os");
-      const path$14 = __require2("path");
+      const path$15 = __require2("path");
       const WELL_KNOWN_CERTIFICATE_CONFIG_FILE = "certificate_config.json";
       const CLOUDSDK_CONFIG_DIRECTORY = "gcloud";
       function snakeToCamel2(str) {
@@ -131801,8 +132189,8 @@ Content-Type: ${currentPart.headers.get("Content-Type") || "application/octet-st
         }
       }
       function getWellKnownCertificateConfigFileLocation() {
-        const configDir = process.env.CLOUDSDK_CONFIG || (_isWindows() ? path$14.join(process.env.APPDATA || "", CLOUDSDK_CONFIG_DIRECTORY) : path$14.join(process.env.HOME || "", ".config", CLOUDSDK_CONFIG_DIRECTORY));
-        return path$14.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
+        const configDir = process.env.CLOUDSDK_CONFIG || (_isWindows() ? path$15.join(process.env.APPDATA || "", CLOUDSDK_CONFIG_DIRECTORY) : path$15.join(process.env.HOME || "", ".config", CLOUDSDK_CONFIG_DIRECTORY));
+        return path$15.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
       }
       function _isWindows() {
         return os$3.platform().startsWith("win");
@@ -133425,7 +133813,7 @@ Content-Type: ${currentPart.headers.get("Content-Type") || "application/octet-st
     require_getCredentials = /* @__PURE__ */ __commonJSMin(((exports) => {
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.getCredentials = getCredentials;
-      const path$13 = __require2("path");
+      const path$14 = __require2("path");
       const fs$16 = __require2("fs");
       const util_1$1 = __require2("util");
       const errorWithCode_1 = require_errorWithCode();
@@ -133496,7 +133884,7 @@ Content-Type: ${currentPart.headers.get("Content-Type") || "application/octet-st
         * @returns An instance of a class that implements ICredentialsProvider.
         */
         static create(keyFilePath) {
-          switch (path$13.extname(keyFilePath)) {
+          switch (path$14.extname(keyFilePath)) {
             case ExtensionFiles.JSON:
               return new JsonCredentialsProvider(keyFilePath);
             case ExtensionFiles.DER:
@@ -136088,7 +136476,7 @@ ${credentialScope}
       const gaxios_1 = require_src$3();
       const gcpMetadata = require_src$1();
       const os$2 = __require2("os");
-      const path$12 = __require2("path");
+      const path$13 = __require2("path");
       const crypto_1 = require_crypto();
       const computeclient_1 = require_computeclient();
       const idtokenclient_1 = require_idtokenclient();
@@ -136328,10 +136716,10 @@ ${credentialScope}
           if (this._isWindows()) location = process.env["APPDATA"];
           else {
             const home = process.env["HOME"];
-            if (home) location = path$12.join(home, ".config");
+            if (home) location = path$13.join(home, ".config");
           }
           if (location) {
-            location = path$12.join(location, "gcloud", "application_default_credentials.json");
+            location = path$13.join(location, "gcloud", "application_default_credentials.json");
             if (!fs$12.existsSync(location)) location = null;
           }
           if (!location) return null;
@@ -136615,7 +137003,7 @@ ${credentialScope}
         async #determineClient() {
           if (this.jsonContent) return this._cacheClientFromJSON(this.jsonContent, this.clientOptions);
           else if (this.keyFilename) {
-            const filePath = path$12.resolve(this.keyFilename);
+            const filePath = path$13.resolve(this.keyFilename);
             const stream = fs$12.createReadStream(filePath);
             return await this.fromStreamAsync(stream, this.clientOptions);
           } else if (this.apiKey) {
@@ -145226,14 +145614,14 @@ ${underline}`);
       }
       return path3;
     });
-    path$11 = /* @__PURE__ */ createPathTagFunction$1(encodeURIPath$1);
+    path$12 = /* @__PURE__ */ createPathTagFunction$1(encodeURIPath$1);
     BaseInteractions = class extends APIResource$1 {
       create(params, options2) {
         var _a3;
         const { api_version = this._client.apiVersion } = params, body = __rest(params, ["api_version"]);
         if ("model" in body && "agent_config" in body) throw new GeminiNextGenAPIClientError(`Invalid request: specified \`model\` and \`agent_config\`. If specifying \`model\`, use \`generation_config\`.`);
         if ("agent" in body && "generation_config" in body) throw new GeminiNextGenAPIClientError(`Invalid request: specified \`agent\` and \`generation_config\`. If specifying \`agent\`, use \`agent_config\`.`);
-        return this._client.post(path$11`/${api_version}/interactions`, Object.assign(Object.assign({ body }, options2), { stream: (_a3 = params.stream) !== null && _a3 !== void 0 ? _a3 : false }));
+        return this._client.post(path$12`/${api_version}/interactions`, Object.assign(Object.assign({ body }, options2), { stream: (_a3 = params.stream) !== null && _a3 !== void 0 ? _a3 : false }));
       }
       /**
       * Deletes the interaction by id.
@@ -145247,7 +145635,7 @@ ${underline}`);
       */
       delete(id, params = {}, options2) {
         const { api_version = this._client.apiVersion } = params !== null && params !== void 0 ? params : {};
-        return this._client.delete(path$11`/${api_version}/interactions/${id}`, options2);
+        return this._client.delete(path$12`/${api_version}/interactions/${id}`, options2);
       }
       /**
       * Cancels an interaction by id. This only applies to background interactions that
@@ -145262,12 +145650,12 @@ ${underline}`);
       */
       cancel(id, params = {}, options2) {
         const { api_version = this._client.apiVersion } = params !== null && params !== void 0 ? params : {};
-        return this._client.post(path$11`/${api_version}/interactions/${id}/cancel`, options2);
+        return this._client.post(path$12`/${api_version}/interactions/${id}/cancel`, options2);
       }
       get(id, params = {}, options2) {
         var _a3;
         const _b = params !== null && params !== void 0 ? params : {}, { api_version = this._client.apiVersion } = _b, query2 = __rest(_b, ["api_version"]);
-        return this._client.get(path$11`/${api_version}/interactions/${id}`, Object.assign(Object.assign({ query: query2 }, options2), { stream: (_a3 = params === null || params === void 0 ? void 0 : params.stream) !== null && _a3 !== void 0 ? _a3 : false }));
+        return this._client.get(path$12`/${api_version}/interactions/${id}`, Object.assign(Object.assign({ query: query2 }, options2), { stream: (_a3 = params === null || params === void 0 ? void 0 : params.stream) !== null && _a3 !== void 0 ? _a3 : false }));
       }
     };
     BaseInteractions._key = Object.freeze(["interactions"]);
@@ -148017,7 +148405,7 @@ ${underline}`);
       }
       return path3;
     };
-    path$10 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
+    path$11 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
     Messages$1 = class extends APIResource {
       /**
       * Get the messages in a stored chat completion. Only Chat Completions that have
@@ -148034,7 +148422,7 @@ ${underline}`);
       * ```
       */
       list(completionID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/chat/completions/${completionID}/messages`, CursorPage, {
+        return this._client.getAPIList(path$11`/chat/completions/${completionID}/messages`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -149006,7 +149394,7 @@ ${underline}`);
       * ```
       */
       retrieve(completionID, options2) {
-        return this._client.get(path$10`/chat/completions/${completionID}`, options2);
+        return this._client.get(path$11`/chat/completions/${completionID}`, options2);
       }
       /**
       * Modify a stored chat completion. Only Chat Completions that have been created
@@ -149022,7 +149410,7 @@ ${underline}`);
       * ```
       */
       update(completionID, body, options2) {
-        return this._client.post(path$10`/chat/completions/${completionID}`, {
+        return this._client.post(path$11`/chat/completions/${completionID}`, {
           body,
           ...options2
         });
@@ -149056,7 +149444,7 @@ ${underline}`);
       * ```
       */
       delete(completionID, options2) {
-        return this._client.delete(path$10`/chat/completions/${completionID}`, options2);
+        return this._client.delete(path$11`/chat/completions/${completionID}`, options2);
       }
       parse(body, options2) {
         validateInputTools(body.tools);
@@ -149185,7 +149573,7 @@ ${underline}`);
       * Retrieves a batch.
       */
       retrieve(batchID, options2) {
-        return this._client.get(path$10`/batches/${batchID}`, options2);
+        return this._client.get(path$11`/batches/${batchID}`, options2);
       }
       /**
       * List your organization's batches.
@@ -149202,7 +149590,7 @@ ${underline}`);
       * (if any) available in the output file.
       */
       cancel(batchID, options2) {
-        return this._client.post(path$10`/batches/${batchID}/cancel`, options2);
+        return this._client.post(path$11`/batches/${batchID}/cancel`, options2);
       }
     };
     Assistants = class extends APIResource {
@@ -149224,7 +149612,7 @@ ${underline}`);
       * @deprecated
       */
       retrieve(assistantID, options2) {
-        return this._client.get(path$10`/assistants/${assistantID}`, {
+        return this._client.get(path$11`/assistants/${assistantID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -149235,7 +149623,7 @@ ${underline}`);
       * @deprecated
       */
       update(assistantID, body, options2) {
-        return this._client.post(path$10`/assistants/${assistantID}`, {
+        return this._client.post(path$11`/assistants/${assistantID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -149259,7 +149647,7 @@ ${underline}`);
       * @deprecated
       */
       delete(assistantID, options2) {
-        return this._client.delete(path$10`/assistants/${assistantID}`, {
+        return this._client.delete(path$11`/assistants/${assistantID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -149354,7 +149742,7 @@ ${underline}`);
       * ```
       */
       cancel(sessionID, options2) {
-        return this._client.post(path$10`/chatkit/sessions/${sessionID}/cancel`, {
+        return this._client.post(path$11`/chatkit/sessions/${sessionID}/cancel`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "chatkit_beta=v1" }, options2?.headers])
         });
@@ -149371,7 +149759,7 @@ ${underline}`);
       * ```
       */
       retrieve(threadID, options2) {
-        return this._client.get(path$10`/chatkit/threads/${threadID}`, {
+        return this._client.get(path$11`/chatkit/threads/${threadID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "chatkit_beta=v1" }, options2?.headers])
         });
@@ -149405,7 +149793,7 @@ ${underline}`);
       * ```
       */
       delete(threadID, options2) {
-        return this._client.delete(path$10`/chatkit/threads/${threadID}`, {
+        return this._client.delete(path$11`/chatkit/threads/${threadID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "chatkit_beta=v1" }, options2?.headers])
         });
@@ -149424,7 +149812,7 @@ ${underline}`);
       * ```
       */
       listItems(threadID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/chatkit/threads/${threadID}/items`, ConversationCursorPage, {
+        return this._client.getAPIList(path$11`/chatkit/threads/${threadID}/items`, ConversationCursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "chatkit_beta=v1" }, options2?.headers])
@@ -149447,7 +149835,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       create(threadID, body, options2) {
-        return this._client.post(path$10`/threads/${threadID}/messages`, {
+        return this._client.post(path$11`/threads/${threadID}/messages`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -149460,7 +149848,7 @@ ${underline}`);
       */
       retrieve(messageID, params, options2) {
         const { thread_id } = params;
-        return this._client.get(path$10`/threads/${thread_id}/messages/${messageID}`, {
+        return this._client.get(path$11`/threads/${thread_id}/messages/${messageID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -149472,7 +149860,7 @@ ${underline}`);
       */
       update(messageID, params, options2) {
         const { thread_id, ...body } = params;
-        return this._client.post(path$10`/threads/${thread_id}/messages/${messageID}`, {
+        return this._client.post(path$11`/threads/${thread_id}/messages/${messageID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -149484,7 +149872,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       list(threadID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/threads/${threadID}/messages`, CursorPage, {
+        return this._client.getAPIList(path$11`/threads/${threadID}/messages`, CursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -149497,7 +149885,7 @@ ${underline}`);
       */
       delete(messageID, params, options2) {
         const { thread_id } = params;
-        return this._client.delete(path$10`/threads/${thread_id}/messages/${messageID}`, {
+        return this._client.delete(path$11`/threads/${thread_id}/messages/${messageID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -149511,7 +149899,7 @@ ${underline}`);
       */
       retrieve(stepID, params, options2) {
         const { thread_id, run_id, ...query2 } = params;
-        return this._client.get(path$10`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+        return this._client.get(path$11`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -149524,7 +149912,7 @@ ${underline}`);
       */
       list(runID, params, options2) {
         const { thread_id, ...query2 } = params;
-        return this._client.getAPIList(path$10`/threads/${thread_id}/runs/${runID}/steps`, CursorPage, {
+        return this._client.getAPIList(path$11`/threads/${thread_id}/runs/${runID}/steps`, CursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -150023,7 +150411,7 @@ ${underline}`);
       }
       create(threadID, params, options2) {
         const { include, ...body } = params;
-        return this._client.post(path$10`/threads/${threadID}/runs`, {
+        return this._client.post(path$11`/threads/${threadID}/runs`, {
           query: { include },
           body,
           ...options2,
@@ -150039,7 +150427,7 @@ ${underline}`);
       */
       retrieve(runID, params, options2) {
         const { thread_id } = params;
-        return this._client.get(path$10`/threads/${thread_id}/runs/${runID}`, {
+        return this._client.get(path$11`/threads/${thread_id}/runs/${runID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -150051,7 +150439,7 @@ ${underline}`);
       */
       update(runID, params, options2) {
         const { thread_id, ...body } = params;
-        return this._client.post(path$10`/threads/${thread_id}/runs/${runID}`, {
+        return this._client.post(path$11`/threads/${thread_id}/runs/${runID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -150063,7 +150451,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       list(threadID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/threads/${threadID}/runs`, CursorPage, {
+        return this._client.getAPIList(path$11`/threads/${threadID}/runs`, CursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -150076,7 +150464,7 @@ ${underline}`);
       */
       cancel(runID, params, options2) {
         const { thread_id } = params;
-        return this._client.post(path$10`/threads/${thread_id}/runs/${runID}/cancel`, {
+        return this._client.post(path$11`/threads/${thread_id}/runs/${runID}/cancel`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -150149,7 +150537,7 @@ ${underline}`);
       }
       submitToolOutputs(runID, params, options2) {
         const { thread_id, ...body } = params;
-        return this._client.post(path$10`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
+        return this._client.post(path$11`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers]),
@@ -150200,7 +150588,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       retrieve(threadID, options2) {
-        return this._client.get(path$10`/threads/${threadID}`, {
+        return this._client.get(path$11`/threads/${threadID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -150211,7 +150599,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       update(threadID, body, options2) {
-        return this._client.post(path$10`/threads/${threadID}`, {
+        return this._client.post(path$11`/threads/${threadID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -150223,7 +150611,7 @@ ${underline}`);
       * @deprecated The Assistants API is deprecated in favor of the Responses API
       */
       delete(threadID, options2) {
-        return this._client.delete(path$10`/threads/${threadID}`, {
+        return this._client.delete(path$11`/threads/${threadID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -150283,7 +150671,7 @@ ${underline}`);
       */
       retrieve(fileID, params, options2) {
         const { container_id } = params;
-        return this._client.get(path$10`/containers/${container_id}/files/${fileID}/content`, {
+        return this._client.get(path$11`/containers/${container_id}/files/${fileID}/content`, {
           ...options2,
           headers: buildHeaders([{ Accept: "application/binary" }, options2?.headers]),
           __binaryResponse: true
@@ -150302,7 +150690,7 @@ ${underline}`);
       * a JSON request with a file ID.
       */
       create(containerID, body, options2) {
-        return this._client.post(path$10`/containers/${containerID}/files`, maybeMultipartFormRequestOptions({
+        return this._client.post(path$11`/containers/${containerID}/files`, maybeMultipartFormRequestOptions({
           body,
           ...options2
         }, this._client));
@@ -150312,13 +150700,13 @@ ${underline}`);
       */
       retrieve(fileID, params, options2) {
         const { container_id } = params;
-        return this._client.get(path$10`/containers/${container_id}/files/${fileID}`, options2);
+        return this._client.get(path$11`/containers/${container_id}/files/${fileID}`, options2);
       }
       /**
       * List Container files
       */
       list(containerID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/containers/${containerID}/files`, CursorPage, {
+        return this._client.getAPIList(path$11`/containers/${containerID}/files`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -150328,7 +150716,7 @@ ${underline}`);
       */
       delete(fileID, params, options2) {
         const { container_id } = params;
-        return this._client.delete(path$10`/containers/${container_id}/files/${fileID}`, {
+        return this._client.delete(path$11`/containers/${container_id}/files/${fileID}`, {
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
         });
@@ -150353,7 +150741,7 @@ ${underline}`);
       * Retrieve Container
       */
       retrieve(containerID, options2) {
-        return this._client.get(path$10`/containers/${containerID}`, options2);
+        return this._client.get(path$11`/containers/${containerID}`, options2);
       }
       /**
       * List Containers
@@ -150368,7 +150756,7 @@ ${underline}`);
       * Delete Container
       */
       delete(containerID, options2) {
-        return this._client.delete(path$10`/containers/${containerID}`, {
+        return this._client.delete(path$11`/containers/${containerID}`, {
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
         });
@@ -150381,7 +150769,7 @@ ${underline}`);
       */
       create(conversationID, params, options2) {
         const { include, ...body } = params;
-        return this._client.post(path$10`/conversations/${conversationID}/items`, {
+        return this._client.post(path$11`/conversations/${conversationID}/items`, {
           query: { include },
           body,
           ...options2
@@ -150392,7 +150780,7 @@ ${underline}`);
       */
       retrieve(itemID, params, options2) {
         const { conversation_id, ...query2 } = params;
-        return this._client.get(path$10`/conversations/${conversation_id}/items/${itemID}`, {
+        return this._client.get(path$11`/conversations/${conversation_id}/items/${itemID}`, {
           query: query2,
           ...options2
         });
@@ -150401,7 +150789,7 @@ ${underline}`);
       * List all items for a conversation with the given ID.
       */
       list(conversationID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/conversations/${conversationID}/items`, ConversationCursorPage, {
+        return this._client.getAPIList(path$11`/conversations/${conversationID}/items`, ConversationCursorPage, {
           query: query2,
           ...options2
         });
@@ -150411,7 +150799,7 @@ ${underline}`);
       */
       delete(itemID, params, options2) {
         const { conversation_id } = params;
-        return this._client.delete(path$10`/conversations/${conversation_id}/items/${itemID}`, options2);
+        return this._client.delete(path$11`/conversations/${conversation_id}/items/${itemID}`, options2);
       }
     };
     Conversations = class extends APIResource {
@@ -150432,13 +150820,13 @@ ${underline}`);
       * Get a conversation
       */
       retrieve(conversationID, options2) {
-        return this._client.get(path$10`/conversations/${conversationID}`, options2);
+        return this._client.get(path$11`/conversations/${conversationID}`, options2);
       }
       /**
       * Update a conversation
       */
       update(conversationID, body, options2) {
-        return this._client.post(path$10`/conversations/${conversationID}`, {
+        return this._client.post(path$11`/conversations/${conversationID}`, {
           body,
           ...options2
         });
@@ -150447,7 +150835,7 @@ ${underline}`);
       * Delete a conversation. Items in the conversation will not be deleted.
       */
       delete(conversationID, options2) {
-        return this._client.delete(path$10`/conversations/${conversationID}`, options2);
+        return this._client.delete(path$11`/conversations/${conversationID}`, options2);
       }
     };
     Conversations.Items = Items;
@@ -150492,14 +150880,14 @@ ${underline}`);
       */
       retrieve(outputItemID, params, options2) {
         const { eval_id, run_id } = params;
-        return this._client.get(path$10`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options2);
+        return this._client.get(path$11`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, options2);
       }
       /**
       * Get a list of output items for an evaluation run.
       */
       list(runID, params, options2) {
         const { eval_id, ...query2 } = params;
-        return this._client.getAPIList(path$10`/evals/${eval_id}/runs/${runID}/output_items`, CursorPage, {
+        return this._client.getAPIList(path$11`/evals/${eval_id}/runs/${runID}/output_items`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -150516,7 +150904,7 @@ ${underline}`);
       * schema specified in the config of the evaluation.
       */
       create(evalID, body, options2) {
-        return this._client.post(path$10`/evals/${evalID}/runs`, {
+        return this._client.post(path$11`/evals/${evalID}/runs`, {
           body,
           ...options2
         });
@@ -150526,13 +150914,13 @@ ${underline}`);
       */
       retrieve(runID, params, options2) {
         const { eval_id } = params;
-        return this._client.get(path$10`/evals/${eval_id}/runs/${runID}`, options2);
+        return this._client.get(path$11`/evals/${eval_id}/runs/${runID}`, options2);
       }
       /**
       * Get a list of runs for an evaluation.
       */
       list(evalID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/evals/${evalID}/runs`, CursorPage, {
+        return this._client.getAPIList(path$11`/evals/${evalID}/runs`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -150542,14 +150930,14 @@ ${underline}`);
       */
       delete(runID, params, options2) {
         const { eval_id } = params;
-        return this._client.delete(path$10`/evals/${eval_id}/runs/${runID}`, options2);
+        return this._client.delete(path$11`/evals/${eval_id}/runs/${runID}`, options2);
       }
       /**
       * Cancel an ongoing evaluation run.
       */
       cancel(runID, params, options2) {
         const { eval_id } = params;
-        return this._client.post(path$10`/evals/${eval_id}/runs/${runID}`, options2);
+        return this._client.post(path$11`/evals/${eval_id}/runs/${runID}`, options2);
       }
     };
     Runs.OutputItems = OutputItems;
@@ -150576,13 +150964,13 @@ ${underline}`);
       * Get an evaluation by ID.
       */
       retrieve(evalID, options2) {
-        return this._client.get(path$10`/evals/${evalID}`, options2);
+        return this._client.get(path$11`/evals/${evalID}`, options2);
       }
       /**
       * Update certain properties of an evaluation.
       */
       update(evalID, body, options2) {
-        return this._client.post(path$10`/evals/${evalID}`, {
+        return this._client.post(path$11`/evals/${evalID}`, {
           body,
           ...options2
         });
@@ -150600,7 +150988,7 @@ ${underline}`);
       * Delete an evaluation.
       */
       delete(evalID, options2) {
-        return this._client.delete(path$10`/evals/${evalID}`, options2);
+        return this._client.delete(path$11`/evals/${evalID}`, options2);
       }
     };
     Evals.Runs = Runs;
@@ -150637,7 +151025,7 @@ ${underline}`);
       * Returns information about a specific file.
       */
       retrieve(fileID, options2) {
-        return this._client.get(path$10`/files/${fileID}`, options2);
+        return this._client.get(path$11`/files/${fileID}`, options2);
       }
       /**
       * Returns a list of files.
@@ -150652,13 +151040,13 @@ ${underline}`);
       * Delete a file and remove it from all vector stores.
       */
       delete(fileID, options2) {
-        return this._client.delete(path$10`/files/${fileID}`, options2);
+        return this._client.delete(path$11`/files/${fileID}`, options2);
       }
       /**
       * Returns the contents of the specified file.
       */
       content(fileID, options2) {
-        return this._client.get(path$10`/files/${fileID}/content`, {
+        return this._client.get(path$11`/files/${fileID}/content`, {
           ...options2,
           headers: buildHeaders([{ Accept: "application/binary" }, options2?.headers]),
           __binaryResponse: true
@@ -150759,7 +151147,7 @@ ${underline}`);
       * ```
       */
       create(fineTunedModelCheckpoint, body, options2) {
-        return this._client.getAPIList(path$10`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, Page, {
+        return this._client.getAPIList(path$11`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, Page, {
           body,
           method: "post",
           ...options2
@@ -150774,7 +151162,7 @@ ${underline}`);
       * @deprecated Retrieve is deprecated. Please swap to the paginated list method instead.
       */
       retrieve(fineTunedModelCheckpoint, query2 = {}, options2) {
-        return this._client.get(path$10`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
+        return this._client.get(path$11`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
           query: query2,
           ...options2
         });
@@ -150796,7 +151184,7 @@ ${underline}`);
       * ```
       */
       list(fineTunedModelCheckpoint, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, ConversationCursorPage, {
+        return this._client.getAPIList(path$11`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, ConversationCursorPage, {
           query: query2,
           ...options2
         });
@@ -150821,7 +151209,7 @@ ${underline}`);
       */
       delete(permissionID, params, options2) {
         const { fine_tuned_model_checkpoint } = params;
-        return this._client.delete(path$10`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`, options2);
+        return this._client.delete(path$11`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`, options2);
       }
     };
     Checkpoints$1 = class extends APIResource {
@@ -150846,7 +151234,7 @@ ${underline}`);
       * ```
       */
       list(fineTuningJobID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`, CursorPage, {
+        return this._client.getAPIList(path$11`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -150893,7 +151281,7 @@ ${underline}`);
       * ```
       */
       retrieve(fineTuningJobID, options2) {
-        return this._client.get(path$10`/fine_tuning/jobs/${fineTuningJobID}`, options2);
+        return this._client.get(path$11`/fine_tuning/jobs/${fineTuningJobID}`, options2);
       }
       /**
       * List your organization's fine-tuning jobs
@@ -150923,7 +151311,7 @@ ${underline}`);
       * ```
       */
       cancel(fineTuningJobID, options2) {
-        return this._client.post(path$10`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options2);
+        return this._client.post(path$11`/fine_tuning/jobs/${fineTuningJobID}/cancel`, options2);
       }
       /**
       * Get status updates for a fine-tuning job.
@@ -150939,7 +151327,7 @@ ${underline}`);
       * ```
       */
       listEvents(fineTuningJobID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/fine_tuning/jobs/${fineTuningJobID}/events`, CursorPage, {
+        return this._client.getAPIList(path$11`/fine_tuning/jobs/${fineTuningJobID}/events`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -150955,7 +151343,7 @@ ${underline}`);
       * ```
       */
       pause(fineTuningJobID, options2) {
-        return this._client.post(path$10`/fine_tuning/jobs/${fineTuningJobID}/pause`, options2);
+        return this._client.post(path$11`/fine_tuning/jobs/${fineTuningJobID}/pause`, options2);
       }
       /**
       * Resume a fine-tune job.
@@ -150968,7 +151356,7 @@ ${underline}`);
       * ```
       */
       resume(fineTuningJobID, options2) {
-        return this._client.post(path$10`/fine_tuning/jobs/${fineTuningJobID}/resume`, options2);
+        return this._client.post(path$11`/fine_tuning/jobs/${fineTuningJobID}/resume`, options2);
       }
     };
     Jobs.Checkpoints = Checkpoints;
@@ -151032,7 +151420,7 @@ ${underline}`);
       * the owner and permissioning.
       */
       retrieve(model, options2) {
-        return this._client.get(path$10`/models/${model}`, options2);
+        return this._client.get(path$11`/models/${model}`, options2);
       }
       /**
       * Lists the currently available models, and provides basic information about each
@@ -151046,7 +151434,7 @@ ${underline}`);
       * delete a model.
       */
       delete(model, options2) {
-        return this._client.delete(path$10`/models/${model}`, options2);
+        return this._client.delete(path$11`/models/${model}`, options2);
       }
     };
     Moderations = class extends APIResource {
@@ -151074,7 +151462,7 @@ ${underline}`);
       * ```
       */
       accept(callID, body, options2) {
-        return this._client.post(path$10`/realtime/calls/${callID}/accept`, {
+        return this._client.post(path$11`/realtime/calls/${callID}/accept`, {
           body,
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
@@ -151089,7 +151477,7 @@ ${underline}`);
       * ```
       */
       hangup(callID, options2) {
-        return this._client.post(path$10`/realtime/calls/${callID}/hangup`, {
+        return this._client.post(path$11`/realtime/calls/${callID}/hangup`, {
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
         });
@@ -151105,7 +151493,7 @@ ${underline}`);
       * ```
       */
       refer(callID, body, options2) {
-        return this._client.post(path$10`/realtime/calls/${callID}/refer`, {
+        return this._client.post(path$11`/realtime/calls/${callID}/refer`, {
           body,
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
@@ -151120,7 +151508,7 @@ ${underline}`);
       * ```
       */
       reject(callID, body = {}, options2) {
-        return this._client.post(path$10`/realtime/calls/${callID}/reject`, {
+        return this._client.post(path$11`/realtime/calls/${callID}/reject`, {
           body,
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
@@ -151399,7 +151787,7 @@ ${underline}`);
       * ```
       */
       list(responseID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/responses/${responseID}/input_items`, CursorPage, {
+        return this._client.getAPIList(path$11`/responses/${responseID}/input_items`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -151441,7 +151829,7 @@ ${underline}`);
         });
       }
       retrieve(responseID, query2 = {}, options2) {
-        return this._client.get(path$10`/responses/${responseID}`, {
+        return this._client.get(path$11`/responses/${responseID}`, {
           query: query2,
           ...options2,
           stream: query2?.stream ?? false
@@ -151461,7 +151849,7 @@ ${underline}`);
       * ```
       */
       delete(responseID, options2) {
-        return this._client.delete(path$10`/responses/${responseID}`, {
+        return this._client.delete(path$11`/responses/${responseID}`, {
           ...options2,
           headers: buildHeaders([{ Accept: "*/*" }, options2?.headers])
         });
@@ -151488,7 +151876,7 @@ ${underline}`);
       * ```
       */
       cancel(responseID, options2) {
-        return this._client.post(path$10`/responses/${responseID}/cancel`, options2);
+        return this._client.post(path$11`/responses/${responseID}/cancel`, options2);
       }
       /**
       * Compact a conversation. Returns a compacted response object.
@@ -151519,7 +151907,7 @@ ${underline}`);
       * Download a skill zip bundle by its ID.
       */
       retrieve(skillID, options2) {
-        return this._client.get(path$10`/skills/${skillID}/content`, {
+        return this._client.get(path$11`/skills/${skillID}/content`, {
           ...options2,
           headers: buildHeaders([{ Accept: "application/binary" }, options2?.headers]),
           __binaryResponse: true
@@ -151532,7 +151920,7 @@ ${underline}`);
       */
       retrieve(version2, params, options2) {
         const { skill_id } = params;
-        return this._client.get(path$10`/skills/${skill_id}/versions/${version2}/content`, {
+        return this._client.get(path$11`/skills/${skill_id}/versions/${version2}/content`, {
           ...options2,
           headers: buildHeaders([{ Accept: "application/binary" }, options2?.headers]),
           __binaryResponse: true
@@ -151548,7 +151936,7 @@ ${underline}`);
       * Create a new immutable skill version.
       */
       create(skillID, body = {}, options2) {
-        return this._client.post(path$10`/skills/${skillID}/versions`, maybeMultipartFormRequestOptions({
+        return this._client.post(path$11`/skills/${skillID}/versions`, maybeMultipartFormRequestOptions({
           body,
           ...options2
         }, this._client));
@@ -151558,13 +151946,13 @@ ${underline}`);
       */
       retrieve(version2, params, options2) {
         const { skill_id } = params;
-        return this._client.get(path$10`/skills/${skill_id}/versions/${version2}`, options2);
+        return this._client.get(path$11`/skills/${skill_id}/versions/${version2}`, options2);
       }
       /**
       * List skill versions for a skill.
       */
       list(skillID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/skills/${skillID}/versions`, CursorPage, {
+        return this._client.getAPIList(path$11`/skills/${skillID}/versions`, CursorPage, {
           query: query2,
           ...options2
         });
@@ -151574,7 +151962,7 @@ ${underline}`);
       */
       delete(version2, params, options2) {
         const { skill_id } = params;
-        return this._client.delete(path$10`/skills/${skill_id}/versions/${version2}`, options2);
+        return this._client.delete(path$11`/skills/${skill_id}/versions/${version2}`, options2);
       }
     };
     Versions.Content = Content;
@@ -151597,13 +151985,13 @@ ${underline}`);
       * Get a skill by its ID.
       */
       retrieve(skillID, options2) {
-        return this._client.get(path$10`/skills/${skillID}`, options2);
+        return this._client.get(path$11`/skills/${skillID}`, options2);
       }
       /**
       * Update the default version pointer for a skill.
       */
       update(skillID, body, options2) {
-        return this._client.post(path$10`/skills/${skillID}`, {
+        return this._client.post(path$11`/skills/${skillID}`, {
           body,
           ...options2
         });
@@ -151621,7 +152009,7 @@ ${underline}`);
       * Delete a skill by its ID.
       */
       delete(skillID, options2) {
-        return this._client.delete(path$10`/skills/${skillID}`, options2);
+        return this._client.delete(path$11`/skills/${skillID}`, options2);
       }
     };
     Skills.Content = Content$1;
@@ -151641,7 +152029,7 @@ ${underline}`);
       * [complete the Upload](https://platform.openai.com/docs/api-reference/uploads/complete).
       */
       create(uploadID, body, options2) {
-        return this._client.post(path$10`/uploads/${uploadID}/parts`, multipartFormRequestOptions({
+        return this._client.post(path$11`/uploads/${uploadID}/parts`, multipartFormRequestOptions({
           body,
           ...options2
         }, this._client));
@@ -151687,7 +152075,7 @@ ${underline}`);
       * Returns the Upload object with status `cancelled`.
       */
       cancel(uploadID, options2) {
-        return this._client.post(path$10`/uploads/${uploadID}/cancel`, options2);
+        return this._client.post(path$11`/uploads/${uploadID}/cancel`, options2);
       }
       /**
       * Completes the
@@ -151707,7 +152095,7 @@ ${underline}`);
       * object.
       */
       complete(uploadID, body, options2) {
-        return this._client.post(path$10`/uploads/${uploadID}/complete`, {
+        return this._client.post(path$11`/uploads/${uploadID}/complete`, {
           body,
           ...options2
         });
@@ -151730,7 +152118,7 @@ ${underline}`);
       * Create a vector store file batch.
       */
       create(vectorStoreID, body, options2) {
-        return this._client.post(path$10`/vector_stores/${vectorStoreID}/file_batches`, {
+        return this._client.post(path$11`/vector_stores/${vectorStoreID}/file_batches`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -151741,7 +152129,7 @@ ${underline}`);
       */
       retrieve(batchID, params, options2) {
         const { vector_store_id } = params;
-        return this._client.get(path$10`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
+        return this._client.get(path$11`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151752,7 +152140,7 @@ ${underline}`);
       */
       cancel(batchID, params, options2) {
         const { vector_store_id } = params;
-        return this._client.post(path$10`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
+        return this._client.post(path$11`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151769,7 +152157,7 @@ ${underline}`);
       */
       listFiles(batchID, params, options2) {
         const { vector_store_id, ...query2 } = params;
-        return this._client.getAPIList(path$10`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`, CursorPage, {
+        return this._client.getAPIList(path$11`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`, CursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -151843,7 +152231,7 @@ ${underline}`);
       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
       */
       create(vectorStoreID, body, options2) {
-        return this._client.post(path$10`/vector_stores/${vectorStoreID}/files`, {
+        return this._client.post(path$11`/vector_stores/${vectorStoreID}/files`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -151854,7 +152242,7 @@ ${underline}`);
       */
       retrieve(fileID, params, options2) {
         const { vector_store_id } = params;
-        return this._client.get(path$10`/vector_stores/${vector_store_id}/files/${fileID}`, {
+        return this._client.get(path$11`/vector_stores/${vector_store_id}/files/${fileID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151864,7 +152252,7 @@ ${underline}`);
       */
       update(fileID, params, options2) {
         const { vector_store_id, ...body } = params;
-        return this._client.post(path$10`/vector_stores/${vector_store_id}/files/${fileID}`, {
+        return this._client.post(path$11`/vector_stores/${vector_store_id}/files/${fileID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -151874,7 +152262,7 @@ ${underline}`);
       * Returns a list of vector store files.
       */
       list(vectorStoreID, query2 = {}, options2) {
-        return this._client.getAPIList(path$10`/vector_stores/${vectorStoreID}/files`, CursorPage, {
+        return this._client.getAPIList(path$11`/vector_stores/${vectorStoreID}/files`, CursorPage, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -151888,7 +152276,7 @@ ${underline}`);
       */
       delete(fileID, params, options2) {
         const { vector_store_id } = params;
-        return this._client.delete(path$10`/vector_stores/${vector_store_id}/files/${fileID}`, {
+        return this._client.delete(path$11`/vector_stores/${vector_store_id}/files/${fileID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151961,7 +152349,7 @@ ${underline}`);
       */
       content(fileID, params, options2) {
         const { vector_store_id } = params;
-        return this._client.getAPIList(path$10`/vector_stores/${vector_store_id}/files/${fileID}/content`, Page, {
+        return this._client.getAPIList(path$11`/vector_stores/${vector_store_id}/files/${fileID}/content`, Page, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151987,7 +152375,7 @@ ${underline}`);
       * Retrieves a vector store.
       */
       retrieve(vectorStoreID, options2) {
-        return this._client.get(path$10`/vector_stores/${vectorStoreID}`, {
+        return this._client.get(path$11`/vector_stores/${vectorStoreID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -151996,7 +152384,7 @@ ${underline}`);
       * Modifies a vector store.
       */
       update(vectorStoreID, body, options2) {
-        return this._client.post(path$10`/vector_stores/${vectorStoreID}`, {
+        return this._client.post(path$11`/vector_stores/${vectorStoreID}`, {
           body,
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
@@ -152016,7 +152404,7 @@ ${underline}`);
       * Delete a vector store.
       */
       delete(vectorStoreID, options2) {
-        return this._client.delete(path$10`/vector_stores/${vectorStoreID}`, {
+        return this._client.delete(path$11`/vector_stores/${vectorStoreID}`, {
           ...options2,
           headers: buildHeaders([{ "OpenAI-Beta": "assistants=v2" }, options2?.headers])
         });
@@ -152026,7 +152414,7 @@ ${underline}`);
       * filter.
       */
       search(vectorStoreID, body, options2) {
-        return this._client.getAPIList(path$10`/vector_stores/${vectorStoreID}/search`, Page, {
+        return this._client.getAPIList(path$11`/vector_stores/${vectorStoreID}/search`, Page, {
           body,
           method: "post",
           ...options2,
@@ -152050,7 +152438,7 @@ ${underline}`);
       * Fetch the latest metadata for a generated video.
       */
       retrieve(videoID, options2) {
-        return this._client.get(path$10`/videos/${videoID}`, options2);
+        return this._client.get(path$11`/videos/${videoID}`, options2);
       }
       /**
       * List recently generated videos for the current project.
@@ -152065,7 +152453,7 @@ ${underline}`);
       * Permanently delete a completed or failed video and its stored assets.
       */
       delete(videoID, options2) {
-        return this._client.delete(path$10`/videos/${videoID}`, options2);
+        return this._client.delete(path$11`/videos/${videoID}`, options2);
       }
       /**
       * Create a character from an uploaded video.
@@ -152082,7 +152470,7 @@ ${underline}`);
       * Streams the rendered video content for the specified video job.
       */
       downloadContent(videoID, query2 = {}, options2) {
-        return this._client.get(path$10`/videos/${videoID}/content`, {
+        return this._client.get(path$11`/videos/${videoID}/content`, {
           query: query2,
           ...options2,
           headers: buildHeaders([{ Accept: "application/binary" }, options2?.headers]),
@@ -152112,13 +152500,13 @@ ${underline}`);
       * Fetch a character.
       */
       getCharacter(characterID, options2) {
-        return this._client.get(path$10`/videos/characters/${characterID}`, options2);
+        return this._client.get(path$11`/videos/characters/${characterID}`, options2);
       }
       /**
       * Create a remix of a completed video using a refreshed prompt.
       */
       remix(videoID, body, options2) {
-        return this._client.post(path$10`/videos/${videoID}/remix`, maybeMultipartFormRequestOptions({
+        return this._client.post(path$11`/videos/${videoID}/remix`, maybeMultipartFormRequestOptions({
           body,
           ...options2
         }, this._client));
@@ -152731,7 +153119,7 @@ ${underline}`);
         let file2;
         if (typeof input === "string") {
           if (!fs$10.existsSync(input)) throw new ChatProviderError$1(`Video file not found: ${input}`);
-          const filename = path$9.basename(input);
+          const filename = path$10.basename(input);
           const mimeType = guessMimeTypeFromExt$1(filename);
           if (mimeType === void 0 || !mimeType.startsWith("video/")) throw new ChatProviderError$1(`KimiFiles.uploadVideo: file extension does not indicate a video type: ${filename}`);
           const data = await fs$10.promises.readFile(input);
@@ -161565,7 +161953,7 @@ ${underline}`);
         };
         return _setPrototypeOf(o, p2);
       }
-      var path$8 = __require2("path");
+      var path$9 = __require2("path");
       module.exports = /* @__PURE__ */ (function(_EmitterObj) {
         _inheritsLoose(Loader, _EmitterObj);
         function Loader() {
@@ -161573,7 +161961,7 @@ ${underline}`);
         }
         var _proto = Loader.prototype;
         _proto.resolve = function resolve3(from, to) {
-          return path$8.resolve(path$8.dirname(from), to);
+          return path$9.resolve(path$9.dirname(from), to);
         };
         _proto.isRelative = function isRelative(filename) {
           return filename.indexOf("./") === 0 || filename.indexOf("../") === 0;
@@ -163157,7 +163545,7 @@ ${underline}`);
         return _setPrototypeOf(o, p2);
       }
       var fs$9 = __require2("fs");
-      var path$7 = __require2("path");
+      var path$8 = __require2("path");
       var Loader = require_loader();
       var PrecompiledLoader = require_precompiled_loader().PrecompiledLoader;
       var chokidar;
@@ -163172,7 +163560,7 @@ ${underline}`);
             _this.noCache = !!opts.noCache;
             if (searchPaths) {
               searchPaths = Array.isArray(searchPaths) ? searchPaths : [searchPaths];
-              _this.searchPaths = searchPaths.map(path$7.normalize);
+              _this.searchPaths = searchPaths.map(path$8.normalize);
             } else _this.searchPaths = ["."];
             if (opts.watch) {
               try {
@@ -163183,7 +163571,7 @@ ${underline}`);
               var paths = _this.searchPaths.filter(fs$9.existsSync);
               var watcher = chokidar.watch(paths);
               watcher.on("all", function(event, fullname) {
-                fullname = path$7.resolve(fullname);
+                fullname = path$8.resolve(fullname);
                 if (event === "change" && fullname in _this.pathsToNames) _this.emit("update", _this.pathsToNames[fullname], fullname);
               });
               watcher.on("error", function(error48) {
@@ -163197,8 +163585,8 @@ ${underline}`);
             var fullpath = null;
             var paths = this.searchPaths;
             for (var i2 = 0; i2 < paths.length; i2++) {
-              var basePath = path$7.resolve(paths[i2]);
-              var p2 = path$7.resolve(paths[i2], name);
+              var basePath = path$8.resolve(paths[i2]);
+              var p2 = path$8.resolve(paths[i2], name);
               if (p2.indexOf(basePath) === 0 && fs$9.existsSync(p2)) {
                 fullpath = p2;
                 break;
@@ -163417,13 +163805,13 @@ ${underline}`);
       module.exports = globals;
     }));
     require_express_app = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-      var path$6 = __require2("path");
+      var path$7 = __require2("path");
       module.exports = function express(env2, app) {
         function NunjucksView(name, opts) {
           this.name = name;
           this.path = name;
           this.defaultEngine = opts.defaultEngine;
-          this.ext = path$6.extname(name);
+          this.ext = path$7.extname(name);
           if (!this.ext && !this.defaultEngine) throw new Error("No default engine was specified and no extension was provided.");
           if (!this.ext) this.name += this.ext = (this.defaultEngine[0] !== "." ? "." : "") + this.defaultEngine;
         }
@@ -163852,7 +164240,7 @@ ${underline}`);
     }));
     require_precompile = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       var fs$8 = __require2("fs");
-      var path$5 = __require2("path");
+      var path$6 = __require2("path");
       var _prettifyError = require_lib$1()._prettifyError;
       var compiler = require_compiler();
       var Environment2 = require_environment().Environment;
@@ -163881,8 +164269,8 @@ ${underline}`);
         var templates = [];
         function addTemplates(dir) {
           fs$8.readdirSync(dir).forEach(function(file2) {
-            var filepath = path$5.join(dir, file2);
-            var subpath = filepath.substr(path$5.join(input, "/").length);
+            var filepath = path$6.join(dir, file2);
+            var subpath = filepath.substr(path$6.join(input, "/").length);
             var stat4 = fs$8.statSync(filepath);
             if (stat4 && stat4.isDirectory()) {
               subpath += "/";
@@ -163894,7 +164282,7 @@ ${underline}`);
         else if (pathStats.isDirectory()) {
           addTemplates(input);
           for (var i2 = 0; i2 < templates.length; i2++) {
-            var name = templates[i2].replace(path$5.join(input, "/"), "");
+            var name = templates[i2].replace(path$6.join(input, "/"), "");
             try {
               precompiled.push(_precompile(fs$8.readFileSync(templates[i2], "utf-8"), name, env2));
             } catch (e2) {
@@ -170436,7 +170824,7 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
         disableModelInvocation: true
       }
     };
-    import_from_cc_codex_default$1 = '---\r\nname: import-from-cc-codex\r\ndescription: Import Claude Code and Codex instructions, skills, and MCP settings into Kimi Code.\r\ndisable-model-invocation: true\r\n---\r\n\r\n# Import from Claude Code and Codex\r\n\r\nThe user invoked `/import-from-cc-codex` (or `/skill:import-from-cc-codex`).\r\nHelp them migrate selected local Claude Code and Codex assets into Kimi Code.\r\nThis skill is intentionally conservative: it imports only instructions, skills,\r\nand MCP server declarations from `.claude` / `.codex` surfaces, with a user\r\npreview before any write.\r\n\r\n## Non-negotiable rules\r\n\r\n- Do **not** migrate `.agents` content. Kimi Code already supports `.agents`\r\n  skills and AGENTS files by default.\r\n- Do **not** migrate Claude custom commands (`.claude/commands/**`). They are\r\n  out of scope for this importer.\r\n- Do **not** migrate credentials, OAuth tokens, sessions, history, logs, hooks,\r\n  plugins, plugin caches, output styles, or custom agents/subagents.\r\n- Do **not** run or install anything from the source directories.\r\n- Do **not** write anything until the user has chosen what to migrate, reviewed\r\n  the final preview, and explicitly confirmed applying it.\r\n- Only write under Kimi Code targets:\r\n  - User-global: `$KIMI_CODE_HOME` if set, otherwise `~/.kimi-code`.\r\n  - Project instructions/skills: `<project root>/.kimi-code`, where the project\r\n    root is the nearest parent directory containing `.git`; if no `.git` exists,\r\n    use the current working directory.\r\n  - Project-local MCP: `<cwd>/.kimi-code/mcp.json`, because Kimi reads the\r\n    current working directory\'s Kimi-specific MCP file, not every project-root\r\n    `.kimi-code/mcp.json` from subdirectories.\r\n- Preserve existing Kimi files. Never overwrite existing skills or replace an\r\n  existing AGENTS.md / mcp.json wholesale.\r\n\r\n## Conversation flow\r\n\r\n### 1. Ask what to migrate first\r\n\r\nBefore reading source files, ask the user which categories to migrate. Use\r\n`AskUserQuestion` when available; otherwise ask in plain text and stop. Offer a\r\nmulti-select choice:\r\n\r\n- Instructions (`AGENTS.md` / `CLAUDE.md`)\r\n- Skills\r\n- MCP settings\r\n- All of the above\r\n\r\nIf the user already gave a preference in the invocation arguments, present it as\r\nthe default/recommended choice, but still ask for confirmation of the categories.\r\nIf the user dismisses or refuses the question, stop.\r\n\r\n### 2. Scan only the chosen categories\r\n\r\nResolve paths explicitly; `~` is the real OS home, and Kimi home follows\r\n`$KIMI_CODE_HOME` before `~/.kimi-code`.\r\n\r\nUser-level sources:\r\n\r\n- Claude instructions:\r\n  - `~/.claude/AGENTS.md`\r\n  - `~/.claude/CLAUDE.md`\r\n- Claude skills:\r\n  - `~/.claude/skills/`\r\n- Claude MCP candidates:\r\n  - `~/.claude.json` only when MCP is selected. Claude Code stores user-level\r\n    MCP declarations there; do not read it for instruction/skill-only imports.\r\n- Codex instructions:\r\n  - `~/.codex/AGENTS.md`\r\n  - `~/.codex/CLAUDE.md` if present\r\n- Codex skills:\r\n  - `~/.codex/skills/`\r\n- Codex MCP candidates:\r\n  - `~/.codex/config.toml`\r\n\r\nProject-level sources, rooted at the project root:\r\n\r\n- Claude instructions:\r\n  - `<project root>/.claude/AGENTS.md`\r\n  - `<project root>/.claude/CLAUDE.md`\r\n- Claude skills:\r\n  - `<project root>/.claude/skills/`\r\n- Codex instructions:\r\n  - `<project root>/.codex/AGENTS.md`\r\n  - `<project root>/.codex/CLAUDE.md` if present\r\n- Codex skills:\r\n  - `<project root>/.codex/skills/`\r\n- Codex MCP candidates:\r\n  - `<project root>/.codex/config.toml`\r\n\r\nDo not scan project-root `AGENTS.md`, project-root `CLAUDE.md`, `.agents/**`, or\r\nproject-root `.mcp.json` in this skill. `AGENTS.md` and `.agents/**` are already\r\nKimi-readable, and project-root `.mcp.json` is already read by Kimi as a\r\nClaude-compatible MCP file.\r\n\r\n### 3. Build an import plan\r\n\r\nCreate a plan with three sections: instructions, skills, and MCP. Include exact\r\nsource and target paths.\r\n\r\n#### Instructions plan\r\n\r\nMap user-level instruction sources to:\r\n\r\n- `$KIMI_CODE_HOME/AGENTS.md`, or `~/.kimi-code/AGENTS.md` if the env var is not\r\n  set.\r\n\r\nMap project-level instruction sources to:\r\n\r\n- `<project root>/.kimi-code/AGENTS.md`\r\n\r\nAppend imported instruction content as marked blocks. Do not duplicate a block\r\nthat already exists in the target file.\r\n\r\nUse this marker shape:\r\n\r\n```md\r\n<!-- Imported from Claude Code: /absolute/source/path -->\r\n\r\n<source content>\r\n\r\n<!-- End imported from Claude Code: /absolute/source/path -->\r\n```\r\n\r\nFor Codex, use `Imported from Codex` / `End imported from Codex`.\r\n\r\nIf a source file is empty, skip it and report it as skipped. If the target exists\r\nand cannot be read as UTF-8 text, stop before writing and report the blocker.\r\n\r\n#### Skills plan\r\n\r\nMap user-level skill sources to:\r\n\r\n- `$KIMI_CODE_HOME/skills/`, or `~/.kimi-code/skills/` if the env var is not set.\r\n\r\nMap project-level skill sources to:\r\n\r\n- `<project root>/.kimi-code/skills/`\r\n\r\nRecognize these skill shapes under `.claude/skills/` or `.codex/skills/`:\r\n\r\n- Directory bundle: `<skill-name>/SKILL.md`\r\n- Flat markdown skill: `<skill-name>.md`\r\n\r\nCopy the entire directory bundle or flat markdown file. Preserve supporting\r\nfiles inside bundles. Do not copy hidden directories, `node_modules`, caches, or\r\nplugin-managed folders.\r\n\r\nBefore planning a copy:\r\n\r\n- Read a bundle\'s `SKILL.md` enough to verify that directory skills have\r\n  frontmatter with non-empty `name` and `description`, because Kimi requires\r\n  those fields for directory skills.\r\n- If the target top-level entry already exists, skip it; do not overwrite.\r\n- If two source entries would write the same target path, keep the first one in\r\n  this order and report the later one as skipped:\r\n  1. project Claude\r\n  2. project Codex\r\n  3. user Claude\r\n  4. user Codex\r\n- Warn when a source skill uses Claude/Codex-specific fields or syntax that Kimi\r\n  may not interpret the same way, such as `allowed-tools`, `disallowed-tools`,\r\n  `context: fork`, `agent`, `hooks`, `paths`, dynamic shell injection with\r\n  ``!`command` ``, or `agents/openai.yaml`. Preserve the file; do not rewrite it\r\n  unless the user explicitly asks.\r\n\r\nDo not convert `.claude/commands/*.md`. Commands are out of scope.\r\n\r\n#### MCP plan\r\n\r\nDo not edit `mcp.json` directly in this import skill. Prepare MCP entries for\r\nmanual follow-up with `/mcp-config`; that built-in skill is user-invocable only,\r\nso you must not try to call it through the `Skill` tool.\r\n\r\nFor the preview, collect MCP candidates and normalize them into Kimi\'s MCP shape\r\nwhen possible:\r\n\r\n```json\r\n{\r\n  "mcpServers": {\r\n    "name": {\r\n      "command": "...",\r\n      "args": ["..."],\r\n      "env": { "KEY": "VALUE" }\r\n    }\r\n  }\r\n}\r\n```\r\n\r\nClaude user MCP:\r\n\r\n- Read `~/.claude.json` only if MCP was selected.\r\n- Look for a top-level `mcpServers` object.\r\n- Keep stdio entries with `command`; keep HTTP entries with `url`.\r\n- Preserve `args`, `env`, `cwd`, `enabled`, `enabledTools`, `disabledTools`,\r\n  `startupTimeoutMs`, `toolTimeoutMs`, `headers`, and `bearerTokenEnvVar` when\r\n  present and valid.\r\n- Drop unsupported or malformed entries and report why.\r\n\r\nCodex MCP:\r\n\r\n- Read selected `config.toml` files only if MCP was selected.\r\n- Look for `[mcp_servers.<name>]` tables.\r\n- Map Codex fields to Kimi fields:\r\n  - `command` -> `command`\r\n  - `args` -> `args`\r\n  - `env` -> `env`\r\n  - `cwd` -> `cwd`\r\n  - `url` -> `url`\r\n  - `bearer_token_env_var` -> `bearerTokenEnvVar`\r\n  - `enabled` -> `enabled`\r\n  - `enabled_tools` -> `enabledTools`\r\n  - `disabled_tools` -> `disabledTools`\r\n  - `startup_timeout_sec` -> `startupTimeoutMs` in milliseconds\r\n  - `tool_timeout_sec` -> `toolTimeoutMs` in milliseconds\r\n  - `http_headers` -> `headers`\r\n- Drop unsupported Codex-only fields and report them, especially `required`,\r\n  `default_tools_approval_mode`, `tools.<tool>.approval_mode`,\r\n  `env_vars`, `env_http_headers`, and `experimental_environment`.\r\n- Do not import project-root `.mcp.json`; Kimi already reads it.\r\n\r\nFor each MCP candidate, choose the target scope in the preview:\r\n\r\n- User-level source -> user-global MCP target (`$KIMI_CODE_HOME/mcp.json` or\r\n  `~/.kimi-code/mcp.json`).\r\n- Project-level source -> project-local Kimi MCP target (`<cwd>/.kimi-code/mcp.json`). If `<cwd>` is not the project root, call this out in the preview so the user understands when Kimi will load it.\r\n\r\nWarn that stdio MCP entries spawn commands at session start, and the user should\r\nonly import MCP servers they trust. Warn if an MCP entry contains apparent\r\nliteral secrets in `env`, `headers`, or token-like fields; prefer env-var\r\nreferences.\r\n\r\nAfter the user confirms applying the final preview, do not write MCP config and\r\ndo not invoke `mcp-config` programmatically. Instead, finish the non-MCP writes\r\nand show a copy-pasteable manual follow-up for the user, including:\r\n\r\n- the `/mcp-config` command they should run,\r\n- target scope and target path,\r\n- the normalized JSON entry or entries to add,\r\n- collision policy: keep existing Kimi entries on name conflict,\r\n- the reminder that unrelated entries must be preserved.\r\n\r\nMake it clear that MCP import is pending until the user manually runs\r\n`/mcp-config` with the prepared entries.\r\n\r\n### 4. Show the final preview and stop\r\n\r\nAfter scanning, show a concise final preview grouped by target file/directory:\r\n\r\n- Will append instruction blocks\r\n- Will copy skill bundles/files\r\n- Will leave these MCP entries pending for a manual `/mcp-config` follow-up\r\n- Already present / skipped\r\n- Warnings and blockers\r\n\r\nThen ask for explicit confirmation before writing. Use a clear choice such as:\r\n\r\n- Apply import\r\n- Cancel\r\n\r\nIf there are blockers, do not offer apply; explain what must be fixed first.\r\n\r\n### 5. Apply only after confirmation\r\n\r\nWhen the user confirms:\r\n\r\n- Create target directories with private permissions where possible.\r\n- Append instruction blocks without duplicating existing imported source blocks.\r\n- Copy skills without overwriting existing target entries.\r\n- Do not write MCP entries. Show the prepared `/mcp-config` follow-up command\r\n  and mark MCP import as pending user action.\r\n- Report exactly what changed and what was skipped.\r\n- Tell the user to start a new session (for example `/new`) or restart Kimi Code\r\n  for newly imported skills, instructions, and MCP servers to be picked up.\r\n\r\n## Output style\r\n\r\nBe brief but precise. Use absolute paths in previews and summaries. Prefer a\r\nsmall table or bullet list over long prose. If nothing is found for a selected\r\ncategory, say so and do not treat it as an error.\r\n';
+    import_from_cc_codex_default$1 = '---\nname: import-from-cc-codex\ndescription: Import Claude Code and Codex instructions, skills, and MCP settings into Kimi Code.\ndisable-model-invocation: true\n---\n\n# Import from Claude Code and Codex\n\nThe user invoked `/import-from-cc-codex` (or `/skill:import-from-cc-codex`).\nHelp them migrate selected local Claude Code and Codex assets into Kimi Code.\nThis skill is intentionally conservative: it imports only instructions, skills,\nand MCP server declarations from `.claude` / `.codex` surfaces, with a user\npreview before any write.\n\n## Non-negotiable rules\n\n- Do **not** migrate `.agents` content. Kimi Code already supports `.agents`\n  skills and AGENTS files by default.\n- Do **not** migrate Claude custom commands (`.claude/commands/**`). They are\n  out of scope for this importer.\n- Do **not** migrate credentials, OAuth tokens, sessions, history, logs, hooks,\n  plugins, plugin caches, output styles, or custom agents/subagents.\n- Do **not** run or install anything from the source directories.\n- Do **not** write anything until the user has chosen what to migrate, reviewed\n  the final preview, and explicitly confirmed applying it.\n- Only write under Kimi Code targets:\n  - User-global: `$KIMI_CODE_HOME` if set, otherwise `~/.kimi-code`.\n  - Project instructions/skills: `<project root>/.kimi-code`, where the project\n    root is the nearest parent directory containing `.git`; if no `.git` exists,\n    use the current working directory.\n  - Project-local MCP: `<cwd>/.kimi-code/mcp.json`, because Kimi reads the\n    current working directory\'s Kimi-specific MCP file, not every project-root\n    `.kimi-code/mcp.json` from subdirectories.\n- Preserve existing Kimi files. Never overwrite existing skills or replace an\n  existing AGENTS.md / mcp.json wholesale.\n\n## Conversation flow\n\n### 1. Ask what to migrate first\n\nBefore reading source files, ask the user which categories to migrate. Use\n`AskUserQuestion` when available; otherwise ask in plain text and stop. Offer a\nmulti-select choice:\n\n- Instructions (`AGENTS.md` / `CLAUDE.md`)\n- Skills\n- MCP settings\n- All of the above\n\nIf the user already gave a preference in the invocation arguments, present it as\nthe default/recommended choice, but still ask for confirmation of the categories.\nIf the user dismisses or refuses the question, stop.\n\n### 2. Scan only the chosen categories\n\nResolve paths explicitly; `~` is the real OS home, and Kimi home follows\n`$KIMI_CODE_HOME` before `~/.kimi-code`.\n\nUser-level sources:\n\n- Claude instructions:\n  - `~/.claude/AGENTS.md`\n  - `~/.claude/CLAUDE.md`\n- Claude skills:\n  - `~/.claude/skills/`\n- Claude MCP candidates:\n  - `~/.claude.json` only when MCP is selected. Claude Code stores user-level\n    MCP declarations there; do not read it for instruction/skill-only imports.\n- Codex instructions:\n  - `~/.codex/AGENTS.md`\n  - `~/.codex/CLAUDE.md` if present\n- Codex skills:\n  - `~/.codex/skills/`\n- Codex MCP candidates:\n  - `~/.codex/config.toml`\n\nProject-level sources, rooted at the project root:\n\n- Claude instructions:\n  - `<project root>/.claude/AGENTS.md`\n  - `<project root>/.claude/CLAUDE.md`\n- Claude skills:\n  - `<project root>/.claude/skills/`\n- Codex instructions:\n  - `<project root>/.codex/AGENTS.md`\n  - `<project root>/.codex/CLAUDE.md` if present\n- Codex skills:\n  - `<project root>/.codex/skills/`\n- Codex MCP candidates:\n  - `<project root>/.codex/config.toml`\n\nDo not scan project-root `AGENTS.md`, project-root `CLAUDE.md`, `.agents/**`, or\nproject-root `.mcp.json` in this skill. `AGENTS.md` and `.agents/**` are already\nKimi-readable, and project-root `.mcp.json` is already read by Kimi as a\nClaude-compatible MCP file.\n\n### 3. Build an import plan\n\nCreate a plan with three sections: instructions, skills, and MCP. Include exact\nsource and target paths.\n\n#### Instructions plan\n\nMap user-level instruction sources to:\n\n- `$KIMI_CODE_HOME/AGENTS.md`, or `~/.kimi-code/AGENTS.md` if the env var is not\n  set.\n\nMap project-level instruction sources to:\n\n- `<project root>/.kimi-code/AGENTS.md`\n\nAppend imported instruction content as marked blocks. Do not duplicate a block\nthat already exists in the target file.\n\nUse this marker shape:\n\n```md\n<!-- Imported from Claude Code: /absolute/source/path -->\n\n<source content>\n\n<!-- End imported from Claude Code: /absolute/source/path -->\n```\n\nFor Codex, use `Imported from Codex` / `End imported from Codex`.\n\nIf a source file is empty, skip it and report it as skipped. If the target exists\nand cannot be read as UTF-8 text, stop before writing and report the blocker.\n\n#### Skills plan\n\nMap user-level skill sources to:\n\n- `$KIMI_CODE_HOME/skills/`, or `~/.kimi-code/skills/` if the env var is not set.\n\nMap project-level skill sources to:\n\n- `<project root>/.kimi-code/skills/`\n\nRecognize these skill shapes under `.claude/skills/` or `.codex/skills/`:\n\n- Directory bundle: `<skill-name>/SKILL.md`\n- Flat markdown skill: `<skill-name>.md`\n\nCopy the entire directory bundle or flat markdown file. Preserve supporting\nfiles inside bundles. Do not copy hidden directories, `node_modules`, caches, or\nplugin-managed folders.\n\nBefore planning a copy:\n\n- Read a bundle\'s `SKILL.md` enough to verify that directory skills have\n  frontmatter with non-empty `name` and `description`, because Kimi requires\n  those fields for directory skills.\n- If the target top-level entry already exists, skip it; do not overwrite.\n- If two source entries would write the same target path, keep the first one in\n  this order and report the later one as skipped:\n  1. project Claude\n  2. project Codex\n  3. user Claude\n  4. user Codex\n- Warn when a source skill uses Claude/Codex-specific fields or syntax that Kimi\n  may not interpret the same way, such as `allowed-tools`, `disallowed-tools`,\n  `context: fork`, `agent`, `hooks`, `paths`, dynamic shell injection with\n  ``!`command` ``, or `agents/openai.yaml`. Preserve the file; do not rewrite it\n  unless the user explicitly asks.\n\nDo not convert `.claude/commands/*.md`. Commands are out of scope.\n\n#### MCP plan\n\nDo not edit `mcp.json` directly in this import skill. Prepare MCP entries for\nmanual follow-up with `/mcp-config`; that built-in skill is user-invocable only,\nso you must not try to call it through the `Skill` tool.\n\nFor the preview, collect MCP candidates and normalize them into Kimi\'s MCP shape\nwhen possible:\n\n```json\n{\n  "mcpServers": {\n    "name": {\n      "command": "...",\n      "args": ["..."],\n      "env": { "KEY": "VALUE" }\n    }\n  }\n}\n```\n\nClaude user MCP:\n\n- Read `~/.claude.json` only if MCP was selected.\n- Look for a top-level `mcpServers` object.\n- Keep stdio entries with `command`; keep HTTP entries with `url`.\n- Preserve `args`, `env`, `cwd`, `enabled`, `enabledTools`, `disabledTools`,\n  `startupTimeoutMs`, `toolTimeoutMs`, `headers`, and `bearerTokenEnvVar` when\n  present and valid.\n- Drop unsupported or malformed entries and report why.\n\nCodex MCP:\n\n- Read selected `config.toml` files only if MCP was selected.\n- Look for `[mcp_servers.<name>]` tables.\n- Map Codex fields to Kimi fields:\n  - `command` -> `command`\n  - `args` -> `args`\n  - `env` -> `env`\n  - `cwd` -> `cwd`\n  - `url` -> `url`\n  - `bearer_token_env_var` -> `bearerTokenEnvVar`\n  - `enabled` -> `enabled`\n  - `enabled_tools` -> `enabledTools`\n  - `disabled_tools` -> `disabledTools`\n  - `startup_timeout_sec` -> `startupTimeoutMs` in milliseconds\n  - `tool_timeout_sec` -> `toolTimeoutMs` in milliseconds\n  - `http_headers` -> `headers`\n- Drop unsupported Codex-only fields and report them, especially `required`,\n  `default_tools_approval_mode`, `tools.<tool>.approval_mode`,\n  `env_vars`, `env_http_headers`, and `experimental_environment`.\n- Do not import project-root `.mcp.json`; Kimi already reads it.\n\nFor each MCP candidate, choose the target scope in the preview:\n\n- User-level source -> user-global MCP target (`$KIMI_CODE_HOME/mcp.json` or\n  `~/.kimi-code/mcp.json`).\n- Project-level source -> project-local Kimi MCP target (`<cwd>/.kimi-code/mcp.json`). If `<cwd>` is not the project root, call this out in the preview so the user understands when Kimi will load it.\n\nWarn that stdio MCP entries spawn commands at session start, and the user should\nonly import MCP servers they trust. Warn if an MCP entry contains apparent\nliteral secrets in `env`, `headers`, or token-like fields; prefer env-var\nreferences.\n\nAfter the user confirms applying the final preview, do not write MCP config and\ndo not invoke `mcp-config` programmatically. Instead, finish the non-MCP writes\nand show a copy-pasteable manual follow-up for the user, including:\n\n- the `/mcp-config` command they should run,\n- target scope and target path,\n- the normalized JSON entry or entries to add,\n- collision policy: keep existing Kimi entries on name conflict,\n- the reminder that unrelated entries must be preserved.\n\nMake it clear that MCP import is pending until the user manually runs\n`/mcp-config` with the prepared entries.\n\n### 4. Show the final preview and stop\n\nAfter scanning, show a concise final preview grouped by target file/directory:\n\n- Will append instruction blocks\n- Will copy skill bundles/files\n- Will leave these MCP entries pending for a manual `/mcp-config` follow-up\n- Already present / skipped\n- Warnings and blockers\n\nThen ask for explicit confirmation before writing. Use a clear choice such as:\n\n- Apply import\n- Cancel\n\nIf there are blockers, do not offer apply; explain what must be fixed first.\n\n### 5. Apply only after confirmation\n\nWhen the user confirms:\n\n- Create target directories with private permissions where possible.\n- Append instruction blocks without duplicating existing imported source blocks.\n- Copy skills without overwriting existing target entries.\n- Do not write MCP entries. Show the prepared `/mcp-config` follow-up command\n  and mark MCP import as pending user action.\n- Report exactly what changed and what was skipped.\n- Tell the user to start a new session (for example `/new`) or restart Kimi Code\n  for newly imported skills, instructions, and MCP servers to be picked up.\n\n## Output style\n\nBe brief but precise. Use absolute paths in previews and summaries. Prefer a\nsmall table or bullet list over long prose. If nothing is found for a selected\ncategory, say so and do not treat it as an error.\n';
     PSEUDO_PATH$9 = "builtin://import-from-cc-codex";
     parsed$9 = parseSkillText$1({
       skillMdPath: "/builtin/skills/import-from-cc-codex.md",
@@ -170472,9 +170860,9 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
         disableModelInvocation: true
       }
     };
-    SKILL_default$5 = "---\r\nname: consolidate\r\ndescription: Apply an approved sub-skill grouping by moving user-specified skills into a parent bundle, with timestamped backups of every modified directory.\r\ndisable-model-invocation: true\r\n---\r\n\r\n# Consolidate sub-skills (`sub-skill.consolidate`)\r\n\r\nExecute the reorganization by moving user-specified skills into a parent bundle, forming a sub-skill hierarchy.\r\n\r\n## When to use\r\n\r\n- The user has approved a grouping proposal (typically from `sub-skill.review`) and wants to apply it.\r\n- Migrating standalone skills into a new or existing parent bundle.\r\n\r\n## Process\r\n\r\n1. **Confirm the plan.** Restate which skills will move and where, and ask the user to confirm **before** making any file changes.\r\n2. **Back up every original skill directory.** Before moving anything, create a timestamped backup of each skill directory that will be modified.\r\n   - For a skill at `<root>/<skill-name>/SKILL.md`, back up the entire `<skill-name>` directory:\r\n     ```bash\r\n     cp -r <skill-name> \"<skill-name>.$(date +%Y%m%d-%H%M%S).bak\"\r\n     ```\r\n   - Keep all backups; never overwrite an existing backup file.\r\n3. **Create or update the parent bundle.**\r\n   - If the parent does not exist, create `<parent-name>/SKILL.md` with `has-sub-skill: true` in the frontmatter.\r\n   - If the parent already exists, ensure its frontmatter includes `has-sub-skill: true`.\r\n4. **Move child skills into the parent.** Move each child skill's entire directory under the parent bundle.\r\n   - Example: `web-search/` \u2192 `web-research/web-search/`\r\n5. **Keep documentation directory alignment.** When moving documentation, references, examples, assets, or other payload directories, align them with the new skill directory layout.\r\n   - Preserve relative links from `SKILL.md` to files such as `references/`, `assets/`, `examples/`, or templates.\r\n   - If a child skill moves from `<root>/<child>/` to `<root>/<parent>/<child>/`, its documentation payload should move with that child unless the approved plan says otherwise.\r\n   - Do not leave documentation in the old location or merge unrelated documentation directories together.\r\n6. **Verify the result.** List the new directory structure and confirm each moved skill still has a valid `SKILL.md` with required frontmatter (`name` and `description`). Check documentation directory alignment and relative links after the move.\r\n7. **Report the change.** Summarize what was moved, the new structure, any documentation directories that moved, and where backups are located.\r\n\r\n## Don'ts\r\n\r\n- **Never move skills without backing up first.**\r\n- **Never overwrite an existing backup** \u2014 always use a fresh timestamped suffix.\r\n- **Don't drop frontmatter or payload files** during the move; the entire directory must be preserved.\r\n- **Don't break documentation directory alignment** \u2014 references, assets, examples, and templates must stay aligned with the skill directory that uses them.\r\n- **Don't create deeply nested hierarchies** (3+ levels) unless the user explicitly requests it.\r\n";
-    SKILL_default$4 = "---\r\nname: review\r\ndescription: Analyze the available skill set and recommend candidate groups that could be consolidated into sub-skill bundles. Read-only \u2014 proposes a plan, does not move files.\r\ndisable-model-invocation: true\r\n---\r\n\r\n# Review sub-skills (`sub-skill.review`)\r\n\r\nAnalyze the current skill inventory and identify candidate groups that could be consolidated into sub-skill bundles. This sub-skill is **read-only**: it produces a proposal for the user to review before any file changes are made by `sub-skill.consolidate`.\r\n\r\n## When to use\r\n\r\n- The user asks to review, reorganize, or audit the skill inventory.\r\n- There are many loosely-related skills that might benefit from hierarchical grouping.\r\n- The user wants to evaluate whether a new skill should be a sub-skill of an existing parent.\r\n\r\n## Process\r\n\r\n1. **List the current inventory.** Use the skill registry (or scan the configured skill roots) to get a full list of skill names, descriptions, and source scopes.\r\n2. **Categorize by domain.** Group skills by functional domain \u2014 e.g. file operations, web tools, collaboration, observability.\r\n3. **Detect coupling.** Identify skills that are frequently used together or share similar `whenToUse` conditions.\r\n4. **Flag granularity issues.** Call out skills that are too fine-grained (e.g. one skill per CLI flag) or too broad to land in any single domain.\r\n5. **Propose sub-skill structures.** For each candidate group, list:\r\n   - The parent skill name and a one-line description.\r\n   - The children that should move under it.\r\n   - Any documentation, reference, example, asset, or template directories that must move with each child so the final directory layout stays aligned.\r\n   - Whether the parent needs `has-sub-skill: true` (it does, if children should be discovered).\r\n6. **Output a summary report.** Present findings as a concise grouped list with rationale, and stop. Do **not** edit any file \u2014 that's `sub-skill.consolidate`'s job.\r\n\r\n## Criteria for a good sub-skill grouping\r\n\r\n- **Shared context.** Children operate within the same domain or workflow.\r\n- **Composable entry point.** The parent gives a natural top-level handle; children handle specifics.\r\n- **Shallow nesting.** Prefer 2 levels (parent \u2192 child). Avoid 3+ unless strictly necessary.\r\n- **Backward compatibility.** Existing skill names should ideally remain discoverable.\r\n\r\n## Example output format\r\n\r\n```\r\nProposed sub-skill: web-research\r\n  - Parent: web-research (has-sub-skill: true)\r\n  - Children:\r\n    - web-search    \u2192 move under web-research/search\r\n    - fetch-url     \u2192 move under web-research/fetch\r\n  - Documentation alignment: move each child's references/examples/assets with that child.\r\n  - Rationale: Both deal with online information retrieval and are often chained together.\r\n```\r\n";
-    SKILL_default$3 = "---\r\nname: sub-skill\r\ndescription: Discover and reorganize the skill inventory into hierarchical sub-skill bundles. Use when the user asks to review, group, or consolidate skills into a parent bundle.\r\ndisable-model-invocation: true\r\nhas-sub-skill: true\r\n---\r\n\r\n# Sub-skill\r\n\r\nContainer skill for analyzing the local skill inventory and reorganizing it into hierarchical sub-skill bundles (`has-sub-skill: true` parents with children inside).\r\n\r\n## When to use\r\n\r\n- The user asks to review, reorganize, or consolidate skills.\r\n- There are many loosely-related skills that might benefit from hierarchical grouping.\r\n- The user wants to evaluate whether a new skill should be a sub-skill of an existing one.\r\n\r\n## Sub-skills\r\n\r\n- **`sub-skill.review`** \u2014 Analyze the current inventory and propose candidate sub-skill groupings.\r\n- **`sub-skill.consolidate`** \u2014 Apply an approved grouping by moving skills into a parent bundle, with timestamped backups.\r\n\r\nThe usual flow is `sub-skill.review` first (read-only proposal), then `sub-skill.consolidate` after the user approves a plan. Never run consolidate without an explicit go-ahead from the user.\r\n";
+    SKILL_default$5 = "---\nname: consolidate\ndescription: Apply an approved sub-skill grouping by moving user-specified skills into a parent bundle, with timestamped backups of every modified directory.\ndisable-model-invocation: true\n---\n\n# Consolidate sub-skills (`sub-skill.consolidate`)\n\nExecute the reorganization by moving user-specified skills into a parent bundle, forming a sub-skill hierarchy.\n\n## When to use\n\n- The user has approved a grouping proposal (typically from `sub-skill.review`) and wants to apply it.\n- Migrating standalone skills into a new or existing parent bundle.\n\n## Process\n\n1. **Confirm the plan.** Restate which skills will move and where, and ask the user to confirm **before** making any file changes.\n2. **Back up every original skill directory.** Before moving anything, create a timestamped backup of each skill directory that will be modified.\n   - For a skill at `<root>/<skill-name>/SKILL.md`, back up the entire `<skill-name>` directory:\n     ```bash\n     cp -r <skill-name> \"<skill-name>.$(date +%Y%m%d-%H%M%S).bak\"\n     ```\n   - Keep all backups; never overwrite an existing backup file.\n3. **Create or update the parent bundle.**\n   - If the parent does not exist, create `<parent-name>/SKILL.md` with `has-sub-skill: true` in the frontmatter.\n   - If the parent already exists, ensure its frontmatter includes `has-sub-skill: true`.\n4. **Move child skills into the parent.** Move each child skill's entire directory under the parent bundle.\n   - Example: `web-search/` \u2192 `web-research/web-search/`\n5. **Keep documentation directory alignment.** When moving documentation, references, examples, assets, or other payload directories, align them with the new skill directory layout.\n   - Preserve relative links from `SKILL.md` to files such as `references/`, `assets/`, `examples/`, or templates.\n   - If a child skill moves from `<root>/<child>/` to `<root>/<parent>/<child>/`, its documentation payload should move with that child unless the approved plan says otherwise.\n   - Do not leave documentation in the old location or merge unrelated documentation directories together.\n6. **Verify the result.** List the new directory structure and confirm each moved skill still has a valid `SKILL.md` with required frontmatter (`name` and `description`). Check documentation directory alignment and relative links after the move.\n7. **Report the change.** Summarize what was moved, the new structure, any documentation directories that moved, and where backups are located.\n\n## Don'ts\n\n- **Never move skills without backing up first.**\n- **Never overwrite an existing backup** \u2014 always use a fresh timestamped suffix.\n- **Don't drop frontmatter or payload files** during the move; the entire directory must be preserved.\n- **Don't break documentation directory alignment** \u2014 references, assets, examples, and templates must stay aligned with the skill directory that uses them.\n- **Don't create deeply nested hierarchies** (3+ levels) unless the user explicitly requests it.\n";
+    SKILL_default$4 = "---\nname: review\ndescription: Analyze the available skill set and recommend candidate groups that could be consolidated into sub-skill bundles. Read-only \u2014 proposes a plan, does not move files.\ndisable-model-invocation: true\n---\n\n# Review sub-skills (`sub-skill.review`)\n\nAnalyze the current skill inventory and identify candidate groups that could be consolidated into sub-skill bundles. This sub-skill is **read-only**: it produces a proposal for the user to review before any file changes are made by `sub-skill.consolidate`.\n\n## When to use\n\n- The user asks to review, reorganize, or audit the skill inventory.\n- There are many loosely-related skills that might benefit from hierarchical grouping.\n- The user wants to evaluate whether a new skill should be a sub-skill of an existing parent.\n\n## Process\n\n1. **List the current inventory.** Use the skill registry (or scan the configured skill roots) to get a full list of skill names, descriptions, and source scopes.\n2. **Categorize by domain.** Group skills by functional domain \u2014 e.g. file operations, web tools, collaboration, observability.\n3. **Detect coupling.** Identify skills that are frequently used together or share similar `whenToUse` conditions.\n4. **Flag granularity issues.** Call out skills that are too fine-grained (e.g. one skill per CLI flag) or too broad to land in any single domain.\n5. **Propose sub-skill structures.** For each candidate group, list:\n   - The parent skill name and a one-line description.\n   - The children that should move under it.\n   - Any documentation, reference, example, asset, or template directories that must move with each child so the final directory layout stays aligned.\n   - Whether the parent needs `has-sub-skill: true` (it does, if children should be discovered).\n6. **Output a summary report.** Present findings as a concise grouped list with rationale, and stop. Do **not** edit any file \u2014 that's `sub-skill.consolidate`'s job.\n\n## Criteria for a good sub-skill grouping\n\n- **Shared context.** Children operate within the same domain or workflow.\n- **Composable entry point.** The parent gives a natural top-level handle; children handle specifics.\n- **Shallow nesting.** Prefer 2 levels (parent \u2192 child). Avoid 3+ unless strictly necessary.\n- **Backward compatibility.** Existing skill names should ideally remain discoverable.\n\n## Example output format\n\n```\nProposed sub-skill: web-research\n  - Parent: web-research (has-sub-skill: true)\n  - Children:\n    - web-search    \u2192 move under web-research/search\n    - fetch-url     \u2192 move under web-research/fetch\n  - Documentation alignment: move each child's references/examples/assets with that child.\n  - Rationale: Both deal with online information retrieval and are often chained together.\n```\n";
+    SKILL_default$3 = "---\nname: sub-skill\ndescription: Discover and reorganize the skill inventory into hierarchical sub-skill bundles. Use when the user asks to review, group, or consolidate skills into a parent bundle.\ndisable-model-invocation: true\nhas-sub-skill: true\n---\n\n# Sub-skill\n\nContainer skill for analyzing the local skill inventory and reorganizing it into hierarchical sub-skill bundles (`has-sub-skill: true` parents with children inside).\n\n## When to use\n\n- The user asks to review, reorganize, or consolidate skills.\n- There are many loosely-related skills that might benefit from hierarchical grouping.\n- The user wants to evaluate whether a new skill should be a sub-skill of an existing one.\n\n## Sub-skills\n\n- **`sub-skill.review`** \u2014 Analyze the current inventory and propose candidate sub-skill groupings.\n- **`sub-skill.consolidate`** \u2014 Apply an approved grouping by moving skills into a parent bundle, with timestamped backups.\n\nThe usual flow is `sub-skill.review` first (read-only proposal), then `sub-skill.consolidate` after the user approves a plan. Never run consolidate without an explicit go-ahead from the user.\n";
     SUB_SKILL_PARENT$1 = makeBuiltin$1(SKILL_default$3, "sub-skill", "builtin://sub-skill", {
       disableModelInvocation: true,
       "has-sub-skill": true
@@ -170686,8 +171074,8 @@ ${content}`;
         if (input !== void 0) this.agent.turn.prompt(input, origin);
       }
     };
-    enter_reminder_default$1 = '## Swarm Mode\r\n\r\nYou are now in "agent swarm" mode. The user may send tasks that require a large number of parallel subagents.\r\n\r\n## Workflow\r\n\r\nYou do not need to use TodoList to record this workflow.\r\n\r\n1. First, you may need to do a small amount of exploratory work before deciding how to divide the task across subagents. You may not need subagents during this exploratory phase.\r\n\r\n2. After exploring, if you are convinced no subagent is needed to complete the task, tell the user why and wait for further instructions; otherwise, continue with the appropriate delegation.\r\n\r\n3. Once you have enough context, do not handle the main work yourself. Use AgentSwarm with a `prompt_template` containing the `{{item}}` placeholder and an `items` array for the requested or appropriate number of subagents, partitioning the problem so each item gives one subagent a distinct part of the work. Pass `subagent_type` when the whole swarm should use a non-default subagent profile.\r\n\r\n## Coordination\r\n\r\n- Give each subagent a distinct scope of work.\r\n- Avoid duplicating work across subagents.\r\n- Avoid assigning conflicting changes or responsibilities to different subagents.\r\n- Remember that subagents have your full capabilities. Do not overload their prompts with excessive detail; only describe the necessary background and each subagent\'s specific task.\r\n- Unless the user explicitly specifies a lower limit, do not try to conserve the number of agents. AgentSwarm supports up to 128 subagents and queues launches automatically, so decompose work as finely as possible while keeping subagent responsibilities non-conflicting; combine tasks only when they are genuinely inseparable. If the subagents only need to read, inspect, or report back without making changes, their scopes may overlap slightly.\r\n';
-    exit_reminder_default$1 = "## Swarm Mode Ended\r\n\r\nSwarm Mode has ended. You are no longer required to follow the Swarm Mode workflow.\r\n\r\nThe user's next request is likely to be a regular request that does not need AgentSwarm. If the request still benefits from parallel subagents, you may call the AgentSwarm tool, but decide from the new request itself rather than the ended Swarm Mode workflow.\r\n";
+    enter_reminder_default$1 = '## Swarm Mode\n\nYou are now in "agent swarm" mode. The user may send tasks that require a large number of parallel subagents.\n\n## Workflow\n\nYou do not need to use TodoList to record this workflow.\n\n1. First, you may need to do a small amount of exploratory work before deciding how to divide the task across subagents. You may not need subagents during this exploratory phase.\n\n2. After exploring, if you are convinced no subagent is needed to complete the task, tell the user why and wait for further instructions; otherwise, continue with the appropriate delegation.\n\n3. Once you have enough context, do not handle the main work yourself. Use AgentSwarm with a `prompt_template` containing the `{{item}}` placeholder and an `items` array for the requested or appropriate number of subagents, partitioning the problem so each item gives one subagent a distinct part of the work. Pass `subagent_type` when the whole swarm should use a non-default subagent profile.\n\n## Coordination\n\n- Give each subagent a distinct scope of work.\n- Avoid duplicating work across subagents.\n- Avoid assigning conflicting changes or responsibilities to different subagents.\n- Remember that subagents have your full capabilities. Do not overload their prompts with excessive detail; only describe the necessary background and each subagent\'s specific task.\n- Unless the user explicitly specifies a lower limit, do not try to conserve the number of agents. AgentSwarm supports up to 128 subagents and queues launches automatically, so decompose work as finely as possible while keeping subagent responsibilities non-conflicting; combine tasks only when they are genuinely inseparable. If the subagents only need to read, inspect, or report back without making changes, their scopes may overlap slightly.\n';
+    exit_reminder_default$1 = "## Swarm Mode Ended\n\nSwarm Mode has ended. You are no longer required to follow the Swarm Mode workflow.\n\nThe user's next request is likely to be a regular request that does not need AgentSwarm. If the request still benefits from parallel subagents, you may call the AgentSwarm tool, but decide from the new request itself rather than the ended Swarm Mode workflow.\n";
     SwarmMode = class {
       agent;
       active = null;
@@ -181864,7 +182252,7 @@ ${content}`;
       module.exports.getMtime = getMtime;
     }));
     require_lockfile = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-      const path$4 = __require2("path");
+      const path$5 = __require2("path");
       const fs2 = require_graceful_fs();
       const retry = require_retry$1();
       const onExit = require_signal_exit();
@@ -181874,7 +182262,7 @@ ${content}`;
         return options2.lockfilePath || `${file2}.lock`;
       }
       function resolveCanonicalPath(file2, options2, callback) {
-        if (!options2.realpath) return callback(null, path$4.resolve(file2));
+        if (!options2.realpath) return callback(null, path$5.resolve(file2));
         options2.fs.realpath(file2, callback);
       }
       function acquireLock(file2, options2, callback) {
@@ -185606,7 +185994,7 @@ query parameters.`;
         return error48 instanceof Error ? error48.message : String(error48);
       }
     };
-    summary_continuation_default$1 = "Your previous response was too brief. Please provide a more comprehensive summary that includes:\r\n\r\n1. Specific technical details and implementations\r\n2. Detailed findings and analysis\r\n3. All important information that the parent agent should know";
+    summary_continuation_default = "Your previous response was too brief. Please provide a more comprehensive summary that includes:\n\n1. Specific technical details and implementations\n2. Detailed findings and analysis\n3. All important information that the parent agent should know";
     DEFAULT_SUBAGENT_TIMEOUT_MS$1 = 7200 * 1e3;
     SUBAGENT_TIMEOUT_ENV$1 = "KIMI_SUBAGENT_TIMEOUT_MS";
     SUMMARY_MIN_LENGTH = 200;
@@ -185846,7 +186234,7 @@ ${childPrompt}`;
           options2.signal.throwIfAborted();
           child.turn.prompt([{
             type: "text",
-            text: summary_continuation_default$1
+            text: summary_continuation_default
           }], SUBAGENT_PROMPT_ORIGIN);
           await runChildTurnToCompletion(child, options2.signal);
           result = lastAssistantText(child);
@@ -186088,7 +186476,7 @@ ${childPrompt}`;
         };
       }
     };
-    task_stop_default$1 = "Stop a running background task.\r\n\r\nOnly use this when a task must genuinely be cancelled \u2014 for a task that is\r\nfinishing normally, wait for its completion notification or inspect it with\r\n`TaskOutput` instead of stopping it.\r\n\r\nGuidelines:\r\n- This is a general-purpose stop capability for any background task. It is not\r\n  a bash-specific kill.\r\n- Stopping a task is destructive: it may leave partial side effects behind.\r\n  Use it with care.\r\n- If the task has already finished, this tool simply returns its current\r\n  status.\r\n";
+    task_stop_default$1 = "Stop a running background task.\n\nOnly use this when a task must genuinely be cancelled \u2014 for a task that is\nfinishing normally, wait for its completion notification or inspect it with\n`TaskOutput` instead of stopping it.\n\nGuidelines:\n- This is a general-purpose stop capability for any background task. It is not\n  a bash-specific kill.\n- Stopping a task is destructive: it may leave partial side effects behind.\n  Use it with care.\n- If the task has already finished, this tool simply returns its current\n  status.\n";
     TaskStopInputSchema$1 = external_exports.object({
       task_id: external_exports.string().describe("The background task ID to stop."),
       reason: external_exports.string().default("Stopped by TaskStop").describe("Short reason recorded when the task is stopped.").optional()
@@ -186226,7 +186614,7 @@ reason: ${result.stopReason ?? reason}`,
         };
       }
     };
-    cron_delete_default$1 = 'Cancel a scheduled cron job by id.\r\n\r\nUse this tool to remove a cron task previously scheduled with\r\n`CronCreate`. The `id` is the 8-hex value returned by `CronCreate`, or\r\nshown in the `id:` column of `CronList` \u2014 quote it verbatim, no\r\nprefix.\r\n\r\nBehaviour by task kind:\r\n\r\n- **Recurring task** (`recurring: true`): stops all future fires\r\n  immediately. The scheduler picks up the deletion on its next tick.\r\n- **One-shot task** (`recurring: false`): cancels the pending fire if\r\n  it has not happened yet. One-shots that have already fired\r\n  auto-delete themselves, so calling `CronDelete` on a fired one-shot\r\n  returns "no cron job with id ...".\r\n\r\nNot-found is reported as an error (not a silent no-op) so you can\r\ncorrect yourself \u2014 typically by calling `CronList` to see which ids\r\nare actually live, rather than re-trying with the same stale id.\r\n\r\nRefresh pattern (use when you want a stale recurring schedule to\r\ncontinue):\r\n\r\nStale recurring tasks are auto-deleted by the system after their final\r\nfire \u2014 there is nothing for `CronDelete` to remove at that point. To\r\nkeep the schedule running, just call `CronCreate` with the same `cron`\r\nand `prompt`. Use `CronList`\'s `prompt` field to recall the original\r\ntext after a context compaction.\r\n\r\n`CronDelete` remains the right call when you want to cancel a task\r\nthat is still live (recurring not yet stale, or a one-shot still\r\npending).\r\n\r\nGuidelines:\r\n\r\n- Users have no direct `/cron` command or self-service UI to delete\r\n  tasks themselves; they must ask the model to cancel a reminder.\r\n  When deleting on behalf of a user, confirm the action and report\r\n  the result plainly.\r\n- Cron deletion is irreversible \u2014 there is no undo. If you delete the\r\n  wrong task, you must re-create it with `CronCreate`.\r\n- If the model is unsure which id is current (e.g. after a context\r\n  compaction), call `CronList` first rather than guessing.\r\n';
+    cron_delete_default$1 = 'Cancel a scheduled cron job by id.\n\nUse this tool to remove a cron task previously scheduled with\n`CronCreate`. The `id` is the 8-hex value returned by `CronCreate`, or\nshown in the `id:` column of `CronList` \u2014 quote it verbatim, no\nprefix.\n\nBehaviour by task kind:\n\n- **Recurring task** (`recurring: true`): stops all future fires\n  immediately. The scheduler picks up the deletion on its next tick.\n- **One-shot task** (`recurring: false`): cancels the pending fire if\n  it has not happened yet. One-shots that have already fired\n  auto-delete themselves, so calling `CronDelete` on a fired one-shot\n  returns "no cron job with id ...".\n\nNot-found is reported as an error (not a silent no-op) so you can\ncorrect yourself \u2014 typically by calling `CronList` to see which ids\nare actually live, rather than re-trying with the same stale id.\n\nRefresh pattern (use when you want a stale recurring schedule to\ncontinue):\n\nStale recurring tasks are auto-deleted by the system after their final\nfire \u2014 there is nothing for `CronDelete` to remove at that point. To\nkeep the schedule running, just call `CronCreate` with the same `cron`\nand `prompt`. Use `CronList`\'s `prompt` field to recall the original\ntext after a context compaction.\n\n`CronDelete` remains the right call when you want to cancel a task\nthat is still live (recurring not yet stale, or a one-shot still\npending).\n\nGuidelines:\n\n- Users have no direct `/cron` command or self-service UI to delete\n  tasks themselves; they must ask the model to cancel a reminder.\n  When deleting on behalf of a user, confirm the action and report\n  the result plainly.\n- Cron deletion is irreversible \u2014 there is no undo. If you delete the\n  wrong task, you must re-create it with `CronCreate`.\n- If the model is unsure which id is current (e.g. after a context\n  compaction), call `CronList` first rather than guessing.\n';
     ID_PATTERN$1 = /^[0-9a-f]{8}$/;
     CronDeleteInputSchema$1 = external_exports.object({ id: external_exports.string().describe("The 8-hex cron job id returned by CronCreate / CronList.") });
     CronDeleteTool$1 = class {
@@ -188553,7 +188941,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
           let [o, h2] = ce(this.path);
           o && typeof h2 == "string" && (this.path = h2, r2 = o);
         }
-        this.win32 = !!i2.win32 || process.platform === "win32", this.win32 && (this.path = Ks(this.path.replaceAll(/\\/g, "/")), t2 = t2.replaceAll(/\\/g, "/")), this.absolute = f3(i2.absolute || $s.resolve(this.cwd, t2)), this.path === "" && (this.path = "./"), r2 && this.warn("TAR_ENTRY_INFO", `stripping ${r2} from absolute path`, {
+        this.win32 = !!i2.win32 || process.platform === "win32", this.win32 && (this.path = Ks(this.path.replaceAll(/\\/g, "/")), t2 = t2.replaceAll(/\\/g, "/")), this.absolute = f3(i2.absolute || path.resolve(this.cwd, t2)), this.path === "" && (this.path = "./"), r2 && this.warn("TAR_ENTRY_INFO", `stripping ${r2} from absolute path`, {
           entry: this,
           path: r2 + this.path
         });
@@ -188640,7 +189028,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
       }
       [Qs](t2) {
         if (!this.stat) throw new Error("cannot create link entry without stat");
-        this.type = "Link", this.linkpath = f3($s.relative(this.cwd, t2)), this.stat.size = 0, this[fe](), this.end();
+        this.type = "Link", this.linkpath = f3(path.relative(this.cwd, t2)), this.stat.size = 0, this[fe](), this.end();
       }
       [qs]() {
         if (!this.stat) throw new Error("cannot create file entry without stat");
@@ -189077,7 +189465,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         return t2 instanceof Yt ? this[er](t2) : this[hi](t2), this.flowing;
       }
       [er](t2) {
-        let e2 = f3($s.resolve(this.cwd, t2.path));
+        let e2 = f3(path.resolve(this.cwd, t2.path));
         if (!this.filter(t2.path, t2)) t2.resume();
         else {
           let i2 = new di(t2.path, e2);
@@ -189086,7 +189474,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         this[Ft]();
       }
       [hi](t2) {
-        let e2 = f3($s.resolve(this.cwd, t2));
+        let e2 = f3(path.resolve(this.cwd, t2));
         this[W].push(new di(t2, e2)), this[Ft]();
       }
       [as](t2) {
@@ -189239,7 +189627,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
     or = (s4, t2) => {
       t2.forEach((e2) => {
         e2.charAt(0) === "@" ? It({
-          file: path.resolve(s4.cwd, e2.slice(1)),
+          file: path$1.resolve(s4.cwd, e2.slice(1)),
           sync: true,
           noResume: true,
           onReadEntry: (i2) => s4.add(i2)
@@ -189248,7 +189636,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
     };
     hr = async (s4, t2) => {
       for (let e2 of t2) e2.charAt(0) === "@" ? await It({
-        file: path.resolve(String(s4.cwd), e2.slice(1)),
+        file: path$1.resolve(String(s4.cwd), e2.slice(1)),
         noResume: true,
         onReadEntry: (i2) => {
           s4.add(i2);
@@ -189288,11 +189676,11 @@ human_shell_hint: The pending question is also visible in /tasks.`,
       });
     };
     Xn = (s4, t2, e2, i2, r2) => {
-      if (t2.isDirectory()) ds(path.resolve(s4, t2.name), e2, i2, (n) => {
+      if (t2.isDirectory()) ds(path$1.resolve(s4, t2.name), e2, i2, (n) => {
         if (n) return r2(n);
-        ui(path.resolve(s4, t2.name), e2, i2, r2);
+        ui(path$1.resolve(s4, t2.name), e2, i2, r2);
       });
-      else ui(path.resolve(s4, t2.name), e2, i2, r2);
+      else ui(path$1.resolve(s4, t2.name), e2, i2, r2);
     };
     ds = (s4, t2, e2, i2) => {
       fsSync.readdir(s4, { withFileTypes: true }, (r2, n) => {
@@ -189311,7 +189699,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
       });
     };
     qn = (s4, t2, e2, i2) => {
-      t2.isDirectory() && us(path.resolve(s4, t2.name), e2, i2), fs$6(path.resolve(s4, t2.name), e2, i2);
+      t2.isDirectory() && us(path$1.resolve(s4, t2.name), e2, i2), fs$6(path$1.resolve(s4, t2.name), e2, i2);
     };
     us = (s4, t2, e2) => {
       let i2;
@@ -189364,11 +189752,11 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         mode: r2,
         recursive: true
       }).then((E) => S2(null, E ?? void 0), S2);
-      ms(d, f3(path.relative(d, s4)).split("/"), r2, c2, d, void 0, S2);
+      ms(d, f3(path$1.relative(d, s4)).split("/"), r2, c2, d, void 0, S2);
     };
     ms = (s4, t2, e2, i2, r2, n, o) => {
       if (t2.length === 0) return o(null, n);
-      let h2 = t2.shift(), a = f3(path.resolve(s4 + "/" + h2));
+      let h2 = t2.shift(), a = f3(path$1.resolve(s4 + "/" + h2));
       fsSync.mkdir(a, e2, wr(a, t2, e2, i2, r2, n, o));
     };
     wr = (s4, t2, e2, i2, r2, n, o) => (h2) => {
@@ -189405,9 +189793,9 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         mode: i2,
         recursive: true
       }) ?? void 0);
-      let T = f3(path.relative(c2, s4)).split("/"), N;
+      let T = f3(path$1.relative(c2, s4)).split("/"), N;
       for (let E = T.shift(), x3 = c2; E && (x3 += "/" + E); E = T.shift()) {
-        x3 = f3(path.resolve(x3));
+        x3 = f3(path$1.resolve(x3));
         try {
           fsSync.mkdirSync(x3, i2), N = N || x3;
         } catch {
@@ -189587,7 +189975,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
           if (t2.preserveOwner) throw new TypeError("cannot preserve owner in archive and also set owner explicitly");
           this.uid = t2.uid, this.gid = t2.gid, this.setOwner = true;
         } else this.uid = void 0, this.gid = void 0, this.setOwner = false;
-        this.preserveOwner = t2.preserveOwner === void 0 && typeof t2.uid != "number" ? !!(process.getuid && process.getuid() === 0) : !!t2.preserveOwner, this.processUid = (this.preserveOwner || this.setOwner) && process.getuid ? process.getuid() : void 0, this.processGid = (this.preserveOwner || this.setOwner) && process.getgid ? process.getgid() : void 0, this.maxDepth = typeof t2.maxDepth == "number" ? t2.maxDepth : no, this.forceChown = t2.forceChown === true, this.win32 = !!t2.win32 || Oe, this.newer = !!t2.newer, this.keep = !!t2.keep, this.noMtime = !!t2.noMtime, this.preservePaths = !!t2.preservePaths, this.unlink = !!t2.unlink, this.cwd = f3(path.resolve(t2.cwd || process.cwd())), this.strip = Number(t2.strip) || 0, this.processUmask = this.chmod ? typeof t2.processUmask == "number" ? t2.processUmask : _r() : 0, this.umask = typeof t2.umask == "number" ? t2.umask : this.processUmask, this.dmode = t2.dmode || 511 & ~this.umask, this.fmode = t2.fmode || 438 & ~this.umask, this.on("entry", (e2) => this[gr](e2));
+        this.preserveOwner = t2.preserveOwner === void 0 && typeof t2.uid != "number" ? !!(process.getuid && process.getuid() === 0) : !!t2.preserveOwner, this.processUid = (this.preserveOwner || this.setOwner) && process.getuid ? process.getuid() : void 0, this.processGid = (this.preserveOwner || this.setOwner) && process.getgid ? process.getgid() : void 0, this.maxDepth = typeof t2.maxDepth == "number" ? t2.maxDepth : no, this.forceChown = t2.forceChown === true, this.win32 = !!t2.win32 || Oe, this.newer = !!t2.newer, this.keep = !!t2.keep, this.noMtime = !!t2.noMtime, this.preservePaths = !!t2.preservePaths, this.unlink = !!t2.unlink, this.cwd = f3(path$1.resolve(t2.cwd || process.cwd())), this.strip = Number(t2.strip) || 0, this.processUmask = this.chmod ? typeof t2.processUmask == "number" ? t2.processUmask : _r() : 0, this.umask = typeof t2.umask == "number" ? t2.umask : this.processUmask, this.dmode = t2.dmode || 511 & ~this.umask, this.fmode = t2.fmode || 438 & ~this.umask, this.on("entry", (e2) => this[gr](e2));
       }
       warn(t2, e2, i2 = {}) {
         return (t2 === "TAR_BAD_ARCHIVE" || t2 === "TAR_ABORT") && (i2.recoverable = false), super.warn(t2, e2, i2);
@@ -189604,7 +189992,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
             entry: t2,
             [e2]: i2
           }), false;
-          let a = path.posix.dirname(t2.path), l = path.posix.normalize(path.posix.join(a, h2.join("/")));
+          let a = path$1.posix.dirname(t2.path), l = path$1.posix.normalize(path$1.posix.join(a, h2.join("/")));
           if (l.startsWith("../") || l === "..") return this.warn("TAR_ENTRY_ERROR", `${e2} escapes extraction directory`, {
             entry: t2,
             [e2]: i2
@@ -189633,7 +190021,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
           maxDepth: this.maxDepth
         }), false;
         if (!this[Es](t2, "path") || !this[Es](t2, "linkpath")) return false;
-        if (t2.absolute = path.isAbsolute(t2.path) ? f3(path.resolve(t2.path)) : f3(path.resolve(this.cwd, t2.path)), !this.preservePaths && typeof t2.absolute == "string" && t2.absolute.indexOf(this.cwd + "/") !== 0 && t2.absolute !== this.cwd) return this.warn("TAR_ENTRY_ERROR", "path escaped extraction target", {
+        if (t2.absolute = path$1.isAbsolute(t2.path) ? f3(path$1.resolve(t2.path)) : f3(path$1.resolve(this.cwd, t2.path)), !this.preservePaths && typeof t2.absolute == "string" && t2.absolute.indexOf(this.cwd + "/") !== 0 && t2.absolute !== this.cwd) return this.warn("TAR_ENTRY_ERROR", "path escaped extraction target", {
           entry: t2,
           path: f3(t2.path),
           resolvedPath: t2.absolute,
@@ -189641,9 +190029,9 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         }), false;
         if (t2.absolute === this.cwd && t2.type !== "Directory" && t2.type !== "GNUDumpDir") return false;
         if (this.win32) {
-          let { root: r2 } = path.win32.parse(String(t2.absolute));
+          let { root: r2 } = path$1.win32.parse(String(t2.absolute));
           t2.absolute = r2 + Xi(String(t2.absolute).slice(r2.length));
-          let { root: n } = path.win32.parse(t2.path);
+          let { root: n } = path$1.win32.parse(t2.path);
           t2.path = n + Xi(t2.path.slice(n.length));
         }
         return true;
@@ -189745,13 +190133,13 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         t2.unsupported = true, this.warn("TAR_ENTRY_UNSUPPORTED", `unsupported entry type: ${t2.type}`, { entry: t2 }), t2.resume();
       }
       [Tr](t2, e2) {
-        let i2 = f3(path.relative(this.cwd, path.resolve(path.dirname(String(t2.absolute)), String(t2.linkpath)))).split("/");
+        let i2 = f3(path$1.relative(this.cwd, path$1.resolve(path$1.dirname(String(t2.absolute)), String(t2.linkpath)))).split("/");
         this[ye](t2, this.cwd, i2, () => this[Si](t2, String(t2.linkpath), "symlink", e2), (r2) => {
           this[O$1](r2, t2), e2();
         });
       }
       [xr](t2, e2) {
-        let i2 = f3(path.resolve(this.cwd, String(t2.linkpath))), r2 = f3(String(t2.linkpath)).split("/");
+        let i2 = f3(path$1.resolve(this.cwd, String(t2.linkpath))), r2 = f3(String(t2.linkpath)).split("/");
         this[ye](t2, this.cwd, r2, () => this[Si](t2, i2, "link", e2), (n) => {
           this[O$1](n, t2), e2();
         });
@@ -189759,10 +190147,10 @@ human_shell_hint: The pending question is also visible in /tasks.`,
       [ye](t2, e2, i2, r2, n) {
         let o = i2.shift();
         if (this.preservePaths || o === void 0) return r2();
-        let h2 = path.resolve(e2, o);
+        let h2 = path$1.resolve(e2, o);
         fsSync.lstat(h2, (a, l) => {
           if (a) return r2();
-          if (l?.isSymbolicLink()) return n(new wt(h2, path.resolve(h2, i2.join("/"))));
+          if (l?.isSymbolicLink()) return n(new wt(h2, path$1.resolve(h2, i2.join("/"))));
           this[ye](t2, h2, i2, r2, n);
         });
       }
@@ -189796,7 +190184,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
           });
         }, n = () => {
           if (t2.absolute !== this.cwd) {
-            let h2 = f3(path.dirname(String(t2.absolute)));
+            let h2 = f3(path$1.dirname(String(t2.absolute)));
             if (h2 !== this.cwd) return this[St](h2, this.dmode, (a) => {
               if (a) {
                 this[O$1](a, t2), i2();
@@ -189871,7 +190259,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
           this[ge] = true;
         }
         if (t2.absolute !== this.cwd) {
-          let n = f3(path.dirname(String(t2.absolute)));
+          let n = f3(path$1.dirname(String(t2.absolute)));
           if (n !== this.cwd) {
             let o = this[St](n, this.dmode);
             if (o) return this[O$1](o, t2);
@@ -189981,10 +190369,10 @@ human_shell_hint: The pending question is also visible in /tasks.`,
         if (this.preservePaths || i2.length === 0) return r2();
         let o = e2;
         for (let h2 of i2) {
-          o = path.resolve(o, h2);
+          o = path$1.resolve(o, h2);
           let [a, l] = Se(() => fsSync.lstatSync(o));
           if (a) return r2();
-          if (l.isSymbolicLink()) return n(new wt(o, path.resolve(e2, i2.join("/"))));
+          if (l.isSymbolicLink()) return n(new wt(o, path$1.resolve(e2, i2.join("/"))));
         }
         r2();
       }
@@ -190101,7 +190489,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
     po = (s4, t2) => {
       t2.forEach((e2) => {
         e2.charAt(0) === "@" ? It({
-          file: path.resolve(s4.cwd, e2.slice(1)),
+          file: path$1.resolve(s4.cwd, e2.slice(1)),
           sync: true,
           noResume: true,
           onReadEntry: (i2) => s4.add(i2)
@@ -190110,7 +190498,7 @@ human_shell_hint: The pending question is also visible in /tasks.`,
     };
     Eo = async (s4, t2) => {
       for (let e2 of t2) e2.charAt(0) === "@" ? await It({
-        file: path.resolve(String(s4.cwd), e2.slice(1)),
+        file: path$1.resolve(String(s4.cwd), e2.slice(1)),
         noResume: true,
         onReadEntry: (i2) => s4.add(i2)
       }) : s4.add(e2);
@@ -191571,7 +191959,7 @@ ${finalMessage}`,
         };
       }
     };
-    grep_default$1 = "Search file contents using regular expressions (powered by ripgrep).\r\n\r\nUse Grep when the task is to find unknown content or unknown file locations. Do not use shell `grep` or `rg` directly; this tool applies workspace path policy, output limits, and sensitive-file filtering.\r\nALWAYS use Grep tool instead of running `grep` or `rg` from a shell \u2014 direct shell calls bypass workspace policy, output limits, and sensitive-file filtering.\r\nIf you already know a concrete file path and need to inspect its contents, use Read directly instead.\r\n\r\nWrite patterns in ripgrep regex syntax, which differs from POSIX `grep` syntax. For example, braces are special, so escape them as `\\{` to match a literal `{`.\r\n\r\nHidden files (dotfiles such as `.gitlab-ci.yml` or `.eslintrc.json`) are searched by default. To also search files excluded by `.gitignore` (such as `node_modules` or build outputs), set `include_ignored` to `true`. Sensitive files (such as `.env`) are always skipped for safety, even when `include_ignored` is `true`.\r\n";
+    grep_default$1 = "Search file contents using regular expressions (powered by ripgrep).\n\nUse Grep when the task is to find unknown content or unknown file locations. Do not use shell `grep` or `rg` directly; this tool applies workspace path policy, output limits, and sensitive-file filtering.\nALWAYS use Grep tool instead of running `grep` or `rg` from a shell \u2014 direct shell calls bypass workspace policy, output limits, and sensitive-file filtering.\nIf you already know a concrete file path and need to inspect its contents, use Read directly instead.\n\nWrite patterns in ripgrep regex syntax, which differs from POSIX `grep` syntax. For example, braces are special, so escape them as `\\{` to match a literal `{`.\n\nHidden files (dotfiles such as `.gitlab-ci.yml` or `.eslintrc.json`) are searched by default. To also search files excluded by `.gitignore` (such as `node_modules` or build outputs), set `include_ignored` to `true`. Sensitive files (such as `.env`) are always skipped for safety, even when `include_ignored` is `true`.\n";
     GrepInputSchema$1 = external_exports.object({
       pattern: external_exports.string().describe("Regular expression to search for."),
       path: external_exports.string().optional().describe("File or directory to search. Accepts an absolute path, or a path relative to the current working directory. Omit to search the current working directory. Use Read instead when you already know a concrete file path and need its contents."),
@@ -221292,7 +221680,7 @@ ${captureLines}` : capture.stack;
     }));
     require_which = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       const isWindows2 = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-      const path$3 = __require2("path");
+      const path$4 = __require2("path");
       const COLON2 = isWindows2 ? ";" : ":";
       const isexe = require_isexe();
       const getNotFoundError = (cmd) => Object.assign(/* @__PURE__ */ new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -221322,7 +221710,7 @@ ${captureLines}` : capture.stack;
           if (i2 === pathEnv.length) return opt.all && found.length ? resolve3(found) : reject(getNotFoundError(cmd));
           const ppRaw = pathEnv[i2];
           const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-          const pCmd = path$3.join(pathPart, cmd);
+          const pCmd = path$4.join(pathPart, cmd);
           resolve3(subStep(!pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd, i2, 0));
         });
         const subStep = (p2, i2, ii2) => new Promise((resolve3, reject) => {
@@ -221343,7 +221731,7 @@ ${captureLines}` : capture.stack;
         for (let i2 = 0; i2 < pathEnv.length; i2++) {
           const ppRaw = pathEnv[i2];
           const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-          const pCmd = path$3.join(pathPart, cmd);
+          const pCmd = path$4.join(pathPart, cmd);
           const p2 = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
           for (let j2 = 0; j2 < pathExt.length; j2++) {
             const cur = p2 + pathExt[j2];
@@ -221371,7 +221759,7 @@ ${captureLines}` : capture.stack;
       module.exports.default = pathKey;
     }));
     require_resolveCommand = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-      const path$2 = __require2("path");
+      const path$3 = __require2("path");
       const which = require_which();
       const getPathKey = require_path_key();
       function resolveCommandAttempt(parsed2, withoutPathExt) {
@@ -221387,13 +221775,13 @@ ${captureLines}` : capture.stack;
         try {
           resolved = which.sync(parsed2.command, {
             path: env2[getPathKey({ env: env2 })],
-            pathExt: withoutPathExt ? path$2.delimiter : void 0
+            pathExt: withoutPathExt ? path$3.delimiter : void 0
           });
         } catch (e2) {
         } finally {
           if (shouldSwitchCwd) process.chdir(cwd2);
         }
-        if (resolved) resolved = path$2.resolve(hasCustomCwd ? parsed2.options.cwd : "", resolved);
+        if (resolved) resolved = path$3.resolve(hasCustomCwd ? parsed2.options.cwd : "", resolved);
         return resolved;
       }
       function resolveCommand(parsed2) {
@@ -221451,7 +221839,7 @@ ${captureLines}` : capture.stack;
       module.exports = readShebang;
     }));
     require_parse$3 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-      const path$1 = __require2("path");
+      const path$2 = __require2("path");
       const resolveCommand = require_resolveCommand();
       const escape2 = require_escape();
       const readShebang = require_readShebang();
@@ -221474,7 +221862,7 @@ ${captureLines}` : capture.stack;
         const needsShell = !isExecutableRegExp.test(commandFile);
         if (parsed2.options.forceShell || needsShell) {
           const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
-          parsed2.command = path$1.normalize(parsed2.command);
+          parsed2.command = path$2.normalize(parsed2.command);
           parsed2.command = escape2.command(parsed2.command);
           parsed2.args = parsed2.args.map((arg) => escape2.argument(arg, needsDoubleEscapeMetaChars));
           parsed2.args = [
@@ -223691,7 +224079,7 @@ This supersedes any earlier plugin_session_start reminder in this session.`, {
       "config_file",
       "bootstrap"
     ];
-    INSTALLED_REL$1 = path.join("plugins", "installed.json");
+    INSTALLED_REL$1 = path$1.join("plugins", "installed.json");
     EMPTY$2 = {
       version: 1,
       plugins: []
@@ -223754,7 +224142,7 @@ This supersedes any earlier plugin_session_start reminder in this session.`, {
             sourceType = "zip-url";
           }
           const buffer = await downloadZip$1(zipUrl);
-          const tmpDir = await mkdtemp(path.join(tmpdir(), "kimi-plugin-zip-"));
+          const tmpDir = await mkdtemp(path$1.join(tmpdir(), "kimi-plugin-zip-"));
           try {
             const detectedRoot = await extractZip$1(buffer, tmpDir);
             parsed2 = await parseManifest$1(detectedRoot);
@@ -236893,7 +237281,7 @@ ${fallbackText}` : fallbackText;
               break;
             }
             const childRel = entry.relPath === "" ? d.name : `${entry.relPath}/${d.name}`;
-            const childAbs = path.join(entry.absPath, d.name);
+            const childAbs = path$1.join(entry.absPath, d.name);
             const fsEntry = await buildFsEntry$1(childRel, d.name, childAbs, d, false);
             if (entry.depthRemaining === req.depth) items.push(fsEntry);
             bucket.push(fsEntry);
@@ -236987,7 +237375,7 @@ ${fallbackText}` : fallbackText;
         } catch (err) {
           throw mapStatError(err, req.path);
         }
-        const name = safe.relative === "." ? path.basename(cwd2) : path.basename(safe.absolute);
+        const name = safe.relative === "." ? path$1.basename(cwd2) : path$1.basename(safe.absolute);
         return buildFsEntryFromStat(safe.relative, name, safe.absolute, st2, true);
       }
       async statMany(sessionId, req) {
@@ -236999,7 +237387,7 @@ ${fallbackText}` : fallbackText;
         const stats = await Promise.all(resolved.map(async ({ raw, safe }) => {
           try {
             const st2 = await promises$1.stat(safe.absolute);
-            const name = safe.relative === "." ? path.basename(cwd2) : path.basename(safe.absolute);
+            const name = safe.relative === "." ? path$1.basename(cwd2) : path$1.basename(safe.absolute);
             return {
               raw,
               entry: buildFsEntryFromStat(safe.relative, name, safe.absolute, st2, false)
@@ -237027,7 +237415,7 @@ ${fallbackText}` : fallbackText;
           throw err;
         }
         const st2 = await promises$1.stat(safe.absolute);
-        const name = path.basename(safe.absolute);
+        const name = path$1.basename(safe.absolute);
         return buildFsEntryFromStat(safe.relative, name, safe.absolute, st2, false);
       }
       async resolveDownload(sessionId, relPath) {
@@ -237072,7 +237460,7 @@ ${fallbackText}` : fallbackText;
         const ig = (0, import_ignore.default)();
         ig.add(".git/");
         try {
-          const contents = await promises$1.readFile(path.join(realCwd, ".gitignore"), "utf-8");
+          const contents = await promises$1.readFile(path$1.join(realCwd, ".gitignore"), "utf-8");
           ig.add(contents);
         } catch {
         }
@@ -237391,7 +237779,7 @@ ${fallbackText}` : fallbackText;
             break;
           }
           filesScanned += 1;
-          const abs = path.join(cwd2, rel);
+          const abs = path$1.join(cwd2, rel);
           let content;
           try {
             content = await promises$1.readFile(abs, "utf-8");
@@ -237440,7 +237828,7 @@ ${fallbackText}` : fallbackText;
         if (depth > WALK_MAX_DEPTH$1) return;
         let entries2;
         try {
-          entries2 = await promises$1.readdir(rootRel === "" ? rootAbs : path.join(rootAbs, ...rootRel.split("/")), { withFileTypes: true });
+          entries2 = await promises$1.readdir(rootRel === "" ? rootAbs : path$1.join(rootAbs, ...rootRel.split("/")), { withFileTypes: true });
         } catch {
           return;
         }
@@ -237462,7 +237850,7 @@ ${fallbackText}` : fallbackText;
         const ig = (0, import_ignore.default)();
         ig.add(".git/");
         try {
-          const contents = await promises$1.readFile(path.join(realCwd, ".gitignore"), "utf-8");
+          const contents = await promises$1.readFile(path$1.join(realCwd, ".gitignore"), "utf-8");
           ig.add(contents);
         } catch {
         }
@@ -240655,7 +241043,7 @@ ${fallbackText}` : fallbackText;
       */
       async _readTranscriptCached(sid, sessionDir) {
         try {
-          const info = await stat$2(path.join(sessionDir, "agents", MAIN_AGENT_ID$8, "wire.jsonl"));
+          const info = await stat$2(path$1.join(sessionDir, "agents", MAIN_AGENT_ID$8, "wire.jsonl"));
           const cached2 = this.transcriptCache.get(sid);
           if (cached2 !== void 0 && cached2.size === info.size && cached2.mtimeMs === info.mtimeMs) {
             this.transcriptCache.delete(sid);
@@ -243753,7 +244141,8 @@ ${fallbackText}` : fallbackText;
       AGENT_NOT_A_SUBAGENT: "agent.not_a_subagent",
       AGENT_NOT_OWNED: "agent.not_owned",
       AGENT_TYPE_NOT_ALLOWED: "agent.type_not_allowed",
-      AGENT_MAX_TOKENS_EXCEEDED: "agent.max_tokens_exceeded"
+      AGENT_MAX_TOKENS_EXCEEDED: "agent.max_tokens_exceeded",
+      AGENT_NO_FINAL_MESSAGE: "agent.no_final_message"
     } };
     registerErrorDomain(AgentLifecycleErrors);
     AuthErrors = {
@@ -250548,28 +250937,23 @@ ${graph.toString()}`;
     nullTelemetryAppender = {
       track: () => {
       },
-      withContext: () => nullTelemetryAppender,
-      setContext: () => {
-      },
       flush: () => {
       },
       shutdown: () => {
       }
     };
+    EMPTY_CONTEXT = Object.freeze({});
     noopTelemetryService = {
       _serviceBrand: void 0,
-      track: () => {
-      },
       track2: () => {
       },
       withContext: () => noopTelemetryService,
       setContext: () => {
       },
+      getContext: () => EMPTY_CONTEXT,
       addAppender: () => ({ dispose: () => {
       } }),
       removeAppender: () => {
-      },
-      setAppender: () => {
       },
       setEnabled: () => {
       },
@@ -254959,7 +255343,11 @@ ${content}`;
       keptUserMessageCount: external_exports.number().optional(),
       keptHeadUserMessageCount: external_exports.number().optional(),
       droppedCount: external_exports.number().optional(),
-      legacyTail: external_exports.boolean().optional()
+      legacyTail: external_exports.boolean().optional(),
+      wireLines: external_exports.object({
+        start: external_exports.number().int().nonnegative(),
+        end: external_exports.number().int().nonnegative()
+      }).optional()
     };
     contextApplyCompactionSchema = external_exports.union([
       external_exports.object({
@@ -255053,7 +255441,8 @@ ${content}`;
         "blocked"
       ]),
       error: external_exports.custom().optional(),
-      durationMs: external_exports.number().optional()
+      durationMs: external_exports.number().optional(),
+      stopReason: external_exports.string().optional()
     });
     TurnEnded = class extends AgentEvent2 {
       static type = "turn.ended";
@@ -255069,6 +255458,7 @@ ${content}`;
         };
         if (this.error !== void 0) record2["error"] = this.error;
         if (this.durationMs !== void 0) record2["durationMs"] = this.durationMs;
+        if (this.stopReason !== void 0) record2["stopReason"] = this.stopReason;
         record2["time"] = this.time;
         return record2;
       }
@@ -255197,22 +255587,10 @@ ${content}`;
     });
     RETENTION_DOC_SCOPE = "file-history";
     touchQueues = /* @__PURE__ */ new Map();
-    contributedFlags = [];
-    IFlagRegistry = createDecorator("flagRegistry");
-    FILE_HISTORY_FLAG_ID = "file_history";
-    registerFlagDefinition({
-      id: FILE_HISTORY_FLAG_ID,
-      title: "Turn-level file history",
-      description: "Record each turn's edited files \u2014 their content from before the first edit and after the turn ends, kept for the last five editing turns of the thirty most recently active sessions per workspace \u2014 so per-turn file diffs come from real whole-file snapshots instead of tool-argument reconstruction. Enabling this stores plain copies of edited file content inside the session data directory.",
-      env: "KIMI_CODE_EXPERIMENTAL_FILE_HISTORY",
-      default: false,
-      surface: "core"
-    });
     AgentFileHistoryService = class AgentFileHistoryService2 extends Service {
       agentCtx;
       agentState;
       dispatcher;
-      flags;
       runtime;
       blobs;
       workspaceCtx;
@@ -255223,12 +255601,11 @@ ${content}`;
       queue = Promise.resolve();
       activeTurnId;
       orphanSweepDone = false;
-      constructor(agentCtx, agentState, toolExecutor, eventBus, dispatcher, flags, runtime, blobs, workspaceCtx, sessionCtx, docs, hostFs, agentLifecycle) {
+      constructor(agentCtx, agentState, toolExecutor, eventBus, dispatcher, runtime, blobs, workspaceCtx, sessionCtx, docs, hostFs, agentLifecycle) {
         super();
         this.agentCtx = agentCtx;
         this.agentState = agentState;
         this.dispatcher = dispatcher;
-        this.flags = flags;
         this.runtime = runtime;
         this.blobs = blobs;
         this.workspaceCtx = workspaceCtx;
@@ -255249,13 +255626,9 @@ ${content}`;
         this._register(eventBus.subscribe(TurnEnded, (event) => {
           if (event.agentId !== this.agentCtx.agentId) return;
           if (this.activeTurnId === event.turnId) this.activeTurnId = void 0;
-          if (!this.enabled()) return;
           this.enqueue(() => this.endCheckpoint(event.turnId));
         }));
         this.effect(() => () => this.queue, "fileHistory:drain");
-      }
-      enabled() {
-        return this.flags.enabled(FILE_HISTORY_FLAG_ID);
       }
       history() {
         return this.agentState.get(fileHistoryKey);
@@ -255264,11 +255637,9 @@ ${content}`;
         return this.queue;
       }
       changes(turnId) {
-        if (!this.enabled()) return Promise.resolve([]);
         return this.enqueueValue(() => this.readChanges(turnId));
       }
       turnRecorded(turnId) {
-        if (!this.enabled()) return Promise.resolve(false);
         return this.enqueueValue(async () => {
           const state = this.history();
           const index = state.checkpoints.findIndex((c2) => c2.turnId === turnId && checkpointPhaseOf(c2) === "start");
@@ -255276,13 +255647,10 @@ ${content}`;
           const end = state.checkpoints.find((c2) => c2.turnId === turnId && checkpointPhaseOf(c2) === "end");
           const live = end === void 0 && index === state.checkpoints.length - 1 && this.activeTurnId === turnId;
           if (end === void 0 && !live) return false;
-          const entries2 = {
-            ...state.checkpoints[index].entries,
-            ...end?.entries
-          };
-          const keyed = Object.values(entries2).find((entry) => entry.key !== null);
-          if (keyed?.key === null || keyed?.key === void 0) return true;
-          return this.blobs.has(this.agentCtx.scope(), keyed.key);
+          const keys2 = /* @__PURE__ */ new Set();
+          for (const entry of [...Object.values(state.checkpoints[index].entries), ...Object.values(end?.entries ?? {})]) if (entry.key !== null) keys2.add(entry.key);
+          for (const key2 of keys2) if (!await this.blobs.has(this.agentCtx.scope(), key2)) return false;
+          return true;
         });
       }
       async readChanges(turnId) {
@@ -255359,7 +255727,6 @@ ${content}`;
         return changes;
       }
       contentAt(turnId, path2, phase = "start") {
-        if (!this.enabled()) return Promise.resolve(void 0);
         return this.enqueueValue(() => this.readContentAt(turnId, path2, phase));
       }
       async readContentAt(turnId, path2, phase) {
@@ -255388,13 +255755,11 @@ ${content}`;
         };
       }
       onWillExecuteTool(event) {
-        if (!this.enabled()) return;
         const path2 = editTargetPath(event.execution.display);
         if (path2 === void 0) return;
         event.waitUntil(this.enqueue(() => this.capture(path2, event.turnId)));
       }
       onSubagentWillExecuteTool(event) {
-        if (!this.enabled()) return;
         const path2 = editTargetPath(event.execution.display);
         if (path2 === void 0) return;
         const main = this.agentLifecycle.handleOf(MAIN_AGENT_ID$1);
@@ -255403,7 +255768,7 @@ ${content}`;
       }
       captureForActiveTurn(path2) {
         const turnId = this.activeTurnId;
-        if (!this.enabled() || turnId === void 0) return Promise.resolve();
+        if (turnId === void 0) return Promise.resolve();
         return this.enqueue(() => this.capture(path2, turnId));
       }
       enqueue(op) {
@@ -255602,14 +255967,13 @@ ${content}`;
       __decorateParam(2, IAgentToolExecutorService),
       __decorateParam(3, IEventBus),
       __decorateParam(4, IEventDispatcher),
-      __decorateParam(5, IFlagService),
-      __decorateParam(6, IAgentRuntimeService),
-      __decorateParam(7, IBlobStore),
-      __decorateParam(8, ISessionWorkspaceContext),
-      __decorateParam(9, ISessionContext),
-      __decorateParam(10, IAtomicDocumentStore),
-      __decorateParam(11, IHostFileSystem),
-      __decorateParam(12, IAgentLifecycleService)
+      __decorateParam(5, IAgentRuntimeService),
+      __decorateParam(6, IBlobStore),
+      __decorateParam(7, ISessionWorkspaceContext),
+      __decorateParam(8, ISessionContext),
+      __decorateParam(9, IAtomicDocumentStore),
+      __decorateParam(10, IHostFileSystem),
+      __decorateParam(11, IAgentLifecycleService)
     ], AgentFileHistoryService);
     LCS_CELL_BUDGET = 4e6;
     LCS_AGGREGATE_CELL_BUDGET = 16e6;
@@ -255626,6 +255990,155 @@ ${content}`;
     META_SCOPE = "session-meta";
     META_KEY$1 = "state.json";
     MTIME_SCAN_CONCURRENCY = 16;
+    WIRE_SESSION_ID_PROPERTY = "sessionId";
+    TelemetryService = class {
+      appenders = [nullTelemetryAppender];
+      context = {};
+      enabled = true;
+      track2(event, properties) {
+        this.dispatch(event, this.ambient(), properties);
+      }
+      withContext(patch) {
+        return new TelemetrySnapshotView(this, applyPatch(this.ambient(), patch));
+      }
+      setContext(patch) {
+        applyPatch(this.context, patch);
+      }
+      getContext() {
+        return this.ambient();
+      }
+      createScopeBinding(seed) {
+        const bound = new BoundTelemetryService(this, this, applyPatch({}, seed));
+        return {
+          telemetry: bound,
+          dispose: () => bound.dispose()
+        };
+      }
+      addAppender(appender) {
+        this.appenders.push(appender);
+        return toDisposable(() => this.removeAppender(appender));
+      }
+      removeAppender(appender) {
+        this.appenders = this.appenders.filter((a) => a !== appender);
+      }
+      setEnabled(enabled) {
+        this.enabled = enabled;
+      }
+      async flush() {
+        await Promise.all(this.appenders.map((appender) => Promise.resolve(appender.flush?.()).catch(onUnexpectedError)));
+      }
+      async shutdown() {
+        await Promise.all(this.appenders.map((appender) => Promise.resolve(appender.shutdown?.()).catch(onUnexpectedError)));
+      }
+      ambient() {
+        return { ...this.context };
+      }
+      dispatch(event, ambient, properties) {
+        if (!this.enabled) return;
+        const record2 = {
+          event,
+          context: { ...ambient },
+          properties: composeTelemetryProperties(ambient, properties)
+        };
+        for (const appender of this.appenders) try {
+          appender.track(record2);
+        } catch (err) {
+          onUnexpectedError(err);
+        }
+      }
+    };
+    BoundTelemetryService = class BoundTelemetryService2 {
+      root;
+      parent;
+      fragment;
+      disposed = false;
+      constructor(root, parent, fragment) {
+        this.root = root;
+        this.parent = parent;
+        this.fragment = fragment;
+      }
+      ambient() {
+        const inherited = this.parent.ambient();
+        if (this.disposed) return inherited;
+        return {
+          ...inherited,
+          ...this.fragment
+        };
+      }
+      track2(event, properties) {
+        this.root.dispatch(event, this.ambient(), properties);
+      }
+      withContext(patch) {
+        return new TelemetrySnapshotView(this.root, applyPatch(this.ambient(), patch));
+      }
+      setContext(patch) {
+        if (!this.disposed) applyPatch(this.fragment, patch);
+      }
+      getContext() {
+        return this.ambient();
+      }
+      createScopeBinding(seed) {
+        const bound = new BoundTelemetryService2(this.root, this, applyPatch({}, seed));
+        return {
+          telemetry: bound,
+          dispose: () => bound.dispose()
+        };
+      }
+      addAppender(appender) {
+        return this.root.addAppender(appender);
+      }
+      removeAppender(appender) {
+        this.root.removeAppender(appender);
+      }
+      setEnabled(enabled) {
+        this.root.setEnabled(enabled);
+      }
+      flush() {
+        return this.root.flush();
+      }
+      shutdown() {
+        return this.root.shutdown();
+      }
+      dispose() {
+        this.disposed = true;
+      }
+    };
+    TelemetrySnapshotView = class TelemetrySnapshotView2 {
+      root;
+      context;
+      constructor(root, context) {
+        this.root = root;
+        this.context = { ...context };
+      }
+      track2(event, properties) {
+        this.root.dispatch(event, this.context, properties);
+      }
+      withContext(patch) {
+        return new TelemetrySnapshotView2(this.root, applyPatch({ ...this.context }, patch));
+      }
+      setContext(patch) {
+        applyPatch(this.context, patch);
+      }
+      getContext() {
+        return { ...this.context };
+      }
+      addAppender(appender) {
+        return this.root.addAppender(appender);
+      }
+      removeAppender(appender) {
+        this.root.removeAppender(appender);
+      }
+      setEnabled(enabled) {
+        this.root.setEnabled(enabled);
+      }
+      flush() {
+        return this.root.flush();
+      }
+      shutdown() {
+        return this.root.shutdown();
+      }
+    };
+    registerScopedService("app", ITelemetryService, TelemetryService, 0, "telemetry");
     ISessionAgentProfileCatalogSeed = createDecorator("sessionAgentProfileCatalogSeed");
     ISessionMetadata = createDecorator("sessionMetadata");
     ISessionSkillCatalogData = createDecorator("sessionSkillCatalogData");
@@ -256207,33 +256720,41 @@ ${content}`;
           cwd: opts.workDir,
           scope: (subKey) => subKey === void 0 || subKey === "" ? sessionScope : `${sessionScope}/${subKey}`
         };
-        const handle = createScopedChildHandle(this.instantiation, "session", opts.sessionId, {
-          seeds: [
-            ...sessionContextSeed(ctx),
-            [ITelemetryService, this.telemetry.withContext({ sessionId: opts.sessionId })],
-            ...sessionAgentProfileCatalogSeed({
-              _serviceBrand: void 0,
-              workspaceKey: workspaceId
-            }),
-            [ISessionSkillCatalogData, this.workspaceSkillCatalog.sessionData()],
-            [ISessionInstructionsProvider, this.workspaceInstructions.sessionProvider()],
-            [ISessionMcpHandle, this.workspaceMcp.sessionHandle()],
-            [ISessionWorkspaceInfo, this.workspaceDirs.sessionInfo()],
-            ...sessionEphemeralMcpServersSeed(opts.mcpServers ?? {})
-          ],
-          configureContainer: (container) => {
-            this._onWillCreateSession.fire({
-              sessionId: opts.sessionId,
-              readSeed: (id) => container.invokeFunction((accessor) => accessor.get(id)),
-              contributeSeed: (id, value) => {
-                container.provide(id, value);
-              },
-              onSessionDispose: (dispose2) => {
-                container.anchorKernelEntry(dispose2, "sessionLifecycle:willCreateParticipant");
-              }
-            });
-          }
-        });
+        const telemetryBinding = bindTelemetryScope(this.telemetry, { session_id: opts.sessionId });
+        let handle;
+        try {
+          handle = createScopedChildHandle(this.instantiation, "session", opts.sessionId, {
+            seeds: [
+              ...sessionContextSeed(ctx),
+              [ITelemetryService, telemetryBinding.telemetry],
+              ...sessionAgentProfileCatalogSeed({
+                _serviceBrand: void 0,
+                workspaceKey: workspaceId
+              }),
+              [ISessionSkillCatalogData, this.workspaceSkillCatalog.sessionData()],
+              [ISessionInstructionsProvider, this.workspaceInstructions.sessionProvider()],
+              [ISessionMcpHandle, this.workspaceMcp.sessionHandle()],
+              [ISessionWorkspaceInfo, this.workspaceDirs.sessionInfo()],
+              ...sessionEphemeralMcpServersSeed(opts.mcpServers ?? {})
+            ],
+            configureContainer: (container) => {
+              container.anchorKernelEntry(() => telemetryBinding.dispose(), "telemetry:session-context");
+              this._onWillCreateSession.fire({
+                sessionId: opts.sessionId,
+                readSeed: (id) => container.invokeFunction((accessor) => accessor.get(id)),
+                contributeSeed: (id, value) => {
+                  container.provide(id, value);
+                },
+                onSessionDispose: (dispose2) => {
+                  container.anchorKernelEntry(dispose2, "sessionLifecycle:willCreateParticipant");
+                }
+              });
+            }
+          });
+        } catch (error48) {
+          telemetryBinding.dispose();
+          throw error48;
+        }
         try {
           await handle.accessor.get(ISessionMetadata).ready;
           await handle.accessor.get(ISessionToolPolicy).ready;
@@ -256279,7 +256800,7 @@ ${content}`;
         if (live !== void 0) return Promise.resolve(live);
         this.resumeFailures.delete(sessionId);
         const promise2 = this.doResume(sessionId, opts).catch((error48) => {
-          this.telemetry.withContext({ sessionId }).track2("session_load_failed", { reason: isError2(error48) ? error48.code : error48 instanceof Error ? error48.name : "unknown" });
+          this.telemetry.withContext({ session_id: sessionId }).track2("session_load_failed", { reason: isError2(error48) ? error48.code : error48 instanceof Error ? error48.name : "unknown" });
           this.resumeFailures.set(sessionId, error48 instanceof Error ? error48 : /* @__PURE__ */ new Error("session resume failed"));
           throw error48;
         }).finally(() => this.resuming.delete(sessionId));
@@ -256339,7 +256860,7 @@ ${content}`;
         handle.dispose();
         await drainLogCloses();
         this._onDidCloseSession.fire({ sessionId });
-        this.telemetry.withContext({ sessionId }).track2("session_ended", { reason: "exit" });
+        this.telemetry.withContext({ session_id: sessionId }).track2("session_ended", { reason: "exit" });
       }
       async archive(sessionId) {
         const handle = this.sessions.get(sessionId);
@@ -256362,7 +256883,7 @@ ${content}`;
         handle.dispose();
         await drainLogCloses();
         this._onDidArchiveSession.fire({ sessionId });
-        this.telemetry.withContext({ sessionId }).track2("session_ended", { reason: "archive" });
+        this.telemetry.withContext({ session_id: sessionId }).track2("session_ended", { reason: "archive" });
       }
       async restore(sessionId, opts) {
         const handle = await this.resume(sessionId, opts);
@@ -257260,6 +257781,8 @@ ${content}`;
       logger;
       telemetry;
       wireScope;
+      lines = 0;
+      lastClearLine;
       agentId;
       persistQueue;
       pendingRepair;
@@ -257310,15 +257833,19 @@ ${content}`;
         let rewrittenRecords;
         let newerWireVersion = false;
         let recordIndex = 0;
+        let lineCount = 0;
         let hasRecords = false;
         let legacyPlanRevisionMigrated = false;
         for await (const candidate of source) {
+          lineCount++;
+          this.lines = lineCount;
           const sourceRecord = candidate;
           if (!isWireRecord(sourceRecord)) {
             this.reportSkippedRecord(void 0, recordIndex, true);
             recordIndex++;
             continue;
           }
+          if (sourceRecord.type === "context.clear") this.lastClearLine = lineCount;
           if (!hasRecords) {
             hasRecords = true;
             if (sourceRecord.type !== "metadata") {
@@ -257352,7 +257879,20 @@ ${content}`;
         if (legacyPlanRevisionMigrated && rewrittenRecords === void 0) rewrittenRecords = await this.rebuildRewriteRecords(migrations, newerWireVersion);
         if (!hasRecords) rewrittenRecords = [createWireMetadataRecord()];
         if (truncation !== void 0) await this.repairJournal(truncation, rewrittenRecords);
-        else if (rewrittenRecords !== void 0) await this.log.rewrite(this.wireScope, AGENT_WIRE_RECORD_KEY, rewrittenRecords);
+        else if (rewrittenRecords !== void 0) {
+          await this.log.rewrite(this.wireScope, AGENT_WIRE_RECORD_KEY, rewrittenRecords);
+          this.lines = rewrittenRecords.length;
+          this.lastClearLine = lastContextClearLineOf(rewrittenRecords);
+        }
+      }
+      lineCount() {
+        return this.lines;
+      }
+      lastContextClearLine() {
+        return this.lastClearLine;
+      }
+      journalPath() {
+        return this.storage.pathFor(this.wireScope, AGENT_WIRE_RECORD_KEY);
       }
       async repairJournal(truncation, rewrittenRecords) {
         let records = rewrittenRecords ?? [];
@@ -257371,6 +257911,10 @@ ${content}`;
           records,
           truncation
         } : void 0;
+        if (outcome !== "failed") {
+          this.lines = records.length;
+          this.lastClearLine = lastContextClearLineOf(records);
+        }
       }
       async repairPendingJournal() {
         const pending = this.pendingRepair;
@@ -257446,6 +257990,8 @@ ${content}`;
       }
       appendRecordLow(record2) {
         this.log.append(this.wireScope, AGENT_WIRE_RECORD_KEY, record2, { onError: onUnexpectedError });
+        this.lines += 1;
+        if (record2.type === "context.clear") this.lastClearLine = this.lines;
       }
     };
     WireService = __decorate([
@@ -257499,120 +258045,6 @@ ${content}`;
       __decorateParam(2, ISessionContext)
     ], SessionLogService);
     registerScopedService("session", ILogService, SessionLogService, 0, "log");
-    TelemetryService = class {
-      appenders = [nullTelemetryAppender];
-      context = {};
-      enabled = true;
-      track(event, properties) {
-        if (!this.enabled) return;
-        const merged = {
-          ...this.context,
-          ...properties
-        };
-        for (const appender of this.appenders) try {
-          appender.track(event, merged);
-        } catch (err) {
-          onUnexpectedError(err);
-        }
-      }
-      track2(event, properties) {
-        this.track(event, properties);
-      }
-      withContext(patch) {
-        return new TelemetryContextView(this, patch);
-      }
-      setContext(patch) {
-        this.context = {
-          ...this.context,
-          ...patch
-        };
-        for (const appender of this.appenders) appender.setContext?.(patch);
-      }
-      addAppender(appender) {
-        this.appenders.push(appender);
-        return toDisposable(() => this.removeAppender(appender));
-      }
-      removeAppender(appender) {
-        this.appenders = this.appenders.filter((a) => a !== appender);
-      }
-      setAppender(appender) {
-        this.appenders = [appender];
-      }
-      setEnabled(enabled) {
-        this.enabled = enabled;
-      }
-      async flush() {
-        await Promise.all(this.appenders.map((appender) => Promise.resolve(appender.flush?.()).catch(onUnexpectedError)));
-      }
-      async shutdown() {
-        await Promise.all(this.appenders.map((appender) => Promise.resolve(appender.shutdown?.()).catch(onUnexpectedError)));
-      }
-    };
-    TelemetryContextView = class TelemetryContextView2 {
-      root;
-      context;
-      constructor(root, context) {
-        this.root = root;
-        this.context = context;
-      }
-      track(event, properties) {
-        this.root.track(event, {
-          ...this.context,
-          ...properties
-        });
-      }
-      track2(event, properties) {
-        this.track(event, properties);
-      }
-      withContext(patch) {
-        return new TelemetryContextView2(this.root, {
-          ...this.context,
-          ...patch
-        });
-      }
-      setContext(patch) {
-        this.context = {
-          ...this.context,
-          ...patch
-        };
-      }
-      addAppender(appender) {
-        return this.root.addAppender(appender);
-      }
-      removeAppender(appender) {
-        this.root.removeAppender(appender);
-      }
-      setAppender(appender) {
-        this.root.setAppender(appender);
-      }
-      setEnabled(enabled) {
-        this.root.setEnabled(enabled);
-      }
-      flush() {
-        return this.root.flush();
-      }
-      shutdown() {
-        return this.root.shutdown();
-      }
-    };
-    registerScopedService("app", ITelemetryService, TelemetryService, 0, "telemetry");
-    IAgentTelemetryContextService = createDecorator("agentTelemetryContextService");
-    AgentTelemetryContextService = class {
-      context;
-      constructor() {
-        this.context = { mode: "agent" };
-      }
-      get() {
-        return this.context;
-      }
-      set(patch) {
-        this.context = {
-          ...this.context,
-          ...patch
-        };
-      }
-    };
-    registerScopedService("agent", IAgentTelemetryContextService, AgentTelemetryContextService, 0, "telemetry");
     KIMI_REGION_PROFILES["mainland-cn"].telemetryEndpoint;
     new TextEncoder();
     new TextDecoder();
@@ -259530,6 +259962,7 @@ ${foregroundOutput}`,
     MAX_LINES = 1e3;
     MAX_LINE_LENGTH = 2e3;
     MAX_BYTES = 100 * 1024;
+    EVENT_LOG_MAX_LINE_LENGTH = 15e4;
     TRANSCODE_MAX_BYTES = 10 * 1024 * 1024;
     PositiveLineOffsetSchema = external_exports.number().int().min(1);
     TailLineOffsetSchema = external_exports.number().int().min(-MAX_LINES).max(-1);
@@ -259544,7 +259977,7 @@ ${foregroundOutput}`,
     });
     IReadTool = createDecorator("readTool");
     IAgentToolResultTruncationService = createDecorator("agentToolResultTruncationService");
-    read_default = "Read a text file from the local filesystem.\n\nIf the user provides a concrete file path to a text file, call Read directly. Do not `Glob`, `ls`, or otherwise pre-check known text file paths; missing or invalid file paths return errors you can handle. Do not use Read for directories; use `ls` via Bash for a known directory, or Glob when you need files matching a name pattern (Glob lists files only, never directories). Use `Grep` only when the task is to search for unknown content or locations.\n\nWhen you need several files, prefer to read them in parallel: emit multiple `Read` calls in a single response instead of reading one file per turn.\n\n- Relative paths resolve against the working directory; a path outside the working directory must be absolute.\n- Returns up to ${MAX_LINES} lines or ${MAX_BYTES_KB} KB per call, whichever comes first; lines longer than ${MAX_LINE_LENGTH} chars are truncated mid-line (recover the elided content with Bash, e.g. `cut` or `sed`).\n- Page larger files with `line_offset` (1-based start line) and `n_lines`. Omit `n_lines` to read up to the ${MAX_LINES}-line cap.\n- Sensitive files (`.env` files, credential stores, SSH private keys, and similar secrets) are refused to protect secrets; do not attempt to read them. Templates and public keys are exempt: `.env.example` / `.env.sample` / `.env.template` and public SSH keys such as `id_rsa.pub` read normally.\n- UTF-8 text files are read directly. UTF-16 LE/BE text files (with or without a BOM) are detected automatically and transcoded to UTF-8 for display; the status block notes the detected encoding, and Edit/Write on such a file still expect UTF-8 \u2014 convert its encoding first (e.g. with `iconv`). Other encodings (e.g. GBK), binary files, and files containing NUL bytes are refused.\n- Negative line_offset reads from the end of the file (for example, -100 reads the last 100 lines); the absolute value cannot exceed ${MAX_LINES}.\n- Output format: `<line-number>\\t<content>` per line.\n- A `<system>...</system>` status block is appended after the file content; it summarizes how much was read (line and byte counts, truncation, line-ending notes) and is not part of the file itself.\n- Pure CRLF files are displayed with LF line endings; `Edit` matches this output and preserves CRLF when writing back.\n- Mixed or lone carriage-return line endings are shown as `\\r` and require exact `Edit.old_string` escapes.\n- After a successful `Edit`/`Write`, do not re-read solely to prove the write landed. When the task depends on an exact file, API, or output shape, inspect the final external contract before finishing.\n";
+    read_default = "Read a text file from the local filesystem.\n\nIf the user provides a concrete file path to a text file, call Read directly. Do not `Glob`, `ls`, or otherwise pre-check known text file paths; missing or invalid file paths return errors you can handle. Do not use Read for directories; use `ls` via Bash for a known directory, or Glob when you need files matching a name pattern (Glob lists files only, never directories). Use `Grep` only when the task is to search for unknown content or locations.\n\nWhen you need several files, prefer to read them in parallel: emit multiple `Read` calls in a single response instead of reading one file per turn.\n\n- Relative paths resolve against the working directory; a path outside the working directory must be absolute.\n- Returns up to ${MAX_LINES} lines or ${MAX_BYTES_KB} KB per call, whichever comes first; lines longer than ${MAX_LINE_LENGTH} chars are truncated mid-line (recover the elided content with Bash, e.g. `cut` or `sed`).\n- Page larger files with `line_offset` (1-based start line) and `n_lines`. Omit `n_lines` to read up to the ${MAX_LINES}-line cap.\n- Kimi Code agent event logs (`wire.jsonl` under the sessions directory) are returned with whole lines (up to ~150k chars per record); read them one record at a time with `n_lines=1` after locating the line with Grep.\n- Sensitive files (`.env` files, credential stores, SSH private keys, and similar secrets) are refused to protect secrets; do not attempt to read them. Templates and public keys are exempt: `.env.example` / `.env.sample` / `.env.template` and public SSH keys such as `id_rsa.pub` read normally.\n- UTF-8 text files are read directly. UTF-16 LE/BE text files (with or without a BOM) are detected automatically and transcoded to UTF-8 for display; the status block notes the detected encoding, and Edit/Write on such a file still expect UTF-8 \u2014 convert its encoding first (e.g. with `iconv`). Other encodings (e.g. GBK), binary files, and files containing NUL bytes are refused.\n- Negative line_offset reads from the end of the file (for example, -100 reads the last 100 lines); the absolute value cannot exceed ${MAX_LINES}.\n- Output format: `<line-number>\\t<content>` per line.\n- A `<system>...</system>` status block is appended after the file content; it summarizes how much was read (line and byte counts, truncation, line-ending notes) and is not part of the file itself.\n- Pure CRLF files are displayed with LF line endings; `Edit` matches this output and preserves CRLF when writing back.\n- Mixed or lone carriage-return line endings are shown as `\\r` and require exact `Edit.old_string` escapes.\n- After a successful `Edit`/`Write`, do not re-read solely to prove the write landed. When the task depends on an exact file, API, or output shape, inspect the final external contract before finishing.\n";
     READ_DESCRIPTION = renderPrompt(read_default, {
       MAX_LINES,
       MAX_BYTES_KB: MAX_BYTES / 1024,
@@ -259608,8 +260041,9 @@ ${foregroundOutput}`,
                 isError: true,
                 output: "Runtime changed before execution. Retry the tool call."
               };
-              const result = await this.execution(lease.runtime.fs, args, path2);
-              return this.resultTruncation.isSpillFilePath(path2) ? {
+              const eventLog = this.resultTruncation.isWireJournalPath(path2);
+              const result = await this.execution(lease.runtime.fs, args, path2, eventLog);
+              return eventLog || this.resultTruncation.isSpillFilePath(path2) ? {
                 ...result,
                 spillExempt: true
               } : result;
@@ -259619,7 +260053,7 @@ ${foregroundOutput}`,
           }
         };
       }
-      async execution(fs2, args, safePath) {
+      async execution(fs2, args, safePath, eventLog) {
         try {
           let stat4;
           try {
@@ -259660,8 +260094,8 @@ ${foregroundOutput}`,
           const lineOffset = args.line_offset ?? 1;
           const requestedLines = args.n_lines ?? 1e3;
           const effectiveLimit = Math.min(requestedLines, MAX_LINES);
-          if (lineOffset < 0) return await this.readTail(args.path, lines, lineOffset, effectiveLimit, requestedLines, detectedEncoding);
-          return await this.readForward(args.path, lines, lineOffset, effectiveLimit, requestedLines, detectedEncoding);
+          if (lineOffset < 0) return await this.readTail(args.path, lines, lineOffset, effectiveLimit, requestedLines, eventLog, detectedEncoding);
+          return await this.readForward(args.path, lines, lineOffset, effectiveLimit, requestedLines, eventLog, detectedEncoding);
         } catch (error48) {
           if (isTextDecodeError(error48)) return {
             isError: true,
@@ -259673,7 +260107,7 @@ ${foregroundOutput}`,
           };
         }
       }
-      async readForward(displayPath, lines, lineOffset, effectiveLimit, requestedLines, detectedEncoding) {
+      async readForward(displayPath, lines, lineOffset, effectiveLimit, requestedLines, eventLog, detectedEncoding) {
         const selectedEntries = [];
         const flags = {
           hasCrLf: false,
@@ -259707,7 +260141,7 @@ ${foregroundOutput}`,
           if (selectedEntries.length >= effectiveLimit) collectionClosed = true;
         }
         const lineEndingStyle = lineEndingStyleFromFlags(flags);
-        const rendered = renderEntries(selectedEntries, lineEndingStyle);
+        const rendered = renderEntries(selectedEntries, lineEndingStyle, lineLengthLimit(eventLog));
         return this.finishReadResult({
           renderedLines: rendered.renderedLines,
           truncatedLineNumbers: rendered.truncatedLineNumbers,
@@ -259717,10 +260151,11 @@ ${foregroundOutput}`,
           startLine: selectedEntries.length > 0 ? lineOffset : 0,
           totalLines: currentLineNo,
           requestedLines,
-          detectedEncoding
+          detectedEncoding,
+          eventLog
         });
       }
-      async readTail(displayPath, lines, lineOffset, effectiveLimit, requestedLines, detectedEncoding) {
+      async readTail(displayPath, lines, lineOffset, effectiveLimit, requestedLines, eventLog, detectedEncoding) {
         const tailCount = Math.abs(lineOffset);
         const entries2 = [];
         const flags = {
@@ -259748,15 +260183,17 @@ ${foregroundOutput}`,
           effectiveLimit,
           totalLines: currentLineNo,
           requestedLines,
+          eventLog,
           detectedEncoding
         });
       }
       finishTailEntries(input) {
         const lineEndingStyle = lineEndingStyleFromFlags(input.lineEndingFlags);
+        const maxLineLength = lineLengthLimit(input.eventLog);
         let renderedCandidates = input.entries.slice(0, input.effectiveLimit).map((entry) => {
           return {
             entry,
-            rendered: renderLine(entry, lineEndingStyle)
+            rendered: renderLine(entry, lineEndingStyle, maxLineLength)
           };
         });
         let totalBytes = 0;
@@ -259770,7 +260207,7 @@ ${foregroundOutput}`,
             const candidate = renderedCandidates[i2];
             if (candidate === void 0) continue;
             const lineBytes = renderedLineBytes(candidate.rendered.line, kept.length === 0);
-            if (bytes + lineBytes > 102400) break;
+            if (kept.length > 0 && bytes + lineBytes > 102400) break;
             kept.unshift(candidate);
             bytes += lineBytes;
           }
@@ -259791,7 +260228,8 @@ ${foregroundOutput}`,
           startLine: renderedCandidates[0]?.entry.lineNo ?? 0,
           totalLines: input.totalLines,
           requestedLines: input.requestedLines,
-          detectedEncoding: input.detectedEncoding
+          detectedEncoding: input.detectedEncoding,
+          eventLog: input.eventLog
         });
       }
       finishReadResult(input) {
@@ -259807,7 +260245,8 @@ ${foregroundOutput}`,
         if (input.maxLinesReached) parts.push(`Max ${String(MAX_LINES)} lines reached.`);
         else if (input.maxBytesReached) parts.push(`Max ${String(MAX_BYTES)} bytes reached.`);
         else if (lineCount < input.requestedLines) parts.push("End of file reached.");
-        if (input.truncatedLineNumbers.length > 0) parts.push(`Lines [${input.truncatedLineNumbers.join(", ")}] were truncated to ${String(MAX_LINE_LENGTH)} characters; use Bash (e.g. cut or sed) to read the elided content of those lines.`);
+        if (input.truncatedLineNumbers.length > 0) parts.push(`Lines [${input.truncatedLineNumbers.join(", ")}] were truncated to ${String(lineLengthLimit(input.eventLog))} characters; use Bash (e.g. cut or sed) to read the elided content of those lines.`);
+        if (input.eventLog) parts.push(`Kimi Code agent event log: records are returned whole up to ${String(EVENT_LOG_MAX_LINE_LENGTH)} characters per line; read one record at a time (n_lines=1). For a longer record, extract fields with Bash: sed -n 'Np' <file> | jq. A primer on this format appears in your compaction note once a compaction has run.`);
         if (input.lineEndingStyle === "mixed") parts.push("Mixed or lone carriage-return line endings are shown as \\r. Use exact \\r\\n or \\r escapes in Edit.old_string for those lines.");
         if (input.detectedEncoding !== void 0) parts.push(`Detected file encoding: ${encodingDisplayName(input.detectedEncoding)}; content transcoded to UTF-8 for display. Edit and Write expect UTF-8 \u2014 convert the file's encoding first (e.g. \`iconv\` via Bash).`);
         return parts.join(" ");
@@ -260422,6 +260861,7 @@ ${foregroundOutput}`,
     };
     MAX_DRAIN = 100;
     HISTORY_TAIL = 500;
+    RETIRED_WIRE_RECORD_TYPES = /* @__PURE__ */ new Set(["staleGuard.recorded", "staleGuard.cleared"]);
     CycleError = class extends StateError {
       depth;
       eventTypes;
@@ -260947,7 +261387,7 @@ ${foregroundOutput}`,
             if (record2.type === "metadata") continue;
             const cls = this.folded.events.get(record2.type);
             if (cls === void 0) {
-              this.reportSkippedRecord(record2.type, recordIndex, false);
+              if (!RETIRED_WIRE_RECORD_TYPES.has(record2.type)) this.reportSkippedRecord(record2.type, recordIndex, false);
               recordIndex++;
               continue;
             }
@@ -261719,6 +262159,7 @@ ${foregroundOutput}`,
       timer = this._register(new IntervalTimer({ unref: true }));
       flushing;
       consecutiveFailures = 0;
+      giveUpTracked = false;
       disposed = false;
       overflowLogged = false;
       constructor(queryStore, flags, telemetry, log2) {
@@ -261833,6 +262274,7 @@ ${foregroundOutput}`,
           await this.queryStore.batch(ops);
           for (const [id, summary] of chunk) if (this.pendingMap.get(id) === summary) this.pendingMap.delete(id);
           this.consecutiveFailures = 0;
+          this.giveUpTracked = false;
         } catch (error48) {
           this.consecutiveFailures += 1;
           this.log.warn("failed to flush session index mirror chunk", {
@@ -261842,10 +262284,13 @@ ${foregroundOutput}`,
           });
           if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
             this.log.warn("session index mirror giving up until the next record; reconciliation will heal", { pending: this.pendingMap.size });
-            this.telemetry.track2("session_index_mirror_give_up", {
-              pending_count: this.pendingMap.size,
-              consecutive_failures: this.consecutiveFailures
-            });
+            if (!this.giveUpTracked) {
+              this.giveUpTracked = true;
+              this.telemetry.track2("session_index_mirror_give_up", {
+                pending_count: this.pendingMap.size,
+                consecutive_failures: this.consecutiveFailures
+              });
+            }
           }
         }
       }
@@ -263697,6 +264142,8 @@ ${err.message}`);
     };
     IHostRequestHeaders = createDecorator("hostRequestHeaders");
     providerDefinitions = /* @__PURE__ */ new Map();
+    contributedFlags = [];
+    IFlagRegistry = createDecorator("flagRegistry");
     registerFlagDefinition({
       id: "auto_session_title",
       title: "AI session titles",
@@ -264005,6 +264452,7 @@ ${err.message}`);
         this._register(this.registry.onDidRegisterOverlay(() => this.reapplyOverlays()));
         const { configKey } = this;
         const { homeDir } = this.bootstrap;
+        this.seedInitialLoad();
         this.ready = (async () => {
           await migrateThinkingEffortMaxToHigh(this.documentStore, configKey, homeDir);
           await this.load("load");
@@ -264145,6 +264593,24 @@ ${err.message}`);
         const run = this.stateChain.then(() => fn2());
         this.stateChain = run.then(() => void 0, () => void 0);
         return run;
+      }
+      seedInitialLoad() {
+        let fileData;
+        try {
+          const text = readFileSync(this.bootstrap.configPath, "utf8");
+          const data = text.trim().length === 0 ? {} : parse3(text);
+          if (!isPlainObject$2(data)) return;
+          fileData = data;
+        } catch {
+          return;
+        }
+        this.rawSnake = cloneRecord(fileData);
+        this.raw = transformTomlData(fileData, this.registry);
+        this.validated = this.buildValidated(this.raw);
+        const next = { ...this.validated };
+        this.applySectionEnvBindings(next, true);
+        this.applyEnvOverlay(next);
+        this.effective = next;
       }
       async load(source) {
         this.diagnosticsList.length = 0;
@@ -267603,7 +268069,7 @@ ${err.message}`);
         let file2;
         if (typeof input === "string") {
           if (!fs$10.existsSync(input)) throw new ChatProviderError(`Video file not found: ${input}`);
-          const filename = path$9.basename(input);
+          const filename = path$10.basename(input);
           const mimeType = guessMimeTypeFromExt(filename);
           if (mimeType === void 0 || !mimeType.startsWith("video/")) throw new ChatProviderError(`KimiFiles.uploadVideo: file extension does not indicate a video type: ${filename}`);
           const data = await fs$10.promises.readFile(input);
@@ -268090,7 +268556,7 @@ ${err.message}`);
       "config_file",
       "bootstrap"
     ];
-    INSTALLED_REL = path.join("plugins", "installed.json");
+    INSTALLED_REL = path$1.join("plugins", "installed.json");
     EMPTY$1 = {
       version: 1,
       plugins: []
@@ -268144,7 +268610,7 @@ ${err.message}`);
               if (installedSha !== void 0) return `https://codeload.github.com/${resolved.owner}/${resolved.repo}/zip/${installedSha}`;
               return resolution.tarballUrl;
             })() : resolved.path);
-            zipTmpDir = await mkdtemp(path.join(tmpdir(), "kimi-plugin-zip-"));
+            zipTmpDir = await mkdtemp(path$1.join(tmpdir(), "kimi-plugin-zip-"));
             sourceRoot = await extractZip(buffer, zipTmpDir);
           }
           const parsed2 = await parseManifest(sourceRoot);
@@ -270010,14 +270476,14 @@ ${err.message}`);
         this.setInstallProgress(entry.id, { running: true });
         (async () => {
           try {
-            const note = await entry.install((step, percent) => {
-              this.setInstallProgress(entry.id, percent === void 0 ? {
+            const note = await entry.install((step, percent2) => {
+              this.setInstallProgress(entry.id, percent2 === void 0 ? {
                 running: true,
                 step
               } : {
                 running: true,
                 step,
-                percent
+                percent: percent2
               });
             });
             this.setInstallProgress(entry.id, {
@@ -271616,6 +272082,10 @@ ${err.message}`);
     }).on(FullCompactionComplete, (s4) => {
       if (s4.phase !== "idle") s4.phase = "idle";
     });
+    fullCompactionWireRangesKey = defineState("fullCompaction.wireRanges", () => []).replayable({ schema: external_exports.custom() }).on(ContextApplyCompaction, (s4, e2) => {
+      const wireLines = e2.wireLines;
+      return wireLines === void 0 ? void 0 : [...s4, wireLines];
+    }).on(ContextClear, (s4) => s4.length === 0 ? void 0 : []);
     USER_PROMPT_ORIGIN = { kind: "user" };
     FULL_COMPACTION_BACKGROUND_ID = "full-compaction";
     activityViewLifecycleKey = defineState("activityView.lifecycle", () => "ready");
@@ -272142,7 +272612,11 @@ IMPORTANT:
 - If you do not know the answer, say so directly.
 `.trim();
     ISessionBtwService = createDecorator("sessionBtwService");
-    REMINDER_VARIANT_PRIORITY = /* @__PURE__ */ new Map([["date_change", -1]]);
+    REMINDER_VARIANT_PRIORITY = /* @__PURE__ */ new Map([
+      ["date_change", -1],
+      ["context_budget", 1],
+      ["compaction_ahead", 2]
+    ]);
     reminderActorLogic = setup({
       types: {},
       actors: { reminderEffects: fromCallback(({ input }) => {
@@ -272848,25 +273322,25 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
       context;
       hostFs;
       blobs;
-      telemetryContext;
       dispatcher;
       sessionCtx;
       agentCtx;
       toolApproval;
       modeService;
+      telemetry;
       agentState;
       review;
-      constructor(context, hostFs, blobs, reminder, telemetryContext, eventBus, dispatcher, sessionCtx, agentCtx, toolExecutor, toolApproval, modeService, telemetry, agentState) {
+      constructor(context, hostFs, blobs, reminder, eventBus, dispatcher, sessionCtx, agentCtx, toolExecutor, toolApproval, modeService, telemetry, agentState) {
         super();
         this.context = context;
         this.hostFs = hostFs;
         this.blobs = blobs;
-        this.telemetryContext = telemetryContext;
         this.dispatcher = dispatcher;
         this.sessionCtx = sessionCtx;
         this.agentCtx = agentCtx;
         this.toolApproval = toolApproval;
         this.modeService = modeService;
+        this.telemetry = telemetry;
         this.agentState = agentState;
         this.agentState.contributeState(planKey);
         this.review = new ExitPlanModeReview(this, this.toolApproval, telemetry);
@@ -272921,7 +273395,7 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
         return this.planFilePathFor(state.id);
       }
       restoreTelemetryMode() {
-        this.telemetryContext.set({ mode: this.isActive ? "plan" : "agent" });
+        this.telemetry.setContext({ mode: this.isActive ? "plan" : "agent" });
       }
       createPlanId() {
         return generateHeroSlug(randomUUID(), /* @__PURE__ */ new Set());
@@ -272936,7 +273410,7 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
             agentId: this.agentCtx.agentId,
             id
           }));
-          this.telemetryContext.set({ mode: "plan" });
+          this.telemetry.setContext({ mode: "plan" });
           enterRecorded = true;
           if (createFile) await this.writeEmptyPlanFile(planFilePath);
         } catch (error48) {
@@ -272949,7 +273423,7 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
           agentId: this.agentCtx.agentId,
           id
         }));
-        this.telemetryContext.set({ mode: "agent" });
+        this.telemetry.setContext({ mode: "agent" });
       }
       async clear() {
         const path2 = this.currentPlanFilePath();
@@ -272961,7 +273435,7 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
           agentId: this.agentCtx.agentId,
           id
         }));
-        this.telemetryContext.set({ mode: "agent" });
+        this.telemetry.setContext({ mode: "agent" });
       }
       async recordRevision() {
         const state = this.agentState.get(planKey);
@@ -273014,16 +273488,15 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
       __decorateParam(1, IHostFileSystem),
       __decorateParam(2, IBlobStore),
       __decorateParam(3, IAgentReminderService),
-      __decorateParam(4, IAgentTelemetryContextService),
-      __decorateParam(5, IEventBus),
-      __decorateParam(6, IEventDispatcher),
-      __decorateParam(7, ISessionContext),
-      __decorateParam(8, IAgentScopeContext),
-      __decorateParam(9, IAgentToolExecutorService),
-      __decorateParam(10, IAgentToolApprovalService),
-      __decorateParam(11, IAgentPermissionModeService),
-      __decorateParam(12, ITelemetryService),
-      __decorateParam(13, IAgentStateService)
+      __decorateParam(4, IEventBus),
+      __decorateParam(5, IEventDispatcher),
+      __decorateParam(6, ISessionContext),
+      __decorateParam(7, IAgentScopeContext),
+      __decorateParam(8, IAgentToolExecutorService),
+      __decorateParam(9, IAgentToolApprovalService),
+      __decorateParam(10, IAgentPermissionModeService),
+      __decorateParam(11, ITelemetryService),
+      __decorateParam(12, IAgentStateService)
     ], AgentPlanService);
     ProfileError = class extends Error2 {
       constructor(code, message, details) {
@@ -273783,7 +274256,8 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
       list() {
         return {
           active: this.active === void 0 ? void 0 : snapshot$1(this.active),
-          pending: this.pending.map(snapshot$1)
+          pending: this.pending.map(snapshot$1),
+          launching: this.launching
         };
       }
       async steer(promptIds) {
@@ -274775,7 +275249,8 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
             agentId: handle.agentId,
             status: "completed",
             result: completion.result,
-            usage: completion.usage
+            usage: completion.usage,
+            stopReason: completion.stopReason
           };
         } catch (error48) {
           if (isProviderRateLimitError(error48)) return {
@@ -275110,7 +275585,8 @@ ${feedback}` : "User requested revisions. Plan mode remains active."
             signal: options2.signal
           }).then((r2) => ({
             result: r2.summary,
-            usage: r2.usage
+            usage: r2.usage,
+            stopReason: r2.stopReason
           }))
         };
       }
@@ -275972,117 +276448,6 @@ ${modelLines}`;
       }
     };
     registerFeature(GoalFeature);
-    IStaleGuardService = createDecorator("staleGuardService");
-    staleGuardRecordedSchema = external_exports.object({
-      path: external_exports.string(),
-      mtimeMs: external_exports.number()
-    });
-    StaleGuardRecorded = class extends Event2 {
-      static type = "staleGuard.recorded";
-      static durable = true;
-      static schema = staleGuardRecordedSchema;
-    };
-    staleGuardClearedSchema = external_exports.object({});
-    StaleGuardCleared = class extends Event2 {
-      static type = "staleGuard.cleared";
-      static durable = true;
-      static schema = staleGuardClearedSchema;
-    };
-    staleGuardKey = defineState("staleGuard", () => /* @__PURE__ */ new Map()).replayable({ schema: external_exports.custom() }).on(StaleGuardRecorded, (s4, e2) => {
-      s4.set(e2.path, e2.mtimeMs);
-    }).on(StaleGuardCleared, (s4) => {
-      s4.clear();
-    });
-    WRITE_OPERATIONS = ["write", "readwrite"];
-    READ_OPERATIONS = ["read"];
-    StaleGuardService = class StaleGuardService2 extends Disposable {
-      states;
-      dispatcher;
-      runtime;
-      constructor(states, dispatcher, runtime, toolExecutor) {
-        super();
-        this.states = states;
-        this.dispatcher = dispatcher;
-        this.runtime = runtime;
-        this.states.contributeState(staleGuardKey);
-        this._register(toolExecutor.onBeforeExecuteTool((event) => this.guardWrite(event)));
-        this._register(toolExecutor.hooks.onDidExecuteTool.register("staleGuard", async (ctx, next) => {
-          await this.observeExecution(ctx);
-          await next();
-        }));
-        this._register(this.runtime.onDidChange(() => {
-          this.dispatcher.dispatch(new StaleGuardCleared({}));
-        }));
-      }
-      recordedMtimeMs(path2) {
-        return this.states.get(staleGuardKey).get(path2);
-      }
-      guardWrite(event) {
-        const name = event.toolCall.name;
-        if (name !== "Edit" && name !== "Write") return;
-        const path2 = accessedFilePath(event.execution.accesses, WRITE_OPERATIONS);
-        if (path2 === void 0) return;
-        const displayPath = stringArg$1(event.args, "path") ?? path2;
-        if (coveredByEarlierRead(event, displayPath)) return;
-        event.waitUntil(async () => {
-          const error48 = await this.checkWritable(path2, displayPath);
-          return error48 === void 0 ? void 0 : { veto: denyToolExecution(error48) };
-        });
-      }
-      async observeExecution(ctx) {
-        if (ctx.outcome !== "executed" || ctx.result.isError === true) return;
-        const name = ctx.toolCall.name;
-        if (name === "Read") {
-          const path2 = accessedFilePath(ctx.accesses, READ_OPERATIONS);
-          if (path2 !== void 0) await this.recordCurrentMtime(path2);
-          return;
-        }
-        if (name === "Edit" || name === "Write") {
-          const path2 = accessedFilePath(ctx.accesses, WRITE_OPERATIONS);
-          if (path2 !== void 0) await this.recordCurrentMtime(path2);
-        }
-      }
-      async checkWritable(path2, displayPath) {
-        const stat4 = await this.statFile(path2);
-        if (stat4 === void 0 || stat4.mtimeMs === void 0) return void 0;
-        const recorded = this.recordedMtimeMs(path2);
-        if (recorded === void 0) return `"${displayPath}" has not been read by this agent yet. Read the file before writing to it.`;
-        if (recorded !== stat4.mtimeMs) return `"${displayPath}" has been modified on disk since this agent last read it. Read the file again before writing to it.`;
-      }
-      async recordCurrentMtime(path2) {
-        const stat4 = await this.statFile(path2);
-        if (stat4?.mtimeMs === void 0) return;
-        await this.dispatcher.dispatch(new StaleGuardRecorded({
-          path: path2,
-          mtimeMs: stat4.mtimeMs
-        }));
-      }
-      async statFile(path2) {
-        const lease = this.runtime.acquire(["fs"]);
-        try {
-          const stat4 = await lease.runtime.fs.stat(path2);
-          return stat4.isFile ? stat4 : void 0;
-        } catch {
-          return;
-        } finally {
-          lease.dispose();
-        }
-      }
-    };
-    StaleGuardService = __decorate([
-      __decorateParam(0, IAgentStateService),
-      __decorateParam(1, IEventDispatcher),
-      __decorateParam(2, IAgentRuntimeService),
-      __decorateParam(3, IAgentToolExecutorService)
-    ], StaleGuardService);
-    StaleGuardFeature = class extends Feature {
-      static name = "staleGuard";
-      constructor() {
-        super();
-        this.contributeAgentService(IStaleGuardService, StaleGuardService, { activation: 0 });
-      }
-    };
-    registerFeature(StaleGuardFeature);
     ITowerRateLimitService = createDecorator("towerRateLimitService");
     RATE_LIMIT_CAPACITY_RECOVERY_INTERVAL_MS = 18e4;
     TOWER_SPAWN_PAUSE_MS = 6e4;
@@ -276282,8 +276647,25 @@ ${modelLines}`;
           return false;
         }
       }
+      async ensureRepository(base) {
+        if (await isInsideRepo(this.repoRoot)) return;
+        await initRepository(this.repoRoot);
+        const unborn = await tryGit(this.repoRoot, [
+          "symbolic-ref",
+          "--short",
+          "HEAD"
+        ]) ?? "main";
+        const resolvedBase = base ?? unborn;
+        if (resolvedBase !== unborn) await checkoutNewLocalBranch(this.repoRoot, resolvedBase);
+        const dirty = await listBaseDirtyEntries(this.repoRoot);
+        if (dirty.length === 0) {
+          await commitAllowEmpty(this.repoRoot, "tower: init");
+          return;
+        }
+        await commitPaths(this.repoRoot, dirty.map((entry) => entry.path), `tower: snapshot of uncommitted base checkout changes (base ${resolvedBase})`);
+      }
       async init(sessionId, base) {
-        if (!await isInsideRepo(this.repoRoot)) throw new TowerProtocolError("tower needs a git repository (the session working directory is not inside one)");
+        await this.ensureRepository(base);
         if (!await hasAnyCommit(this.repoRoot)) throw new TowerProtocolError("the repository has no commits yet \u2014 create an initial commit first");
         if (await this.isInitialized()) {
           const state2 = await this.load();
@@ -276375,6 +276757,14 @@ ${modelLines}`;
           retired: stale.length > 0 ? stale.map((agent) => agent.name).join(",") : void 0
         });
         return stale.map((agent) => agent.name);
+      }
+      async release(sessionId) {
+        if (!await this.isInitialized()) return;
+        const state = await this.load();
+        if (state.sessionId !== sessionId) return;
+        state.sessionId = void 0;
+        await this.save(state);
+        await this.appendLog(TOWER_NAME, "release", { session: sessionId });
       }
       async ensureGitExclude() {
         const excludePath = join2(await readGitDir(this.repoRoot) ?? join2(this.repoRoot, ".git"), "info", "exclude");
@@ -277783,6 +278173,7 @@ reason: ${result.stopReason ?? reason}`,
     TASK_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
     SESSION_CLOSED_REASON = "Session closed";
     NOTIFICATION_FALLBACK_PREVIEW_BYTES = 3e3;
+    QUESTION_ANSWER_INLINE_BYTES = 16e3;
     ACTIVE_BACKGROUND_TASK_INJECTION_VARIANT = "background_task_status";
     TASK_RESUME_TERMINATION_VARIANT = "task_resume_termination";
     ACTIVE_BACKGROUND_TASK_GUIDANCE = ["The conversation was compacted, so the earlier messages that started these background tasks are gone \u2014 but the tasks are still running from before.", "Do not start duplicates. Use TaskList to list them, TaskOutput for a non-blocking status/output snapshot, and TaskStop to cancel one \u2014 completion arrives via automatic notification."].join(" ");
@@ -278256,7 +278647,12 @@ ${formatTaskList(tasks, true)}`;
       async stopAllOnExit(reason) {
         if (this.keepAliveOnExit()) return [];
         const active = this.list(true);
-        await Promise.all(active.filter((task) => task.detached === true).map((task) => this.suppressTerminalNotification(task.taskId)));
+        await Promise.allSettled(active.filter((task) => task.detached === true).map((task) => this.suppressTerminalNotification(task.taskId).catch((error48) => {
+          this.log.error("terminal notification suppression failed", {
+            taskId: task.taskId,
+            error: error48
+          });
+        })));
         return this.stopAll(reason);
       }
       dispose() {
@@ -278611,8 +279007,7 @@ ${formatTaskList(tasks, true)}`;
         try {
           let output = emptyOutputSnapshot();
           try {
-            output = await this.getOutputSnapshot(info.taskId, 0);
-            if (!output.fullOutputAvailable) output = await this.getOutputSnapshot(info.taskId, NOTIFICATION_FALLBACK_PREVIEW_BYTES);
+            output = await this.notificationOutputSnapshot(info);
           } catch (error48) {
             this.log.error("task notification output read failed; delivering without output", {
               taskId: info.taskId,
@@ -278624,7 +279019,7 @@ ${formatTaskList(tasks, true)}`;
           if (this.deliveredNotificationKeys.has(key2)) return void 0;
           if (this.hasDeliveredNotification(key2)) return void 0;
           this.scheduledNotificationKeys.add(key2);
-          const notification = buildAgentTaskNotification(info, agentTaskNotificationChildren(output));
+          const notification = buildAgentTaskNotification(info, output);
           return {
             content: [{
               type: "text",
@@ -278636,6 +279031,12 @@ ${formatTaskList(tasks, true)}`;
         } finally {
           this.buildingNotificationKeys.delete(key2);
         }
+      }
+      async notificationOutputSnapshot(info) {
+        if (info.kind === "question") return this.getOutputSnapshot(info.taskId, QUESTION_ANSWER_INLINE_BYTES);
+        const persisted = await this.getOutputSnapshot(info.taskId, 0);
+        if (persisted.fullOutputAvailable) return persisted;
+        return this.getOutputSnapshot(info.taskId, NOTIFICATION_FALLBACK_PREVIEW_BYTES);
       }
       fireNotificationHook(notification) {
         this.dispatcher.dispatch(new TaskNotified({
@@ -278726,6 +279127,9 @@ ${formatTaskList(tasks, true)}`;
       __decorateParam(14, IAgentStateService)
     ], AgentTaskService);
     registerScopedService("agent", IAgentTaskService, AgentTaskService, 0, "task");
+    REPEAT_BREAKER_STOP_REASON = "repeat_breaker";
+    IAgentToolDedupeService = createDecorator("agentToolDedupeService");
+    REPEAT_BREAKER_SETTLE_REASON = "stopped by the repeat breaker after issuing the same tool call repeatedly; its output is a handoff, not a finished result";
     SubagentTask = class {
       handle;
       description;
@@ -278737,6 +279141,7 @@ ${formatTaskList(tasks, true)}`;
       parentToolCallId;
       model;
       thinkingEffort;
+      stopCode;
       constructor(handle, description, abortController) {
         this.handle = handle;
         this.description = description;
@@ -278755,13 +279160,18 @@ ${formatTaskList(tasks, true)}`;
         else sink.signal.addEventListener("abort", requestAbort, { once: true });
         try {
           const outcome = await this.handle.completion;
+          this.stopCode = outcome.stopReason;
           sink.appendOutput(outcome.result);
-          await sink.settle({ status: "completed" });
+          await sink.settle({
+            status: "completed",
+            stopReason: completedSettleReason(outcome.stopReason)
+          });
         } catch (error48) {
           if (sink.signal.aborted && (isAbortError(error48) || error48 === sink.signal.reason)) {
             await sink.settle({ status: "killed" });
             return;
           }
+          this.stopCode = stopCodeOf(error48);
           await sink.settle({
             status: "failed",
             stopReason: errorMessage$3(error48)
@@ -278778,7 +279188,8 @@ ${formatTaskList(tasks, true)}`;
           subagentType: this.subagentType,
           parentToolCallId: this.parentToolCallId,
           model: this.model,
-          thinkingEffort: this.thinkingEffort
+          thinkingEffort: this.thinkingEffort,
+          stopCode: this.stopCode
         };
       }
     };
@@ -279232,7 +279643,6 @@ Review branch "${target}" against base "${reviewBase}".
       __decorateParam(1, ISessionManager),
       __decorateParam(2, IAgentScopeContext)
     ], TowerTeardownTool);
-    summary_continuation_default = "Your previous response was too brief. Please provide a more comprehensive summary that includes:\n\n1. Specific technical details and implementations\n2. Detailed findings and analysis\n3. All important information that the parent agent should know";
     tower_worker_overlay_default = "You are a tower worker/reviewer in a multi-agent tower workspace. All collaboration protocol traffic (inbox messages, findings, reviews, mission updates) goes through the Tower* tools ONLY \u2014 never create, edit, or delete any file under `.tower/` by hand; the tools are the only writers, and hand-written protocol files break the merge gate. Your TowerSpawn briefing names your mission (worker) or review target (reviewer) \u2014 stay inside it.\n";
     TOWER_WORKER_TOOLS = [
       "Agent",
@@ -279266,7 +279676,7 @@ Review branch "${target}" against base "${reviewBase}".
     ];
     TOWER_WORKER_ROLE = `${`${TASK_AGENT_ROLE_PREFIX}
 
-Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. A final message of only a sentence or two is treated as too brief and sent back to you for expansion, costing an extra turn.`}
+Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. If you are stopped before finishing, the parent receives only what you have written so far, so keep the handoff current.`}
 
 ${tower_worker_overlay_default.trim()}`;
     TOWER_WORKER_PROFILE_DEF = normalizeAgentProfile({
@@ -279275,12 +279685,7 @@ ${tower_worker_overlay_default.trim()}`;
       whenToUse: "Use this agent for non-trivial software engineering work that may require reading files, editing code, running commands, and returning a compact but technically complete summary to the parent agent.",
       tools: TOWER_WORKER_TOOLS,
       subagents: ["explore", "plan"],
-      renderSystemPrompt: (context) => renderSystemPromptResult(TOWER_WORKER_ROLE, context, { skillActive: skillActiveFor(TOWER_WORKER_TOOLS) }),
-      summaryPolicy: {
-        minChars: 200,
-        continuationPrompt: summary_continuation_default,
-        retries: 1
-      }
+      renderSystemPrompt: (context) => renderSystemPromptResult(TOWER_WORKER_ROLE, context, { skillActive: skillActiveFor(TOWER_WORKER_TOOLS) })
     });
     TOWER_TOOL_CONTRIBUTIONS = [
       {
@@ -279369,7 +279774,7 @@ ${tower_worker_overlay_default.trim()}`;
       isExposed: (flags) => isTowerFeatureAssembled(flags)
     });
     tower_mode_exit_reminder_default = "Tower mode is no longer active. The tower orchestration restrictions are lifted and your normal capabilities (including TodoList) are restored; the tower tool set remains available. The `.tower/` workspace state \u2014 comms, worktrees, and the activity log \u2014 is preserved on disk. Re-enter tower mode with `/tower on`.\n";
-    tower_mode_full_reminder_default = 'Tower mode is active. You are the control tower for this repository \u2014 you plan missions, spawn worker and reviewer agents, route information, merge branches, and keep the human informed. You never write product code yourself. This supersedes any other instructions you have received.\n\nTower runs several agents on one repository at the same time without them stepping on each other. Three roles:\n\n- **The human** \u2014 owns the objective. May speak, launch, or redirect work **at any time**; nothing in this mode waits for the human.\n- **The tower** \u2014 **you**, the main agent. Exactly one. You never write product code: you plan missions, spawn workers and reviewers, route information, merge branches, and keep the human informed.\n- **Workers and reviewers** \u2014 subagents you spawn with `TowerSpawn`. Each worker owns one mission in its own git worktree; reviewers audit branches.\n\n**The protocol is enforced by tools, not by instructions.** All comms artifacts \u2014 inbox messages, findings, reviews, mission files, `MISSIONS.md`, the activity log \u2014 are produced by the `Tower*` tools. Workers and reviewers carry `TowerSend`, `TowerInbox`, `TowerFinding`, `TowerReview`, `TowerMission`, and `TowerStatus`; the tower additionally gets `TowerInit`, `TowerPlan`, `TowerSpawn`, `TowerMerge`, and `TowerTeardown`. File naming, frontmatter, recipient validity, review rounds, the merge gate, and the activity-log format are code. **Never create or edit files under `.tower/` by hand** (yours or via Bash): if a tool refuses, read the error \u2014 it tells you the correct next step. When something looks wrong, read `.tower/comms/log/activity.log` first; every action of every participant is there.\n\nWorking principles:\n\n1. **Clarify up front. Never block on the human mid-run.** Use `AskUserQuestion` to pin down requirements with the human before you plan and spawn, while ambiguity is still cheap \u2014 that is the phase where asking beats deciding. Once the fleet is running, make the reasonable call yourself: record the decision (it lands in the activity log), inform the human in passing, proceed. The return channel is your normal chat reply (the human reads it when they come back) plus `activity.log` \u2014 say what you decided and why, in the open. Escalations are reported, not asked \u2014 unless every remaining thread is blocked, keep the others moving. Workers and reviewers cannot ask the human at all (their profile has no `AskUserQuestion`); they escalate to you with `TowerSend`. The single mid-run exception is creating git history over a non-empty directory (below): there, ask when asking is possible (not under auto permission mode) and take the safe default when it is not.\n2. **Agents negotiate internally.** Workers talk to each other through `TowerSend` directly \u2014 questions, review requests, broadcasts (`to: "all"`). You are the coordinator and the only merger, not a content relay: you relay wake-ups (resume an idle agent with a pointer to what it should read), triage findings, untangle conflicts, and merge.\n3. **Scope isolation is real.** `TowerPlan` rejects overlapping scopes, and `TowerMerge` refuses branches that changed files outside their mission scope. Plan scopes carefully; if a mission legitimately needs more, you widen it with `TowerMission` (scope patch \u2014 only you can, and it is logged).\n\n## Prepare (only when the directory is not a tower-ready git repo)\n\n`TowerInit` requires a git repository with at least one commit. If `git rev-parse --is-inside-work-tree` fails:\n\n- **Empty directory** \u2192 `git init` + `git commit --allow-empty -m "tower: init"`, then proceed. No confirmation needed.\n- **Non-empty directory** \u2192 never `git add -A`: a blind initial commit can seal secrets, large binaries, or dependency directories into history irreversibly. Survey the directory (file count, largest files, secret-looking names like `.env` or `*.pem`), present the summary, and ask the human **exactly once** whether to initialize and commit the existing files \u2014 but only when asking is possible. Under auto permission mode `AskUserQuestion` is disabled: do not call it into a deny error. Default to the safe behavior instead \u2014 do NOT commit existing files; stop tower there and tell the human in your reply the two commands to run themselves (`git init` plus an initial commit of their choosing). If they agree to the commit, write a conservative `.gitignore` (dependencies, build output, secrets), show the staged list, commit, proceed.\n\n## Tower workflow\n\n1. **Init** \u2014 `TowerInit`. It creates `.tower/` and records the base branch \u2014 when the human enabled tower mode with `/tower <base>`, the workspace and base branch are already set up, so `TowerInit` just confirms them. Workers and reviewers never prompt for tool approvals \u2014 they are pinned to the auto permission mode at spawn, whatever the session\'s mode. Your own orchestration calls still follow the session mode, so if it would interrupt you with constant prompts, tell the human once that a more autonomous mode fits tower better \u2014 then proceed regardless. When `TowerInit` reports carried-over open missions from a previous session, settle them **before planning**: continue the ones that belong to the current objective with fresh workers, and abandon the unrelated ones (`TowerMission status=abandoned`) \u2014 missions that are neither merged nor abandoned keep their scopes reserved, so `TowerPlan` rejects any new mission overlapping them.\n2. **Plan** \u2014 break the objective into 2\u20134 missions and call `TowerPlan` with each mission\'s title, **disjoint** scope globs (picomatch: `**` crosses directories), tasks, and dependencies. Mark read-only investigation missions `kind: "survey"`: a survey\'s scope is informational (it reserves nothing, so surveys and builds may overlap the same paths), the worker must not change code, and it closes with a zero-diff `TowerMerge` \u2014 no reviewer needed. Shared files (lockfiles, central configs) belong to exactly one build mission or to your own integration work. Post the plan to the human in one compact message and launch immediately \u2014 their words are plan changes, never a gate.\n3. **Spawn** \u2014 one `TowerSpawn` per mission (`kind: "worker"`, background, code-built briefing), and **spawn every dependency-unblocked mission right away**: fire the `TowerSpawn` calls back to back, never trickle them out one at a time and never wait for one worker before launching the next \u2014 the fleet exists to run in parallel. The tool refuses duplicate names \u2014 resume the existing agent with the `Agent` tool instead. Workers commit on their branch; their completion wakes you. Once the batch is running, **end your turn**: completions and inbox traffic arrive as notifications, so never poll `TowerInbox`/`TowerStatus` in a loop and never sit synchronously waiting on a worker. Workers use the configured secondary model when `[secondary_model]` provides one; otherwise they inherit your model. Reviewers always bind your primary model \u2014 review quality is not where you save. The resolved model is shown in the spawn output and the `spawn` line of `activity.log`.\n4. **Supervise** \u2014 on every wake (worker completion, human message): `TowerInbox` and `TowerStatus`, then act:\n   - Review request \u2192 `TowerSpawn` a reviewer (`kind: "reviewer"`, `review_target` the branch). Do not review mission code yourself. Survey missions skip review \u2014 close them with `TowerMerge` once their summary lands.\n   - Review verdict not clean \u2192 resume the author (Agent tool) pointing at the review file; the author fixes, pushes, and requests re-review. Round cap: at 5 rounds, or when two consecutive rounds report the same findings, stop the loop, inform the human, and redirect (reassign, split, descope).\n   - Blocker \u2192 answer or reassign if you can; if it genuinely needs the human, inform them and keep the rest moving.\n   - Finding \u2192 triage: assign to a mission, plan a new one, or backlog \u2014 the disposition is your call; tell the human.\n   - Completion report with a suspicious diff (\u{1F7E2} claimed, zero changed files) \u2192 investigate before accepting.\n5. **Merge** \u2014 `TowerMerge(branch)` in Dependency Flow order. The gate refuses when there is no clean review for the current tip, dependencies are unmerged, or files escaped the scope \u2014 the error message is your next step. After a merge, the result lists branches that now conflict: tell those workers (resume) to rebase onto the new base, resolve, push, and request re-review; their moved tip makes the gate demand a fresh clean review.\n6. **Teardown promptly** \u2014 when `TowerStatus` shows every mission \u2705 merged and no unactioned inbox items remain, call `TowerTeardown` **right away** and report the final summary (missions, merges, review rounds, findings and their disposition). Do not wait for the human to ask: branches and `.tower/comms/` (including the activity log) are kept and dirty worktrees are protected by the tool \u2014 only disk is freed. Teardown does **not** exit tower mode \u2014 you remain the tower, ready to `TowerInit` the next objective, until the human turns the mode off with `/tower off`. A `/tower teardown` from the human is the same instruction at any earlier point.\n\n## Hard rules for the tower\n\n- Exactly one tower. If a worker starts assigning work or merging, correct it on your next resume.\n- Never write product code yourself; integration fixes at merge time are yours, everything else goes to a worker.\n- Mission tracking lives in the tower protocol (`TowerPlan`/`TowerMission`/`TowerStatus`, `MISSIONS.md`), never in `TodoList` \u2014 it is code-denied in tower mode because todo semantics (one task in progress at a time) would serialize the fleet.\n- Workers negotiate through `TowerSend`; you relay wake-ups and step in for conflicts, caps, findings, and merges.\n- Never hand-edit `.tower/` files. The tools are the protocol.\n- You perform every merge, through `TowerMerge` \u2014 never `git merge` by hand, never merge around a refusal.\n- Before `TowerTeardown`, summarize what every worker produced for the human \u2014 per mission: what was built, the branch and its merge outcome, and anything left undone. Never tear down without that summary.\n';
+    tower_mode_full_reminder_default = 'Tower mode is active. You are the control tower for this repository \u2014 you plan missions, spawn worker and reviewer agents, route information, merge branches, and keep the human informed. You never write product code yourself. This supersedes any other instructions you have received.\n\nTower runs several agents on one repository at the same time without them stepping on each other. Three roles:\n\n- **The human** \u2014 owns the objective. May speak, launch, or redirect work **at any time**; nothing in this mode waits for the human.\n- **The tower** \u2014 **you**, the main agent. Exactly one. You never write product code: you plan missions, spawn workers and reviewers, route information, merge branches, and keep the human informed.\n- **Workers and reviewers** \u2014 subagents you spawn with `TowerSpawn`. Each worker owns one mission in its own git worktree; reviewers audit branches.\n\n**The protocol is enforced by tools, not by instructions.** All comms artifacts \u2014 inbox messages, findings, reviews, mission files, `MISSIONS.md`, the activity log \u2014 are produced by the `Tower*` tools. Workers and reviewers carry `TowerSend`, `TowerInbox`, `TowerFinding`, `TowerReview`, `TowerMission`, and `TowerStatus`; the tower additionally gets `TowerInit`, `TowerPlan`, `TowerSpawn`, `TowerMerge`, and `TowerTeardown`. File naming, frontmatter, recipient validity, review rounds, the merge gate, and the activity-log format are code. **Never create or edit files under `.tower/` by hand** (yours or via Bash): if a tool refuses, read the error \u2014 it tells you the correct next step. When something looks wrong, read `.tower/comms/log/activity.log` first; every action of every participant is there.\n\nWorking principles:\n\n1. **Clarify up front. Never block on the human mid-run.** Use `AskUserQuestion` to pin down requirements with the human before you plan and spawn, while ambiguity is still cheap \u2014 that is the phase where asking beats deciding. Once the fleet is running, make the reasonable call yourself: record the decision (it lands in the activity log), inform the human in passing, proceed. The return channel is your normal chat reply (the human reads it when they come back) plus `activity.log` \u2014 say what you decided and why, in the open. Escalations are reported, not asked \u2014 unless every remaining thread is blocked, keep the others moving. Workers and reviewers cannot ask the human at all (their profile has no `AskUserQuestion`); they escalate to you with `TowerSend`. The single mid-run exception is creating git history over a non-empty directory (below): there, ask when asking is possible (not under auto permission mode) and take the safe default when it is not.\n2. **Agents negotiate internally.** Workers talk to each other through `TowerSend` directly \u2014 questions, review requests, broadcasts (`to: "all"`). You are the coordinator and the only merger, not a content relay: you relay wake-ups (resume an idle agent with a pointer to what it should read), triage findings, untangle conflicts, and merge.\n3. **Scope isolation is real.** `TowerPlan` rejects overlapping scopes, and `TowerMerge` refuses branches that changed files outside their mission scope. Plan scopes carefully; if a mission legitimately needs more, you widen it with `TowerMission` (scope patch \u2014 only you can, and it is logged).\n\n## Prepare (only when the directory is not a tower-ready git repo)\n\n`TowerInit` requires a git repository with at least one commit. If the session working directory is not inside one, the engine bootstraps it for you: `git init`, then an initial commit on the base branch \u2014 an empty directory gets `git commit --allow-empty -m "tower: init"`; a non-empty directory gets every present file committed as a dirty-base snapshot (`tower: snapshot of uncommitted base checkout changes (base <base>)` \u2014 the same semantics as starting a tower over an uncommitted checkout). If the directory holds secrets or large files that must not enter history, move them out or add a `.gitignore` BEFORE starting the tower \u2014 the snapshot commits everything present.\n\n## Tower workflow\n\n1. **Init** \u2014 `TowerInit`. It creates `.tower/` and records the base branch \u2014 when the human enabled tower mode with `/tower <base>`, the workspace and base branch are already set up, so `TowerInit` just confirms them. Workers and reviewers never prompt for tool approvals \u2014 they are pinned to the auto permission mode at spawn, whatever the session\'s mode. Your own orchestration calls still follow the session mode, so if it would interrupt you with constant prompts, tell the human once that a more autonomous mode fits tower better \u2014 then proceed regardless. When `TowerInit` reports carried-over open missions from a previous session, settle them **before planning**: continue the ones that belong to the current objective with fresh workers, and abandon the unrelated ones (`TowerMission status=abandoned`) \u2014 missions that are neither merged nor abandoned keep their scopes reserved, so `TowerPlan` rejects any new mission overlapping them.\n2. **Plan** \u2014 break the objective into 2\u20134 missions and call `TowerPlan` with each mission\'s title, **disjoint** scope globs (picomatch: `**` crosses directories), tasks, and dependencies. Mark read-only investigation missions `kind: "survey"`: a survey\'s scope is informational (it reserves nothing, so surveys and builds may overlap the same paths), the worker must not change code, and it closes with a zero-diff `TowerMerge` \u2014 no reviewer needed. Shared files (lockfiles, central configs) belong to exactly one build mission or to your own integration work. Post the plan to the human in one compact message and launch immediately \u2014 their words are plan changes, never a gate.\n3. **Spawn** \u2014 one `TowerSpawn` per mission (`kind: "worker"`, background, code-built briefing), and **spawn every dependency-unblocked mission right away**: fire the `TowerSpawn` calls back to back, never trickle them out one at a time and never wait for one worker before launching the next \u2014 the fleet exists to run in parallel. The tool refuses duplicate names \u2014 resume the existing agent with the `Agent` tool instead. Workers commit on their branch; their completion wakes you. Once the batch is running, **end your turn**: completions and inbox traffic arrive as notifications, so never poll `TowerInbox`/`TowerStatus` in a loop and never sit synchronously waiting on a worker. Workers use the configured secondary model when `[secondary_model]` provides one; otherwise they inherit your model. Reviewers always bind your primary model \u2014 review quality is not where you save. The resolved model is shown in the spawn output and the `spawn` line of `activity.log`.\n4. **Supervise** \u2014 on every wake (worker completion, human message): `TowerInbox` and `TowerStatus`, then act:\n   - Review request \u2192 `TowerSpawn` a reviewer (`kind: "reviewer"`, `review_target` the branch). Do not review mission code yourself. Survey missions skip review \u2014 close them with `TowerMerge` once their summary lands.\n   - Review verdict not clean \u2192 resume the author (Agent tool) pointing at the review file; the author fixes, pushes, and requests re-review. Round cap: at 5 rounds, or when two consecutive rounds report the same findings, stop the loop, inform the human, and redirect (reassign, split, descope).\n   - Blocker \u2192 answer or reassign if you can; if it genuinely needs the human, inform them and keep the rest moving.\n   - Finding \u2192 triage: assign to a mission, plan a new one, or backlog \u2014 the disposition is your call; tell the human.\n   - Completion report with a suspicious diff (\u{1F7E2} claimed, zero changed files) \u2192 investigate before accepting.\n5. **Merge** \u2014 `TowerMerge(branch)` in Dependency Flow order. The gate refuses when there is no clean review for the current tip, dependencies are unmerged, or files escaped the scope \u2014 the error message is your next step. After a merge, the result lists branches that now conflict: tell those workers (resume) to rebase onto the new base, resolve, push, and request re-review; their moved tip makes the gate demand a fresh clean review.\n6. **Teardown promptly** \u2014 when `TowerStatus` shows every mission \u2705 merged and no unactioned inbox items remain, call `TowerTeardown` **right away** and report the final summary (missions, merges, review rounds, findings and their disposition). Do not wait for the human to ask: branches and `.tower/comms/` (including the activity log) are kept and dirty worktrees are protected by the tool \u2014 only disk is freed. Teardown does **not** exit tower mode \u2014 you remain the tower, ready to `TowerInit` the next objective, until the human turns the mode off with `/tower off`. A `/tower teardown` from the human is the same instruction at any earlier point.\n\n## Hard rules for the tower\n\n- Exactly one tower. If a worker starts assigning work or merging, correct it on your next resume.\n- Never write product code yourself; integration fixes at merge time are yours, everything else goes to a worker.\n- Mission tracking lives in the tower protocol (`TowerPlan`/`TowerMission`/`TowerStatus`, `MISSIONS.md`), never in `TodoList` \u2014 it is code-denied in tower mode because todo semantics (one task in progress at a time) would serialize the fleet.\n- Workers negotiate through `TowerSend`; you relay wake-ups and step in for conflicts, caps, findings, and merges.\n- Never hand-edit `.tower/` files. The tools are the protocol.\n- You perform every merge, through `TowerMerge` \u2014 never `git merge` by hand, never merge around a refusal.\n- Before `TowerTeardown`, summarize what every worker produced for the human \u2014 per mission: what was built, the branch and its merge outcome, and anything left undone. Never tear down without that summary.\n';
     tower_mode_sparse_reminder_default = "Tower mode still active (see full instructions earlier). You are the control tower: run the protocol only through the `Tower*` tools \u2014 never create or edit files under `.tower/` by hand. Mission tracking lives in `TowerPlan`/`TowerMission`/`TowerStatus` (`MISSIONS.md`); TodoList is code-denied in tower mode. When something looks wrong, read `.tower/comms/log/activity.log` first. Never write product code yourself \u2014 workers own missions; you coordinate, review-route, and merge.\n";
     TOWER_MODE_DEDUP_MIN_TURNS = 2;
     TOWER_MODE_FULL_REFRESH_TURNS = 5;
@@ -279415,7 +279820,8 @@ ${tower_worker_overlay_default.trim()}`;
       sessionCtx;
       flags;
       sessions;
-      constructor(dispatcher, agentState, toolApproval, toolExecutor, profile, agentCtx, sessionCtx, flags, sessions, featureManager, config2, reminder, context, eventBus) {
+      log;
+      constructor(dispatcher, agentState, toolApproval, toolExecutor, profile, agentCtx, sessionCtx, flags, sessions, featureManager, config2, reminder, context, eventBus, log2) {
         super();
         this.dispatcher = dispatcher;
         this.agentState = agentState;
@@ -279425,6 +279831,7 @@ ${tower_worker_overlay_default.trim()}`;
         this.sessionCtx = sessionCtx;
         this.flags = flags;
         this.sessions = sessions;
+        this.log = log2;
         this.agentState.contributeState(towerKey);
         this.agentState.contributeState(towerOwnerKey);
         this.agentState.contributeState(towerBaseKey);
@@ -279486,26 +279893,41 @@ ${tower_worker_overlay_default.trim()}`;
         }));
       }
       async enter(base) {
-        if (this.agentCtx.agentId !== "main") return;
-        if (!this.flags.enabled("tower")) return;
-        if (!isTowerFeatureAssembled(this.flags)) return;
+        if (this.agentCtx.agentId !== "main") return {
+          entered: false,
+          reason: "not-main-agent"
+        };
+        if (!this.flags.enabled("tower")) return {
+          entered: false,
+          reason: "experiment-off"
+        };
+        if (!isTowerFeatureAssembled(this.flags)) return {
+          entered: false,
+          reason: "feature-not-assembled"
+        };
         if (base !== void 0) await this.prepareUserBase(base);
         if (this.isActive) {
           if (base !== void 0 && base !== this.agentState.get(towerBaseKey)) this.dispatchEnter(base);
-          return;
+          return { entered: true };
         }
         const owner = await this.resolveTowerOwner();
         if (owner !== void 0 && owner !== this.sessionCtx.sessionId) {
           const ownerHandle = this.sessions.get(owner);
           if (ownerHandle !== void 0) {
             const activity = ownerHandle.accessor.get(ISessionActivityView).state();
-            if (activity.busy || activity.pendingInteraction !== "none") return;
+            if (activity.busy || activity.pendingInteraction !== "none") return {
+              entered: false,
+              reason: "owned-by-live-session",
+              owner,
+              ownerTitle: await this.resolveOwnerTitle(ownerHandle)
+            };
             ownerHandle.accessor.get(IAgentLifecycleService).handleOf("main")?.accessor.get(IAgentTowerService).exit();
           }
         }
         for (const name of TOWER_MODE_TOOLS) this.profile.addActiveTool(name);
         this.lastPublished = true;
         this.dispatchEnter(base);
+        return { entered: true };
       }
       get requestedBase() {
         return this.agentState.get(towerBaseKey) ?? void 0;
@@ -279513,6 +279935,7 @@ ${tower_worker_overlay_default.trim()}`;
       async prepareUserBase(base) {
         const repoRoot = resolveTowerRepoRoot(this.sessionCtx.cwd);
         const store = new TowerStore(repoRoot);
+        await store.ensureRepository(base);
         if (await store.isInitialized()) {
           const state = await store.load();
           if (state.base === base) {
@@ -279554,6 +279977,12 @@ ${tower_worker_overlay_default.trim()}`;
         if (!this.agentState.get(towerKey)) return;
         this.lastPublished = false;
         this.dispatcher.dispatch(new TowerModeExit({ agentId: this.agentCtx.agentId }));
+        this.releaseTowerOwnership();
+      }
+      async releaseTowerOwnership() {
+        await new TowerStore(resolveTowerRepoRoot(this.sessionCtx.cwd)).release(this.sessionCtx.sessionId).then(() => void 0, (error48) => {
+          this.log.warn(`failed to release tower workspace ownership: ${error48 instanceof Error ? error48.message : String(error48)}`);
+        });
       }
       get isActive() {
         return this.agentCtx.agentId === "main" && this.flags.enabled("tower") && isTowerFeatureAssembled(this.flags) && this.agentState.get(towerKey);
@@ -279564,10 +279993,18 @@ ${tower_worker_overlay_default.trim()}`;
         const owner = await this.resolveTowerOwner();
         if (owner === void 0 || owner === this.sessionCtx.sessionId) return;
         if (this.sessions.get(owner) === void 0) return;
-        this.dispatcher.dispatch(new TowerModeExit({ agentId: this.agentCtx.agentId }));
+        this.exit();
       }
       async resolveTowerOwner() {
         return await new TowerStore(resolveTowerRepoRoot(this.sessionCtx.cwd)).load().then((state) => state.sessionId, () => void 0) ?? this.agentState.get(towerOwnerKey);
+      }
+      async resolveOwnerTitle(ownerHandle) {
+        try {
+          const meta3 = await ownerHandle.accessor.get(ISessionMetadata).read();
+          return isUntitled(meta3.title) ? void 0 : meta3.title;
+        } catch {
+          return;
+        }
       }
       async recordTowerAgentDeath(info) {
         if (info.kind !== "agent") return;
@@ -279619,7 +280056,8 @@ ${tower_worker_overlay_default.trim()}`;
       __decorateParam(10, IConfigService),
       __decorateParam(11, IAgentReminderService),
       __decorateParam(12, IAgentContextMemoryService),
-      __decorateParam(13, IEventBus)
+      __decorateParam(13, IEventBus),
+      __decorateParam(14, ILogService)
     ], AgentTowerService);
     registerScopedService("agent", IAgentTowerService, AgentTowerService, 0, "tower");
     IAgentCacheProbeService = createDecorator("agentCacheProbeService");
@@ -279756,13 +280194,34 @@ ${tower_worker_overlay_default.trim()}`;
       }
     };
     registerFeature(UsageFeature);
-    IAgentToolDedupeService = createDecorator("agentToolDedupeService");
+    HANDOFF_STEP_KIND = "handoff";
+    HandoffStepRequest = class extends ContinuationStepRequest {
+      observer;
+      constructor(observer) {
+        super({ kind: HANDOFF_STEP_KIND });
+        this.observer = observer;
+      }
+      onWillMaterialize() {
+        this.observer.onMaterialize();
+      }
+      abort() {
+        const aborted2 = super.abort();
+        if (aborted2) this.observer.onAbort();
+        return aborted2;
+      }
+    };
     REMINDER_TEXT_1 = "\n\n" + wrapSystemReminder("The same tool call has been repeated several times in a row. Before making your next call, write one sentence stating what new information you expect it to produce. Then act on that sentence: if it names something this result does not already give you, choose the action that best provides it; otherwise, continue with the evidence you already have.");
     REMINDER_TEXT_3 = "\n\n" + wrapSystemReminder("Write your final response now, without any further tool calls. Cover: the current blocker, each approach you have tried and what it established, and the specific information or decision you need from the user to unblock progress. Text only.");
     REPEAT_REMINDER_1_START = 3;
     REPEAT_REMINDER_2_START = 5;
     REPEAT_REMINDER_3_START = 8;
     REPEAT_FORCE_STOP_STREAK = 12;
+    HANDOFF_VETO_RESULT = {
+      output: `This turn was ended by the repeat breaker after the same tool call was issued ${String(REPEAT_FORCE_STOP_STREAK)} times in a row. This step accepts a text response only, so the tool call was not executed. Reply in text: the current blocker, what you tried, and what you need next.`,
+      isError: true,
+      stopTurn: true,
+      stopTurnReason: REPEAT_BREAKER_STOP_REASON
+    };
     DEDUPE_PLACEHOLDER_RESULT = { output: "" };
     toolDedupeStepCallsKey = defineState("toolDedupe.stepCalls", () => []);
     toolDedupeOriginalCallIndexKey = defineState("toolDedupe.originalCallIndex", () => /* @__PURE__ */ new Map());
@@ -279774,14 +280233,19 @@ ${tower_worker_overlay_default.trim()}`;
     toolDedupeActiveStepKey = defineState("toolDedupe.activeStep", () => 0);
     toolDedupeTurnCallRecordsKey = defineState("toolDedupe.turnCallRecords", () => /* @__PURE__ */ new Map());
     toolDedupeTurnRepeatCountKey = defineState("toolDedupe.turnRepeatCount", () => 0);
+    toolDedupeHandoffPhaseKey = defineState("toolDedupe.handoffPhase", () => "idle");
     AgentToolDedupeService = class AgentToolDedupeService2 extends Service {
       telemetry;
+      loop;
       toolExecutor;
       states;
       stepDeferreds = /* @__PURE__ */ new Map();
+      handoffVetoedCallIds = /* @__PURE__ */ new Set();
+      forceStoppedInStep = false;
       constructor(telemetry, loop, toolExecutor, states, eventBus) {
         super();
         this.telemetry = telemetry;
+        this.loop = loop;
         this.toolExecutor = toolExecutor;
         this.states = states;
         this.states.contributeState(toolDedupeStepCallsKey);
@@ -279794,20 +280258,34 @@ ${tower_worker_overlay_default.trim()}`;
         this.states.contributeState(toolDedupeActiveStepKey);
         this.states.contributeState(toolDedupeTurnCallRecordsKey);
         this.states.contributeState(toolDedupeTurnRepeatCountKey);
+        this.states.contributeState(toolDedupeHandoffPhaseKey);
         this._register(eventBus.subscribe(TurnEnded, () => this.clearTurnRecords()));
         loop.hooks.onWillBeginStep.register("toolDedupe", async (ctx, next) => {
           this.beginStep(ctx.turnId, ctx.step);
           await next();
         });
-        loop.hooks.onDidFinishStep.register("toolDedupe", async (_ctx, next) => {
+        loop.hooks.onDidFinishStep.register("toolDedupe", async (ctx, next) => {
           this.endStep();
+          this.settleHandoff(ctx.turnId);
           await next();
         });
         toolExecutor.onBeforeExecuteTool((event) => {
+          if (this.handoffPhase === "active") {
+            this.handoffVetoedCallIds.add(event.toolCall.id);
+            event.veto(HANDOFF_VETO_RESULT);
+            return;
+          }
           const checked = this.checkToolCall(event.toolCall.id, event.toolCall.name, event.args, event.trace);
           if (checked.syntheticResult !== null) event.veto(checked.syntheticResult);
         });
         toolExecutor.hooks.onDidExecuteTool.register("toolDedupe", async (ctx, next) => {
+          if (this.handoffPhase === "active") {
+            this.handoffVetoedCallIds.add(ctx.toolCall.id);
+            ctx.result = HANDOFF_VETO_RESULT;
+            ctx.stopTurn = true;
+            await next();
+            return;
+          }
           this.registerSkipped(ctx.toolCall.id, ctx.toolCall.name, ctx.args, ctx.toolCall.arguments, ctx.trace);
           ctx.result = await this.finalizeResult(ctx.toolCall.id, ctx.toolCall.name, ctx.args, ctx.result, ctx.trace);
           if (ctx.result.stopTurn === true) ctx.stopTurn = true;
@@ -279862,6 +280340,12 @@ ${tower_worker_overlay_default.trim()}`;
       set turnRepeatCount(value) {
         this.states.set(toolDedupeTurnRepeatCountKey, value);
       }
+      get handoffPhase() {
+        return this.states.get(toolDedupeHandoffPhaseKey);
+      }
+      set handoffPhase(value) {
+        this.states.set(toolDedupeHandoffPhaseKey, value);
+      }
       clearTurnRecords() {
         this.turnCallRecords.clear();
         this.turnRepeatCount = 0;
@@ -279871,9 +280355,12 @@ ${tower_worker_overlay_default.trim()}`;
           this.activeTurnId = turnId;
           this.consecutiveKey = null;
           this.consecutiveCount = 0;
+          this.handoffPhase = "idle";
           this.clearTurnRecords();
         }
         if (step !== void 0) this.activeStep = step;
+        this.forceStoppedInStep = false;
+        this.handoffVetoedCallIds.clear();
         for (const deferred2 of this.stepDeferreds.values()) deferred2.resolve({
           output: "Tool call deduplicated but original result was lost",
           isError: true
@@ -279890,6 +280377,28 @@ ${tower_worker_overlay_default.trim()}`;
           this.consecutiveKey = key2;
           this.consecutiveCount = 1;
         }
+      }
+      settleHandoff(turnId) {
+        const phase = this.handoffPhase;
+        if (phase === "active") {
+          this.handoffPhase = "done";
+          const properties = {
+            turn_id: turnId,
+            outcome: this.handoffVetoedCallIds.size > 0 ? "vetoed" : "text"
+          };
+          this.telemetry.track2("tool_call_repeat_handoff", properties);
+          return;
+        }
+        if (phase !== "idle" || !this.forceStoppedInStep) return;
+        this.handoffPhase = "pending";
+        this.loop.enqueue(new HandoffStepRequest({
+          onMaterialize: () => {
+            this.handoffPhase = "active";
+          },
+          onAbort: () => {
+            this.handoffPhase = "done";
+          }
+        }));
       }
       recordTurnRepeat(toolCallId, toolName, args, key2, trace) {
         const signature = callSignature(key2);
@@ -279980,6 +280489,7 @@ ${tower_worker_overlay_default.trim()}`;
         if (streak >= REPEAT_FORCE_STOP_STREAK) {
           finalResult = forceStopResult(result, REMINDER_TEXT_3);
           action = "stop";
+          this.forceStoppedInStep = true;
         } else if (streak >= REPEAT_REMINDER_3_START) {
           finalResult = appendReminder(result, REMINDER_TEXT_3);
           action = "r3";
@@ -280166,7 +280676,7 @@ ${tower_worker_overlay_default.trim()}`;
     UNSAFE_OPERAND$1 = /[$`*?[\]~]/;
     AGENTS_MD_BASENAMES = new Set(AGENTS_MD_PLAIN_NAMES);
     BASH_PARSE_OPTIONS = {
-      timeoutMs: 20,
+      timeoutMs: 500,
       maxNodes: 1e4
     };
     DISCOVERY_REMINDER_VARIANT = "agents_md";
@@ -281440,12 +281950,7 @@ ${records.join("\n---\n")}`,
     ];
     CODER_ROLE = `${TASK_AGENT_ROLE_PREFIX}
 
-Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. A final message of only a sentence or two is treated as too brief and sent back to you for expansion, costing an extra turn.`;
-    DEFAULT_SUMMARY_POLICY = {
-      minChars: 200,
-      continuationPrompt: summary_continuation_default,
-      retries: 1
-    };
+Your final message is the entire handoff \u2014 the parent sees nothing else from your run. Make it technically complete: what you changed and why, the path of every file you touched, how you verified the change (tests or commands run, with results), and anything left undone or worth follow-up. If you are stopped before finishing, the parent receives only what you have written so far, so keep the handoff current.`;
     registerAgentProfile({
       name: "agent",
       description: "Default agent",
@@ -281462,8 +281967,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       description: "General software engineering agent \u2014 the only subagent type with file-editing tools; use it for any delegated task that must modify code.",
       whenToUse: "Use this agent for non-trivial software engineering work that may require reading files, editing code, running commands, and returning a compact but technically complete summary to the parent agent.",
       tools: CODER_TOOLS,
-      renderSystemPrompt: (context) => renderSystemPromptResult(CODER_ROLE, context, { skillActive: skillActiveFor(CODER_TOOLS) }),
-      summaryPolicy: DEFAULT_SUMMARY_POLICY
+      renderSystemPrompt: (context) => renderSystemPromptResult(CODER_ROLE, context, { skillActive: skillActiveFor(CODER_TOOLS) })
     });
     registerAgentProfile({
       name: "explore",
@@ -281477,8 +281981,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         } catch {
           return "";
         }
-      },
-      summaryPolicy: DEFAULT_SUMMARY_POLICY
+      }
     });
     DEFAULT_PERMISSION_MODE_SECTION = "defaultPermissionMode";
     registerConfigSection(DEFAULT_PERMISSION_MODE_SECTION, external_exports.enum([
@@ -281514,6 +282017,8 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       }
     };
     nextAgentId = 0;
+    REMOVE_PROMPT_QUIESCE_TIMEOUT_MS = 3e3;
+    REMOVE_PROMPT_QUIESCE_POLL_MS = 10;
     AgentLifecycleService = class AgentLifecycleService2 extends Disposable {
       instantiation;
       ctx;
@@ -281597,11 +282102,15 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         let stage = "scope";
         let containerRef;
         let createdHandle;
+        const telemetryBinding = bindTelemetryScope(this.telemetry, {
+          agent_id: agentId,
+          mode: "agent"
+        });
         try {
           const handle = createScopedChildHandle(this.instantiation, "agent", agentId, {
             seeds: [
               [IAgentScopeContext, scopeContext],
-              [ITelemetryService, this.telemetry.withContext({ agent_id: agentId })],
+              [ITelemetryService, telemetryBinding.telemetry],
               [IAgentRuntimeBindingSeed, {
                 _serviceBrand: void 0,
                 binding: {
@@ -281611,6 +282120,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
               }]
             ],
             configureContainer: (container2) => {
+              container2.anchorKernelEntry(() => telemetryBinding.dispose(), "telemetry:agent-context");
               container2.anchorKernelFinalizer(() => {
                 eventBus?.deactivateAgent(agent);
               }, "agent-event-bus-deactivate");
@@ -281635,7 +282145,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
             type: agentId === "main" ? "main" : "sub",
             parentAgentId: agentId === "main" ? void 0 : "main",
             forkedFrom: opts.forkedFrom,
-            labels: opts.labels
+            labels: withSubagentProfile(opts.labels, agentId === "main" ? void 0 : opts.binding?.profile)
           });
           this.onDidCreateEmitter.fire(agent);
           didCreate = true;
@@ -281664,9 +282174,12 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
               await managed.handle.dispose();
             } catch {
             }
-          } else if (createdHandle !== void 0) try {
-            await createdHandle.dispose();
-          } catch {
+          } else {
+            if (createdHandle !== void 0) try {
+              await createdHandle.dispose();
+            } catch {
+            }
+            telemetryBinding.dispose();
           }
           if (!finalizerArmed) eventBus?.deactivateAgent(agent);
           if (didCreate) this.onDidCloseEmitter.fire(agent);
@@ -281684,16 +282197,16 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         if (sourceManaged === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Source agent "${sourceContext.agentId}" does not exist`, { details: { agentId: sourceContext.agentId } });
         if (opts?.agentId !== void 0 && this.get(opts.agentId) !== void 0) throw new Error2(ErrorCodes$1.AGENT_ALREADY_EXISTS, `Agent "${opts.agentId}" already exists`, { details: { agentId: opts.agentId } });
         const source = sourceManaged.handle;
+        const sourceData = source.accessor.get(IAgentProfileService).data();
+        const override = opts?.binding;
         const childContext = await this.create({
           agentId: opts?.agentId,
           runtimeId: source.accessor.get(IAgentRuntimeBindingService).current.runtimeId,
           forkedFrom: source.id,
-          labels: opts?.labels
+          labels: withSubagentProfile(opts?.labels, override?.profile ?? sourceData.profileName)
         });
         const child = this.requireManaged(childContext).handle;
-        const sourceData = source.accessor.get(IAgentProfileService).data();
         const childProfile = child.accessor.get(IAgentProfileService);
-        const override = opts?.binding;
         if (override?.profile !== void 0) await childProfile.bind({
           profile: override.profile,
           model: override.model ?? sourceData.modelAlias,
@@ -281723,7 +282236,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         for (const managed of this.roster.values()) {
           if (managed.closing || !managed.active) continue;
           const handle = managed.handle;
-          if (handle.accessor.get(IAgentStateService).get(profileKey).profileName === "tower-worker") continue;
+          if (hasPinnedPermissionMode(handle.accessor.get(IAgentStateService).get(profileKey).profileName)) continue;
           handle.accessor.get(IAgentPermissionModeService).setMode(mode);
         }
       }
@@ -281765,16 +282278,43 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         const compactionSettled = compaction?.promise.catch(() => void 0) ?? Promise.resolve();
         const reason = abortError$1("Agent removed");
         const prompt = handle.accessor.get(IAgentPromptService);
-        for (const turnId of loop.status().pendingTurnIds) loop.cancel(turnId, reason);
-        loop.cancel(void 0, reason);
         if (compaction !== null && !compaction.abortController.signal.aborted) compaction.abortController.abort(reason);
-        await Promise.all([
-          loop.settled(),
-          compactionSettled,
-          prompt.drain(reason)
-        ]);
-        managed.killSpace();
-        await handle.dispose();
+        const promptIdleDeadline = Date.now() + REMOVE_PROMPT_QUIESCE_TIMEOUT_MS;
+        let releaseQuiescence;
+        for (; ; ) {
+          for (const turnId of loop.status().pendingTurnIds) loop.cancel(turnId, reason);
+          loop.cancel(void 0, reason);
+          await Promise.all([
+            loop.settled(),
+            compactionSettled,
+            prompt.drain(reason)
+          ]);
+          let idle = true;
+          try {
+            const snapshot2 = prompt.list();
+            idle = !snapshot2.launching && snapshot2.active === void 0 && snapshot2.pending.length === 0;
+          } catch {
+            idle = true;
+          }
+          if (idle) try {
+            const guard = loop.tryAcquireQuiescence();
+            if (guard !== void 0) {
+              releaseQuiescence = () => guard.dispose();
+              break;
+            }
+          } catch {
+            break;
+          }
+          if (Date.now() >= promptIdleDeadline) break;
+          await new Promise((resolve3) => setTimeout(resolve3, REMOVE_PROMPT_QUIESCE_POLL_MS));
+        }
+        try {
+          await handle.accessor.get(IEventDispatcher).flush().catch(onUnexpectedError);
+          managed.killSpace();
+          await handle.dispose();
+        } finally {
+          releaseQuiescence?.();
+        }
         if (this.roster.get(agent.agentId) === managed) this.roster.delete(agent.agentId);
         this.onDidCloseEmitter.fire(agent);
       }
@@ -282271,7 +282811,6 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         const handle = this.agentLifecycle.handleOf(agent.agentId);
         if (handle === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Agent "${agent.agentId}" does not exist`, { details: { agentId: agent.agentId } });
         return runAgentTurn(handle, request, {
-          summaryPolicy: opts.summaryPolicy ?? this.summaryPolicyFor(handle),
           signal: opts.signal,
           onReady: opts.onReady
         });
@@ -282376,11 +282915,6 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         if (handle === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Caller agent "${agentId}" does not exist`, { details: { agentId } });
         return handle;
       }
-      summaryPolicyFor(handle) {
-        const profileName = handle.accessor.get(IAgentProfileService).data().profileName;
-        if (profileName === void 0) return void 0;
-        return this.catalog.get(profileName)?.summaryPolicy;
-      }
     };
     SessionSubagentService = __decorate([
       __decorateParam(0, IAgentLifecycleService),
@@ -282450,6 +282984,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       profile;
       toolPolicy;
       toolRegistry;
+      permissionMode;
       sessionMetadata;
       log;
       config;
@@ -282464,7 +282999,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
       canRunInBackground;
       catalogReady = false;
       frozenCatalogProfiles;
-      constructor(agentLifecycle, subagents, catalog, scopeContext, tasks, profile, toolPolicy, toolRegistry, sessionMetadata, log2, config2, flags, contributions) {
+      constructor(agentLifecycle, subagents, catalog, scopeContext, tasks, profile, toolPolicy, toolRegistry, permissionMode, sessionMetadata, log2, config2, flags, contributions) {
         this.agentLifecycle = agentLifecycle;
         this.subagents = subagents;
         this.catalog = catalog;
@@ -282472,6 +283007,7 @@ Your final message is the entire handoff \u2014 the parent sees nothing else fro
         this.profile = profile;
         this.toolPolicy = toolPolicy;
         this.toolRegistry = toolRegistry;
+        this.permissionMode = permissionMode;
         this.sessionMetadata = sessionMetadata;
         this.log = log2;
         this.config = config2;
@@ -282546,7 +283082,7 @@ ${modelLines}`;
             isError: true
           };
         }
-        const profileNameForDisplay = resumeAgentId !== void 0 && resumeAgentId.length > 0 ? this.resumeProfileName(resumeAgentId) ?? "subagent" : requestedProfileName ?? (args.fork === true ? this.profile.data().profileName ?? "coder" : "coder");
+        const profileNameForDisplay = resumeAgentId !== void 0 && resumeAgentId.length > 0 ? await this.resumeProfileName(resumeAgentId) ?? "subagent" : requestedProfileName ?? (args.fork === true ? this.profile.data().profileName ?? "coder" : "coder");
         return {
           description: `${args.run_in_background === true ? "Launching background" : "Launching"} ${profileNameForDisplay} agent: ${args.description}`,
           accesses: ToolAccesses.none(),
@@ -282561,10 +283097,10 @@ ${modelLines}`;
           execute: (ctx) => this.execution(args, ctx)
         };
       }
-      resumeProfileName(agentId) {
+      async resumeProfileName(agentId) {
         const target = this.agentLifecycle.handleOf(agentId);
-        if (target === void 0) return void 0;
-        return target.accessor.get(IAgentProfileService).data().profileName;
+        if (target !== void 0) return target.accessor.get(IAgentProfileService).data().profileName;
+        return subagentProfileName((await this.sessionMetadata.read()).agents?.[agentId]);
       }
       async launch(args, toolCallId, controller) {
         const requester = this.agentLifecycle.handleOf(this.callerAgentId);
@@ -282577,9 +283113,7 @@ ${modelLines}`;
         let displayModelSource;
         let promptText = args.prompt;
         if (isResume) {
-          const target2 = this.agentLifecycle.handleOf(resumeAgentId);
-          if (target2 === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Agent instance "${resumeAgentId}" does not exist`, { details: { agentId: resumeAgentId } });
-          await this.ensureOwnedIdleSubagent(resumeAgentId, target2);
+          const target2 = await this.resolveResumeTarget(resumeAgentId);
           agentId = target2.id;
           const resumed = target2.accessor.get(IAgentProfileService).data();
           profileName = resumed.profileName ?? "subagent";
@@ -282626,18 +283160,38 @@ ${modelLines}`;
           thinkingEffort: this.agentLifecycle.handleOf(agentId)?.accessor.get(IAgentProfileService).getEffectiveThinkingLevel(),
           completion: mirrored.then((r2) => ({
             result: r2.summary,
-            usage: r2.usage
+            usage: r2.usage,
+            stopReason: r2.stopReason
           }))
         };
       }
-      async ensureOwnedIdleSubagent(agentId, target) {
+      async resolveResumeTarget(agentId) {
+        const live = this.agentLifecycle.handleOf(agentId);
         const meta3 = (await this.sessionMetadata.read()).agents?.[agentId];
-        if (!isSubagentMeta(meta3)) throw new Error2(ErrorCodes$1.AGENT_NOT_A_SUBAGENT, `Agent instance "${agentId}" is not a subagent`, { details: { agentId } });
+        if (meta3 === void 0 && live === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Agent instance "${agentId}" does not exist`, { details: { agentId } });
+        if (meta3 === void 0 || !isSubagentMeta(meta3)) throw new Error2(ErrorCodes$1.AGENT_NOT_A_SUBAGENT, `Agent instance "${agentId}" is not a subagent`, { details: { agentId } });
         if (subagentParentAgentId(meta3) !== this.callerAgentId) throw new Error2(ErrorCodes$1.AGENT_NOT_OWNED, `Agent instance "${agentId}" does not belong to this parent agent`, { details: {
           agentId,
           callerAgentId: this.callerAgentId
         } });
+        const target = live ?? await this.rebuildSubagent(agentId, meta3);
         if (target.accessor.get(IAgentLoopService).status().state === "running") throw new Error2(ErrorCodes$1.AGENT_ALREADY_RUNNING, `Agent instance "${agentId}" is already running and cannot run concurrently`, { details: { agentId } });
+        return target;
+      }
+      async rebuildSubagent(agentId, meta3) {
+        await this.agentLifecycle.create({
+          agentId,
+          labels: labelsFromAgentMeta(meta3),
+          forkedFrom: meta3.forkedFrom
+        });
+        const rebuilt = this.agentLifecycle.handleOf(agentId);
+        if (rebuilt === void 0) throw new Error2(ErrorCodes$1.AGENT_NOT_FOUND, `Agent instance "${agentId}" does not exist`, { details: { agentId } });
+        if (!hasPinnedPermissionMode(rebuilt.accessor.get(IAgentProfileService).data().profileName)) rebuilt.accessor.get(IAgentPermissionModeService).setMode(this.permissionMode.mode);
+        this.log.info("subagent rebuilt for resume", {
+          agentId,
+          callerAgentId: this.callerAgentId
+        });
+        return rebuilt;
       }
       async execution(args, { toolCallId, signal }) {
         try {
@@ -282739,10 +283293,10 @@ ${modelLines}`;
       }
       async formatForegroundResult(taskId, handle, timeoutMs) {
         const info = this.tasks.getTask(taskId);
-        if (info?.status === "completed") return { output: formatForegroundAgentSuccess(handle, await this.tasks.readOutput(taskId)) };
-        const timedOut = info?.status === "timed_out";
+        const stopCode = info?.kind === "agent" ? info.stopCode : void 0;
+        if (info?.status === "completed") return { output: formatForegroundAgentSuccess(handle, await this.tasks.readOutput(taskId), stopCode) };
         return {
-          output: formatForegroundAgentFailure(handle, timedOut ? `Agent timed out after ${formatSubagentTimeoutDescription(timeoutMs)}.` : formatSubagentStoppedMessage(info?.stopReason), timedOut),
+          output: formatForegroundAgentFailure(handle, info?.status === "timed_out" ? `Agent timed out after ${formatSubagentTimeoutDescription(timeoutMs)}.` : formatSubagentStoppedMessage(info?.stopReason), failureStopReason(info, stopCode)),
           isError: true
         };
       }
@@ -282756,12 +283310,41 @@ ${modelLines}`;
       __decorateParam(5, IAgentProfileService),
       __decorateParam(6, IAgentToolPolicyService),
       __decorateParam(7, IAgentToolRegistryService),
-      __decorateParam(8, ISessionMetadata),
-      __decorateParam(9, ILogService),
-      __decorateParam(10, IConfigService),
-      __decorateParam(11, IFlagService),
-      __decorateParam(12, AgentToolContribution)
+      __decorateParam(8, IAgentPermissionModeService),
+      __decorateParam(9, ISessionMetadata),
+      __decorateParam(10, ILogService),
+      __decorateParam(11, IConfigService),
+      __decorateParam(12, IFlagService),
+      __decorateParam(13, AgentToolContribution)
     ], SubagentTool);
+    REASON_MAX_CHARS = 2e3;
+    REPEAT_BREAKER_NOTICE = "notice: The subagent was stopped by the repeat breaker after issuing the same tool call repeatedly. The summary below is its handoff, not a finished result.";
+    RESUME_NEXT_STEP = "next_step: Resume to continue where it stopped, or take over the task yourself; if neither works, report the failure to the user.";
+    NEXT_STEP_BY_REASON = {
+      completed: void 0,
+      repeat_breaker: "next_step: The subagent was stuck on one tool call. If you resume it, change the instructions or supply the missing input; otherwise continue the work yourself.",
+      cancelled: "next_step: The user stopped this subagent. Do not restart it unless the user asks.",
+      filtered: "next_step: Resuming is unlikely to help; rephrase or split the task before trying again.",
+      max_tokens: RESUME_NEXT_STEP,
+      max_steps: RESUME_NEXT_STEP,
+      provider_error: RESUME_NEXT_STEP,
+      no_final_message: RESUME_NEXT_STEP,
+      stopped: RESUME_NEXT_STEP,
+      timed_out: RESUME_NEXT_STEP,
+      error: RESUME_NEXT_STEP
+    };
+    STOP_REASON_BY_CODE = {
+      [REPEAT_BREAKER_STOP_REASON]: "repeat_breaker",
+      [ErrorCodes$1.AGENT_MAX_TOKENS_EXCEEDED]: "max_tokens",
+      [ErrorCodes$1.LOOP_MAX_STEPS_EXCEEDED]: "max_steps",
+      [ErrorCodes$1.PROVIDER_FILTERED]: "filtered",
+      [ErrorCodes$1.PROVIDER_RATE_LIMIT]: "provider_error",
+      [ErrorCodes$1.PROVIDER_API_ERROR]: "provider_error",
+      [ErrorCodes$1.PROVIDER_OVERLOADED]: "provider_error",
+      [ErrorCodes$1.PROVIDER_CONNECTION_ERROR]: "provider_error",
+      [ErrorCodes$1.PROVIDER_AUTH_ERROR]: "provider_error",
+      [ErrorCodes$1.AGENT_NO_FINAL_MESSAGE]: "no_final_message"
+    };
     registerAgentToolService(ISubagentTool, SubagentTool, {
       name: "Agent",
       domain: "subagent",
@@ -282991,10 +283574,10 @@ ${modelLines}`;
           kind: "question",
           payload: req,
           origin: {
-            turnId: req.turnId,
+            turnId: options2?.detached === true ? void 0 : req.turnId,
             agentId: options2?.agentId
           }
-        });
+        }).then((response) => isInteractionCancellation(response) ? null : response);
         const signal = options2?.signal;
         if (signal !== void 0) if (signal.aborted) this.dismiss(id);
         else {
@@ -283069,6 +283652,13 @@ ${modelLines}`;
         try {
           const result = await this.run(sink.signal);
           const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output);
+          if (result.isError === true) {
+            await sink.settle({
+              status: "failed",
+              stopReason: output
+            });
+            return;
+          }
           sink.appendOutput(output);
           await sink.settle({ status: "completed" });
         } catch (error48) {
@@ -283174,13 +283764,8 @@ ${modelLines}`;
         return {
           isError: false,
           output: `task_id: ${taskId}
-description: ${description}
 status: ${status}
-automatic_notification: true
-next_step: Continue your current work; the answer will arrive automatically when the user responds.
-next_step: Use TaskOutput with this task_id for a non-blocking status/answer snapshot.
-next_step: Use TaskStop only if the question should be cancelled.
-human_shell_hint: The pending question is also visible in the client UI.`
+next_step: Continue your work; the answer arrives automatically in a later message. Use TaskStop only to cancel the question.`
         };
       }
       async executeQuestion(args, { toolCallId, signal, turnId, trace }) {
@@ -283199,7 +283784,8 @@ human_shell_hint: The pending question is also visible in the client UI.`
             }))
           }, {
             signal,
-            agentId: this.scopeContext.agentId
+            agentId: this.scopeContext.agentId,
+            detached: args.background === true
           }));
           if (normalized === null || Object.keys(normalized.answers).length === 0) {
             const properties2 = { trace_id: trace?.traceId };
@@ -288060,7 +288646,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         return this.storage.readStream(scope, key2, range);
       }
       async has(scope, key2) {
-        return (await this.storage.list(scope, key2)).includes(key2);
+        return await this.storage.size(scope, key2) !== void 0;
       }
       async delete(scope, key2) {
         await this.storage.delete(scope, key2);
@@ -289326,8 +289912,8 @@ human_shell_hint: The pending question is also visible in the client UI.`
       snapshotFd = null;
       walFd = null;
       constructor(dir) {
-        this.snapshotPath = path.join(dir, "db.snapshot");
-        this.walPath = path.join(dir, "db.wal");
+        this.snapshotPath = path$1.join(dir, "db.snapshot");
+        this.walPath = path$1.join(dir, "db.wal");
       }
       /** Open both files (null-safe per side) and return the dev/ino identity of
       *  each attached handle (null = the file does not exist). Recovery's
@@ -290144,7 +290730,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         hooks.beforeRename?.();
         fsSync.renameSync(tmp, filePath);
         try {
-          const dfd = fsSync.openSync(path.dirname(filePath), "r");
+          const dfd = fsSync.openSync(path$1.dirname(filePath), "r");
           try {
             fsSync.fsyncSync(dfd);
           } finally {
@@ -291413,12 +291999,12 @@ human_shell_hint: The pending question is also visible in the client UI.`
       }
       /** Delete watch registrations whose owner pid is no longer alive. */
       async reapDeadWatches() {
-        const dir = path.dirname(this.path);
-        const prefix = `${path.basename(this.path)}.watch-`;
+        const dir = path$1.dirname(this.path);
+        const prefix = `${path$1.basename(this.path)}.watch-`;
         for (const f4 of await fs.readdir(dir).catch(() => [])) {
           if (!f4.startsWith(prefix)) continue;
           const pid = Number(f4.slice(prefix.length).split("-")[0]);
-          if (Number.isInteger(pid) && pid !== process.pid && !pidAlive(pid)) await fs.unlink(path.join(dir, f4)).catch(() => {
+          if (Number.isInteger(pid) && pid !== process.pid && !pidAlive(pid)) await fs.unlink(path$1.join(dir, f4)).catch(() => {
           });
         }
       }
@@ -291429,21 +292015,21 @@ human_shell_hint: The pending question is also visible in the client UI.`
       *  tokenless watch line cannot be told apart from our own when its pid is
       *  ours, so it keeps the old pid-based exclusion. */
       async hasLiveForeignWatch() {
-        const dir = path.dirname(this.path);
-        const prefix = `${path.basename(this.path)}.watch-`;
+        const dir = path$1.dirname(this.path);
+        const prefix = `${path$1.basename(this.path)}.watch-`;
         for (const f4 of await fs.readdir(dir).catch(() => [])) {
           if (!f4.startsWith(prefix)) continue;
           const pid = Number(f4.slice(prefix.length).split("-")[0]);
           if (!Number.isInteger(pid)) continue;
           let token;
           try {
-            token = JSON.parse(await fs.readFile(path.join(dir, f4), "utf8")).token;
+            token = JSON.parse(await fs.readFile(path$1.join(dir, f4), "utf8")).token;
           } catch {
             token = void 0;
           }
           if (token !== void 0 ? token === this.token : pid === process.pid) continue;
           if (pidAlive(pid)) return true;
-          await fs.unlink(path.join(dir, f4)).catch(() => {
+          await fs.unlink(path$1.join(dir, f4)).catch(() => {
           });
         }
         return false;
@@ -292613,12 +293199,12 @@ human_shell_hint: The pending question is also visible in the client UI.`
         this.deps = deps;
       }
       textIndexPath() {
-        return path.join(this.deps.dir(), TEXT_INDEXES_FILE);
+        return path$1.join(this.deps.dir(), TEXT_INDEXES_FILE);
       }
       /** On-disk postings file path for a text index (root location — the legacy
       *  pre-generation home; the name sanitization lives in generation.ts). */
       textPostingsPath(name) {
-        return path.join(this.deps.dir(), rootPostingsFile(name));
+        return path$1.join(this.deps.dir(), rootPostingsFile(name));
       }
       /** The canonical definition shape a text index's manifest hash is computed
       *  from (both sides use it, so a legacy definition without `tokenizer`
@@ -292931,7 +293517,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         if (!walSt || walSt.dev !== cp2.walDev || walSt.ino !== cp2.walIno || walSt.size < cp2.walOffset) throw new GenerationCorruptError("WAL anchor mismatch (rotated or truncated since the build)");
         if (this.deps.valueMode() === "disk" && cp2.snapshotIno !== 0) {
           if (!cp2.snapshotLinked) throw new GenerationCorruptError("snapshot not hard-linked; disk refs unservable");
-          const snapSt = await fs.stat(path.join(this.deps.dir(), SNAPSHOT_FILE)).catch((e2) => {
+          const snapSt = await fs.stat(path$1.join(this.deps.dir(), SNAPSHOT_FILE)).catch((e2) => {
             if (e2.code === "ENOENT") return null;
             throw e2;
           });
@@ -292957,7 +293543,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         const tStore = performance.now();
         const storeInfo = manifest.files[STORE_IMAGE_FILE];
         if (!storeInfo) throw new GenerationCorruptError("store image missing from manifest");
-        const storePayload = await readGenerationFileCheckedAsync(path.join(genDir, STORE_IMAGE_FILE), "MDGS", 4, storeInfo);
+        const storePayload = await readGenerationFileCheckedAsync(path$1.join(genDir, STORE_IMAGE_FILE), "MDGS", 4, storeInfo);
         const now = Date.now();
         const droppedExpired = [];
         const records = [];
@@ -293078,7 +293664,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
       async loadDtImage(genDir, manifest) {
         const info = manifest.files[DT_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileCheckedAsync(path.join(genDir, DT_INDEX_FILE), "MDGD", 1, info);
+          const payload = await readGenerationFileCheckedAsync(path$1.join(genDir, DT_INDEX_FILE), "MDGD", 1, info);
           this.deps.dt.loadImage(readDtIndexImage(payload));
           return;
         } catch (e2) {
@@ -293103,7 +293689,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         let images = null;
         const info = manifest.files[SECONDARY_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileCheckedAsync(path.join(genDir, SECONDARY_INDEX_FILE), "MDSI", 1, info);
+          const payload = await readGenerationFileCheckedAsync(path$1.join(genDir, SECONDARY_INDEX_FILE), "MDSI", 1, info);
           images = new Map((await readSecondaryIndexImageAsync(payload)).map((i2) => [i2.name, i2]));
         } catch (e2) {
           if (!(e2 instanceof GenerationCorruptError)) throw e2;
@@ -293133,7 +293719,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         let images = null;
         const info = manifest.files[COMPOUND_INDEX_FILE];
         if (info) try {
-          const payload = await readGenerationFileCheckedAsync(path.join(genDir, COMPOUND_INDEX_FILE), "MDCI", 1, info);
+          const payload = await readGenerationFileCheckedAsync(path$1.join(genDir, COMPOUND_INDEX_FILE), "MDCI", 1, info);
           images = new Map((await readCompoundIndexImageAsync(payload)).map((i2) => [i2.name, i2]));
         } catch (e2) {
           if (!(e2 instanceof GenerationCorruptError)) throw e2;
@@ -293174,9 +293760,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
           let attached = false;
           if (dictInfo && docsInfo && postingsInfo && manifest.indexDefs.text[def.name] === indexDefHash(TextRegistry.canonicalTextDef(def))) try {
             const tImage = performance.now();
-            const dictPayload = await readGenerationFileCheckedAsync(path.join(genDir, textDictionaryFile(def.name)), "MDTD", 1, dictInfo);
-            const docsPayload = await readGenerationFileCheckedAsync(path.join(genDir, textDocsFile(def.name)), "MDTC", 1, docsInfo);
-            const postingsPath = path.join(genDir, textPostingsFile(def.name));
+            const dictPayload = await readGenerationFileCheckedAsync(path$1.join(genDir, textDictionaryFile(def.name)), "MDTD", 1, dictInfo);
+            const docsPayload = await readGenerationFileCheckedAsync(path$1.join(genDir, textDocsFile(def.name)), "MDTC", 1, docsInfo);
+            const postingsPath = path$1.join(genDir, textPostingsFile(def.name));
             const tCrc = performance.now();
             await verifyFileIntegrityAsync(postingsPath, postingsInfo);
             this.deps.lifecycle.time("postingsIntegrityCheckMs", performance.now() - tCrc);
@@ -293341,7 +293927,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         const existing = await listGenerations(this.deps.dir());
         const id = generationId(Math.max(prevCurrent ? existing.find((g2) => g2.id === prevCurrent)?.n ?? 0 : 0, existing[0]?.n ?? 0) + 1);
         const tmpName = `${id}.tmp-${process.pid}`;
-        const tmpDir = path.join(gens, tmpName);
+        const tmpDir = path$1.join(gens, tmpName);
         const gb = {
           queue: [],
           bytes: 0,
@@ -293420,7 +294006,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
             }
             textBuilds.set(name, {
               ti: ti2,
-              b: ti2.beginBuild({ postingsPath: path.join(tmpDir, textPostingsFile(name)) })
+              b: ti2.beginBuild({ postingsPath: path$1.join(tmpDir, textPostingsFile(name)) })
             });
           } catch {
           }
@@ -293468,7 +294054,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
             checkAlive();
           }
           if (workerTargets.size > 0) {
-            const snapPath = path.join(this.deps.dir(), SNAPSHOT_FILE);
+            const snapPath = path$1.join(this.deps.dir(), SNAPSHOT_FILE);
             const walAnchor = fsSync.statSync(this.deps.walPath());
             let snapAnchor = null;
             try {
@@ -293500,9 +294086,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
                 name,
                 fields: def?.fields ?? null,
                 tokenizer: def?.tokenizer === "ngram" ? "ngram" : "default",
-                postingsPath: path.join(tmpDir, textPostingsFile(name)),
-                dictionaryPath: path.join(tmpDir, textDictionaryFile(name)),
-                baseDocsPath: path.join(tmpDir, `${textDocsFile(name)}.base`)
+                postingsPath: path$1.join(tmpDir, textPostingsFile(name)),
+                dictionaryPath: path$1.join(tmpDir, textDictionaryFile(name)),
+                baseDocsPath: path$1.join(tmpDir, `${textDocsFile(name)}.base`)
               })),
               memoryBudgetBytes: this.deps.textBuildMemoryBytes()
             }, {
@@ -293531,7 +294117,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
             }
           }
           const sortedImageKeys = [...imageRecords.keys()].sort();
-          const storeRes = await writeStoreImage(path.join(tmpDir, STORE_IMAGE_FILE), (function* () {
+          const storeRes = await writeStoreImage(path$1.join(tmpDir, STORE_IMAGE_FILE), (function* () {
             for (const kstr of sortedImageKeys) {
               const r2 = imageRecords.get(kstr);
               yield {
@@ -293546,11 +294132,11 @@ human_shell_hint: The pending question is also visible in the client UI.`
             bytes: storeRes.bytes,
             crc32: storeRes.crc32
           };
-          files[DT_INDEX_FILE] = await writeDtIndexImage(path.join(tmpDir, DT_INDEX_FILE), dtB.exportImage());
+          files[DT_INDEX_FILE] = await writeDtIndexImage(path$1.join(tmpDir, DT_INDEX_FILE), dtB.exportImage());
           const secImages = secB.exportImage();
-          files[SECONDARY_INDEX_FILE] = await writeSecondaryIndexImage(path.join(tmpDir, SECONDARY_INDEX_FILE), secImages);
+          files[SECONDARY_INDEX_FILE] = await writeSecondaryIndexImage(path$1.join(tmpDir, SECONDARY_INDEX_FILE), secImages);
           const cmpExport = cmpB.exportImage();
-          files[COMPOUND_INDEX_FILE] = await writeCompoundIndexImage(path.join(tmpDir, COMPOUND_INDEX_FILE), cmpExport.images);
+          files[COMPOUND_INDEX_FILE] = await writeCompoundIndexImage(path$1.join(tmpDir, COMPOUND_INDEX_FILE), cmpExport.images);
           if (workerHandle) {
             let result;
             try {
@@ -293565,9 +294151,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
             for (const r2 of result.indexes) {
               const target = workerTargets.get(r2.name);
               if (!target) continue;
-              const postingsPath = path.join(tmpDir, textPostingsFile(r2.name));
-              const dictionaryPath = path.join(tmpDir, textDictionaryFile(r2.name));
-              const baseDocsPath = path.join(tmpDir, `${textDocsFile(r2.name)}.base`);
+              const postingsPath = path$1.join(tmpDir, textPostingsFile(r2.name));
+              const dictionaryPath = path$1.join(tmpDir, textDictionaryFile(r2.name));
+              const baseDocsPath = path$1.join(tmpDir, `${textDocsFile(r2.name)}.base`);
               await verifyFileCrcAsync(postingsPath, r2.postingsInfo);
               const dictEntries = (await readTextDictionaryImageAsync(await readGenerationFileCheckedAsync(dictionaryPath, "MDTD", 1, r2.dictionaryInfo))).map((e2) => [e2.term, {
                 off: e2.off,
@@ -293591,7 +294177,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
           for (const [name, state] of textStates) {
             const workerResult = workerResults.get(name);
             if (workerResult) files[textDictionaryFile(name)] = workerResult.dictionaryInfo;
-            else files[textDictionaryFile(name)] = await writeTextDictionaryImage(path.join(tmpDir, textDictionaryFile(name)), (function* () {
+            else files[textDictionaryFile(name)] = await writeTextDictionaryImage(path$1.join(tmpDir, textDictionaryFile(name)), (function* () {
               for (const [term, e2] of state.dict) yield {
                 term,
                 off: e2.off,
@@ -293616,10 +294202,10 @@ human_shell_hint: The pending question is also visible in the client UI.`
                 }))
               }))
             };
-            files[textDocsFile(name)] = await writeTextDocsImage(path.join(tmpDir, textDocsFile(name)), docsImage);
+            files[textDocsFile(name)] = await writeTextDocsImage(path$1.join(tmpDir, textDocsFile(name)), docsImage);
             const clean = cleanPostings.get(name);
             if (clean) {
-              const dst = path.join(tmpDir, textPostingsFile(name));
+              const dst = path$1.join(tmpDir, textPostingsFile(name));
               try {
                 await fs.link(clean.src, dst);
               } catch {
@@ -293633,7 +294219,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
               files[textPostingsFile(name)] = postInfo;
             }
           }
-          const snapSrc = path.join(this.deps.dir(), SNAPSHOT_FILE);
+          const snapSrc = path$1.join(this.deps.dir(), SNAPSHOT_FILE);
           let snapSt = null;
           let snapshotLinked = false;
           try {
@@ -293642,11 +294228,11 @@ human_shell_hint: The pending question is also visible in the client UI.`
             if (e2.code !== "ENOENT") throw e2;
           }
           if (snapSt) try {
-            await fs.link(snapSrc, path.join(tmpDir, GEN_SNAPSHOT_FILE));
+            await fs.link(snapSrc, path$1.join(tmpDir, GEN_SNAPSHOT_FILE));
             snapshotLinked = true;
           } catch {
-            await fs.copyFile(snapSrc, path.join(tmpDir, GEN_SNAPSHOT_FILE));
-            const h2 = await fs.open(path.join(tmpDir, GEN_SNAPSHOT_FILE), "r");
+            await fs.copyFile(snapSrc, path$1.join(tmpDir, GEN_SNAPSHOT_FILE));
+            const h2 = await fs.open(path$1.join(tmpDir, GEN_SNAPSHOT_FILE), "r");
             try {
               await h2.sync();
             } finally {
@@ -293711,9 +294297,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
             for (const [, { ti: ti2 }] of workerTargets) ti2.close();
           }
           await publishGeneration(this.deps.dir(), tmpName, id, { stats: this.deps.stats });
-          for (const [name, tb] of textBuilds) tb.ti.repointPostings(path.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
-          for (const [name, { ti: ti2 }] of workerTargets) ti2.repointPostings(path.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
-          for (const [name, ti2] of textClean) if (cleanPostings.has(name)) ti2.repointPostings(path.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
+          for (const [name, tb] of textBuilds) tb.ti.repointPostings(path$1.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
+          for (const [name, { ti: ti2 }] of workerTargets) ti2.repointPostings(path$1.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
+          for (const [name, ti2] of textClean) if (cleanPostings.has(name)) ti2.repointPostings(path$1.join(generationDir(this.deps.dir(), id), textPostingsFile(name)));
           this.generationInfo = {
             id,
             createdAt: manifest.createdAt,
@@ -293727,7 +294313,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
           });
           for (const name of textStates.keys()) await fs.rm(this.deps.textRegistry.textPostingsPath(name), { force: true }).catch(() => {
           });
-          for (const name of workerResults.keys()) await fs.rm(path.join(generationDir(this.deps.dir(), id), `${textDocsFile(name)}.base`), { force: true }).catch(() => {
+          for (const name of workerResults.keys()) await fs.rm(path$1.join(generationDir(this.deps.dir(), id), `${textDocsFile(name)}.base`), { force: true }).catch(() => {
           });
         } catch (e2) {
           if (this.genBuild === gb) this.genBuild = null;
@@ -295384,7 +295970,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
           let snapshotDev = 0;
           let snapshotIno = 0;
           try {
-            const snapAnchor = fsSync.statSync(path.join(this.dir, SNAPSHOT_FILE));
+            const snapAnchor = fsSync.statSync(path$1.join(this.dir, SNAPSHOT_FILE));
             snapshotDev = snapAnchor.dev;
             snapshotIno = snapAnchor.ino;
           } catch (e2) {
@@ -295400,12 +295986,12 @@ human_shell_hint: The pending question is also visible in the client UI.`
           ti2.beginRebase();
           return checkpoint;
         };
-        const scratchDir = this.readOnly ? this.roScratchDir ??= path.join(this.dir, "..", `${path.basename(this.dir)}.ro-scratch`, `${process.pid}-${randomUUID().slice(0, 8)}`) : null;
+        const scratchDir = this.readOnly ? this.roScratchDir ??= path$1.join(this.dir, "..", `${path$1.basename(this.dir)}.ro-scratch`, `${process.pid}-${randomUUID().slice(0, 8)}`) : null;
         this.maintenance.submit("text-build", async (ctx) => {
           for (const { name, ti: ti2, def } of armed) {
             const output = scratchDir !== null ? {
               dir: scratchDir,
-              postingsPath: path.join(scratchDir, rootPostingsFile(name))
+              postingsPath: path$1.join(scratchDir, rootPostingsFile(name))
             } : null;
             let checkpoint = pin();
             let committed = false;
@@ -295501,7 +296087,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
             walDev = walAnchor.dev;
             walIno = walAnchor.ino;
             try {
-              const snapAnchor = fsSync.statSync(path.join(this.dir, SNAPSHOT_FILE));
+              const snapAnchor = fsSync.statSync(path$1.join(this.dir, SNAPSHOT_FILE));
               snapDev = snapAnchor.dev;
               snapIno = snapAnchor.ino;
             } catch (e2) {
@@ -295518,7 +296104,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
           ti2.abortRebase();
           throw e2;
         }
-        const tmpDir = output === null ? path.join(this.dir, `${rootPostingsFile(name)}.tmpbuild`) : null;
+        const tmpDir = output === null ? path$1.join(this.dir, `${rootPostingsFile(name)}.tmpbuild`) : null;
         let slotRelease = null;
         try {
           const artifactsDir = tmpDir ?? output.dir;
@@ -295527,9 +296113,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
             force: true
           });
           await fs.mkdir(artifactsDir, { recursive: true });
-          const postingsPath = tmpDir !== null ? path.join(tmpDir, rootPostingsFile(name)) : output.postingsPath;
-          const dictionaryPath = path.join(artifactsDir, textDictionaryFile(name));
-          const baseDocsPath = path.join(artifactsDir, `${textDocsFile(name)}.base`);
+          const postingsPath = tmpDir !== null ? path$1.join(tmpDir, rootPostingsFile(name)) : output.postingsPath;
+          const dictionaryPath = path$1.join(artifactsDir, textDictionaryFile(name));
+          const baseDocsPath = path$1.join(artifactsDir, `${textDocsFile(name)}.base`);
           const workerAvailable = textBuildWorkerAvailable();
           let inlineReason;
           if (workerAvailable) {
@@ -295538,7 +296124,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
           } else inlineReason = "runtime-unavailable";
           const inline = slotRelease === null;
           const handle = startWorkerTextBuild({
-            snapshotPath: snapIno !== 0 ? path.join(this.dir, SNAPSHOT_FILE) : null,
+            snapshotPath: snapIno !== 0 ? path$1.join(this.dir, SNAPSHOT_FILE) : null,
             walPath: this.walPath,
             walOffset: sealedOffset,
             walDev,
@@ -295602,9 +296188,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
           }).catch(() => {
           });
           else {
-            await fs.rm(path.join(output.dir, textDictionaryFile(name)), { force: true }).catch(() => {
+            await fs.rm(path$1.join(output.dir, textDictionaryFile(name)), { force: true }).catch(() => {
             });
-            await fs.rm(path.join(output.dir, `${textDocsFile(name)}.base`), { force: true }).catch(() => {
+            await fs.rm(path$1.join(output.dir, `${textDocsFile(name)}.base`), { force: true }).catch(() => {
             });
           }
         }
@@ -295632,7 +296218,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
       *  SEAM (injected into TextRegistry): kept on MiniDb so tests can stub it
       *  on the instance. */
       async persistTextIndexDefinitions(defs) {
-        await writeFileAtomic(path.join(this.dir, TEXT_INDEXES_FILE), JSON.stringify(defs), { stats: this.stats });
+        await writeFileAtomic(path$1.join(this.dir, TEXT_INDEXES_FILE), JSON.stringify(defs), { stats: this.stats });
       }
       async loadCompoundIndexDefinitions() {
         return this.indexAdmin.loadCompoundIndexDefinitions(this.compoundIndexPath);
@@ -295918,9 +296504,9 @@ human_shell_hint: The pending question is also visible in the client UI.`
         await fs.mkdir(destDir, { recursive: true });
         const names2 = await fs.readdir(srcDir);
         for (const name of names2) if (isPersistentFile(name) || name === "backup.manifest.json") {
-          const src = path.join(srcDir, name);
-          if ((await fs.stat(src)).isDirectory()) await fs.cp(src, path.join(destDir, name), { recursive: true });
-          else await fs.copyFile(src, path.join(destDir, name));
+          const src = path$1.join(srcDir, name);
+          if ((await fs.stat(src)).isDirectory()) await fs.cp(src, path$1.join(destDir, name), { recursive: true });
+          else await fs.copyFile(src, path$1.join(destDir, name));
         }
         return MiniDb2.open({
           ...openOpts,
@@ -296371,7 +296957,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
       async tryCatchUpReader(cached2, dir, parts) {
         const mark = cached2.walMark;
         if (!mark) return false;
-        const st2 = await fs.stat(path.join(dir, "db.wal")).catch(() => null);
+        const st2 = await fs.stat(path$1.join(dir, "db.wal")).catch(() => null);
         if (!st2 || st2.dev !== mark.dev || st2.ino !== mark.ino || st2.size < mark.size) return false;
         while (cached2.busy > 0) await sleep$1(5);
         cached2.busy++;
@@ -296425,7 +297011,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         return shardFor(key2, this.meta.shardCount);
       }
       shardDir(shardId) {
-        return path.join(this.baseDir, shardDirName(shardId, this.meta.shardCount));
+        return path$1.join(this.baseDir, shardDirName(shardId, this.meta.shardCount));
       }
       shardIds() {
         return Array.from({ length: this.meta.shardCount }, (_2, i2) => i2);
@@ -296447,7 +297033,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         if (!dir) throw new TypeError("Topology.open: dir is required");
         if (opts.shardCount !== void 0 && (!Number.isInteger(opts.shardCount) || opts.shardCount < 1)) throw new RangeError(`shardCount must be a positive integer, got ${opts.shardCount}`);
         await fs.mkdir(dir, { recursive: true });
-        const metaPath = path.join(dir, CLUSTER_META_FILE);
+        const metaPath = path$1.join(dir, CLUSTER_META_FILE);
         const requested = {
           version: META_VERSION,
           shardCount: opts.shardCount ?? DEFAULT_SHARD_COUNT,
@@ -296478,7 +297064,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         return this.meta.shardCount;
       }
       shardDir(shardId) {
-        return path.join(this.dir, shardDirName(shardId, this.meta.shardCount));
+        return path$1.join(this.dir, shardDirName(shardId, this.meta.shardCount));
       }
       allShardDirs() {
         return Array.from({ length: this.meta.shardCount }, (_2, i2) => this.shardDir(i2));
@@ -296513,7 +297099,7 @@ human_shell_hint: The pending question is also visible in the client UI.`
         await topology.ensureShardDirs();
         const router = new Router(opts.dir, topology.meta);
         const readOnly = !!opts.readOnly;
-        const indexPath = path.join(opts.dir, CLUSTER_INDEX_FILE);
+        const indexPath = path$1.join(opts.dir, CLUSTER_INDEX_FILE);
         const pool = new ShardLockPool({
           writerOpts: {
             valueCodec: topology.meta.valueCodec,
@@ -299108,7 +299694,8 @@ ${fallbackText}` : fallbackText;
           summaryOutputTokens: input.summaryOutputTokens,
           keptUserMessageCount: result.keptUserMessageCount,
           keptHeadUserMessageCount: result.keptHeadUserMessageCount,
-          droppedCount: result.droppedCount
+          droppedCount: result.droppedCount,
+          wireLines: input.wireLines
         }));
         this.tokenCounting.rebase(this.scopeContext.agentContext, {
           length: result.messages.length,
@@ -299677,6 +300264,9 @@ ${SUPERSEDES_SUFFIX}`;
       shouldBlock(usedSize) {
         return this.delegate().shouldBlock(usedSize);
       }
+      budget() {
+        return this.delegate().budget();
+      }
       computeCompactCount(messages, source) {
         return this.windowDelegate().computeCompactCount(messages, source);
       }
@@ -299729,6 +300319,17 @@ ${SUPERSEDES_SUFFIX}`;
       shouldBlock(usedSize) {
         if (this.maxSize <= 0) return false;
         return usedSize >= this.maxSize * this.config.blockRatio || this.shouldUseReservedContext(usedSize);
+      }
+      budget() {
+        const maxSize = this.maxSize;
+        const reservedContextSize = this.config.reservedContextSize;
+        const reservedTrigger = reservedContextSize > 0 && reservedContextSize < maxSize ? maxSize - reservedContextSize : Number.POSITIVE_INFINITY;
+        return {
+          maxSize,
+          triggerRatio: this.config.triggerRatio,
+          reservedContextSize,
+          triggerTokens: maxSize <= 0 ? Number.POSITIVE_INFINITY : Math.min(Math.ceil(maxSize * this.config.triggerRatio), reservedTrigger)
+        };
       }
       shouldUseReservedContext(usedSize) {
         const reservedSize = this.config.reservedContextSize;
@@ -299903,6 +300504,15 @@ ${SUPERSEDES_SUFFIX}`;
       __decorateParam(1, IAgentScopeContext),
       __decorateParam(2, IInstantiationService)
     ], AgentTodoService);
+    compaction_ahead_default = "<compaction_ahead>\nContext is at ~${used_pct}%; automatic compaction runs at ${trigger_pct}% (about ${remaining_k}k tokens from now). When it runs you will write a handoff note with text only \u2014 no tool calls. This is your last chance to act:\n- persist unfinished intermediate results to files or the todo list \u2014 these survive verbatim and can be read back;\n- verify with tools any claim you intend to carry forward (run the test; don't assume) \u2014 the note will be written with the result in view;\n- bring the current sub-task to a hand-off-able boundary; don't start large new work now;\n- if a long user input or constraint may be truncated (kept user messages are capped at ~${kept_k}k tokens), restate its essentials.\nThen continue the task; do not stop.\n</compaction_ahead>\n";
+    context_budget_default = "<context_budget>\nContext: ~${used_pct}% of the ${max_k}k-token window is used; automatic compaction runs at ${trigger_k}k (${trigger_pct}%). Figures are as of the last check.\nAt compaction this window is replaced by a handoff note you write yourself (text only, no tools). Kept verbatim: your recent user messages (capped at ~${kept_k}k tokens; a long one keeps only its head) and the todo list. Cleared: assistant messages, tool calls and tool results \u2014 but the full record stays on disk and a recovery pointer will follow the note.\nDo not wrap up or stop early because of budget. Prefer Grep or paged Read over whole-file reads when the payoff is small.\n</context_budget>\n";
+    CONTEXT_BUDGET_REMINDER_VARIANT = "context_budget";
+    COMPACTION_AHEAD_REMINDER_VARIANT = "compaction_ahead";
+    COMPACTION_AHEAD_LEAD_RATIO = 0.1;
+    BUCKET_THRESHOLDS = [["three_quarters", 0.75], ["half", 0.5]];
+    WRITE_TOOL_NAMES = /* @__PURE__ */ new Set(["Write", "Edit"]);
+    BASH_TOOL_NAMES = /* @__PURE__ */ new Set(["Bash"]);
+    TODO_TOOL_NAMES = /* @__PURE__ */ new Set(["TodoList", "SetTodoList"]);
     McpServerStatus = class extends AgentEvent2 {
       static type = "mcp.server.status";
       static observable = true;
@@ -299969,6 +300579,8 @@ continue:
   here is one less thing the next turn must rediscover. Include any required
   format for the final answer.
 
+This conversation's event log stays on disk and a recovery pointer is appended below your note automatically, so you need not reproduce long outputs verbatim \u2014 keep exact identifiers, key values and error lines, and name anything the next turn should look up.
+
 Your TODO list is re-attached automatically below this note from its live
 source, so do not transcribe it \u2014 copying it wastes space and can contradict the
 live version. What that list cannot hold is the reasoning between tasks \u2014 why one
@@ -299991,6 +300603,7 @@ need in the conversation history.
 
 \${custom_instruction_block}
 `;
+    context_recovery_footer_default = "## Context Recovery\nEverything before this note is still on disk in this agent's event log (read-only, append-only):\n  ${wire_path}\n${window_lines}\nIf you need exact command output, file contents, error text, or the wording of an earlier request, look it up there instead of guessing. How to read it:\n- Layout: one file per agent. agents/main/ is the main agent; each subagent has its own agents/<agentId>/wire.jsonl. A parent's log holds only the Agent tool call and the subagent's returned result \u2014 the subagent's own steps are in its own file.\n- Format: one JSON record per line, append-only; `type` says what it is. The conversation is in `context.append_message` (user prompts) and `context.append_loop_event` (event.type: step.begin | content.part [text|think] | tool.call | tool.result | step.end). Every other type (llm.request, usage.record, token_counting.measured, metadata, profile.bind, \u2026) is bookkeeping \u2014 skip it.\n- Boundaries: `context.apply_compaction` marks a compaction (older lines stay in the file; grep for it to find exact boundaries). `context.undo` count=N retracts the previous N messages \u2014 treat retracted content as never having happened. `context.clear` resets the conversation.\n- Externalized content: tool results over 50k chars are stored truncated, with an `output_path` to a tool-results/*.txt file holding the full text. Media parts are blob references, not inline.\n- Reading: lines are long JSON (often 10k+ chars). Grep the file for a keyword to get line numbers, then Read exactly that line (line_offset=N, n_lines=1) \u2014 Read returns wire.jsonl lines whole up to ~150k chars. To pull one field with real newlines: sed -n 'Np' wire.jsonl | jq -r '.event.result.output'. Never Read large ranges \u2014 a handful of records can exceed the per-call byte cap.\n";
     DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS = 128 * 1024;
     OVERFLOW_CONTEXT_SAFETY_RATIO = 0.85;
     OVERFLOW_STATUS_RECOVERY_RATIO = 0.5;
@@ -300029,12 +300642,13 @@ need in the conversation history.
       eventBus;
       loopService;
       states;
+      wire;
       hooks = { onWillCompact: new OrderedHookSlot() };
       _onDidFinishCompaction = this._register(new Emitter());
       onDidFinishCompaction = this._onDidFinishCompaction.event;
       strategy;
       _compacting = null;
-      constructor(context, tokenCounting, llmRequester, profile, toolRegistry, toolSelect, agent, todo, telemetry, dispatcher, eventBus, loopService, states) {
+      constructor(context, tokenCounting, llmRequester, profile, toolRegistry, toolSelect, agent, todo, telemetry, dispatcher, eventBus, loopService, states, wire) {
         super();
         this.context = context;
         this.tokenCounting = tokenCounting;
@@ -300049,7 +300663,9 @@ need in the conversation history.
         this.eventBus = eventBus;
         this.loopService = loopService;
         this.states = states;
+        this.wire = wire;
         this.states.contributeState(fullCompactionKey);
+        this.states.contributeState(fullCompactionWireRangesKey);
         this.states.contributeState(fullCompactionCompactionCountInTurnKey);
         this.states.contributeState(fullCompactionObservedMaxContextTokensByModelKey);
         this.states.contributeState(fullCompactionLastCompactedTokenCountKey);
@@ -300107,6 +300723,12 @@ need in the conversation history.
       }
       get compacting() {
         return this._compacting;
+      }
+      budget() {
+        return {
+          used: this.tokenCountWithPending(),
+          ...this.strategy.budget()
+        };
       }
       cancel() {
         const active = this._compacting;
@@ -300375,14 +300997,10 @@ need in the conversation history.
           const maxContextTokens = resolvedModel.modelCapabilities.max_context_tokens;
           const defaultCompactionCap = maxContextTokens > 0 ? Math.min(maxContextTokens, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS) : void 0;
           const compactionMaxOutputSize = resolvedModel.maxOutputSize ?? defaultCompactionCap;
-          const customInstruction = data.instruction?.trim() ?? "";
-          const instruction = renderPrompt(compaction_instruction_default, { custom_instruction_block: customInstruction.length > 0 ? `
-Optional user instruction:
-${customInstruction}
-` : "" }).trimEnd();
+          const instruction = renderCompactionInstruction({ customInstruction: data.instruction });
           const delays = retryBackoffDelays(5);
           let attempt;
-          let historyForModel = stripDynamicToolContext(originalHistory);
+          let historyForModel = stripDynamicToolContext(originalHistory).filter((message) => !isContextBudgetReminder(message));
           let droppedCount = 0;
           let overflowShrinkCount = 0;
           let emptyOrTruncatedShrinkCount = 0;
@@ -300411,6 +301029,7 @@ ${customInstruction}
                 if (overflowShrinkCount > MAX_COMPACTION_OVERFLOW_SHRINK_ATTEMPTS || messagesToCompact.length <= 1) throw error48;
                 const before2 = messagesToCompact.length;
                 historyForModel = shrinkCompactionHistoryAfterOverflow(messagesToCompact, overflowShrinkCount, (message) => this.tokenCounting.estimateMessage(message));
+                if (historyForModel.length === 0) throw error48;
                 droppedCount += before2 - historyForModel.length;
                 retryCount = 0;
                 continue;
@@ -300438,14 +301057,20 @@ ${customInstruction}
             throw compactionCancelledReason(active2);
           }
           const summary = await this.postProcessSummary(attempt.summary);
+          const wireLines = await this.captureWireLines();
+          const recoveryFooter = this.renderRecoveryFooter(wireLines);
+          const summaryText = buildCompactionSummaryText(summary);
           const result = this.context.applyCompaction({
             summary,
-            contextSummary: buildCompactionSummaryText(summary),
+            contextSummary: recoveryFooter === void 0 ? summaryText : `${summaryText}
+
+${recoveryFooter}`,
             compactedCount: originalHistory.length,
             tokensBefore,
-            summaryOutputTokens: attempt.usage?.output,
+            summaryOutputTokens: attempt.usage === null ? void 0 : attempt.usage.output + (recoveryFooter === void 0 ? 0 : this.tokenCounting.estimateText(recoveryFooter)),
             requestOverheadTokens: this.requestTokens([]),
-            droppedCount: droppedCount === 0 ? void 0 : droppedCount
+            droppedCount: droppedCount === 0 ? void 0 : droppedCount,
+            wireLines
           });
           const properties = {
             turn_id: active.originTurnId,
@@ -300459,7 +301084,8 @@ ${customInstruction}
             round: 1,
             thinking_effort: thinkingEffort,
             trace_id: attempt.traceId,
-            ...usageTelemetry(attempt.usage)
+            ...usageTelemetry(attempt.usage),
+            ...aheadReminderTelemetry(originalHistory)
           };
           this.telemetry.track2("compaction_finished", properties);
           return result;
@@ -300488,6 +301114,31 @@ ${customInstruction}
 
 ${renderTodoList(todos, "## TODO List")}`;
       }
+      async captureWireLines() {
+        try {
+          await this.wire.flush();
+        } catch (error48) {
+          onUnexpectedError(error48);
+          return;
+        }
+        const end = this.wire.lineCount();
+        const previous = this.states.get(fullCompactionWireRangesKey).at(-1);
+        const start = Math.max(previous?.end ?? 0, this.wire.lastContextClearLine() ?? 0) + 1;
+        if (end < start) return void 0;
+        return {
+          start,
+          end
+        };
+      }
+      renderRecoveryFooter(wireLines) {
+        if (wireLines === void 0) return void 0;
+        const journalPath = this.wire.journalPath();
+        if (journalPath === void 0) return void 0;
+        return renderContextRecoveryPointer({
+          journalPath,
+          windows: [...this.states.get(fullCompactionWireRangesKey), wireLines]
+        });
+      }
       tokenCountWithPending() {
         return this.tokenCounting.get(agentContextOfScope(this.agent)).size;
       }
@@ -300505,9 +301156,79 @@ ${renderTodoList(todos, "## TODO List")}`;
       __decorateParam(9, IEventDispatcher),
       __decorateParam(10, IEventBus),
       __decorateParam(11, IAgentLoopService),
-      __decorateParam(12, IAgentStateService)
+      __decorateParam(12, IAgentStateService),
+      __decorateParam(13, IWireService)
     ], AgentFullCompactionService);
     registerScopedService("agent", IAgentFullCompactionService, AgentFullCompactionService, 0, "fullCompaction");
+    contextBudgetActorLogic = setup({
+      types: {},
+      actors: { contextBudgetReminders: fromCallback(({ input }) => {
+        const runtime = input.runtime;
+        const reminder = runtime.get(IAgentReminderService);
+        const compaction = runtime.get(IAgentFullCompactionService);
+        const telemetry = runtime.get(ITelemetryService);
+        const budgetRegistration = reminder.register(CONTEXT_BUDGET_REMINDER_VARIANT, ({ lastDisclosure }) => {
+          const budget = compaction.budget();
+          const bucket = contextBudgetBucket(budget);
+          if (bucket === void 0 || lastDisclosure?.bucket === bucket) return void 0;
+          telemetry.track2("context_budget_reminder", {
+            bucket,
+            used_tokens: budget.used,
+            trigger_tokens: budget.triggerTokens,
+            max_tokens: budget.maxSize
+          });
+          return {
+            content: renderContextBudgetReminder(budget),
+            disclosure: { bucket }
+          };
+        });
+        const aheadRegistration = reminder.register(COMPACTION_AHEAD_REMINDER_VARIANT, ({ lastInjection }) => {
+          if (lastInjection !== void 0) return void 0;
+          const budget = compaction.budget();
+          if (!shouldRemindCompactionAhead(budget)) return void 0;
+          telemetry.track2("compaction_ahead_reminder", {
+            used_tokens: budget.used,
+            trigger_tokens: budget.triggerTokens,
+            lead_tokens: compactionAheadLeadTokens(budget)
+          });
+          return renderCompactionAheadReminder(budget);
+        });
+        return () => {
+          budgetRegistration.dispose();
+          aheadRegistration.dispose();
+        };
+      }) }
+    }).createMachine({
+      context: ({ input }) => ({ runtime: input }),
+      initial: "beforeRestore",
+      states: {
+        beforeRestore: { on: { "runtime.restore": "active" } },
+        active: { invoke: {
+          src: "contextBudgetReminders",
+          input: ({ context }) => ({ runtime: context.runtime })
+        } }
+      }
+    });
+    IAgentContextBudgetService = createDecorator("agentContextBudgetService");
+    AgentContextBudgetService = class AgentContextBudgetService2 extends AgentActorService {
+      constructor(dispatcher, scopeContext, instantiation) {
+        super(dispatcher, scopeContext, instantiation);
+        this.attachActor(contextBudgetActorLogic, { id: "contextBudget" });
+      }
+    };
+    AgentContextBudgetService = __decorate([
+      __decorateParam(0, IEventDispatcher),
+      __decorateParam(1, IAgentScopeContext),
+      __decorateParam(2, IInstantiationService)
+    ], AgentContextBudgetService);
+    ContextBudgetFeature = class extends Feature {
+      static name = "contextBudget";
+      constructor() {
+        super();
+        this.contributeAgentService(IAgentContextBudgetService, AgentContextBudgetService);
+      }
+    };
+    registerFeature(ContextBudgetFeature);
     IAgentMediaResolverService = createDecorator("agentVideoResolverService");
     ToolCallIdNormalizer = class {
       seen = /* @__PURE__ */ new Set();
@@ -300729,14 +301450,16 @@ ${renderTodoList(todos, "## TODO List")}`;
       async requestWithTrace(trace, overrides, onPart, signal) {
         signal?.throwIfAborted();
         const startedAt = Date.now();
-        trace.set(void 0);
+        const setTrace = (traceId) => {
+          trace.set(traceId);
+          if (overrides.source?.type === "turn") this.telemetry.setContext({ trace_id: traceId });
+        };
+        setTrace(void 0);
         try {
-          return await this.runRequest(this.resolveRequest(overrides), onPart, signal, (traceId) => {
-            trace.set(traceId);
-          });
+          return await this.runRequest(this.resolveRequest(overrides), onPart, signal, setTrace);
         } catch (error48) {
           this.logRequestFailure(error48, overrides, signal);
-          trace.set(this.trackApiError(error48, startedAt, signal, overrides.source, trace.traceId));
+          setTrace(this.trackApiError(error48, startedAt, signal, overrides.source, trace.traceId));
           throw error48;
         }
       }
@@ -301208,6 +301931,10 @@ ${renderTodoList(todos, "## TODO List")}`;
       hasPendingRequests() {
         return this.items.some((item) => !item.aborted);
       }
+      peekDriverKind() {
+        this.discardAborted();
+        return (this.items.find((item) => !item.mergeable) ?? this.items[0])?.kind;
+      }
       takeNextBatch() {
         this.discardAborted();
         if (this.items.length === 0) return void 0;
@@ -301250,7 +301977,6 @@ ${renderTodoList(todos, "## TODO List")}`;
       dispatcher;
       scopeContext;
       telemetry;
-      telemetryContext;
       states;
       hooks = {
         onWillBeginStep: new OrderedHookSlot(),
@@ -301265,7 +301991,7 @@ ${renderTodoList(todos, "## TODO List")}`;
       settleWaiters = [];
       quiescenceDepth = 0;
       activeRequestTrace;
-      constructor(context, llmRequester, toolExecutor, config2, dispatcher, scopeContext, telemetry, telemetryContext, states) {
+      constructor(context, llmRequester, toolExecutor, config2, dispatcher, scopeContext, telemetry, states) {
         super();
         this.context = context;
         this.llmRequester = llmRequester;
@@ -301274,7 +302000,6 @@ ${renderTodoList(todos, "## TODO List")}`;
         this.dispatcher = dispatcher;
         this.scopeContext = scopeContext;
         this.telemetry = telemetry;
-        this.telemetryContext = telemetryContext;
         this.states = states;
         this.states.contributeState(turnKey);
         this.states.contributeState(loopNextReservedTurnIdKey);
@@ -301596,22 +302321,20 @@ ${renderTodoList(todos, "## TODO List")}`;
       }
       async runTurn(turn, ready) {
         const startedAt = Date.now();
-        this.telemetryContext.set({ turn_id: turn.id });
-        const telemetryContext = this.telemetryContext.get();
-        const turnTelemetry = this.telemetry.withContext(telemetryContext);
-        const { mode, provider_type, protocol } = telemetryContext;
+        this.telemetry.setContext({ turn_id: turn.id });
+        const { mode, provider_type, protocol } = this.telemetry.getContext();
         let thinkingEffort;
         let result;
         try {
           thinkingEffort = this.llmRequester.prepareTurnConfig(turn.id)?.thinkingEffort;
+          this.telemetry.setContext({ thinking_effort: thinkingEffort });
           const started = {
             turn_id: turn.id,
-            mode,
+            mode: mode ?? "agent",
             provider_type,
-            protocol,
-            thinking_effort: thinkingEffort
+            protocol
           };
-          turnTelemetry.track2("turn_started", started);
+          this.telemetry.track2("turn_started", started);
           result = await this.run({
             turnId: turn.id,
             signal: turn.signal,
@@ -301635,7 +302358,8 @@ ${renderTodoList(todos, "## TODO List")}`;
               reason: result.type,
               error: error48,
               durationMs,
-              interruptReason
+              interruptReason,
+              stopReason: result.type === "completed" ? result.stopReason : void 0
             }));
             if (error48 !== void 0) this.dispatcher.dispatch(new AgentErrorEvent({
               ...error48,
@@ -301645,27 +302369,30 @@ ${renderTodoList(todos, "## TODO List")}`;
               const interrupted = {
                 turn_id: turn.id,
                 at_step: result.steps,
-                mode,
+                mode: mode ?? "agent",
                 interrupt_reason: interruptReason,
                 provider_type,
                 protocol,
-                thinking_effort: thinkingEffort,
                 trace_id: traceId
               };
-              turnTelemetry.track2("turn_interrupted", interrupted);
+              this.telemetry.track2("turn_interrupted", interrupted);
             }
           }
           const ended = {
             turn_id: turn.id,
             reason: result?.type ?? "failed",
             duration_ms: Date.now() - startedAt,
-            mode,
+            mode: mode ?? "agent",
             provider_type,
             protocol,
-            thinking_effort: thinkingEffort,
             trace_id: traceId
           };
-          turnTelemetry.track2("turn_ended", ended);
+          this.telemetry.track2("turn_ended", ended);
+          this.telemetry.setContext({
+            turn_id: void 0,
+            trace_id: void 0,
+            thinking_effort: void 0
+          });
           this.activeRequestTrace = void 0;
           this.lastRequestTraceId = void 0;
           this.pumpTurns();
@@ -301746,19 +302473,30 @@ ${renderTodoList(todos, "## TODO List")}`;
           queue: job?.queue ?? this.standaloneStepQueue,
           steps: 0,
           lastStopReason: void 0,
+          forcedStopReason: void 0,
           current: void 0
+        };
+      }
+      completedResult(runtime) {
+        const truncated = runtime.lastStopReason === "truncated";
+        if (runtime.forcedStopReason === void 0) return {
+          type: "completed",
+          steps: runtime.steps,
+          truncated
+        };
+        return {
+          type: "completed",
+          steps: runtime.steps,
+          truncated,
+          stopReason: runtime.forcedStopReason
         };
       }
       beginLoopStep(runtime) {
         runtime.current = void 0;
         runtime.turnSignal.throwIfAborted();
-        if (!runtime.queue.hasPendingRequests()) return { result: {
-          type: "completed",
-          steps: runtime.steps,
-          truncated: runtime.lastStopReason === "truncated"
-        } };
+        if (!runtime.queue.hasPendingRequests()) return { result: this.completedResult(runtime) };
         const maxSteps = this.config.get(LOOP_CONTROL_SECTION)?.maxStepsPerTurn;
-        if (maxSteps !== void 0 && maxSteps > 0 && runtime.steps >= maxSteps) throw createMaxStepsExceededError(maxSteps);
+        if (maxSteps !== void 0 && maxSteps > 0 && runtime.steps >= maxSteps && runtime.queue.peekDriverKind() !== "handoff") throw createMaxStepsExceededError(maxSteps);
         const batch = runtime.queue.takeNextBatch();
         const mutableStep = runtime.job?.steps.get(batch.driver.id);
         if (mutableStep !== void 0) {
@@ -301785,16 +302523,13 @@ ${renderTodoList(todos, "## TODO List")}`;
         }
         runtime.current = void 0;
         runtime.lastStopReason = result.stopReason;
+        if (result.stopTurnReason !== void 0 && runtime.forcedStopReason === void 0) runtime.forcedStopReason = result.stopTurnReason;
         if (result.stopReason === "filtered") throw new Error2(ErrorCodes$1.PROVIDER_FILTERED, "Provider safety policy blocked the response.", {
           name: "ProviderFilteredError",
           details: { finishReason: "filtered" }
         });
         if (!result.hookStopTurn) return void 0;
-        return {
-          type: "completed",
-          steps: runtime.steps,
-          truncated: result.stopReason === "truncated"
-        };
+        return this.completedResult(runtime);
       }
       async handleLoopStepError(runtime, error48) {
         const cancellation = this.handleLoopCancellation(runtime, error48);
@@ -301880,6 +302615,7 @@ ${renderTodoList(todos, "## TODO List")}`;
       }
       async executeLoopStep(turnId, signal, turnSignal, currentStep, firstStepOfTurn, stepUuid, onStarted) {
         this.activeRequestTrace = void 0;
+        this.telemetry.setContext({ trace_id: void 0 });
         await this.hooks.onWillBeginStep.run({
           turnId,
           step: currentStep,
@@ -301905,12 +302641,13 @@ ${renderTodoList(todos, "## TODO List")}`;
           }
           this.lastRequestTraceId = request.trace.traceId;
           this.appendResponseContent(turnId, currentStep, stepUuid, response);
-          const finishReason = await this.executeStepTools(turnId, signal, currentStep, stepUuid, response, request.trace);
+          const { finishReason, stopTurnReason } = await this.executeStepTools(turnId, signal, currentStep, stepUuid, response, request.trace);
           this.finishStep(turnId, signal, currentStep, stepUuid, response, finishReason, markStepStarted);
           stepEndAppended = true;
           return {
             stopReason: finishReason,
-            hookStopTurn: await this.runAfterStep(turnId, signal, currentStep, firstStepOfTurn, response.usage, finishReason)
+            hookStopTurn: await this.runAfterStep(turnId, signal, currentStep, firstStepOfTurn, response.usage, finishReason),
+            stopTurnReason
           };
         } catch (error48) {
           if (!stepEndAppended) this.context.appendLoopEvent({
@@ -301966,9 +302703,10 @@ ${renderTodoList(todos, "## TODO List")}`;
       }
       async executeStepTools(turnId, signal, currentStep, stepUuid, response, trace) {
         let finishReason = response.providerFinishReason ?? "completed";
-        if (response.message.toolCalls.length === 0) return finishReason === "tool_calls" ? "other" : finishReason;
+        if (response.message.toolCalls.length === 0) return { finishReason: finishReason === "tool_calls" ? "other" : finishReason };
         const toolCallUuids = /* @__PURE__ */ new Map();
         let stopTurn = false;
+        let stopTurnReason;
         for await (const toolResult of this.toolExecutor.execute(response.message.toolCalls, {
           signal,
           turnId,
@@ -302001,10 +302739,16 @@ ${renderTodoList(todos, "## TODO List")}`;
               note: result.note
             }
           });
-          if (result.stopTurn === true) stopTurn = true;
+          if (result.stopTurn === true) {
+            stopTurn = true;
+            stopTurnReason ??= result.stopTurnReason;
+          }
         }
         finishReason = stopTurn ? "completed" : "tool_calls";
-        return finishReason;
+        return {
+          finishReason,
+          stopTurnReason
+        };
       }
       finishStep(turnId, signal, currentStep, stepUuid, response, finishReason, markStepStarted) {
         signal.throwIfAborted();
@@ -302155,8 +302899,7 @@ ${renderTodoList(todos, "## TODO List")}`;
       __decorateParam(4, IEventDispatcher),
       __decorateParam(5, IAgentScopeContext),
       __decorateParam(6, ITelemetryService),
-      __decorateParam(7, IAgentTelemetryContextService),
-      __decorateParam(8, IAgentStateService)
+      __decorateParam(7, IAgentStateService)
     ], AgentLoopService);
     registerScopedService("agent", IAgentLoopService, AgentLoopService, 0, "loop");
     IAgentLoopContinuationService = createDecorator("agentLoopContinuationService");
@@ -302556,7 +303299,7 @@ ${hash2}`;
       name = "ReadMediaFile";
       description;
       parameters = toInputJsonSchema(ReadMediaFileInputSchema);
-      compressTelemetry;
+      telemetry;
       inlineVideoSupported;
       constructor(runtime, workspace, capabilities, videoUploader, telemetry, inlineVideoSupported2) {
         this.runtime = runtime;
@@ -302564,10 +303307,7 @@ ${hash2}`;
         this.capabilities = capabilities;
         this.videoUploader = videoUploader;
         this.description = buildDescription(capabilities);
-        this.compressTelemetry = telemetry === void 0 ? void 0 : {
-          client: telemetry,
-          source: "read_media"
-        };
+        this.telemetry = telemetry;
         this.inlineVideoSupported = inlineVideoSupported2 ?? false;
       }
       async videoContentPart(data, mimeType, safePath) {
@@ -302696,7 +303436,8 @@ ${hash2}`;
           if (fileType.kind === "image") if (args.region !== void 0) {
             const outcome = await cropImageForModel(data, fileType.mimeType, args.region, {
               skipResize: args.full_resolution === true,
-              telemetry: this.compressTelemetry
+              telemetry: this.telemetry,
+              telemetrySource: "read_media"
             });
             if (!outcome.ok) return {
               isError: true,
@@ -302742,7 +303483,8 @@ ${hash2}`;
             const compressed = await compressImageForModel$1(data, fileType.mimeType, {
               byteBudget: readByteBudget,
               maxEdge,
-              telemetry: this.compressTelemetry
+              telemetry: this.telemetry,
+              telemetrySource: "read_media"
             });
             if (compressed.finalByteLength > readByteBudget || Math.max(compressed.width, compressed.height) > maxEdge) return {
               isError: true,
@@ -303479,7 +304221,7 @@ ${hash2}`;
       stripEnv: stripPermissionEnv
     });
     PARSE_OPTIONS = {
-      timeoutMs: 20,
+      timeoutMs: 500,
       maxNodes: 1e4
     };
     MAX_NESTED_SHELL_DEPTH = 4;
@@ -303584,26 +304326,14 @@ ${hash2}`;
       }
       evaluate(context) {
         if (!isDangerousCommandGuardEnabled(this.config)) return void 0;
+        if (this.modeService.mode === "auto") return void 0;
         if (context.toolCall.name !== "Bash") return void 0;
         const command = bashCommandText(context.args);
         const verdict = command === void 0 ? { kind: "unanalyzable" } : analyzeSource(command, 0, (source) => this.bashParser.parse(source, PARSE_OPTIONS));
         if (verdict === void 0) return void 0;
-        const auto = this.modeService.mode === "auto";
-        if (verdict.kind === "dangerous") {
-          if (auto) return {
-            kind: "deny",
-            reason: { dangerous_command: verdict.command },
-            message: `Bash command '${verdict.command}' is blocked in auto permission mode because it is considered dangerous. Ask the user to switch permission mode or run it themselves.`
-          };
-          return {
-            kind: "ask",
-            reason: { dangerous_command: verdict.command }
-          };
-        }
-        if (auto) return {
-          kind: "deny",
-          reason: { unanalyzable_command: true },
-          message: "This Bash command could not be analyzed and is blocked in auto permission mode. Rewrite it with a literal command name and arguments, or ask the user to run it themselves."
+        if (verdict.kind === "dangerous") return {
+          kind: "ask",
+          reason: { dangerous_command: verdict.command }
         };
         return {
           kind: "ask",
@@ -303979,7 +304709,6 @@ ${hash2}`;
     AgentProfileService = class AgentProfileService2 extends Disposable {
       dispatcher;
       telemetry;
-      telemetryContext;
       config;
       modelCatalog;
       protocolAdapters;
@@ -304006,11 +304735,10 @@ ${hash2}`;
       activeProfile;
       frozenSkillListing;
       frozenPluginSections;
-      constructor(dispatcher, telemetry, telemetryContext, config2, modelCatalog, protocolAdapters, runtime, sessionContext, bootstrap2, workspace, catalog, skillCatalog, instructions, sessionToolPolicy, toolPolicyGate, toolRegistry, builtinProfiles, scopeContext, states, plugins2, identity, agentsMdReminder) {
+      constructor(dispatcher, telemetry, config2, modelCatalog, protocolAdapters, runtime, sessionContext, bootstrap2, workspace, catalog, skillCatalog, instructions, sessionToolPolicy, toolPolicyGate, toolRegistry, builtinProfiles, scopeContext, states, plugins2, identity, agentsMdReminder) {
         super();
         this.dispatcher = dispatcher;
         this.telemetry = telemetry;
-        this.telemetryContext = telemetryContext;
         this.config = config2;
         this.modelCatalog = modelCatalog;
         this.protocolAdapters = protocolAdapters;
@@ -304038,6 +304766,10 @@ ${hash2}`;
         this.states.contributeState(profileEmittedToolPatternWarningsKey);
         this.states.contributeState(profileEmittedPluginBudgetWarningsKey);
         this.configure({});
+        this._register(this.dispatcher.hooks.onDidRestore.register("profile", async (_ctx, next) => {
+          this.syncTelemetryModelContext(this.modelAlias);
+          await next();
+        }));
         this._register(this.config.onDidSectionChange(({ domain: domain2 }) => {
           if (domain2 === "tools") this.publishToolPatternWarnings();
         }));
@@ -304314,15 +305046,18 @@ ${hash2}`;
         return payload;
       }
       afterConfigDispatch(changed) {
-        if (changed.modelAlias !== void 0) {
-          const model = this.tryResolveRawModel();
-          this.telemetryContext.set({
-            provider_type: model?.providerType ?? model?.protocol,
-            protocol: model?.protocol
-          });
-        }
+        if (changed.modelAlias !== void 0) this.syncTelemetryModelContext(changed.modelAlias);
         if (changed.modelAlias !== void 0 || changed.thinkingLevel !== void 0) this.warnAboutAnthropicThinkingEffort();
         this.emitStatusUpdated(changed.modelAlias !== void 0 || changed.thinkingLevel !== void 0);
+      }
+      syncTelemetryModelContext(modelAlias) {
+        if (modelAlias === void 0) return;
+        const model = this.tryResolveRawModel();
+        this.telemetry.setContext({
+          model: modelAlias,
+          provider_type: model?.providerType ?? model?.protocol,
+          protocol: model?.protocol
+        });
       }
       warnAboutAnthropicThinkingEffort() {
         try {
@@ -304598,26 +305333,25 @@ ${section.content}`;
     AgentProfileService = __decorate([
       __decorateParam(0, IEventDispatcher),
       __decorateParam(1, ITelemetryService),
-      __decorateParam(2, IAgentTelemetryContextService),
-      __decorateParam(3, IConfigService),
-      __decorateParam(4, IModelCatalog),
-      __decorateParam(5, IProtocolAdapterRegistry),
-      __decorateParam(6, IAgentRuntimeService),
-      __decorateParam(7, ISessionContext),
-      __decorateParam(8, IBootstrapService),
-      __decorateParam(9, ISessionWorkspaceContext),
-      __decorateParam(10, ISessionAgentProfileCatalog),
-      __decorateParam(11, ISessionSkillCatalog),
-      __decorateParam(12, ISessionInstructionsProvider),
-      __decorateParam(13, ISessionToolPolicy),
-      __decorateParam(14, ISessionToolPolicyGate),
-      __decorateParam(15, IAgentToolRegistryService),
-      __decorateParam(16, IBuiltinAgentProfileLoader),
-      __decorateParam(17, IAgentScopeContext),
-      __decorateParam(18, IAgentStateService),
-      __decorateParam(19, IPluginService),
-      __decorateParam(20, IAgentIdentity),
-      __decorateParam(21, IAgentAgentsMdReminderService)
+      __decorateParam(2, IConfigService),
+      __decorateParam(3, IModelCatalog),
+      __decorateParam(4, IProtocolAdapterRegistry),
+      __decorateParam(5, IAgentRuntimeService),
+      __decorateParam(6, ISessionContext),
+      __decorateParam(7, IBootstrapService),
+      __decorateParam(8, ISessionWorkspaceContext),
+      __decorateParam(9, ISessionAgentProfileCatalog),
+      __decorateParam(10, ISessionSkillCatalog),
+      __decorateParam(11, ISessionInstructionsProvider),
+      __decorateParam(12, ISessionToolPolicy),
+      __decorateParam(13, ISessionToolPolicyGate),
+      __decorateParam(14, IAgentToolRegistryService),
+      __decorateParam(15, IBuiltinAgentProfileLoader),
+      __decorateParam(16, IAgentScopeContext),
+      __decorateParam(17, IAgentStateService),
+      __decorateParam(18, IPluginService),
+      __decorateParam(19, IAgentIdentity),
+      __decorateParam(20, IAgentAgentsMdReminderService)
     ], AgentProfileService);
     registerScopedService("agent", IAgentProfileService, AgentProfileService, 0, "profile");
     IAgentShellCommandService = createDecorator("agentShellCommandService");
@@ -305514,6 +306248,11 @@ ${todo_list_write_reminder_default.trim()}`
         const dir = normalize2(join$1(this.bootstrap.homeDir, this.storageScope));
         const normalized = normalize2(path2);
         return normalized === dir || normalized.startsWith(`${dir}/`);
+      }
+      isWireJournalPath(path2) {
+        const sessionsDir = normalize2(join$1(this.bootstrap.homeDir, this.bootstrap.scope("sessions")));
+        const normalized = normalize2(path2);
+        return normalized.startsWith(`${sessionsDir}/`) && basename$1(normalized) === "wire.jsonl";
       }
       async saveToolResult(toolName, toolCallId, text) {
         try {
@@ -308502,19 +309241,41 @@ ${todo_list_write_reminder_default.trim()}`
       * Forward engine telemetry to the host-supplied client. Without this the
       * client only served `KimiHarness`-level events and every engine-side event
       * (`track2` facts from agent/session scopes) was dropped on the v2 route.
-      * The `ITelemetryAppender` shape is a structural superset of the v1
-      * `TelemetryClient`, so the client installs directly. The `telemetry`
-      * config section gates engine events the same way the v2 print runner
-      * gates them; the host keeps owning the client's lifecycle (flush /
-      * shutdown stay with the host, matching the v1 core's arrangement).
+      * The v1 `TelemetryClient` is wrapped into the engine appender record shape
+      * (event + ambient context + final properties). The `telemetry` config
+      * section gates engine events the same way the v2 print runner gates them;
+      * the host keeps owning the client's lifecycle (flush / shutdown stay with
+      * the host, matching the v1 core's arrangement).
+      *
+      * The engine's own `session_started` is forwarded unless
+      * {@link suppressEngineSessionStarted} was called — see its doc for why the
+      * harness-assembled client drops that row.
       */
       installEngineTelemetry(client) {
         if (client === void 0) return;
         const telemetry = this.app.accessor.get(ITelemetryService);
-        telemetry.setAppender(client);
+        telemetry.addAppender({ track: (record2) => {
+          if (this.engineSessionStartedSuppressed && record2.event === "session_started") return;
+          client.track(record2.event, record2.properties);
+        } });
         this.configReady.then(() => {
           telemetry.setEnabled(this.engineAccessor.get(IConfigService).get("telemetry") !== false);
         });
+      }
+      engineSessionStartedSuppressed = false;
+      /**
+      * Drop the engine's own `session_started` from telemetry forwarding. Called
+      * by `createKimiHarnessV2` at assembly time: the harness emits that event
+      * for every session it opens (create / resume / reload / fork) with the
+      * richer client-attribution schema, so the engine's
+      * `{resumed, experimental_flags}` copy would double-count every open.
+      * Direct `SDKRpcClientV2` consumers never call this and keep the engine row
+      * — it is their only `session_started` producer. Hosts without a harness
+      * (run-v2-print, kap-server) wire their own appenders and are unaffected
+      * either way.
+      */
+      suppressEngineSessionStarted() {
+        this.engineSessionStartedSuppressed = true;
       }
       /**
       * Exposed experimental flag ids in the `session_started` wire shape (sorted,
@@ -309752,8 +310513,8 @@ ${todo_list_write_reminder_default.trim()}`
         const agent = await this.agentScope(input.sessionId);
         const tower = agent.accessor.get(IAgentTowerService);
         if (input.enabled) {
-          await tower.enter(input.base);
-          if (!tower.isActive) throw new Error2(ErrorCodes$1.SESSION_TOWER_MODE_INVALID, "tower mode could not be enabled \u2014 another live session owns the workspace tower");
+          const result = await tower.enter(input.base);
+          if (!result.entered) throw new Error2(ErrorCodes$1.SESSION_TOWER_MODE_INVALID, towerEnterFailureMessage(result));
         } else tower.exit();
         await agent.accessor.get(IAgentReminderService).reconcileWhenIdle("tower_mode");
       }
