@@ -268,8 +268,11 @@ describe("Kimi Code wire history", () => {
     process.env.KIMI_CODE_HOME = home;
     try {
       const history = await getSessionHistory(workDir, sessionId);
-      expect(history).toHaveLength(2_105);
+      // 连续的 turn.prompt 之间没有收口记录，按"被打断轮"语义每条后续 prompt 前合成一个 TurnEnd：
+      // 2105 个 TurnBegin + 2104 个合成 TurnEnd。
+      expect(history).toHaveLength(4_209);
       expect(history[0]).toMatchObject({ type: "TurnBegin", payload: { user_input: "message-0" } });
+      expect(history[1]).toMatchObject({ type: "TurnEnd", payload: { finishReason: "interrupted_by_next_prompt" } });
       expect(history.at(-1)).toMatchObject({ type: "TurnBegin", payload: { user_input: "message-2104" } });
     } finally {
       if (previousHome === undefined) delete process.env.KIMI_CODE_HOME;

@@ -28,3 +28,12 @@
 
 1. 不要重启实例；先 `node` 连 CDP（9222 端口）读 IndexedDB `kimix-state` / `state` store 中 `kimix_local_session_<id>` 的 events 统计，并抓 diag.log 中该会话的 `kimiHistoryReconciliation.*` / `ChatThread.subagentContentRegressionSnapshot` 条目。
 2. 对比 `sourceEventCount` 与离线探针（`getSessionHistoryById` + `mapHistoryEvents` 长度）：超出即为合并污染。
+
+## 更新（2026-09-08，v2.21.180 已修）
+
+上文"无法复现 / 时间线受损"的结论被用户新截图推翻。真正根因：**v2 wire 里被用户打断的轮不会写出 `step.end(end_turn)`/`turn.ended` 任何收口记录**，下一条 `turn.prompt` 是上轮终结的唯一证据。解析层不关闭上轮 → 上轮最后一条 ContentPart 正文保持 `isComplete:false` → mergeEvents 把下一轮首句正文跨 user 边界追加进上轮 → UI 上「继续」按钮前显示续跑段首句（实机：显示「你好霖江路，继续。先看 onnxruntime-node…」，官方 web 该位置显示上轮真正的末句「缺 onnxruntime-common 依赖，补上再测：」，wire L2702 turnId=14）。
+
+- 修复：`electron/sessionHistory.ts` `parseKimiCodeWireEvents` 在 `turn.prompt` 到达且上轮未收口时先合成 `{ type: "TurnEnd", payload: { finishReason: "interrupted_by_next_prompt" } }`；`prompt.completed`/`context.clear` 同样收口。
+- 回归测试：`electron/__tests__/wireInterruptedTurn.test.ts`（2 用例）；`src/utils/__tests__/sessionHistory.test.ts` 长历史用例期望更新为 4209（2105 TurnBegin + 2104 合成 TurnEnd）。
+- 离线验证：真实 wire 全链路（getSessionHistoryById → mapHistoryEvents → deduplicate → settleInactiveEvents → buildRenderItems）修复后 item 31 只含上轮末句、item 32=user「继续」、item 33=续跑首句，与官方 web 一致。
+- 上文"自愈盲区"（process-history-regression 门禁永久拒绝 canonical 替换）仍然有效，留作后续项。

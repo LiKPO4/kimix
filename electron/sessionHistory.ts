@@ -496,17 +496,31 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
   return null;
 }
 
-async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistoryEvent[]> {
+export async function parseKimiCodeWireEvents(wireFile: string): Promise<SessionHistoryEvent[]> {
   if (!fs.existsSync(wireFile)) return [];
   const events: SessionHistoryEvent[] = [];
+  // v2 引擎里被用户打断的轮不会写出 step.end(end_turn)/turn.ended 任何收口记录，
+  // 下一条 turn.prompt 是上轮终结的唯一证据。不在这里关闭会让上一轮最后一条正文
+  // 保持 isComplete:false，mergeEvents 把下一轮首句正文跨 user 边界追加并进上一轮
+  // （实机：「继续」前的正文错显示为续跑段首句，与官方 web 不一致）。
+  let turnOpen = false;
   const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   for await (const line of rl) {
     if (!line.trim()) continue;
     try {
       const record = JSON.parse(line) as Record<string, unknown>;
+      if (record.type === "turn.prompt" && turnOpen) {
+        events.push({ type: "TurnEnd", payload: { finishReason: "interrupted_by_next_prompt" }, time: record.time });
+        turnOpen = false;
+      }
       const event = parseKimiCodeRecord(record);
-      if (event) events.push(event);
+      if (event) {
+        events.push(event);
+        if (event.type === "TurnBegin") turnOpen = true;
+        else if (event.type === "TurnEnd" || event.type === "turn.ended") turnOpen = false;
+      }
+      if (record.type === "prompt.completed" || record.type === "context.clear") turnOpen = false;
     } catch {
       continue;
     }

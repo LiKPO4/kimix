@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：老会话被打断轮正文跨轮合并（v2.21.180）
+
+- 根因（实锤）：v2 wire 里被用户打断的轮不写 step.end(end_turn)/turn.ended 任何收口记录，下一条 turn.prompt 是上轮终结的唯一证据；解析层不关闭上轮 → 上轮末条 ContentPart 保持 isComplete:false → mergeEvents 把下一轮首句正文跨 user 边界并入上轮 →「继续」按钮前显示续跑段首句而非上轮末句（与官方 web 不一致）。受影响会话 session_d4035d92（wire 3794 行，v2 词汇表）。
+- 修复：electron/sessionHistory.ts parseKimiCodeWireEvents 增加 turnOpen 状态，turn.prompt 到达且上轮未收口时先合成 TurnEnd(finishReason=interrupted_by_next_prompt)；prompt.completed/context.clear 同样收口。
+- 验证：新增 electron/__tests__/wireInterruptedTurn.test.ts（2 用例）；真实 wire 离线全链路（getSessionHistoryById→mapHistoryEvents→deduplicate→settleInactiveEvents→buildRenderItems）复现并验证修复后与官方 web 一致；sessionHistory 长历史用例期望 2105→4209（连续 prompt 各合成 TurnEnd）；typecheck、全量 200 文件 2179 测试、pnpm build 全通过。
+- 文档：docs/issue-old-session-truncated-body-events-snapshot.md 末尾补更正段（原"无法复现"结论被推翻；"自愈盲区"后续项仍有效）。知识库 runtime-routing.md 加不变量 106。
+
 ## 2026-09-07 功能：跟进 0.41 权限模式改名 + 选区标注（v2.21.179）
 
 - 权限改名（对齐官方 0.41 web）：manual=始终询问(Always Ask)、yolo=必要时询问(Ask When Needed)、auto=完全自动(Never Ask)，Composer/SettingsPanel/AddRoomAgentDialog 三处同步；desc/tooltip 按官方语义重写，完全自动明确「危险命令也不再询问」（0.41 移除 auto deny）。切换到 必要时询问/完全自动 时 window.confirm 警告「文件可能被直接修改或删除」（Composer 与 SettingsPanel 两条切换路径都拦，同模式重复点击不拦）。
