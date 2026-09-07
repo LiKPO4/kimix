@@ -83,6 +83,14 @@ describe("v2 wire 被打断轮收口", () => {
     expect(idxTurn1Text).toBeGreaterThan(-1);
     expect(idxTurn2Text).toBeGreaterThan(continueBegin);
     expect(idxTurn1Text).toBeLessThan(idxSyntheticEnd);
+
+    // 合成 TurnEnd 的时间戳必须是上轮最后活动时间（小于「继续」prompt 时间、不早于
+    // 上轮末条正文），否则「本轮总耗时」会把用户两轮之间的离开间隔算进去（实机 352分2秒 事故）。
+    const continueTime = events[continueBegin].time as number;
+    const turn1TextTime = events[idxTurn1Text].time as number;
+    expect(typeof synthetic.time).toBe("number");
+    expect(synthetic.time as number).toBeGreaterThanOrEqual(turn1TextTime);
+    expect(synthetic.time as number).toBeLessThan(continueTime);
   });
 
   it("正常收口的轮不会多出合成 TurnEnd", async () => {

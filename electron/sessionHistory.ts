@@ -503,7 +503,11 @@ export async function parseKimiCodeWireEvents(wireFile: string): Promise<Session
   // 下一条 turn.prompt 是上轮终结的唯一证据。不在这里关闭会让上一轮最后一条正文
   // 保持 isComplete:false，mergeEvents 把下一轮首句正文跨 user 边界追加并进上一轮
   // （实机：「继续」前的正文错显示为续跑段首句，与官方 web 不一致）。
+  // 合成 TurnEnd 的时间戳打上轮最后一条记录的时间而不是下一条 prompt 的时间：
+  // completedAssistantDuration = 轮起点 → TurnEnd.time，若用 prompt 时间会把
+  // 用户两轮之间的离开间隔（可能数小时）算进「本轮总耗时」。
   let turnOpen = false;
+  let lastTurnActivityTime: number | undefined;
   const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   for await (const line of rl) {
@@ -511,7 +515,7 @@ export async function parseKimiCodeWireEvents(wireFile: string): Promise<Session
     try {
       const record = JSON.parse(line) as Record<string, unknown>;
       if (record.type === "turn.prompt" && turnOpen) {
-        events.push({ type: "TurnEnd", payload: { finishReason: "interrupted_by_next_prompt" }, time: record.time });
+        events.push({ type: "TurnEnd", payload: { finishReason: "interrupted_by_next_prompt" }, time: lastTurnActivityTime ?? record.time });
         turnOpen = false;
       }
       const event = parseKimiCodeRecord(record);
@@ -520,6 +524,7 @@ export async function parseKimiCodeWireEvents(wireFile: string): Promise<Session
         if (event.type === "TurnBegin") turnOpen = true;
         else if (event.type === "TurnEnd" || event.type === "turn.ended") turnOpen = false;
       }
+      if (turnOpen && typeof record.time === "number") lastTurnActivityTime = record.time;
       if (record.type === "prompt.completed" || record.type === "context.clear") turnOpen = false;
     } catch {
       continue;

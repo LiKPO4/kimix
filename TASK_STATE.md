@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：被打断轮耗时含用户离开间隔 + 耗时格式小时化（v2.21.181）
+
+- 耗时值修正：v2.21.180 合成的 TurnEnd 原打"下一条 prompt 时间"，而 completedAssistantDuration = 轮起点 → TurnEnd.time，把用户两轮之间的离开间隔算进「本轮总耗时」（实机 352分2秒 = 11:36→17:28 的间隔）。现改为打上轮最后一条 wire 记录的时间（lastTurnActivityTime），只计真实工作时长。
+- 格式：formatAssistantTurnDuration ≥61 分钟才显示 x小时x分x秒（60分22秒 不变，61分22秒 → 1小时1分22秒）。
+- 验证：duration/wireInterruptedTurn 定向测试（新增合成 TurnEnd 时间戳断言与小时格式用例）、全量 200 文件 2179 测试、typecheck、pnpm build 通过；实机 CDP 复查老会话耗时显示。
+
 ## 2026-09-08 修复：老会话被打断轮正文跨轮合并（v2.21.180）
 
 - 根因（实锤）：v2 wire 里被用户打断的轮不写 step.end(end_turn)/turn.ended 任何收口记录，下一条 turn.prompt 是上轮终结的唯一证据；解析层不关闭上轮 → 上轮末条 ContentPart 保持 isComplete:false → mergeEvents 把下一轮首句正文跨 user 边界并入上轮 →「继续」按钮前显示续跑段首句而非上轮末句（与官方 web 不一致）。受影响会话 session_d4035d92（wire 3794 行，v2 词汇表）。
