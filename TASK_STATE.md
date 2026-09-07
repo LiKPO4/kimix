@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-07 功能：跟进 0.41 权限模式改名 + 选区标注（v2.21.179）
+
+- 权限改名（对齐官方 0.41 web）：manual=始终询问(Always Ask)、yolo=必要时询问(Ask When Needed)、auto=完全自动(Never Ask)，Composer/SettingsPanel/AddRoomAgentDialog 三处同步；desc/tooltip 按官方语义重写，完全自动明确「危险命令也不再询问」（0.41 移除 auto deny）。切换到 必要时询问/完全自动 时 window.confirm 警告「文件可能被直接修改或删除」（Composer 与 SettingsPanel 两条切换路径都拦，同模式重复点击不拦）。
+- 选区标注（对齐官方 selection annotation）：新增 src/utils/selectionQuote.ts（规范化/引用块格式化/草稿合并/标注域判定，13 条单测）+ src/components/chat/SelectionAnnotationPopover.tsx（选区上方浮层：引用到对话/评论，评论模式 textarea，Esc/外点/滚动收起）；AppShell 挂载；标注面 = ChatThread 消息流列 + DiffPanel 文件预览内容区（data-kimix-annotatable），浮层自身 data-kimix-annotatable-exclude；注入通道为新 window 事件 kimix:composer-insert-quote → Composer 追加草稿并聚焦。
+- 验证：typecheck、全量 199 文件 2177 测试、pnpm build 通过；SettingsPanel.permissionMutation 测试改用新标签并打桩 confirm。
+- 知识库：project/kimix.md 新增两条边界（权限命名/警告、选区标注机制），log.md 记录并声明旧的「逐条确认/自动通过/完全自主」措辞约束作废。
+- 未做（用户明确不做）：Esc 不关右侧面板、右侧 Bash 终端风格重排。已知边界：标注面暂未覆盖长程任务面板等次要区域；实机视觉验收待用户截图。
+
 ## 2026-09-07 跟进：vendored SDK 升级官方 0.41.0（v2.21.178）
 
 - 做法：浅克隆 `@moonshot-ai/kimi-code@0.41.0`（`95478e8c`）到 `.kimix-upstream-kimi-code/`，pnpm install + node-sdk build，重跑 vendor-kimi-code-sdk.mjs 重新打包（13.6MB）；MCP 超时 overlay marker `DEFAULT_STARTUP_TIMEOUT_MS = 3e4;` 在 0.41 dist 中原样保留，补丁照旧套用。README provenance 同步。

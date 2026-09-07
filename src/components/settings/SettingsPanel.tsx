@@ -1722,9 +1722,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   ];
 
   const permissions: { value: PermissionMode; label: string; desc: string; icon: typeof Shield; tooltip: string }[] = [
-    { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", icon: Shield, tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
-    { value: "yolo", label: "自动通过", desc: "自动批准普通工具；危险命令和敏感操作仍会确认", icon: GitBranch, tooltip: "自动通过：普通工具自动批准；危险命令、敏感操作和关键问题仍会确认。谨慎使用。" },
-    { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", icon: Zap, tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
+    { value: "manual", label: "始终询问", desc: "只读操作自动放行；编辑文件、运行命令等每个操作逐一确认", icon: Shield, tooltip: "始终询问（Always Ask）：只读操作自动放行，其余每个操作逐一确认。" },
+    { value: "yolo", label: "必要时询问", desc: "常规修改和命令自动完成；高危操作、提问和计划仍会问你", icon: GitBranch, tooltip: "必要时询问（Ask When Needed）：常规修改和命令自动完成；高危操作、提问和计划仍会问你。" },
+    { value: "auto", label: "完全自动", desc: "完全不打断，包括危险命令在内的所有操作自动完成", icon: Zap, tooltip: "完全自动（Never Ask）：完全不打断，所有操作和判断自动完成，危险命令也不再询问。" },
   ];
   // 设置面板路径：有 runtime 时权限调整「立即写 server」（写后回读校准），
   // 与 Composer 路径统一「立即写 server」（与官方 Web 轮中可切换同语义）；
@@ -1736,6 +1736,23 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     if (permissionMutationInFlightRef.current) return;
     // 全局默认总是本地写：这是新会话默认偏好，与当前会话权限解耦
     const globalBefore = useAppStore.getState().permissionMode;
+    // 官方 0.41 语义：切换到 必要时询问/完全自动 时警告文件可能被直接修改或删除
+    {
+      const state0 = useAppStore.getState();
+      const current0 = state0.currentSession;
+      let effectiveBefore: PermissionMode = globalBefore;
+      if (current0) {
+        const t0 = useSessionStore.getState().sessions.find((session) => session.id === current0.id) ?? current0;
+        const owner0 = getPrimaryRoomAgent(t0).id;
+        effectiveBefore = getRoomAgent(t0, owner0, globalBefore)?.permissionMode ?? t0.permissionMode ?? globalBefore;
+      }
+      if (mode !== effectiveBefore && (mode === "yolo" || mode === "auto")) {
+        const warning = mode === "auto"
+          ? "「完全自动」模式下所有操作（包括危险命令）都不再询问，文件可能被直接修改或删除。确定切换？"
+          : "「必要时询问」模式下常规修改和命令会直接执行，文件可能被直接修改或删除；高危操作、提问和计划仍会问你。确定切换？";
+        if (!window.confirm(warning)) return;
+      }
+    }
     setPermissionMode(mode);
     const appState = useAppStore.getState();
     const current = appState.currentSession;

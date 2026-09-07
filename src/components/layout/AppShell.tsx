@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Composer } from "@/components/chat/Composer";
+import { SelectionAnnotationPopover } from "@/components/chat/SelectionAnnotationPopover";
 import { ContextBar } from "@/components/chat/ContextBar";
 import { getVisibleTodos } from "@/components/chat/TodoPanel";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
@@ -2283,6 +2284,7 @@ ${isFinalStep
       </div>
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SelectionAnnotationPopover />
       <LongTasksPanel />
       <ToastSystem message={toastMessage} />
       <TextContextMenu />

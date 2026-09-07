@@ -7,9 +7,9 @@ import { buildSessionModelOptions, groupSessionModelOptions } from "@/utils/sess
 import type { RoomAgentDraft } from "@/utils/roomAgentProvisioning";
 
 const PERMISSIONS: Array<{ value: PermissionMode; label: string; description: string }> = [
-  { value: "manual", label: "逐条确认", description: "每个工具操作都需手动确认" },
-  { value: "yolo", label: "自动通过", description: "普通工具自动批，危险或敏感操作仍确认" },
-  { value: "auto", label: "完全自主", description: "完全自主运行，不再询问" },
+  { value: "manual", label: "始终询问", description: "只读自动放行，其余每个操作逐一确认" },
+  { value: "yolo", label: "必要时询问", description: "常规修改自动完成，高危操作和提问仍确认" },
+  { value: "auto", label: "完全自动", description: "完全不打断，危险命令也不再询问" },
 ];
 
 function uniqueAgentName(label: string, session: Session) {

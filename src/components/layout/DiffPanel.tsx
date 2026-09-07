@@ -94,7 +94,7 @@ export function DiffPanel({ width, projectPath, allowedExtensions, selectedPath,
         </div>
       </div>
       {/* Outer shell stays surface-base; section card + file rows use elevated so the list is not same-color inset. */}
-      <div className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
+      <div data-kimix-annotatable className="min-h-0 flex-1 overflow-y-auto" style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 14, paddingBottom: 20 }}>
         {error && (
           <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ padding: "12px 12px", marginBottom: 10, backgroundColor: "var(--accent-danger-light)" }}>
             {error}

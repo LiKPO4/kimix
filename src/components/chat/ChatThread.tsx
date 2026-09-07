@@ -1994,6 +1994,7 @@ export const ChatThread = memo(function ChatThread() {
       >
         <div
           ref={viewport.streamContentRef}
+          data-kimix-annotatable
           className="kimix-chat-stream-column flex min-h-full w-full flex-col"
           style={{
             gap: 22,

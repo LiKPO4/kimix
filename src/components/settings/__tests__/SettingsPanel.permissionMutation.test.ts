@@ -34,6 +34,8 @@ beforeEach(() => {
   useSessionStore.setState({ sessions: [makeSession()] });
   // 默认 IPC 全部失败兜底；setKimiCodePermission 单独 mock 为 reject，
   // 复现「异常路径不复位并发守卫」：第二次点击应仍能发起切换。
+  // 切换到 必要时询问/完全自动 会触发官方 0.41 语义的修改/删除警告，测试中一律确认
+  vi.spyOn(window, "confirm").mockReturnValue(true);
   const setPermissionMock = vi.fn().mockRejectedValue(new Error("ipc down"));
   (window as unknown as { api: unknown }).api = new Proxy({}, {
     get: (_target, prop) => {
@@ -89,12 +91,12 @@ describe("SettingsPanel 权限切换并发守卫", () => {
     const api = window.api as unknown as { setKimiCodePermission: ReturnType<typeof vi.fn> };
     const setPermissionMock = api.setKimiCodePermission;
 
-    await clickPermission(container, "完全自主");
+    await clickPermission(container, "完全自动");
     expect(setPermissionMock).toHaveBeenCalledTimes(1);
 
     // 修复前：异常后 ref 卡在 true，第二次点击被守卫静默吞掉（仍是 1 次）；
     // 修复后：finally 复位，第二次点击正常发起（2 次）。
-    await clickPermission(container, "逐条确认");
+    await clickPermission(container, "始终询问");
     expect(setPermissionMock).toHaveBeenCalledTimes(2);
   });
 });

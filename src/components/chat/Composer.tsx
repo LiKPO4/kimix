@@ -34,6 +34,7 @@ import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
 import { hasRecentDuplicatePendingMessage } from "@/utils/promptQueue";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
+import { mergeQuoteIntoDraft } from "@/utils/selectionQuote";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { normalizeTowerPreflight, type TowerPreflightView, type TowerSnapshotView } from "@/utils/tower";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
@@ -122,9 +123,9 @@ function hasDraggedFiles(event: React.DragEvent): boolean {
 }
 
 const PERMISSION_OPTIONS: { value: PermissionMode; label: string; desc: string; tooltip: string }[] = [
-  { value: "manual", label: "逐条确认", desc: "每个工具操作都需要你手动确认", tooltip: "逐条确认：每个工具操作都需要你手动确认。" },
-  { value: "yolo", label: "自动通过", desc: "自动批准普通工具；危险命令和敏感操作仍会确认", tooltip: "自动通过：普通工具自动批准；危险命令、敏感操作和关键问题仍会确认。" },
-  { value: "auto", label: "完全自主", desc: "完全自主运行，智能体自己做决定，不再询问", tooltip: "完全自主：完全自主运行，智能体自己做决定，不再询问。" },
+  { value: "manual", label: "始终询问", desc: "只读操作自动放行；编辑文件、运行命令等每个操作逐一确认", tooltip: "始终询问（Always Ask）：只读操作自动放行，其余每个操作逐一确认。" },
+  { value: "yolo", label: "必要时询问", desc: "常规修改和命令自动完成；高危操作、提问和计划仍会问你", tooltip: "必要时询问（Ask When Needed）：常规修改和命令自动完成；高危操作、提问和计划仍会问你。" },
+  { value: "auto", label: "完全自动", desc: "完全不打断，包括危险命令在内的所有操作自动完成", tooltip: "完全自动（Never Ask）：完全不打断，所有操作和判断自动完成，危险命令也不再询问。" },
 ];
 
 const permissionMenuIcons = {
@@ -859,6 +860,17 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     window.addEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
     return () => window.removeEventListener("kimix:restore-composer-draft", handleRestoreComposerDraft);
   }, []);
+
+  useEffect(() => {
+    const handleInsertQuote = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      if (!detail?.text) return;
+      setInput((prev) => mergeQuoteIntoDraft(prev, detail.text!));
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    };
+    window.addEventListener("kimix:composer-insert-quote", handleInsertQuote);
+    return () => window.removeEventListener("kimix:composer-insert-quote", handleInsertQuote);
+  }, [setInput]);
 
   useEffect(() => {
     if (!currentSession) {
@@ -4043,6 +4055,15 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
       return;
     }
     const previousMode = mutationPermissionMode ?? permissionMode;
+    if (mode !== previousMode && (mode === "yolo" || mode === "auto")) {
+      const warning = mode === "auto"
+        ? "「完全自动」模式下所有操作（包括危险命令）都不再询问，文件可能被直接修改或删除。确定切换？"
+        : "「必要时询问」模式下常规修改和命令会直接执行，文件可能被直接修改或删除；高危操作、提问和计划仍会问你。确定切换？";
+      if (!window.confirm(warning)) {
+        setShowPermissionMenu(false);
+        return;
+      }
+    }
     emitPermissionModeDiag("click", {
       traceId,
       requestedMode: mode,
@@ -4543,9 +4564,9 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const permissionLabel = {
-    manual: "逐条确认",
-    auto: "完全自主",
-    yolo: "自动通过",
+    manual: "始终询问",
+    auto: "完全自动",
+    yolo: "必要时询问",
   }[mutationPermissionMode ?? permissionMode];
   const permissionLabelFontSize = permissionLabel.length > 5 ? 11 : permissionLabel.length > 4 ? 12 : 13;
 
