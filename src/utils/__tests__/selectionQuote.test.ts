@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ANNOTATABLE_ATTR,
   ANNOTATABLE_EXCLUDE_ATTR,
+  formatQuoteChipLabel,
   formatSelectionQuote,
   isSelectionAnnotatable,
   mergeQuoteIntoDraft,
@@ -95,5 +96,19 @@ describe("isSelectionAnnotatable", () => {
       focusNode: document.querySelector("#b")!.firstChild,
     });
     expect(isSelectionAnnotatable(sel)).toBe(false);
+  });
+});
+
+describe("formatQuoteChipLabel", () => {
+  it("取首个非空行并压缩连续空白", () => {
+    expect(formatQuoteChipLabel("\n\n  第一行   有空格  \n第二行")).toBe("第一行 有空格");
+  });
+
+  it("超长按字符截断加省略号", () => {
+    expect(formatQuoteChipLabel("一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十")).toBe("一二三四五六七八九十一二三四五六七八九十一二三四…");
+  });
+
+  it("空引用返回空串", () => {
+    expect(formatQuoteChipLabel("\n\n")).toBe("");
   });
 });

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images, RadioTower, AlertTriangle } from "lucide-react";
+import { Plus, ArrowUp, ChevronDown, Check, Send, Edit2, Trash2, Mic, Hand, ShieldAlert, CircleCheck, Brain, X, GripVertical, MoreHorizontal, AtSign, TerminalSquare, FileText, Bot, Puzzle, ClipboardList, Palette, Zap, Loader2, Film, Images, RadioTower, AlertTriangle, MessageSquareQuote } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
@@ -34,7 +34,7 @@ import { isSamePath } from "@/utils/pathCase";
 import { logError } from "@/utils/reportError";
 import { hasRecentDuplicatePendingMessage } from "@/utils/promptQueue";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
-import { mergeQuoteIntoDraft } from "@/utils/selectionQuote";
+import { formatQuoteChipLabel, formatSelectionQuote, mergeQuoteIntoDraft } from "@/utils/selectionQuote";
 import { displayedSwarmMode, hasPendingSwarmMode, pendingSwarmModeValue } from "@/utils/swarmMode";
 import { normalizeTowerPreflight, type TowerPreflightView, type TowerSnapshotView } from "@/utils/tower";
 import { resolveResumedSessionModel } from "@/utils/modelDisplay";
@@ -513,19 +513,27 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const initialDraft = useRef(readComposerDraft(composerDraftKey)).current;
   const [input, setInputState] = useState(initialDraft.content);
   const [imageAttachments, setImageAttachmentsState] = useState<ImageAttachment[]>(initialDraft.attachments);
+  const [quoteAttachments, setQuoteAttachmentsState] = useState<string[]>(initialDraft.quotes);
   const inputValueRef = useRef(initialDraft.content);
   const imageAttachmentsValueRef = useRef<ImageAttachment[]>(initialDraft.attachments);
+  const quoteAttachmentsValueRef = useRef<string[]>(initialDraft.quotes);
   const setInput = useCallback((next: string | ((value: string) => string)) => {
     const value = typeof next === "function" ? next(inputValueRef.current) : next;
     inputValueRef.current = value;
-    writeComposerDraft(composerDraftKey, { content: value, attachments: imageAttachmentsValueRef.current });
+    writeComposerDraft(composerDraftKey, { content: value, attachments: imageAttachmentsValueRef.current, quotes: quoteAttachmentsValueRef.current });
     setInputState(value);
   }, [composerDraftKey]);
   const setImageAttachments = useCallback((next: ImageAttachment[] | ((value: ImageAttachment[]) => ImageAttachment[])) => {
     const value = typeof next === "function" ? next(imageAttachmentsValueRef.current) : next;
     imageAttachmentsValueRef.current = value;
-    writeComposerDraft(composerDraftKey, { content: inputValueRef.current, attachments: value });
+    writeComposerDraft(composerDraftKey, { content: inputValueRef.current, attachments: value, quotes: quoteAttachmentsValueRef.current });
     setImageAttachmentsState(value);
+  }, [composerDraftKey]);
+  const setQuoteAttachments = useCallback((next: string[] | ((value: string[]) => string[])) => {
+    const value = typeof next === "function" ? next(quoteAttachmentsValueRef.current) : next;
+    quoteAttachmentsValueRef.current = value;
+    writeComposerDraft(composerDraftKey, { content: inputValueRef.current, attachments: imageAttachmentsValueRef.current, quotes: value });
+    setQuoteAttachmentsState(value);
   }, [composerDraftKey]);
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [drawingBoardRequest, setDrawingBoardRequest] = useState<DrawingBoardRequest | null>(null);
@@ -747,6 +755,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     writeComposerDraft(composerDraftKey, {
       content: inputValueRef.current,
       attachments: imageAttachmentsValueRef.current,
+      quotes: quoteAttachmentsValueRef.current,
     });
   }, [composerDraftKey]);
 
@@ -863,9 +872,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
 
   useEffect(() => {
     const handleInsertQuote = (event: Event) => {
-      const detail = (event as CustomEvent<{ text?: string }>).detail;
-      if (!detail?.text) return;
-      setInput((prev) => mergeQuoteIntoDraft(prev, detail.text!));
+      const detail = (event as CustomEvent<{ quote?: string; comment?: string }>).detail;
+      const quote = detail?.quote?.trim();
+      if (!quote) return;
+      // 引用作为原子 chip 挂在输入框上（对齐官方 web），发送时才折叠为 > 引用块正文；
+      // 评论仍是用户自己的文字，直接进草稿。
+      setQuoteAttachments((prev) => [...prev, quote]);
+      const comment = detail?.comment?.trim();
+      if (comment) setInput((prev) => mergeQuoteIntoDraft(prev, comment));
       window.requestAnimationFrame(() => inputRef.current?.focus());
     };
     window.addEventListener("kimix:composer-insert-quote", handleInsertQuote);
@@ -3441,7 +3455,14 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   };
 
   const handleSend = async () => {
-    const trimmed = input.trim();
+    // 引用 chip 在发送时折叠回正文（markdown 引用块），wire 载荷与旧行为一致；
+    // 若发送被拦截（toast/弹窗），引用以纯文本留在草稿里，不丢内容。
+    if (quoteAttachmentsValueRef.current.length > 0) {
+      const quoted = quoteAttachmentsValueRef.current.map((quote) => formatSelectionQuote(quote)).filter(Boolean).join("\n\n");
+      if (quoted) setInput((prev) => (prev.trim() ? `${quoted}\n\n${prev.trimEnd()}` : quoted));
+      setQuoteAttachments([]);
+    }
+    const trimmed = inputValueRef.current.trim();
     const imagesToSend = imageAttachments;
     if ((!trimmed && imagesToSend.length === 0) || !canUseComposer) return;
     if (cacheHintDialog) return;
@@ -4582,7 +4603,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const towerSubagents = activeSession?.events.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => (
     event.type === "subagent" && Boolean(event.agentId && towerAgentIds.has(event.agentId))
   )) ?? [];
-  const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0);
+  const canSendNow = canUseComposer && (input.trim().length > 0 || imageAttachments.length > 0 || quoteAttachments.length > 0);
   const visibleRoomControlTargets = roomControlRequest?.action === "stop" ? roomStopTargets : roomSteerTargets;
   const roomControlTitle = roomControlRequest?.action === "stop" ? "选择要停止的 Agent" : "选择要引导的 Agent";
   const hideComposerCard = (card: ComposerDockCard, label: string) => {
@@ -4955,6 +4976,32 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             )}
           </div>
         )}
+        {quoteAttachments.length > 0 && (
+          <div className="flex flex-wrap" style={{ gap: 8, paddingTop: 2, paddingBottom: 12 }}>
+            {quoteAttachments.map((quote, index) => (
+              <div
+                key={`quote-${index}`}
+                className="flex items-center rounded-lg border border-[var(--kimix-panel-border)] bg-[var(--kimix-panel-soft-bg)]"
+                style={{ height: 32, paddingLeft: 12, paddingRight: 8, gap: 8, maxWidth: 320 }}
+                title={quote}
+              >
+                <MessageSquareQuote size={13} className="shrink-0 text-[var(--kimix-panel-text-muted)]" />
+                <span className="min-w-0 truncate text-[12px] text-[var(--kimix-panel-text-secondary)]">{formatQuoteChipLabel(quote)}</span>
+                <button
+                  type="button"
+                  onClick={() => setQuoteAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                  className="kimix-inline-icon-action shrink-0 rounded-full text-[var(--kimix-panel-text-muted)] hover:bg-surface-hover"
+                  style={{ padding: 2, width: 20, height: 20, lineHeight: 0 }}
+                  title="移除引用"
+                  aria-label="移除引用"
+                >
+                  <X size={12} style={{ display: "block" }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {imageAttachments.length > 0 && (
           <div className="flex flex-wrap" style={{ gap: 10, paddingTop: 2, paddingBottom: 12 }}>
             {imageAttachments.map((attachment) => {

@@ -13,6 +13,8 @@ export type ComposerDraftAttachment = {
 export type ComposerDraft = {
   content: string;
   attachments: ComposerDraftAttachment[];
+  /** 选区标注引用（规范化原文，不带 `> ` 前缀）；发送时拼装为 markdown 引用块，仅内存随附件生命周期。 */
+  quotes: string[];
 };
 
 const LEGACY_STORAGE_PREFIX = "kimix_composer_draft_v1:";
@@ -123,28 +125,29 @@ function cloneDraft(draft: ComposerDraft): ComposerDraft {
   return {
     content: draft.content,
     attachments: draft.attachments.map((attachment) => ({ ...attachment })),
+    quotes: [...draft.quotes],
   };
 }
 
 export function readComposerDraft(key: string | null): ComposerDraft {
-  if (!key) return { content: "", attachments: [] };
+  if (!key) return { content: "", attachments: [], quotes: [] };
   const cached = memoryDrafts.get(key);
   if (cached) return cloneDraft(cached);
   try {
-    if (typeof localStorage === "undefined") return { content: "", attachments: [] };
+    if (typeof localStorage === "undefined") return { content: "", attachments: [], quotes: [] };
     const content = readPersistedContent(key);
-    const restored = { content, attachments: [] } satisfies ComposerDraft;
+    const restored = { content, attachments: [], quotes: [] } satisfies ComposerDraft;
     if (content) memoryDrafts.set(key, restored);
     return cloneDraft(restored);
   } catch {
-    return { content: "", attachments: [] };
+    return { content: "", attachments: [], quotes: [] };
   }
 }
 
 export function writeComposerDraft(key: string | null, draft: ComposerDraft): void {
   if (!key) return;
   const next = cloneDraft(draft);
-  if (!next.content && next.attachments.length === 0) memoryDrafts.delete(key);
+  if (!next.content && next.attachments.length === 0 && next.quotes.length === 0) memoryDrafts.delete(key);
   else memoryDrafts.set(key, next);
   try {
     if (typeof localStorage === "undefined") return;

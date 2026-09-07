@@ -25,7 +25,7 @@ describe("composerDraft", () => {
 
   it("persists exact unsent text across an in-memory restart", () => {
     const key = resolveComposerDraftKey("session-1", "project-1");
-    writeComposerDraft(key, { content: "  尚未发送的正文\n第二行  ", attachments: [] });
+    writeComposerDraft(key, { content: "  尚未发送的正文\n第二行  ", attachments: [], quotes: [] });
     clearComposerDraftMemoryCache();
 
     expect(readComposerDraft(key).content).toBe("  尚未发送的正文\n第二行  ");
@@ -36,6 +36,7 @@ describe("composerDraft", () => {
     writeComposerDraft(key, {
       content: "附带文件",
       attachments: [{ id: "image-1", name: "截图.png", dataUrl: "data:image/png;base64,AA==" }],
+      quotes: [],
     });
 
     expect(readComposerDraft(key).attachments).toEqual([
@@ -46,18 +47,18 @@ describe("composerDraft", () => {
   it("does not leak a draft into another session and removes explicit clears", () => {
     const first = resolveComposerDraftKey("session-1", "project-1");
     const second = resolveComposerDraftKey("session-2", "project-1");
-    writeComposerDraft(first, { content: "会话一草稿", attachments: [] });
+    writeComposerDraft(first, { content: "会话一草稿", attachments: [], quotes: [] });
 
     expect(readComposerDraft(second).content).toBe("");
     clearComposerDraft(first);
-    expect(readComposerDraft(first)).toEqual({ content: "", attachments: [] });
+    expect(readComposerDraft(first)).toEqual({ content: "", attachments: [], quotes: [] });
   });
 
   it("ignores corrupted persistent data instead of breaking the composer", () => {
     const key = resolveComposerDraftKey("session-broken", "project-1")!;
     localStorage.setItem(`kimix_composer_draft_v1:${encodeURIComponent(key)}`, "not-json");
 
-    expect(readComposerDraft(key)).toEqual({ content: "", attachments: [] });
+    expect(readComposerDraft(key)).toEqual({ content: "", attachments: [], quotes: [] });
   });
 
   it("preserves parallel window slots instead of overwriting another window draft", () => {
@@ -73,7 +74,7 @@ describe("composerDraft", () => {
 
     expect(readComposerDraft(key).content).toBe("另一个窗口尚未发送的内容");
 
-    writeComposerDraft(key, { content: "当前窗口的草稿", attachments: [] });
+    writeComposerDraft(key, { content: "当前窗口的草稿", attachments: [], quotes: [] });
 
     expect(localStorage.getItem(otherWindowKey)).toContain("另一个窗口尚未发送的内容");
     expect(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
@@ -102,7 +103,7 @@ describe("composerDraft", () => {
     }));
     clearComposerDraftMemoryCache();
 
-    expect(readComposerDraft(key)).toEqual({ content: "", attachments: [] });
+    expect(readComposerDraft(key)).toEqual({ content: "", attachments: [], quotes: [] });
   });
 
   it("keeps the draft contract wired across workspace unmounts and conversation switches", () => {

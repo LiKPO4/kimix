@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 功能：选区引用改为输入框原子 chip（v2.21.184，对齐官方 web）
+
+- 需求（用户截图）：官方把选区引用作为整体 chip 存在于输入框（图标+截断摘录，hover 出完整引用卡）；Kimix 目前只是把 `> ` 引用块纯文本拼进草稿（图2 红箭头），要优化成官方形态。
+- 现状实据：`SelectionAnnotationPopover.tsx` dispatchQuote 发 `kimix:composer-insert-quote`（detail.text 已是 `> ` 格式化的 markdown）；`Composer.tsx:865` handleInsertQuote 直接 `mergeQuoteIntoDraft` 进 textarea；草稿模型 `composerDraft.ts` ComposerDraft = { content, attachments }（attachments 仅内存不落盘，localStorage 只持久 content）。
+- 设计（最小增量，不动协议）：① ComposerDraft 加 `quotes?: string[]`（规范化选区原文，仅内存，随 attachments 生命周期）；② popover detail 改传 `{ quote, comment? }` 原文；③ Composer 加 quoteAttachments state + ref，引用进 quotes、评论仍进正文；④ chips 渲染在图片附件区旁（图标+首行截断+×删除+title 全文，遵守留白规则：inline style、chip 高 32、左右 padding 12、浅灰边框不用黑框）；⑤ 发送时 quotes.map(formatSelectionQuote).join("
+
+") 拼到 content 前面，wire 载荷不变；⑥ selectionQuote 测试加 chip/拼装用例。
+- 验证路径：单测 + typecheck + 全量 + build + bump 2.21.184 + dev 实例（bash-zp45ljfw，CDP 9222）实机：选区→引用到对话→chip 出现→发送→消息里仍是引用块。
+- 已完成前序：v2.21.180-183 四提交（dd5ef8a6/b7b6ecdd/35a52435/73a55327）全部验证过——打断轮正文跨轮合并修复、耗时口径（最后 loop 事件）、61 分钟起小时格式、缓存升版 20→21 清创；实机老会话耗时 8分48秒 正确。
+- 落地：composerDraft 加 quotes（仅内存）；popover detail 改传 { quote, comment? } 原文；Composer 加 quoteAttachments state，chips 渲染在图片附件区前（MessageSquareQuote 图标+首行截断+×删除+title 全文）；handleSend 开头统一折叠为 `> ` 引用块（setInput 合并 + inputValueRef 同步），wire 载荷不变；canSendNow 计入 quotes；chip × 按钮挂 kimix-inline-icon-action 角色类。
+- 验证：selectionQuote/composerDraft 定向测试、全量 200 文件 2182 测试、typecheck、pnpm build 通过；实机 CDP（dev 实例 9222）10/10：选区→浮层→点「引用到对话」出 chip 且不写 textarea、带 comment 时 comment 进正文、× 删除生效。发送折叠路径（> 引用块）代码仅 5 行且 formatSelectionQuote 有单测，实机未发真实消息。
+- 挂起：选区浮层视觉验收待用户截图；发版需补 docs/release-notes/v2.21.179.md（覆盖 178+179，若 180+ 一起发再补）。
+
 ## 2026-09-08 缓存：历史缓存升版 20→21 清创（v2.21.183）
 
 - 背景：v2.21.180-182 修了 wire 解析，但 IndexedDB 持久化时间线里 baked 的旧 durationMs（含离开间隔，实机 21122138ms=352分2秒）不会随解析修复自动刷新——正文一致时 repair 门禁不触发替换。真实用户（≤179）缓存里是跨轮合并正文，正文不一致会走 canonical 替换自愈；升版兜底让所有会话下次打开一次性重跑 repair。

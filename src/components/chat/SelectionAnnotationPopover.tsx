@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquareQuote, PenLine, X } from "lucide-react";
 
 import {
-  formatSelectionQuote,
   isSelectionAnnotatable,
   normalizeSelectedText,
 } from "@/utils/selectionQuote";
@@ -17,9 +16,13 @@ type PopoverState = {
 };
 
 function dispatchQuote(selectedText: string, comment?: string) {
-  const text = formatSelectionQuote(selectedText, comment);
-  if (!text) return;
-  window.dispatchEvent(new CustomEvent("kimix:composer-insert-quote", { detail: { text } }));
+  const quote = normalizeSelectedText(selectedText);
+  if (!quote) return;
+  // 传规范化原文（不带 `> ` 前缀）：Composer 以原子引用 chip 展示，发送时才折叠为引用块
+  const trimmedComment = comment?.trim();
+  window.dispatchEvent(new CustomEvent("kimix:composer-insert-quote", {
+    detail: { quote, comment: trimmedComment || undefined },
+  }));
 }
 
 /**

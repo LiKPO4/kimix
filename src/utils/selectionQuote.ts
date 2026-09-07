@@ -30,6 +30,13 @@ export function formatSelectionQuote(selectedText: string, comment?: string): st
   return trimmedComment ? `${quote}\n\n${trimmedComment}` : quote;
 }
 
+/** 引用 chip 的一行摘要：取首个非空行、压缩连续空白、按字符截断。 */
+export function formatQuoteChipLabel(quote: string, maxLength = 24): string {
+  const firstLine = quote.split("\n").find((line) => line.trim()) ?? "";
+  const compact = firstLine.replace(/\s+/g, " ").trim();
+  return compact.length > maxLength ? `${compact.slice(0, maxLength)}…` : compact;
+}
+
 /** 把新引用片段合并进现有草稿：草稿非空时先空两行分隔。 */
 export function mergeQuoteIntoDraft(draft: string, quote: string): string {
   if (!quote) return draft;
