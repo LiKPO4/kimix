@@ -52,6 +52,9 @@ const INTERRUPTED_WIRE = [
   loopEvent({ type: "step.begin", turnId: "1" }),
   textPart("1", "缺依赖，补上再测："),
   loopEvent({ type: "step.begin", turnId: "1" }),
+  // 簿记记录随下一条 prompt 一起写入（时间已是数小时后），不得污染上轮终点
+  JSON.stringify({ type: "config.update", agentId: "main", time: ++seq }),
+  JSON.stringify({ type: "prompt.accepted", agentId: "main", time: ++seq }),
   // 用户点击「继续」：新的 turn.prompt 直接到来，turn 1 永远没有 end_turn/turn.ended
   JSON.stringify({ type: "turn.prompt", agentId: "main", input: [{ type: "text", text: "继续" }], origin: { kind: "user" }, time: ++seq }),
   loopEvent({ type: "step.begin", turnId: "2" }),
@@ -84,13 +87,14 @@ describe("v2 wire 被打断轮收口", () => {
     expect(idxTurn2Text).toBeGreaterThan(continueBegin);
     expect(idxTurn1Text).toBeLessThan(idxSyntheticEnd);
 
-    // 合成 TurnEnd 的时间戳必须是上轮最后活动时间（小于「继续」prompt 时间、不早于
-    // 上轮末条正文），否则「本轮总耗时」会把用户两轮之间的离开间隔算进去（实机 352分2秒 事故）。
+    // 合成 TurnEnd 的时间戳必须是上轮最后 loop 事件时间：不早于上轮末条正文，
+    // 且必须早于「继续」前的 config.update / prompt.accepted 簿记记录（continueTime-2），
+    // 否则「本轮总耗时」会把用户两轮之间的离开间隔算进去（实机 352分2秒 事故）。
     const continueTime = events[continueBegin].time as number;
     const turn1TextTime = events[idxTurn1Text].time as number;
     expect(typeof synthetic.time).toBe("number");
     expect(synthetic.time as number).toBeGreaterThanOrEqual(turn1TextTime);
-    expect(synthetic.time as number).toBeLessThan(continueTime);
+    expect(synthetic.time as number).toBeLessThan(continueTime - 2);
   });
 
   it("正常收口的轮不会多出合成 TurnEnd", async () => {

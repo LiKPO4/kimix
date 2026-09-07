@@ -1,5 +1,10 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：耗时终点被簿记记录污染（v2.21.182）
+
+- v2.21.181 的"上轮最后活动时间"统计口径过宽：config.update / prompt.accepted 这类簿记记录随下一条 prompt 一起写入（时间已是数小时后），把上轮终点又推回 prompt 时刻，实机仍显示 5小时52分2秒。收窄为只数 context.append_loop_event（真实 turn 工作），簿记记录不再参与。
+- 测试：fixture 在「继续」prompt 前插入 config.update/prompt.accepted 污染记录，断言合成 TurnEnd 时间早于这两条簿记记录。全量 2179 测试、typecheck、pnpm build 通过。
+
 ## 2026-09-08 修复：被打断轮耗时含用户离开间隔 + 耗时格式小时化（v2.21.181）
 
 - 耗时值修正：v2.21.180 合成的 TurnEnd 原打"下一条 prompt 时间"，而 completedAssistantDuration = 轮起点 → TurnEnd.time，把用户两轮之间的离开间隔算进「本轮总耗时」（实机 352分2秒 = 11:36→17:28 的间隔）。现改为打上轮最后一条 wire 记录的时间（lastTurnActivityTime），只计真实工作时长。

@@ -503,9 +503,11 @@ export async function parseKimiCodeWireEvents(wireFile: string): Promise<Session
   // 下一条 turn.prompt 是上轮终结的唯一证据。不在这里关闭会让上一轮最后一条正文
   // 保持 isComplete:false，mergeEvents 把下一轮首句正文跨 user 边界追加并进上一轮
   // （实机：「继续」前的正文错显示为续跑段首句，与官方 web 不一致）。
-  // 合成 TurnEnd 的时间戳打上轮最后一条记录的时间而不是下一条 prompt 的时间：
+  // 合成 TurnEnd 的时间戳打上轮最后一条 loop 事件的时间而不是下一条 prompt 的时间：
   // completedAssistantDuration = 轮起点 → TurnEnd.time，若用 prompt 时间会把
-  // 用户两轮之间的离开间隔（可能数小时）算进「本轮总耗时」。
+  // 用户两轮之间的离开间隔（可能数小时）算进「本轮总耗时」。注意只数
+  // context.append_loop_event——config.update / prompt.accepted 这类簿记记录
+  // 会随下一条 prompt 一起写入（时间已是数小时后），不能把上轮终点推到那时。
   let turnOpen = false;
   let lastTurnActivityTime: number | undefined;
   const stream = fs.createReadStream(wireFile, { encoding: "utf-8" });
@@ -524,7 +526,7 @@ export async function parseKimiCodeWireEvents(wireFile: string): Promise<Session
         if (event.type === "TurnBegin") turnOpen = true;
         else if (event.type === "TurnEnd" || event.type === "turn.ended") turnOpen = false;
       }
-      if (turnOpen && typeof record.time === "number") lastTurnActivityTime = record.time;
+      if (turnOpen && record.type === "context.append_loop_event" && typeof record.time === "number") lastTurnActivityTime = record.time;
       if (record.type === "prompt.completed" || record.type === "context.clear") turnOpen = false;
     } catch {
       continue;
