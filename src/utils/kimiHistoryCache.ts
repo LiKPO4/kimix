@@ -3,7 +3,10 @@ import type { TimelineEvent } from "@/types/ui";
 // 19：思考虚高缓存曾被 body-only 等价认证冻结（实机实据见
 // hasInflatedLocalKimiThinkingHistory 注释）；升版强制重跑 repair，
 // canonical 更富的会话将被整体替换洗净。
-export const KIMI_HISTORY_CACHE_VERSION = 20;
+// 20→21（v2.21.182）：被打断轮合成 TurnEnd 收口（跨轮正文合并修复）+ 耗时终点
+// 改打上轮最后 loop 事件时间；旧缓存里 baked 的跨轮合并正文与含离开间隔的
+// durationMs 需一次性重跑 repair 用 canonical 重解析洗净。
+export const KIMI_HISTORY_CACHE_VERSION = 21;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 

@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **KIMI_HISTORY_CACHE_VERSION 20→21 re-runs repair once for interrupted-turn cache damage (v2.21.183)**: cached timelines hold baked cross-turn-merged bodies and away-gap `durationMs` that parser fixes alone cannot refresh (equal bodies never trigger canonical replacement). The version bump forces every session to re-run repair once against a canonical re-parse carrying the synthesized-TurnEnd semantics. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 106.
+
 * **Interrupted-turn activity tracking ignores prompt-time bookkeeping records (v2.21.182)**: `config.update`/`prompt.accepted` records are written together with the next prompt (hours later), so counting any timed record as turn activity pushed the synthesized TurnEnd right back to prompt time. Only `context.append_loop_event` records now advance the interrupted turn’s end timestamp. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 106.
 
 * **Interrupted-turn durations exclude the away gap, and durations past 61 minutes read in hours (v2.21.181)**: the synthesized `TurnEnd` for an interrupted v2 turn is now stamped with the turn’s last wire-record time instead of the next prompt’s time, so 本轮总耗时 no longer counts the hours the user spent away between turns (real incident: 352分2秒 for a sub-minute turn). `formatAssistantTurnDuration` keeps the 分/秒 format through 60分59秒 and switches to 小时/分/秒 at 61 minutes. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 106.

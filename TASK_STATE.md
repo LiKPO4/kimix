@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 缓存：历史缓存升版 20→21 清创（v2.21.183）
+
+- 背景：v2.21.180-182 修了 wire 解析，但 IndexedDB 持久化时间线里 baked 的旧 durationMs（含离开间隔，实机 21122138ms=352分2秒）不会随解析修复自动刷新——正文一致时 repair 门禁不触发替换。真实用户（≤179）缓存里是跨轮合并正文，正文不一致会走 canonical 替换自愈；升版兜底让所有会话下次打开一次性重跑 repair。
+- 改动：KIMI_HISTORY_CACHE_VERSION 20→21（kimiHistoryCache.ts 注释 + 钉住测试同步）。
+- 本机验证：CDP 删除该会话持久化键后重开，耗时显示以 canonical 重解析为准。
+
 ## 2026-09-08 修复：耗时终点被簿记记录污染（v2.21.182）
 
 - v2.21.181 的"上轮最后活动时间"统计口径过宽：config.update / prompt.accepted 这类簿记记录随下一条 prompt 一起写入（时间已是数小时后），把上轮终点又推回 prompt 时刻，实机仍显示 5小时52分2秒。收窄为只数 context.append_loop_event（真实 turn 工作），簿记记录不再参与。
