@@ -1041,7 +1041,7 @@ export function mergeCanonicalFragmentTurnBodies(
 export function shouldReplaceWithCanonicalKimiHistory(
   cachedEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
-  context?: { sessionId?: string; roomAgentId?: string; reason?: string; rawCanonicalEvents?: TimelineEvent[] },
+  context?: { sessionId?: string; roomAgentId?: string; reason?: string; rawCanonicalEvents?: TimelineEvent[]; forceCanonical?: boolean },
 ): boolean {
   if (canonicalEvents.length === 0) return false;
   // Log-safe context: strip rawCanonicalEvents (a full event array) to avoid
@@ -1129,7 +1129,13 @@ export function shouldReplaceWithCanonicalKimiHistory(
   const canonicalImageCount = displayableUserImageCount(canonicalEvents);
   const cachedImageCount = displayableUserImageCount(cachedEvents);
 
-  const regression = canonicalAssistantSize < cachedAssistantSize
+  // 缓存版本升版的强制重洗（forceCanonical，仅限本地 wire 派生的 canonical）：
+  // 旧缓存正文/ thinking 可能由已修复的渲染 bug 虚胖（如跨轮合并、通知误切轮），
+  // 尺寸回退门会把干净的 canonical 永远挡在门外。此时尺寸类 veto 全部跳过，
+  // 但过程历史回退门（工具调用生命周期帧）仍保留，防止部分快照摧毁本地时间线。
+  const regression = context?.forceCanonical
+    ? null
+    : canonicalAssistantSize < cachedAssistantSize
     ? {
         reason: "assistant-body-regression",
         localSize: cachedAssistantSize,
@@ -1160,7 +1166,8 @@ export function shouldReplaceWithCanonicalKimiHistory(
     return false;
   }
 
-  const shouldReplace = canonicalAssistantSize > cachedAssistantSize ||
+  const shouldReplace = context?.forceCanonical === true ||
+    canonicalAssistantSize > cachedAssistantSize ||
     canonicalImageCount > cachedImageCount ||
     (hasMalformedAssistantMarkdown(cachedEvents) && !hasMalformedAssistantMarkdown(canonicalEvents)) ||
     (Boolean(canonicalAssistantBody) && canonicalAssistantBody !== cachedAssistantBody && canonicalAssistantSize >= cachedAssistantSize) ||
@@ -1176,6 +1183,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
     logEvent("kimiHistoryReconciliation.accepted", {
       ...logCtx,
       callerReason: context?.reason,
+      ...(context?.forceCanonical ? { reason: "forced-cache-version-upgrade" } : {}),
       localSize: cachedAssistantSize,
       canonicalSize: canonicalAssistantSize,
     });

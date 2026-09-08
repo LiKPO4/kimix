@@ -4322,3 +4322,69 @@ describe("mapHistoryEvents notification turn boundary", () => {
     expect(stamped[0]).toMatchObject({ type: "status_update", notificationTurnBoundary: false });
   });
 });
+
+describe("mergeEvents 通知身份全局去重", () => {
+  const notif = (sourceId: string, type = "task.completed", id = `n-${sourceId}-${type}`): TimelineEvent => ({
+    id,
+    type: "status_update",
+    timestamp: 1_000,
+    message: "后台任务已完成",
+    source: "runtime",
+    tone: "info",
+    notification: {
+      kind: "notification",
+      type,
+      sourceKind: "background_task",
+      sourceId,
+      raw: `<notification id="task:${sourceId}:completed" type="${type}"></notification>`,
+    },
+  });
+  const assistantMsg: TimelineEvent = {
+    id: "a1", type: "assistant_message", timestamp: 2_000, content: "正文", isThinking: false, isComplete: true,
+  };
+
+  it("同身份通知隔着整轮再次到达（快照重放副本）时不追加", () => {
+    const existing: TimelineEvent[] = [notif("bash-1"), assistantMsg];
+    const replay = { ...notif("bash-1", "task.completed", "n-replay"), timestamp: 9_000 };
+
+    const events = mergeEvents(existing, replay);
+
+    expect(events).toBe(existing);
+  });
+
+  it("相邻到达的同身份通知也不合并/追加", () => {
+    const existing: TimelineEvent[] = [notif("bash-1")];
+
+    const events = mergeEvents(existing, notif("bash-1", "task.completed", "n-dup"));
+
+    expect(events).toHaveLength(1);
+    expect(events[0].id).toBe("n-bash-1-task.completed");
+  });
+
+  it("不同来源或不同信封类型的通知不去重", () => {
+    const existing: TimelineEvent[] = [notif("bash-1"), assistantMsg];
+
+    const otherSource = mergeEvents(existing, notif("bash-2"));
+    expect(otherSource).toHaveLength(3);
+
+    const otherType = mergeEvents(existing, notif("bash-1", "task.failed"));
+    expect(otherType).toHaveLength(3);
+  });
+
+  it("cron-fire 周期触发不参与身份去重", () => {
+    const cron = (id: string): TimelineEvent => ({
+      id,
+      type: "status_update",
+      timestamp: 1_000,
+      message: "定时任务触发",
+      source: "runtime",
+      tone: "info",
+      notification: { kind: "cron-fire", type: "cron.fire", sourceId: "job-1", raw: "<cron-fire/>" },
+    });
+    const existing: TimelineEvent[] = [cron("c1"), assistantMsg];
+
+    const events = mergeEvents(existing, cron("c2"));
+
+    expect(events).toHaveLength(3);
+  });
+});

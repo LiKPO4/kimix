@@ -18,7 +18,9 @@ import { kimiHistoryProcessEventCount } from "@/utils/kimiHistoryCache";
 
 // Bump when rejected-pair recovery semantics change so an older rejection
 // cannot suppress a newly capable additive repair after an app upgrade.
-const STORAGE_KEY = "kimix_reconcile_circuit_v6";
+// v7: 缓存升版强制采纳（forceCanonical）让曾被尺寸 veto 拒绝的 (local, canonical)
+// 对现在可能成功，旧熔断条目不得继续压制重试。
+const STORAGE_KEY = "kimix_reconcile_circuit_v7";
 const LRU_MAX = 500;
 
 type CircuitEntry = {

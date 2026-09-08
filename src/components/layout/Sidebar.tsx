@@ -830,10 +830,12 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       const currentHasConversation = current.events.some((event) => (
         event.type === "user_message" || event.type === "assistant_message"
       ));
+      // 缓存版本陈旧且 canonical 来自本地 wire 时强制采纳（同 repair 路径语义）。
+      const forceCanonical = session.kimiHistoryCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
       const canonicalAdopted = !currentHasConversation || shouldReplaceWithCanonicalKimiHistory(
         current.events,
         events,
-        { sessionId: session.id, reason: "sidebar-select" },
+        { sessionId: session.id, reason: "sidebar-select", forceCanonical },
       );
       const mergedEvents = canonicalAdopted
         ? backfillTurnModelsFromUsageStatuses(events)

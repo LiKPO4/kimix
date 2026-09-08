@@ -22,10 +22,11 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 22 to force re-hydration of caches holding notification-split turns", () => {
-    // 21→22（v2.21.187）：轮内通知不再切轮（NotificationMessage + boundary=false），
-    // 旧缓存 baked 的通知切轮需升版重跑 repair 用 canonical 重解析洗净。
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(22);
+  it("uses cache version 23 to force re-hydration of caches blocked by the size veto", () => {
+    // 22→23（v2.21.188）：187 只让 repair 重跑却没让结果被采纳（虚胖旧缓存触发
+    // assistant-body-regression veto）；本版对版本陈旧且 canonical 来自本地 wire 的
+    // 会话强制采纳，并按通知身份全局去重拦住快照重放副本。
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(23);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {

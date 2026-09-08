@@ -9,7 +9,12 @@ import type { TimelineEvent } from "@/types/ui";
 // 21→22（v2.21.187）：轮内后台任务/ cron 通知不再产出 TurnBegin（canonical 改发
 // NotificationMessage，映射 boundary=false 不切轮）；旧缓存里按旧启发式 baked 的
 // 通知切轮（一轮拆成两张「输出完成」卡）需一次性重跑 repair 用 canonical 重解析洗净。
-export const KIMI_HISTORY_CACHE_VERSION = 22;
+// 22→23（v2.21.188）：187 的升版只让 repair 重跑，没让结果被采纳——旧缓存正文虚胖
+// 触发 assistant-body-regression veto，干净 canonical 被挡在门外（实机 diag 实证）。
+// 本版对版本陈旧且 canonical 来自本地 wire 的会话强制采纳（forceCanonical，跳过尺寸
+// 类 veto、保留过程历史回退门），并在 mergeEvents 按通知身份全局去重，拦住 WS 快照
+// 重放副本在正文下方叠出第二张通知卡。
+export const KIMI_HISTORY_CACHE_VERSION = 23;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 

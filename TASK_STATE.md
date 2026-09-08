@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：通知卡多路到达叠卡 + 缓存升版不采纳（v2.21.188）
+
+- 根因 A（实机 fiber 取证）：独立通知卡来自 live WS 快照重放路径（snapshotMessageToServerFrames 给每条历史 user 消息合成 TurnBegin）→ App.tsx 按当前 runtime 状态盖 boundary=true（会话 idle）→ mergeEvents 只和末尾事件合并、无通知身份去重 → 重放副本在正文下方叠出第二张卡。历史 canonical 里该通知是 NotificationMessage（boundary=false，正确折叠）。
+- 根因 B（diag.log 实证）：缓存升版（21→22）只决定 repair 是否运行，不决定结果被采纳——活跃会话 493c0ce1 三次 reconciliation.rejected reason=assistant-body-regression（localSize 28399 > canonicalSize 25138），旧缓存虚胖是 187 前切轮 bug baked，尺寸 veto 把干净 canonical 永远挡在门外。
+- 修法：① mergeEvents 按通知身份（type+sourceId，子代理按 agentId；cron-fire 除外）全局去重；② 缓存版本 22→23 + 四个采纳点（repair/startup resume/reload/sidebar-select）在版本陈旧且 canonical 为本地 wire 来源时传 forceCanonical：跳过尺寸类 veto、保留过程历史回退门；③ 熔断器 kimix_reconcile_circuit_v6→v7（语义变更后旧拒绝不得压制重试）。
+- 评估后不做的边界：history 重放帧不按 payload.origin 重盖 boundary——扁平快照无法区分轮内/空闲到达（全 wire 普查：任务通知均为 append_message，turn.prompt 从不带 task origin，idle 到达也是 append_message 只是落在轮外），猜方向会反向破坏官方语义；残留竞态窗口由 force 采纳自愈。
+- 验证：新增用例（mergeEvents 去重 4 + forceCanonical 3）+ 定向 1830 过 + 全量 2202 过 + typecheck + build 通过；实机验收见收尾。
+
 ## 2026-09-08 修复：轮内后台通知把同一轮切成两张「输出完成」卡（v2.21.187）
 
 - 根因（取证：wire 5606-6041 + diag.log 实况帧 + server 快照探针 + 最小复现测试）：轮内中间步正文是 isComplete:true（agent-core-v2 步提交），通知到达时 buildRenderItems 的「前轮 assistant 全完结」切分启发式误判成立 → 同一轮被切成两张卡（均带整轮耗时），第二张卡的思考段被顶成正文。server 快照是扁平消息流、消息无 turn_id，重载后同样复现。

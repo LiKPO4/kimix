@@ -2142,6 +2142,20 @@ function isNotificationStatusUpdate(event: Extract<TimelineEvent, { type: "statu
     event.source === "runtime" || event.source === "skill" || event.source === "slash";
 }
 
+/**
+ * 通知身份：同一条后台任务/子代理通知可能经 live 帧、WS 快照重放、历史 canonical
+ * 多路重复到达。kind=notification 时按 信封 type + 来源 id 判同；cron-fire 是周期
+ * 触发，同一 job 的多次触发是不同事件，不参与去重。
+ */
+export function notificationDedupKey(event: TimelineEvent): string | undefined {
+  if (event.type !== "status_update") return undefined;
+  const detail = event.notification;
+  if (!detail || detail.kind !== "notification") return undefined;
+  const source = detail.sourceKind === "subagent" && detail.agentId ? detail.agentId : detail.sourceId;
+  if (!source) return undefined;
+  return `${detail.type}:${source}`;
+}
+
 export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent): TimelineEvent[] {
   // 忽略重复的用户消息（前端已提前添加，SDK 的 TurnBegin 会再发一次）
   if (incoming.type === "user_message") {
@@ -2758,6 +2772,13 @@ export function mergeEvents(existing: TimelineEvent[], incoming: TimelineEvent):
   }
 
   if (incoming.type === "status_update") {
+    // 同一通知的多路重复到达（live 帧 / WS 快照重放 / 历史 canonical）：全局按
+    // 通知身份去重。只和末尾事件合并挡不住隔了整轮的重放副本——它会在正文下方
+    // 叠出第二张通知卡（官方语义里轮内注入的通知应折在所属轮的过程链里）。
+    const incomingNotificationKey = notificationDedupKey(incoming);
+    if (incomingNotificationKey && existing.some((event) => notificationDedupKey(event) === incomingNotificationKey)) {
+      return existing;
+    }
     const last = existing[existing.length - 1];
     if (last?.type === "steer_message" && last.status === "sent") {
       return appendAfterConfirmedSteer(existing, [incoming], { closeOpenAssistant: false });

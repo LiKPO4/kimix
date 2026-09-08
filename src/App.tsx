@@ -329,7 +329,13 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
         const preState = useSessionStore.getState();
         const preSession = preState.sessions.find((s) => s.id === session.id);
         const preLocalEvents = preSession ? getRoomAgentEvents(preSession, target.roomAgentId) : [];
-        if (isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
+        // 缓存版本陈旧且 canonical 来自本地 wire（完整权威）时强制采纳：旧缓存的
+        // 虚胖正文/通知误切轮由已修复的 bug baked，尺寸类 veto 会永远挡住干净 canonical。
+        const preCacheVersion = preSession
+          ? (preSession.collaboration ? getRoomAgent(preSession, target.roomAgentId)?.kimiHistoryCacheVersion : preSession.kimiHistoryCacheVersion)
+          : undefined;
+        const forceCanonical = preCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
+        if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
           circuitSkipped = true;
           continue;
         }
@@ -367,7 +373,7 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
               Date.now(),
               new Set([target.roomAgentId]),
             );
-            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair", rawCanonicalEvents: canonicalEvents })) {
+            if (!shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair", rawCanonicalEvents: canonicalEvents, forceCanonical })) {
               const fragmentPatchedEvents = mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localEvents), reconciliation.events, { sessionId: item.id, roomAgentId: target.roomAgentId, reason: "repair" });
               const canonicalVerified = hasEquivalentKimiHistoryTurnBodies(fragmentPatchedEvents, reconciliation.events) &&
                 !hasInflatedLocalKimiThinkingHistory(fragmentPatchedEvents, reconciliation.events);
@@ -2454,8 +2460,12 @@ function App() {
                 const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;
                 const ownerAgentId = roomRuntimeOwner?.roomAgentId ?? getPrimaryRoomAgent(latestOwner).id;
                 const localAgentEvents = getRoomAgentEvents(latestOwner, ownerAgentId);
+                const ownerCacheVersion = latestOwner.collaboration
+                  ? getRoomAgent(latestOwner, ownerAgentId)?.kimiHistoryCacheVersion
+                  : latestOwner.kimiHistoryCacheVersion;
+                const forceCanonical = ownerCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
                 // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-                if (isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, canonicalEvents)) {
+                if (!forceCanonical && isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, canonicalEvents)) {
                   return;
                 }
                 const reconciliation = reconcileAgentCanonicalHistory({
@@ -2466,7 +2476,7 @@ function App() {
                   reason: "startup",
                 });
                 const shouldUseCanonicalHistory = reconciliation.applied &&
-                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup", rawCanonicalEvents: canonicalEvents });
+                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup", rawCanonicalEvents: canonicalEvents, forceCanonical });
                 const canonicalAdopted = reconciliation.applied && (localAgentEvents.length === 0 || shouldUseCanonicalHistory);
                 const rejectedBaseEvents = !reconciliation.applied || canonicalAdopted
                   ? localAgentEvents
@@ -3866,8 +3876,10 @@ function App() {
           let applied = false;
           updateSession(session.id, (item) => {
             const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
+            const reloadCacheVersion = item.collaboration ? getRoomAgent(item, roomAgentId)?.kimiHistoryCacheVersion : item.kimiHistoryCacheVersion;
+            const forceCanonical = reloadCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
             // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-            if (isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
+            if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
               return item;
             }
             const reconciliation = timeSync(`${reason}.reconcile`, () => reconcileAgentCanonicalHistory({
@@ -3880,7 +3892,7 @@ function App() {
             if (!reconciliation.applied) {
               return item;
             }
-            if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalSnapshotEvents })) {
+            if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalSnapshotEvents, forceCanonical })) {
               const patchedEvents = mergeMissingUsageStatusEvents(
                 mergeMissingLatestCanonicalAssistant(
                   mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localAgentEvents), reconciliation.events, { sessionId: session.id, roomAgentId, reason }),

@@ -1654,3 +1654,42 @@ describe("stampCurrentTurnModel", () => {
     expect(stampCurrentTurnModel(events, "kimi/k3")).toBe(events);
   });
 });
+
+describe("shouldReplaceWithCanonicalKimiHistory forceCanonical（缓存升版强制采纳）", () => {
+  it("缓存正文虚胖触发尺寸 veto 时，forceCanonical 直接采纳更小的干净 canonical", () => {
+    const logSpy = vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const cached: TimelineEvent[] = [
+      userMessage,
+      assistant("被旧 bug 跨轮合并虚胖的长正文。第一段。第二段。第三段。", { id: "local-fat" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("干净正文。", { id: "official-clean", snapshotMessageId: "msg-1", snapshotMessageIdStable: true }),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair" })).toBe(false);
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair", forceCanonical: true })).toBe(true);
+    expect(logSpy).toHaveBeenCalledWith("kimiHistoryReconciliation.accepted", expect.objectContaining({
+      reason: "forced-cache-version-upgrade",
+    }));
+  });
+
+  it("forceCanonical 下过程历史回退门仍然生效（部分快照不得摧毁工具时间线）", () => {
+    vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const cached: TimelineEvent[] = [
+      userMessage,
+      toolCall(),
+      assistant("本地正文比 canonical 长得多得多，且带工具过程。", { id: "local-rich" }),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("短", { id: "official-partial" }),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair", forceCanonical: true })).toBe(false);
+  });
+
+  it("forceCanonical 下空 canonical 仍然拒绝", () => {
+    expect(shouldReplaceWithCanonicalKimiHistory([userMessage, assistant("x")], [], { forceCanonical: true })).toBe(false);
+  });
+});
