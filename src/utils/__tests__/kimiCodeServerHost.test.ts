@@ -20,6 +20,7 @@ import {
   buildTowerModeServerProfilePatch,
   normalizeKimiFileSuggestions,
   resolveEngineStatusAfterPromptCompleted,
+  resolveSnapshotPublishStatus,
   resolveEffectiveServerEngineStatus,
   resolveExternalApprovalSettleStatus,
   selectExternallyResolvedQuestionIds,
@@ -390,6 +391,26 @@ describe("resolveEngineStatusAfterPromptCompleted", () => {
   it("keeps running when activity is unknown rather than faking completed", () => {
     expect(resolveEngineStatusAfterPromptCompleted({})).toBe("running");
     expect(resolveEngineStatusAfterPromptCompleted({ status: "unknown-future" })).toBe("running");
+  });
+});
+
+describe("resolveSnapshotPublishStatus（后台任务不钉住轮次）", () => {
+  it("busy 仅来自后台任务（无 in_flight、主轮已结束）时按 completed 发布", () => {
+    expect(resolveSnapshotPublishStatus("running", false, false)).toBe("completed");
+  });
+
+  it("主轮在跑或无法确认时不动 running", () => {
+    expect(resolveSnapshotPublishStatus("running", true, false)).toBe("running");
+    expect(resolveSnapshotPublishStatus("running", true, true)).toBe("running");
+    expect(resolveSnapshotPublishStatus("running", false, true)).toBe("running");
+    expect(resolveSnapshotPublishStatus("running", false, undefined)).toBe("running");
+  });
+
+  it("非 running 状态原样透传", () => {
+    expect(resolveSnapshotPublishStatus("waiting_approval", false, false)).toBe("waiting_approval");
+    expect(resolveSnapshotPublishStatus("waiting_question", false, false)).toBe("waiting_question");
+    expect(resolveSnapshotPublishStatus("idle", false, false)).toBe("idle");
+    expect(resolveSnapshotPublishStatus("error", false, false)).toBe("error");
   });
 });
 

@@ -3650,15 +3650,17 @@ function handleServerFrame(frame: ServerFrame) {
     if (session && managed) {
       managed.session = session;
       const resolvedStatus = resolveServerEngineStatus(session);
-      const terminalish = resolvedStatus !== "running" && resolvedStatus !== "waiting_approval" && resolvedStatus !== "waiting_question";
-      const snapshotInFlight = snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object";
+      const snapshotInFlight = Boolean(snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object");
+      // 先更新 mainTurnActive：发布状态映射要区分「主轮在跑」与「仅后台任务 busy」。
+      managed.mainTurnActive = snapshotInFlight ? true : session?.main_turn_active === true;
+      const publishStatus = resolveSnapshotPublishStatus(resolvedStatus, snapshotInFlight, managed.mainTurnActive);
+      const terminalish = publishStatus !== "running" && publishStatus !== "waiting_approval" && publishStatus !== "waiting_question";
       // pre-POST snapshot 必然「prompt 到达前」(busy=false/inFlight=0)，不得把刚乐观
       // 置 running 的轮降级成 completed（实机：新轮 121ms 被定成「输出完成 1s」）。
       // mainTurnActive 期间终态判定交给 prompt.completed/settle 路径。
       if (!(terminalish && managed.mainTurnActive === true && !snapshotInFlight)) {
-        setStatus(sessionId, resolvedStatus);
+        setStatus(sessionId, publishStatus);
       }
-      managed.mainTurnActive = snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? true : session?.main_turn_active === true;
     }
     const replayFingerprint = `${snapshot.as_of_seq}|${snapshot.epoch ?? ""}|${snapshot.in_flight_turn && typeof snapshot.in_flight_turn === "object" ? 1 : 0}|${Array.isArray(snapshot.messages?.items) ? snapshot.messages.items.length : 0}`;
     const previousFingerprint = snapshotReplayFingerprints.get(sessionId);
@@ -3786,6 +3788,23 @@ export function resolveEngineStatusAfterPromptCompleted(
   if (engine === "unknown") return "running";
   // idle / completed
   return "completed";
+}
+
+/**
+ * 快照/轮询的发布状态映射：busy=true 但主轮已结束（无 in_flight 且
+ * mainTurnActive=false，即只剩后台任务挂着）时按 completed 发布——后台任务不
+ * 钉住轮次 running，与 resolveEngineStatusAfterPromptCompleted 同一规则。否则
+ * 每次快照/轮询都会把已收口的最新轮重开成「执行中」并藏掉正文
+ * （docs/issue-background-bash-turn-reopen-events-snapshot.md）。
+ * mainTurnActive 为 undefined（无法确认）时保守不动 running。
+ */
+export function resolveSnapshotPublishStatus(
+  resolved: KimiCodeEngineStatus,
+  snapshotInFlight: boolean,
+  mainTurnActive: boolean | undefined,
+): KimiCodeEngineStatus {
+  if (resolved === "running" && !snapshotInFlight && mainTurnActive === false) return "completed";
+  return resolved;
 }
 
 /** Long continuation grace is only justified by explicit continuation work. */

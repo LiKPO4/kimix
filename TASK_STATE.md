@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：后台 Bash 运行中已收口轮被快照重开成「执行中」（v2.21.186）
+
+- 根因（快照取证 docs/issue-background-bash-turn-reopen-events-snapshot.md）：轮派生的后台 Bash 未退出 → server 侧 busy 保持 true → 快照/轮询分支把 busy 直接映射 running 发布 → 已 settle 的最新轮被 isActiveAssistant 重开成「执行中」、正文被 live draft 层藏掉；约 90s 后下一个真实事件到来才自愈。
+- 官方语义佐证（upstream kap-server/agent-core-v2）：busy = turnActive || background>0，mainTurnActive 单列；in_flight_turn 空闲时为 null。web 端据此区分「会话忙」与「轮次进行中」。
+- 修法：electron/kimiCodeHost.ts 快照分支先更新 mainTurnActive，再经新纯函数 resolveSnapshotPublishStatus 映射——running 且无 in_flight 且 mainTurnActive===false（仅后台任务 busy）按 completed 发布；与 resolveEngineStatusAfterPromptCompleted 既有的「后台任务不钉住轮次」规则同源。mainTurnActive undefined（无法确认）时保守不动 running。
+- 验证：kimiCodeServerHost 定向测试 61 过（新增 3 用例）、typecheck 通过；全量+build 见收尾；实机：重启 dev 实例后，在本会话挂长时后台任务、轮结束时观察卡片是否稳定 settle（CDP 复查 diag.log/display 状态）。
+
+
 ## 2026-09-08 功能：选区引用改为输入框原子 chip（v2.21.184，对齐官方 web）
 
 - 需求（用户截图）：官方把选区引用作为整体 chip 存在于输入框（图标+截断摘录，hover 出完整引用卡）；Kimix 目前只是把 `> ` 引用块纯文本拼进草稿（图2 红箭头），要优化成官方形态。
