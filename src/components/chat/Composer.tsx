@@ -4589,7 +4589,6 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     auto: "完全自动",
     yolo: "必要时询问",
   }[mutationPermissionMode ?? permissionMode];
-  const permissionLabelFontSize = permissionLabel.length > 5 ? 11 : permissionLabel.length > 4 ? 12 : 13;
 
   const composerCardSessionId = activeSession?.id ?? "__global__";
   const hiddenCards = hiddenComposerCards[composerCardSessionId] ?? [];
@@ -5222,13 +5221,13 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
             <div
               ref={permissionBtnRef}
               className="kimix-permission-button-wrap relative min-w-0 shrink-0"
-              style={{ flex: "0 0 116px", width: 116 }}
+              style={{ flex: "0 0 auto", minWidth: 116 }}
             >
               <button
                 disabled={!canConfigureNextTurn}
                 onClick={() => setShowPermissionMenu((v) => !v)}
-                className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact w-full min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
-                style={{ width: "100%", maxWidth: "100%", height: 32, minHeight: 32, gap: 6, paddingLeft: 12, paddingRight: 12 }}
+                className="kimix-icon-text-button kimix-control-button kimix-muted-action is-compact min-w-0 overflow-hidden disabled:cursor-not-allowed disabled:opacity-35"
+                style={{ height: 32, minHeight: 32, gap: 6, paddingLeft: 12, paddingRight: 12 }}
                 title={activeSession && !hasUniqueMutationOwner
                   ? mutationOwnerError
                   : isMutationOwnerRunning
@@ -5241,7 +5240,7 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
                   const PermissionIcon = permissionMenuIcons[mutationPermissionMode ?? permissionMode];
                   return <PermissionIcon size={14} className="shrink-0 text-[var(--kimix-panel-text-secondary)]" />;
                 })()}
-                <span className="kimix-permission-button-label min-w-0 flex-1 truncate" style={{ fontSize: permissionLabelFontSize, lineHeight: "20px" }}>{permissionLabel}</span>
+                <span className="kimix-permission-button-label" style={{ fontSize: 13, lineHeight: "20px", whiteSpace: "nowrap" }}>{permissionLabel}</span>
                 <ChevronDown size={12} className="shrink-0" />
               </button>
               {showPermissionMenu && (
