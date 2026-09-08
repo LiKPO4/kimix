@@ -1532,6 +1532,11 @@ function App() {
   const notifiedApprovalRequestRef = useRef<Set<string>>(new Set());
   const runtimeTerminalPollRef = useRef<Map<string, number>>(new Map());
   const runtimeLastStreamEventAtRef = useRef<Map<string, number>>(new Map());
+  // 当前打开轮的 origin.kind（turn.started 帧到达时记录，终态帧清除）：
+  // 用于区分「主轮在飞时注入的同轮通知」（折进当前轮）与「空闲时后台任务
+  // 完成触发的通知轮」（通知自开新轮）——两者事件形状相同，只能按到达时
+  // 的运行态盖章。
+  const runtimeTurnOriginRef = useRef<Map<string, string>>(new Map());
   const runtimeHistoryRefreshAtRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => window.api.onNotificationClick((payload) => {
@@ -2830,6 +2835,22 @@ function App() {
       const rawEvent = payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
         ? payload.event as Record<string, unknown>
         : null;
+      // 记录当前打开轮的 origin.kind（task-origin turn.started = 后台任务通知轮）。
+      // 无 origin 的 turn.started（如 in_flight 快照合成帧）不覆盖，避免抹掉真实来源。
+      if (rawEvent?.type === "turn.started") {
+        const turnPayload = rawEvent.payload && typeof rawEvent.payload === "object" && !Array.isArray(rawEvent.payload)
+          ? rawEvent.payload as Record<string, unknown>
+          : {};
+        const turnOrigin = turnPayload.origin && typeof turnPayload.origin === "object" && !Array.isArray(turnPayload.origin)
+          ? (turnPayload.origin as Record<string, unknown>).kind
+          : undefined;
+        if (typeof turnOrigin === "string" && turnOrigin) {
+          runtimeTurnOriginRef.current.set(payload.sessionId, turnOrigin);
+        }
+      }
+      if (rawEvent?.type === "prompt.completed" || rawEvent?.type === "prompt.aborted") {
+        runtimeTurnOriginRef.current.delete(payload.sessionId);
+      }
       if (rawEvent?.type === "agent.status.updated") {
         syncSessionSwarmMode(uiSessionId, rawEvent, roomAgentId);
         syncSessionTowerMode(uiSessionId, rawEvent);
@@ -2988,8 +3009,17 @@ function App() {
           })
         : mapKimiCodeEvent(payload.event);
       if (!mapped) return;
+      // 通知信封的轮边界盖章（官方 activeOrNewTurn）：主轮在飞且非任务轮时，
+      // 通知是同轮注入（折进当前轮，不切分）；任务轮/空闲时通知自开新轮。
+      // 缺失时保留旧启发式（buildRenderItems 内 notificationTurnBoundary === undefined）。
+      const mappedStamped = mapped.type === "status_update" && mapped.notification && mapped.notificationTurnBoundary === undefined
+        ? {
+            ...mapped,
+            notificationTurnBoundary: !(runtimeActive && runtimeTurnOriginRef.current.get(payload.sessionId) !== "task" && runtimeTurnOriginRef.current.get(payload.sessionId) !== "background_task"),
+          }
+        : mapped;
       const longTaskRole = getLongTaskRoleForRuntime(targetSession, payload.sessionId);
-      const mappedWithRole = attachLongTaskAgentRole(mapped, longTaskRole);
+      const mappedWithRole = attachLongTaskAgentRole(mappedStamped, longTaskRole);
       const roomScopedEvent = targetSession?.longTask || !roomAgentId
         ? mappedWithRole
         : scopeEventToRoomAgent(mappedWithRole, roomAgentId);
@@ -3394,6 +3424,7 @@ function App() {
         (activeRunningSessionId === uiSessionId || activeRunningSessionId === statusRuntimeSessionId)
       ) {
         setRunningSessionId(null);
+        runtimeTurnOriginRef.current.delete(statusRuntimeSessionId);
       }
 
       if (payload.status === "error" || payload.status === "interrupted") {

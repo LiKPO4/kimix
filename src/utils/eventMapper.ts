@@ -1715,6 +1715,9 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
           source: "runtime",
           tone: envelope.tone,
           notification: envelope.notification,
+          // turn.prompt 信封结构上是新轮起点；server 快照重放时被本地 wire 镜像
+          // 盖章为同轮内通知（notificationTurnBoundary=false）的除外。
+          notificationTurnBoundary: payload.notificationTurnBoundary === false ? false : true,
         };
       }
       // goal 续跑是系统触发消息（wire turn.prompt 记录带 origin），折叠为状态
@@ -1752,6 +1755,25 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         roomMessageId: userMessage.deliveryIdentity?.roomMessageId,
         agentTurnId: userMessage.deliveryIdentity?.agentTurnId,
         dispatchAttemptId: userMessage.deliveryIdentity?.dispatchAttemptId,
+      };
+    }
+
+    // 同轮内注入的通知（wire context.append_message role=user，origin.kind=task/cron）：
+    // 结构上属于当前打开的轮，永不作为轮边界（官方 activeOrNewTurn 的 mid-turn 分支）。
+    case "NotificationMessage": {
+      const userMessage = extractUserMessage(payload.user_input);
+      if (!userMessage.content.trim()) return null;
+      const envelope = parseKimiAgentEnvelope(userMessage.content);
+      if (!envelope) return null;
+      return {
+        id: generateId(),
+        type: "status_update",
+        timestamp: eventTimestamp,
+        message: envelope.summary,
+        source: "runtime",
+        tone: envelope.tone,
+        notification: envelope.notification,
+        notificationTurnBoundary: false,
       };
     }
 

@@ -623,6 +623,11 @@ export interface StatusUpdateEvent {
   /** 代理循环信封（后台任务通知/定时任务触发）的结构化字段，映射层从原始信封提取；
    *  缺失（旧持久化数据）时渲染层回退为摘要 pill。 */
   notification?: StatusNotificationDetail;
+  /** 通知是否自开一轮（官方 activeOrNewTurn 的判定结果，在生产侧盖章）：
+   *  true=空闲时通知自己开新轮（渲染层在轮边界切分）；false=同轮内注入的
+   *  通知（wire append_message / 主轮在飞时到达），永远折进当前轮。
+   *  缺失（旧持久化数据）时渲染层回退为“前轮 assistant 全完结”启发式。 */
+  notificationTurnBoundary?: boolean;
 }
 
 /** status_update 携带的通知信封详情（对齐官方通知卡的 类型/来源/严重度/原始 payload）。 */

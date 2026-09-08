@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：轮内后台通知把同一轮切成两张「输出完成」卡（v2.21.187）
+
+- 根因（取证：wire 5606-6041 + diag.log 实况帧 + server 快照探针 + 最小复现测试）：轮内中间步正文是 isComplete:true（agent-core-v2 步提交），通知到达时 buildRenderItems 的「前轮 assistant 全完结」切分启发式误判成立 → 同一轮被切成两张卡（均带整轮耗时），第二张卡的思考段被顶成正文。server 快照是扁平消息流、消息无 turn_id，重载后同样复现。
+- wire 结构事实：轮内通知 = context.append_message role=user（origin.kind=task），永不开新轮；空闲通知轮 = turn.prompt。两类在此前都被解析层丢弃/无法区分。
+- 修法：生产侧盖章 status_update.notificationTurnBoundary——canonical 解析新增 NotificationMessage（boundary=false，顺带让 canonical 历史不再丢通知卡）；live 在 App.tsx 入队边界按 runtimeActive + runtimeTurnOriginRef（turn.started origin）盖章；server 重载用本地 wire 镜像按信封 id 匹配盖章（stampMidTurnNotificationBoundaries）。无标志的旧缓存事件保留旧启发式。
+- 验证：定向 253 过（新增 7 用例）、全量 2194 过、typecheck 通过；build 与实机重载验收见收尾。
+
 ## 2026-09-08 修复：后台 Bash 运行中已收口轮被快照重开成「执行中」（v2.21.186）
 
 - 根因（快照取证 docs/issue-background-bash-turn-reopen-events-snapshot.md）：轮派生的后台 Bash 未退出 → server 侧 busy 保持 true → 快照/轮询分支把 busy 直接映射 running 发布 → 已 settle 的最新轮被 isActiveAssistant 重开成「执行中」、正文被 live draft 层藏掉；约 90s 后下一个真实事件到来才自愈。

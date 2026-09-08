@@ -1405,7 +1405,10 @@ export function buildRenderItems(
     if (event.type === "status_update" && event.notification) {
       const bodyAssistants = turnBody.filter((candidate) => candidate.type === "assistant_message");
       const previousTurnComplete = bodyAssistants.length > 0 && bodyAssistants.every((candidate) => candidate.isComplete);
-      if (previousTurnComplete) flushTurn(false, true);
+      // notificationTurnBoundary=false（同轮内注入的通知）永不切轮：agent-core-v2
+      // 会在轮内提交 isComplete:true 的中间步正文，「前轮全完结」启发式在轮中
+      // 同样成立，靠它切分会把同一轮拆成两张「输出完成」卡、思考段被顶成正文。
+      if (previousTurnComplete && event.notificationTurnBoundary !== false) flushTurn(false, true);
       turnBody.push(event);
       continue;
     }

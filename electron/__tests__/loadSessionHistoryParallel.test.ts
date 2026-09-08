@@ -13,6 +13,7 @@ import {
   type SessionHistoryEvent,
 } from "../sessionHistory";
 import type { SessionHistoryResult } from "../sessionHistoryFallback";
+import { stampMidTurnNotificationBoundaries } from "../sessionHistoryFallback";
 
 const serverEvents: SessionHistoryEvent[] = [
   { type: "TurnBegin", payload: { user_input: "hi" }, time: 100 },
@@ -167,5 +168,38 @@ describe("loadSessionHistoryParallel", () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("stampMidTurnNotificationBoundaries", () => {
+  const notificationXml = (id: string) =>
+    `<notification id="${id}" category="task" type="task.completed" source_kind="background_task" source_id="bash-1">\nTitle: Background process completed\n</notification>`;
+
+  it("wire append_message 里的同轮通知 → server 历史对应 TurnBegin 盖章 boundary=false", () => {
+    const serverEvents: SessionHistoryResult["events"] = [
+      { type: "TurnBegin", payload: { user_input: "跑测试" }, time: 1 },
+      { type: "ContentPart", payload: { type: "text", text: "中间步" }, time: 2 },
+      { type: "TurnBegin", payload: { user_input: notificationXml("task:bash-1:completed") }, time: 3 },
+      { type: "ContentPart", payload: { type: "text", text: "最终正文" }, time: 4 },
+    ];
+    const localEvents: SessionHistoryResult["events"] = [
+      { type: "TurnBegin", payload: { user_input: [{ type: "text", text: "跑测试" }] }, time: 1 },
+      { type: "NotificationMessage", payload: { user_input: [{ type: "text", text: notificationXml("task:bash-1:completed") }] }, time: 3 },
+    ];
+    const stamped = stampMidTurnNotificationBoundaries(serverEvents, localEvents);
+    const notif = stamped[2];
+    expect((notif.payload as Record<string, unknown>).notificationTurnBoundary).toBe(false);
+    // 真实用户 TurnBegin 不受影响
+    expect((stamped[0].payload as Record<string, unknown>).notificationTurnBoundary).toBeUndefined();
+  });
+
+  it("本地镜像没有同轮通知时不动 server 历史", () => {
+    const serverEvents: SessionHistoryResult["events"] = [
+      { type: "TurnBegin", payload: { user_input: notificationXml("task:bash-9:completed") }, time: 1 },
+    ];
+    const stamped = stampMidTurnNotificationBoundaries(serverEvents, [
+      { type: "TurnBegin", payload: { user_input: "别的" }, time: 1 },
+    ]);
+    expect(stamped[0]).toBe(serverEvents[0]);
   });
 });

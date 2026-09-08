@@ -14,7 +14,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime, type SessionHistoryResult } from "./sessionHistoryFallback";
+import { loadSessionHistoryWithFallback, mergeHistoryStatusEventsByTime, stampMidTurnNotificationBoundaries, type SessionHistoryResult } from "./sessionHistoryFallback";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -384,6 +384,29 @@ function parseEventPayload(
 }
 
 export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHistoryEvent | null {
+  // Mid-turn injected user messages (background-task / cron notification envelopes).
+  // Unlike turn.prompt these never open a new turn in the wire: they are appended
+  // into the currently open turn, so the renderer must fold them into that turn
+  // (notificationTurnBoundary=false) instead of splitting a new card.
+  // 必须放在 message 新格式分支之前：append_message 的 message 没有 type 字段，
+  // 会被该分支当成未知记录提前丢弃。
+  if (record.type === "context.append_message" && record.message && typeof record.message === "object") {
+    const message = record.message as { role?: unknown; content?: unknown };
+    if (message.role !== "user") return null;
+    const content = message.content;
+    const text = typeof content === "string"
+      ? content
+      : Array.isArray(content)
+        ? content.map((part) => (part && typeof part === "object" ? String((part as Record<string, unknown>).text ?? "") : "")).join("")
+        : "";
+    if (!/<notification\b|<cron-fire\b/i.test(text)) return null;
+    return {
+      type: "NotificationMessage",
+      payload: { user_input: content },
+      time: record.time,
+    };
+  }
+
   // New-format: { message: { type, payload } } (same as old wire format after passthrough).
   if (record.message && typeof record.message === "object") {
     const message = record.message as {
@@ -713,12 +736,15 @@ export async function loadSessionHistoryParallel(
     // 回退路径已返回本地镜像，无需再水合
     if (history.source !== "server") return history;
     try {
+      const localEvents = await localHistoryPromise;
+      // 快照消息是扁平流，同轮内通知需用 wire 镜像结构盖章（否则被切成新轮卡）
+      const stampedEvents = stampMidTurnNotificationBoundaries(history.events, localEvents);
       // 快照消息不带 model/usage 字段（0.29 实测全 null）；从 wire 镜像补齐各轮用量/模型页脚
-      const statusEvents = (await localHistoryPromise).filter(
+      const statusEvents = localEvents.filter(
         (event) => event.type === "StatusUpdate"
           && Boolean(event.payload && typeof event.payload === "object" && "token_usage" in (event.payload as Record<string, unknown>)),
       );
-      return { ...history, events: mergeHistoryStatusEventsByTime(history.events, statusEvents) };
+      return { ...history, events: mergeHistoryStatusEventsByTime(stampedEvents, statusEvents) };
     } catch (hydrationError) {
       // wire 镜像在 existsSync 与流读取之间可能被删/独占，水合失败不应拖垮完好的 server 快照
       console.warn("[kimi-code] loadSession wire hydration failed, falling back to unmerged server events:", hydrationError);

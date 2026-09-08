@@ -122,3 +122,49 @@ describe("v2 wire 被打断轮收口", () => {
     expect(events.filter((event) => event.type === "TurnBegin")).toHaveLength(2);
   });
 });
+
+describe("同轮内通知（context.append_message）解析", () => {
+  it("轮内 append_message 的通知信封 → NotificationMessage，不产生轮边界", async () => {
+    const notificationText = '<notification id="task:bash-abc:completed" category="task" type="task.completed" source_kind="background_task" source_id="bash-abc">\nTitle: Background process completed\nSeverity: info\n跑测试 completed.\n</notification>';
+    const file = fixture([
+      JSON.stringify({ type: "turn.prompt", agentId: "main", input: [{ type: "text", text: "跑测试" }], origin: { kind: "user" }, time: ++seq }),
+      loopEvent({ type: "step.begin", turnId: "1" }),
+      textPart("1", "中间步正文"),
+      // 后台任务完成：同轮内注入的 user 角色通知（origin.kind=task）
+      JSON.stringify({
+        type: "context.append_message",
+        agentId: "main",
+        message: { role: "user", content: [{ type: "text", text: notificationText }], origin: { kind: "task", taskId: "bash-abc", status: "completed", notificationId: "task:bash-abc:completed" } },
+        time: ++seq,
+      }),
+      textPart("1", "最终正文"),
+      loopEvent({ type: "step.end", turnId: "1", finishReason: "end_turn" }),
+      JSON.stringify({ type: "turn.ended", agentId: "main", time: ++seq }),
+    ]);
+    const events = await parseKimiCodeWireEvents(file);
+    const notifications = events.filter((event) => event.type === "NotificationMessage");
+    expect(notifications).toHaveLength(1);
+    // 通知位于两条正文之间，且没有产生额外 TurnBegin/TurnEnd
+    const types = events.map((event) => event.type);
+    expect(types.filter((type) => type === "TurnBegin")).toHaveLength(1);
+    expect(types.indexOf("NotificationMessage")).toBeGreaterThan(types.indexOf("TurnBegin"));
+    expect(types.indexOf("NotificationMessage")).toBeLessThan(types.lastIndexOf("ContentPart"));
+  });
+
+  it("非通知的 append_message（system-reminder 注入等）不产生事件", async () => {
+    const file = fixture([
+      JSON.stringify({ type: "turn.prompt", agentId: "main", input: [{ type: "text", text: "干活" }], origin: { kind: "user" }, time: ++seq }),
+      loopEvent({ type: "step.begin", turnId: "1" }),
+      textPart("1", "正文"),
+      JSON.stringify({
+        type: "context.append_message",
+        agentId: "main",
+        message: { role: "user", content: [{ type: "text", text: "<system-reminder>别忘了更新 todo</system-reminder>" }], origin: { kind: "injection", variant: "todo_list_reminder" } },
+        time: ++seq,
+      }),
+      loopEvent({ type: "step.end", turnId: "1", finishReason: "end_turn" }),
+    ]);
+    const events = await parseKimiCodeWireEvents(file);
+    expect(events.filter((event) => event.type === "NotificationMessage")).toHaveLength(0);
+  });
+});

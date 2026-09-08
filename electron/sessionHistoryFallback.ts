@@ -71,3 +71,49 @@ export function mergeHistoryStatusEventsByTime(
   }
   return merged;
 }
+
+/**
+ * 抽取信封消息（notification / cron-fire）的稳定 id，用于跨来源匹配同一通知。
+ * user_input 可能是字符串或 content part 数组（wire append_message 为数组）。
+ */
+function notificationEnvelopeId(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const input = (payload as Record<string, unknown>).user_input;
+  const text = typeof input === "string"
+    ? input
+    : Array.isArray(input)
+      ? input.map((part) => (part && typeof part === "object" ? String((part as Record<string, unknown>).text ?? "") : "")).join("")
+      : "";
+  return (
+    text.match(/<notification\b[^>]*\bid="([^"]+)"/i)?.[1] ??
+    text.match(/<cron-fire\b[^>]*\bjobId="([^"]+)"/i)?.[1]
+  );
+}
+
+/**
+ * Server 快照是扁平消息流，无法区分「同轮内注入的通知」（wire append_message）
+ * 与「自开一轮的通知」（wire turn.prompt）；本地 wire 镜像是唯一结构权威。
+ * 用镜像里 append_message 通知的信封 id 给 server 历史里的对应 TurnBegin 盖章
+ * notificationTurnBoundary=false，渲染层据此把通知折回所属轮而不是切出新卡。
+ */
+export function stampMidTurnNotificationBoundaries(
+  events: SessionHistoryResult["events"],
+  localEvents: SessionHistoryResult["events"],
+): SessionHistoryResult["events"] {
+  const midTurnIds = new Set<string>();
+  for (const event of localEvents) {
+    if (event.type !== "NotificationMessage") continue;
+    const id = notificationEnvelopeId(event.payload);
+    if (id) midTurnIds.add(id);
+  }
+  if (midTurnIds.size === 0) return events;
+  return events.map((event) => {
+    if (event.type !== "TurnBegin") return event;
+    const id = notificationEnvelopeId(event.payload);
+    if (!id || !midTurnIds.has(id)) return event;
+    const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
+      ? event.payload as Record<string, unknown>
+      : {};
+    return { ...event, payload: { ...payload, notificationTurnBoundary: false } };
+  });
+}

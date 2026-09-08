@@ -4284,3 +4284,41 @@ describe("status_update family-aware merge", () => {
     expect(events[0]).toMatchObject({ message: "模型：x", tokenCount: 10, inputTokenCount: 20 });
   });
 });
+
+describe("mapHistoryEvents notification turn boundary", () => {
+  const notificationXml = '<notification id="task:bash-m:completed" category="task" type="task.completed" source_kind="background_task" source_id="bash-m">\nTitle: Background process completed\nSeverity: info\n跑测试 completed.\n</notification>';
+
+  it("NotificationMessage（wire 同轮注入）→ status_update 且 notificationTurnBoundary=false", () => {
+    const result = mapHistoryEvents([{
+      type: "NotificationMessage",
+      payload: { user_input: [{ type: "text", text: notificationXml }] },
+    }]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "status_update",
+      notificationTurnBoundary: false,
+    });
+    expect((result[0] as { notification?: { sourceId?: string } }).notification?.sourceId).toBe("bash-m");
+  });
+
+  it("NotificationMessage 非信封内容不产出事件", () => {
+    const result = mapHistoryEvents([{
+      type: "NotificationMessage",
+      payload: { user_input: [{ type: "text", text: "<system-reminder>x</system-reminder>" }] },
+    }]);
+    expect(result).toHaveLength(0);
+  });
+
+  it("TurnBegin 信封默认自开新轮（boundary=true），被盖章 false 时保留", () => {
+    const ownTurn = mapHistoryEvents([{
+      type: "TurnBegin",
+      payload: { user_input: [{ type: "text", text: notificationXml }] },
+    }]);
+    expect(ownTurn[0]).toMatchObject({ type: "status_update", notificationTurnBoundary: true });
+    const stamped = mapHistoryEvents([{
+      type: "TurnBegin",
+      payload: { user_input: [{ type: "text", text: notificationXml }], notificationTurnBoundary: false },
+    }]);
+    expect(stamped[0]).toMatchObject({ type: "status_update", notificationTurnBoundary: false });
+  });
+});

@@ -6,7 +6,10 @@ import type { TimelineEvent } from "@/types/ui";
 // 20→21（v2.21.182）：被打断轮合成 TurnEnd 收口（跨轮正文合并修复）+ 耗时终点
 // 改打上轮最后 loop 事件时间；旧缓存里 baked 的跨轮合并正文与含离开间隔的
 // durationMs 需一次性重跑 repair 用 canonical 重解析洗净。
-export const KIMI_HISTORY_CACHE_VERSION = 21;
+// 21→22（v2.21.187）：轮内后台任务/ cron 通知不再产出 TurnBegin（canonical 改发
+// NotificationMessage，映射 boundary=false 不切轮）；旧缓存里按旧启发式 baked 的
+// 通知切轮（一轮拆成两张「输出完成」卡）需一次性重跑 repair 用 canonical 重解析洗净。
+export const KIMI_HISTORY_CACHE_VERSION = 22;
 
 const LEGACY_CLARIFICATION_PREFIX = /^【Kimix 需求澄清(?:工具)?[:：]/;
 

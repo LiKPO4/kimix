@@ -360,6 +360,52 @@ describe("buildRenderItems notification cards", () => {
     if (group.type !== "notification_group") throw new Error("expect group");
     expect(group.events.map((event) => event.id)).toEqual(["n1", "n2", "n3"]);
   });
+
+  it("同轮内通知（notificationTurnBoundary=false）不切轮，即使中间步 assistant 已完结", () => {
+    // 实机事故：agent-core-v2 轮内提交 isComplete:true 的中间步正文，后台任务
+    // 完成通知（wire append_message / 快照重放）到达时「前轮全完结」启发式成立，
+    // 同一轮被切成两张「输出完成」卡，思考段被顶成第二张卡的正文。
+    const midTurnNotification = {
+      ...notificationStatus("n1", 3),
+      notificationTurnBoundary: false,
+    } as TimelineEvent;
+    const items = buildRenderItems([
+      { id: "user", type: "user_message", timestamp: 1, content: "可以，开始修复" } as TimelineEvent,
+      assistantEvent("加测试。先看测试文件导入块的收尾行：", { id: "a1", timestamp: 2, isComplete: true }),
+      midTurnNotification,
+      assistantEvent("", {
+        id: "a2",
+        timestamp: 4,
+        isComplete: true,
+        thinking: "thinking 内容",
+        thinkingParts: [{ id: "tp1", timestamp: 4, text: "thinking 内容" }],
+      }),
+      assistantEvent("最终回复正文。", { id: "a3", timestamp: 5, isComplete: true }),
+    ], "kimi-code");
+    const assistantItems = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistantItems).toHaveLength(1);
+    const assistantItem = assistantItems[0];
+    if (assistantItem?.type !== "event" || assistantItem.event.type !== "assistant_message") throw new Error("expect assistant");
+    expect(assistantItem.event.content).toContain("加测试。先看测试文件导入块的收尾行：");
+    expect(assistantItem.event.content).toContain("最终回复正文。");
+    expect(assistantItem.turnBlocks?.some((block) => block.kind === "notification" && block.event.id === "n1")).toBe(true);
+    expect(items.filter((item) => item.type === "event" && item.event.type === "status_update" && (item.event as { notification?: unknown }).notification)).toHaveLength(0);
+  });
+
+  it("自开新轮的通知（notificationTurnBoundary=true）仍按旧规则切轮", () => {
+    const ownTurnNotification = {
+      ...notificationStatus("n1", 3),
+      notificationTurnBoundary: true,
+    } as TimelineEvent;
+    const items = buildRenderItems([
+      { id: "user", type: "user_message", timestamp: 1, content: "跑测试" } as TimelineEvent,
+      assistantEvent("完成", { id: "a1", timestamp: 2, isComplete: true }),
+      ownTurnNotification,
+      assistantEvent("通知轮正文", { id: "a2", timestamp: 4, isComplete: true }),
+    ], "kimi-code");
+    const assistantItems = items.filter((item) => item.type === "event" && item.event.type === "assistant_message");
+    expect(assistantItems).toHaveLength(2);
+  });
 });
 
 describe("question_request folding", () => {

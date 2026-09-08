@@ -22,11 +22,10 @@ const tool: TimelineEvent = {
 };
 
 describe("Kimi history cache migration", () => {
-  it("uses cache version 21 to force re-hydration of caches holding cross-turn-merged bodies and away-gap durations", () => {
-    // 20→21（v2.21.182）：v2 wire 被打断轮无收口记录，旧缓存 baked 了跨轮合并正文
-    // 与含用户离开间隔的 durationMs；升版让受影响会话一次性重跑 repair，用带
-    // 合成 TurnEnd 语义的 canonical 重解析洗净。
-    expect(KIMI_HISTORY_CACHE_VERSION).toBe(21);
+  it("uses cache version 22 to force re-hydration of caches holding notification-split turns", () => {
+    // 21→22（v2.21.187）：轮内通知不再切轮（NotificationMessage + boundary=false），
+    // 旧缓存 baked 的通知切轮需升版重跑 repair 用 canonical 重解析洗净。
+    expect(KIMI_HISTORY_CACHE_VERSION).toBe(22);
   });
 
   it("detects both generations of legacy clarification wrappers in cached user messages", () => {
