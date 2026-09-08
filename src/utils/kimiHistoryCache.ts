@@ -49,6 +49,20 @@ export function hasKimiProcessHistoryRegression(cached: TimelineEvent[], canonic
   return kimiHistoryProcessEventCount(canonical) < kimiHistoryProcessEventCount(cached);
 }
 
+// 仅顶层过程事件计数（不展开子代理嵌套帧）。force 升版采纳时使用：canonical 的
+// 子代理子事件由子代理 wire 重新派生，而本地嵌套帧来自 live 重放材料化——旧版
+// 每次重放给同一批官方调用生成全新 toolCallId（实据 session_d4035d92：51 个真实
+// 调用在本地被放大成 316 个嵌套帧），按扁平计数会让幽灵帧否决干净的 canonical。
+// 顶层帧不受该 bug 影响（本地顶层帧与官方 id 一一对应），保留顶层回退门仍可挡住
+// 真正的部分快照。
+export function kimiHistoryProcessEventCountTopLevel(events: TimelineEvent[]) {
+  return events.reduce((count, event) => count + (PROCESS_EVENT_TYPES.has(event.type) ? 1 : 0), 0);
+}
+
+export function hasKimiProcessHistoryRegressionTopLevel(cached: TimelineEvent[], canonical: TimelineEvent[]) {
+  return kimiHistoryProcessEventCountTopLevel(canonical) < kimiHistoryProcessEventCountTopLevel(cached);
+}
+
 function toolCallIdentities(events: TimelineEvent[]) {
   return flattenTimelineEvents(events)
     .filter((event): event is Extract<TimelineEvent, { type: "tool_call" }> => (

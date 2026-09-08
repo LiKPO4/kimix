@@ -5,6 +5,7 @@ import { mergeAssistantThinkingParts, mergeEvents } from "@/utils/eventMapper";
 import {
   hasCanonicalKimiThinkingHistory,
   hasKimiProcessHistoryRegression,
+  hasKimiProcessHistoryRegressionTopLevel,
   hasLegacyKimiClarificationWrapper,
   hasRepairableDuplicateKimiToolHistory,
   hasRicherKimiProcessHistory,
@@ -1107,8 +1108,14 @@ export function shouldReplaceWithCanonicalKimiHistory(
   // Server snapshots can contain the newest assistant text/thinking while
   // omitting tool-call lifecycle frames. Never let such a partial snapshot
   // destructively replace a richer live/local process timeline.
+  // forceCanonical（本地 wire 派生 canonical）下只比顶层帧：子代理嵌套帧在本地
+  // 可能被 live 重放重复材料化（幽灵帧），canonical 则从子代理 wire 重新派生，
+  // 扁平计数会让幽灵帧永远否决升版重洗（实据 session_d4035d92：739 vs 470）。
   const repairsDuplicateToolHistory = hasRepairableDuplicateKimiToolHistory(cachedEvents, canonicalEvents);
-  if (hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents) && !repairsDuplicateToolHistory) {
+  const processRegression = context?.forceCanonical
+    ? hasKimiProcessHistoryRegressionTopLevel(comparisonCached, canonicalEvents)
+    : hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents);
+  if (processRegression && !repairsDuplicateToolHistory) {
     if (context?.sessionId && context?.roomAgentId) {
       markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }

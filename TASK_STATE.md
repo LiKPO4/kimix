@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 修复：force 采纳被幽灵过程帧否决 + IndexedDB blob 断链（v2.21.189）
+
+- 根因（真实缓存分解石锤）：旧 live 重放把子代理工具调用每次重放生成新 toolCallId 重复材料化（51→316，全在 4 张 subagent 卡内），扁平过程计数 739 vs canonical 470，188 的 forceCanonical 仍被 process-history-regression 门挡下 → 旧缓存（cacheVersion=20）+ patch 合并零件继续上屏：19 份 bash-pza2gyn0 通知、bash-8bmhvsc1 双份卡、3 轮正文残片。
+- 修复：force 模式过程门改比顶层帧（hasKimiProcessHistoryRegressionTopLevel，kimiHistoryCache.ts）；顶层帧 id 官方一一对应不可能幽灵膨胀，部分快照保护不退化。真实导出数据验证 accepted=true；合成单测 2 个。全量 2207 过。
+- 顺带发现的独立问题（机制未查明，记入 invariant 110）：released profile 的 IndexedDB 记录引用 9 个 blob 块缺 3 个（21:57-22:00 修复循环 48 版/3 分钟、每版 5 新 blob 全丢），记录从盘上不可读、应用靠内存续命。已补 3 个空 blob 恢复可读（丢 3 段 thinking 字符串），重启验证会话正常加载。勘界手法：headless Chrome + --user-data-dir=profile 副本 + CDP Runtime.evaluate 整记录导出（脚本在 .tmp-forensics/，用完即删）。
+- 用户 live store 已修复；released app 已重启。
+
+
 ## 2026-09-08 修复：通知卡多路到达叠卡 + 缓存升版不采纳（v2.21.188）
 
 - 根因 A（实机 fiber 取证）：独立通知卡来自 live WS 快照重放路径（snapshotMessageToServerFrames 给每条历史 user 消息合成 TurnBegin）→ App.tsx 按当前 runtime 状态盖 boundary=true（会话 idle）→ mergeEvents 只和末尾事件合并、无通知身份去重 → 重放副本在正文下方叠出第二张卡。历史 canonical 里该通知是 NotificationMessage（boundary=false，正确折叠）。

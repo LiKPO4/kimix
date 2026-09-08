@@ -1689,6 +1689,65 @@ describe("shouldReplaceWithCanonicalKimiHistory forceCanonical（缓存升版强
     expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair", forceCanonical: true })).toBe(false);
   });
 
+  it("forceCanonical 下子代理嵌套幽灵帧膨胀不再否决采纳（实据 session_d4035d92：51 真实调用被 live 重放材料化成 316 帧）", () => {
+    vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const ghostCalls: TimelineEvent[] = Array.from({ length: 6 }, (_, i) => ({
+      id: `ghost-${i}`,
+      type: "tool_call" as const,
+      timestamp: 2,
+      toolCallId: `tool_ghost_${i}`,
+      toolName: "Grep",
+      status: "success" as const,
+      arguments: {},
+    }));
+    const canonicalCalls: TimelineEvent[] = [0, 1].map((i) => ({
+      id: `real-${i}`,
+      type: "tool_call" as const,
+      timestamp: 2,
+      toolCallId: `tool_real_${i}`,
+      toolName: "Grep",
+      status: "success" as const,
+      arguments: {},
+    }));
+    const cached: TimelineEvent[] = [
+      userMessage,
+      { id: "sub-local", type: "subagent", timestamp: 2, agentId: "agent-1", agentName: "explore", status: "completed", events: ghostCalls },
+      assistant("被旧 bug 虚胖的本地正文，比 canonical 长很多，确保尺寸 veto 也会触发。"),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      { id: "sub-official", type: "subagent", timestamp: 2, agentId: "agent-1", agentName: "explore", status: "completed", events: canonicalCalls },
+      assistant("干净正文。"),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair" })).toBe(false);
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair", forceCanonical: true })).toBe(true);
+  });
+
+  it("forceCanonical 下顶层过程帧回退仍然否决（部分快照保护不退化）", () => {
+    vi.spyOn(reportError, "logEvent").mockImplementation(() => {});
+    const cached: TimelineEvent[] = [
+      userMessage,
+      toolCall("Bash"),
+      {
+        id: "tool-2",
+        type: "tool_call",
+        timestamp: 2,
+        toolCallId: "call-2",
+        toolName: "Read",
+        status: "success",
+        arguments: {},
+      },
+      assistant("本地正文与工具过程都在。"),
+    ];
+    const canonical: TimelineEvent[] = [
+      userMessage,
+      assistant("干净正文。"),
+    ];
+
+    expect(shouldReplaceWithCanonicalKimiHistory(cached, canonical, { reason: "repair", forceCanonical: true })).toBe(false);
+  });
+
   it("forceCanonical 下空 canonical 仍然拒绝", () => {
     expect(shouldReplaceWithCanonicalKimiHistory([userMessage, assistant("x")], [], { forceCanonical: true })).toBe(false);
   });
