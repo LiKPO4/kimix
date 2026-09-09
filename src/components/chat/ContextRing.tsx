@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useLiveSession } from "@/hooks/useLiveSession";
-import { getSessionContextUsages, getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
+import { getSessionContextUsages, getSessionOutputStats, getSessionRecommendationMetrics } from "@/utils/sessionMetrics";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { isSessionRuntimeRunning } from "@/utils/sessionActivity";
 import {
@@ -13,6 +13,11 @@ import { ComposerToolbarPopover } from "./ComposerToolbarPopover";
 function formatK(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
   return String(tokens);
+}
+
+function formatSpeed(tokensPerSecond: number): string {
+  const value = tokensPerSecond >= 100 ? String(Math.round(tokensPerSecond)) : tokensPerSecond.toFixed(1);
+  return `${value} t/s`;
 }
 
 function CircularProgress({ percent, size = 18, strokeWidth = 2.5 }: { percent: number; size?: number; strokeWidth?: number }) {
@@ -86,6 +91,7 @@ export function ContextRing() {
     [session, modelContextLimits],
   );
   const primaryContextUsage = contextUsages.find((usage) => usage.isPrimary) ?? contextUsages[0];
+  const outputStats = useMemo(() => getSessionOutputStats(session), [session]);
 
   // 从事件流中判断是否在压缩中：最近一个 compaction 事件是 begin 且后面没有 end
   const isCompacting = useMemo(() => {
@@ -316,6 +322,30 @@ export function ContextRing() {
               </div>
             )}
           </div>
+          {(outputStats.avgCacheHitRate !== undefined || outputStats.avgSpeed !== undefined || outputStats.currentTurnSpeed !== undefined) && (
+            <div className="kimix-menu-separator" style={{ marginTop: 16, paddingTop: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {outputStats.avgCacheHitRate !== undefined && (
+                  <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                    <span className="text-[13px] text-text-muted">平均缓存命中率：</span>
+                    <span className="kimix-tabular-nums shrink-0 text-[13px] text-text-secondary">{outputStats.avgCacheHitRate.toFixed(1)}%</span>
+                  </div>
+                )}
+                {outputStats.avgSpeed !== undefined && (
+                  <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                    <span className="text-[13px] text-text-muted">平均速度：</span>
+                    <span className="kimix-tabular-nums shrink-0 text-[13px] text-text-secondary">{formatSpeed(outputStats.avgSpeed)}</span>
+                  </div>
+                )}
+                {outputStats.currentTurnSpeed !== undefined && (
+                  <div className="flex items-center justify-between" style={{ gap: 12 }}>
+                    <span className="text-[13px] text-text-muted">本轮速度：</span>
+                    <span className="kimix-tabular-nums shrink-0 text-[13px] text-text-secondary">{formatSpeed(outputStats.currentTurnSpeed)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {sessionRecommendationEnabled && (
             <div className="kimix-menu-separator" style={{ marginTop: 16, paddingTop: 14 }}>
               <div className="flex items-center justify-between" style={{ gap: 12, marginBottom: 7 }}>

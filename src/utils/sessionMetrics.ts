@@ -270,3 +270,68 @@ export function shouldRecommendNewSession(session: Session, enabled: boolean, tu
   if (!enabled) return false;
   return countUserTurns(session.events) >= Math.max(1, Math.round(turnLimit || 1));
 }
+
+export interface SessionOutputStats {
+  /** 平均缓存命中率（0-100）：ΣinputCacheRead / Σ输入，仅统计 turn 级 usage.record。 */
+  avgCacheHitRate?: number;
+  /** 平均输出速度（tokens/s）：Σ输出 / Σ生成窗口，跨全部轮次。 */
+  avgSpeed?: number;
+  /** 本轮输出速度（tokens/s）：最近一条 user_message 之后的同口径均值。 */
+  currentTurnSpeed?: number;
+}
+
+// 生成窗口过短会被 Date.now() 量化噪声主导（对齐官方 MIN_STREAM_MS_FOR_TPS=50）；
+// 过长说明边界事件缺失（如历史从轮中间开始重放），窗口不可信，跳过该步。
+const MIN_STEP_WINDOW_MS = 50;
+const MAX_STEP_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * 背景信息窗口的输出统计。口径：
+ * - 只统计主 Agent 的 turn 级 usage 帧（usageScope==="turn" 且无 agentId），
+ *   session 级（压缩快照）与 agent.status.updated 的累计帧不参与，避免重复计数。
+ * - 每步生成窗口 ≈ 该 usage 帧时间 − 前一个主 Agent 边界（user_message /
+ *   tool_result）时间；usage.record 在 LLM 响应完成时落盘、工具执行之前，
+ *   因此该窗口近似本步纯生成耗时。子代理边界不计（其活动发生在主生成流内）。
+ * - 无缓存分解字段的旧持久化数据不参与命中率（避免把“无数据”显示成 0%）。
+ */
+export function getSessionOutputStats(session: Session | null | undefined): SessionOutputStats {
+  const events = session?.events ?? [];
+  let cacheRead = 0;
+  let cacheInput = 0;
+  let totalOutput = 0;
+  let totalWindowMs = 0;
+  let turnOutput = 0;
+  let turnWindowMs = 0;
+  let lastBoundaryTs: number | undefined;
+  for (const event of events) {
+    if (event.type === "user_message" || event.type === "tool_result") {
+      if (event.type === "user_message") {
+        turnOutput = 0;
+        turnWindowMs = 0;
+        lastBoundaryTs = event.timestamp;
+      } else if (!event.agentId) {
+        lastBoundaryTs = event.timestamp;
+      }
+      continue;
+    }
+    if (event.type !== "status_update") continue;
+    if (event.usageScope !== "turn" || event.agentId) continue;
+    if (typeof event.inputCacheRead === "number") {
+      cacheRead += event.inputCacheRead;
+      cacheInput += event.inputTokenCount ?? event.inputCacheRead + (event.inputCacheCreation ?? 0);
+    }
+    const output = event.tokenCount ?? 0;
+    if (output <= 0 || lastBoundaryTs === undefined) continue;
+    const windowMs = event.timestamp - lastBoundaryTs;
+    if (windowMs < MIN_STEP_WINDOW_MS || windowMs > MAX_STEP_WINDOW_MS) continue;
+    totalOutput += output;
+    totalWindowMs += windowMs;
+    turnOutput += output;
+    turnWindowMs += windowMs;
+  }
+  return {
+    avgCacheHitRate: cacheInput > 0 ? (cacheRead / cacheInput) * 100 : undefined,
+    avgSpeed: totalWindowMs > 0 ? totalOutput / (totalWindowMs / 1000) : undefined,
+    currentTurnSpeed: turnWindowMs > 0 ? turnOutput / (turnWindowMs / 1000) : undefined,
+  };
+}

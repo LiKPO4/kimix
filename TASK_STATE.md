@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-08 功能：背景信息窗口输出统计（v2.21.190）
+
+- 需求：ContextRing 浮层加平均缓存命中率 / 平均速度 / 本轮速度。
+- 接口勘界（先于实现）：官方速度来自 streamTiming（llmStreamDurationMs 等，仅 telemetry，vendor/kimi-code-sdk 195352），不上 wire，无法直接采用；缓存分解（inputCacheRead/Creation/Other）usage.record 全量携带。命中率口径与官方 debug-timing.ts 一致：cacheRead/总输入。
+- 实现：StatusUpdateEvent 补 inputCacheRead/inputCacheCreation；live（kimiCodeEventMapper usage.record）+ 历史（electron/sessionHistory 透传 agent_id、eventMapper StatusUpdate）两链补齐并标子代理 agentId；sessionMetrics.getSessionOutputStats 只统计主 Agent turn 级帧，生成窗口=usage 帧时间−前一主 Agent 边界（user_message/tool_result），50ms~30min 守卫（对齐官方 MIN_STREAM_MS_FOR_TPS 精神）；旧持久化无缓存字段不参与命中率。
+- 验证：6 个新单测 + 相关 5 文件 424 过 + typecheck 干净；全量回归后台跑。
+- 已知边界：速度为事件时间戳近似（无官方 streamTiming），含重试等待；命中率仅覆盖 190 起新落盘/重放的 usage 帧，旧数据足够时也参与。
+
 ## 2026-09-08 修复：force 采纳被幽灵过程帧否决 + IndexedDB blob 断链（v2.21.189）
 
 - 根因（真实缓存分解石锤）：旧 live 重放把子代理工具调用每次重放生成新 toolCallId 重复材料化（51→316，全在 4 张 subagent 卡内），扁平过程计数 739 vs canonical 470，188 的 forceCanonical 仍被 process-history-regression 门挡下 → 旧缓存（cacheVersion=20）+ patch 合并零件继续上屏：19 份 bash-pza2gyn0 通知、bash-8bmhvsc1 双份卡、3 轮正文残片。

@@ -1958,12 +1958,16 @@ export function mapStreamEvent(event: unknown): TimelineEvent | null {
         (isNumber(tokenUsage.input_cache_read) ? tokenUsage.input_cache_read : 0) +
         (isNumber(tokenUsage.input_cache_creation) ? tokenUsage.input_cache_creation : 0);
       const contextSize = isNumber(payload.context_usage) ? payload.context_usage : undefined;
+      const agentIdRaw = isString(payload.agent_id) ? payload.agent_id : isString(payload.agentId) ? payload.agentId : undefined;
       return {
         id: generateId(),
         type: "status_update",
         timestamp: eventTimestamp,
+        agentId: agentIdRaw && agentIdRaw !== "main" ? agentIdRaw : undefined,
         tokenCount: isNumber(tokenUsage.output) ? tokenUsage.output : 0,
         inputTokenCount,
+        inputCacheRead: isNumber(tokenUsage.input_cache_read) ? tokenUsage.input_cache_read : undefined,
+        inputCacheCreation: isNumber(tokenUsage.input_cache_creation) ? tokenUsage.input_cache_creation : undefined,
         contextSize,
         usageScope: payload.usage_scope === "turn" || payload.usage_scope === "session" ? payload.usage_scope : undefined,
         planMode: typeof payload.plan_mode === "boolean" ? payload.plan_mode : undefined,

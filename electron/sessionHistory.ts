@@ -453,6 +453,7 @@ export function parseKimiCodeRecord(record: Record<string, unknown>): SessionHis
         },
         model: record.model,
         usage_scope: record.usageScope,
+        agent_id: typeof record.agentId === "string" ? record.agentId : undefined,
       },
       time: record.time,
     };

@@ -783,8 +783,11 @@ export function mapKimiCodeEvent(
         id: getId(options),
         type: "status_update",
         timestamp,
+        agentId: getAgentId(event),
         tokenCount: usageOutput(usage),
         inputTokenCount: usageInput(usage),
+        inputCacheRead: isNumber(usage.inputCacheRead) ? usage.inputCacheRead : undefined,
+        inputCacheCreation: isNumber(usage.inputCacheCreation) ? usage.inputCacheCreation : undefined,
         usageScope: event.usageScope === "turn" || event.usageScope === "session" ? event.usageScope : undefined,
         message: isString(event.model) ? `模型：${event.model}` : undefined,
       };

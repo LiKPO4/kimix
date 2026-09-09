@@ -610,6 +610,10 @@ export interface StatusUpdateEvent {
   totalSteps?: number;
   tokenCount?: number;
   inputTokenCount?: number;
+  /** 输入缓存分解（usage.record 透传）：命中率 = inputCacheRead / inputTokenCount。
+   *  旧持久化数据无此字段，统计时按“无缓存数据”处理而非 0 命中。 */
+  inputCacheRead?: number;
+  inputCacheCreation?: number;
   contextSize?: number;
   contextLimit?: number;
   usageScope?: "turn" | "session";

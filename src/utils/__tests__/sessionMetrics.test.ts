@@ -10,6 +10,7 @@ import {
   preferPositiveMetric,
   statusesAfterLatestContextBoundary,
   getSessionContextUsages,
+  getSessionOutputStats,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
   shouldRenderStandaloneStatusUpdate,
@@ -591,5 +592,79 @@ describe("statusesAfterLatestContextBoundary", () => {
     const result = statusesAfterLatestContextBoundary(events);
     expect(result.statuses.map((e) => e.id)).toEqual(["s1"]);
     expect(result.foundBoundary).toBe(false);
+  });
+});
+
+describe("getSessionOutputStats", () => {
+  const usage = (id: string, timestamp: number, extra: Partial<Extract<TimelineEvent, { type: "status_update" }>> = {}): TimelineEvent => ({
+    id,
+    type: "status_update",
+    timestamp,
+    usageScope: "turn",
+    ...extra,
+  });
+
+  it("按 turn 级 usage 帧计算平均缓存命中率", () => {
+    const session = makeSession([
+      { id: "u1", type: "user_message", timestamp: 1000, content: "a" },
+      usage("s1", 2000, { tokenCount: 100, inputTokenCount: 1000, inputCacheRead: 900, inputCacheCreation: 50 }),
+      usage("s2", 4000, { tokenCount: 100, inputTokenCount: 1000, inputCacheRead: 100, inputCacheCreation: 0 }),
+    ]);
+    expect(getSessionOutputStats(session).avgCacheHitRate).toBeCloseTo(50, 5);
+  });
+
+  it("无缓存分解字段的旧数据不参与命中率", () => {
+    const session = makeSession([
+      { id: "u1", type: "user_message", timestamp: 1000, content: "a" },
+      usage("s1", 2000, { tokenCount: 100, inputTokenCount: 1000 }),
+    ]);
+    expect(getSessionOutputStats(session).avgCacheHitRate).toBeUndefined();
+  });
+
+  it("按生成窗口计算本轮速度与平均速度", () => {
+    // 轮 1：一步，窗口 1000ms、输出 100 → 100 t/s
+    // 轮 2：两步，窗口各 1000ms、输出各 150 → 150 t/s；平均 (100+300)/(1+2)=133.33
+    const session = makeSession([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100, inputTokenCount: 10, inputCacheRead: 5 }),
+      { id: "u2", type: "user_message", timestamp: 5000, content: "b" },
+      usage("s2", 6000, { tokenCount: 150, inputTokenCount: 10, inputCacheRead: 5 }),
+      { id: "t1", type: "tool_result", timestamp: 7000, agentId: undefined, toolCallId: "c1", toolName: "Bash", result: "ok" },
+      usage("s3", 8000, { tokenCount: 150, inputTokenCount: 10, inputCacheRead: 5 }),
+    ]);
+    const stats = getSessionOutputStats(session);
+    expect(stats.currentTurnSpeed).toBeCloseTo(150, 5);
+    expect(stats.avgSpeed).toBeCloseTo(400 / 3, 5);
+  });
+
+  it("窗口过短或缺边界时跳过速度但保留命中率", () => {
+    const session = makeSession([
+      usage("s0", 500, { tokenCount: 100, inputTokenCount: 10, inputCacheRead: 5 }),
+      { id: "u1", type: "user_message", timestamp: 1000, content: "a" },
+      usage("s1", 1010, { tokenCount: 100, inputTokenCount: 10, inputCacheRead: 5 }),
+    ]);
+    const stats = getSessionOutputStats(session);
+    expect(stats.avgSpeed).toBeUndefined();
+    expect(stats.avgCacheHitRate).toBeCloseTo(50, 5);
+  });
+
+  it("session 级与子代理 usage 帧不参与统计", () => {
+    const session = makeSession([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100, inputTokenCount: 1000, inputCacheRead: 500 }),
+      usage("s2", 2000, { usageScope: "session", tokenCount: 9999, inputTokenCount: 9999, inputCacheRead: 9999 }),
+      usage("s3", 3000, { agentId: "sub-1", tokenCount: 9999, inputTokenCount: 9999, inputCacheRead: 9999 }),
+    ]);
+    const stats = getSessionOutputStats(session);
+    expect(stats.avgCacheHitRate).toBeCloseTo(50, 5);
+    expect(stats.avgSpeed).toBeCloseTo(100, 5);
+  });
+
+  it("空会话返回全空统计", () => {
+    expect(getSessionOutputStats(makeSession([]))).toEqual({
+      avgCacheHitRate: undefined,
+      avgSpeed: undefined,
+      currentTurnSpeed: undefined,
+    });
   });
 });
