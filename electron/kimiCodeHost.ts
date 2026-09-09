@@ -44,12 +44,14 @@ import {
   mergeServerRelatedSessions,
   normalizeServerTerminalCreateError,
   snapshotMessagesToServerFrames,
+  prependOlderServerMessages,
   snapshotToHistoryFrames,
   toServerConfigPatch,
   type ServerFrame,
   type ServerAuthSummary,
   type ServerBackgroundTask,
   type ServerMcpServer,
+  type ServerMessageSummary,
   type ServerOAuthFlow,
   type ServerSession,
   type ServerSkill,
@@ -3089,6 +3091,18 @@ export async function loadServerSessionHistory(sessionId: string): Promise<{ eve
     throw new Error(`Session ${sessionId} 当前由兼容链路管理，改用本地 wire 镜像加载历史。`);
   }
   const snapshot = await getServerClient().getSnapshot(sessionId);
+  let truncated = snapshot.messages?.has_more === true;
+  const snapshotItems = snapshot.messages?.items;
+  if (truncated && Array.isArray(snapshotItems)) {
+    const fullItems = await prependOlderServerMessages(
+      (beforeId) => getServerClient().listMessages(sessionId, 100, beforeId),
+      snapshotItems as ServerMessageSummary[],
+    );
+    if (fullItems) {
+      snapshot.messages = { items: fullItems, has_more: false };
+      truncated = false;
+    }
+  }
   const frames = snapshotToHistoryFrames(snapshot, sessionId);
   return {
     events: frames.map((frame) => ({
@@ -3097,8 +3111,8 @@ export async function loadServerSessionHistory(sessionId: string): Promise<{ eve
       time: serverReplayTimestamp(frame),
     })),
     source: "server",
-    // 0.29 快照只回最近 100 条消息（messages.has_more），调用方需改用本地 wire 全量镜像
-    truncated: snapshot.messages?.has_more === true,
+    // 快照只回最近 100 条；上面已用 listMessages before_id 翻页尝试补齐，补齐失败才保持 truncated
+    truncated,
   };
 }
 

@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 修复：Server 历史快照 100 条截断改为 before_id 翻页补齐全量（v2.21.196）
+
+- 背景：getSnapshot 的 messages 只回最近 100 条（has_more），长会话 canonical 侧缺早期轮次（v2.20.244 实据：末轮整个缺席，修复管线无法对齐），此前记录为 upstream boundary。
+- 方案：放弃 transcript turn 映射路线，改用 listMessages 的 before_id 游标分页（0.41 起，kap-server messageHistory 返回倒序页）。新增纯函数 prependOlderServerMessages（kimiCodeServerClient）：倒序页反转升序、按 id 去重前插，空页/游标无进展/抛错/超 200 页 → null；loadServerSessionHistory 在 has_more=true 时调用，成功则 truncated=false 直接用全量，失败保持旧逻辑回退本地 wire 镜像。
+- 验收：typecheck 过；新增 8 条单测（多页拼接/空页/去重/防死循环/页数上限/抛错），全量 2223 过；实机打开 >100 条的长会话验证正文完整性待用户确认。
+- 边界：before_id 需 server ≥0.41；旧 server 上报错被捕获 → null → 回退镜像兜底，行为与之前一致。
+
+
 ## 2026-09-09 功能：官方队列单条取消——steer 滞留内容可摘除（v2.21.195）
 
 - 背景：0.33 起官方 per-prompt ::abort 对 msg_* id 恒 40402（v2 回归），steer 第二步失败、内容滞留官方队列时用户无法取消，轮末必然自动补跑（runtime-routing 20a）。0.42.0 kap-server 恢复该能力（promptService.abort 支持 pending 队列项摘除 + publishAborted）。

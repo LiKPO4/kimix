@@ -1004,6 +1004,60 @@ function hasPromptCompletionDisplayFrame(frames: readonly ServerFrame[]): boolea
 const PROMPT_COMPLETION_BARRIER_RETRY_DELAYS_MS = [0, 100, 250, 500, 1_000, 2_000, 3_000, 3_000] as const;
 const FAILED_PROMPT_COMPLETION_REASONS = new Set(["failed", "error", "interrupted", "cancelled", "canceled", "aborted", "filtered"]);
 
+function serverMessageIdOf(message: ServerMessageSummary | null | undefined): string {
+  return message && typeof message.id === "string" ? message.id : "";
+}
+
+// getSnapshot 的 messages 只回最近 100 条（has_more=true 表示还有更旧的）。
+// listMessages 支持 before_id 游标翻页：返回倒序（新→旧）、严格比 pivot 旧的一页。
+// 这里逐页向前补齐、反转为升序后前插；补齐失败（抛错/空页但仍有更旧/游标无进展/超页数）
+// 返回 null，由调用方保留 truncated 标记走本地 wire 镜像兜底。
+export async function prependOlderServerMessages(
+  fetchPage: (beforeId: string) => Promise<{ items: ServerMessageSummary[]; has_more: boolean }>,
+  tailItems: readonly ServerMessageSummary[],
+  maxPages = 200,
+): Promise<ServerMessageSummary[] | null> {
+  const all = [...tailItems];
+  const seen = new Set<string>();
+  for (const message of all) {
+    const id = serverMessageIdOf(message);
+    if (id) seen.add(id);
+  }
+  let oldestSeen = serverMessageIdOf(all[0]);
+  if (!oldestSeen) return null;
+  for (let page = 0; page < maxPages; page += 1) {
+    let result: { items: ServerMessageSummary[]; has_more: boolean };
+    try {
+      result = await fetchPage(oldestSeen);
+    } catch {
+      return null;
+    }
+    const pageItems = Array.isArray(result?.items) ? result.items : [];
+    if (pageItems.length === 0) {
+      return result?.has_more === true ? null : all;
+    }
+    const freshAscending: ServerMessageSummary[] = [];
+    for (let i = pageItems.length - 1; i >= 0; i -= 1) {
+      const message = pageItems[i];
+      const id = serverMessageIdOf(message);
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      freshAscending.push(message);
+    }
+    if (freshAscending.length === 0) {
+      return result.has_more === true ? null : all;
+    }
+    all.unshift(...freshAscending);
+    const nextOldest = serverMessageIdOf(freshAscending[0]);
+    if (!nextOldest || nextOldest === oldestSeen) {
+      return result.has_more === true ? null : all;
+    }
+    oldestSeen = nextOldest;
+    if (result.has_more !== true) return all;
+  }
+  return null;
+}
+
 export function snapshotToHistoryFrames(snapshot: ServerSnapshot, sessionId: string): ServerFrame[] {
   const frames = snapshotMessagesToServerFrames(snapshot, sessionId);
   const seq = snapshot.as_of_seq;
@@ -1400,8 +1454,9 @@ export class KimiCodeServerClient {
     return result.connections;
   }
 
-  listMessages(sessionId: string, pageSize = 20): Promise<{ items: ServerMessageSummary[]; has_more: boolean }> {
+  listMessages(sessionId: string, pageSize = 20, beforeId?: string): Promise<{ items: ServerMessageSummary[]; has_more: boolean }> {
     const query = new URLSearchParams({ page_size: String(Math.max(1, Math.min(100, pageSize))) });
+    if (beforeId) query.set("before_id", beforeId);
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages?${query}`);
   }
 
