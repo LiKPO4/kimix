@@ -1,5 +1,18 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 修复：重启截断轮正文永不自愈——image veto 挡死更富 canonical（v2.21.192）
+
+- 现象：dev 实例观察 CLI 会话（session_493c0ce1），v2.21.191 修复轮（turn 24）卡片只显示中间句「等待测试期间准备提交说明。检查结果：」，1273 字最终正文丢失。
+- 取证链（根因快照流程）：① server messages API 权威数据完整（msg _003275 len=1273）；② diag.log：渲染器 03:54:49 重启（dev 重 build），最终正文 03:55 才 stream，本地时间线截断在 03:53:23（CDP dump 内存 store 实证 4486 events，无 03:53:23 后任何事件）；③ loadKimiCodeSession wire 派生 canonical 完整（4669 events 含最终 ContentPart）；④ CDP 实机跑 shouldReplaceWithCanonicalKimiHistory 判定 false——localImg=1 vs canonImg=0 触发 user-image-regression veto（body/think/process 三项 canonical 全部更富也过不去）；⑤ diag.log reconcile 记录：02:57 后该会话再无任何 reconcile（触发缺口：活跃会话被启动修复排除 + 渲染器没见证 settle）。
+- 根因：wire 派生 canonical 天然不含渲染器本地图片（dataUrl 是 renderer-local 元数据），凡用户贴过图的会话，repair/startup/settle 三条 reconcile 路径直接对账必吃 image veto，截断历史永不自愈。kimiCodeSnapshotReplay/undoHistory 早有 preserveLocalUserMediaInCanonicalHistory 先例，这三条路径漏了。
+- 修复（App.tsx 4 处，全部在熔断/veto 之前先 preserve）：
+  1. repairKimiCodeHistoryBodies（repair 路径，~328）；
+  2. recoverCollaborationRoomAtStartup 消费点（collaboration 启动恢复，~584）；
+  3. 启动水合 owner 分支（~2462，ownerCanonicalEvents）；
+  4. reconcileFromHistorySnapshot（settle 路径 terminal-tail/running-sample，~3878，canonicalForAgent）。
+- 回归测试：kimiHistoryReconciliation.test.ts 新增「wire 派生 canonical 缺本地图片时 veto 整体替换；preserve 接回媒体后放行更富 canonical」，锁住调用方契约。
+- 备注：v6 熔断存储里留有该会话旧条目（roomAgentId=room-agent:session_...，v7 已换 key 不再生效）；自愈触发依赖 settle 后 scheduleSettledActiveSessionHistoryRepair 或下次启动恢复，无需额外触发器改动。
+
 ## 2026-09-09 修复：后台 Bash 钉住「运行中」根治——轮询路径漏校正（v2.21.191）
 
 - 现象：v2.21.190 dev 实例里，CLI 会话（session_493c0ce1）轮已结束 31 分钟仍显示 执行中/运行中/侧栏转圈。

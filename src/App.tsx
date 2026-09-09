@@ -324,11 +324,16 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
           loaded.data && typeof loaded.data === "object" && Array.isArray(loaded.data.events)
             ? loaded.data.events
             : [];
-        // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-        const canonicalEvents = settleInactiveEvents(mapHistoryEvents(eventsSource));
         const preState = useSessionStore.getState();
         const preSession = preState.sessions.find((s) => s.id === session.id);
         const preLocalEvents = preSession ? getRoomAgentEvents(preSession, target.roomAgentId) : [];
+        // wire 派生 canonical 不含渲染器本地图片（dataUrl 等），直接对账必触发
+        // user-image-regression veto，把更富的 canonical 永远挡在门外；先接回本地媒体。
+        const canonicalEvents = preserveLocalUserMediaInCanonicalHistory(
+          preLocalEvents,
+          settleInactiveEvents(mapHistoryEvents(eventsSource)),
+        );
+        // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
         // 缓存版本陈旧且 canonical 来自本地 wire（完整权威）时强制采纳：旧缓存的
         // 虚胖正文/通知误切轮由已修复的 bug baked，尺寸类 veto 会永远挡住干净 canonical。
         const preCacheVersion = preSession
@@ -582,15 +587,17 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
           continue;
         }
         const localEvents = getRoomAgentEvents(next, result.target.roomAgentId);
+        // 同 repair：canonical 来自 wire，先接回渲染器本地图片，避免 image veto 误杀。
+        const canonicalEvents = preserveLocalUserMediaInCanonicalHistory(localEvents, result.canonicalEvents);
         // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-        if (isCanonicalReconciliationCircuitOpen(session.id, result.target.roomAgentId, localEvents, result.canonicalEvents)) {
+        if (isCanonicalReconciliationCircuitOpen(session.id, result.target.roomAgentId, localEvents, canonicalEvents)) {
           continue;
         }
         const reconciliation = reconcileAgentCanonicalHistory({
           session: next,
           roomAgentId: result.target.roomAgentId,
           expectedRuntimeSessionId: result.sessionId,
-          canonicalEvents: result.canonicalEvents,
+          canonicalEvents,
           reason: "startup",
         });
         if (!reconciliation.applied) {
@@ -607,7 +614,7 @@ async function recoverCollaborationRoomAtStartup(roomId: string): Promise<void> 
         )) {
           deliveryEvidence.set(attemptId, evidence);
         }
-        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery", rawCanonicalEvents: result.canonicalEvents });
+        const shouldUseCanonicalHistory = shouldReplaceWithCanonicalKimiHistory(localEvents, reconciliation.events, { sessionId: reconciliation.session.id, roomAgentId: result.target.roomAgentId, reason: "runtime-recovery", rawCanonicalEvents: canonicalEvents });
         const canonicalAdopted = localEvents.length === 0 || shouldUseCanonicalHistory;
         const rejectedBaseEvents = canonicalAdopted
           ? localEvents
@@ -2460,23 +2467,25 @@ function App() {
                 const latestOwner = useSessionStore.getState().sessions.find((item) => item.id === runtimeOwner.id) ?? runtimeOwner;
                 const ownerAgentId = roomRuntimeOwner?.roomAgentId ?? getPrimaryRoomAgent(latestOwner).id;
                 const localAgentEvents = getRoomAgentEvents(latestOwner, ownerAgentId);
+                // 同 repair/settle：先把渲染器本地图片接回 canonical，避免 image veto 误杀更富历史。
+                const ownerCanonicalEvents = preserveLocalUserMediaInCanonicalHistory(localAgentEvents, canonicalEvents);
                 const ownerCacheVersion = latestOwner.collaboration
                   ? getRoomAgent(latestOwner, ownerAgentId)?.kimiHistoryCacheVersion
                   : latestOwner.kimiHistoryCacheVersion;
                 const forceCanonical = ownerCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
                 // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-                if (!forceCanonical && isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, canonicalEvents)) {
+                if (!forceCanonical && isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, ownerCanonicalEvents)) {
                   return;
                 }
                 const reconciliation = reconcileAgentCanonicalHistory({
                   session: latestOwner,
                   roomAgentId: ownerAgentId,
                   expectedRuntimeSessionId: historySessionId,
-                  canonicalEvents,
+                  canonicalEvents: ownerCanonicalEvents,
                   reason: "startup",
                 });
                 const shouldUseCanonicalHistory = reconciliation.applied &&
-                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup", rawCanonicalEvents: canonicalEvents, forceCanonical });
+                  shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: latestOwner.id, roomAgentId: ownerAgentId, reason: "startup", rawCanonicalEvents: ownerCanonicalEvents, forceCanonical });
                 const canonicalAdopted = reconciliation.applied && (localAgentEvents.length === 0 || shouldUseCanonicalHistory);
                 const rejectedBaseEvents = !reconciliation.applied || canonicalAdopted
                   ? localAgentEvents
@@ -3876,23 +3885,25 @@ function App() {
           let applied = false;
           updateSession(session.id, (item) => {
             const localAgentEvents = getRoomAgentEvents(item, roomAgentId);
+            // 同 repair：先接回渲染器本地图片，避免 user-image veto 拒绝更富 canonical。
+            const canonicalForAgent = preserveLocalUserMediaInCanonicalHistory(localAgentEvents, canonicalSnapshotEvents);
             const reloadCacheVersion = item.collaboration ? getRoomAgent(item, roomAgentId)?.kimiHistoryCacheVersion : item.kimiHistoryCacheVersion;
             const forceCanonical = reloadCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
             // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-            if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalSnapshotEvents)) {
+            if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalForAgent)) {
               return item;
             }
             const reconciliation = timeSync(`${reason}.reconcile`, () => reconcileAgentCanonicalHistory({
               session: item,
               roomAgentId,
               expectedRuntimeSessionId: runtimeSessionId,
-              canonicalEvents: canonicalSnapshotEvents,
+              canonicalEvents: canonicalForAgent,
               reason,
             }));
             if (!reconciliation.applied) {
               return item;
             }
-            if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalSnapshotEvents, forceCanonical })) {
+            if (!shouldReplaceWithCanonicalKimiHistory(localAgentEvents, reconciliation.events, { sessionId: session.id, roomAgentId, reason, rawCanonicalEvents: canonicalForAgent, forceCanonical })) {
               const patchedEvents = mergeMissingUsageStatusEvents(
                 mergeMissingLatestCanonicalAssistant(
                   mergeCanonicalFragmentTurnBodies(collapseDuplicateMaterializations(localAgentEvents), reconciliation.events, { sessionId: session.id, roomAgentId, reason }),

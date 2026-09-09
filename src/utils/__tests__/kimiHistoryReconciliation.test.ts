@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import * as reportError from "@/utils/reportError";
+import { preserveLocalUserMediaInCanonicalHistory } from "../eventMapper";
 import {
   collapseDuplicateMaterializations,
   hasDisplayableUserImageRefs,
@@ -915,6 +916,26 @@ describe("shouldReplaceWithCanonicalKimiHistory", () => {
     const local = [userMessage, toolCall(), assistant("body")];
     const canonical = [userMessage, assistant("canonical body")];
     expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(false);
+  });
+
+  it("wire 派生 canonical 缺本地图片时 veto 整体替换；preserve 接回媒体后放行更富 canonical", () => {
+    // 实机事故（session_493c0ce1 turn 24）：渲染器重启截断本地时间线（缺最终正文），
+    // wire 派生 canonical 更富但不带渲染器本地 dataUrl 图片 → user-image-regression
+    // veto 永远拒绝替换。调用方必须先 preserve 本地媒体再走 veto（repair/startup/settle
+    // 三条 reconcile 路径的统一口径，本用例锁住该契约）。
+    const local: TimelineEvent[] = [
+      { ...userMessage, images: [{ name: "img.png", dataUrl: "data:image/png;base64,abc" }] },
+      assistant("中间过程句"),
+    ];
+    const wireCanonical: TimelineEvent[] = [
+      userMessage,
+      assistant("中间过程句"),
+      toolCall(),
+      assistant("最终完整正文，比本地长得多"),
+    ];
+    expect(shouldReplaceWithCanonicalKimiHistory(local, wireCanonical)).toBe(false);
+    const canonical = preserveLocalUserMediaInCanonicalHistory(local, wireCanonical);
+    expect(shouldReplaceWithCanonicalKimiHistory(local, canonical)).toBe(true);
   });
 
   it("replaces when canonical has more displayable user images", () => {
