@@ -12,6 +12,8 @@
   4. reconcileFromHistorySnapshot（settle 路径 terminal-tail/running-sample，~3878，canonicalForAgent）。
 - 回归测试：kimiHistoryReconciliation.test.ts 新增「wire 派生 canonical 缺本地图片时 veto 整体替换；preserve 接回媒体后放行更富 canonical」，锁住调用方契约。
 - 备注：v6 熔断存储里留有该会话旧条目（roomAgentId=room-agent:session_...，v7 已换 key 不再生效）；自愈触发依赖 settle 后 scheduleSettledActiveSessionHistoryRepair 或下次启动恢复，无需额外触发器改动。
+- 2026-09-09 二轮追查（用户反馈未自愈）：CDP 实机复跑 repair pipeline（preserve 后）reconApplied=true、verdict=true——修复本身有效，但**触发器没跑**：diag.log 无任何新 reconcile 记录。触发缺口实锤两点：① 该会话 1392 次 [poll] 全部 engine=running（getStatus 在轮间窗口根本没被执行——渲染层只在活动轮期间轮询，空闲会话无轮询）；② electron 状态推送（main.ts:4226 setKimiCodeStatusSink）依赖 server 推送，work_changed 只在变迁时推，轮结束常常零推送 → scheduleSettledActiveSessionHistoryRepair（App.tsx:3224，挂在 onKimiCodeStatus completed/idle）不可达。结论：截断历史自愈目前只有「启动水合（startup owner 分支，已带 preserve）」这一条可靠触发路径；stream 驱动 settle 不挂 repair 是待补的触发缺口（下轮小步修：在流式 settle / 轮询 terminal 分支补 scheduleSettledActiveSessionHistoryRepair 或 terminal-tail 无条件化）。
+（roomAgentId=room-agent:session_...，v7 已换 key 不再生效）；自愈触发依赖 settle 后 scheduleSettledActiveSessionHistoryRepair 或下次启动恢复，无需额外触发器改动。
 
 ## 2026-09-09 修复：后台 Bash 钉住「运行中」根治——轮询路径漏校正（v2.21.191）
 
