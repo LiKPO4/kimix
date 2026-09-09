@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **SDK-route `lastTurnReason` needs no mapping — it already flows through (v2.21.196 follow-up)**: invariant 14h previously recorded the SDK route as not forwarding `lastTurnReason`. Live probe against the vendored 0.42.0 bundle shows `harness.listSessions()` returns `lastTurnReason` (completed/cancelled) directly, and `listSdkSessionSummaries` mutates the SDK summaries in place without field picking, so the renderer's `reconcileOfficialSessionCatalog` consumes it identically to the Server route; no code change was needed, only the knowledge correction. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 14h.
+
 * **Snapshot 100-message cap no longer truncates canonical Server history (v2.21.196)**: `getSnapshot` still caps `messages` at the latest 100 (`has_more`), but `loadServerSessionHistory` now pages backwards through `listMessages`' `before_id` cursor (server 0.41+, descending pages) via the new `prependOlderServerMessages` helper — pages are reversed to ascending, deduped by id, and prepended until `has_more` clears, so the canonical side carries the full history instead of a 100-message window. Pagination failure (error, empty page with more claimed, stalled cursor, 200-page cap) returns null and preserves the old `truncated` fallback to the local wire mirror. This removes the v2.20.244 field defect where a long session's final turns were absent from the canonical side entirely. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariants 19/20a.
 
 
