@@ -86,4 +86,14 @@ describe("prependOlderServerMessages", () => {
     const result = await prependOlderServerMessages(async () => ({ items: [], has_more: false }), tail);
     expect(result).toBeNull();
   });
+
+  it("snapshot 风格消息用 message_id 字段也能定位游标", async () => {
+    const snapshotStyle = (id: string) => ({ message_id: id, session_id: "s1", role: "user", content: [], created_at: "2026-01-01T00:00:00Z" } as unknown as ServerMessageSummary);
+    const { calls, fetchPage } = pageFetcher({
+      m5: { items: [snapshotStyle("m4")], has_more: false },
+    });
+    const result = await prependOlderServerMessages(fetchPage, [snapshotStyle("m5")]);
+    expect(result?.map((m) => (m as unknown as Record<string, unknown>).message_id ?? m.id)).toEqual(["m4", "m5"]);
+    expect(calls).toEqual(["m5"]);
+  });
 });

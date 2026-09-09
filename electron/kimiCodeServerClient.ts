@@ -1004,8 +1004,15 @@ function hasPromptCompletionDisplayFrame(frames: readonly ServerFrame[]): boolea
 const PROMPT_COMPLETION_BARRIER_RETRY_DELAYS_MS = [0, 100, 250, 500, 1_000, 2_000, 3_000, 3_000] as const;
 const FAILED_PROMPT_COMPLETION_REASONS = new Set(["failed", "error", "interrupted", "cancelled", "canceled", "aborted", "filtered"]);
 
+// snapshot 的 items 是 unknown[]，消息 id 字段名按 snapshotMessageIdentity 的口径宽容读取。
 function serverMessageIdOf(message: ServerMessageSummary | null | undefined): string {
-  return message && typeof message.id === "string" ? message.id : "";
+  if (!message || typeof message !== "object") return "";
+  const record = message as Record<string, unknown>;
+  for (const key of ["id", "message_id", "messageId"]) {
+    const value = record[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return "";
 }
 
 // getSnapshot 的 messages 只回最近 100 条（has_more=true 表示还有更旧的）。
