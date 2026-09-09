@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 跟进：官方 0.42.0——vendor SDK 刷新 + v1 引擎移除适配（v2.21.194）
+
+- vendor bundle 刷新到官方 tag 0.42.0（commit 6954d2c8，node-sdk 仍 0.20.0）：scripts/vendor-kimi-code-sdk.mjs 一次通过，MCP 超时补丁命中；probe-kimi-code-host.mjs prompt/steer/cancel 三轮全过。
+- 关键架构变化：上游删除 v1 引擎（@moonshot-ai/agent-core）与 createKimiHarnessV2 导出，createKimiHarness 即 v2 引擎。getHarness（electron/kimiCodeHost.ts）改为优先 createKimiHarnessV2（≤0.41 bundle）否则 createKimiHarness；KIMIX_SDK_ENGINE=v1 在 0.42+ bundle 上失效（也落到 v2）。三个探针脚本（host/capabilities/extra-skills）同步改 fallback。
+- bundle 测试重指：recordUnexecutedToolCalls（v1 内部）→ v2 abortedToolOutput；last_turn_reason/mcpServerStatusPayloadSchema 两个 wire schema 移到 kap-server 包（不再随 node-sdk 打包），断言改为运行时字段 lastTurnReason 与 mcp.server.status/status==="removed" 处理。
+- SECONDARY_MODEL：上游 0.42.0 删除实验 flag（0.40 起已常开），kimiCodeServerHost 保留注入（对 ≤0.41 外部 server 是必需的，对 0.42+ 是无害 no-op），注释已更新。
+- HEIC/HEIF/BMP：官方 0.42.0 引擎侧支持（Kimi 模型）；Kimix 附件管线本来就透传原始 MIME（accept="image/*" + readAsDataURL），无需改动。已知边界：Chromium 无法渲染 HEIC 缩略图（composer 预览裂图，发送/引擎侧正常）。
+- 其他 0.42.0 条目核查：侧栏会话删除已有（Sidebar.tsx）；工具调用折叠已有；composer 媒体 rail 为大 UX 改动不跟进；[database] 配置段/Read 上限为 SDK 内部行为自然继承。
+
 ## 2026-09-09 修复：轮询 settle 挂 settled repair，堵截断历史自愈触发缺口（v2.21.193）
 
 - 背景：v2.21.192 修好了 image veto，但用户实机反馈未自愈——触发器没跑。实锤：渲染层只在活动轮期间轮询（空闲会话零轮询）；electron 状态推送依赖 server 推送而轮结束常零事件，onKimiCodeStatus 上挂的 scheduleSettledActiveSessionHistoryRepair 不可达。唯一可靠触发只剩启动水合（重启 dev 已验证自愈成功，用户确认正文恢复）。

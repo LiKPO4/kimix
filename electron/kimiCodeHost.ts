@@ -80,8 +80,8 @@ type KimiCodeSdkModule = {
     uiMode?: string;
     skillDirs?: readonly string[];
   }) => KimiHarnessLike;
-  // v2 引擎（SDKRpcClientV2）：与 v1 同一 KimiHarness 类型面、写同一份会话存储，
-  // 行为细节差异见 getHarness 注释。
+  // v2 引擎（SDKRpcClientV2）：与 v1 同一 KimiHarness 类型面、写同一份会话存储。
+  // 官方 0.42.0 起该导出被删除（v1 引擎移除，createKimiHarness 即 v2），仅 ≤0.41 bundle 存在。
   createKimiHarnessV2?: (options: {
     homeDir?: string;
     identity?: KimiCodeHostIdentity;
@@ -4583,14 +4583,13 @@ async function getHarness(): Promise<KimiHarnessLike> {
   };
   // 默认走 v2 引擎（SDKRpcClientV2）：两引擎写同一份会话存储（state.json/wire.jsonl 同构），
   // 来回切换无需数据迁移；KIMIX_SDK_ENGINE=v1 时整体回退 v1 引擎。
+  // 官方 0.42.0 起删除 v1 引擎（agent-core）与 createKimiHarnessV2 导出，createKimiHarness 即 v2 引擎；
+  // ≤0.41 bundle 中 createKimiHarnessV2 为 v2、createKimiHarness 为 v1，故优先取 V2 导出。
   const useV1Engine = process.env.KIMIX_SDK_ENGINE === "v1";
-  if (!useV1Engine && sdk.createKimiHarnessV2) {
-    harness = sdk.createKimiHarnessV2(options);
+  const v2Factory = sdk.createKimiHarnessV2 ?? sdk.createKimiHarness;
+  if (!useV1Engine && v2Factory) {
+    harness = v2Factory(options);
   } else {
-    if (!useV1Engine) {
-      // 防御旧 bundle：无 createKimiHarnessV2 导出时回退 v1。
-      console.warn("[KimiCodeHost] SDK bundle 未导出 createKimiHarnessV2，回退到 v1 引擎。");
-    }
     if (sdk.createKimiHarness) {
       harness = sdk.createKimiHarness(options);
     } else if (sdk.KimiHarness) {

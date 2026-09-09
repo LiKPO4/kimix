@@ -22,10 +22,12 @@ const installId = (() => {
 
 async function main() {
   const sdk = await import(pathToFileURL(sdkEntry).href);
-  if (typeof sdk.createKimiHarnessV2 !== "function") {
-    throw new Error("SDK bundle 未导出 createKimiHarnessV2，capability 面不可用。");
+  // 官方 0.42.0 起删除 createKimiHarnessV2 导出，createKimiHarness 即 v2 引擎；≤0.41 bundle 优先取 V2 导出。
+  const v2Factory = sdk.createKimiHarnessV2 ?? sdk.createKimiHarness;
+  if (typeof v2Factory !== "function") {
+    throw new Error("SDK bundle 未导出 v2 引擎创建函数，capability 面不可用。");
   }
-  const harness = sdk.createKimiHarnessV2({
+  const harness = v2Factory({
     homeDir: process.env.KIMI_CODE_HOME,
     identity: {
       productName: "Kimix",

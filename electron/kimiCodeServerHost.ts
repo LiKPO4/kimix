@@ -491,7 +491,9 @@ export class KimiCodeServerHost {
             KIMI_CODE_NO_AUTO_UPDATE: this.env.KIMI_CODE_NO_AUTO_UPDATE || "1",
             // Enable the official 0.29.1 secondary-model feature (PR #2064) so
             // subagents can use a separately configured [secondary_model] in
-            // config.toml instead of inheriting the caller's model.
+            // config.toml instead of inheriting the caller's model. Upstream
+            // 0.42.0 removed this flag (pool is always-on there); the injection
+            // stays as a no-op for older external/fallback runtimes.
             KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL: this.env.KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL || "1",
           },
           windowsHide: true,

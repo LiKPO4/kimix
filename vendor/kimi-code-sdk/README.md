@@ -23,12 +23,12 @@ previous runtime dependency on a `%TEMP%/kimix-kimi-code-research` directory.
 | Field | Value |
 |---|---|
 | Source repo | `github.com/MoonshotAI/kimi-code` (`packages/node-sdk`) |
-| Official base | `95478e8c7ba248fd2470d5bb151555ec7fedd19d` (tag `@moonshot-ai/kimi-code@0.41.0`) |
+| Official base | `6954d2c8bf94a5c7fc29cc6ae35b15d042cc4dcb` (tag `@moonshot-ai/kimi-code@0.42.0`) |
 | Feature overlay | None; custom Agents, plugin Agents/system prompts, and secondary-model routing are upstream |
 | Kimix overlay | MCP fallback startup timeout only, applied by the vendor script |
 | node-sdk version | `0.20.0` |
-| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.41.0` |
-| Bundled on | 2026-09-07 |
+| Validated against CLI | source tag `@moonshot-ai/kimi-code@0.42.0` |
+| Bundled on | 2026-09-09 |
 | Bundler | `esbuild` (`--bundle --platform=node --format=esm`) + `createRequire` banner |
 | Externalized (optional natives) | `bufferutil`, `utf-8-validate`, `canvas` (consumers guard with try/catch) |
 
@@ -39,7 +39,10 @@ Servers that declare `startupTimeoutMs` keep their own value. The fallback can b
 overridden with `KIMIX_KIMI_CODE_MCP_STARTUP_TIMEOUT_MS`. The vendor script applies
 this patch after every regeneration and fails loudly if the upstream marker changes.
 
-This overlay only patches the agent-core-v2 engine's `McpConnectionManager`; the v1 fallback engine (`KIMIX_SDK_ENGINE=v1`) keeps the upstream 30s fallback and remains overridable via the upstream `KIMI_MCP_STARTUP_TIMEOUT_MS`.
+This overlay only patches the agent-core-v2 engine's `McpConnectionManager`. Upstream
+`0.42.0` removed the v1 engine (`agent-core`) entirely, so `KIMIX_SDK_ENGINE=v1` now also
+lands on the v2 engine and the upstream `KIMI_MCP_STARTUP_TIMEOUT_MS` v1 override no longer
+exists in this bundle.
 
 Kimi Code `0.31.0` brings Markdown custom Agents and secondary-model routing to the
 legacy Node SDK path, and adds plugin-contributed Agents and system prompts to both
@@ -61,6 +64,16 @@ telemetry forwarding uses the appender-record shape with the engine's own
 dangerous or unanalyzable commands in Auto permission mode (they now approve
 silently; Manual/YOLO still ask). Kimix's approval boundary only surfaces requests
 that reach it, so no host-side change is required for the Auto-mode relaxation.
+
+Kimi Code `0.42.0` removes the legacy v1 engine (`@moonshot-ai/agent-core`) and the
+`createKimiHarnessV2` export: `createKimiHarness` now builds the v2 engine
+(`SDKRpcClientV2`) directly. Kimix's `getHarness()` prefers `createKimiHarnessV2` when
+present (<=0.41 bundles) and otherwise uses `createKimiHarness`, so both bundle
+generations land on the v2 engine. The secondary-model experiment flag
+(`KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL`) is also removed upstream (pool always-on);
+Kimix keeps injecting it for older external/fallback runtimes. Image attachments accept
+HEIC/HEIF/BMP for Kimi models (engine-side), and Kimix's attachment pipeline already
+passes original MIME types through, so no host change was needed there.
 
 The `0.31.0` host-identity contract requires `productName`, `version`, and `platform`.
 Kimix identifies itself as the desktop host rather than impersonating the CLI.

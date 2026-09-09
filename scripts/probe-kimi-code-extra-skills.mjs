@@ -18,7 +18,9 @@ if (!workDir || !path.isAbsolute(workDir)) throw new Error("--work-dir 必须是
 
 const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "kimix-extra-skill-probe-"));
 const sdk = await import(pathToFileURL(sdkEntry).href);
-const harness = sdk.createKimiHarnessV2({
+// 官方 0.42.0 起删除 createKimiHarnessV2 导出，createKimiHarness 即 v2 引擎；≤0.41 bundle 优先取 V2 导出。
+const v2Factory = sdk.createKimiHarnessV2 ?? sdk.createKimiHarness;
+const harness = v2Factory({
   homeDir,
   identity: { productName: "Kimix", version: "extra-skill-probe", platform: "kimi_code_desktop" },
   uiMode: "extra-skill-probe",

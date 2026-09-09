@@ -80,13 +80,16 @@ async function main() {
     uiMode: "kimix-host-probe",
   };
   // KIMIX_HOST_PROBE_ENGINE=v1 时才走 v1 引擎（createKimiHarness / KimiHarness 回退），
-  // 默认（不设 env 或设非 "v1" 值）走 v2 引擎（createKimiHarnessV2），与产品默认引擎一致。
+  // 默认（不设 env 或设非 "v1" 值）走 v2 引擎，与产品默认引擎一致。
+  // 官方 0.42.0 起删除 v1 引擎与 createKimiHarnessV2 导出，createKimiHarness 即 v2 引擎；
+  // ≤0.41 bundle 中 createKimiHarnessV2 为 v2，故优先取 V2 导出（与 getHarness 逻辑一致）。
   const useV1 = process.env.KIMIX_HOST_PROBE_ENGINE === "v1";
+  const v2Factory = sdk.createKimiHarnessV2 ?? sdk.createKimiHarness;
   const harness = useV1
     ? typeof sdk.createKimiHarness === "function"
       ? sdk.createKimiHarness(options)
       : new sdk.KimiHarness(options)
-    : sdk.createKimiHarnessV2(options);
+    : v2Factory(options);
 
   try {
     const config = await harness.getConfig();
