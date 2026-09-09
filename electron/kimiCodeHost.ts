@@ -1917,6 +1917,8 @@ async function runWithInteractiveAgent<T>(
 export async function steer(sessionId: string, input: string | KimiCodePromptPart[]): Promise<{
   steered: boolean;
   disposition?: "queued" | "running";
+  /** 官方侧 prompt id；steered=false 且 disposition="queued" 时用于单条取消。 */
+  prompt_id?: string;
 }> {
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
@@ -1963,6 +1965,16 @@ export async function undoHistory(sessionId: string, count: number): Promise<voi
   const managed = getManagedSession(sessionId);
   if (!managed.session.undoHistory) throw new Error("当前兼容链路不支持撤回历史。");
   await managed.session.undoHistory(count);
+}
+
+// 取消仍滞留在官方队列中的 prompt（典型场景：steer 第二步失败、内容已进官方队列）。
+// 需要官方 ≥0.42（kap-server 恢复单条 prompts/:abort）；旧 Server 报错由渲染层呈现。
+export async function abortQueuedPrompt(sessionId: string, promptId: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  if (!serverSessions.has(sessionId)) {
+    throw new Error("仅 Server 会话支持取消官方队列中的内容。");
+  }
+  await getServerClient().abortPrompt(sessionId, promptId);
 }
 
 export async function cancel(sessionId: string): Promise<void> {

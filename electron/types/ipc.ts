@@ -2508,6 +2508,8 @@ export type KimiCodeSteerResult = {
   /** false 表示未注入当前轮：内容已在官方队列等待排空（queued）或已自行开跑（running）。 */
   steered: boolean;
   disposition?: "queued" | "running";
+  /** 官方侧 prompt id；steered=false 且 disposition="queued" 时用于单条取消（需官方 ≥0.42）。 */
+  prompt_id?: string;
 };
 
 export type KimiCodeSteerResponse = {

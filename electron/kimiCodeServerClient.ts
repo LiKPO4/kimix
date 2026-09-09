@@ -1739,6 +1739,16 @@ export class KimiCodeServerClient {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:abort`, { method: "POST", body: "{}" });
   }
 
+  // 单条 prompt 取消：官方 0.33 起该路由对 msg_* id 恒 40402（v2 回归，只能整会话 abort），
+  // 0.42.0（kap-server）恢复——对队列中的 prompt_id 摘除并发布 prompt.aborted。
+  // 旧 Server 会报错，由调用方呈现；不得用于替代整会话 abort。
+  abortPrompt(sessionId: string, promptId: string): Promise<unknown> {
+    return this.request(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/prompts/${encodeURIComponent(promptId)}:abort`,
+      { method: "POST", body: "{}" },
+    );
+  }
+
   compactSession(sessionId: string, instruction?: string): Promise<Record<string, never>> {
     return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:compact`, {
       method: "POST",

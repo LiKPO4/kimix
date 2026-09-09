@@ -11,6 +11,7 @@ import { ChangeCard } from "./ChangeCard";
 import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
 import { QuestionCard } from "./QuestionCard";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
+import { STEER_OFFICIAL_QUEUE_CANCEL_EVENT } from "@/utils/steerOfficialQueueCancel";
 import { ImagePreviewOverlay, materializePreviewImageDataUrl, type PreviewImage } from "./ImagePreviewOverlay";
 import { formatAssistantTurnDuration, reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
 import { formatFullToolArgumentsForDisplay, formatFullToolResultForDisplay, formatToolArgumentsForDisplay, formatToolResultForDisplay, toolArgumentPreview } from "@/utils/toolDisplay";
@@ -881,7 +882,7 @@ const UserMessageBubble = memo(function UserMessageBubble({ event, onDelete }: {
   );
 });
 
-const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = false }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean }) {
+const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = false, sessionId }: { event: Extract<TimelineEvent, { type: "steer_message" }>; embedded?: boolean; sessionId?: string }) {
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const images = event.images ?? [];
   const previewImages = getPreviewImages(images);
@@ -890,6 +891,8 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
     ? "引导中"
     : event.status === "accepted"
       ? "等待写入"
+    : event.status === "cancelled"
+      ? "已取消"
     : event.status === "failed"
       ? "引导失败"
       : "引导已写入";
@@ -924,6 +927,20 @@ const SteerMessageBubble = memo(function SteerMessageBubble({ event, embedded = 
             {label}
           </div>
           {event.error && <div className="mt-1 text-right text-[12.5px] text-accent-danger" style={{ paddingRight: 15 }}>{event.error.replace(/[。.]+$/u, "")}</div>}
+          {event.status === "failed" && event.officialPromptId && sessionId && (
+            <div className="mt-2 flex justify-end" style={{ paddingRight: 15 }}>
+              <button
+                type="button"
+                className="kimix-icon-text-button kimix-muted-action is-compact"
+                style={{ height: 32, paddingLeft: 12, paddingRight: 12 }}
+                onClick={() => window.dispatchEvent(new CustomEvent(STEER_OFFICIAL_QUEUE_CANCEL_EVENT, {
+                  detail: { sessionId, steerId: event.id },
+                }))}
+              >
+                从官方队列取消
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {previewImage && (previewImage.dataUrl || previewImage.url) && (
@@ -3514,7 +3531,7 @@ export const MessageBubble = memo(function MessageBubble({ event, sessionId, tur
     return <UserMessageBubble event={event} onDelete={onDeleteUserMessage} />;
   }
   if (event.type === "steer_message") {
-    return <SteerMessageBubble event={event} />;
+    return <SteerMessageBubble event={event} sessionId={sessionId} />;
   }
   return <AssistantMessageBubble event={event} sessionId={sessionId} turnStartedAt={turnStartedAt} isAssistantActive={isAssistantActive} leadingTools={leadingTools} leadingSubagents={leadingSubagents} leadingHooks={leadingHooks} leadingApprovals={leadingApprovals} activeStatus={activeStatus} changedFiles={changedFiles} changeSummary={changeSummary} trailingStatuses={trailingStatuses} hideProcessSummary={hideProcessSummary} expandProcessByDefault={expandProcessByDefault} eagerMarkdown={eagerMarkdown} turnBlocks={turnBlocks} />;
 }, messageBubblePropsEqual);

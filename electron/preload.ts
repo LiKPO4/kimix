@@ -487,6 +487,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:cancelGoal", req),
   steerKimiCode: (req: KimiCodePromptRequest): Promise<KimiCodeSteerResponse> =>
     ipcRenderer.invoke("kimi-code:steer", req),
+  abortKimiCodeQueuedPrompt: (req: { sessionId: string; promptId: string }): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:abortQueuedPrompt", req),
   undoKimiCodeHistory: (req: KimiCodeUndoHistoryRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:undoHistory", req),
   cancelKimiCodeTurn: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>

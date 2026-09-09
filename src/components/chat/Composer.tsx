@@ -88,6 +88,7 @@ import {
   type RoomDeliverySendResult,
 } from "@/utils/roomDelivery";
 import { ROOM_DELIVERY_ACTION_EVENT, type RoomDeliveryActionDetail } from "@/utils/roomDeliveryAction";
+import { STEER_OFFICIAL_QUEUE_CANCEL_EVENT } from "@/utils/steerOfficialQueueCancel";
 import { resolveRoomPromptRoute } from "@/utils/roomRouting";
 import { detachRoomAgentAsSession, roomHasActiveAgentWork, roomHasExecutingAgentWork } from "@/utils/sessionArchive";
 import { readComposerDraft, resolveComposerDraftKey, writeComposerDraft, type ComposerDraftAttachment } from "@/utils/composerDraft";
@@ -1605,6 +1606,53 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     window.addEventListener(ROOM_DELIVERY_ACTION_EVENT, handleRoomDeliveryAction);
     return () => window.removeEventListener(ROOM_DELIVERY_ACTION_EVENT, handleRoomDeliveryAction);
   }, [removeRoomAgentActivity, updateSession]);
+
+  // 官方队列单条取消（官方 0.42 kap-server 恢复 per-prompt :abort；0.33 起该路由对
+  // 旧 id 恒 40402，此前只能整会话 abort）：steer 第二步失败、内容滞留官方队列时，
+  // 气泡上的「从官方队列取消」走这里摘除，避免轮末自动补跑同一份内容。
+  useEffect(() => {
+    const handleSteerOfficialQueueCancel = (rawEvent: Event) => {
+      const detail = (rawEvent as CustomEvent<{ sessionId?: string; steerId?: string }>).detail;
+      if (!detail?.sessionId || !detail.steerId) return;
+      void (async () => {
+        const session = useSessionStore.getState().sessions.find((candidate) => candidate.id === detail.sessionId);
+        if (!session) return;
+        // steer id 全局唯一；顶层事件与房间 Agent 事件两侧定位。
+        const agentEntry = Object.entries(session.collaboration?.agentEvents ?? {})
+          .find(([, events]) => events.some((event) => event.id === detail.steerId));
+        const roomAgentId = agentEntry?.[0];
+        const steer = (roomAgentId ? agentEntry[1] : session.events)
+          .find((event): event is Extract<TimelineEvent, { type: "steer_message" }> => (
+            event.id === detail.steerId && event.type === "steer_message"
+          ));
+        if (!steer?.officialPromptId || !steer.officialQueueSessionId) return;
+        if (steer.status === "cancelled" || steer.status === "sent") return;
+        const res = await window.api.abortKimiCodeQueuedPrompt({
+          sessionId: steer.officialQueueSessionId,
+          promptId: steer.officialPromptId,
+        });
+        if (!res.success) {
+          window.dispatchEvent(new CustomEvent("kimix:toast", { detail: `取消失败：${res.error}` }));
+          return;
+        }
+        updateSession(session.id, (current) => {
+          const markCancelled = (events: TimelineEvent[]) => events.map((event) => (
+            event.id === steer.id && event.type === "steer_message" && event.status !== "cancelled"
+              ? { ...event, status: "cancelled" as const, error: undefined }
+              : event
+          ));
+          const next = roomAgentId
+            ? updateRoomAgentEvents(current, roomAgentId, markCancelled)
+            : { ...current, events: markCancelled(current.events) };
+          return { ...next, updatedAt: Date.now() };
+        });
+        syncCurrentSessionFromStore(session.id);
+        await persistLocalConversationState();
+      })();
+    };
+    window.addEventListener(STEER_OFFICIAL_QUEUE_CANCEL_EVENT, handleSteerOfficialQueueCancel);
+    return () => window.removeEventListener(STEER_OFFICIAL_QUEUE_CANCEL_EVENT, handleSteerOfficialQueueCancel);
+  }, [updateSession, syncCurrentSessionFromStore]);
 
   const sendPromptContent = async (content: string, options?: { addUserEvent?: boolean; manualSubmitAutoScroll?: boolean; images?: ImageAttachment[]; outboundContent?: string; postUserStatusMessage?: string }) => {
     const ensuredSession = await ensureSession();
@@ -3674,15 +3722,24 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
   const updateSteerStatus = (
     sessionId: string,
     steerId: string,
-    status: "accepted" | "sent" | "failed",
+    status: "accepted" | "sent" | "failed" | "cancelled",
     error?: string,
     roomTarget?: Pick<RoomAgentControlTarget, "roomAgentId">,
+    officialQueue?: { promptId: string; queueSessionId: string },
   ) => {
     updateSession(sessionId, (session) => {
       const updateEvents = (events: TimelineEvent[]) => events.map((event) => event.id === steerId && event.type === "steer_message"
-        ? event.status === "sent" && status === "accepted"
+        // cancelled 是用户主动终态（已从官方队列摘除），任何收敛/重放都不得覆盖。
+        ? event.status === "cancelled" || (event.status === "sent" && status === "accepted")
           ? event
-          : { ...event, status, error: status === "failed" ? error : undefined }
+          : {
+              ...event,
+              status,
+              error: status === "failed" ? error : undefined,
+              ...(officialQueue
+                ? { officialPromptId: officialQueue.promptId, officialQueueSessionId: officialQueue.queueSessionId }
+                : {}),
+            }
         : event
       );
       const next = roomTarget
@@ -4487,7 +4544,17 @@ export function Composer({ bashTasks = [], subagentTasks = [], officialGoal, onP
     if (res.success && res.data && res.data.steered === false) {
       // 两步 steer 的第二步失败，但内容已在官方队列/已自行开跑：不得回补本地
       // 队列（否则官方排空 + 本地派发各跑一次，同一内容出现两遍回复）。
-      updateSteerStatus(activeSession.id, steerId, "failed", "引导内容已在官方队列，当前轮结束后自动发送", roomTarget);
+      // 内容滞留官方队列时记录官方 prompt 身份，气泡上提供「从官方队列取消」（官方 ≥0.42）。
+      updateSteerStatus(
+        activeSession.id,
+        steerId,
+        "failed",
+        "引导内容已在官方队列，当前轮结束后自动发送",
+        roomTarget,
+        res.data.disposition === "queued" && res.data.prompt_id && runtimeSessionId
+          ? { promptId: res.data.prompt_id, queueSessionId: runtimeSessionId }
+          : undefined,
+      );
       window.dispatchEvent(new CustomEvent("kimix:toast", {
         detail: "引导内容已在官方队列，当前轮结束后自动发送",
       }));

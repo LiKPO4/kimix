@@ -608,6 +608,7 @@ function installBrowserPreviewApi() {
     resumeKimiCodeGoal: (): Promise<KimiCodeGoalResponse> => fail("继续 Kimi Code Goal"),
     cancelKimiCodeGoal: (): Promise<KimiCodeGoalResponse> => fail("取消 Kimi Code Goal"),
     steerKimiCode: (): Promise<KimiCodeSteerResponse> => fail("发送 Kimi Code 引导"),
+    abortKimiCodeQueuedPrompt: (): Promise<VoidResponse> => fail("取消官方队列内容"),
     undoKimiCodeHistory: (): Promise<VoidResponse> => Promise.resolve({ success: true, data: undefined }),
     cancelKimiCodeTurn: (): Promise<VoidResponse> => fail("停止 Kimi Code"),
     setKimiCodePlanMode: (): Promise<VoidResponse> => fail("切换 Kimi Code Plan 模式"),

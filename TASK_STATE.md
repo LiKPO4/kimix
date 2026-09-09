@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 功能：官方队列单条取消——steer 滞留内容可摘除（v2.21.195）
+
+- 背景：0.33 起官方 per-prompt ::abort 对 msg_* id 恒 40402（v2 回归），steer 第二步失败、内容滞留官方队列时用户无法取消，轮末必然自动补跑（runtime-routing 20a）。0.42.0 kap-server 恢复该能力（promptService.abort 支持 pending 队列项摘除 + publishAborted）。
+- 实现链：serverClient.abortPrompt（POST /sessions/{id}/prompts/{prompt_id}:abort）→ kimiCodeHost.abortQueuedPrompt（仅 Server 路由）→ IPC kimi-code:abortQueuedPrompt → preload abortKimiCodeQueuedPrompt → Composer 监听 kimix:steer-official-queue-cancel → MessageBubble steer 气泡「从官方队列取消」按钮。
+- 数据模型：SteerMessageEvent 新增 status:"cancelled"（用户主动终态，updateSteerStatus 与 replay 收敛均不得覆盖）+ officialPromptId/officialQueueSessionId（仅 disposition="queued" 时记录；协作房间下记 runtimeSessionId）。
+- 边界：旧 Server（≤0.41）调用报错由 toast 呈现；abort 命中已开跑 prompt 等价于停止该轮（官方语义）；cancelled 后官方不再落 user 确认帧，不会出双气泡。
+
 ## 2026-09-09 扫描：历史遗留项对照上游 0.42.0（纯调查，无代码改动）
 
 - 可跟进（上游已补全）：① 官方队列单条取消——0.33 的 per-prompt abort 40402 回归在 0.42.0 kap-server 已修（promptService.abort 支持 pending 队列项，路由 POST /sessions/{id}/prompts/{prompt_id}::abort，listPrompts 暴露 prompt_id）；② transcript turn 级双向分页（before_turn/after_turn + page_size≤100，cold 会话从 wire 重建）可替代 snapshot 100 条硬上限做 canonical 全量历史加载（runtime-routing 20a defect 1 的截断缺口）；③ SDK 路由 SessionSummary.lastTurnReason（v2 暴露，Kimix SDK 侧 summary 映射尚未转发）。

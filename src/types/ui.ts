@@ -446,8 +446,12 @@ export interface SteerMessageEvent {
   timestamp: number;
   content: string;
   images?: UserMessageImage[];
-  status: "sending" | "accepted" | "sent" | "failed";
+  status: "sending" | "accepted" | "sent" | "failed" | "cancelled";
   error?: string;
+  /** 官方队列中的 prompt id（steer 第二步失败、内容滞留官方队列时记录），用于单条取消。 */
+  officialPromptId?: string;
+  /** 提交该 prompt 的运行时会话 id（协作房间下与 Kimix 会话 id 不同），单条取消时使用。 */
+  officialQueueSessionId?: string;
 }
 
 export interface AssistantMessageEvent {

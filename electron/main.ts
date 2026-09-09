@@ -6146,6 +6146,19 @@ ipcMain.handle("kimi-code:steer", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:abortQueuedPrompt", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    const promptId = typeof req.promptId === "string" ? req.promptId : "";
+    if (!sessionId || !promptId) return { success: false, error: "Missing sessionId or promptId" };
+    await kimiCodeHost.abortQueuedPrompt(sessionId, promptId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:undoHistory", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
