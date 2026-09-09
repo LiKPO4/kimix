@@ -1,5 +1,17 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 修复：后台 Bash 钉住「运行中」根治——轮询路径漏校正（v2.21.191）
+
+- 现象：v2.21.190 dev 实例里，CLI 会话（session_493c0ce1）轮已结束 31 分钟仍显示 执行中/运行中/侧栏转圈。
+- 石锤（server events jsonl seq 7064-7067）：10:57:55 turn.ended(completed) 后 server 发 work_changed busy=true + main_turn_active=false（busy 被后台 pnpm dev 钉住，invariant 105），此后 31 分钟零事件（work_changed 只在变迁时推）。
+- 根因链：electron settle/快照路径已有「busy+mta=false→completed」校正（resolveSnapshotPublishStatus/resolveEngineStatusAfterPromptCompleted，kimiCodeHost.ts:3779-3808），但**渲染层 1.5s 轮询路径**（App.tsx:4085 reconcileRuntimeStatus → getKimiCodeStatus IPC → kimiCodeHost.getStatus:2249 → resolveEffectiveServerEngineStatus:3950）不做该校正：busy=true 恒返回 running（3959-3961），每 1.5s 把已收口的会话重新钉回 running → 永不收敛。这就是「修了很多次又复发」的结构性原因：校正只覆盖 settle/快照两条路，漏了轮询第三条路。
+- 修复方案（已实施，66 项 host 测试含 5 个新组合用例过、typecheck 干净）：
+  1. kimiCodeHost.getStatus：结果再套 resolveSnapshotPublishStatus(polled.engineStatus, false, serverManaged.mainTurnActive)（该函数已导出，mta=false→completed、true/undefined→不动，保守语义不变）。
+  2. handleServerFrame 补 turn.started（主 Agent）→ managed.mainTurnActive=true：目前 mta 只在首个 delta（3739）/快照/settle 置真，prompt.completed 置假后新轮窗口期内 mta=false，校正 1 会把新轮误判 completed 闪「输出完成」。
+  3. 测试：src/utils/__tests__/kimiCodeServerHost.test.ts 加组合用例（running+mta false→completed；true/undefined→running；waiting_approval 不动）。
+  4. 版本 bump 2.21.191 + knowledge runtime-routing invariant 补充（校正必须覆盖全部发布路径含轮询）。
+- 关键事实备忘：server busy 语义=_computeWorkFacts（vendor 240585）busy=mta||approval||question，但实际 work_changed busy=true 仅因后台任务（实证），两条代码路径口径不同，以实证为准；isSessionRuntimeRunning=runningSessionId匹配||2min内timeline活跃（sessionActivity.ts:138）；渲染轮询 1.5s（App.tsx:4085）。
+
 ## 2026-09-08 功能：背景信息窗口输出统计（v2.21.190）
 
 - 需求：ContextRing 浮层加平均缓存命中率 / 平均速度 / 本轮速度。

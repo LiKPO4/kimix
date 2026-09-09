@@ -2250,11 +2250,19 @@ export async function getStatus(sessionId: string): Promise<KimiCodeSessionStatu
   sessionId = resolveMigratedSessionId(sessionId);
   const serverManaged = serverSessions.get(sessionId);
   if (serverManaged) {
-    return serverStatusToKimiCodeStatus(
+    const polled = serverStatusToKimiCodeStatus(
       await refreshServerSessionStatus(sessionId, false),
       serverManaged.session.usage,
       serverManaged.status,
     );
+    // 轮询也是发布路径：busy=true 但主轮已结束（仅后台任务挂着）时必须按 completed
+    // 发布，与快照/settle 同一规则。漏掉这步时，常驻后台任务（如 pnpm dev）让 server
+    // busy 恒 true，1.5s 轮询把已收口的会话反复钉回 running 且再无事件能收敛。
+    if (polled.engineStatus === undefined) return polled;
+    return {
+      ...polled,
+      engineStatus: resolveSnapshotPublishStatus(polled.engineStatus, false, serverManaged.mainTurnActive),
+    };
   }
   const managed = getManagedSession(sessionId);
   return normalizeSdkSessionStatus(await managed.session.getStatus(), managed.status);
@@ -3749,6 +3757,16 @@ function handleServerFrame(frame: ServerFrame) {
   // 翻回 running 并经 setStatus 触发提问对账（helper 已过滤子代理帧与审批场景）。
   if (shouldResumeWaitingQuestionOnFrame(frame.type, serverSessions.get(sessionId)?.status, payload.agentId)) {
     setStatus(sessionId, "running");
+  }
+  if (frame.type === "turn.started") {
+    // 主轮开始即标记 mainTurnActive：此前仅靠首个 delta（下方 thinking/assistant
+    // 分支）置真，prompt.completed 置假后、新轮首个 delta 前的窗口期 mta=false，
+    // getStatus 的 background-busy 校正会把新轮误判 completed 闪「输出完成」。
+    const startedAgentId = typeof payload.agentId === "string" && payload.agentId ? payload.agentId : "main";
+    if (startedAgentId === "main") {
+      const startedManaged = serverSessions.get(sessionId);
+      if (startedManaged) startedManaged.mainTurnActive = true;
+    }
   }
   if (frame.type === "prompt.completed") {
     // 0.29 实测：Swarm/Agent 子代理的 prompt.completed 携带子代理自己的 agentId。

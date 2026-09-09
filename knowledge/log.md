@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Background-busy correction must cover every status-publish path, including the renderer poll (v2.21.191)**: server `busy` stays true while only a detached background task runs, and `work_changed` fires only on fact transitions, so no correction event ever arrives. The settle and snapshot paths already mapped background-only busy to completed, but the renderer 1.5s poll (`getKimiCodeStatus` IPC → host `getStatus` → `resolveEffectiveServerEngineStatus`) returned raw busy-driven running and re-pinned a settled session every poll — observed as 31 minutes of 执行中/运行中 on an idle CLI-driven session. `getStatus` now wraps its result in the same `resolveSnapshotPublishStatus`, and `turn.started` (main agent) stamps `mainTurnActive = true` in the Host so a fresh turn's pre-delta window is not misread as background-only busy. See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 107.
+
+
 * **forceCanonical 的过程历史门只比顶层帧——子代理嵌套幽灵帧不得否决升版采纳 (v2.21.189)**: live 重放路径曾把子代理的同一批官方工具调用在每次重放时用新生成的 toolCallId 重复材料化进 subagent.events（实据 session_d4035d92：51 个真实调用膨胀成 316 个嵌套帧），扁平计数 739 vs canonical 470 让 188 的 forceCanonical 采纳仍被 process-history-regression 门挡下，用户看到 19 份重复通知与正文残片。force 模式改用 hasKimiProcessHistoryRegressionTopLevel（顶层帧 id 与官方一一对应，不可能幽灵膨胀，仍能挡住真正的部分快照）。勘界时发现 released profile 的 IndexedDB 记录已从盘上不可读（9 个外部 blob 块缺 3 个，应用靠内存续命），补空占位块恢复可读；headless Chrome + --user-data-dir 指向 profile 副本 + CDP Runtime.evaluate 是可复用的整记录导出手段。See [/architecture/runtime-routing.md](/architecture/runtime-routing.md) invariant 110.
 
 

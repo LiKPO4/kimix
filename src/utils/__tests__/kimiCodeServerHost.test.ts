@@ -628,3 +628,41 @@ describe("isLiveMainTurnActivityFrame", () => {
     expect(isLiveMainTurnActivityFrame({ type: "prompt.completed" })).toBe(false);
   });
 });
+
+describe("getStatus 轮询发布口径（background-busy 校正组合）", () => {
+  // 与 kimiCodeHost.getStatus 相同的组合：resolveEffectiveServerEngineStatus
+  // 之后再套 resolveSnapshotPublishStatus。v2.21.190 实机回归：常驻后台任务
+  // （pnpm dev）让 server busy 恒 true，轮询缺校正时每 1.5s 把已收口会话钉回
+  // running 且再无事件收敛（31 分钟「执行中」）。
+  const polled = (
+    status: { status?: unknown; busy?: unknown },
+    managedStatus: Parameters<typeof resolveEffectiveServerEngineStatus>[1],
+    mainTurnActive: boolean | undefined,
+  ) => resolveSnapshotPublishStatus(
+    resolveEffectiveServerEngineStatus(status, managedStatus),
+    false,
+    mainTurnActive,
+  );
+
+  it("busy=true + 主轮已结束（mta=false）→ completed，不再钉 running", () => {
+    expect(polled({ status: "running", busy: true }, "completed", false)).toBe("completed");
+    expect(polled({ status: "idle", busy: true }, "running", false)).toBe("completed");
+  });
+
+  it("busy=true + 主轮在跑（mta=true）→ running", () => {
+    expect(polled({ status: "running", busy: true }, "running", true)).toBe("running");
+  });
+
+  it("busy=true + mta 未知（undefined）→ 保守 running", () => {
+    expect(polled({ status: "running", busy: true }, "completed", undefined)).toBe("running");
+  });
+
+  it("等待交互状态不被校正改写", () => {
+    expect(polled({ status: "awaiting_approval", busy: true }, "waiting_approval", false)).toBe("waiting_approval");
+    expect(polled({ status: "awaiting_question", busy: true }, "waiting_question", false)).toBe("waiting_question");
+  });
+
+  it("raw idle + managed running 的既有 grace 不变", () => {
+    expect(polled({ status: "idle", busy: false }, "running", true)).toBe("running");
+  });
+});
