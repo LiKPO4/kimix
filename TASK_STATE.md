@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 修复：轮询 settle 挂 settled repair，堵截断历史自愈触发缺口（v2.21.193）
+
+- 背景：v2.21.192 修好了 image veto，但用户实机反馈未自愈——触发器没跑。实锤：渲染层只在活动轮期间轮询（空闲会话零轮询）；electron 状态推送依赖 server 推送而轮结束常零事件，onKimiCodeStatus 上挂的 scheduleSettledActiveSessionHistoryRepair 不可达。唯一可靠触发只剩启动水合（重启 dev 已验证自愈成功，用户确认正文恢复）。
+- 修复（一行+注释）：轮询 terminal 分支（App.tsx ~4040，settleTerminalRoomAgent 之后）无条件挂 scheduleSettledActiveSessionHistoryRepair(session.id)。该分支每到终态必达（活动轮期间 1.5s 轮询，191 修复后 busy 校正保证能观测到 completed）；repair 本身有 2.5s 防抖、运行中跳过、熔断器+限流保护，幂等安全。
+- 覆盖场景：渲染器重启/订阅丢失截断最后一截正文后，下一轮正常结束（或当前轮被轮询观测到终态）即触发自愈，不再需要重启应用。
+
 ## 2026-09-09 修复：重启截断轮正文永不自愈——image veto 挡死更富 canonical（v2.21.192）
 
 - 现象：dev 实例观察 CLI 会话（session_493c0ce1），v2.21.191 修复轮（turn 24）卡片只显示中间句「等待测试期间准备提交说明。检查结果：」，1273 字最终正文丢失。

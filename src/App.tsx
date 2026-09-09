@@ -4038,6 +4038,10 @@ function App() {
           roomMessageId: active?.roomMessageId ?? persistedTarget?.roomMessageId,
         }, terminalStatus, settledAt, turnReceivedBody));
         syncCurrentSessionFromStore(session.id);
+        // 轮终态是截断历史（渲染器重启/订阅丢失截掉最后一截正文）最可靠的自愈触发点：
+        // 状态推送与流式 settle 都可能缺席（实据 session_493c0ce1 turn 24），轮询 terminal
+        // 分支每到终态必达，挂一次 settled repair（2.5s 防抖 + 运行中跳过 + 熔断/限流保护）。
+        scheduleSettledActiveSessionHistoryRepair(session.id);
         // 收尾帧丢失（重启/订阅被顶替/断线）时立即补一次同守卫对账，让最后一截
         // 正文马上自愈，而不是挂到下次启动或发消息。
         if (Date.now() - terminalLastStreamEventAt > TERMINAL_STREAM_GAP_MS) {
