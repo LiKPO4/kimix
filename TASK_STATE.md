@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 扫描：历史遗留项对照上游 0.42.0（纯调查，无代码改动）
+
+- 可跟进（上游已补全）：① 官方队列单条取消——0.33 的 per-prompt abort 40402 回归在 0.42.0 kap-server 已修（promptService.abort 支持 pending 队列项，路由 POST /sessions/{id}/prompts/{prompt_id}::abort，listPrompts 暴露 prompt_id）；② transcript turn 级双向分页（before_turn/after_turn + page_size≤100，cold 会话从 wire 重建）可替代 snapshot 100 条硬上限做 canonical 全量历史加载（runtime-routing 20a defect 1 的截断缺口）；③ SDK 路由 SessionSummary.lastTurnReason（v2 暴露，Kimix SDK 侧 summary 映射尚未转发）。
+- 仍未支持（继续等官方）：Server 路由 Goal 写、plugin commands、config reload、additionalDirs、unarchive、Skill 附件（SDK activateSkill 仍只有 name/args）、snapshot 100 条上限本身、Windows conpty 终端（上游仍无 Windows native 证据）。
+- 已跟进过的历史项：任意文件附件（0.25 遗留，Kimix 已实现 kind:"file"）；v1→v2、secondary model、HEIC 随 v2.21.194 完成。
+- knowledge runtime-routing 14h/20a 已同步上述边界变化。
+
 ## 2026-09-09 跟进：官方 0.42.0——vendor SDK 刷新 + v1 引擎移除适配（v2.21.194）
 
 - vendor bundle 刷新到官方 tag 0.42.0（commit 6954d2c8，node-sdk 仍 0.20.0）：scripts/vendor-kimi-code-sdk.mjs 一次通过，MCP 超时补丁命中；probe-kimi-code-host.mjs prompt/steer/cancel 三轮全过。
