@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 发版 v2.21.197（已推送 tag，CI 全绿，Release 已发布）
+
+- 覆盖 v2.21.97~197 共 100 个 patch：notes 合并自既有分段 notes（118/122/144/162/175/184/188）+ 189~197 新增段，落 docs/release-notes/v2.21.197.md 并同步根目录 fallback。
+- 当日主线：0.42.0 vendor 跟进（19bd54a7）、官方队列单条取消（f01553b5）、历史 100 条截断改 before_id 翻页补齐（cbb8e514 + eae341fe 游标宽容读取）、SDK lastTurnReason 实测已透传（36880399 仅勘正文档）。
+- CI run 34369514194 全绿（win/mac/linux/publish），Release 产物 17 个齐全，body 正确取自版本 notes 而非 fallback。
+
+
 ## 2026-09-09 修复：Server 历史快照 100 条截断改为 before_id 翻页补齐全量（v2.21.196）
 
 - 背景：getSnapshot 的 messages 只回最近 100 条（has_more），长会话 canonical 侧缺早期轮次（v2.20.244 实据：末轮整个缺席，修复管线无法对齐），此前记录为 upstream boundary。
