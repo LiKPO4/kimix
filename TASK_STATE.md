@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 修复：气泡速率不显示/「消息处理中」未风格化/气泡内容设置样式（v2.21.199）
+
+- 速率根因：SDK 发射顺序 usage.record(turn 级) → agent.status.updated（带 currentTurn 汇总但无 usageScope），turn_end 档展示的恰是最后一帧，computeTurnUsageSpeeds 按帧 id 查表恒 miss；修复为最近一次速率回填给同轮后续主 Agent 状态帧（sessionMetrics.ts），两条回归测试。
+- 「消息处理中」兜底胶囊（MessageBubble assistantFooter）补 kimix-status-surface，与 StatusCard 中性 tone 对齐吃风格化边框/圆角 token。
+- 设置「气泡内容」去掉 kimix-settings-card 外壳，改为与相邻分区一致的 kimix-settings-permission 按钮行（多选 is-active）；并补上 v2.21.198 漏提交的 App.tsx setStatusCardItems 同步注册。
+- 验收：typecheck 过、全量 vitest 2230 过、build 过；UI 三处待用户截图验收。
+
+
 ## 2026-09-09 功能：回合结束气泡内容可配置 + 输出速率（v2.21.198）
 
 - 设置 → 消息信息 新增「气泡内容」五个开关：模型/输入/输出/上下文/输出速率（t/s），默认全开；存储链 appStore → useSettingsSync → electron settingsService（DEFAULT_SETTINGS 含默认，zod schema 校验），启动 useBootstrap 读回。
