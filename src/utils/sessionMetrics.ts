@@ -339,24 +339,35 @@ export function getSessionOutputStats(session: Session | null | undefined): Sess
 /**
  * 逐帧计算回合结束气泡可显示的输出速率（tokens/s）。
  * 口径与 getSessionOutputStats 相同：turn 级主 Agent usage 帧的输出 tokens ÷
- * 生成窗口（帧时间 − 前一个主边界 user_message/tool_result），同样带 50ms~30min 守卫。
- * 返回 eventId → tokens/s；不满足口径的帧不出现（调用方隐藏速率项）。
+ * 生成窗口（帧时间 − 前一个主边界 user_message/tool_result），同样带 50ms~30min 守卫；
+ * 最近一次算出的速率同时回填给同轮后续主 Agent 状态帧（轮末气泡展示的是最后的
+ * agent.status.updated 汇总帧，本身没有 usageScope）。
+ * 返回 eventId → tokens/s；没有任何可用速率的帧不出现（调用方隐藏速率项）。
  */
 export function computeTurnUsageSpeeds(events: readonly TimelineEvent[]): Map<string, number> {
   const speeds = new Map<string, number>();
   let lastBoundaryTs: number | undefined;
+  // SDK 发射顺序是 usage.record（turn 级）→ agent.status.updated（带 currentTurn
+  // 汇总但没有 usageScope），而轮末气泡展示的恰是最后一帧；把最近一次算出的速率
+  // 回填给同轮后续主 Agent 状态帧，保证被展示的帧也能查到速率。
+  let lastTurnSpeed: number | undefined;
   for (const event of events) {
     if (event.type === "user_message" || (event.type === "tool_result" && !event.agentId)) {
       lastBoundaryTs = event.timestamp;
+      lastTurnSpeed = undefined;
       continue;
     }
-    if (event.type !== "status_update") continue;
-    if (event.usageScope !== "turn" || event.agentId) continue;
-    const output = event.tokenCount ?? 0;
-    if (output <= 0 || lastBoundaryTs === undefined) continue;
-    const windowMs = event.timestamp - lastBoundaryTs;
-    if (windowMs < MIN_STEP_WINDOW_MS || windowMs > MAX_STEP_WINDOW_MS) continue;
-    speeds.set(event.id, output / (windowMs / 1000));
+    if (event.type !== "status_update" || event.agentId) continue;
+    if (event.usageScope === "turn") {
+      const output = event.tokenCount ?? 0;
+      const windowMs = lastBoundaryTs === undefined ? 0 : event.timestamp - lastBoundaryTs;
+      if (output > 0 && windowMs >= MIN_STEP_WINDOW_MS && windowMs <= MAX_STEP_WINDOW_MS) {
+        lastTurnSpeed = output / (windowMs / 1000);
+        speeds.set(event.id, lastTurnSpeed);
+      }
+      continue;
+    }
+    if (lastTurnSpeed !== undefined) speeds.set(event.id, lastTurnSpeed);
   }
   return speeds;
 }

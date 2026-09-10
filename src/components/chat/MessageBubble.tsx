@@ -3053,7 +3053,7 @@ function AssistantMessageFooter({
       ) : (
         <div className="flex min-w-0 max-w-full items-center justify-center" style={{ paddingLeft: 86, paddingRight: 86 }}>
           <div
-            className="inline-flex max-w-full items-center rounded-full bg-surface-hover text-[13px] leading-[18px] text-text-muted"
+            className="kimix-status-surface inline-flex max-w-full items-center rounded-full bg-surface-hover text-[13px] leading-[18px] text-text-muted"
             style={{ paddingLeft: 13, paddingRight: 13, paddingTop: 5, paddingBottom: 5 }}
           >
             <span className="kimix-tabular-nums truncate">{fallbackLabel}</span>

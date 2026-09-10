@@ -2309,10 +2309,10 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </button>
                 </div>
-                <div className="kimix-settings-card" style={{ marginTop: 12, padding: "14px 16px" }}>
+                <div style={{ marginTop: 14 }}>
                   <div className="kimix-settings-permission-label">气泡内容</div>
-                  <div className="kimix-settings-permission-desc" style={{ marginTop: 2, marginBottom: 10 }}>选择回合结束气泡里显示哪些信息项。</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div className="kimix-settings-permission-desc" style={{ marginTop: 4 }}>选择回合结束气泡里显示哪些信息项。</div>
+                  <div className="kimix-settings-permissions" style={{ marginTop: 10 }}>
                     {([
                       ["model", "模型"],
                       ["input", "输入 Tokens"],
@@ -2325,11 +2325,12 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                         type="button"
                         aria-pressed={statusCardItems[key]}
                         onClick={() => setStatusCardItems({ [key]: !statusCardItems[key] })}
-                        className="kimix-style-exempt flex min-w-0 items-center text-left"
-                        style={{ gap: 12 }}
+                        className={`kimix-settings-permission ${statusCardItems[key] ? "is-active" : ""}`}
                       >
                         <SelectionIndicator selected={statusCardItems[key]} />
-                        <div className="kimix-settings-permission-label">{label}</div>
+                        <div className="kimix-settings-permission-copy">
+                          <div className="kimix-settings-permission-label">{label}</div>
+                        </div>
                       </button>
                     ))}
                   </div>

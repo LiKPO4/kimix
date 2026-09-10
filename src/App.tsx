@@ -1490,6 +1490,7 @@ function App() {
   const setChatNavigationRailWidth = useAppStore((s) => s.setChatNavigationRailWidth);
   const setAdditionalWorkDirs = useAppStore((s) => s.setAdditionalWorkDirs);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
+  const setStatusCardItems = useAppStore((s) => s.setStatusCardItems);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
   const setSessionRecommendationTurnLimit = useAppStore((s) => s.setSessionRecommendationTurnLimit);
@@ -1612,6 +1613,7 @@ function App() {
       setChatNavigationRailWidth,
       setAdditionalWorkDirs,
       setDetailedContext,
+      setStatusCardItems,
       setStatusUpdateDisplay,
       setSessionRecommendationEnabled,
       setSessionRecommendationTurnLimit,
@@ -1628,7 +1630,7 @@ function App() {
       setTheme, setUiStyle, setCustomUiStyles, setThemePalette, setCustomThemePalette, setKimiThemePalettes,
       setPermissionMode, setDefaultThinking, setDefaultThinkingEffort, setDefaultPlanMode, setFontSize,
       setChatNavigationRailEnabled, setChatNavigationRailSide, setChatNavigationRailWidth,
-      setAdditionalWorkDirs, setDetailedContext, setStatusUpdateDisplay,
+      setAdditionalWorkDirs, setDetailedContext, setStatusCardItems, setStatusUpdateDisplay,
       setSessionRecommendationEnabled, setSessionRecommendationTurnLimit,
       setVoiceShortcut, setNotificationMode, setNotificationShowContent,
       setThinkingTranslationProvider, setThinkingTranslationIntervalMs, setThinkingTranslationDisplayMode,

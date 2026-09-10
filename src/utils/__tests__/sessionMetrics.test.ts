@@ -704,4 +704,28 @@ describe("computeTurnUsageSpeeds", () => {
     expect([...speeds.keys()]).toEqual(["s5"]);
     expect(speeds.get("s5")).toBeCloseTo(50, 5);
   });
+
+  it("把速率回填给同轮后续的 agent.status.updated 汇总帧（轮末气泡展示的帧）", () => {
+    // 实机根因：SDK 顺序是 usage.record（turn 级）→ agent.status.updated（无
+    // usageScope），turn_end 档展示的恰是后者，不回填时速率永远不显示。
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100 }),
+      { id: "s2", type: "status_update", timestamp: 1100, tokenCount: 100, inputTokenCount: 29730, message: "模型：k3" },
+      usage("s3", 5000, { tokenCount: 100, agentId: "sub-1" }),
+    ]);
+    expect(speeds.get("s1")).toBeCloseTo(100, 5);
+    expect(speeds.get("s2")).toBeCloseTo(100, 5);
+    expect(speeds.has("s3")).toBe(false);
+  });
+
+  it("新一轮边界后不回填上一轮的速率", () => {
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100 }),
+      { id: "u2", type: "user_message", timestamp: 5000, content: "b" },
+      { id: "s2", type: "status_update", timestamp: 6000, tokenCount: 50, inputTokenCount: 10, message: "模型：k3" },
+    ]);
+    expect(speeds.has("s2")).toBe(false);
+  });
 });
