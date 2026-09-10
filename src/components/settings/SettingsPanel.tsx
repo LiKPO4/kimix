@@ -396,6 +396,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const detailedContext = useAppStore((s) => s.detailedContext);
   const setDetailedContext = useAppStore((s) => s.setDetailedContext);
   const statusUpdateDisplay = useAppStore((s) => s.statusUpdateDisplay);
+  const statusCardItems = useAppStore((s) => s.statusCardItems);
+  const setStatusCardItems = useAppStore((s) => s.setStatusCardItems);
   const setStatusUpdateDisplay = useAppStore((s) => s.setStatusUpdateDisplay);
   const sessionRecommendationEnabled = useAppStore((s) => s.sessionRecommendationEnabled);
   const setSessionRecommendationEnabled = useAppStore((s) => s.setSessionRecommendationEnabled);
@@ -2306,6 +2308,31 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="kimix-settings-permission-desc">对话中完全隐藏 Tokens 和 Context 信息</div>
                     </div>
                   </button>
+                </div>
+                <div className="kimix-settings-card" style={{ marginTop: 12, padding: "14px 16px" }}>
+                  <div className="kimix-settings-permission-label">气泡内容</div>
+                  <div className="kimix-settings-permission-desc" style={{ marginTop: 2, marginBottom: 10 }}>选择回合结束气泡里显示哪些信息项。</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {([
+                      ["model", "模型"],
+                      ["input", "输入 Tokens"],
+                      ["output", "输出 Tokens"],
+                      ["context", "上下文用量"],
+                      ["speed", "输出速率（t/s）"],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-pressed={statusCardItems[key]}
+                        onClick={() => setStatusCardItems({ [key]: !statusCardItems[key] })}
+                        className="kimix-style-exempt flex min-w-0 items-center text-left"
+                        style={{ gap: 12 }}
+                      >
+                        <SelectionIndicator selected={statusCardItems[key]} />
+                        <div className="kimix-settings-permission-label">{label}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -8327,6 +8327,13 @@ const SettingsSchema = z.object({
   showThinking: z.boolean().optional(),
   detailedContext: z.boolean().optional(),
   statusUpdateDisplay: z.enum(["each", "turn_end", "never"]).optional(),
+  statusCardItems: z.object({
+    model: z.boolean(),
+    input: z.boolean(),
+    output: z.boolean(),
+    context: z.boolean(),
+    speed: z.boolean(),
+  }).optional(),
   sessionRecommendationEnabled: z.boolean().optional(),
   sessionRecommendationTurnLimit: z.number().int().min(1).max(200).optional(),
   voiceShortcut: z.string().min(1).max(80).optional(),

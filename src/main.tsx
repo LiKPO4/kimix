@@ -118,6 +118,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   showThinking: true,
   detailedContext: false,
   statusUpdateDisplay: "turn_end",
+  statusCardItems: { model: true, input: true, output: true, context: true, speed: true },
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
   voiceShortcut: "Win+H",

@@ -1738,6 +1738,14 @@ export type AppSettings = {
   showThinking: boolean;
   detailedContext: boolean;
   statusUpdateDisplay: "each" | "turn_end" | "never";
+  /** 回合结束气泡显示哪些内容项。 */
+  statusCardItems: {
+    model: boolean;
+    input: boolean;
+    output: boolean;
+    context: boolean;
+    speed: boolean;
+  };
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;

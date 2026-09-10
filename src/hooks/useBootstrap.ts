@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, PermissionMode, StatusUpdateDisplay, NotificationMode, Project, KimiThemePreset, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
+import type { Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, PermissionMode, StatusUpdateDisplay, StatusCardItems, NotificationMode, Project, KimiThemePreset, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { writeCachedThemeSnapshot } from "@/utils/themeSnapshot";
 
@@ -20,6 +20,7 @@ interface BootstrapSetters {
   setChatNavigationRailWidth: (v: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (v: boolean) => void;
+  setStatusCardItems: (v: Partial<StatusCardItems>) => void;
   setStatusUpdateDisplay: (v: StatusUpdateDisplay) => void;
   setSessionRecommendationEnabled: (v: boolean) => void;
   setSessionRecommendationTurnLimit: (v: number) => void;
@@ -64,6 +65,7 @@ export function useBootstrap(setters: BootstrapSetters) {
           setters.setChatNavigationRailWidth(res.data.chatNavigationRailWidth);
           setters.setAdditionalWorkDirs(res.data.additionalWorkDirs ?? []);
           setters.setDetailedContext(res.data.detailedContext);
+          setters.setStatusCardItems(res.data.statusCardItems ?? { model: true, input: true, output: true, context: true, speed: true });
           setters.setStatusUpdateDisplay(res.data.statusUpdateDisplay);
           setters.setSessionRecommendationEnabled(res.data.sessionRecommendationEnabled);
           setters.setSessionRecommendationTurnLimit(res.data.sessionRecommendationTurnLimit);

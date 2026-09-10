@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noteStartupStateSet } from "@/utils/startupProfiler";
-import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
+import type { AppState, Project, Session, PermissionMode, Theme, ThemePaletteColors, ThemePaletteId, UiStyleId, StatusUpdateDisplay, StatusCardItems, NotificationMode, ComposerDockCard, RightSidebarCardId, WorkspaceView, KimiThemePreset, ProcessDisplayMode, RoomAgentActivity, SettingsPageId, ThinkingTranslationDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
 import type { UiStyleDocumentV1 } from "@/utils/uiStyleContract";
 import { DEFAULT_THEME_PALETTE_ID, isUiStyleThemePaletteId, kimiThemePaletteId, normalizeKimiThemePresets, normalizeThemePaletteColors, normalizeThemePaletteId, uiStyleThemePaletteId, upsertKimiThemePresets } from "@/utils/themePalettes";
 import { readCachedThemeSnapshot } from "@/utils/themeSnapshot";
@@ -187,6 +187,7 @@ export interface AppStore extends AppState {
   setChatNavigationRailWidth: (width: number) => void;
   setAdditionalWorkDirs: (dirs: string[]) => void;
   setDetailedContext: (enabled: boolean) => void;
+  setStatusCardItems: (items: Partial<StatusCardItems>) => void;
   setStatusUpdateDisplay: (display: StatusUpdateDisplay) => void;
   setSessionRecommendationEnabled: (enabled: boolean) => void;
   setSessionRecommendationTurnLimit: (limit: number) => void;
@@ -255,6 +256,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   chatNavigationRailWidth: 11,
   additionalWorkDirs: [],
   detailedContext: false,
+  statusCardItems: { model: true, input: true, output: true, context: true, speed: true },
   statusUpdateDisplay: "turn_end",
   sessionRecommendationEnabled: true,
   sessionRecommendationTurnLimit: 10,
@@ -330,6 +332,7 @@ export const useAppStore = create<AppStore>((rawSet) => {
   setChatNavigationRailWidth: (width) => set({ chatNavigationRailWidth: Math.max(6, Math.min(28, Math.round(width))) }),
   setAdditionalWorkDirs: (dirs) => set({ additionalWorkDirs: dirs }),
   setDetailedContext: (enabled) => set({ detailedContext: enabled }),
+  setStatusCardItems: (items) => set((state) => ({ statusCardItems: { ...state.statusCardItems, ...items } })),
   setStatusUpdateDisplay: (display) => set({ statusUpdateDisplay: display }),
   setSessionRecommendationEnabled: (enabled) => set({ sessionRecommendationEnabled: enabled }),
   setSessionRecommendationTurnLimit: (limit) => set({ sessionRecommendationTurnLimit: Math.max(1, Math.min(200, Math.round(limit))) }),

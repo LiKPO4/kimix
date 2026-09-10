@@ -16,7 +16,7 @@ import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
 import { ChangeCard } from "./ChangeCard";
 import { FileCard } from "./FileCard";
-import { StatusCard } from "./StatusCard";
+import { StatusCard, StatusCardSpeedContext } from "./StatusCard";
 import { NotificationCard, NotificationGroupCard } from "./NotificationCard";
 import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
@@ -26,7 +26,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { createToolOnlyAssistantEvent } from "@/utils/chatRenderItems";
 import { buildTurnBlocks, type TurnBlock } from "@/utils/turnBlocks";
 import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@/utils/duration";
-import { hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
+import { computeTurnUsageSpeeds, hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { groupNotificationRenderItems } from "@/utils/notificationGroups";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, normalizeCompactionDisplay, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
 import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
@@ -1567,6 +1567,9 @@ export const ChatThread = memo(function ChatThread() {
     () => filterStatusUpdates(splitEvents.events, statusUpdateDisplay),
     [splitEvents.events, statusUpdateDisplay]
   );
+  // 回合结束气泡的输出速率按完整事件流预计算（速率需要 user/tool 边界时间差），
+  // 经 context 下发给各 StatusCard，避免把 map 逐层透传。
+  const statusCardSpeeds = useMemo(() => computeTurnUsageSpeeds(roomTimeline), [roomTimeline]);
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
   const sessionRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities)
     .filter((activity) => activity.roomId === session?.id), [roomAgentActivities, session?.id]);
@@ -1966,6 +1969,7 @@ export const ChatThread = memo(function ChatThread() {
       id="ChatThread"
       onRender={(id, phase, actualDuration) => noteProfilerCommit(`react-commit:${id}:${phase}`, actualDuration)}
     >
+    <StatusCardSpeedContext.Provider value={statusCardSpeeds}>
     <div className="relative h-full" style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
       {session.longTask && (
         <div className="kimix-content-x pointer-events-none absolute inset-x-0 z-30" style={{ top: 10 }}>
@@ -2076,6 +2080,7 @@ export const ChatThread = memo(function ChatThread() {
         </div>
       </div>
     </div>
+    </StatusCardSpeedContext.Provider>
     </Profiler>
   );
 });

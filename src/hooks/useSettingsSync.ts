@@ -22,6 +22,7 @@ export function useSettingsSync() {
         state.chatNavigationRailWidth !== prev.chatNavigationRailWidth ||
         state.additionalWorkDirs !== prev.additionalWorkDirs ||
         state.detailedContext !== prev.detailedContext ||
+        state.statusCardItems !== prev.statusCardItems ||
         state.statusUpdateDisplay !== prev.statusUpdateDisplay ||
         state.sessionRecommendationEnabled !== prev.sessionRecommendationEnabled ||
         state.sessionRecommendationTurnLimit !== prev.sessionRecommendationTurnLimit ||
@@ -57,6 +58,7 @@ export function useSettingsSync() {
           chatNavigationRailWidth: state.chatNavigationRailWidth,
           additionalWorkDirs: state.additionalWorkDirs,
           detailedContext: state.detailedContext,
+          statusCardItems: state.statusCardItems,
           statusUpdateDisplay: state.statusUpdateDisplay,
           sessionRecommendationEnabled: state.sessionRecommendationEnabled,
           sessionRecommendationTurnLimit: state.sessionRecommendationTurnLimit,

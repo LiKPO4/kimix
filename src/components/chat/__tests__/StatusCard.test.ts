@@ -35,7 +35,7 @@ describe("getStatusCardDetailTexts", () => {
       contextSize: 100_670,
     }, false);
 
-    expect(details).toEqual(["输入: 100.67k", "输出: 2.37k", "Context: 100.67k"]);
+    expect(details).toEqual(["输入: 100.67k", "输出: 2.37k", "上下文: 100.67k"]);
   });
 
   it("keeps notification text on non-metric notification rows", () => {
@@ -94,12 +94,12 @@ describe("Context format consistency", () => {
       id: "a", type: "status_update", timestamp: 1,
       contextSize: 329520, contextLimit: 997000,
     }, false);
-    expect(withLimit).toEqual(["Context: 329.52k"]);
+    expect(withLimit).toEqual(["上下文: 329.52k"]);
     const withoutLimit = getStatusCardDetailTexts({
       id: "b", type: "status_update", timestamp: 2,
       contextSize: 329520,
     }, false);
-    expect(withoutLimit).toEqual(["Context: 329.52k"]);
+    expect(withoutLimit).toEqual(["上下文: 329.52k"]);
   });
 
   it("shows used/limit in detailed mode and converts ratio sizes", () => {
@@ -107,6 +107,33 @@ describe("Context format consistency", () => {
       id: "c", type: "status_update", timestamp: 1,
       contextSize: 0.3305, contextLimit: 997000,
     }, true);
-    expect(detailed).toEqual(["Context: 329.51k/997.00k"]);
+    expect(detailed).toEqual(["上下文: 329.51k/997.00k"]);
+  });
+});
+
+describe("status card items 配置", () => {
+  const metricEvent = {
+    id: "usage",
+    type: "status_update" as const,
+    timestamp: 1,
+    message: "模型：kimi-code/k3",
+    inputTokenCount: 128_000,
+    tokenCount: 4_200,
+    contextSize: 106_870,
+  };
+
+  it("按配置过滤内容项", () => {
+    expect(getStatusCardDetailTexts(metricEvent, false, { model: true, input: false, output: true, context: false, speed: false }))
+      .toEqual(["模型：k3", "输出: 4.20k"]);
+    expect(getStatusCardDetailTexts(metricEvent, false, { model: false, input: false, output: false, context: false, speed: false }))
+      .toEqual([]);
+  });
+
+  it("速率项仅在配置开启且速率可用时显示", () => {
+    const all = { model: false, input: false, output: false, context: false, speed: true };
+    expect(getStatusCardDetailTexts(metricEvent, false, all, 123.4)).toEqual(["速率: 123 t/s"]);
+    expect(getStatusCardDetailTexts(metricEvent, false, all, 45.67)).toEqual(["速率: 45.7 t/s"]);
+    expect(getStatusCardDetailTexts(metricEvent, false, all)).toEqual([]);
+    expect(getStatusCardDetailTexts(metricEvent, false, { ...all, speed: false }, 123.4)).toEqual([]);
   });
 });

@@ -96,6 +96,8 @@ export interface AppState {
   additionalWorkDirs: string[];
   detailedContext: boolean;
   statusUpdateDisplay: StatusUpdateDisplay;
+  /** 回合结束气泡显示哪些内容项。 */
+  statusCardItems: StatusCardItems;
   sessionRecommendationEnabled: boolean;
   sessionRecommendationTurnLimit: number;
   voiceShortcut: string;
@@ -142,6 +144,19 @@ export interface AppState {
 }
 
 export type StatusUpdateDisplay = "each" | "turn_end" | "never";
+/** 回合结束气泡（Tokens 状态胶囊）可配置的内容项。 */
+export interface StatusCardItems {
+  /** 模型名。 */
+  model: boolean;
+  /** 输入 Tokens。 */
+  input: boolean;
+  /** 输出 Tokens。 */
+  output: boolean;
+  /** 上下文用量。 */
+  context: boolean;
+  /** 输出速率（t/s，按生成窗口近似）。 */
+  speed: boolean;
+}
 export type ProcessDisplayMode = "kimix" | "kimi-web";
 
 export interface Project {

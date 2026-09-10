@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-09 功能：回合结束气泡内容可配置 + 输出速率（v2.21.198）
+
+- 设置 → 消息信息 新增「气泡内容」五个开关：模型/输入/输出/上下文/输出速率（t/s），默认全开；存储链 appStore → useSettingsSync → electron settingsService（DEFAULT_SETTINGS 含默认，zod schema 校验），启动 useBootstrap 读回。
+- StatusCard 按配置过滤内容项（全部关闭时不渲染空胶囊，Plan 标记不受配置影响）；「Context:」改中文「上下文:」。
+- 速率：sessionMetrics.computeTurnUsageSpeeds 按完整事件流预计算（turn 级主 Agent usage 帧输出 ÷ 生成窗口，与背景信息统计同口径 50ms~30min 守卫），ChatThread 经 StatusCardSpeedContext 下发，三处 StatusCard 调用点零改动。
+- 测试：StatusCard 过滤/速率显示 2 条 + computeTurnUsageSpeeds 2 条；Context→上下文 存量断言同步更新。
+
+
 ## 2026-09-09 发版 v2.21.197（已推送 tag，CI 全绿，Release 已发布）
 
 - 覆盖 v2.21.97~197 共 100 个 patch：notes 合并自既有分段 notes（118/122/144/162/175/184/188）+ 189~197 新增段，落 docs/release-notes/v2.21.197.md 并同步根目录 fallback。

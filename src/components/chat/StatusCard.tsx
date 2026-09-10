@@ -1,8 +1,11 @@
-import { memo } from "react";
+import { createContext, memo, useContext } from "react";
 import { useAppStore } from "@/stores/appStore";
-import type { TimelineEvent } from "@/types/ui";
+import type { StatusCardItems, TimelineEvent } from "@/types/ui";
 import { compactModelText } from "@/utils/modelDisplay";
 import { hasMetricStatus, isEmptyStatusUpdate, isNotificationSummaryMessage, shouldShowInlineStatusUpdate } from "@/utils/sessionMetrics";
+
+/** 每个 turn 级 usage 帧的输出速率（eventId → t/s），由 ChatThread 按完整事件流预计算。 */
+export const StatusCardSpeedContext = createContext<Map<string, number> | null>(null);
 
 interface StatusCardProps {
   event: Extract<TimelineEvent, { type: "status_update" }>;
@@ -35,19 +38,31 @@ function formatContext(event: Extract<TimelineEvent, { type: "status_update" }>,
   return formatK(absolute);
 }
 
+const STATUS_CARD_ITEMS_ALL: StatusCardItems = { model: true, input: true, output: true, context: true, speed: true };
+
+function formatSpeed(tokensPerSecond: number): string {
+  const value = tokensPerSecond >= 100 ? String(Math.round(tokensPerSecond)) : tokensPerSecond.toFixed(1);
+  return `${value} t/s`;
+}
+
 export function getStatusCardDetailTexts(
   event: Extract<TimelineEvent, { type: "status_update" }>,
   detailedContext: boolean,
+  items: StatusCardItems = STATUS_CARD_ITEMS_ALL,
+  speedTokensPerSecond?: number,
 ): string[] {
   // 182 前的遗留持久化行可能把通知摘要混进度量行 message；与上方 tone/source
   // 兜底同类的显示层修复，度量行不显示通知文案。
   const leakedNotificationMessage = hasMetricStatus(event) && isNotificationSummaryMessage(event.message);
   return [
     event.planMode === true ? "Plan" : "",
-    event.message && !leakedNotificationMessage ? compactModelText(event.message) : "",
-    event.inputTokenCount !== undefined ? `输入: ${formatK(event.inputTokenCount)}` : "",
-    event.tokenCount !== undefined ? `输出: ${formatK(event.tokenCount)}` : "",
-    shouldDisplayStatusContext(event) ? `Context: ${formatContext(event, detailedContext)}` : "",
+    items.model && event.message && !leakedNotificationMessage ? compactModelText(event.message) : "",
+    items.input && event.inputTokenCount !== undefined ? `输入: ${formatK(event.inputTokenCount)}` : "",
+    items.output && event.tokenCount !== undefined ? `输出: ${formatK(event.tokenCount)}` : "",
+    items.context && shouldDisplayStatusContext(event) ? `上下文: ${formatContext(event, detailedContext)}` : "",
+    items.speed && typeof speedTokensPerSecond === "number" && Number.isFinite(speedTokensPerSecond) && speedTokensPerSecond > 0
+      ? `速率: ${formatSpeed(speedTokensPerSecond)}`
+      : "",
   ].filter(Boolean);
 }
 
@@ -65,12 +80,16 @@ export function getStatusCardToneClass(event: Extract<TimelineEvent, { type: "st
 
 export const StatusCard = memo(function StatusCard({ event, inline = false, allowModelOnly = false }: StatusCardProps) {
   const detailedContext = useAppStore((s) => s.detailedContext);
+  const statusCardItems = useAppStore((s) => s.statusCardItems);
+  const speedTokensPerSecond = useContext(StatusCardSpeedContext)?.get(event.id);
   if (allowModelOnly ? !shouldShowInlineStatusUpdate(event) : isEmptyStatusUpdate(event)) return null;
   const toneClass = getStatusCardToneClass(event);
-  const details = getStatusCardDetailTexts(event, detailedContext).map((text) => ({
+  const details = getStatusCardDetailTexts(event, detailedContext, statusCardItems, speedTokensPerSecond).map((text) => ({
     text,
-    tabular: text.startsWith("输入:") || text.startsWith("输出:") || text.startsWith("Context:"),
+    tabular: text.startsWith("输入:") || text.startsWith("输出:") || text.startsWith("上下文:") || text.startsWith("速率:"),
   }));
+  // 用户在设置里关掉了该帧能显示的全部内容项时不渲染空胶囊。
+  if (details.length === 0) return null;
 
   const pill = (
       <div

@@ -10,6 +10,7 @@ import {
   preferPositiveMetric,
   statusesAfterLatestContextBoundary,
   getSessionContextUsages,
+  computeTurnUsageSpeeds,
   getSessionOutputStats,
   getSessionRecommendationMetrics,
   shouldShowInlineStatusUpdate,
@@ -666,5 +667,41 @@ describe("getSessionOutputStats", () => {
       avgSpeed: undefined,
       currentTurnSpeed: undefined,
     });
+  });
+});
+
+describe("computeTurnUsageSpeeds", () => {
+  const usage = (id: string, timestamp: number, extra: Partial<Extract<TimelineEvent, { type: "status_update" }>> = {}): TimelineEvent => ({
+    id,
+    type: "status_update",
+    timestamp,
+    usageScope: "turn",
+    ...extra,
+  });
+
+  it("为每条主 Agent turn 级 usage 帧计算速率", () => {
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100 }),
+      { id: "t1", type: "tool_result", timestamp: 2000, toolCallId: "c1", toolName: "Bash", result: "ok" },
+      usage("s2", 4000, { tokenCount: 300 }),
+    ]);
+    expect(speeds.get("s1")).toBeCloseTo(100, 5);
+    expect(speeds.get("s2")).toBeCloseTo(150, 5);
+    expect(speeds.size).toBe(2);
+  });
+
+  it("跳过子代理帧、session 级帧、无边界或窗口异常的帧", () => {
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 1000, content: "a" },
+      usage("s0", 500, { tokenCount: 100 }),
+      usage("s1", 1010, { tokenCount: 100 }),
+      usage("s2", 2000, { tokenCount: 100, agentId: "sub-1" }),
+      usage("s3", 3000, { tokenCount: 100, usageScope: "session" }),
+      usage("s4", 4000, { tokenCount: 0 }),
+      usage("s5", 5000, { tokenCount: 200 }),
+    ]);
+    expect([...speeds.keys()]).toEqual(["s5"]);
+    expect(speeds.get("s5")).toBeCloseTo(50, 5);
   });
 });
