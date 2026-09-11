@@ -721,6 +721,31 @@ describe("computeTurnUsageSpeeds", () => {
     expect(speeds.has("s3")).toBe(false);
   });
 
+  it("SDK 路由：已完成的 tool_call（durationMs）也作为生成窗口边界", () => {
+    // SDK 路由 tool.result 被吸收进 tool_call，时间线里没有独立 tool_result；
+    // 没有这条边界时所有 usage 帧窗口从 user_message 起算并逐帧叠加（实机
+    // 8.18k 输出显示 2.4 t/s）。工具执行 60s 不应计入生成窗口。
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      usage("s1", 1000, { tokenCount: 100 }),
+      { id: "tc1", type: "tool_call", timestamp: 2000, toolCallId: "c1", toolName: "Bash", status: "success", arguments: {}, durationMs: 60000 },
+      usage("s2", 63000, { tokenCount: 200 }),
+    ]);
+    // s1: 100/1s = 100；s2 窗口从工具完成时刻 62000 起算：200/1s = 200；
+    // 累计 (100+200)/(1+1) = 150
+    expect(speeds.get("s1")).toBeCloseTo(100, 5);
+    expect(speeds.get("s2")).toBeCloseTo(150, 5);
+  });
+
+  it("SDK 路由：running 或无 durationMs 的 tool_call 不作边界", () => {
+    const speeds = computeTurnUsageSpeeds([
+      { id: "u1", type: "user_message", timestamp: 0, content: "a" },
+      { id: "tc1", type: "tool_call", timestamp: 500, toolCallId: "c1", toolName: "Bash", status: "running", arguments: {} },
+      usage("s1", 1000, { tokenCount: 100 }),
+    ]);
+    expect(speeds.get("s1")).toBeCloseTo(100, 5);
+  });
+
   it("新一轮边界后不回填上一轮的速率", () => {
     const speeds = computeTurnUsageSpeeds([
       { id: "u1", type: "user_message", timestamp: 0, content: "a" },

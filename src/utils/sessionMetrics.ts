@@ -314,6 +314,14 @@ export function getSessionOutputStats(session: Session | null | undefined): Sess
       }
       continue;
     }
+    // SDK 路由下 tool.result 被吸收进 tool_call（durationMs=完成−开始），时间线里
+    // 没有独立 tool_result；用已完成主工具调用的完成时刻作为边界，否则所有 usage
+    // 帧的窗口都从 user_message 起算并逐帧叠加（实机 8.18k 输出显示 2.4 t/s）。
+    if (event.type === "tool_call" && !event.agentId && typeof event.durationMs === "number") {
+      // 回放/乱序下边界只许前进，不得把一个已完成窗口重新拉长。
+      lastBoundaryTs = Math.max(lastBoundaryTs ?? 0, event.timestamp + event.durationMs);
+      continue;
+    }
     if (event.type !== "status_update") continue;
     if (event.usageScope !== "turn" || event.agentId) continue;
     if (typeof event.inputCacheRead === "number") {
@@ -363,6 +371,12 @@ export function computeTurnUsageSpeeds(events: readonly TimelineEvent[]): Map<st
         turnWindowMs = 0;
       }
       lastBoundaryTs = event.timestamp;
+      continue;
+    }
+    // 同 getSessionOutputStats：SDK 路由的边界在已完成 tool_call 的完成时刻上。
+    if (event.type === "tool_call" && !event.agentId && typeof event.durationMs === "number") {
+      // 回放/乱序下边界只许前进，不得把一个已完成窗口重新拉长。
+      lastBoundaryTs = Math.max(lastBoundaryTs ?? 0, event.timestamp + event.durationMs);
       continue;
     }
     if (event.type !== "status_update" || event.agentId) continue;
