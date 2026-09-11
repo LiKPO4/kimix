@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-10 修复：气泡速率口径两级修正（累计化 + SDK 路由 tool_call 边界）
+
+- 一级（ba17614d）：速率从单步值改本轮累计口径（累计输出 ÷ 累计生成窗口），与气泡上的累计输出 tokens 同语义；原单步口径下最后一步收尾调用输出极少导致 0.6 t/s 假象。
+- 二级（c52f2c84）：实机 8.18k 输出仍显示 2.4 t/s，用本会话 wire 复核发现 SDK 路由 tool.result 被吸收进 tool_call、时间线无独立 tool_result，所有 usage 帧窗口从 user_message 起算逐帧叠加（5.6 分钟的轮叠出 57 分钟假窗口）。修复：getSessionOutputStats 与 computeTurnUsageSpeeds 均以已完成主 tool_call 的 timestamp+durationMs 为边界（只许前进）；背景信息窗口的平均/本轮速度同源受益。
+- 验收：typecheck + 全量 vitest 2232 过 + build 过；实机数值待用户重启 dev 后确认。
+
+
 ## 2026-09-09 修复：气泡速率不显示/「消息处理中」未风格化/气泡内容设置样式（v2.21.199）
 
 - 速率根因：SDK 发射顺序 usage.record(turn 级) → agent.status.updated（带 currentTurn 汇总但无 usageScope），turn_end 档展示的恰是最后一帧，computeTurnUsageSpeeds 按帧 id 查表恒 miss；修复为最近一次速率回填给同轮后续主 Agent 状态帧（sessionMetrics.ts），两条回归测试。
