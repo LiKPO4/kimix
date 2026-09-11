@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session, TimelineEvent } from "@/types/ui";
-import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isOfficialTerminalLastTurnReason, isSessionOfficialFailed, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive, normalizeOfficialLastTurnReason } from "../sessionActivity";
+import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSessionConversationActivityAt, hasActiveTimelineWork, hasActiveTimelineWorkEvents, hasOpenTimelineWorkEvents, isActiveKimiCodeEngineStatus, isOfficialTerminalLastTurnReason, isSessionOfficialFailed, isSessionRuntimeRunning, isSessionRuntimeTracked, isSessionSidebarBusy, isTerminalKimiCodeEngineStatus, isTimelineEventActive, normalizeOfficialLastTurnReason } from "../sessionActivity";
 
 function session(events: TimelineEvent[] = []): Session {
   return {
@@ -31,6 +31,21 @@ describe("sessionActivity", () => {
     expect(isActiveKimiCodeEngineStatus("completed")).toBe(false);
     expect(isActiveKimiCodeEngineStatus("unknown")).toBe(false);
     expect(isActiveKimiCodeEngineStatus(undefined)).toBe(false);
+  });
+
+  it("hasActiveTimelineWork 缓存：同一 events 引用在过期窗前复用结果，过期/新数组后重算", () => {
+    const now = 10 * 60 * 1000;
+    const openTool: TimelineEvent = { id: "t1", type: "tool_call", timestamp: now, toolCallId: "c1", toolName: "Bash", status: "running", arguments: {} };
+    const events: TimelineEvent[] = [openTool];
+    const s = session(events);
+    // 新鲜 open 事件 → true，且在 2 分钟陈旧窗前缓存命中
+    expect(hasActiveTimelineWork(s, now + 1000)).toBe(true);
+    expect(hasActiveTimelineWork(s, now + 60 * 1000)).toBe(true);
+    // 越过陈旧窗后（同一引用）重算为 false
+    expect(hasActiveTimelineWork(s, now + 3 * 60 * 1000)).toBe(false);
+    // false 结果缓存到数组引用变化为止；新事件数组（新 open 事件）立即变 true
+    const events2: TimelineEvent[] = [...events, { ...openTool, id: "t2", toolCallId: "c2", timestamp: now + 4 * 60 * 1000 }];
+    expect(hasActiveTimelineWork(session(events2), now + 4 * 60 * 1000 + 1000)).toBe(true);
   });
 
   it("treats running tool work as active timeline work", () => {

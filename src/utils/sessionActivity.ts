@@ -120,8 +120,30 @@ export function hasActiveTimelineWorkEvents(events: TimelineEvent[], now = Date.
   return events.some((event) => isTimelineEventActive(event, now));
 }
 
+// 侧栏每个会话行每次渲染都会调 hasActiveTimelineWork，流式 flush 会换新 sessions
+// 数组引用导致全行重扫（实机 profile：isTimelineEventOpen 自耗时 708ms/42s）。
+// 按 events 数组引用缓存结果（事件数组不可变，新事件必然是新数组引用）：
+// - true：最后一个 open 事件越过 2 分钟陈旧窗前结论不变；
+// - false：只有新事件到来（引用变化）才可能变 true。
+const activeTimelineWorkCache = new WeakMap<TimelineEvent[], { result: boolean; validUntil: number }>();
+
 export function hasActiveTimelineWork(session: Session, now = Date.now()) {
-  return hasActiveTimelineWorkEvents(session.events, now);
+  const events = session.events;
+  const cached = activeTimelineWorkCache.get(events);
+  if (cached && now < cached.validUntil) return cached.result;
+  let result = false;
+  let latestExpiryAt = 0;
+  for (const event of events) {
+    if (!isTimelineEventOpen(event)) continue;
+    const expiryAt = event.timestamp + STALE_TIMELINE_WORK_MS;
+    if (expiryAt > latestExpiryAt) latestExpiryAt = expiryAt;
+    if (now - event.timestamp <= STALE_TIMELINE_WORK_MS) result = true;
+  }
+  activeTimelineWorkCache.set(events, {
+    result,
+    validUntil: result ? latestExpiryAt : Number.POSITIVE_INFINITY,
+  });
+  return result;
 }
 
 export function getNextTimelineWorkExpiryAt(events: TimelineEvent[], now = Date.now()): number | null {

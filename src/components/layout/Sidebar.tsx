@@ -51,8 +51,15 @@ function isSameProjectPath(a: string | undefined, b: string | undefined) {
   return isSamePath(a, b);
 }
 
+// Session 对象不可变（任何更新都产生新引用），按对象身份缓存身份集合：
+// dedupeSidebarSessions 的 O(n²) 成对比较在流式 flush 期间反复触发，
+// 实机 profile 该路径自耗时 1.2s+/42s。
+const sessionIdentitySetCache = new WeakMap<Session, Set<string>>();
+
 function sessionIdentitySet(session: Session): Set<string> {
-  return new Set([
+  const cached = sessionIdentitySetCache.get(session);
+  if (cached) return cached;
+  const set = new Set([
     session.id,
     session.runtimeSessionId,
     session.officialSessionId,
@@ -60,6 +67,8 @@ function sessionIdentitySet(session: Session): Set<string> {
     session.longTask?.executorSessionId,
     session.longTask?.reviewerSessionId,
   ].filter((id): id is string => Boolean(id)));
+  sessionIdentitySetCache.set(session, set);
+  return set;
 }
 
 function normalizedSidebarSessionTitle(session: Session): string {

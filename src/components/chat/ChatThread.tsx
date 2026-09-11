@@ -1459,42 +1459,57 @@ export function buildRenderItems(
   return groupNotificationRenderItems(items);
 }
 
+function filterStatusLaneKey(event: Extract<TimelineEvent, { type: "status_update" }>): string {
+  if (event.agentTurnId) return `t:${event.agentTurnId}`;
+  if (event.roomAgentId) return `r:${event.roomAgentId}`;
+  return "main";
+}
+
 export function filterStatusUpdates(events: TimelineEvent[], display: "each" | "turn_end" | "never"): TimelineEvent[] {
-  return events.filter((event, index) => {
-    if (event.type !== "status_update") return true;
-    if (event.source === "slash") return true;
+  // each 档保留全部事件，直接返回原数组引用（等价于逐帧 filter 全 true，
+  // 同时让下游 memo 吃到引用稳定）。
+  if (display === "each") return events;
+  const isExempt = (event: TimelineEvent) => (
+    event.type !== "status_update" ||
+    event.source === "slash" ||
     // 通知信封（后台任务/定时任务）是事件而不是进度状态：不受状态显示档位过滤，
     // 与 slash 通知同规则，否则 turn_end/never 档下官方通知卡永远丢失。
-    if (event.notification) return true;
+    Boolean(event.type === "status_update" && event.notification) ||
     // Prompt-link statuses drive the live assistant process header. They are
     // intentionally retained even when standalone status cards are hidden;
     // renderTurnBody removes them again once the turn settles.
-    if (event.source === "ipc" && event.parentEventId) return true;
-    if (display === "never") return false;
-    if (display === "each") return true;
-    const previousTurnIndex = events.findLastIndex((candidate, candidateIndex) => (
-      candidateIndex < index &&
-      (candidate.type === "user_message" || candidate.type === "steer_message")
-    ));
-    const nextTurnIndex = events.findIndex((candidate, candidateIndex) => (
-      candidateIndex > index &&
-      (candidate.type === "user_message" || candidate.type === "steer_message")
-    ));
-    const turnStart = previousTurnIndex === -1 ? 0 : previousTurnIndex + 1;
-    const turnEnd = nextTurnIndex === -1 ? events.length : nextTurnIndex;
-    const statusesInAgentTurn = events.slice(turnStart, turnEnd).filter((candidate): candidate is Extract<TimelineEvent, { type: "status_update" }> => {
-      if (candidate.type !== "status_update") return false;
-      if (candidate.source === "slash") return false;
-      if (candidate.source === "ipc" && candidate.parentEventId) return false;
-      if (event.agentTurnId) return candidate.agentTurnId === event.agentTurnId;
-      if (event.roomAgentId) return candidate.roomAgentId === event.roomAgentId && !candidate.agentTurnId;
-      return !candidate.agentTurnId && !candidate.roomAgentId;
-    });
-    const interruptedStatus = statusesInAgentTurn.findLast(isInterruptedStatusEvent);
-    const metricStatus = statusesInAgentTurn.findLast(hasMetricStatus);
-    const preferredStatus = metricStatus ?? statusesInAgentTurn.at(-1);
-    return interruptedStatus === event || preferredStatus === event;
-  });
+    Boolean(event.type === "status_update" && event.source === "ipc" && event.parentEventId)
+  );
+  if (display === "never") return events.filter(isExempt);
+  // turn_end 单趟分组（旧实现逐帧 findLastIndex+slice+filter 整个轮次区间，
+  // O(状态数 × 事件数)，大会话流式期间每个 flush 都烧几十毫秒——实机 profile
+  // 自耗时 1.57s/42s）。按 (轮次段, lane) 聚合 lastInterrupted/lastMetric/lastAny。
+  const interruptedByLane = new Map<string, TimelineEvent>();
+  const metricByLane = new Map<string, TimelineEvent>();
+  const anyByLane = new Map<string, TimelineEvent>();
+  let segment = 0;
+  for (const event of events) {
+    if (event.type === "user_message" || event.type === "steer_message") {
+      segment += 1;
+      continue;
+    }
+    if (event.type !== "status_update") continue;
+    if (event.source === "slash") continue;
+    if (event.source === "ipc" && event.parentEventId) continue;
+    const key = `${segment}|${filterStatusLaneKey(event)}`;
+    if (isInterruptedStatusEvent(event)) interruptedByLane.set(key, event);
+    if (hasMetricStatus(event)) metricByLane.set(key, event);
+    anyByLane.set(key, event);
+  }
+  // 每条 lane 保留：最后一条中断帧 + 优选帧（最后一条 metric 帧，否则最后一条任意帧）。
+  // 所有进入跟踪的帧都记进了 anyByLane，lane 键集合以它为准。
+  const keep = new Set<TimelineEvent>();
+  for (const [key, any] of anyByLane) {
+    const interrupted = interruptedByLane.get(key);
+    if (interrupted) keep.add(interrupted);
+    keep.add(metricByLane.get(key) ?? any);
+  }
+  return events.filter((event) => isExempt(event) || keep.has(event));
 }
 
 function hasVisibleConversation(events: TimelineEvent[], runningSessionId: string | null, sessionId?: string, runtimeSessionId?: string, isRoomRunning = false): boolean {
