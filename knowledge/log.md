@@ -1,5 +1,8 @@
 # Kimix Knowledge Update Log
 
+* **Scroll jank during streaming was O(n²) flush-path work, not rendering (v2.21.200)**: CDP evidence (lag-triggered CPU profile + timeline scroll trace on the live window) showed ~90% idle with recurring 150–300ms tasks from `filterStatusUpdates` per-event turn-segment rescans (O(statuses × events), 168ms/call at 7.6k events → single-pass O(n), 1.63ms) and Sidebar per-row full-history busy scans + identity-Set churn on every stream flush (WeakMap caches keyed on immutable events/Session identity). Rule: flush-path work must be O(new events), never O(history). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md) invariant V.
+
+
 * **Turn-end speed pill must read the backfilled summary frame, not only turn-scoped usage frames (v2.21.199)**: the SDK emits `usage.record` (turn scope) then `agent.status.updated` (cumulative currentTurn, no `usageScope`), and turn_end filtering displays the latter — so per-id speed lookups always missed and 速率 never rendered. `computeTurnUsageSpeeds` now backfills the latest computed turn speed onto subsequent main-agent status frames within the same segment. See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md) invariant U.
 
 

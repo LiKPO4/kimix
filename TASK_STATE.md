@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-09-11 性能：流式运行+大内容滚动卡顿根治（v2.21.200）
+
+- 方法论：CDP 实机测量（scripts/cdp-scroll-trace.mjs 新增 + 既有 lag 触发 profile），先证伪「渲染瓶颈」（Layout 13ms/Paint 123ms per 14s 滚动 trace，主线程 ~90% idle），再抓到每 5s 左右 150-300ms 主线程任务。
+- 根因 1：filterStatusUpdates 逐帧 findLastIndex+slice+filter 整个轮次区间，O(状态数×事件数)，7600 事件单次 168ms，每个流式 flush 都跑 → 重写单趟 O(n) 分组（1.63ms，103 倍），语义等价（62 条既有测试全过）。
+- 根因 2：侧栏 isSessionSidebarBusy→hasActiveTimelineWork 每行每次渲染全扫事件数组（isTimelineEventOpen 自耗 708ms/42s）；hasActiveTimelineWork 按 events 引用 WeakMap 缓存（true 缓到最晚 open 事件过陈旧窗，false 缓到引用变化），语义严格等价 + 缓存语义测试。
+- 根因 3：Sidebar sessionIdentitySet 在 dedupe O(n²) 成对比较中反复分配 Set（areRelatedSidebarSessions 自耗 1.23s/42s）→ WeakMap 按 Session 对象缓存。
+- 结论沉淀：Invariant V——flush 路径禁止 O(历史) 工作；此前历次修复只降频率没降复杂度，所以「修几次见效不强」。虚拟化（ChatGPT/kimi-web 式）不是当前瓶颈，暂不需要。
+- 验收：typecheck + 全量 vitest 2233 过 + build 过；实机流畅度待用户重启应用后确认（当前运行实例仍是旧代码）。
+
+
 ## 2026-09-10 修复：气泡速率口径两级修正（累计化 + SDK 路由 tool_call 边界）
 
 - 一级（ba17614d）：速率从单步值改本轮累计口径（累计输出 ÷ 累计生成窗口），与气泡上的累计输出 tokens 同语义；原单步口径下最后一步收尾调用输出极少导致 0.6 t/s 假象。
