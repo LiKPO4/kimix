@@ -679,7 +679,9 @@ describe("computeTurnUsageSpeeds", () => {
     ...extra,
   });
 
-  it("为每条主 Agent turn 级 usage 帧计算速率", () => {
+  it("速率是本轮累计输出 ÷ 累计生成窗口（与气泡上的累计输出 tokens 同语义）", () => {
+    // 第一步 100 tokens/1s，第二步 300 tokens/2s → s2 处累计 (100+300)/(1+2)=133.33，
+    // 不是单步的 150，避免与气泡上的累计输出 tokens 并排时被误读。
     const speeds = computeTurnUsageSpeeds([
       { id: "u1", type: "user_message", timestamp: 0, content: "a" },
       usage("s1", 1000, { tokenCount: 100 }),
@@ -687,7 +689,7 @@ describe("computeTurnUsageSpeeds", () => {
       usage("s2", 4000, { tokenCount: 300 }),
     ]);
     expect(speeds.get("s1")).toBeCloseTo(100, 5);
-    expect(speeds.get("s2")).toBeCloseTo(150, 5);
+    expect(speeds.get("s2")).toBeCloseTo(400 / 3, 5);
     expect(speeds.size).toBe(2);
   });
 

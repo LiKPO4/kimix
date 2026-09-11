@@ -338,23 +338,31 @@ export function getSessionOutputStats(session: Session | null | undefined): Sess
 
 /**
  * 逐帧计算回合结束气泡可显示的输出速率（tokens/s）。
- * 口径与 getSessionOutputStats 相同：turn 级主 Agent usage 帧的输出 tokens ÷
- * 生成窗口（帧时间 − 前一个主边界 user_message/tool_result），同样带 50ms~30min 守卫；
- * 最近一次算出的速率同时回填给同轮后续主 Agent 状态帧（轮末气泡展示的是最后的
+ * 口径与 getSessionOutputStats.currentTurnSpeed 相同：本轮累计输出 tokens ÷ 累计生成
+ * 窗口（每个 turn 级主 Agent usage 帧相对前一边界 user_message/tool_result 的时间差，
+ * 带 50ms~30min 守卫），并与气泡上的累计输出 tokens 保持同一语义。
+ * 累计速率同时回填给同轮后续主 Agent 状态帧（轮末气泡展示的是最后的
  * agent.status.updated 汇总帧，本身没有 usageScope）。
  * 返回 eventId → tokens/s；没有任何可用速率的帧不出现（调用方隐藏速率项）。
  */
 export function computeTurnUsageSpeeds(events: readonly TimelineEvent[]): Map<string, number> {
   const speeds = new Map<string, number>();
   let lastBoundaryTs: number | undefined;
-  // SDK 发射顺序是 usage.record（turn 级）→ agent.status.updated（带 currentTurn
-  // 汇总但没有 usageScope），而轮末气泡展示的恰是最后一帧；把最近一次算出的速率
-  // 回填给同轮后续主 Agent 状态帧，保证被展示的帧也能查到速率。
-  let lastTurnSpeed: number | undefined;
+  let turnOutput = 0;
+  let turnWindowMs = 0;
+  // 速率口径是「本轮累计输出 ÷ 累计生成窗口」（与 getSessionOutputStats.currentTurnSpeed
+  // 一致），而不是单步速率：气泡上展示的输出 tokens 是本轮累计值，单步速率与它并排
+  // 会被读成「累计输出 ÷ 速率」（实机 v2.21.199：输出 556 配单步 0.6 t/s）。
+  // 同时 SDK 发射顺序是 usage.record（turn 级）→ agent.status.updated（带 currentTurn
+  // 汇总但没有 usageScope），轮末气泡展示的恰是最后一帧；把累计速率回填给同轮后续
+  // 主 Agent 状态帧，保证被展示的帧也能查到速率。
   for (const event of events) {
     if (event.type === "user_message" || (event.type === "tool_result" && !event.agentId)) {
+      if (event.type === "user_message") {
+        turnOutput = 0;
+        turnWindowMs = 0;
+      }
       lastBoundaryTs = event.timestamp;
-      lastTurnSpeed = undefined;
       continue;
     }
     if (event.type !== "status_update" || event.agentId) continue;
@@ -362,12 +370,11 @@ export function computeTurnUsageSpeeds(events: readonly TimelineEvent[]): Map<st
       const output = event.tokenCount ?? 0;
       const windowMs = lastBoundaryTs === undefined ? 0 : event.timestamp - lastBoundaryTs;
       if (output > 0 && windowMs >= MIN_STEP_WINDOW_MS && windowMs <= MAX_STEP_WINDOW_MS) {
-        lastTurnSpeed = output / (windowMs / 1000);
-        speeds.set(event.id, lastTurnSpeed);
+        turnOutput += output;
+        turnWindowMs += windowMs;
       }
-      continue;
     }
-    if (lastTurnSpeed !== undefined) speeds.set(event.id, lastTurnSpeed);
+    if (turnWindowMs > 0) speeds.set(event.id, turnOutput / (turnWindowMs / 1000));
   }
   return speeds;
 }
