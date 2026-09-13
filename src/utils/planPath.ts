@@ -21,6 +21,21 @@ export function shouldRetrySessionPlanRead(
     && retryAttempt < SESSION_PLAN_MAX_RETRIES;
 }
 
+export type SessionPlanApplied = { target: string; hasContent: boolean };
+
+/** Plan 刷新目标身份：同一会话 + 同一捕获路径才允许沿用已展示的正文。 */
+export function sessionPlanTargetKey(sessionId: string | null | undefined, planPath: string | null) {
+  return `${sessionId ?? ""}\u0000${planPath ?? ""}`;
+}
+
+/**
+ * 同一 Plan 目标已经展示过正文时，事件驱动的刷新必须静默进行：loading 占位会整体
+ * 替换正文，流式期间每次事件追加都会闪一下（用户反馈「执行一步闪烁一次」）。
+ */
+export function canPreserveSessionPlanContent(applied: SessionPlanApplied | null, target: string) {
+  return applied !== null && applied.target === target && applied.hasContent;
+}
+
 const KIMI_PLAN_PATH_PATTERN = /(?:[A-Za-z]:\\[^\r\n"'<>|]*?\.kimi(?:-code)?\\plans\\[^\s"'<>|]+\.md|\/[^\s"'<>]*?\.kimi(?:-code)?\/plans\/[^\s"'<>|]+\.md|\.kimi(?:-code)?[\\/]+plans[\\/]+[^\s"'<>|]+\.md)/gi;
 
 export function cleanPlanPath(pathValue: string) {

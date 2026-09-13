@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@/types/ui";
 import {
+  canPreserveSessionPlanContent,
   findSessionPlanPath,
   findSessionPlanSignal,
   hasSessionPlanSignal,
   sessionPlanFallbackPolicy,
+  sessionPlanTargetKey,
   SESSION_PLAN_MAX_RETRIES,
   shouldRetrySessionPlanRead,
 } from "../planPath";
@@ -83,5 +85,26 @@ describe("planPath", () => {
       content: null,
       source: "plan_file",
     });
+  });
+});
+
+describe("会话 Plan 刷新占位", () => {
+  it("同一目标且已展示正文时保持静默，避免执行一步闪烁一次", () => {
+    const target = sessionPlanTargetKey("session-1", "C:\\ws\\.kimi-code\\plans\\plan.md");
+    expect(canPreserveSessionPlanContent({ target, hasContent: true }, target)).toBe(true);
+    expect(canPreserveSessionPlanContent({ target, hasContent: false }, target)).toBe(false);
+    expect(canPreserveSessionPlanContent(null, target)).toBe(false);
+  });
+
+  it("会话或捕获路径变化时不沿用旧正文", () => {
+    const applied = { target: sessionPlanTargetKey("session-1", "__latest_kimi_plan__"), hasContent: true };
+    expect(canPreserveSessionPlanContent(applied, sessionPlanTargetKey("session-2", "__latest_kimi_plan__"))).toBe(false);
+    expect(canPreserveSessionPlanContent(applied, sessionPlanTargetKey("session-1", null))).toBe(false);
+    expect(canPreserveSessionPlanContent(applied, sessionPlanTargetKey("session-1", ".kimi/plans/other.md"))).toBe(false);
+  });
+
+  it("目标键区分会话与路径，避免拼接歧义", () => {
+    expect(sessionPlanTargetKey("s1", null)).not.toBe(sessionPlanTargetKey("s1", "__latest_kimi_plan__"));
+    expect(sessionPlanTargetKey("s1|p", null)).not.toBe(sessionPlanTargetKey("s1", "p"));
   });
 });

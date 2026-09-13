@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-13 修复：右侧 Plan 面板「执行一步闪烁一次」（v2.21.201）
+
+- 根因：AppShell 的 refreshSessionPlan 每次 events 引用变化都会重建（callback 依赖 sessionPlanSignal 对象，流式 flush 每次换新对象），effect 每次执行都非静默置 loading: true；Plan 卡渲染 loading ? 占位 : 正文，占位把已展示正文整体替换 → 每个事件批次闪一下（用户观察为「执行一步闪烁一次」）。
+- 修复：planPath.ts 新增 sessionPlanTargetKey / canPreserveSessionPlanContent；AppShell 记录「会话+捕获路径」最近一次已采纳目标，同一目标已有正文时后台刷新静默（不置 loading），目标/会话变化仍走占位；成功回包内容、路径、updatedAt、message 均未变化时返回原状态对象，避免每批次无谓重渲染。
+- 边界：目标变化（新 Plan 路径、换会话）仍显示占位；手动刷新在已有正文时为静默更新（无 loading 反馈）；无正文时保持原占位行为；exit_plan_mode 正文分支行为不变。
+- 验证：typecheck 干净；planPath 8 条（新增 3 条）全过；全量 201 文件 2236 用例全过；build 通过。实机闪烁是否消失待用户重启确认。
+- 后续事项（记录不扩范围）：findSessionPlanSignal 每次 events 变化全量反向扫描（无 Plan 会话为 O(历史) + 正则扫正文），与 Invariant V 同类，可考虑增量扫描；后台静默 re-read 仍为每事件批次一次 IPC，如需可加节流。
+
 ## 2026-09-13 复核：v2.21.200 性能修复与速率边界修复（差分对拍验证，无代码改动）
 
 - filterStatusUpdates：从 git 还原旧实现与新实现对拍（确定性用例 + 种子化模糊，覆盖通知帧/slash/ipc-parent/多 lane/多轮次段/interrupted+metric 组合），2000 组比较 0 差异；chatRenderItems 62 + sessionActivity 22 + sessionMetrics 57 全绿；typecheck 干净。判定：语义等价成立，「each 返回原数组引用」无下游原地写风险（调用方只读）。

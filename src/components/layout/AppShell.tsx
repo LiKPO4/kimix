@@ -35,7 +35,7 @@ import { type DownloadProgressInfo } from "@/utils/format";
 import { isSamePath } from "@/utils/pathCase";
 import { parseLongTaskDetail, normalizeReviewItem } from "@/utils/longTaskParser";
 import { sendDocumentCommand, deleteSelection } from "@/utils/dom";
-import { findSessionPlanSignal, SESSION_PLAN_RETRY_INTERVAL_MS, shouldRetrySessionPlanRead } from "@/utils/planPath";
+import { canPreserveSessionPlanContent, findSessionPlanSignal, SESSION_PLAN_RETRY_INTERVAL_MS, sessionPlanTargetKey, shouldRetrySessionPlanRead, type SessionPlanApplied } from "@/utils/planPath";
 import { clampWidth } from "@/utils/number";
 import { persistLocalConversationState } from "@/utils/persistence";
 import { DialogSystem } from "./DialogSystem";
@@ -379,6 +379,9 @@ export function AppShell() {
   const [towerSnapshot, setTowerSnapshot] = useState<TowerSnapshotView | null>(null);
   const sessionPlanRequestRef = useRef(0);
   const sessionPlanRetryTimerRef = useRef<number | null>(null);
+  // 同一 Plan 目标的重复刷新不再回落到 loading 占位：占位会整体替换已展示的正文，
+  // 流式期间每次事件追加都会闪一下（用户反馈「执行一步闪烁一次」）。
+  const sessionPlanAppliedRef = useRef<SessionPlanApplied | null>(null);
   const [btwTransientBySessionId, setBtwTransientBySessionId] = useState<Record<string, BtwTransientState>>({});
 
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1583,6 +1586,7 @@ ${isFinalStep
       sessionPlanRetryTimerRef.current = null;
     }
     const requestId = ++sessionPlanRequestRef.current;
+    const planTarget = sessionPlanTargetKey(mutationSessionView?.id, sessionPlanPath);
     if (hasLongTaskMeta || !liveCurrentSessionProjectPath || !mutationSessionView) {
       setSessionPlanState({
         loading: false,
@@ -1592,6 +1596,7 @@ ${isFinalStep
         error: liveCurrentSession?.collaboration && !mutationSessionView ? mutationOwnerError || "请先选择一个 Agent。" : null,
         message: undefined,
       });
+      sessionPlanAppliedRef.current = { target: planTarget, hasContent: false };
       return;
     }
     if (sessionPlanSignal?.content) {
@@ -1603,14 +1608,19 @@ ${isFinalStep
         error: null,
         message: undefined,
       });
+      sessionPlanAppliedRef.current = { target: planTarget, hasContent: true };
       return;
     }
     if (!sessionPlanPath) {
+      sessionPlanAppliedRef.current = { target: planTarget, hasContent: false };
       setSessionPlanState({ loading: false, path: null, content: "", updatedAt: null, error: null, message: undefined });
       return;
     }
     const pathToRead = sessionPlanPath;
-    if (!options?.silent) {
+    // 同一 Plan 目标已展示正文时保持静默：loading 占位会整体替换正文，
+    // 流式期间每次 flush 都会触发刷新，无守卫时会「执行一步闪烁一次」。
+    const keepVisibleContent = canPreserveSessionPlanContent(sessionPlanAppliedRef.current, planTarget);
+    if (!options?.silent && !keepVisibleContent) {
       setSessionPlanState((state) => ({ ...state, loading: true, path: sessionPlanPath, error: null }));
     }
     void window.api.readTextFile({
@@ -1620,14 +1630,26 @@ ${isFinalStep
     }).then((res) => {
       if (requestId !== sessionPlanRequestRef.current) return;
       if (res.success) {
-        setSessionPlanState({
-          loading: false,
-          path: res.data.path,
-          content: res.data.content,
-          updatedAt: res.data.updatedAt,
-          error: null,
-          message: res.data.message,
-        });
+        sessionPlanAppliedRef.current = { target: planTarget, hasContent: Boolean(res.data.content) };
+        // 内容与路径都未变化时保留原状态对象：流式期间每个事件批次都会触发静默刷新，
+        // 无差别重建状态会让 Plan 卡片持续重渲染。
+        setSessionPlanState((previous) => (
+          !previous.loading &&
+          previous.path === res.data.path &&
+          previous.content === res.data.content &&
+          previous.updatedAt === res.data.updatedAt &&
+          previous.error === null &&
+          previous.message === res.data.message
+            ? previous
+            : {
+                loading: false,
+                path: res.data.path,
+                content: res.data.content,
+                updatedAt: res.data.updatedAt,
+                error: null,
+                message: res.data.message,
+              }
+        ));
         const retryAttempt = options?.retryAttempt ?? 0;
         if (shouldRetrySessionPlanRead(pathToRead, res.data.retryable, retryAttempt)) {
           sessionPlanRetryTimerRef.current = window.setTimeout(() => {
@@ -1636,10 +1658,12 @@ ${isFinalStep
           }, SESSION_PLAN_RETRY_INTERVAL_MS);
         }
       } else {
+        sessionPlanAppliedRef.current = { target: planTarget, hasContent: false };
         setSessionPlanState({ loading: false, path: sessionPlanPath, content: "", updatedAt: null, error: res.error, message: undefined });
       }
     }).catch((err: unknown) => {
       if (requestId !== sessionPlanRequestRef.current) return;
+      sessionPlanAppliedRef.current = { target: planTarget, hasContent: false };
       setSessionPlanState({
         loading: false,
         path: sessionPlanPath,
