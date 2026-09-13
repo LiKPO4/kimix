@@ -520,9 +520,12 @@ export function LongTaskInspectorPanel({
     setWorkspaceView("settings");
     window.setTimeout(() => window.dispatchEvent(new CustomEvent("kimix:focus-model-settings")), 80);
   };
+  // 只跟随会话与运行时绑定变化重载：runningSessionId 在每个轮次起止翻转，
+  // 会让健康卡状态图标与刷新按钮反复切成旋转加载（表现为轮次级闪烁），
+  // 并带来每轮 5 次 IPC 检测；诊断详情可手动刷新。
   useEffect(() => {
     void loadKimiHealth();
-  }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId, runningSessionId]);
+  }, [projectPathForKimi, liveCurrentSession?.id, liveCurrentSession?.runtimeSessionId]);
   const projectPathForGit = liveCurrentSession?.projectPath ?? currentProject?.path ?? "";
   const displaySessionDiffs = useMemo(
     () => alignSessionDiffsToGitStatus(sessionDiffs, gitStatus),

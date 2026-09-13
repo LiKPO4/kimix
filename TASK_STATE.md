@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-13 审计：右侧栏其他卡片闪烁排查 + Kimi 健康卡轮次刷新修复（v2.21.202）
+
+- 穷举 LongTaskInspectorPanel / Sidebar / ComposerDockBar / TowerInspector 全部 *Loading 渲染分支并核对触发频率：其余卡片的加载占位/加载图标都只在会话级（切会话、面板开合、运行时绑定变化）或用户动作时出现；Plan 卡是唯一随 events 引用（每 flush）非静默刷新的卡片（已修）。
+- 修复：Kimi Code 健康卡 effect 依赖移除 runningSessionId——它每个轮次起止翻转，导致状态图标与刷新按钮每轮切成旋转加载（轮次级闪烁）并触发 5 次 IPC 健康检测；改为只跟随会话/运行时绑定变化重载，诊断详情保留手动刷新。
+- 边界：换会话/换绑定后健康卡仍自动重载（图标短暂旋转属正常反馈）；展开态诊断（工具/MCP/订阅/Prompt 队列）不再随轮次自动刷新。
+- 验证：typecheck 干净；全量 201 文件 2236 用例全过；build 通过。实机待用户重启确认。
+- 记录暂不修（收益低于改动风险）：①refreshSessionLongTasks 依赖 longTaskMeta 对象，长程任务会话里进度更新会带一次列表静默刷新（小 spinner + 1 次 IPC）；②longTaskEventCount 驱动的 detail 静默刷新为每 flush 一次 IPC（不可见）。
+
 ## 2026-09-13 修复：右侧 Plan 面板「执行一步闪烁一次」（v2.21.201）
 
 - 根因：AppShell 的 refreshSessionPlan 每次 events 引用变化都会重建（callback 依赖 sessionPlanSignal 对象，流式 flush 每次换新对象），effect 每次执行都非静默置 loading: true；Plan 卡渲染 loading ? 占位 : 正文，占位把已展示正文整体替换 → 每个事件批次闪一下（用户观察为「执行一步闪烁一次」）。
