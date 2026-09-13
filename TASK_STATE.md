@@ -1,5 +1,15 @@
 # Kimix 长程任务状态
 
+## 2026-09-13 复核：v2.21.200 性能修复与速率边界修复（差分对拍验证，无代码改动）
+
+- filterStatusUpdates：从 git 还原旧实现与新实现对拍（确定性用例 + 种子化模糊，覆盖通知帧/slash/ipc-parent/多 lane/多轮次段/interrupted+metric 组合），2000 组比较 0 差异；chatRenderItems 62 + sessionActivity 22 + sessionMetrics 57 全绿；typecheck 干净。判定：语义等价成立，「each 返回原数组引用」无下游原地写风险（调用方只读）。
+- hasActiveTimelineWork 缓存：逐行比对 isTimelineEventOpen+时效 ≡ isTimelineEventActive；失效 = events 数组引用变化（事件不可变，addEvent 用 [...s.events]）或最后一个 open 事件过期（Sidebar 过期定时器触发重渲染，缓存随之失效）。
+- sessionIdentitySet WeakMap：纯 memo；全仓无 Session 字段原地写（仅测试文件出现），前提成立。
+- 速率边界（c52f2c84）：tool_call 完成时刻边界只在「非子代理 + 有 durationMs」时生效，Math.max 只许前进；与既有 user_message/tool_result 分支无冲突；2 条新测试覆盖 running/无 durationMs 不参与。
+- 已知边界（缓存正确性前提，非缺陷）：若未来出现同一 events 引用原地追加、或调用方传入递减的 now（生产均为 Date.now() 且非递减），WeakMap 缓存会静默返回过期结果；改动这两类模式时需同步复核。
+- 仍未验证：实机滚动流畅度与速率数值（待用户重启应用确认，见 v2.21.200 条目）。
+
+
 ## 2026-09-11 性能：流式运行+大内容滚动卡顿根治（v2.21.200）
 
 - 方法论：CDP 实机测量（scripts/cdp-scroll-trace.mjs 新增 + 既有 lag 触发 profile），先证伪「渲染瓶颈」（Layout 13ms/Paint 123ms per 14s 滚动 trace，主线程 ~90% idle），再抓到每 5s 左右 150-300ms 主线程任务。
