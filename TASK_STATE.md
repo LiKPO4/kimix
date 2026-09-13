@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-13 发版 v2.21.202（已推送 tag）
+
+- 覆盖 v2.21.198~202 共 5 个 patch：气泡内容五开关、回合结束气泡输出速率（累计口径 + SDK 路由 tool_call 边界）、大会话流式滚动卡顿修复（Invariant V）、Plan 卡与 Kimi 健康卡闪烁修复。
+- 发版前复核：13 个提交逐条过审（198 设置链路与速率初版、199 速率回填/样式/补漏提交注入、200 差分对拍语义等价、201/202 自审）；typecheck 干净 + 全量 201 文件 2236 用例 + build 全过；knowledge:validate PASS（20 概念 / 641 链接）。
+- notes 落 docs/release-notes/v2.21.202.md 并同步根目录 fallback；推送 master + tag 触发 CI。
+
 ## 2026-09-13 审计：右侧栏其他卡片闪烁排查 + Kimi 健康卡轮次刷新修复（v2.21.202）
 
 - 穷举 LongTaskInspectorPanel / Sidebar / ComposerDockBar / TowerInspector 全部 *Loading 渲染分支并核对触发频率：其余卡片的加载占位/加载图标都只在会话级（切会话、面板开合、运行时绑定变化）或用户动作时出现；Plan 卡是唯一随 events 引用（每 flush）非静默刷新的卡片（已修）。
