@@ -7,6 +7,7 @@ import {
   getDiagRecorderState,
   recordDiagLine,
   resetDiagRecorderForTests,
+  setDiagRecordingAutoArm,
   shouldRecordFrameGap,
   startDiagRecording,
   stopDiagRecording,
@@ -51,7 +52,12 @@ function installMockApi(overrides: Partial<Record<string, unknown>> = {}) {
         remainingMs: 0,
         lineCount: 0,
         bytes: 0,
+        autoArm: false,
       },
+    })),
+    setDiagRecordingAutoArm: vi.fn(async (req: { armed: boolean }) => ({
+      success: true,
+      data: { autoArm: req.armed },
     })),
     ...overrides,
   };
@@ -175,5 +181,37 @@ describe("diagRecorder 录制流程", () => {
     await syncDiagRecorderFromMain();
     expect(getDiagRecorderState().phase).toBe("saved");
     expect(getDiagRecorderState().filePath).toBe("C:/tmp/kimix-record-last.log");
+  });
+});
+
+describe("diagRecorder 启动自动录制开关", () => {
+  it("开关写入主进程并回读状态", async () => {
+    const api = installMockApi();
+    await setDiagRecordingAutoArm(true);
+    expect(api.setDiagRecordingAutoArm).toHaveBeenCalledWith({ armed: true });
+    expect(getDiagRecorderState().autoArm).toBe(true);
+
+    await setDiagRecordingAutoArm(false);
+    expect(getDiagRecorderState().autoArm).toBe(false);
+  });
+
+  it("对账采纳主进程的已开启状态", async () => {
+    installMockApi({
+      getDiagRecordingStatus: vi.fn(async () => ({
+        success: true,
+        data: {
+          active: false,
+          filePath: null,
+          startedAt: null,
+          endsAt: null,
+          remainingMs: 0,
+          lineCount: 0,
+          bytes: 0,
+          autoArm: true,
+        },
+      })),
+    });
+    await syncDiagRecorderFromMain();
+    expect(getDiagRecorderState().autoArm).toBe(true);
   });
 });

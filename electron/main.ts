@@ -9,7 +9,7 @@ import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
 import { experimentalFeatureRequiresRestart, KimiCodeExperimentalFeatureSchema } from "./kimiCodeExperimentalFeatures";
-import { createDiagRecordingController, type DiagRecordingController } from "./diagRecording";
+import { DIAG_RECORDING_AUTO_DURATION_MS, createDiagRecordingController, readDiagRecordingAutoArm, writeDiagRecordingAutoArm, type DiagRecordingController } from "./diagRecording";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
@@ -8665,11 +8665,15 @@ ipcMain.handle("app:getDiagLogPath", async () => {
 
 // --- 日志录制（设置 → 诊断 → 日志录制）：限时采集 diag 行、心跳摘要与主进程采样 ---
 let diagRecordingController: DiagRecordingController | null = null;
+let startupAutoRecordPending = false;
+function getDiagRecordingBaseDir() {
+  return path.join(app.getPath("userData"), "diagnostics");
+}
 
 function getDiagRecordingController() {
   if (!diagRecordingController) {
     diagRecordingController = createDiagRecordingController({
-      baseDir: path.join(app.getPath("userData"), "diagnostics"),
+      baseDir: getDiagRecordingBaseDir(),
       headerProvider: () => [
         `# app=${app.getName()} v${app.getVersion()} packaged=${app.isPackaged ? 1 : 0}`,
         `# platform=${process.platform} arch=${process.arch} electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node}`,
@@ -8680,6 +8684,11 @@ function getDiagRecordingController() {
         const cpu = process.getCPUUsage();
         const toMb = (value: number) => Math.round(value / 1024 / 1024);
         return `[main] sample rss=${toMb(memory.rss)}MB heapUsed=${toMb(memory.heapUsed)}MB cpu=${cpu.percentCPUUsage.toFixed(1)}% windows=${BrowserWindow.getAllWindows().length}`;
+      },
+      onSessionEnd: (result) => {
+        if (!startupAutoRecordPending) return;
+        startupAutoRecordPending = false;
+        notifyStartupAutoRecordingSaved(result.filePath);
       },
     });
   }
@@ -8737,11 +8746,55 @@ ipcMain.handle("app:stopDiagRecording", async (_, request?: unknown) => {
 
 ipcMain.handle("app:getDiagRecordingStatus", async () => {
   try {
-    return { success: true, data: getDiagRecordingController().status() };
+    const autoArm = await readDiagRecordingAutoArm(getDiagRecordingBaseDir());
+    return { success: true, data: { ...getDiagRecordingController().status(), autoArm } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
+
+ipcMain.handle("app:setDiagRecordingAutoArm", async (_, request?: unknown) => {
+  try {
+    const armed = Boolean(request && typeof request === "object" && (request as { armed?: unknown }).armed === true);
+    await writeDiagRecordingAutoArm(getDiagRecordingBaseDir(), armed);
+    return { success: true, data: { autoArm: armed } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// 启动自动录制：窗口创建前触发、不依赖渲染层；一次性标记录完即清，
+// 也支持 --kimix-auto-record 参数或 KIMIX_AUTO_RECORD=1 强制本次录制。
+async function startStartupAutoRecordingIfNeeded() {
+  try {
+    const baseDir = getDiagRecordingBaseDir();
+    const forced = process.argv.includes("--kimix-auto-record") || process.env.KIMIX_AUTO_RECORD === "1";
+    const armed = forced || await readDiagRecordingAutoArm(baseDir);
+    if (!armed) return;
+    if (!forced) await writeDiagRecordingAutoArm(baseDir, false);
+    const result = await getDiagRecordingController().start(DIAG_RECORDING_AUTO_DURATION_MS);
+    if (result.ok) startupAutoRecordPending = true;
+  } catch {
+    // 自动录制失败不得影响启动。
+  }
+}
+
+function notifyStartupAutoRecordingSaved(filePath: string) {
+  try {
+    if (!Notification.isSupported()) return;
+    const notification = new Notification({
+      title: "Kimix 启动诊断录制已完成",
+      body: `日志已保存，点击打开所在文件夹：${filePath}`,
+      silent: false,
+    });
+    notification.on("click", () => {
+      try { shell.showItemInFolder(filePath); } catch { /* 打开失败忽略 */ }
+    });
+    notification.show();
+  } catch {
+    // 通知失败忽略。
+  }
+}
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {
   try {
@@ -8994,6 +9047,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(() => {
+  void startStartupAutoRecordingIfNeeded();
   protocol.handle("kimix-media", (request) => handleKimixMediaRequest(request));
   logMainStartup("app-ready");
   cleanupStaleScheduledShutdown();

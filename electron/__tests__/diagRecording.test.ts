@@ -8,6 +8,8 @@ import {
   createDiagRecordingController,
   formatDiagRecordingFileName,
   normalizeDiagRecordingDuration,
+  readDiagRecordingAutoArm,
+  writeDiagRecordingAutoArm,
 } from "../diagRecording";
 
 let tempDir: string;
@@ -29,6 +31,26 @@ describe("diagRecording helpers", () => {
   it("文件名按本地时间零填充", () => {
     expect(formatDiagRecordingFileName(new Date(2026, 8, 13, 9, 5, 7)))
       .toBe("kimix-record-20260913-090507.log");
+  });
+
+  it("启动自动录制标记可写入、读取与清除", async () => {
+    expect(await readDiagRecordingAutoArm(tempDir)).toBe(false);
+    await writeDiagRecordingAutoArm(tempDir, true);
+    expect(await readDiagRecordingAutoArm(tempDir)).toBe(true);
+    await writeDiagRecordingAutoArm(tempDir, false);
+    expect(await readDiagRecordingAutoArm(tempDir)).toBe(false);
+  });
+
+  it("收尾后触发 onSessionEnd 回调（含停止原因与路径）", async () => {
+    const onSessionEnd = vi.fn();
+    const controller = createDiagRecordingController({ baseDir: tempDir, onSessionEnd });
+    const started = await controller.start(60_000);
+    expect(started.ok).toBe(true);
+    await controller.stop("manual");
+    expect(onSessionEnd).toHaveBeenCalledTimes(1);
+    const result = onSessionEnd.mock.calls[0][0] as { reason: string; filePath: string };
+    expect(result.reason).toBe("manual");
+    if (started.ok) expect(result.filePath).toBe(started.filePath);
   });
 
   it("时长归一化：非法值回退默认，越界收敛到 30s~30min", () => {

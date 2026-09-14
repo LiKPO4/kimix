@@ -22,6 +22,8 @@ export type DiagRecorderState = {
   lineCount: number;
   filePath: string | null;
   lastError: string | null;
+  /** 已开启「下次启动自动录制」（一次性，启动录制时由主进程清除）。 */
+  autoArm: boolean;
 };
 
 const EMPTY_STATE: DiagRecorderState = {
@@ -32,6 +34,7 @@ const EMPTY_STATE: DiagRecorderState = {
   lineCount: 0,
   filePath: null,
   lastError: null,
+  autoArm: false,
 };
 
 let state: DiagRecorderState = { ...EMPTY_STATE };
@@ -255,6 +258,20 @@ export async function stopDiagRecording(reason = "manual") {
   }
 }
 
+/** 开启/关闭「下次启动自动录制」：开启后重启 Kimix 会立刻录制启动后的前 1 分钟。 */
+export async function setDiagRecordingAutoArm(armed: boolean) {
+  try {
+    const res = await window.api?.setDiagRecordingAutoArm?.({ armed });
+    if (!res || !res.success) {
+      setState({ lastError: res?.error ?? "设置启动自动录制失败" });
+      return;
+    }
+    setState({ autoArm: res.data.autoArm, lastError: null });
+  } catch (error) {
+    setState({ lastError: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 /** 设置页挂载时与主进程对账：渲染层重载后仍在录制时要能恢复显示与采集。 */
 export async function syncDiagRecorderFromMain() {
   if (state.phase === "recording") return;
@@ -262,6 +279,7 @@ export async function syncDiagRecorderFromMain() {
     const res = await window.api?.getDiagRecordingStatus?.();
     if (!res || !res.success) return;
     const data = res.data;
+    const autoArm = data.autoArm === true;
     if (data.active && data.startedAt !== null && data.endsAt !== null) {
       setState({
         phase: "recording",
@@ -271,14 +289,17 @@ export async function syncDiagRecorderFromMain() {
         lineCount: data.lineCount,
         filePath: data.filePath,
         lastError: null,
+        autoArm,
       });
       startCollectors();
       armAutoStop(data.endsAt);
       return;
     }
     if (data.filePath) {
-      setState({ phase: "saved", filePath: data.filePath, lineCount: data.lineCount, endsAt: null });
+      setState({ phase: "saved", filePath: data.filePath, lineCount: data.lineCount, endsAt: null, autoArm });
+      return;
     }
+    if (state.autoArm !== autoArm) setState({ autoArm });
   } catch {
     // 对账失败保持现状；下次挂载或操作会重试。
   }

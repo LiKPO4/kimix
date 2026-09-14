@@ -3,10 +3,13 @@ import path from "node:path";
 
 /** 用户主动触发的限时诊断录制：落盘到 userData/diagnostics，便于事后排查卡顿与状态异常。 */
 export const DIAG_RECORDING_DEFAULT_DURATION_MS = 5 * 60 * 1000;
+/** 启动自动录制固定覆盖启动后的第一分钟（用户点不动界面时也能抓现场）。 */
+export const DIAG_RECORDING_AUTO_DURATION_MS = 60 * 1000;
 export const DIAG_RECORDING_MIN_DURATION_MS = 30 * 1000;
 export const DIAG_RECORDING_MAX_DURATION_MS = 30 * 60 * 1000;
 export const DIAG_RECORDING_SAMPLE_INTERVAL_MS = 10 * 1000;
 export const DIAG_RECORDING_MAX_BYTES = 16 * 1024 * 1024;
+export const DIAG_RECORDING_ARM_FILE_NAME = "auto-record.json";
 
 export type DiagRecordingStatus = {
   active: boolean;
@@ -38,6 +41,27 @@ export function formatDiagRecordingFileName(date: Date) {
   return `kimix-record-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.log`;
 }
 
+/** 「下次启动自动录制」标记：单独文件存放，主进程在窗口创建前即可读取，不依赖渲染层与设置同步链。 */
+export async function readDiagRecordingAutoArm(baseDir: string): Promise<boolean> {
+  try {
+    const raw = await fs.promises.readFile(path.join(baseDir, DIAG_RECORDING_ARM_FILE_NAME), "utf8");
+    const parsed = JSON.parse(raw) as { armed?: unknown };
+    return parsed?.armed === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function writeDiagRecordingAutoArm(baseDir: string, armed: boolean): Promise<void> {
+  const filePath = path.join(baseDir, DIAG_RECORDING_ARM_FILE_NAME);
+  if (!armed) {
+    await fs.promises.rm(filePath, { force: true });
+    return;
+  }
+  await fs.promises.mkdir(baseDir, { recursive: true });
+  await fs.promises.writeFile(filePath, JSON.stringify({ armed: true, at: new Date().toISOString() }), "utf8");
+}
+
 type DiagRecordingSession = {
   filePath: string;
   startedAt: number;
@@ -56,6 +80,8 @@ export type DiagRecordingControllerOptions = {
   headerProvider?: () => string[];
   /** 主进程侧周期采样行（进程内存/CPU 等）；返回 null 表示跳过本次采样。 */
   sampleProvider?: () => string | null;
+  /** 每次录制收尾（手动/到时/超限）后回调，用于完成提示等副作用。 */
+  onSessionEnd?: (result: DiagRecordingStopResult) => void;
   now?: () => number;
   sampleIntervalMs?: number;
   maxBytes?: number;
@@ -107,6 +133,11 @@ export function createDiagRecordingController(options: DiagRecordingControllerOp
       reason,
     };
     lastStop = result;
+    try {
+      options.onSessionEnd?.(result);
+    } catch {
+      // 完成回调的副作用（通知等）不得影响收尾。
+    }
     return result;
   }
 

@@ -2860,6 +2860,20 @@ export type DiagRecordingStatusData = {
   remainingMs: number;
   lineCount: number;
   bytes: number;
+  /** 「下次启动自动录制」是否已开启（一次性标记）。 */
+  autoArm: boolean;
+};
+
+export type DiagRecordingAutoArmRequest = {
+  armed: boolean;
+};
+
+export type DiagRecordingAutoArmResponse = {
+  success: true;
+  data: { autoArm: boolean };
+} | {
+  success: false;
+  error: string;
 };
 
 export type DiagRecordingStatusResponse = {

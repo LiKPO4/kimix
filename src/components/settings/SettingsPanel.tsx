@@ -12,7 +12,7 @@ import { getPrimaryRoomAgent, getRoomAgent, getRoomAgentRuntimeId } from "@/util
 import { updateRoomMutationOwner } from "@/utils/roomMutationOwner";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
-import { formatRemainingLabel, getDiagRecorderState, startDiagRecording, stopDiagRecording, subscribeDiagRecorder, syncDiagRecorderFromMain } from "@/utils/diagRecorder";
+import { formatRemainingLabel, getDiagRecorderState, setDiagRecordingAutoArm, startDiagRecording, stopDiagRecording, subscribeDiagRecorder, syncDiagRecorderFromMain } from "@/utils/diagRecorder";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
@@ -472,6 +472,9 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     return () => window.clearInterval(timer);
   }, [diagRecorderState.phase, diagRecorderState.endsAt]);
   const diagRecorderRemainingMs = diagRecorderState.endsAt === null ? diagRecorderState.durationMs : Math.max(0, diagRecorderState.endsAt - diagRecorderNow);
+  const handleToggleDiagRecordingAutoArm = () => {
+    void setDiagRecordingAutoArm(!diagRecorderState.autoArm);
+  };
   const handleStartDiagRecording = () => {
     setDiagRecorderNow(Date.now());
     void startDiagRecording();
@@ -3985,6 +3988,18 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
                         录制约 5 分钟的运行日志（卡顿、内存采样、控制台与运行日志），方便把问题现场保存下来排查。
                       </div>
+        <button
+          type="button"
+          aria-pressed={diagRecorderState.autoArm}
+          onClick={handleToggleDiagRecordingAutoArm}
+          className={`kimix-settings-permission ${diagRecorderState.autoArm ? "is-active" : ""}`}
+        >
+          <SelectionIndicator selected={diagRecorderState.autoArm} />
+          <div className="kimix-settings-permission-copy">
+            <div className="kimix-settings-permission-label">下次启动自动录制</div>
+            <div className="kimix-settings-permission-desc">开启后重启 Kimix 会在启动瞬间自动录制前 1 分钟（界面卡到点不动时也能抓现场），录完弹出系统通知，点击即可打开日志所在文件夹。</div>
+          </div>
+        </button>
                       {diagRecorderState.phase === "saved" && diagRecorderState.filePath && (
                         <div className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
                           <div className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={diagRecorderState.filePath}>

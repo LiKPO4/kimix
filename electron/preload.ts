@@ -224,6 +224,8 @@ import type {
   LoggerWriteResponse,
   DiagRecordingAppendRequest,
   DiagRecordingAppendResponse,
+  DiagRecordingAutoArmRequest,
+  DiagRecordingAutoArmResponse,
   DiagRecordingStartRequest,
   DiagRecordingStartResponse,
   DiagRecordingStatusResponse,
@@ -641,6 +643,8 @@ const api = {
     ipcRenderer.invoke("app:stopDiagRecording", req),
   getDiagRecordingStatus: (): Promise<DiagRecordingStatusResponse> =>
     ipcRenderer.invoke("app:getDiagRecordingStatus"),
+  setDiagRecordingAutoArm: (req: DiagRecordingAutoArmRequest): Promise<DiagRecordingAutoArmResponse> =>
+    ipcRenderer.invoke("app:setDiagRecordingAutoArm", req),
   openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
 

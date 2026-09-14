@@ -699,6 +699,7 @@ function installBrowserPreviewApi() {
     appendDiagRecording: () => fail("写入日志录制"),
     stopDiagRecording: () => fail("停止日志录制"),
     getDiagRecordingStatus: () => fail("读取日志录制状态"),
+    setDiagRecordingAutoArm: () => fail("设置启动自动录制"),
     openExternal: async (url: string): Promise<VoidResponse> => {
       window.open(url, "_blank", "noopener,noreferrer");
       return { success: true, data: undefined };
