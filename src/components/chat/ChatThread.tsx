@@ -1584,7 +1584,7 @@ export const ChatThread = memo(function ChatThread() {
   );
   // 回合结束气泡的输出速率按完整事件流预计算（速率需要 user/tool 边界时间差），
   // 经 context 下发给各 StatusCard，避免把 map 逐层透传。
-  const statusCardSpeeds = useMemo(() => computeTurnUsageSpeeds(roomTimeline), [roomTimeline]);
+  const statusCardSpeeds = useMemo(() => timeSync("computeTurnUsageSpeeds", () => computeTurnUsageSpeeds(roomTimeline)), [roomTimeline]);
   const runtimeSessionId = session ? getRuntimeSessionId(session) : undefined;
   const sessionRoomAgentActivities = useMemo(() => Object.values(roomAgentActivities)
     .filter((activity) => activity.roomId === session?.id), [roomAgentActivities, session?.id]);
@@ -1664,7 +1664,7 @@ export const ChatThread = memo(function ChatThread() {
     return item?.type === "event" ? item.event.id : undefined;
   }, [renderItems]);
   const contentVersion = useMemo(
-    () => buildContentVersion(session, roomTimeline, renderItems),
+    () => timeSync("buildContentVersion", () => buildContentVersion(session, roomTimeline, renderItems)),
     [session, roomTimeline, renderItems]
   );
 

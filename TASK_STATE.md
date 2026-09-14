@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-14 排查+增强：启动/切换会话卡顿日志分析（v2.21.205）
+
+- 首份录制分析（packaged 2.21.204，60s）：主线程反复被 ~3.5s 长任务阻塞（帧间隔 3.5-3.9s，单段最长连续 10.7s）；主进程健康（CPU≤4.1%、RSS 109→324MB 回落 218MB）、持久化快（stripMs≤12 / commitMs≤101）。
+- 相关性：冻结集中在重会话 session_7413a04c（417 事件、单轮 10 个子代理、thinking 265334 字、轮显示时长 43min）；切到小会话（35 事件）的 15s 内无任何 >100ms 卡顿；每次进入/切回重会话即出现 3.5s 级冻结。冻结结束点恰好落地 chatRenderItems.subagentContentSurfaced / subagentContentRegressionSnapshot / kimiHistoryReconciliation.rejected(sidebar-select)，即冻结发生在其之前的渲染/对账通路；现有日志不足以分辨具体函数。
+- 诊断增强：① 录制期间自动强制开启性能桶（perfFlags 运行时覆盖；diagRecorder 启停开关 + 收尾写 [perfDiag] final summary），下份日志将含 react-commit:ChatThread / react-commit:MarkdownRenderer / buildRenderItems / projectCollaborationTimeline / computeTurnUsageSpeeds / buildContentVersion / *.reconcile 等分桶 count/total/max；② MarkdownRenderer 增加独立 Profiler；③ 补 computeTurnUsageSpeeds 与 buildContentVersion 两个 timeSync 埋点。
+- 验证：typecheck 干净；全量 203 文件 2256 用例全过（新增 1 条：录制期性能桶开关）；build 通过。待用户用 2.21.205 重录，重点看 react-commit 与 buildRenderItems 的 maxMs 归因。
+
 ## 2026-09-14 功能：启动自动录制——重启即录启动后前 1 分钟（v2.21.204）
 
 - 背景：公司电脑启动后持续卡顿、点不进诊断页，需要无需 UI 交互即可抓启动现场。

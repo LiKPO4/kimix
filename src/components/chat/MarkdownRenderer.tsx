@@ -5,13 +5,14 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Check, ChevronDown, Copy } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Profiler, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "katex/dist/katex.min.css";
 import githubCssUrl from "highlight.js/styles/github.css?url";
 import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreAssistantProgressParagraphs, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
+import { noteProfilerCommit } from "@/utils/perfDiag";
 import { isStreamingPlainMarkdownEnabled, shouldUsePlainStreamingMarkdown } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 import { renderStreamingPlainBlockToHtml, splitStreamingPlainBlocks } from "@/utils/streamingPlainMarkdown";
@@ -705,6 +706,10 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   }
 
   return (
+    <Profiler
+      id="MarkdownRenderer"
+      onRender={(id, phase, actualDuration) => noteProfilerCommit(`react-commit:${id}:${phase}`, actualDuration)}
+    >
     <div
       ref={containerRef}
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
@@ -736,5 +741,6 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
         </div>
       )}
     </div>
+    </Profiler>
   );
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isPerfDiagEnabled } from "@/utils/perfFlags";
 import {
   formatDiagRecorderLine,
   formatFrameGapLine,
@@ -185,6 +186,15 @@ describe("diagRecorder 录制流程", () => {
 });
 
 describe("diagRecorder 启动自动录制开关", () => {
+  it("录制期间自动开启性能桶，结束后恢复", async () => {
+    installMockApi();
+    expect(isPerfDiagEnabled()).toBe(false);
+    await startDiagRecording();
+    expect(isPerfDiagEnabled()).toBe(true);
+    await stopDiagRecording("manual");
+    expect(isPerfDiagEnabled()).toBe(false);
+  });
+
   it("开关写入主进程并回读状态", async () => {
     const api = installMockApi();
     await setDiagRecordingAutoArm(true);

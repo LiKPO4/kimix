@@ -46,6 +46,14 @@ export function isActiveTurnDraftEnabled() {
   return readEnabledFlag(ACTIVE_TURN_DRAFT_KEY, true);
 }
 
+let perfDiagRuntimeOverride: boolean | null = null;
+
+/** 日志录制期间强制开启性能桶；null 表示恢复用户设置。 */
+export function setPerfDiagRuntimeOverride(enabled: boolean | null) {
+  perfDiagRuntimeOverride = enabled;
+}
+
 export function isPerfDiagEnabled() {
+  if (perfDiagRuntimeOverride !== null) return perfDiagRuntimeOverride;
   return readEnabledFlag(PERF_DIAG_KEY, false);
 }

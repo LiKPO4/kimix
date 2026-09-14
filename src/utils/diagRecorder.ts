@@ -6,6 +6,8 @@
  * diag.log 行与心跳摘要。批量经 IPC 交给主进程串行落盘，默认 5 分钟自动停止。
  */
 
+import { ensureLongTaskObserver, getPerfDiagSnapshot, resetPerfDiagCounters } from "@/utils/perfDiag";
+import { setPerfDiagRuntimeOverride } from "@/utils/perfFlags";
 export const DIAG_RECORDING_DEFAULT_DURATION_MS = 5 * 60 * 1000;
 export const FRAME_GAP_THRESHOLD_MS = 100;
 const SAMPLE_INTERVAL_MS = 10_000;
@@ -103,6 +105,32 @@ export function subscribeDiagRecorder(listener: (next: DiagRecorderState) => voi
 function setState(patch: Partial<DiagRecorderState>) {
   state = { ...state, ...patch };
   for (const listener of listeners) listener(state);
+}
+
+/** 录制期间自动开启性能桶（React commit / buildRenderItems / 对账相位等）。 */
+function enablePerfCapture() {
+  setPerfDiagRuntimeOverride(true);
+  ensureLongTaskObserver();
+  resetPerfDiagCounters();
+}
+
+function disablePerfCapture() {
+  setPerfDiagRuntimeOverride(null);
+}
+
+/** 收尾前把最后一段性能桶写进录制（补上 10s 汇总之外的尾部数据）。 */
+async function flushPerfSummary() {
+  try {
+    const snapshot = getPerfDiagSnapshot();
+    const hasData = snapshot.longTasks.count > 0
+      || Object.keys(snapshot.timings).length > 0
+      || snapshot.renderTurnBodyRuns > 0;
+    if (!hasData) return;
+    resetPerfDiagCounters();
+    await window.api?.writeDiag?.({ message: "[perfDiag] final summary", data: snapshot });
+  } catch {
+    // 汇总失败忽略。
+  }
 }
 
 // ---------- 采集与落盘 ----------
@@ -224,6 +252,7 @@ export async function startDiagRecording(durationMs = DIAG_RECORDING_DEFAULT_DUR
       filePath: res.data.filePath,
       lastError: null,
     });
+    enablePerfCapture();
     buffer = [];
     startCollectors();
     armAutoStop(res.data.endsAt);
@@ -239,6 +268,8 @@ export async function stopDiagRecording(reason = "manual") {
     window.clearTimeout(autoStopTimer);
     autoStopTimer = null;
   }
+  await flushPerfSummary();
+  disablePerfCapture();
   await flushBuffer();
   try {
     const res = await window.api?.stopDiagRecording?.({ reason });
@@ -291,6 +322,7 @@ export async function syncDiagRecorderFromMain() {
         lastError: null,
         autoArm,
       });
+      enablePerfCapture();
       startCollectors();
       armAutoStop(data.endsAt);
       return;
@@ -309,4 +341,5 @@ export function resetDiagRecorderForTests() {
   state = { ...EMPTY_STATE };
   buffer = [];
   listeners.clear();
+  setPerfDiagRuntimeOverride(null);
 }
