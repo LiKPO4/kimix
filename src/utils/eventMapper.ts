@@ -332,7 +332,6 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
 type AssistantThinkingPartsIndex = {
   parts: AssistantThinkingPart[];
   normalized: string[];
-  byId: Map<string, number>;
 };
 
 const normalizedThinkingPartCache = new WeakMap<AssistantThinkingPart, string>();
@@ -340,7 +339,6 @@ const assistantThinkingPartsIndexCache = new WeakMap<AssistantThinkingPart[], As
 const EMPTY_ASSISTANT_THINKING_PARTS_INDEX: AssistantThinkingPartsIndex = {
   parts: [],
   normalized: [],
-  byId: new Map(),
 };
 
 function normalizedThinkingPart(part: AssistantThinkingPart): string {
@@ -398,7 +396,6 @@ function mergeAssistantThinkingPartBatch(
 ): AssistantThinkingPartsIndex {
   let parts = [...base.parts];
   let normalized = [...base.normalized];
-  let byId = new Map(base.byId);
   let changed = false;
 
   for (const part of incoming) {
@@ -407,8 +404,16 @@ function mergeAssistantThinkingPartBatch(
 
     // Same id means a streaming update of the same thought: replace in place
     // only when the incoming text grew, otherwise keep the existing version.
-    const sameIdIndex = byId.get(part.id);
-    if (sameIdIndex !== undefined) {
+    // 线性扫描代替逐批克隆的 id 索引：逐批克隆 Map 是整链最贵的常数项
+    // （实机 4000 段逐批 reduce 约 700ms，其中大半是 Map 拷贝）。
+    let sameIdIndex = -1;
+    for (let index = 0; index < parts.length; index += 1) {
+      if (parts[index].id === part.id) {
+        sameIdIndex = index;
+        break;
+      }
+    }
+    if (sameIdIndex !== -1) {
       const current = parts[sameIdIndex];
       if (part.text.length > current.text.length) {
         const replacement = {
@@ -459,14 +464,27 @@ function mergeAssistantThinkingPartBatch(
       };
       parts.splice(insertIndex, 0, replacement);
       normalized.splice(insertIndex, 0, normalizedThinkingPart(replacement));
-      byId = new Map(parts.map((item, index) => [item.id, index]));
       changed = true;
       continue;
     }
 
-    byId.set(part.id, parts.length);
-    parts.push(part);
-    normalized.push(partText);
+    // 保持按 timestamp 有序插入，避免每次合并都全量 sort + 重建索引
+    // （逆序/乱序到达时旧实现每次 O(P log P)+O(P)，整链 O(P² log P)）。
+    const tail = parts.length > 0 ? parts[parts.length - 1] : null;
+    if (!tail || part.timestamp >= tail.timestamp) {
+      parts.push(part);
+      normalized.push(partText);
+    } else {
+      let low = 0;
+      let high = parts.length;
+      while (low < high) {
+        const mid = (low + high) >> 1;
+        if (parts[mid].timestamp <= part.timestamp) low = mid + 1;
+        else high = mid;
+      }
+      parts.splice(low, 0, part);
+      normalized.splice(low, 0, partText);
+    }
     changed = true;
   }
 
@@ -481,11 +499,10 @@ function mergeAssistantThinkingPartBatch(
       .sort((left, right) => left.part.timestamp - right.part.timestamp);
     parts = ordered.map((entry) => entry.part);
     normalized = ordered.map((entry) => entry.normalized);
-    byId = new Map(parts.map((part, index) => [part.id, index]));
     changed = true;
   }
 
-  return changed ? { parts, normalized, byId } : base;
+  return changed ? { parts, normalized } : base;
 }
 
 function prepareAssistantThinkingParts(parts: AssistantThinkingPart[]): AssistantThinkingPartsIndex {
@@ -516,6 +533,38 @@ export function mergeAssistantThinkingParts(
   const indexed = output === merged.parts ? merged : { ...merged, parts: output };
   assistantThinkingPartsIndexCache.set(output, indexed);
   return output;
+}
+
+/**
+ * 顺序合并多个批次的 thinkingParts，语义与逐批调用 mergeAssistantThinkingParts
+ * 完全一致，但整链只做一次拷贝——避免逐批克隆 O(批次 × 累计段数) 的二次开销
+ * （实机重会话 4000 段时逐批 reduce 约 700ms）。
+ */
+export function mergeAssistantThinkingPartsSequential(
+  existing: AssistantThinkingPart[] | undefined,
+  batches: ReadonlyArray<AssistantThinkingPart[] | undefined>,
+): AssistantThinkingPart[] | undefined {
+  let result = existing;
+  let index: AssistantThinkingPartsIndex | null = null;
+  for (const batch of batches) {
+    if (!batch?.length) continue;
+    if (!result?.length) {
+      const mergedEmpty = mergeAssistantThinkingPartBatch(EMPTY_ASSISTANT_THINKING_PARTS_INDEX, batch);
+      const output = sameThinkingPartOrder(mergedEmpty.parts, batch) ? batch : mergedEmpty.parts;
+      const indexed = output === mergedEmpty.parts ? mergedEmpty : { ...mergedEmpty, parts: output };
+      assistantThinkingPartsIndexCache.set(output, indexed);
+      if (indexed.parts !== output) assistantThinkingPartsIndexCache.set(indexed.parts, indexed);
+      result = output;
+      index = indexed;
+      continue;
+    }
+    const base = index && index.parts === result ? index : prepareAssistantThinkingParts(result);
+    const next = mergeAssistantThinkingPartBatch(base, batch);
+    assistantThinkingPartsIndexCache.set(next.parts, next);
+    result = next.parts;
+    index = next;
+  }
+  return result;
 }
 
 function isInsideUnclosedInlineCode(content: string) {

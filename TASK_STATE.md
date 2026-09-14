@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-14 优化：thinking 合并链二次开销——有序插入 + 批量顺序合并 + 去 Map 索引（v2.21.207）
+
+- 背景：205 版日志（打开重会话）仍是 buildRenderItems 单次 3405.8ms / 3408.5ms，与冻结一一对应；206 的 thinkingBlocks 增量修复不覆盖合并链。
+- 优化（eventMapper.ts，全部经等价性验证）：① 新增 mergeAssistantThinkingPartsSequential（顺序合并多批次，与逐批 reduce 语义一致），ChatThread.mergeAssistantProcessEvents 与 kimiHistoryReconciliation 的逐批/逐 part reduce 链改为单次调用；② part 插入改为按 timestamp 有序插入（原 push+全量 sort+重建索引在乱序到达时整链 O(P² log P)）；③ 去掉索引内的 byId Map（逐批克隆 Map 是整链最贵常数项），同 id 查找改线性扫描。
+- 验证：与逐批 reduce 做 800 轮随机批次等价性对拍（累积重放/后缀重叠/同 id 流式更新/乱序时间戳）零差异；eventMapper 216 条测试全过；基准 4000 段 顺序 656→226ms、逆序 742→250ms；typecheck + 全量 2256 用例 + build 全过。
+- 交付口径：本版起本地测试包只打 NSIS Setup 并只复制 Setup 到桌面（用户 2026-09-14 要求）。
+- 说明：该日志来自 205，206+207 的修复尚未在用户机器验证——请用 207 复测重会话打开/切换。
+
 ## 2026-09-14 修复：重会话卡顿根因——buildThinkingBlocks 归一化 O(段数×总长)（v2.21.206）
 
 - 第二份录制（v2.21.205 带性能桶）定点：buildRenderItems 单次 maxMs=4144、10s 内 4 次共 8049ms，与 3.9-4.3s 冻结一一对应；computeTurnUsageSpeeds/协作投影/persist 均 0.1-104ms 量级。

@@ -105,10 +105,7 @@ function dedupeLocalHistoryForComparison(events: TimelineEvent[]): TimelineEvent
       }
       if (next.type === "assistant_message") {
         if (next.thinkingParts?.length) {
-          const parts = next.thinkingParts.reduce<NonNullable<typeof next.thinkingParts> | undefined>(
-            (acc, part) => mergeAssistantThinkingParts(acc, [part]),
-            undefined,
-          );
+          const parts = mergeAssistantThinkingParts(undefined, next.thinkingParts);
           if (parts && parts.length !== next.thinkingParts.length) next = { ...next, thinkingParts: parts };
         }
         if (next.thinking) {

@@ -29,7 +29,7 @@ import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@
 import { computeTurnUsageSpeeds, hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { groupNotificationRenderItems } from "@/utils/notificationGroups";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, normalizeCompactionDisplay, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
-import { mergeAssistantThinkingParts, mergeAssistantThinkingText } from "@/utils/eventMapper";
+import { mergeAssistantThinkingPartsSequential, mergeAssistantThinkingText } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationEventIds, chatNavigationTargetId } from "@/utils/chatNavigation";
@@ -863,9 +863,9 @@ export function buildRenderItems(
     const durationMs = reliableDurations.length > 0
       ? Math.max(...reliableDurations)
       : undefined;
-    const mergedThinkingParts = visible.reduce<Extract<TimelineEvent, { type: "assistant_message" }>["thinkingParts"]>(
-      (merged, event) => mergeAssistantThinkingParts(merged, event.thinkingParts),
+    const mergedThinkingParts = mergeAssistantThinkingPartsSequential(
       undefined,
+      visible.map((event) => event.thinkingParts),
     );
     // thinking 字符串从 thinkingParts 合并结果派生，消除双轨漂移：
     // live 渲染优先读 thinking，settle 后优先读 thinkingParts，独立合并
