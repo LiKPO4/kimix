@@ -3,16 +3,17 @@ import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap
 
 const THINKING_PART_OVERLAP_MIN_CHARS = 16;
 
-function normalizeForOverlap(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+/** 与归一化匹配口径一致的空白折叠（不 trim），供增量累积归一化视图使用。 */
+function collapseForOverlap(text: string): string {
+  return text.replace(/\s+/g, " ");
 }
 
-function findPartOverlap(prev: string, next: string): number {
-  return longestSuffixPrefixOverlap(
-    normalizeForOverlap(prev),
-    normalizeForOverlap(next),
-    THINKING_PART_OVERLAP_MIN_CHARS,
-  );
+/** 把新一段的折叠文本并入累计视图：跨边界的空白运行整体只折叠成一个空格。 */
+function appendCollapsedNormalized(current: string, addition: string): string {
+  if (!current) return addition;
+  if (!addition) return current;
+  if (current.endsWith(" ") && addition.startsWith(" ")) return current + addition.slice(1);
+  return current + addition;
 }
 
 export type ThinkingBlock = {
@@ -103,31 +104,51 @@ export function buildThinkingBlocks(input: {
   const groups: { firstPart: ThinkingPart; text: string }[] = [];
   let boundaryIndex = 0;
   let current: { firstPart: ThinkingPart; text: string } | null = null;
+  // 增量维护「累计思考文本的归一化视图」（等价于对整体 collapse+trim，见
+  // appendCollapsedNormalized）：旧实现对每一段都重新归一化并 KMP 全量累计文本，
+  // O(段数 × 总长)——实机 26.5 万字 / 约两千段时单次超 1 秒，是切换会话卡顿的根因。
+  let currentNorm = "";
   for (const part of parts) {
     // Official history gives the final think part and its following tool call the
     // same timestamp. Only a later think part starts the next process phase.
     while (boundaryIndex < boundaries.length && part.timestamp > boundaries[boundaryIndex]) {
       if (current) groups.push(current);
       current = null;
+      currentNorm = "";
       boundaryIndex += 1;
     }
-    if (!current) current = { firstPart: part, text: "" };
+    if (!current) {
+      current = { firstPart: part, text: "" };
+      currentNorm = "";
+    }
+    const partNormRaw = collapseForOverlap(part.text);
+    const partNorm = partNormRaw.trim();
     // When adjacent parts share a mid-stream overlap (reconnect replay /
     // resync boundary), concatenating them duplicates the tail of the previous
     // part as the head of the next. Strip the matching prefix from the new
     // part before appending so the joined text stays clean.
     if (current.text) {
-      const overlap = findPartOverlap(current.text, part.text);
+      // 重叠长度不可能超过 next 的长度：只取累计文本的尾部窗口做 KMP，结果与
+      // 全量扫描完全一致。
+      const left = currentNorm.trim();
+      const windowSize = Math.max(partNorm.length, THINKING_PART_OVERLAP_MIN_CHARS);
+      const leftWindow = left.length > windowSize ? left.slice(-windowSize) : left;
+      const overlap = longestSuffixPrefixOverlap(leftWindow, partNorm, THINKING_PART_OVERLAP_MIN_CHARS);
       if (overlap > 0) {
         const trimmed = stripNormalizedPrefix(part.text, overlap);
         // 剥空即整段重复（完整重放），不追加；与 mergeAssistantThinkingText 的
         // 剥空处理对齐，避免 next 全文已是前文后缀时静默产出重复文本。
-        if (trimmed.trim()) current.text += trimmed;
+        if (trimmed.trim()) {
+          current.text += trimmed;
+          currentNorm = appendCollapsedNormalized(currentNorm, collapseForOverlap(trimmed));
+        }
       } else {
         current.text += part.text;
+        currentNorm = appendCollapsedNormalized(currentNorm, partNormRaw);
       }
     } else {
       current.text += part.text;
+      currentNorm = appendCollapsedNormalized(currentNorm, partNormRaw);
     }
   }
   if (current) groups.push(current);

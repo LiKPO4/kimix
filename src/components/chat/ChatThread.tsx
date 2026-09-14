@@ -809,7 +809,7 @@ export function buildRenderItems(
   completedTurnCache?: Map<string, CompletedTurnRenderCacheEntry>,
   primaryRoomAgentId?: string,
 ): RenderItem[] {
-  events = restoreLateHistoricalChangePlacement(events);
+  events = timeSync("renderItems.placement", () => restoreLateHistoricalChangePlacement(events));
   const items: RenderItem[] = [];
   const usedCompletedTurnCacheKeys = new Set<string>();
 
@@ -915,14 +915,14 @@ export function buildRenderItems(
     );
     let toolsAttached = false;
     let assistantAttached = false;
-    const mergedAssistantEvent = mergeAssistantProcessEvents(assistantEvents, segmentOrdinal);
+    const mergedAssistantEvent = timeSync("renderItems.mergeAssistant", () => mergeAssistantProcessEvents(assistantEvents, segmentOrdinal));
 
     const statusEvents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "status_update" }> => event.type === "status_update");
     const subagents = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "subagent" }> => event.type === "subagent");
     const hooks = turnEvents.filter((event): event is Extract<TimelineEvent, { type: "hook" }> => event.type === "hook");
     // Official-ordered render blocks for this turn: thinking / text / tool /
     // subagent / approval appear exactly where they sit in the event array.
-    const turnBlocks = buildTurnBlocks(turnEvents);
+    const turnBlocks = timeSync("renderItems.turnBlocks", () => buildTurnBlocks(turnEvents));
     // Resolved (approved/rejected) approvals fold into the assistant process
     // summary; only pending ones stay as standalone interactive cards. If there
     // is no assistant message to fold into, keep them standalone as a fallback.

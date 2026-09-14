@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-09-14 修复：重会话卡顿根因——buildThinkingBlocks 归一化 O(段数×总长)（v2.21.206）
+
+- 第二份录制（v2.21.205 带性能桶）定点：buildRenderItems 单次 maxMs=4144、10s 内 4 次共 8049ms，与 3.9-4.3s 冻结一一对应；computeTurnUsageSpeeds/协作投影/persist 均 0.1-104ms 量级。
+- 根因：buildThinkingBlocks（经 buildTurnBlocks 在 buildRenderItems 内、MessageBubble 也调用）对每个 thinking 分段都重新归一化 + KMP 扫描全量累计思考文本（normalizeForOverlap(prev) 为 O(总长)），整体 O(段数×总长)。基准实测 26.5 万字/2000 段单次 1095ms；该重会话一轮 10 子代理 + 26.5 万字思考，单次 buildRenderItems 内多次触发 → 4.1s 冻结。
+- 修复（thinkingBlocks.ts，语义严格等价）：① 增量维护累计文本归一化视图（折叠口径与 normalizeForOverlap 一致，跨段边界空白运行按整体归一化合并）；② 重叠检测只取累计文本尾部窗口（重叠长度不可能超过下一段长度，KMP 结果不变）。
+- 验证：既有 thinkingBlocks/textOverlap 23 条测试全过；与旧实现 500 轮差分模糊对拍（完整重放/前缀重放/后缀-前缀重叠/边界空白）零差异；基准 2000 段 1095ms→118ms；typecheck + 全量 2256 用例 + build 全过。
+- 另加子相位计时（renderItems.placement / mergeAssistant / turnBlocks），下份日志可确认归因与其余分桶。
+- 记录次要项：mergeAssistantThinkingPartBatch 逐段 includes 扫描（1000 段约 51ms）暂可接受，若下份日志显示占优再优化。
+
 ## 2026-09-14 排查+增强：启动/切换会话卡顿日志分析（v2.21.205）
 
 - 首份录制分析（packaged 2.21.204，60s）：主线程反复被 ~3.5s 长任务阻塞（帧间隔 3.5-3.9s，单段最长连续 10.7s）；主进程健康（CPU≤4.1%、RSS 109→324MB 回落 218MB）、持久化快（stripMs≤12 / commitMs≤101）。
