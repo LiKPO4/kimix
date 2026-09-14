@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive, RadioTower, BellOff } from "lucide-react";
+import { X, Settings, Sun, Palette, Moon, Monitor, LayoutTemplate, Shield, Zap, GitBranch, Terminal, AlertCircle, RefreshCw, MessageSquare, Bell, Mic, Keyboard, Archive, Trash2, Unlink, Check, LogIn, LogOut, ShieldCheck, ShieldX, ChevronDown, ChevronUp, GripVertical, Download, Upload, FileText, List, Bot, Search, FolderOpen, Gauge, KeyRound, ExternalLink, Languages, HardDrive, RadioTower, BellOff, PlayCircle, Square } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { isCacheHintDismissed, setCacheHintDismissed } from "@/utils/cacheHint";
 import { isWindows } from "@/utils/platform";
@@ -12,6 +12,7 @@ import { getPrimaryRoomAgent, getRoomAgent, getRoomAgentRuntimeId } from "@/util
 import { updateRoomMutationOwner } from "@/utils/roomMutationOwner";
 import { getRuntimeSessionId } from "@/utils/runtimeSession";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
+import { formatRemainingLabel, getDiagRecorderState, startDiagRecording, stopDiagRecording, subscribeDiagRecorder, syncDiagRecorderFromMain } from "@/utils/diagRecorder";
 import { setKimiCodePermissionWithRecovery } from "@/utils/kimiCodePermission";
 import { isKimiCodeSessionUnavailableError } from "@/utils/kimiCodeSessionRecovery";
 import type { Theme, PermissionMode, NotificationMode, ThemePaletteColors, ThemePaletteId, KimiThemePreset, ProcessDisplayMode, ThinkingTranslationProvider } from "@/types/ui";
@@ -109,6 +110,7 @@ const DEFAULT_SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
   "migration",
   "identity",
   "freeze",
+  "record",
 ];
 
 type KimiAuthStatus = {
@@ -458,6 +460,29 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   }, [archivedSessionItems]);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const [freezeReports, setFreezeReports] = useState<FreezeReport[]>([]);
+  const [diagRecorderState, setDiagRecorderState] = useState(getDiagRecorderState());
+  const [diagRecorderNow, setDiagRecorderNow] = useState(() => Date.now());
+  useEffect(() => {
+    void syncDiagRecorderFromMain();
+    return subscribeDiagRecorder(setDiagRecorderState);
+  }, []);
+  useEffect(() => {
+    if (diagRecorderState.phase !== "recording" || diagRecorderState.endsAt === null) return;
+    const timer = window.setInterval(() => setDiagRecorderNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [diagRecorderState.phase, diagRecorderState.endsAt]);
+  const diagRecorderRemainingMs = diagRecorderState.endsAt === null ? diagRecorderState.durationMs : Math.max(0, diagRecorderState.endsAt - diagRecorderNow);
+  const handleStartDiagRecording = () => {
+    setDiagRecorderNow(Date.now());
+    void startDiagRecording();
+  };
+  const handleStopDiagRecording = () => {
+    void stopDiagRecording("manual");
+  };
+  const handleRevealDiagRecording = () => {
+    const filePath = diagRecorderState.filePath;
+    if (filePath) void window.api.revealPath({ path: filePath });
+  };
   const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [officialArchivedSessions, setOfficialArchivedSessions] = useState<KimiCodeArchivedSessionSummary[]>([]);
   const [officialArchivedQuery, setOfficialArchivedQuery] = useState("");
@@ -3917,6 +3942,80 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   ) : (
                     <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">暂无卡死诊断记录。</div>
+                  )}
+                </div>
+              </div>
+              <div className="kimix-settings-section" {...settingsSectionProps("record", 15)}>
+                <div className="kimix-settings-row-title">
+                  <div className="kimix-settings-section-title">
+                    <FileText size={16} className="text-text-muted" />
+                    <span>日志录制</span>
+                  </div>
+                  <div className="flex items-center" style={{ gap: 8 }}>
+                    {diagRecorderState.phase === "recording" && (
+                      <span className="kimix-settings-badge text-[12.5px] leading-5" style={{ paddingLeft: 10, paddingRight: 10 }}>
+                        剩余 {formatRemainingLabel(diagRecorderRemainingMs)}
+                      </span>
+                    )}
+                    {settingsDragHandle("record", "日志录制")}
+                  </div>
+                </div>
+                <div className="kimix-settings-card" style={{ padding: "18px 16px" }}>
+                  {diagRecorderState.phase === "recording" ? (
+                    <div className="flex flex-col" style={{ gap: 14 }}>
+                      <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
+                        正在录制，剩余 <span className="kimix-tabular-nums font-medium text-[var(--kimix-panel-text)]">{formatRemainingLabel(diagRecorderRemainingMs)}</span>，已采集 {diagRecorderState.lineCount} 行。到时自动停止，也可以随时手动停止并保存。
+                      </div>
+                      <div className="text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">
+                        录制内容：卡顿与长任务、帧率与内存采样、控制台输出、运行日志与状态机关键帧。
+                      </div>
+                      <div className="flex items-center" style={{ gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={handleStopDiagRecording}
+                          className="kimix-icon-text-button kimix-inspector-action is-compact bg-accent-danger-light text-accent-danger"
+                        >
+                          <Square size={13} />
+                          停止并保存
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col" style={{ gap: 14 }}>
+                      <div className="text-[13.5px] leading-6 text-[var(--kimix-panel-text-secondary)]">
+                        录制约 5 分钟的运行日志（卡顿、内存采样、控制台与运行日志），方便把问题现场保存下来排查。
+                      </div>
+                      {diagRecorderState.phase === "saved" && diagRecorderState.filePath && (
+                        <div className="kimix-settings-list-item" style={{ padding: "12px 12px" }}>
+                          <div className="truncate text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]" title={diagRecorderState.filePath}>
+                            已保存：{diagRecorderState.filePath}
+                          </div>
+                          <div className="flex items-center" style={{ gap: 10, marginTop: 10 }}>
+                            <button
+                              type="button"
+                              onClick={handleRevealDiagRecording}
+                              className="kimix-icon-text-button kimix-inspector-action is-compact text-text-secondary"
+                            >
+                              <FolderOpen size={13} />
+                              打开所在文件夹
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {diagRecorderState.lastError && (
+                        <div className="text-[12.5px] leading-5 text-accent-danger">上次操作失败：{diagRecorderState.lastError}</div>
+                      )}
+                      <div className="flex items-center" style={{ gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={handleStartDiagRecording}
+                          className="kimix-icon-text-button is-compact bg-accent-primary text-white hover:bg-accent-primary/90"
+                        >
+                          <PlayCircle size={13} />
+                          开始录制
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

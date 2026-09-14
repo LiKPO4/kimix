@@ -1,5 +1,14 @@
 # Kimix 长程任务状态
 
+## 2026-09-14 功能：设置-诊断新增「日志录制」（v2.21.203）
+
+- 需求：设置页可录制含卡顿在内的运行日志，默认录制 5 分钟，可随时手动停止并保存，便于事后排查。
+- 主进程 electron/diagRecording.ts：串行写队列（异步、不阻塞事件循环）+ 可注入时钟/采样端点；文件落 userData/diagnostics/kimix-record-<本地时间戳>.log；头部含版本/平台/脱敏状态，尾部含 reason/lines/bytes/duration；到时自动停止（timeout）、超 16MB 自动停止（size-cap）、重复 stop 幂等、收尾行保证在内容之后。
+- IPC：app:startDiagRecording / appendDiagRecording / stopDiagRecording / getDiagRecordingStatus（types/ipc.ts 类型 + preload 暴露 + main.tsx 浏览器预览 fail 存根）。
+- 采集源：① appendDiagLine 集成——录制期所有 diag.log 行（live 状态机、流式关键帧、错误上报）同步写入录制文件；② rendererHeartbeat 集成——每 2s 一条脱敏摘要（可见性/堆内存/事件数/引擎/运行态）；③ 渲染层 src/utils/diagRecorder.ts——rAF 帧间隔 >100ms 记 frame-gap、每 10s 采样 frames/maxGap/heap、console 与 longtask 经 useRendererLagDetector 转发、1s 或 40 行批量 flush、到时自动停止、启动/挂载时与主进程对账（渲染层重载可续录）。
+- 设置页：诊断页新增「日志录制」小节（录制中显示剩余时间与已采集行数，停止后显示文件路径 + 打开所在文件夹 + 再录一次）；settingsNavigation 增加 record 分区、搜索索引与页面描述。
+- 验证：typecheck 干净；全量 203 文件 2251 用例全过（新增 15 条：控制器 8 + 渲染层 7，导航测试补充断言）；build 通过。实机录制效果待用户重启确认。
+
 ## 2026-09-13 发版 v2.21.202（已推送 tag）
 
 - 覆盖 v2.21.198~202 共 5 个 patch：气泡内容五开关、回合结束气泡输出速率（累计口径 + SDK 路由 tool_call 边界）、大会话流式滚动卡顿修复（Invariant V）、Plan 卡与 Kimi 健康卡闪烁修复。

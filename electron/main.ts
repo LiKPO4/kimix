@@ -9,6 +9,7 @@ import { execFile, spawn } from "node:child_process";
 import AdmZip from "adm-zip";
 import { z } from "zod";
 import { experimentalFeatureRequiresRestart, KimiCodeExperimentalFeatureSchema } from "./kimiCodeExperimentalFeatures";
+import { createDiagRecordingController, type DiagRecordingController } from "./diagRecording";
 import * as hookRunner from "./hookRunner";
 import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
@@ -8438,6 +8439,7 @@ ipcMain.on("app:rendererHeartbeat", (_, payload: unknown) => {
     payload: payload && typeof payload === "object" ? payload as RendererHeartbeatPayload : null,
   };
   rendererWatchdogReported = false;
+  captureRendererHeartbeatForRecording(payload);
 });
 
 ipcMain.on("app:rendererStartup", (_, payload: unknown) => {
@@ -8598,6 +8600,7 @@ async function appendDiagLine(line: string) {
       console.warn("[diag] failed to append diag.log:", error);
     }
   }
+  diagRecordingController?.captureLine(line);
 }
 
 let diagWriteQueue = Promise.resolve();
@@ -8658,6 +8661,86 @@ ipcMain.handle("app:writeDiag", async (_, request: unknown) => {
 
 ipcMain.handle("app:getDiagLogPath", async () => {
   return { success: true, data: getDiagLogPath() };
+});
+
+// --- 日志录制（设置 → 诊断 → 日志录制）：限时采集 diag 行、心跳摘要与主进程采样 ---
+let diagRecordingController: DiagRecordingController | null = null;
+
+function getDiagRecordingController() {
+  if (!diagRecordingController) {
+    diagRecordingController = createDiagRecordingController({
+      baseDir: path.join(app.getPath("userData"), "diagnostics"),
+      headerProvider: () => [
+        `# app=${app.getName()} v${app.getVersion()} packaged=${app.isPackaged ? 1 : 0}`,
+        `# platform=${process.platform} arch=${process.arch} electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node}`,
+        `# redacted=${process.env.KIMIX_DETAILED_DIAGNOSTICS === "1" ? 0 : 1}`,
+      ],
+      sampleProvider: () => {
+        const memory = process.memoryUsage();
+        const cpu = process.getCPUUsage();
+        const toMb = (value: number) => Math.round(value / 1024 / 1024);
+        return `[main] sample rss=${toMb(memory.rss)}MB heapUsed=${toMb(memory.heapUsed)}MB cpu=${cpu.percentCPUUsage.toFixed(1)}% windows=${BrowserWindow.getAllWindows().length}`;
+      },
+    });
+  }
+  return diagRecordingController;
+}
+
+function captureRendererHeartbeatForRecording(payload: unknown) {
+  const controller = diagRecordingController;
+  if (!controller || !controller.status().active) return;
+  const data = payload && typeof payload === "object" ? payload as RendererHeartbeatPayload : null;
+  if (!data) return;
+  const heapMb = data.memory ? Math.round((data.memory.usedJSHeapSize ?? 0) / 1024 / 1024) : -1;
+  const session = data.currentSession;
+  controller.captureLine(
+    `[${new Date().toISOString()}] [renderer] visible=${data.visibilityState} focused=${data.focused ? 1 : 0} heapMB=${heapMb} events=${session?.eventCount ?? "-"} engine=${session?.engine ?? "-"} loading=${session?.isLoading ? 1 : 0} running=${data.runningSessionId ? 1 : 0}`,
+  );
+}
+
+ipcMain.handle("app:startDiagRecording", async (_, request?: unknown) => {
+  try {
+    const durationMs = request && typeof request === "object" ? (request as { durationMs?: unknown }).durationMs : undefined;
+    const result = await getDiagRecordingController().start(durationMs);
+    if (!result.ok) return { success: false, error: result.error };
+    return { success: true, data: { filePath: result.filePath, startedAt: result.startedAt, endsAt: result.endsAt, durationMs: result.durationMs, lineCount: result.lineCount, bytes: result.bytes } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:appendDiagRecording", async (_, request?: unknown) => {
+  try {
+    const rawLines = request && typeof request === "object" ? (request as { lines?: unknown }).lines : undefined;
+    const lines = Array.isArray(rawLines)
+      ? rawLines.filter((line): line is string => typeof line === "string" && line.length > 0)
+      : [];
+    getDiagRecordingController().append(lines);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:stopDiagRecording", async (_, request?: unknown) => {
+  try {
+    const reason = request && typeof request === "object" && typeof (request as { reason?: unknown }).reason === "string"
+      ? (request as { reason: string }).reason
+      : "manual";
+    const result = await getDiagRecordingController().stop(reason);
+    if (!result.ok) return { success: false, error: result.error };
+    return { success: true, data: { filePath: result.filePath, startedAt: result.startedAt, stoppedAt: result.stoppedAt, durationMs: result.durationMs, lineCount: result.lineCount, bytes: result.bytes, reason: result.reason } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("app:getDiagRecordingStatus", async () => {
+  try {
+    return { success: true, data: getDiagRecordingController().status() };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 });
 
 ipcMain.handle("app:openExternal", async (_, url: string) => {

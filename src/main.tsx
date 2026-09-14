@@ -695,6 +695,10 @@ function installBrowserPreviewApi() {
     onDownloadUpdateProgress: () => () => {},
     writeDiag: () => fail("写入诊断日志"),
     getDiagLogPath: () => fail("读取诊断日志路径"),
+    startDiagRecording: () => fail("开始日志录制"),
+    appendDiagRecording: () => fail("写入日志录制"),
+    stopDiagRecording: () => fail("停止日志录制"),
+    getDiagRecordingStatus: () => fail("读取日志录制状态"),
     openExternal: async (url: string): Promise<VoidResponse> => {
       window.open(url, "_blank", "noopener,noreferrer");
       return { success: true, data: undefined };

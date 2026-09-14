@@ -25,7 +25,8 @@ export type SettingsSectionId =
   | "voice"
   | "archived"
   | "migration"
-  | "freeze";
+  | "freeze"
+  | "record";
 
 export type SettingsPageDefinition = {
   id: SettingsPageId;
@@ -107,8 +108,8 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     id: "diagnostics",
     group: "高级",
     label: "诊断",
-    description: "查看房间投递身份和界面卡死诊断信息。",
-    sections: ["identity", "freeze"],
+    description: "查看房间投递身份、界面卡死记录与日志录制。",
+    sections: ["identity", "freeze", "record"],
   },
 ];
 
@@ -312,6 +313,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     pageId: "diagnostics",
     sectionId: "freeze",
     keywords: ["性能", "卡顿", "日志", "lag"],
+  },
+  {
+    id: "log-recording",
+    label: "日志录制",
+    description: "录制约 5 分钟的卡顿、内存与运行日志用于问题排查",
+    pageId: "diagnostics",
+    sectionId: "record",
+    keywords: ["录制", "日志", "卡顿", "排查", "record"],
   },
 ];
 

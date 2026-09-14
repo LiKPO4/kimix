@@ -15,6 +15,7 @@ describe("settingsNavigation", () => {
     expect(getSettingsPageForSection("auth")).toBe("account");
     expect(getSettingsPageForSection("monthlyQuota")).toBe("account");
     expect(getSettingsPageForSection("freeze")).toBe("diagnostics");
+    expect(getSettingsPageForSection("record")).toBe("diagnostics");
     expect(getSettingsPageForSection("palette")).toBe("appearance");
     expect(getSettingsPageForSection("uiStyle")).toBe("appearance");
     expect(getSettingsPageForSection("display")).toBe("appearance");
@@ -29,6 +30,7 @@ describe("settingsNavigation", () => {
   it("可按标题、说明和中英文关键词搜索", () => {
     expect(searchSettings("API Key").map((item) => item.id)).toContain("models");
     expect(searchSettings("卡顿").map((item) => item.id)).toContain("freeze");
+    expect(searchSettings("录制").map((item) => item.id)).toContain("log-recording");
     expect(searchSettings("调色板").map((item) => item.id)).toEqual(["palette"]);
     expect(searchSettings("界面字号").map((item) => item.id)).toEqual(["display"]);
     expect(searchSettings("复古").map((item) => item.id)).toEqual(["ui-style"]);

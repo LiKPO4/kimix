@@ -222,6 +222,13 @@ import type {
   VoidResponse,
   LoggerWriteRequest,
   LoggerWriteResponse,
+  DiagRecordingAppendRequest,
+  DiagRecordingAppendResponse,
+  DiagRecordingStartRequest,
+  DiagRecordingStartResponse,
+  DiagRecordingStatusResponse,
+  DiagRecordingStopRequest,
+  DiagRecordingStopResponse,
 } from "./types/ipc";
 
 type BootstrapPayload = {
@@ -626,6 +633,14 @@ const api = {
     ipcRenderer.invoke("app:writeDiag", req),
   getDiagLogPath: (): Promise<{ success: true; data: string }> =>
     ipcRenderer.invoke("app:getDiagLogPath"),
+  startDiagRecording: (req?: DiagRecordingStartRequest): Promise<DiagRecordingStartResponse> =>
+    ipcRenderer.invoke("app:startDiagRecording", req),
+  appendDiagRecording: (req: DiagRecordingAppendRequest): Promise<DiagRecordingAppendResponse> =>
+    ipcRenderer.invoke("app:appendDiagRecording", req),
+  stopDiagRecording: (req?: DiagRecordingStopRequest): Promise<DiagRecordingStopResponse> =>
+    ipcRenderer.invoke("app:stopDiagRecording", req),
+  getDiagRecordingStatus: (): Promise<DiagRecordingStatusResponse> =>
+    ipcRenderer.invoke("app:getDiagRecordingStatus"),
   openExternal: (url: string): Promise<VoidResponse> =>
     ipcRenderer.invoke("app:openExternal", url),
 

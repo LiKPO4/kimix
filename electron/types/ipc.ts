@@ -2798,6 +2798,78 @@ export type LoggerWriteResponse = {
   error: string;
 };
 
+export type DiagRecordingStartRequest = {
+  durationMs?: number;
+};
+
+export type DiagRecordingSessionInfo = {
+  filePath: string;
+  startedAt: number;
+  endsAt: number;
+  durationMs: number;
+  lineCount: number;
+  bytes: number;
+};
+
+export type DiagRecordingStartResponse = {
+  success: true;
+  data: DiagRecordingSessionInfo;
+} | {
+  success: false;
+  error: string;
+};
+
+export type DiagRecordingAppendRequest = {
+  lines: string[];
+};
+
+export type DiagRecordingAppendResponse = {
+  success: true;
+} | {
+  success: false;
+  error: string;
+};
+
+export type DiagRecordingStopRequest = {
+  reason?: string;
+};
+
+export type DiagRecordingStopData = {
+  filePath: string;
+  startedAt: number;
+  stoppedAt: number;
+  durationMs: number;
+  lineCount: number;
+  bytes: number;
+  reason: string;
+};
+
+export type DiagRecordingStopResponse = {
+  success: true;
+  data: DiagRecordingStopData;
+} | {
+  success: false;
+  error: string;
+};
+
+export type DiagRecordingStatusData = {
+  active: boolean;
+  filePath: string | null;
+  startedAt: number | null;
+  endsAt: number | null;
+  remainingMs: number;
+  lineCount: number;
+  bytes: number;
+};
+
+export type DiagRecordingStatusResponse = {
+  success: true;
+  data: DiagRecordingStatusData;
+} | {
+  success: false;
+  error: string;
+};
+
 export type WindowControlResponse = {
   success: true;
 } | {

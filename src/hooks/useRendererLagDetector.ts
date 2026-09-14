@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/appStore";
+import { recordDiagLine, syncDiagRecorderFromMain } from "@/utils/diagRecorder";
 
 const FREEZE_REPORTS_KEY = "kimix_freeze_reports";
 const MAX_FREEZE_REPORTS_RAW_LENGTH = 64 * 1024;
@@ -44,12 +45,14 @@ function serializeConsoleArg(value: unknown): string {
 }
 
 function pushConsoleLog(level: RendererConsoleLog["level"], args: unknown[]) {
+  const message = truncate(args.map(serializeConsoleArg).join(" "));
   recentConsoleLogs.push({
     at: new Date().toISOString(),
     level,
-    message: truncate(args.map(serializeConsoleArg).join(" ")),
+    message,
   });
   recentConsoleLogs.splice(0, Math.max(0, recentConsoleLogs.length - MAX_RECENT_CONSOLE_LOGS));
+  recordDiagLine(`[console] ${level}: ${message}`);
 }
 
 function installConsoleCapture() {
@@ -88,6 +91,7 @@ function installLongTaskObserver() {
           name: entry.name,
           entryType: entry.entryType,
         });
+        recordDiagLine(`[longtask] duration=${Math.round(entry.duration)}ms start=${Math.round(entry.startTime)}`);
       });
       recentLongTasks.splice(0, Math.max(0, recentLongTasks.length - MAX_RECENT_LONG_TASKS));
     });
@@ -249,6 +253,8 @@ export function useRendererLagDetector() {
       if (lagMs > 2500) recordRendererLag(lagMs);
     }, 1000);
     reportRendererHeartbeat();
+    // 渲染层重载后若主进程仍在录制，恢复采集与显示。
+    void syncDiagRecorderFromMain();
     const heartbeatTimer = window.setInterval(reportRendererHeartbeat, HEARTBEAT_INTERVAL_MS);
     document.addEventListener("visibilitychange", resetTick);
     window.addEventListener("focus", resetTick);
