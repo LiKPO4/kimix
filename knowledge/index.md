@@ -17,6 +17,7 @@ okf_version: "0.1"
 
 # Operations
 
+* [Diagnostics Log Recording](operations/diagnostics-recording.md) - Bounded on-demand runtime log recording from settings diagnostics: capture sources, file layout, and auto-stop rules.
 * [MCP and Plugin Lifecycle](operations/mcp-and-plugin-lifecycle.md) - Safe discovery, update, reload, and recovery rules for MCP servers and Kimi plugins.
 * [Release Process](operations/release-process.md) - Tag-driven GitHub Actions release procedure and required release-note checks.
 

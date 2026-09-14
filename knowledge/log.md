@@ -1,5 +1,7 @@
 # Kimix Knowledge Update Log
 
+* **Bounded diagnostic recording is a settings-level runbook now (v2.21.203)**: 设置 → 诊断 → 日志录制 records a five-minute (default) runtime log to `userData/diagnostics/kimix-record-*.log` — frame gaps over 100ms, 10s heap/frames samples, console and longtask forwards, plus every `diag.log` line and 2s heartbeat summaries duplicated in by the main process. The main-side controller owns the write queue, the timeout/size-cap auto-stop and the idempotent stop; the renderer reconciles on startup so a reload continues an active recording. See [/operations/diagnostics-recording.md](/operations/diagnostics-recording.md).
+
 * **Scroll jank during streaming was O(n²) flush-path work, not rendering (v2.21.200)**: CDP evidence (lag-triggered CPU profile + timeline scroll trace on the live window) showed ~90% idle with recurring 150–300ms tasks from `filterStatusUpdates` per-event turn-segment rescans (O(statuses × events), 168ms/call at 7.6k events → single-pass O(n), 1.63ms) and Sidebar per-row full-history busy scans + identity-Set churn on every stream flush (WeakMap caches keyed on immutable events/Session identity). Rule: flush-path work must be O(new events), never O(history). See [/architecture/streaming-render-pipeline.md](/architecture/streaming-render-pipeline.md) invariant V.
 
 

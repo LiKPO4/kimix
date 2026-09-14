@@ -8,6 +8,7 @@
 - 采集源：① appendDiagLine 集成——录制期所有 diag.log 行（live 状态机、流式关键帧、错误上报）同步写入录制文件；② rendererHeartbeat 集成——每 2s 一条脱敏摘要（可见性/堆内存/事件数/引擎/运行态）；③ 渲染层 src/utils/diagRecorder.ts——rAF 帧间隔 >100ms 记 frame-gap、每 10s 采样 frames/maxGap/heap、console 与 longtask 经 useRendererLagDetector 转发、1s 或 40 行批量 flush、到时自动停止、启动/挂载时与主进程对账（渲染层重载可续录）。
 - 设置页：诊断页新增「日志录制」小节（录制中显示剩余时间与已采集行数，停止后显示文件路径 + 打开所在文件夹 + 再录一次）；settingsNavigation 增加 record 分区、搜索索引与页面描述。
 - 验证：typecheck 干净；全量 203 文件 2251 用例全过（新增 15 条：控制器 8 + 渲染层 7，导航测试补充断言）；build 通过。实机录制效果待用户重启确认。
+- knowledge：新增 operations/diagnostics-recording.md runbook（采集源、文件布局、自动停止规则），operations/根索引与 log 同步。
 
 ## 2026-09-13 发版 v2.21.202（已推送 tag）
 
