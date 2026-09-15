@@ -1,5 +1,19 @@
 # Kimix 长程任务状态
 
+## 2026-09-15 跟进官方 0.43.0/0.43.1（v2.21.209，8 次提交 8a521a41→97bb8b5f）
+
+- **vendor 0.43.1**（8a521a41）：node-sdk 仍 0.20.0，但 agent-core-v2 引擎 124 文件变更（版本号未 bump）；AI 标题从实验毕业默认开启、compaction_max_attempts、KIMI_CODE_PERMISSION_MODE_REMINDER、MCP deferred/dynamically_loaded_tools、goal 时间预算不计关闭时间+取消 24h 上限、rm -rf /tmp 静默、steering 打断后台等待、LLM 重试崩溃、子代理内存/GC/swarm 渲染修复；probe/typecheck/2256 用例/build 全过。
+- **B1 标题透传**（无需改代码）：App.tsx extractOfficialSessionTitle 已消费 session.meta.updated 的 title，0.43.1 引擎默认生成后自动显示（titleLocked 不覆盖）。
+- **B2 权限提醒开关**（260fada5）：设置-权限新增「不注入权限模式提醒」，env 注入点 getHarness/requestKimiServerStartup/saveSettings。
+- **B3 重新生成标题 + goal 时间**（9d60cb53）：重命名框新增 Sparkles 按钮调 SDK generateSessionTitle(force)（托管 Server 会话无此 RPC 提示）；Goal 面板显示「时间 已用/预算」或「已运行」。
+- **C1 会话删除**（f088451f）：侧栏 hover 新增 Trash2 + 确认弹窗；SDK 链路 harness.deleteSession、Server 链路 POST /sessions/:id:delete（0.43.1 kap-server 路由）；删除当前会话清空 currentSession/runningSessionId。
+- **C2 frontmatter 卡片**（c970e183）：MarkdownRenderer 非流式富通道解析 YAML frontmatter 为键值卡片+标签胶囊；新增 parseMarkdownFrontmatter 9 条单测。
+- **C3 models 缺失警告**（f6b10ef5）：模型列表缺 model 字段条目显示黄色 AlertTriangle「缺少 model 字段，无法使用」。
+- **C4 MCP deferred**（42c3e03e）：MCP 添加表单新增「按需加载工具（deferred）」开关，写 mcp.json。
+- **C5 loop_control**（97bb8b5f）：设置-常规新增「上下文压缩」配置 compaction_max_attempts（1-20）；顺带修复 tomlSectionEditor keyPattern `\s*` 吃 section 后换行的缺陷。
+- 待验收（用户实机）：AI 标题自动生成显示、重命名重生成、会话删除、frontmatter 卡片、deferred 开关、loop_control 保存、权限提醒开关；Server 标题重生成暂不支持（有 /title/generate 端点可后续补）。
+- 本地领先 origin 16 个提交（203~209 全部未推送）；发版需用户明确要求，需写 docs/release-notes/v2.21.209.md（覆盖 202 之后）。
+
 ## 2026-09-15 修复：更新记录弹窗的「浏览器查看」被更新状态连带禁用（v2.21.208）
 
 - 现象（用户截图）：Kimi Code 更新进行中（以及检查中）时，两张更新卡片的「浏览器查看」链接被禁用变灰；打开浏览器只是外链跳转，不影响更新流程。

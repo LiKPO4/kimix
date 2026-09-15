@@ -448,7 +448,8 @@ describe("UI_STYLES", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
 
-    expect(sidebar.match(/kimix-sidebar-reveal-action/g)).toHaveLength(6);
+    // 6 个既有操作 + v2.21.209 会话删除按钮 = 7。
+    expect(sidebar.match(/kimix-sidebar-reveal-action/g)).toHaveLength(7);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-sidebar-reveal-action:not\(:hover\):not\(:focus-visible\):not\(:active\)\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.kimix-sidebar-icon-action:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-navigation-action-hover-shadow\);/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-inline-icon-action[^)]*\)[^{}]*:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-control-hover-shadow\);/s);
