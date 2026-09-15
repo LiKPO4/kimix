@@ -8,6 +8,7 @@ import { normalizePathForComparison } from "./pathCase";
 import { countUnifiedDiffChanges } from "./diff";
 import { extractFileAttachmentText } from "./userFileAttachments";
 import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap";
+import { appendCollapsedNormalized, collapseForOverlap } from "./thinkingBlocks";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -329,6 +330,83 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
   return left + right;
 }
 
+
+/**
+ * 顺序合并多段 thinking 文本，输出与逐次 reduce(mergeAssistantThinkingText) 完全一致。
+ * 差异仅在开销：整链只维护一份增量归一化视图（跨段空白运行按整体归一化合并，口径与
+ * normalizeThinkingWhitespace 一致，见 appendCollapsedNormalized），KMP 只扫累计文本尾部
+ * 窗口（重叠长度不可能超过 incoming 的归一化长度），并对 includes 做长度前置剪枝——
+ * 避免 reduce 场景每次对全量累计文本重新归一化 + 全量扫描的 O(N × 总长)
+ * （实机单轮 10 子代理 / 26.5 万字思考时单次 mergeAssistant 约 3 秒，v2.21.209 录制）。
+ */
+export function mergeAssistantThinkingTextSequence(
+  texts: ReadonlyArray<string | undefined>,
+): string | undefined {
+  let left: string | undefined;
+  // 增量归一化视图（collapseForOverlap 口径，未 trim），与对整体 normalizeThinkingWhitespace 等价。
+  let leftNorm = "";
+  const resetNorm = (text: string) => {
+    leftNorm = collapseForOverlap(text);
+  };
+  for (const incoming of texts) {
+    const right = incoming ?? "";
+    if (!right.trim()) continue;
+    if (!left || !left.trim()) {
+      left = incoming;
+      resetNorm(left ?? "");
+      continue;
+    }
+    let next: string;
+    let appendedRaw = "";
+    if (left === right || (left.length < right.length && right.includes(left))) {
+      // left 是 right 的子串（或相等）：取 right。长度剪枝等价——更长的串不可能是更短串的子串。
+      next = right;
+    } else if (right.length <= left.length && left.includes(right)) {
+      next = left;
+    } else if (left.endsWith(right)) {
+      next = left;
+    } else if (left.length <= right.length && right.startsWith(left)) {
+      next = right;
+    } else {
+      const normalizedLeft = leftNorm.trim();
+      const normalizedRight = normalizeThinkingWhitespace(right);
+      if (normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight)) {
+        next = left;
+      } else if (normalizedRight.includes(normalizedLeft)) {
+        next = right;
+      } else {
+        // 尾窗 KMP：重叠长度不可能超过 right 的归一化长，与全量扫描结果一致。
+        const windowSize = Math.max(normalizedRight.length, THINKING_OVERLAP_MIN_CHARS);
+        const leftWindow = normalizedLeft.length > windowSize ? normalizedLeft.slice(-windowSize) : normalizedLeft;
+        const overlap = longestSuffixPrefixOverlap(leftWindow, normalizedRight, THINKING_OVERLAP_MIN_CHARS);
+        if (overlap > 0) {
+          const trimmedRight = stripNormalizedPrefix(right, overlap);
+          if (!trimmedRight.trim()) {
+            // 剥空即整段重复（完整重放），与 mergeAssistantThinkingText 一致。
+            next = left;
+          } else {
+            next = left + trimmedRight;
+            appendedRaw = trimmedRight;
+          }
+        } else {
+          next = left + right;
+          appendedRaw = right;
+        }
+      }
+    }
+    if (next === left) continue;
+    if (next === right) {
+      left = next;
+      resetNorm(next);
+      continue;
+    }
+    left = next;
+    if (appendedRaw) leftNorm = appendCollapsedNormalized(leftNorm, collapseForOverlap(appendedRaw));
+    else resetNorm(next);
+  }
+  return left;
+}
+
 type AssistantThinkingPartsIndex = {
   parts: AssistantThinkingPart[];
   normalized: string[];
@@ -398,6 +476,13 @@ function mergeAssistantThinkingPartBatch(
   let normalized = [...base.normalized];
   let changed = false;
 
+  // 批量重放形态（快照/重放每事件带全量 parts）下，逐段对已累计 parts 做同 id 线性扫描
+  // 是 O(批次 × P²)；incoming 较多时先建一份局部 id→index 索引，批内替换/插入同步维护。
+  let idIndex: Map<string, number> | null = incoming.length >= 4 ? new Map() : null;
+  if (idIndex) {
+    for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
+  }
+
   for (const part of incoming) {
     const partText = normalizedThinkingPart(part);
     if (!partText) continue;
@@ -406,11 +491,13 @@ function mergeAssistantThinkingPartBatch(
     // only when the incoming text grew, otherwise keep the existing version.
     // 线性扫描代替逐批克隆的 id 索引：逐批克隆 Map 是整链最贵的常数项
     // （实机 4000 段逐批 reduce 约 700ms，其中大半是 Map 拷贝）。
-    let sameIdIndex = -1;
-    for (let index = 0; index < parts.length; index += 1) {
-      if (parts[index].id === part.id) {
-        sameIdIndex = index;
-        break;
+    let sameIdIndex = idIndex ? (idIndex.get(part.id) ?? -1) : -1;
+    if (sameIdIndex === -1 && !idIndex) {
+      for (let index = 0; index < parts.length; index += 1) {
+        if (parts[index].id === part.id) {
+          sameIdIndex = index;
+          break;
+        }
       }
     }
     if (sameIdIndex !== -1) {
@@ -464,6 +551,11 @@ function mergeAssistantThinkingPartBatch(
       };
       parts.splice(insertIndex, 0, replacement);
       normalized.splice(insertIndex, 0, normalizedThinkingPart(replacement));
+      if (idIndex) {
+        // filter + splice 使全部索引移位：重建局部索引（覆盖型重放是罕见分支）。
+        idIndex = new Map();
+        for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
+      }
       changed = true;
       continue;
     }
@@ -474,6 +566,7 @@ function mergeAssistantThinkingPartBatch(
     if (!tail || part.timestamp >= tail.timestamp) {
       parts.push(part);
       normalized.push(partText);
+      if (idIndex) idIndex.set(part.id, parts.length - 1);
     } else {
       let low = 0;
       let high = parts.length;
@@ -484,6 +577,10 @@ function mergeAssistantThinkingPartBatch(
       }
       parts.splice(low, 0, part);
       normalized.splice(low, 0, partText);
+      if (idIndex) {
+        idIndex = new Map();
+        for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
+      }
     }
     changed = true;
   }

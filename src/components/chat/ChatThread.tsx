@@ -29,7 +29,7 @@ import { reliableAssistantDurationMs, reliableAssistantDurationBetween } from "@
 import { computeTurnUsageSpeeds, hasMetricStatus, mergeContextOnlyStatusUpdates, mergeMetricStatusUpdates, shouldRenderStandaloneStatusUpdate } from "@/utils/sessionMetrics";
 import { groupNotificationRenderItems } from "@/utils/notificationGroups";
 import { hasLocalFailedSendAttempt, hasLocalOrphanUserSendAttempt, normalizeCompactionDisplay, removeLocalUserSendAttempt } from "@/utils/eventHelpers";
-import { mergeAssistantThinkingPartsSequential, mergeAssistantThinkingText } from "@/utils/eventMapper";
+import { mergeAssistantThinkingPartsSequential, mergeAssistantThinkingTextSequence } from "@/utils/eventMapper";
 import { logError, logEvent } from "@/utils/reportError";
 import { hasExpandableChatHistory, selectInitialChatTail, shouldUseInitialChatTail } from "@/utils/chatTailWindow";
 import { chatNavigationContainsEventId, chatNavigationEventIds, chatNavigationTargetId } from "@/utils/chatNavigation";
@@ -872,10 +872,7 @@ export function buildRenderItems(
     // 会让同一内容在渲染路径切换时"变样"。
     const mergedThinking = mergedThinkingParts?.length
       ? mergedThinkingParts.map((part) => part.text).join("") || undefined
-      : visible.reduce<string | undefined>(
-          (merged, event) => mergeAssistantThinkingText(merged, event.thinking),
-          undefined,
-        );
+      : mergeAssistantThinkingTextSequence(visible.map((event) => event.thinking));
     return {
       ...first,
       id: first.agentTurnId || first.roomMessageId

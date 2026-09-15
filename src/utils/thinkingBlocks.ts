@@ -4,12 +4,12 @@ import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap
 const THINKING_PART_OVERLAP_MIN_CHARS = 16;
 
 /** 与归一化匹配口径一致的空白折叠（不 trim），供增量累积归一化视图使用。 */
-function collapseForOverlap(text: string): string {
+export function collapseForOverlap(text: string): string {
   return text.replace(/\s+/g, " ");
 }
 
 /** 把新一段的折叠文本并入累计视图：跨边界的空白运行整体只折叠成一个空格。 */
-function appendCollapsedNormalized(current: string, addition: string): string {
+export function appendCollapsedNormalized(current: string, addition: string): string {
   if (!current) return addition;
   if (!addition) return current;
   if (current.endsWith(" ") && addition.startsWith(" ")) return current + addition.slice(1);
