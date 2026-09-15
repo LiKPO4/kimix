@@ -714,6 +714,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsLoading, setExperimentalSettingsLoading] = useState(true);
   const [experimentalSettingsSaving, setExperimentalSettingsSaving] = useState(false);
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
+  const [permissionReminderDisabled, setPermissionReminderDisabledState] = useState(false);
+  const [permissionReminderSaving, setPermissionReminderSaving] = useState(false);
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
   const [cacheHintDismissed, setCacheHintDismissedState] = useState(false);
   const [roomDeliveryInspectorOpen, setRoomDeliveryInspectorOpen] = useState(false);
@@ -1344,6 +1346,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     void refreshExperimentalSettings();
   };
 
+  const refreshPermissionReminderSetting = async () => {
+    const res = await window.api.getSettings();
+    if (!res.success) return;
+    setPermissionReminderDisabledState(Boolean(res.data.permissionModeReminderDisabled));
+  };
+
+  const savePermissionReminderDisabled = async (disabled: boolean) => {
+    setPermissionReminderDisabledState(disabled);
+    setPermissionReminderSaving(true);
+    const res = await window.api.saveSettings({ permissionModeReminderDisabled: disabled });
+    setPermissionReminderSaving(false);
+    if (!res.success) {
+      // 保存失败回读校准，避免 UI 与持久化状态不一致。
+      void refreshPermissionReminderSetting();
+      return;
+    }
+  };
+
   const refreshMonthlyQuotaSettings = async () => {
     setMonthlyQuotaLoading(true);
     const [settingsResult, credentialResult] = await Promise.all([
@@ -1665,6 +1685,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (!settingsStatusCache.auth) void refreshAuth();
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       void refreshExperimentalSettings();
+      void refreshPermissionReminderSetting();
       void refreshMonthlyQuotaSettings();
       void refreshOfficialArchivedSessions();
       loadFreezeReports();
@@ -2305,6 +2326,19 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       </div>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    aria-pressed={permissionReminderDisabled}
+                    disabled={permissionReminderSaving}
+                    onClick={() => void savePermissionReminderDisabled(!permissionReminderDisabled)}
+                    className={`kimix-settings-permission ${permissionReminderDisabled ? "is-active" : ""}`}
+                  >
+                    <SelectionIndicator selected={permissionReminderDisabled} />
+                    <div className="kimix-settings-permission-copy">
+                      <div className="kimix-settings-permission-label">不注入权限模式提醒</div>
+                      <div className="kimix-settings-permission-desc">开启后不再向模型上下文注入自动权限模式说明（对应 KIMI_CODE_PERMISSION_MODE_REMINDER=0），新会话及重启托管 Kimi Server 后生效</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 

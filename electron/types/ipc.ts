@@ -1758,6 +1758,8 @@ export type AppSettings = {
   experimentalKimiToolSelect: boolean;
   experimentalKimiSubagentFork: boolean;
   experimentalKimiTower: boolean;
+  /** 设为 true 时向引擎注入 KIMI_CODE_PERMISSION_MODE_REMINDER=0，不向模型上下文注入自动权限模式提醒。 */
+  permissionModeReminderDisabled: boolean;
   kimiMonthlyQuotaEnabled: boolean;
   thinkingTranslationProvider: ThinkingTranslationProvider;
   /** @deprecated 仅用于迁移 2.21.80 及更早版本的布尔开关。 */

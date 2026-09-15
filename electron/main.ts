@@ -4343,6 +4343,12 @@ function requestKimiServerStartup() {
   // Tower 是 App-scope 功能，必须在官方 Server 进程创建前注入环境变量；运行中的
   // Server 不会被此处重启，设置页会据此提示用户重启 Kimix。
   process.env.KIMI_CODE_EXPERIMENTAL_TOWER = settingsService.loadSettings().experimentalKimiTower ? "1" : "0";
+  // 0.43.0+：KIMI_CODE_PERMISSION_MODE_REMINDER=0 时不向模型上下文注入自动权限模式提醒。
+  if (settingsService.loadSettings().permissionModeReminderDisabled) {
+    process.env.KIMI_CODE_PERMISSION_MODE_REMINDER = "0";
+  } else {
+    delete process.env.KIMI_CODE_PERMISSION_MODE_REMINDER;
+  }
   logMainStartup("kimi-server:start");
   kimiServerStartupPromise = kimiCodeServerHost.start().then((serverStatus) => {
     if (serverStatus.enabled) {
@@ -8347,6 +8353,7 @@ const SettingsSchema = z.object({
   experimentalKimiToolSelect: z.boolean().optional(),
   experimentalKimiSubagentFork: z.boolean().optional(),
   experimentalKimiTower: z.boolean().optional(),
+  permissionModeReminderDisabled: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
   thinkingTranslationProvider: z.enum(["off", "local", "azure"]).optional(),
   thinkingTranslationEnabled: z.boolean().optional(),
@@ -8395,6 +8402,13 @@ ipcMain.handle("app:saveSettings", async (_, settings: unknown) => {
     if (typeof parsed.data.experimentalKimiTower === "boolean") {
       // 下一次托管 Server 启动读取持久化选择；不触碰已经附着的外部 Server。
       process.env.KIMI_CODE_EXPERIMENTAL_TOWER = parsed.data.experimentalKimiTower ? "1" : "0";
+    }
+    if (typeof parsed.data.permissionModeReminderDisabled === "boolean") {
+      if (parsed.data.permissionModeReminderDisabled) {
+        process.env.KIMI_CODE_PERMISSION_MODE_REMINDER = "0";
+      } else {
+        delete process.env.KIMI_CODE_PERMISSION_MODE_REMINDER;
+      }
     }
     return { success: true, data: undefined };
   } catch (err) {
