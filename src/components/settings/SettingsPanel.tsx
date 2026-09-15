@@ -716,6 +716,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
   const [permissionReminderDisabled, setPermissionReminderDisabledState] = useState(false);
   const [permissionReminderSaving, setPermissionReminderSaving] = useState(false);
+  const [loopControlMaxAttempts, setLoopControlMaxAttempts] = useState<number | null>(null);
+  const [loopControlSaving, setLoopControlSaving] = useState(false);
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
   const [cacheHintDismissed, setCacheHintDismissedState] = useState(false);
   const [roomDeliveryInspectorOpen, setRoomDeliveryInspectorOpen] = useState(false);
@@ -1352,6 +1354,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setPermissionReminderDisabledState(Boolean(res.data.permissionModeReminderDisabled));
   };
 
+  const refreshLoopControlSetting = async () => {
+    const res = await window.api.getKimiLoopControl();
+    if (!res.success) return;
+    setLoopControlMaxAttempts(res.data.compactionMaxAttempts);
+  };
+
+  const saveLoopControlMaxAttempts = async (value: number) => {
+    setLoopControlSaving(true);
+    const res = await window.api.saveKimiLoopControl({ compactionMaxAttempts: value });
+    setLoopControlSaving(false);
+    if (!res.success) {
+      // 保存失败回读校准。
+      void refreshLoopControlSetting();
+      return;
+    }
+    setLoopControlMaxAttempts(value);
+  };
+
   const savePermissionReminderDisabled = async (disabled: boolean) => {
     setPermissionReminderDisabledState(disabled);
     setPermissionReminderSaving(true);
@@ -1686,6 +1706,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       void refreshExperimentalSettings();
       void refreshPermissionReminderSetting();
+      void refreshLoopControlSetting();
       void refreshMonthlyQuotaSettings();
       void refreshOfficialArchivedSessions();
       loadFreezeReports();
@@ -2777,6 +2798,35 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                       value={sessionRecommendationTurnLimit}
                       disabled={!sessionRecommendationEnabled}
                       onCommit={setSessionRecommendationTurnLimit}
+                      className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="kimix-settings-section" {...settingsSectionProps("loopControl", 9)}>
+                <div className="kimix-settings-section-title">
+                  <RefreshCw size={16} className="text-text-muted" />
+                  <span>上下文压缩</span>
+                  {settingsDragHandle("loopControl", "上下文压缩")}
+                </div>
+                <div
+                  className="kimix-settings-card kimix-settings-two-column-card"
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 112px", gap: 16, alignItems: "center", padding: "14px 16px" }}
+                >
+                  <div className="min-w-0">
+                    <div className="kimix-settings-permission-label">压缩请求失败的最大总重试次数</div>
+                    <div className="kimix-settings-permission-desc">对应官方 [loop_control] 的 compaction_max_attempts（0.43.0+，默认 5）；保存后对新会话生效</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="mb-1 text-right text-[12.5px] leading-5 text-[var(--kimix-panel-text-secondary)]">重试上限</div>
+                    <NumberInput
+                      id="compaction-max-attempts"
+                      min={1}
+                      max={20}
+                      value={loopControlMaxAttempts ?? 5}
+                      disabled={loopControlSaving}
+                      onCommit={(next) => void saveLoopControlMaxAttempts(next)}
                       className="kimix-settings-input kimix-number-input h-9 w-full rounded-lg text-center text-[14px] outline-none transition-colors"
                     />
                   </div>

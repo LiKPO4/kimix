@@ -15,6 +15,12 @@ import * as kimiCodeHost from "./kimiCodeHost";
 import { setServerClientDiag } from "./kimiCodeServerClient";
 import { safeGenericAttachmentName } from "./kimiCodeFileAttachments";
 import { writeKimiConfigTomlIfUnchanged } from "./kimiConfigWriteGuard";
+import {
+  readCompactionMaxAttempts,
+  setCompactionMaxAttempts,
+  COMPACTION_MAX_ATTEMPTS_MIN,
+  COMPACTION_MAX_ATTEMPTS_MAX,
+} from "./loopControlToml";
 import { KIMI_MEDIA_BLOB_HASH, KIMI_MEDIA_FILE_ID, readLocalKimiMediaFile, readLocalMediaFileAtPath, resolveKimiMediaBlobPath, resolveKimiMediaFilePath, type LocalKimiMediaFile } from "./kimiMediaFile";
 import { kimiCodeServerHost, serverAuthHeaders } from "./kimiCodeServerHost";
 import { resolveRuntimeModelPolicy } from "./kimiCodeRuntimePolicy";
@@ -6021,6 +6027,35 @@ ipcMain.handle("kimi-code:deleteSession", async (_, request: unknown) => {
     const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
     if (!sessionId) return { success: false, error: "Missing sessionId" };
     await kimiCodeHost.deleteSession(sessionId);
+    return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:getLoopControl", async () => {
+  try {
+    const configPath = getKimiPaths().config;
+    const toml = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+    return { success: true, data: { compactionMaxAttempts: readCompactionMaxAttempts(toml) } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("kimi-code:saveLoopControl", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const value = typeof req.compactionMaxAttempts === "number" ? req.compactionMaxAttempts : Number.NaN;
+    if (!Number.isInteger(value) || value < COMPACTION_MAX_ATTEMPTS_MIN || value > COMPACTION_MAX_ATTEMPTS_MAX) {
+      return { success: false, error: `compactionMaxAttempts 必须是 ${COMPACTION_MAX_ATTEMPTS_MIN}-${COMPACTION_MAX_ATTEMPTS_MAX} 的整数` };
+    }
+    ensureKimiCodeMigratedConfig();
+    const configPath = getKimiPaths().config;
+    const current = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf-8") : "";
+    const next = setCompactionMaxAttempts(current, value);
+    backupFileIfExists(configPath);
+    writeKimiConfigTomlIfUnchanged(configPath, current, next);
     return { success: true, data: undefined };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };

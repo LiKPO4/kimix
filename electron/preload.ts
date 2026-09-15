@@ -202,6 +202,8 @@ import type {
   KimiCodeRenameSessionRequest,
   KimiCodeRegenerateTitleRequest,
   KimiCodeRegenerateTitleResponse,
+  KimiCodeLoopControlResponse,
+  SaveKimiLoopControlRequest,
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
@@ -480,6 +482,10 @@ const api = {
     ipcRenderer.invoke("kimi-code:deleteSession", req),
   regenerateKimiSessionTitle: (req: KimiCodeRegenerateTitleRequest): Promise<KimiCodeRegenerateTitleResponse> =>
     ipcRenderer.invoke("kimi-code:regenerateSessionTitle", req),
+  getKimiLoopControl: (): Promise<KimiCodeLoopControlResponse> =>
+    ipcRenderer.invoke("kimi-code:getLoopControl"),
+  saveKimiLoopControl: (req: SaveKimiLoopControlRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:saveLoopControl", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:reloadSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodePromptResponse> =>

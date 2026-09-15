@@ -2168,6 +2168,14 @@ export type KimiCodeRenameSessionRequest = {
   title: string;
 };
 
+export type KimiCodeLoopControlResponse =
+  | { success: true; data: { compactionMaxAttempts: number | null } }
+  | { success: false; error: string };
+
+export type SaveKimiLoopControlRequest = {
+  compactionMaxAttempts: number;
+};
+
 export type KimiCodeRegenerateTitleRequest = {
   sessionId: string;
 };

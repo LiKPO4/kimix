@@ -21,6 +21,7 @@ export type SettingsSectionId =
   | "thinkingTranslation"
   | "filePreview"
   | "newSession"
+  | "loopControl"
   | "notification"
   | "voice"
   | "archived"
@@ -53,7 +54,7 @@ export const SETTINGS_PAGES: SettingsPageDefinition[] = [
     group: "基础设置",
     label: "常规",
     description: "管理通知、新对话建议、文件预览和系统输入。",
-    sections: ["newSession", "notification", "filePreview", "voice"],
+    sections: ["newSession", "loopControl", "notification", "filePreview", "voice"],
   },
   {
     id: "appearance",
@@ -121,6 +122,14 @@ const SETTINGS_SEARCH_INDEX: SettingsSearchResult[] = [
     pageId: "general",
     sectionId: "newSession",
     keywords: ["轮数", "上下文", "长会话"],
+  },
+  {
+    id: "loop-control",
+    label: "上下文压缩",
+    description: "压缩请求失败的最大重试次数",
+    pageId: "general",
+    sectionId: "loopControl",
+    keywords: ["压缩", "重试", "compaction", "loop_control"],
   },
   {
     id: "notifications",

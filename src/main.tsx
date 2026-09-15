@@ -597,6 +597,8 @@ function installBrowserPreviewApi() {
     renameKimiCodeSession: (): Promise<VoidResponse> => fail("重命名 Kimi Code 会话"),
     deleteKimiCodeSession: (): Promise<VoidResponse> => fail("删除 Kimi Code 会话"),
     regenerateKimiSessionTitle: (): Promise<never> => fail("重新生成 Kimi Code 会话标题"),
+    getKimiLoopControl: (): Promise<never> => fail("读取 loop_control 配置"),
+    saveKimiLoopControl: (): Promise<never> => fail("保存 loop_control 配置"),
     reloadKimiCodeSession: (): Promise<VoidResponse> => fail("重载 Kimi Code 会话"),
     sendKimiCodePrompt: (): Promise<KimiCodePromptResponse> => fail("发送 Kimi Code 消息"),
     loadKimiCodeFile: (): Promise<KimiCodeFileResponse> => fail("加载 Kimi Code 媒体文件"),

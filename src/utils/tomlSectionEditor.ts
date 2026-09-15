@@ -23,7 +23,9 @@ export function setTomlSectionValuePreservingLayout(
   const bodyStart = (match.index ?? 0) + match[0].length;
   const bodyEnd = matches[matchIndex + 1]?.index ?? raw.length;
   const body = raw.slice(bodyStart, bodyEnd);
-  const keyPattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*$`, "m");
+  // 只匹配行首空格/制表符：`\s*` 会连上一行行尾换行一起吃掉，导致 section 标题与
+  // 第一行键粘连（目标键恰为 section 后第一行时触发）。
+  const keyPattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}\\s*=.*$`, "m");
 
   if (keyPattern.test(body)) {
     return `${raw.slice(0, bodyStart)}${body.replace(keyPattern, line)}${raw.slice(bodyEnd)}`;
