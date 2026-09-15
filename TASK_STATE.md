@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-15 发版 v2.21.212（已推送 tag，CI 全绿）
+
+- 覆盖 v2.21.203~212 共 10 个 patch：日志录制（203/204）、性能桶（205）、重会话卡顿根治（206/207/210/211）、更新弹窗浏览器查看（208）、官方 0.43.1 跟进全家桶（209）、套餐用量新结构修复（212）。
+- 发版前复核：官方最新 release 仍 0.43.1（与 vendor 一致，39 条变更全部跟进完毕）；release notes 落 docs/release-notes/v2.21.212.md（面向用户、覆盖 202 之后）。
+- Release run 34981576589 全绿（win/mac/linux + publish），产物 18 个，body 正确取自版本 notes；Knowledge run 全绿。
+- master 与 origin 已同步（22 个提交推送），工作区干净，无未推送内容。
+- 遗留：Server 会话「重新生成标题」可后续接 /title/generate 端点；0.44.0 发布时重新 vendor（main 上 6 个未发版提交均为内部重构/CLI 功能，无协议层变化需提前适配）。
+
 ## 2026-09-15 跟进官方 0.43.0/0.43.1（v2.21.209，8 次提交 8a521a41→97bb8b5f）
 
 - **vendor 0.43.1**（8a521a41）：node-sdk 仍 0.20.0，但 agent-core-v2 引擎 124 文件变更（版本号未 bump）；AI 标题从实验毕业默认开启、compaction_max_attempts、KIMI_CODE_PERMISSION_MODE_REMINDER、MCP deferred/dynamically_loaded_tools、goal 时间预算不计关闭时间+取消 24h 上限、rm -rf /tmp 静默、steering 打断后台等待、LLM 重试崩溃、子代理内存/GC/swarm 渲染修复；probe/typecheck/2256 用例/build 全过。
