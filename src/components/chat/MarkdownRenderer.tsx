@@ -12,6 +12,7 @@ import githubDarkCssUrl from "highlight.js/styles/github-dark.css?url";
 import { normalizeIndentedFencedCodeBlocks, normalizeNestedMarkdownFencedCodeBlocks, restoreAssistantProgressParagraphs, restoreInlineMarkdownHeadings, restoreMarkdownTables } from "@/utils/assistantParagraphs";
 import { splitCjkTrailingTextFromAutolink } from "@/utils/markdownLinks";
 import { truncateMarkdownForPreview } from "@/utils/markdownTruncate";
+import { parseMarkdownFrontmatter, type FrontmatterEntry } from "@/utils/markdownFrontmatter";
 import { noteProfilerCommit } from "@/utils/perfDiag";
 import { isStreamingPlainMarkdownEnabled, shouldUsePlainStreamingMarkdown } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
@@ -431,9 +432,14 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
   // the full markdown-repair stack (tables/fences/heading normalization, which
   // is O(content) regex work per frame) is skipped until the settled rich pass.
   const liveContent = useThrottledStreamingContent(content, streaming && !usePlainStreaming);
+  // YAML frontmatter 只对非流式富通道解析成键值卡片；流式纯文本通道按原文显示。
+  const frontmatter = useMemo(
+    () => (plainPath ? null : parseMarkdownFrontmatter(liveContent)),
+    [liveContent, plainPath],
+  );
   const normalizedContent = useMemo(
-    () => (plainPath ? liveContent : normalizeMarkdownContent(liveContent, normalizeAssistantProgress)),
-    [liveContent, normalizeAssistantProgress, plainPath],
+    () => (plainPath ? liveContent : normalizeMarkdownContent(frontmatter?.body ?? liveContent, normalizeAssistantProgress)),
+    [liveContent, normalizeAssistantProgress, plainPath, frontmatter],
   );
 
   useEffect(() => {
@@ -684,7 +690,8 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
 
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkPreserveAssistantLineBreaks], []);
   const rehypePlugins = useMemo(() => [rehypeKatex], []);
-  const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(displayContent);
+  const frontmatterExtraHeight = frontmatter ? 40 + 26 * frontmatter.meta.length : 0;
+  const placeholderHeight = measuredHeight ?? estimateMarkdownHeight(displayContent) + frontmatterExtraHeight;
 
   useLayoutEffect(() => {
     if (!shouldRender) return;
@@ -714,6 +721,9 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       ref={containerRef}
       className={`markdown-body ${wrapLongLines ? "kimix-markdown-wrap-long-lines" : ""}`}
     >
+      {frontmatter && !plainPath && (
+        <FrontmatterCard meta={frontmatter.meta} />
+      )}
       {renderAsStreaming ? (
         <StreamingMarkdown
           content={displayContent}
@@ -742,5 +752,55 @@ export function MarkdownRenderer({ content, wrapLongLines = false, deferOffscree
       )}
     </div>
     </Profiler>
+  );
+}
+
+function FrontmatterCard({ meta }: { meta: FrontmatterEntry[] }) {
+  return (
+    <div
+      className="kimix-inset-section"
+      style={{
+        borderRadius: 12,
+        backgroundColor: "var(--kimix-panel-soft-bg)",
+        padding: "10px 14px",
+        marginBottom: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      {meta.map(({ key, value }) => (
+        <div
+          key={key}
+          style={{ display: "grid", gridTemplateColumns: "minmax(0, 120px) minmax(0, 1fr)", gap: 10, alignItems: "start" }}
+        >
+          <span className="text-[12px] font-medium text-[var(--kimix-panel-text-muted)]" style={{ lineHeight: "20px", paddingTop: 1 }}>{key}</span>
+          {Array.isArray(value) ? (
+            <span className="flex flex-wrap" style={{ gap: 6 }}>
+              {value.length > 0 ? (
+                value.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full text-[11.5px] text-[var(--kimix-panel-badge-text)]"
+                    style={{ backgroundColor: "var(--kimix-panel-badge-bg)", lineHeight: "20px", padding: "1px 10px" }}
+                  >
+                    {item}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]">—</span>
+              )}
+            </span>
+          ) : (
+            <span
+              className="text-[12.5px] leading-5 text-[var(--kimix-panel-text)]"
+              style={{ overflowWrap: "break-word", wordBreak: "break-word" }}
+            >
+              {value}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
