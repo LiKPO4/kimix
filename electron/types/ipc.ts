@@ -738,6 +738,7 @@ export type AddMcpServerRequest = {
   env?: string[];
   headers?: string[];
   auth?: "oauth";
+  deferred?: boolean;
 };
 
 export type ImportPluginMcpServerRequest = {

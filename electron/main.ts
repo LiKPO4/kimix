@@ -558,6 +558,8 @@ type McpServerRecord = {
   transport?: "http" | "sse" | "stdio";
   auth?: "oauth" | string;
   enabled?: boolean;
+  /** 0.43.0+：工具不进顶层列表，模型支持动态工具加载时按需 select_tools。 */
+  deferred?: boolean;
 };
 
 type ImportCcCodexPlanItem = {
@@ -2430,6 +2432,7 @@ function addMcpServerToConfig(request: unknown) {
     env: z.array(z.string().trim()).optional(),
     headers: z.array(z.string().trim()).optional(),
     auth: z.literal("oauth").optional(),
+    deferred: z.boolean().optional(),
   }).parse(request);
   const name = sanitizeMcpServerName(parsed.name);
   if (name !== parsed.name) {
@@ -2445,6 +2448,7 @@ function addMcpServerToConfig(request: unknown) {
     env: parseKeyValueList(parsed.env),
     headers: parseKeyValueList(parsed.headers),
   };
+  if (parsed.deferred) server.deferred = true;
   if (parsed.transport === "http" || parsed.transport === "sse") {
     if (!parsed.url) throw new Error(`${parsed.transport.toUpperCase()} MCP 需要填写 URL`);
     server.url = parsed.url;

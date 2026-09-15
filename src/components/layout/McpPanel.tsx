@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
+import { Cable, ChevronDown, ChevronUp, KeyRound, Plus, RefreshCw, ShieldCheck, TestTube2, Trash2, Zap } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { mcpStatusLabel, mcpStatusTone } from "@/utils/mcpServerStatus";
 import type { KimiCodeMarketplacePlugin, KimiCodeMcpServerInfo, KimiCodePluginSummary, KimiCodeServerAgentInfo, KimiCodeServerRuntimeDiagnostics } from "@electron/types/ipc";
@@ -49,6 +49,7 @@ type AddFormState = {
   envItems: KeyValueItem[];
   headerItems: KeyValueItem[];
   authOauth: boolean;
+  deferred: boolean;
 };
 
 const KIMI_AUTH_CHANGED_EVENT = "kimix:kimi-auth-changed";
@@ -71,6 +72,7 @@ function createEmptyForm(): AddFormState {
     envItems: [createKeyValueItem()],
     headerItems: [createKeyValueItem()],
     authOauth: false,
+    deferred: false,
   };
 }
 
@@ -310,6 +312,7 @@ export function McpPanel({ onBackToChat, embedded = false }: { onBackToChat?: ()
         env: normalizeKeyValueItems(form.envItems, "="),
         headers: normalizeKeyValueItems(form.headerItems, ":"),
         auth: form.authOauth ? "oauth" : undefined,
+        deferred: form.deferred,
       });
       if (!res.success) {
         setMessage(`添加失败：${res.error}`);
@@ -618,6 +621,20 @@ mcp.json：${configPath || auth?.mcpConfigPath || "-"}`}
                       />
                     </label>
                   )}
+                  <label className="min-w-0">
+                    <div className="text-[13px] text-[var(--kimix-panel-text-secondary)]">按需加载工具（deferred）</div>
+                    <button
+                      type="button"
+                      onClick={() => setForm((current) => ({ ...current, deferred: !current.deferred }))}
+                      aria-pressed={form.deferred}
+                      className="kimix-state-button kimix-form-field-state-button mt-2 flex h-10 w-full items-center justify-between rounded-xl text-[14px] transition-colors"
+                      style={{ paddingLeft: 16, paddingRight: 16 }}
+                    >
+                      <span>{form.deferred ? "已开启" : "关闭"}</span>
+                      <Zap size={14} />
+                    </button>
+                    <div className="text-[12px] leading-5 text-[var(--kimix-panel-text-muted)]" style={{ marginTop: 6 }}>开启后该服务工具不进顶层列表，由模型按需 select_tools 加载；需要「工具按需加载」实验功能且模型支持动态工具加载</div>
+                  </label>
                   <label className="min-w-0">
                     <div className="text-[13px] text-[var(--kimix-panel-text-secondary)]">OAuth 授权</div>
                     <button
