@@ -598,7 +598,6 @@ function HelpDialogPanel({
                     </button>
                     <button
                       onClick={onOpenLatestRelease}
-                      disabled={updateState.loading}
                       className="kimix-style-exempt text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
                       style={updateLinkButtonStyle}
                     >
@@ -671,7 +670,6 @@ function HelpDialogPanel({
                     </button>
                     <button
                       onClick={() => void window.api.openExternal(KIMI_CODE_UPDATE_PAGE_URL)}
-                      disabled={cliUpdateState.loading || cliUpdateState.updating}
                       className="kimix-style-exempt text-[12.5px] leading-5 text-accent-primary transition-colors hover:text-accent-primary-dark disabled:opacity-45"
                       style={updateLinkButtonStyle}
                     >
