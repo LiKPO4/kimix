@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, MoreHorizontal, Pin, Archive, Trash2, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore } from "@/stores/appStore";
@@ -231,6 +231,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   const [openProjectMenu, setOpenProjectMenu] = useState<{ projectId: string; top: number; bottom: number; left: number } | null>(null);
   const [projectActionFocusId, setProjectActionFocusId] = useState<string | null>(null);
   const [sessionActionFocusId, setSessionActionFocusId] = useState<string | null>(null);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<Session | null>(null);
+  const [deleteSessionBusy, setDeleteSessionBusy] = useState(false);
   const lastAutoExpandedProjectPath = useRef<string | null>(null);
   const handledInitialProjectExpansionRef = useRef(false);
   const projectCatalogRefreshInFlightRef = useRef<Set<string>>(new Set());
@@ -771,6 +773,28 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     setExpandedProjectPaths((current) => new Set([...current, normalizeProjectPath(project.path)]));
   };
 
+  const confirmDeleteSession = async () => {
+    const target = deleteSessionTarget;
+    if (!target || deleteSessionBusy) return;
+    setDeleteSessionBusy(true);
+    const runtimeSessionId = getRuntimeSessionId(target) ?? target.id;
+    const res = await window.api.deleteKimiCodeSession({ sessionId: runtimeSessionId });
+    setDeleteSessionBusy(false);
+    if (!res.success) {
+      toast(`删除失败：${res.error}`);
+      return;
+    }
+    deleteSession(target.id);
+    if (currentSession?.id === target.id) {
+      setCurrentSession(null);
+    }
+    if (runningSessionId === target.id || runningSessionId === target.runtimeSessionId) {
+      setRunningSessionId(null);
+    }
+    setDeleteSessionTarget(null);
+    toast("已删除会话");
+  };
+
   const selectSession = async (sessionId: string) => {
     const session = visibleSessions.find((s) => s.id === sessionId);
     if (!session) return;
@@ -888,7 +912,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
   };
 
   return (
-    <aside style={{ width, paddingLeft: 12, paddingRight: 6, paddingBottom: 8 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col">
+    <>
+      <aside style={{ width, paddingLeft: 12, paddingRight: 6, paddingBottom: 8 }} className="kimix-sidebar flex h-full shrink-0 select-none flex-col">
       <div className="no-drag space-y-1 px-2 pb-2">
         <button
           onClick={async () => {
@@ -1239,6 +1264,18 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       >
                                         <Archive size={13} />
                                       </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeleteSessionTarget(s);
+                                        }}
+                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+                                        style={{ width: 26, height: 26, flexBasis: 26 }}
+                                        title="删除会话"
+                                        aria-label="删除会话"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -1296,6 +1333,45 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           <span className="ml-auto shrink-0 text-[13px] text-text-muted">v{APP_VERSION}</span>
         </button>
       </div>
-    </aside>
+      </aside>
+      {deleteSessionTarget && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
+          style={{ padding: 24 }}
+          onMouseDown={() => {
+            if (!deleteSessionBusy) setDeleteSessionTarget(null);
+          }}
+        >
+          <div
+            className="kimix-modal-card w-full max-w-[400px]"
+            style={{ padding: 22 }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="text-[16px] font-semibold leading-6">删除会话</div>
+            <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px", backgroundColor: "var(--accent-danger-light)" }}>
+              确定删除「{deleteSessionTarget.title}」？这会永久删除官方会话及其全部对话记录，无法恢复。
+            </div>
+            <div className="flex justify-end" style={{ gap: 10, marginTop: 18 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteSessionTarget(null)}
+                disabled={deleteSessionBusy}
+                className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteSession()}
+                disabled={deleteSessionBusy}
+                className="kimix-icon-text-button is-compact text-accent-red disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteSessionBusy ? "删除中..." : "永久删除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

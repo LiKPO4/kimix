@@ -1840,6 +1840,13 @@ export class KimiCodeServerClient {
     });
   }
 
+  deleteSession(sessionId: string): Promise<{ deleted: true }> {
+    return this.request(`/api/v1/sessions/${encodeURIComponent(sessionId)}:delete`, {
+      method: "POST",
+      body: "{}",
+    });
+  }
+
   async listTasks(sessionId: string, status?: ServerBackgroundTask["status"]): Promise<ServerBackgroundTask[]> {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
     const result = await this.request<{ items: ServerBackgroundTask[] }>(

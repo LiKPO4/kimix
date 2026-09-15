@@ -113,6 +113,7 @@ type KimiHarnessLike = {
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
   generateSessionTitle?(input: { id: string; force?: boolean; source?: "user_prompts" | "first_turn" | "digest" }): Promise<string | undefined>;
+  deleteSession?(input: { sessionId: string }): Promise<unknown>;
   listSessions(options?: { workDir?: string; sessionId?: string; includeArchive?: boolean }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
@@ -1187,6 +1188,31 @@ export async function regenerateSessionTitle(sessionId: string): Promise<string 
   const sdkHarness = await getHarness();
   if (!sdkHarness.generateSessionTitle) throw new Error("当前兼容链路不支持重新生成标题。");
   return sdkHarness.generateSessionTitle({ id: sessionId, force: true });
+}
+
+// 永久删除会话（官方 store + 本地运行时状态）。与归档不同，删除不可恢复。
+export async function deleteSession(sessionId: string): Promise<void> {
+  sessionId = resolveMigratedSessionId(sessionId);
+  const managed = serverSessions.get(sessionId);
+  if (managed) {
+    await getServerClient().deleteSession(sessionId);
+    serverSessions.delete(sessionId);
+    forgetSessionState(sessionScopedState, sessionId);
+    settlePendingForSession(sessionId, "cancelled");
+    await getServerClient().unsubscribe(sessionId).catch((error) => {
+      console.warn(`[KimiCodeServerHost] unsubscribe deleted session ${sessionId} failed:`, error);
+    });
+    return;
+  }
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.deleteSession) throw new Error("当前兼容链路不支持删除会话。");
+  await sdkHarness.deleteSession({ sessionId });
+  closeSession(sessionId);
+  for (const [serverSessionId, migratedSessionId] of serverSessionMigrations) {
+    if (serverSessionId === sessionId || migratedSessionId === sessionId) {
+      serverSessionMigrations.delete(serverSessionId);
+    }
+  }
 }
 
 export async function reloadSession(sessionId: string): Promise<void> {

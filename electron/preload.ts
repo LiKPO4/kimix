@@ -476,6 +476,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:createChildSession", req),
   renameKimiCodeSession: (req: KimiCodeRenameSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:renameSession", req),
+  deleteKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
+    ipcRenderer.invoke("kimi-code:deleteSession", req),
   regenerateKimiSessionTitle: (req: KimiCodeRegenerateTitleRequest): Promise<KimiCodeRegenerateTitleResponse> =>
     ipcRenderer.invoke("kimi-code:regenerateSessionTitle", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
