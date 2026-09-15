@@ -41,6 +41,21 @@ export function toOfficialGoalSnapshot(raw: unknown): OfficialGoalSnapshot | nul
     const value = source[key];
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
   };
+  const rawBudget = source.budget;
+  const budgetSource =
+    rawBudget && typeof rawBudget === "object" && !Array.isArray(rawBudget)
+      ? (rawBudget as Record<string, unknown>)
+      : undefined;
+  const budget = budgetSource
+      ? ({
+          turnBudget: pickNumberFrom(budgetSource, "turnBudget"),
+          tokenBudget: pickNumberFrom(budgetSource, "tokenBudget"),
+          wallClockBudgetMs: pickNumberFrom(budgetSource, "wallClockBudgetMs"),
+          remainingTurns: pickNumberFrom(budgetSource, "remainingTurns"),
+          remainingTokens: pickNumberFrom(budgetSource, "remainingTokens"),
+          remainingWallClockMs: pickNumberFrom(budgetSource, "remainingWallClockMs"),
+        })
+      : undefined;
   return {
     goalId: pickString("goalId"),
     objective,
@@ -50,7 +65,14 @@ export function toOfficialGoalSnapshot(raw: unknown): OfficialGoalSnapshot | nul
     tokensUsed: pickNumber("tokensUsed"),
     wallClockMs: pickNumber("wallClockMs"),
     terminalReason: pickString("terminalReason"),
+    budget,
   };
+
+function pickNumberFrom(raw: Record<string, unknown>, key: string): number | null | undefined {
+  const value = raw[key];
+  if (value === null || value === undefined) return value ?? undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
 }
 
 /**

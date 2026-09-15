@@ -112,6 +112,7 @@ type KimiHarnessLike = {
   resumeSession(input: { id: string; additionalDirs?: readonly string[] }): Promise<KimiCodeSessionLike>;
   forkSession?(input: { id: string; forkId?: string; title?: string; metadata?: JsonObject }): Promise<KimiCodeSessionLike>;
   renameSession?(input: { id: string; title: string }): Promise<void>;
+  generateSessionTitle?(input: { id: string; force?: boolean; source?: "user_prompts" | "first_turn" | "digest" }): Promise<string | undefined>;
   listSessions(options?: { workDir?: string; sessionId?: string; includeArchive?: boolean }): Promise<KimiCodeSessionSummary[]>;
   exportSession(input: KimiCodeExportSessionInput): Promise<KimiCodeExportSessionResult>;
   getConfig(options?: { reload?: boolean }): Promise<KimiCodeConfig>;
@@ -1173,6 +1174,19 @@ export async function renameSession(sessionId: string, title: string): Promise<v
   const sdkHarness = await getHarness();
   if (!sdkHarness.renameSession) throw new Error("当前兼容链路不支持会话重命名。");
   await sdkHarness.renameSession({ id: sessionId, title });
+}
+
+// 0.43.0+ 引擎：AI 会话标题默认开启，经 chat_title 平台工具生成；此处按用户动作强制重生成。
+// 托管官方 Server 会话无该 RPC，抛错由渲染层提示。返回 undefined 表示生成不可用
+//（无托管 OAuth 登录 / 会话无对话内容等）。
+export async function regenerateSessionTitle(sessionId: string): Promise<string | undefined> {
+  const serverManaged = serverSessions.get(sessionId);
+  if (serverManaged) {
+    throw new Error("托管官方 Server 会话暂不支持重新生成标题。");
+  }
+  const sdkHarness = await getHarness();
+  if (!sdkHarness.generateSessionTitle) throw new Error("当前兼容链路不支持重新生成标题。");
+  return sdkHarness.generateSessionTitle({ id: sessionId, force: true });
 }
 
 export async function reloadSession(sessionId: string): Promise<void> {

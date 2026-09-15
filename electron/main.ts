@@ -6011,6 +6011,18 @@ ipcMain.handle("kimi-code:renameSession", async (_, request: unknown) => {
   }
 });
 
+ipcMain.handle("kimi-code:regenerateSessionTitle", async (_, request: unknown) => {
+  try {
+    const req = request && typeof request === "object" ? request as Record<string, unknown> : {};
+    const sessionId = typeof req.sessionId === "string" ? req.sessionId : "";
+    if (!sessionId) return { success: false, error: "Missing sessionId" };
+    const title = await kimiCodeHost.regenerateSessionTitle(sessionId);
+    return { success: true, data: { title } };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle("kimi-code:reloadSession", async (_, request: unknown) => {
   try {
     const req = request && typeof request === "object" ? request as Record<string, unknown> : {};

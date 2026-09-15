@@ -22,6 +22,7 @@ import {
   Play,
   Pause,
   RefreshCw,
+  Sparkles,
   Square,
   SquareTerminal,
   X,
@@ -108,6 +109,7 @@ export function SessionToolbar({
   const [renameDraft, setRenameDraft] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [regenerateBusy, setRegenerateBusy] = useState(false);
   const sessionMenuRef = useRef<HTMLDivElement>(null);
   const launchMenuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
@@ -201,6 +203,41 @@ export function SessionToolbar({
     setRenameBusy(false);
     setRenameDialogOpen(false);
     showToast(liveCurrentSession.collaboration && mutationOwner ? `${mutationOwner.displayName} · 已同步官方标题和房间标题` : "已重命名");
+  };
+
+  const regenerateCurrentSessionTitle = async () => {
+    if (!liveCurrentSession) {
+      showToast("当前没有对话");
+      return;
+    }
+    if (liveCurrentSession.engine !== "kimi-code") {
+      setRenameError("当前会话不支持 AI 标题生成");
+      return;
+    }
+    if (liveCurrentSession.collaboration && !mutationOwner) {
+      setRenameError(mutationOwnerError || "请先选择一个 Agent。");
+      return;
+    }
+    const runtimeSessionId = mutationOwner?.runtimeSessionId;
+    if (!runtimeSessionId) {
+      setRenameError("没有可重新生成标题的官方会话");
+      return;
+    }
+    setRegenerateBusy(true);
+    setRenameError(null);
+    const res = await window.api.regenerateKimiSessionTitle({ sessionId: runtimeSessionId });
+    setRegenerateBusy(false);
+    if (!res.success) {
+      setRenameError(`重新生成失败：${res.error}`);
+      return;
+    }
+    const title = res.data?.title;
+    if (!title || !title.trim()) {
+      setRenameError("暂时无法生成标题（需要官方账号登录且会话已有对话内容）");
+      return;
+    }
+    setRenameDraft(title);
+    showToast("已生成新标题，点击「保存」生效");
   };
 
   const archiveCurrentSession = async () => {
@@ -689,17 +726,29 @@ export function SessionToolbar({
               <X size={16} />
             </button>
           </div>
-          <input
-            value={renameDraft}
-            onChange={(event) => {
-              setRenameDraft(event.target.value);
-              setRenameError(null);
-            }}
-            autoFocus
-            className="kimix-settings-input h-10 w-full text-[14px]"
-            style={{ marginTop: 16, paddingLeft: 14, paddingRight: 14 }}
-            placeholder="输入新的对话标题"
-          />
+          <div className="flex items-center" style={{ gap: 10, marginTop: 16 }}>
+            <input
+              value={renameDraft}
+              onChange={(event) => {
+                setRenameDraft(event.target.value);
+                setRenameError(null);
+              }}
+              autoFocus
+              className="kimix-settings-input h-10 min-w-0 flex-1 text-[14px]"
+              style={{ paddingLeft: 14, paddingRight: 14 }}
+              placeholder="输入新的对话标题"
+            />
+            <button
+              type="button"
+              title="用 AI 重新生成标题"
+              aria-label="用 AI 重新生成标题"
+              disabled={renameBusy || regenerateBusy}
+              onClick={() => void regenerateCurrentSessionTitle()}
+              className="kimix-muted-action flex h-10 w-10 shrink-0 items-center justify-center rounded-lg disabled:cursor-wait disabled:opacity-50"
+            >
+              <Sparkles size={15} className={regenerateBusy ? "animate-pulse" : ""} />
+            </button>
+          </div>
           {renameError && (
             <div className="kimix-inset-section text-[13px] leading-5 text-accent-danger" style={{ marginTop: 12, padding: "9px 12px", backgroundColor: "var(--accent-danger-light)" }}>
               {renameError}

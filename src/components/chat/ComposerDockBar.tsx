@@ -299,6 +299,15 @@ function BackgroundTaskListItems({ tasks }: { tasks: KimiCodeBackgroundTaskInfo[
   );
 }
 
+function formatGoalElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds} 秒`;
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes} 分 ${totalSeconds % 60} 秒`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} 时 ${minutes % 60} 分`;
+}
+
 function goalCapsuleStatusLabel(status: string) {
   const normalized = status.trim().toLowerCase();
   if (normalized === "active") return "进行中";
@@ -327,6 +336,14 @@ function GoalPanelBody({ goal, onPauseGoal, onResumeGoal, onCancelGoal, onRefres
   const meta = [`状态：${goalCapsuleStatusLabel(goal.status)}`];
   if (typeof goal.turnsUsed === "number" && goal.turnsUsed > 0) meta.push(`${goal.turnsUsed} 轮`);
   if (typeof goal.tokensUsed === "number" && goal.tokensUsed > 0) meta.push(`${goal.tokensUsed} tokens`);
+  if (typeof goal.wallClockMs === "number" && goal.wallClockMs > 0) {
+    const budgetMs = goal.budget?.wallClockBudgetMs;
+    meta.push(
+      budgetMs && budgetMs > 0
+        ? `时间 ${formatGoalElapsed(goal.wallClockMs)} / ${formatGoalElapsed(budgetMs)}`
+        : `已运行 ${formatGoalElapsed(goal.wallClockMs)}`,
+    );
+  }
   return (
     <div className="flex flex-col" style={{ gap: 10, paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 10 }}>
       <div className="text-[13px] leading-6 text-[var(--kimix-panel-text)]" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{goal.objective}</div>

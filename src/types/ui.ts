@@ -365,6 +365,14 @@ export interface OfficialGoalSnapshot {
   tokensUsed?: number;
   wallClockMs?: number;
   terminalReason?: string;
+  budget?: {
+    turnBudget?: number | null;
+    tokenBudget?: number | null;
+    wallClockBudgetMs?: number | null;
+    remainingTurns?: number | null;
+    remainingTokens?: number | null;
+    remainingWallClockMs?: number | null;
+  };
 }
 
 export interface BtwRound {

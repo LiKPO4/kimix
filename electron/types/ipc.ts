@@ -2167,6 +2167,14 @@ export type KimiCodeRenameSessionRequest = {
   title: string;
 };
 
+export type KimiCodeRegenerateTitleRequest = {
+  sessionId: string;
+};
+
+export type KimiCodeRegenerateTitleResponse =
+  | { success: true; data: { title?: string } }
+  | { success: false; error: string };
+
 export type KimiCodePromptRequest = {
   sessionId: string;
   content: string;

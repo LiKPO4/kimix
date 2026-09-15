@@ -200,6 +200,8 @@ import type {
   KimiCodeActivateSkillRequest,
   KimiCodeQuestionResponseRequest,
   KimiCodeRenameSessionRequest,
+  KimiCodeRegenerateTitleRequest,
+  KimiCodeRegenerateTitleResponse,
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
@@ -474,6 +476,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:createChildSession", req),
   renameKimiCodeSession: (req: KimiCodeRenameSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:renameSession", req),
+  regenerateKimiSessionTitle: (req: KimiCodeRegenerateTitleRequest): Promise<KimiCodeRegenerateTitleResponse> =>
+    ipcRenderer.invoke("kimi-code:regenerateSessionTitle", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:reloadSession", req),
   sendKimiCodePrompt: (req: KimiCodePromptRequest): Promise<KimiCodePromptResponse> =>
