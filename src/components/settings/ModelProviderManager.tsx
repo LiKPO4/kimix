@@ -11,6 +11,7 @@ import {
   Server,
   Trash2,
   Zap,
+  AlertTriangle,
 } from "lucide-react";
 import type {
   DiscoveredKimiProviderModel,
@@ -908,7 +909,14 @@ export function ModelProviderManager({ config, onConfigChange }: Props) {
                 >
                   <div className="min-w-0">
                     <div className="truncate text-[12.5px] font-medium text-text-primary">{model.displayName || model.alias}</div>
-                    <div className="truncate text-[11.5px] leading-5 text-text-muted">{model.model || model.alias}</div>
+                    {model.model ? (
+                      <div className="truncate text-[11.5px] leading-5 text-text-muted">{model.model}</div>
+                    ) : (
+                      <div className="flex items-center text-[11.5px] leading-5 text-accent-warning" style={{ gap: 5 }}>
+                        <AlertTriangle size={11} className="shrink-0" />
+                        <span className="truncate">缺少 model 字段，无法使用</span>
+                      </div>
+                    )}
                   </div>
                   <span className="kimix-settings-badge shrink-0 text-[11px] tabular-nums" style={{ minWidth: 66, padding: "3px 8px", textAlign: "center" }}>
                     {model.maxContextSize ? `${Math.round(model.maxContextSize / 1000)}k` : "Context"}
