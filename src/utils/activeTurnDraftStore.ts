@@ -1,11 +1,40 @@
 import { useSyncExternalStore } from "react";
 import type { TimelineEvent } from "@/types/ui";
-import { mergeAssistantThinkingParts, mergeAssistantThinkingText, mergeEvents } from "@/utils/eventMapper";
+import { mergeAssistantThinkingParts, mergeAssistantThinkingTextStep, mergeEvents } from "@/utils/eventMapper";
+import { appendCollapsedNormalized, collapseForOverlap } from "@/utils/thinkingBlocks";
 import { isScrollYieldEnabled } from "@/utils/perfFlags";
 import { isUserScrollActive } from "@/utils/userScrollActivity";
 import { noteStreamAnchorDecision } from "@/utils/liveTurnDiag";
 
 type AssistantMessage = Extract<TimelineEvent, { type: "assistant_message" }>;
+
+// draft 每 flush 都新建事件对象，但 thinking 文本是增量累积的——为每个 draft 对象缓存
+// collapseForOverlap 归一化视图（口径与 normalizeThinkingWhitespace 一致），避免每 flush 对
+// 全量累计文本重新归一化（26.5 万字级长思考时 O(flush × 总长)，是流式长会话卡顿的同型根因）。
+const draftThinkingNormCache = new WeakMap<AssistantMessage, string>();
+const thinkingNormOf = (event: AssistantMessage): string => {
+  const cached = draftThinkingNormCache.get(event);
+  if (cached !== undefined) return cached;
+  const norm = collapseForOverlap(event.thinking ?? "");
+  draftThinkingNormCache.set(event, norm);
+  return norm;
+};
+
+// anchorStreamText 黑盒合并后按结果维护视图：未变取旧视图；整体替换取 delta 折叠；
+// 前缀追加增量 append；其余兜底全量（罕见）。
+function thinkingNormAfterStreamMerge(
+  baseText: string,
+  baseNorm: string,
+  deltaText: string,
+  mergedText: string,
+): string {
+  if (mergedText === baseText) return baseNorm;
+  if (mergedText === deltaText) return collapseForOverlap(deltaText);
+  if (baseText && mergedText.startsWith(baseText)) {
+    return appendCollapsedNormalized(baseNorm, collapseForOverlap(mergedText.slice(baseText.length)));
+  }
+  return collapseForOverlap(mergedText);
+}
 
 export type ActiveTurnDraft = {
   /** Distinguishes each persisted segment when one Agent turn crosses formal boundaries. */
@@ -289,38 +318,49 @@ function applyStreamOffsetDelta(
     const anchored = merged.anchor !== null;
     const basePart = base.thinkingParts?.[0];
     const deltaPart = event.thinkingParts?.[0];
+    const mergedEvent: AssistantMessage = {
+      ...base,
+      thinking: merged.text || undefined,
+      thinkingParts: merged.text
+        ? anchored
+          ? [{
+              id: basePart?.id ?? deltaPart?.id ?? event.id,
+              timestamp: basePart?.timestamp ?? event.timestamp,
+              text: merged.text,
+              signature: deltaPart?.signature ?? basePart?.signature,
+            }]
+          : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts)
+        : base.thinkingParts,
+      model: event.model ?? base.model,
+      agentRole: event.agentRole ?? base.agentRole,
+    };
+    draftThinkingNormCache.set(
+      mergedEvent,
+      thinkingNormAfterStreamMerge(base.thinking ?? "", thinkingNormOf(base), event.thinking ?? "", merged.text),
+    );
     return {
-      event: {
-        ...base,
-        thinking: merged.text || undefined,
-        thinkingParts: merged.text
-          ? anchored
-            ? [{
-                id: basePart?.id ?? deltaPart?.id ?? event.id,
-                timestamp: basePart?.timestamp ?? event.timestamp,
-                text: merged.text,
-                signature: deltaPart?.signature ?? basePart?.signature,
-              }]
-            : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts)
-          : base.thinkingParts,
-        model: event.model ?? base.model,
-        agentRole: event.agentRole ?? base.agentRole,
-      },
+      event: mergedEvent,
       contentAnchor: anchors.content,
       thinkAnchor: merged.anchor,
       accepted: merged.accepted,
     };
   }
   const merged = anchorStreamText(base.content, event.content ?? "", offset, anchors.content, committed?.content, formalCoverage?.content);
+  const baseNorm = thinkingNormOf(base);
+  const thinkingMerge = merged.anchor !== null
+    ? { text: base.thinking, norm: baseNorm }
+    : mergeAssistantThinkingTextStep(base.thinking, baseNorm, event.thinking);
+  const mergedEvent: AssistantMessage = {
+    ...base,
+    content: merged.text,
+    thinking: thinkingMerge.text,
+    thinkingParts: merged.anchor !== null ? base.thinkingParts : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
+    model: event.model ?? base.model,
+    agentRole: event.agentRole ?? base.agentRole,
+  };
+  draftThinkingNormCache.set(mergedEvent, thinkingMerge.norm);
   return {
-    event: {
-      ...base,
-      content: merged.text,
-      thinking: merged.anchor !== null ? base.thinking : mergeAssistantThinkingText(base.thinking, event.thinking),
-      thinkingParts: merged.anchor !== null ? base.thinkingParts : mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
-      model: event.model ?? base.model,
-      agentRole: event.agentRole ?? base.agentRole,
-    },
+    event: mergedEvent,
     contentAnchor: merged.anchor,
     thinkAnchor: anchors.think,
     accepted: merged.accepted,
@@ -463,12 +503,20 @@ export function applyActiveTurnDraftDelta(
           thinkingParts: mergeAssistantThinkingParts(base.thinkingParts, event.thinkingParts),
           model: event.model ?? base.model,
           agentRole: event.agentRole ?? base.agentRole,
-        }].map((mergedEvent) => ({
-          ...mergedEvent,
-          thinking: mergedEvent.thinkingParts?.length
+        }].map((mergedEvent) => {
+          const step = mergedEvent.thinkingParts?.length
+            ? null
+            : mergeAssistantThinkingTextStep(base.thinking, thinkingNormOf(base), event.thinking);
+          const thinking = mergedEvent.thinkingParts?.length
             ? mergedEvent.thinkingParts.map((part) => part.text).join("")
-            : mergeAssistantThinkingText(base.thinking, event.thinking),
-        }))
+            : step!.text;
+          const eventWithThinking: AssistantMessage = { ...mergedEvent, thinking };
+          draftThinkingNormCache.set(
+            eventWithThinking,
+            mergedEvent.thinkingParts?.length ? collapseForOverlap(thinking ?? "") : step!.norm,
+          );
+          return eventWithThinking;
+        })
       : mergeEvents([base], {
           ...event,
           isComplete: false,

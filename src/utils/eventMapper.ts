@@ -339,70 +339,71 @@ export function mergeAssistantThinkingText(existing?: string, incoming?: string)
  * 避免 reduce 场景每次对全量累计文本重新归一化 + 全量扫描的 O(N × 总长)
  * （实机单轮 10 子代理 / 26.5 万字思考时单次 mergeAssistant 约 3 秒，v2.21.209 录制）。
  */
+export type ThinkingTextMergeView = { text: string | undefined; norm: string };
+
+/**
+ * 带归一化视图的 mergeAssistantThinkingText 单步。leftNorm 是 left 的
+ * collapseForOverlap 视图（未 trim，口径与 normalizeThinkingWhitespace 一致），
+ * 调用方跨多次合并维护它即可避免每步对全量累计文本重新归一化——
+ * mergeAssistantThinkingTextSequence 与 activeTurnDraftStore 的每 flush 合并共用这套分支逻辑。
+ */
+export function mergeAssistantThinkingTextStep(
+  left: string | undefined,
+  leftNorm: string,
+  incoming?: string,
+): ThinkingTextMergeView {
+  const right = incoming ?? "";
+  if (!right.trim()) return { text: left, norm: leftNorm };
+  if (!left || !left.trim()) return { text: incoming, norm: collapseForOverlap(right) };
+  if (left === right || (left.length < right.length && right.includes(left))) {
+    // left 是 right 的子串（或相等）：取 right。长度剪枝等价——更长的串不可能是更短串的子串。
+    return { text: right, norm: collapseForOverlap(right) };
+  }
+  if (right.length <= left.length && left.includes(right)) return { text: left, norm: leftNorm };
+  if (left.endsWith(right)) return { text: left, norm: leftNorm };
+  if (left.length <= right.length && right.startsWith(left)) {
+    return { text: right, norm: collapseForOverlap(right) };
+  }
+  const normalizedLeft = leftNorm.trim();
+  const normalizedRight = normalizeThinkingWhitespace(right);
+  if (normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight)) {
+    return { text: left, norm: leftNorm };
+  }
+  if (normalizedRight.includes(normalizedLeft)) {
+    return { text: right, norm: collapseForOverlap(right) };
+  }
+  // 尾窗 KMP：重叠长度不可能超过 right 的归一化长，与全量扫描结果一致。
+  const windowSize = Math.max(normalizedRight.length, THINKING_OVERLAP_MIN_CHARS);
+  const leftWindow = normalizedLeft.length > windowSize ? normalizedLeft.slice(-windowSize) : normalizedLeft;
+  const overlap = longestSuffixPrefixOverlap(leftWindow, normalizedRight, THINKING_OVERLAP_MIN_CHARS);
+  if (overlap > 0) {
+    const trimmedRight = stripNormalizedPrefix(right, overlap);
+    if (!trimmedRight.trim()) {
+      // 剥空即整段重复（完整重放），与 mergeAssistantThinkingText 一致。
+      return { text: left, norm: leftNorm };
+    }
+    return { text: left + trimmedRight, norm: appendCollapsedNormalized(leftNorm, collapseForOverlap(trimmedRight)) };
+  }
+  return { text: left + right, norm: appendCollapsedNormalized(leftNorm, collapseForOverlap(right)) };
+}
+
+/**
+ * 顺序合并多段 thinking 文本，输出与逐次 reduce(mergeAssistantThinkingText) 完全一致。
+ * 差异仅在开销：整链只维护一份增量归一化视图（跨段空白运行按整体归一化合并，口径与
+ * normalizeThinkingWhitespace 一致，见 appendCollapsedNormalized），KMP 只扫累计文本尾部
+ * 窗口（重叠长度不可能超过 incoming 的归一化长度），并对 includes 做长度前置剪枝——
+ * 避免 reduce 场景每次对全量累计文本重新归一化 + 全量扫描的 O(N × 总长)
+ * （实机单轮 10 子代理 / 26.5 万字思考时单次 mergeAssistant 约 3 秒，v2.21.209 录制）。
+ */
 export function mergeAssistantThinkingTextSequence(
   texts: ReadonlyArray<string | undefined>,
 ): string | undefined {
   let left: string | undefined;
-  // 增量归一化视图（collapseForOverlap 口径，未 trim），与对整体 normalizeThinkingWhitespace 等价。
   let leftNorm = "";
-  const resetNorm = (text: string) => {
-    leftNorm = collapseForOverlap(text);
-  };
   for (const incoming of texts) {
-    const right = incoming ?? "";
-    if (!right.trim()) continue;
-    if (!left || !left.trim()) {
-      left = incoming;
-      resetNorm(left ?? "");
-      continue;
-    }
-    let next: string;
-    let appendedRaw = "";
-    if (left === right || (left.length < right.length && right.includes(left))) {
-      // left 是 right 的子串（或相等）：取 right。长度剪枝等价——更长的串不可能是更短串的子串。
-      next = right;
-    } else if (right.length <= left.length && left.includes(right)) {
-      next = left;
-    } else if (left.endsWith(right)) {
-      next = left;
-    } else if (left.length <= right.length && right.startsWith(left)) {
-      next = right;
-    } else {
-      const normalizedLeft = leftNorm.trim();
-      const normalizedRight = normalizeThinkingWhitespace(right);
-      if (normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight)) {
-        next = left;
-      } else if (normalizedRight.includes(normalizedLeft)) {
-        next = right;
-      } else {
-        // 尾窗 KMP：重叠长度不可能超过 right 的归一化长，与全量扫描结果一致。
-        const windowSize = Math.max(normalizedRight.length, THINKING_OVERLAP_MIN_CHARS);
-        const leftWindow = normalizedLeft.length > windowSize ? normalizedLeft.slice(-windowSize) : normalizedLeft;
-        const overlap = longestSuffixPrefixOverlap(leftWindow, normalizedRight, THINKING_OVERLAP_MIN_CHARS);
-        if (overlap > 0) {
-          const trimmedRight = stripNormalizedPrefix(right, overlap);
-          if (!trimmedRight.trim()) {
-            // 剥空即整段重复（完整重放），与 mergeAssistantThinkingText 一致。
-            next = left;
-          } else {
-            next = left + trimmedRight;
-            appendedRaw = trimmedRight;
-          }
-        } else {
-          next = left + right;
-          appendedRaw = right;
-        }
-      }
-    }
-    if (next === left) continue;
-    if (next === right) {
-      left = next;
-      resetNorm(next);
-      continue;
-    }
-    left = next;
-    if (appendedRaw) leftNorm = appendCollapsedNormalized(leftNorm, collapseForOverlap(appendedRaw));
-    else resetNorm(next);
+    const step = mergeAssistantThinkingTextStep(left, leftNorm, incoming);
+    left = step.text;
+    leftNorm = step.norm;
   }
   return left;
 }
@@ -3154,7 +3155,13 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
       (left.dispatchAttemptId && left.dispatchAttemptId === right.dispatchAttemptId)
     );
   };
+  // identity 缓存：26.5 万字级 thinking 的归一化 + stringify 只做一次；
+  // dedup 循环内同一对象查/存各一次、mergeEvents 每 flush 全量循环反复参与时全部命中。
+  const assistantBodyKeyCache = new WeakMap<AssistantEvent, string | null>();
+  const assistantDeliveryContentKeyCache = new WeakMap<AssistantEvent, string | null>();
   const assistantBodyKey = (event: AssistantEvent) => {
+    const cached = assistantBodyKeyCache.get(event);
+    if (cached !== undefined) return cached;
     const content = normalizeThinkingWhitespace(event.content);
     const thinkingSource = event.thinking?.trim()
       ? event.thinking
@@ -3162,18 +3169,24 @@ export function deduplicateTimelineEvents(events: TimelineEvent[]): TimelineEven
     const thinking = normalizeThinkingWhitespace(
       thinkingSource
     );
-    if (!content && !thinking) return null;
-    return JSON.stringify([event.roomAgentId ?? "", content, thinking]);
+    const key = !content && !thinking ? null : JSON.stringify([event.roomAgentId ?? "", content, thinking]);
+    assistantBodyKeyCache.set(event, key);
+    return key;
   };
   const assistantDeliveryContentKey = (event: AssistantEvent) => {
+    const cached = assistantDeliveryContentKeyCache.get(event);
+    if (cached !== undefined) return cached;
     const content = normalizeThinkingWhitespace(event.content);
-    if (!content || (!event.roomMessageId && !event.agentTurnId)) return null;
-    return JSON.stringify([
-      event.roomAgentId ?? "",
-      event.roomMessageId ?? "",
-      event.agentTurnId ?? "",
-      content,
-    ]);
+    const key = !content || (!event.roomMessageId && !event.agentTurnId)
+      ? null
+      : JSON.stringify([
+        event.roomAgentId ?? "",
+        event.roomMessageId ?? "",
+        event.agentTurnId ?? "",
+        content,
+      ]);
+    assistantDeliveryContentKeyCache.set(event, key);
+    return key;
   };
   const mergeAssistantReplayCopies = (
     current: AssistantEvent,
