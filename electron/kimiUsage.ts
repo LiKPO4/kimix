@@ -340,6 +340,9 @@ export function parseManagedUsagePayload(payload: unknown, now = Date.now()): Ki
     throw new Error(formatKimiUsageError(message));
   }
   if (record.kind !== "ok") throw new Error("Kimi 用量接口返回格式异常");
+  // 0.43.x+ SDK 透传新结构：{ kind:"ok", quota: { usages: {...} } }。
+  const fromQuota = parseQuotaUsagesPeriods(getRecord(record.quota), record, "Kimi Code 官方用量接口", now);
+  if (fromQuota) return fromQuota;
   const limits = Array.isArray(record.limits) ? record.limits : [];
   const fiveHourRow = findManagedUsageLimit(limits, /(^|\b)(5h|300m|5\s*小时)/i);
   const weeklyRow = getRecord(record.summary) ?? findManagedUsageLimit(limits, /week|weekly|本周|每周|一周/i);
@@ -378,7 +381,62 @@ function serverUsageRowToManagedRow(row: Record<string, unknown> | null): Record
   return resetAt === undefined ? row : { ...row, refreshAt: resetAt };
 }
 
-/** 官方 Server `/api/v1/oauth/usage` 载荷解析（支持 5小时、本周 及动态 本月 探针）。 */
+function parseQuotaUsagesPeriods(
+  quota: Record<string, unknown> | null,
+  fallbackExtra: Record<string, unknown> | null,
+  source: string,
+  now: number,
+): KimiUsageData | null {
+  const usages = getRecord(quota?.usages);
+  if (!usages) return null;
+  const fiveHourRow = findQuotaUsageRow(usages, /5h|300m|5\s*hour|5\s*小时/i);
+  const weeklyRow = findQuotaUsageRow(usages, /7d|week|weekly|本周|每周|一周/i);
+  const fiveHour = usagePeriodFromRatio("5小时", fiveHourRow, now + 5 * 60 * 60 * 1000);
+  const weekly = usagePeriodFromRatio("本周", weeklyRow, nextWeekRefreshAt(now));
+  const extraUsage = extraUsageFromPayload(quota ?? {}) ?? (fallbackExtra ? extraUsageFromPayload(fallbackExtra) : undefined);
+  const periods = [fiveHour, weekly];
+  return {
+    available: periods.some((period) => period.available) || Boolean(extraUsage),
+    updatedAt: now,
+    source,
+    ...(extraUsage ? { extraUsage } : {}),
+    periods,
+  };
+}
+
+function usagePeriodFromRatio(
+  label: string,
+  row: Record<string, unknown> | null,
+  fallbackRefreshAt: number,
+): UsagePeriod {
+  if (!row) return { label, available: false, percent: 0, refreshAt: fallbackRefreshAt, message: "暂无官方数据" };
+  const ratio = toNumber(row.usedRatio ?? row.ratio ?? row.percent);
+  const refreshAt = toTimestamp(row.resetAt ?? row.reset_at ?? row.refreshAt) ?? fallbackRefreshAt;
+  if (ratio === undefined) {
+    return { label, available: false, percent: 0, refreshAt, message: "暂无官方数据" };
+  }
+  // usedRatio 为 0-1 小数；percent 字段若存在按 0-100 口径处理。
+  const normalized = ratio <= 1 && row.percent === undefined ? ratio * 100 : ratio;
+  return {
+    label,
+    percent: Math.max(0, Math.min(100, normalized)),
+    available: true,
+    refreshAt,
+  };
+}
+
+/** 从 0.43.x 的 quota.usages 键值集合里按窗口语义找行（宽容键名，防止官方再微调命名）。 */
+function findQuotaUsageRow(usages: Record<string, unknown>, pattern: RegExp): Record<string, unknown> | null {
+  const direct = Object.entries(usages).find(([key]) => pattern.test(key))?.[1];
+  return getRecord(direct);
+}
+
+/**
+ * 官方 Server `/api/v1/oauth/usage` 载荷解析（支持 5小时、本周 及动态 本月 探针）。
+ * 0.43.x kap-server 起响应结构从 { limits: [...], summary } 改为
+ * { quota: { usages: { limit5h: { usedRatio, resetAt }, limit7d: {...} } } }——新结构优先，
+ * 旧 limits/summary 结构保留兼容。
+ */
 export function parseServerUsagePayload(payload: unknown, now = Date.now()): KimiUsageData {
   const record = getRecord(payload);
   if (!record) throw new Error("Kimi 用量接口返回格式异常");
@@ -387,6 +445,10 @@ export function parseServerUsagePayload(payload: unknown, now = Date.now()): Kim
     throw new Error(formatKimiUsageError(message));
   }
   if (record.kind !== "ok") throw new Error("Kimi 用量接口返回格式异常");
+  // 0.43.x+ 新结构：quota.usages.{limit5h,limit7d}（usedRatio 0-1 + resetAt ISO）。
+  const quota = getRecord(record.quota);
+  const fromQuota = parseQuotaUsagesPeriods(quota, record, "Kimi Code 官方 Server 用量接口", now);
+  if (fromQuota) return fromQuota;
   const limits = Array.isArray(record.limits) ? record.limits : [];
   const fiveHourRow = serverUsageRowToManagedRow(findServerWindowLimit(limits, 5, "HOUR"));
   const weeklyRow = serverUsageRowToManagedRow(getRecord(record.summary));
