@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import type { WindowAPI } from "../electron/preload";
 import type {
@@ -755,6 +755,33 @@ function reloadKimixWindow() {
   window.location.reload();
 }
 
+// React ErrorBoundary：window.onerror 只能拿到 minified 堆栈（无组件名）；
+// componentDidCatch 的 componentStack 含组件名（keepNames 后不压缩），是运行时
+// 错误的组件级定位证据。
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    const detail = info.componentStack ?? "";
+    showCenteredError(error.message, detail || error.stack);
+    void window.api?.writeDiag?.({
+      message: "renderer.reactError",
+      data: { message: error.message, stack: error.stack ?? "", componentStack: detail },
+    })?.catch(() => {});
+  }
+
+  render() {
+    return this.props.children;
+  }
+}
+
 function showCenteredError(message: string, detail?: string) {
   const existing = document.getElementById("kimix-runtime-error");
   if (existing) existing.remove();
@@ -894,7 +921,9 @@ ensureLongTaskObserver();
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>
 );
 requestAnimationFrame(() => {
