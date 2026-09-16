@@ -4268,6 +4268,19 @@ button.bg-accent-primary:disabled:hover,
   box-shadow: none;
 }
 
+/* 会话/项目行操作按钮的 hover 反馈统一由此处接管（不依赖 Tailwind 颜色类生成）：
+   普通操作 hover 显示浅灰底 + 主文本色；仅危险变体（删除）保留红色，
+   两者都用显式 CSS 变量，保证任何主题/风格下都可见。 */
+.kimix-sidebar-reveal-action:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.kimix-sidebar-reveal-action.kimix-sidebar-reveal-danger:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--accent-danger-light);
+  color: var(--accent-danger);
+}
+
 /* Agent 过程头和游离的折叠思考摘要静止时保持安静，只预留 hover 边框宽度以避免位移。 */
 :root[data-ui-style-contract="v1"] button.kimix-chat-standalone-disclosure {
   border: var(--ui-role-control-hover-border);

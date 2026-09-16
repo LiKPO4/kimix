@@ -460,7 +460,9 @@ describe("UI_STYLES", () => {
 
     expect(css).not.toContain(':not([class*="bg-accent-"])');
     expect(css.match(/:not\(\[class\^="bg-accent-"\]\):not\(\[class\*=" bg-accent-"\]\)/g)).toHaveLength(5);
-    expect(sidebar).toContain('kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger');
+    // 危险操作（删除）改用显式 danger 变体类（hover 红色由 index.css 接管，不依赖 Tailwind 任意值类生成）。
+    expect(sidebar).toContain('kimix-sidebar-reveal-action kimix-inline-icon-action kimix-sidebar-reveal-danger text-text-muted');
+    expect(sidebar).not.toContain('hover:bg-accent-danger/10 hover:text-accent-danger');
   });
   it("工作区分段外壳按结构消费材质并保持同心圆角", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");

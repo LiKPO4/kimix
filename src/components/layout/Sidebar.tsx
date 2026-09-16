@@ -1064,7 +1064,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 e.stopPropagation();
                                 void (isPinned ? unpinProject(project) : pinProject(project));
                               }}
-                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted"
                               title={isPinned ? "取消置顶项目" : "置顶项目"}
                               aria-label={isPinned ? "取消置顶项目" : "置顶项目"}
                             >
@@ -1081,7 +1081,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                     : { projectId: project.id, top: rect.top, bottom: rect.bottom, left: Math.max(4, rect.right - menuWidth) }
                                 );
                               }}
-                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted"
                               title="项目菜单"
                               aria-label="项目菜单"
                             >
@@ -1095,7 +1095,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                 await createSessionForProject(project);
                               }}
                               disabled={Boolean(creatingSessionProjectPath)}
-                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary disabled:cursor-wait disabled:opacity-60"
+                              className="kimix-sidebar-reveal-action kimix-sidebar-icon-action flex items-center justify-center text-text-muted disabled:cursor-wait disabled:opacity-60"
                               title="在该项目下新对话"
                               aria-label="在该项目下新对话"
                             >
@@ -1226,7 +1226,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                           e.stopPropagation();
                                           void exportSessionMarkdown(s.id);
                                         }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted"
                                         style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="导出 Markdown"
                                         aria-label="导出 Markdown"
@@ -1238,7 +1238,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                           e.stopPropagation();
                                           void exportSessionArchive(s.id, s.title);
                                         }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted"
                                         style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="导出 Kimi 调试包"
                                         aria-label="导出 Kimi 调试包"
@@ -1267,7 +1267,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                             if (!result.outcomes?.length) toast("已归档对话");
                                           });
                                         }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted"
                                         style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="归档会话"
                                         aria-label="归档会话"
@@ -1279,7 +1279,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                           e.stopPropagation();
                                           setDeleteSessionTarget(s);
                                         }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted hover:bg-accent-danger/10 hover:text-accent-danger"
+                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action kimix-sidebar-reveal-danger text-text-muted"
                                         style={{ width: 26, height: 26, flexBasis: 26 }}
                                         title="删除会话"
                                         aria-label="删除会话"
