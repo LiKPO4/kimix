@@ -1,5 +1,13 @@
 # Kimix 长程任务状态
 
+## 2026-09-16 发版 v2.21.222（已推送 tag，CI 全绿）
+
+- 覆盖 v2.21.213~222 共 10 个 patch：重会话切换/打开卡顿五层根因链修复（213~218，用户验收「不卡了，很流畅」）、侧栏 hover 反馈统一（219/220）、Windows 11 Mica 窗口材质开关（221）、会话菜单清理与悬停组收敛（222）；218 后的 review 复核修复 completedTurnCache 上下文 key（并入 221 提交）。
+- 发版前复核：typecheck 干净 + 全量 208 文件 2281 用例全过 + build 通过 + knowledge:validate PASS（含新增 500 轮 parts 差分对拍与 windowChrome/用量/loop_control 等测试）；release notes 落 docs/release-notes/v2.21.222.md。
+- Release run 35097743747 全绿（win/mac/linux + publish），产物 17 个，body 正确取自版本 notes；Knowledge run 35097724139 全绿。
+- master 与 origin 同步至 1870c2dc；工作区仅余早期诊断脚本残留（.tmp-*.py，未跟踪，待清理）。
+- 遗留：首次进入超大会话仍有一次约 2 秒 parts 合并（进程内一次）；Mica 视觉效果与四角观感待用户实机截图确认；官方 0.44.0 发布时重新 vendor。
+
 ## 2026-09-16 重会话切换卡顿全链路闭环（213~218，用户已验收「不卡了，很流畅」）
 
 - 五轮录制逐层定位：210 thinking 文本合并 O(N×总长) → 211 dedup bodyKey 缓存 + draft 增量视图 → 214/215 completedTurnCache 三重失效（切换清空+每遍清理+组件重挂载）改模块级单例 → 216 forceCanonical 豁免 circuit → 218 Sidebar 链路无 check + context 缺 roomAgentId（mark 永不执行）。218 录制验证：circuit.open 11 次拦截、rejected 降至每会话仅首次一次、切换 longtask 从 800-900ms 降到 <110ms。
