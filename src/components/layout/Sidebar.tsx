@@ -16,6 +16,7 @@ import { compareSessionsByRecentConversation, getNextTimelineWorkExpiryAt, getSe
 import { useArchiveSession } from "@/hooks/useArchiveSession";
 import { KIMI_HISTORY_CACHE_VERSION } from "@/utils/kimiHistoryCache";
 import { backfillTurnModelsFromUsageStatuses, mergeMissingLatestCanonicalAssistant, mergeMissingUsageStatusEvents, shouldReplaceWithCanonicalKimiHistory } from "@/utils/kimiHistoryReconciliation";
+import { isCanonicalReconciliationCircuitOpen } from "@/utils/reconcileCircuitBreaker";
 import { normalizeAdditionalWorkDirs } from "@/utils/additionalWorkDirs";
 import { isSamePath, normalizePathForComparison } from "@/utils/pathCase";
 import { reportError } from "@/utils/reportError";
@@ -865,21 +866,30 @@ export function Sidebar({ width = 320 }: SidebarProps) {
       ));
       // 缓存版本陈旧且 canonical 来自本地 wire 时强制采纳（同 repair 路径语义）。
       const forceCanonical = session.kimiHistoryCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
-      const canonicalAdopted = !currentHasConversation || shouldReplaceWithCanonicalKimiHistory(
+      const selectRoomAgentId = events.find((event) => typeof event.roomAgentId === "string" && event.roomAgentId)?.roomAgentId ?? "";
+      // Circuit breaker：同 (local, canonical) pair 已 rejected 过则跳过整个对账——
+      // 该链路此前没有 check 且 shouldReplace 的 context 缺 roomAgentId（mark 永不记录），
+      // 每次 sidebar-select 都重复全量对账（217 录制：切换卡顿 800-900ms 的主项）。
+      const circuitOpen = !currentHasConversation
+        ? false
+        : isCanonicalReconciliationCircuitOpen(session.id, selectRoomAgentId, current.events, events);
+      const canonicalAdopted = !currentHasConversation || (!circuitOpen && shouldReplaceWithCanonicalKimiHistory(
         current.events,
         events,
-        { sessionId: session.id, reason: "sidebar-select", forceCanonical },
-      );
+        { sessionId: session.id, roomAgentId: selectRoomAgentId, reason: "sidebar-select", forceCanonical },
+      ));
       const mergedEvents = canonicalAdopted
         ? backfillTurnModelsFromUsageStatuses(events)
-        : mergeMissingUsageStatusEvents(
-          mergeMissingLatestCanonicalAssistant(
-            current.events,
+        : circuitOpen
+          ? current.events
+          : mergeMissingUsageStatusEvents(
+            mergeMissingLatestCanonicalAssistant(
+              current.events,
+              events,
+              { sessionId: session.id, reason: "sidebar-select" },
+            ),
             events,
-            { sessionId: session.id, reason: "sidebar-select" },
-          ),
-          events,
-        );
+          );
       // Canonical adoption is not guaranteed: a richer local timeline may be
       // retained and can still contain stale open assistants/tools. Reconcile
       // the final merged result against the authoritative runtime status.

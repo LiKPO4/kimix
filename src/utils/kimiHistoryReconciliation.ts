@@ -1114,8 +1114,10 @@ export function shouldReplaceWithCanonicalKimiHistory(
     ? hasKimiProcessHistoryRegressionTopLevel(comparisonCached, canonicalEvents)
     : hasKimiProcessHistoryRegression(comparisonCached, canonicalEvents);
   if (processRegression && !repairsDuplicateToolHistory) {
-    if (context?.sessionId && context?.roomAgentId) {
-      markReconciliationRejected(context.sessionId, context.roomAgentId, cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
+    // roomAgentId 允许空串：非 room 会话的 sidebar-select 链路（Sidebar.tsx）无 roomAgentId，
+    // 此前条件要求两者都非空导致 mark 永不执行、熔断形同虚设（217 录制 counts 无 circuit.mark）。
+    if (context?.sessionId) {
+      markReconciliationRejected(context.sessionId, context.roomAgentId ?? "", cachedEvents, context.rawCanonicalEvents ?? canonicalEvents);
     }
     logEvent("kimiHistoryReconciliation.rejected", {
       ...logCtx,
@@ -1124,6 +1126,13 @@ export function shouldReplaceWithCanonicalKimiHistory(
       localProcessEvents: kimiHistoryProcessEventCount(comparisonCached),
       canonicalProcessEvents: kimiHistoryProcessEventCount(canonicalEvents),
       fingerprint: computeReconciliationFingerprint(cachedEvents, canonicalEvents),
+      // 217 录制：counts 无 circuit.mark——透出 mark 被跳过的原因（context 缺 sessionId/roomAgentId 时熔断永不记录）
+      markContext: {
+        hasSessionId: Boolean(context?.sessionId),
+        hasRoomAgentId: Boolean(context?.roomAgentId),
+        sessionId: context?.sessionId ?? null,
+        roomAgentId: context?.roomAgentId ?? null,
+      },
     });
     return false;
   }
