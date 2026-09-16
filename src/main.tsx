@@ -788,12 +788,27 @@ function showCenteredError(message: string, detail?: string) {
 }
 
 window.addEventListener("error", (event) => {
-  showCenteredError(event.message, `${event.filename}:${event.lineno}`);
+  // 完整堆栈进入诊断详情与 diag 日志：文件名:行号只有 minified 位置，定位不了组件。
+  const stack = event.error instanceof Error && event.error.stack
+    ? event.error.stack
+    : `${event.filename}:${event.lineno}`;
+  const detail = `${event.filename}:${event.lineno}\n${stack}`;
+  showCenteredError(event.message, detail);
+  void window.api?.writeDiag?.({
+    message: "renderer.uncaught",
+    data: { message: event.message, filename: event.filename, lineno: event.lineno, stack },
+  })?.catch(() => {});
 });
 
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason instanceof Error ? event.reason.message : String(event.reason);
-  showCenteredError(reason);
+  const stack = event.reason instanceof Error && event.reason.stack ? event.reason.stack : "";
+  const detail = stack ? `unhandled rejection\n${stack}` : "unhandled rejection";
+  showCenteredError(reason, detail);
+  void window.api?.writeDiag?.({
+    message: "renderer.unhandledrejection",
+    data: { reason, stack },
+  })?.catch(() => {});
 });
 
 window.addEventListener("keydown", (event) => {
