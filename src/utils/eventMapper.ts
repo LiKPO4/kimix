@@ -9,6 +9,7 @@ import { countUnifiedDiffChanges } from "./diff";
 import { extractFileAttachmentText } from "./userFileAttachments";
 import { longestSuffixPrefixOverlap, stripNormalizedPrefix } from "./textOverlap";
 import { appendCollapsedNormalized, collapseForOverlap } from "./thinkingBlocks";
+import { notePerfDiagCount } from "./perfDiag";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -714,6 +715,7 @@ export function mergeAssistantThinkingPartsSequential(
   let index: AssistantThinkingPartsIndex | null = null;
   for (const batch of batches) {
     if (!batch?.length) continue;
+    notePerfDiagCount("partsMerge.batch");
     if (!result?.length) {
       const mergedEmpty = mergeAssistantThinkingPartBatch(EMPTY_ASSISTANT_THINKING_PARTS_INDEX, batch);
       const output = sameThinkingPartOrder(mergedEmpty.parts, batch) ? batch : mergedEmpty.parts;

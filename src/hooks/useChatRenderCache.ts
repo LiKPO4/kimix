@@ -9,14 +9,17 @@ import type { CompletedTurnRenderCacheEntry } from "@/types/chatRender";
  * DOM. This ref-backed cache is scoped to the current session and cleared when
  * the session changes.
  */
-// 跨会话保留：此前实现是「切换会话即清空」——重会话（单轮 95 assistant / 26.5 万字
-// 思考，合并一次约 2 秒）来回切换时缓存永远是冷的，每切一次重付全额合并开销
-//（v2.21.213 录制归因：perfDiag counts 全空 = 缓存条目从未存活到命中）。
+// 跨会话/跨挂载保留：缓存必须驻留模块级。两层原因（v2.21.214/215 录制归因）：
+// ① 此前「切换会话即清空」让来回切换永远冷缓存；
+// ② 修复为 useRef 保留后依然无效——AppShell 用 {chatWorkspaceActive && <ChatThread/>}
+//   条件渲染，进出设置页/插件页时 ChatThread 卸载重挂载，useRef 随组件实例重建。
 // cacheKey 形如 `${roomAgentId}:${agentTurnId}:${segmentOrdinal}:${turnStartedAt}`，
-// agentTurnId/事件 id 全局唯一，天然按会话隔离，跨会话保留不会串数据。
+// agentTurnId/事件 id 全局唯一，天然按会话隔离，跨实例保留不会串数据。
 // 容量上限由 ChatThread 的写入侧负责（Map 插入序淘汰最旧）。sessionId 保留在签名里
-// 供调用方按当前会话传参；缓存本身不再按会话清空。
+// 供调用方按当前会话传参。
+const globalCompletedTurnRenderCache = new Map<string, CompletedTurnRenderCacheEntry>();
+
 export function useChatRenderCache(_sessionId: string | undefined) {
-  const cacheRef = useRef(new Map<string, CompletedTurnRenderCacheEntry>());
+  const cacheRef = useRef(globalCompletedTurnRenderCache);
   return cacheRef;
 }
