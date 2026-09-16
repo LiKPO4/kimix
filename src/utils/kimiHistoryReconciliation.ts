@@ -14,6 +14,7 @@ import {
 import { logEvent } from "@/utils/reportError";
 import {
   clearReconciliationCircuit,
+  computeReconciliationFingerprint,
   markReconciliationRejected,
 } from "@/utils/reconcileCircuitBreaker";
 
@@ -1122,6 +1123,7 @@ export function shouldReplaceWithCanonicalKimiHistory(
       reason: "process-history-regression",
       localProcessEvents: kimiHistoryProcessEventCount(comparisonCached),
       canonicalProcessEvents: kimiHistoryProcessEventCount(canonicalEvents),
+      fingerprint: computeReconciliationFingerprint(cachedEvents, canonicalEvents),
     });
     return false;
   }

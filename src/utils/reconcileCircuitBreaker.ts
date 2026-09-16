@@ -15,6 +15,7 @@
  */
 import type { TimelineEvent } from "@/types/ui";
 import { kimiHistoryProcessEventCount } from "@/utils/kimiHistoryCache";
+import { notePerfDiagCount } from "@/utils/perfDiag";
 
 // Bump when rejected-pair recovery semantics change so an older rejection
 // cannot suppress a newly capable additive repair after an app upgrade.
@@ -86,6 +87,13 @@ function displayableUserImageCount(events: TimelineEvent[]): number {
  * events with Date.now() timestamps, which would make the fingerprint change
  * every ~70ms and defeat the circuit breaker.
  */
+export function computeReconciliationFingerprint(
+  localEvents: TimelineEvent[],
+  canonicalEvents: TimelineEvent[],
+): string {
+  return computeFingerprint(localEvents, canonicalEvents);
+}
+
 function computeFingerprint(
   localEvents: TimelineEvent[],
   canonicalEvents: TimelineEvent[],
@@ -138,8 +146,11 @@ export function isCanonicalReconciliationCircuitOpen(
   const fingerprint = computeFingerprint(localEvents, canonicalEvents);
   const data = loadCircuit();
   const entry = data[key];
+  notePerfDiagCount("circuit.check");
   if (!entry) return false;
-  return entry.fingerprint === fingerprint;
+  const open = entry.fingerprint === fingerprint;
+  notePerfDiagCount(open ? "circuit.open" : "circuit.fingerprintShift");
+  return open;
 }
 
 /**
@@ -172,6 +183,7 @@ export function markReconciliationRejected(
 
   data[key] = { fingerprint, rejectedAt: Date.now() };
   saveCircuit(data);
+  notePerfDiagCount("circuit.mark");
 }
 
 /**
