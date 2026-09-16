@@ -800,6 +800,8 @@ function assistantFailureContent(message: string): string {
   return `模型请求失败：${message.trim() || "当前轮未返回可显示内容。"}`;
 }
 
+const MAX_COMPLETED_TURN_RENDER_CACHE = 240;
+
 export function buildRenderItems(
   events: TimelineEvent[],
   sessionEngine?: "prompt" | "kimi-code",
@@ -1385,6 +1387,17 @@ export function buildRenderItems(
       items: items.slice(itemStart),
       sessionEngine,
     });
+    // 容量保护：跨会话保留后条目会累积，超出上限按插入序淘汰最旧
+    //（turn 渲染结果只含 render item 引用，淘汰不影响事件数据本身）。
+    if (completedTurnCache.size > MAX_COMPLETED_TURN_RENDER_CACHE) {
+      let removed = 0;
+      const excess = completedTurnCache.size - (MAX_COMPLETED_TURN_RENDER_CACHE >> 1);
+      for (const key of completedTurnCache.keys()) {
+        completedTurnCache.delete(key);
+        removed += 1;
+        if (removed >= excess) break;
+      }
+    }
   };
   // 同一 agentTurnId 在一遍渲染内的 flush 次序（steer 切分会产生 0=前段、
   // 1=后段）；事件序列稳定时跨遍一致，供 completedTurnCacheKey 区分段。
@@ -1463,11 +1476,9 @@ export function buildRenderItems(
     turnBody.push(event);
   }
   flushTurn(true);
-  if (completedTurnCache) {
-    for (const cacheKey of completedTurnCache.keys()) {
-      if (!usedCompletedTurnCacheKeys.has(cacheKey)) completedTurnCache.delete(cacheKey);
-    }
-  }
+  // 注：不再按「本遍未使用即删」清理缓存——该策略会让跨会话保留形同虚设
+  //（切到 B 渲染时 A 的 key 全被删，切回冷缓存；213 录制 counts 全空即此因）。
+  // 内存由写入侧 MAX_COMPLETED_TURN_RENDER_CACHE 容量上限兜底。
   return groupNotificationRenderItems(items);
 }
 

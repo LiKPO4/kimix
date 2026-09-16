@@ -44,22 +44,28 @@ describe("useChatRenderCache", () => {
     expect(result.current.current.size).toBe(1);
   });
 
-  it("clears the cache when the session id changes", () => {
+  // 跨会话保留（v2.21.214）：cacheKey 含全局唯一的 agentTurnId/事件 id，天然按会话隔离；
+  // 来回切换大会话时 completed turn 直接命中——「切换即清空」会让重会话每切一次
+  // 重付全额合并开销（单轮 95 assistant / 26.5 万字思考约 2 秒，213 录制归因）。
+  it("keeps entries across session switches (back-navigation hits)", () => {
     const { result, rerender } = renderHook((sessionId: string) => useChatRenderCache(sessionId), {
       initialProps: "session-1",
     });
     result.current.current.set("key", { events: [], items: [] });
     rerender("session-2");
-    expect(result.current.current.size).toBe(0);
+    expect(result.current.current.size).toBe(1);
+    expect(result.current.current.get("key")).toBeTruthy();
+    rerender("session-1");
+    expect(result.current.current.get("key")).toBeTruthy();
   });
 
-  it("returns a fresh empty cache when switching to undefined session", () => {
+  it("keeps entries when switching to undefined session", () => {
     const { result, rerender } = renderHook((sessionId?: string) => useChatRenderCache(sessionId), {
       initialProps: "session-1",
     });
     result.current.current.set("key", { events: [], items: [] });
     rerender(undefined);
-    expect(result.current.current.size).toBe(0);
+    expect(result.current.current.size).toBe(1);
   });
 
   it("can store and retrieve a completed turn entry", () => {
