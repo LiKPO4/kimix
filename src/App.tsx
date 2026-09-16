@@ -340,7 +340,10 @@ async function repairKimiCodeHistoryBodies(sessions: Session[], options?: { incl
           ? (preSession.collaboration ? getRoomAgent(preSession, target.roomAgentId)?.kimiHistoryCacheVersion : preSession.kimiHistoryCacheVersion)
           : undefined;
         const forceCanonical = preCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
-        if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
+        // forceCanonical 不再豁免 circuit：v7 起第一次跑完会记录新 fingerprint，同 pair
+        // 重试的判定与 additive patch 都是确定性的（旧会话升版重洗每次结果相同；
+        // 215 录制：每次 sidebar-select 重复全量对账 575 vs 83 = 切换卡顿 800-900ms 主项）。
+        if (isCanonicalReconciliationCircuitOpen(session.id, target.roomAgentId, preLocalEvents, canonicalEvents)) {
           circuitSkipped = true;
           continue;
         }
@@ -2476,7 +2479,8 @@ function App() {
                   : latestOwner.kimiHistoryCacheVersion;
                 const forceCanonical = ownerCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
                 // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-                if (!forceCanonical && isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, ownerCanonicalEvents)) {
+                // forceCanonical 不豁免（同 pair 判定与 patch 确定性，重跑结果不变）。
+                if (isCanonicalReconciliationCircuitOpen(latestOwner.id, ownerAgentId, localAgentEvents, ownerCanonicalEvents)) {
                   return;
                 }
                 const reconciliation = reconcileAgentCanonicalHistory({
@@ -3892,7 +3896,8 @@ function App() {
             const reloadCacheVersion = item.collaboration ? getRoomAgent(item, roomAgentId)?.kimiHistoryCacheVersion : item.kimiHistoryCacheVersion;
             const forceCanonical = reloadCacheVersion !== KIMI_HISTORY_CACHE_VERSION && loaded.data.source === "local";
             // Circuit breaker: skip if the same (local, canonical) pair was already rejected.
-            if (!forceCanonical && isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalForAgent)) {
+            // forceCanonical 不豁免（同 pair 判定与 patch 确定性，重跑结果不变）。
+            if (isCanonicalReconciliationCircuitOpen(session.id, roomAgentId, localAgentEvents, canonicalForAgent)) {
               return item;
             }
             const reconciliation = timeSync(`${reason}.reconcile`, () => reconcileAgentCanonicalHistory({
