@@ -1,4 +1,4 @@
-import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, MoreHorizontal, Pin, Archive, Trash2, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, Download, FileText, AlertTriangle } from "lucide-react";
+import { SquarePen, Settings, FolderOpen, Search, LayoutGrid, MoreHorizontal, Pin, Archive, X, FolderSearch, GitBranch, Loader2, Plus, Webhook, FileText, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore } from "@/stores/appStore";
@@ -796,6 +796,29 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     toast("已删除会话");
   };
 
+  // SessionToolbar 菜单的会话动作事件（导出调试包 / 删除对话）：实现与确认弹窗都
+  // 在本组件，用事件委托避免跨组件搬状态；ref 持有最新实现，监听只挂一次。
+  const sessionActionHandlerRef = useRef<(detail: { kind: string; sessionId: string }) => void>(() => {});
+  sessionActionHandlerRef.current = (detail) => {
+    const target = useSessionStore.getState().sessions.find((session) => session.id === detail.sessionId)
+      ?? (useAppStore.getState().currentSession?.id === detail.sessionId ? useAppStore.getState().currentSession : null);
+    if (!target) {
+      toast("会话不存在或已删除");
+      return;
+    }
+    if (detail.kind === "export-archive") void exportSessionArchive(target.id, target.title);
+    else if (detail.kind === "delete") setDeleteSessionTarget(target);
+  };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string; sessionId?: string }>).detail;
+      if (!detail?.kind || !detail?.sessionId) return;
+      sessionActionHandlerRef.current({ kind: detail.kind, sessionId: detail.sessionId });
+    };
+    window.addEventListener("kimix:session-action", handler);
+    return () => window.removeEventListener("kimix:session-action", handler);
+  }, []);
+
   const selectSession = async (sessionId: string) => {
     const session = visibleSessions.find((s) => s.id === sessionId);
     if (!session) return;
@@ -1236,18 +1259,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          void exportSessionArchive(s.id, s.title);
-                                        }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action text-text-muted"
-                                        style={{ width: 26, height: 26, flexBasis: 26 }}
-                                        title="导出 Kimi 调试包"
-                                        aria-label="导出 Kimi 调试包"
-                                      >
-                                        <Download size={13} />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
                                           void archiveSession(s.id).then((result) => {
                                             if (result.outcomes?.length) {
                                               toast(`房间${formatRoomLifecycleOutcomes("archive", result.outcomes)}`);
@@ -1273,18 +1284,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
                                         aria-label="归档会话"
                                       >
                                         <Archive size={13} />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDeleteSessionTarget(s);
-                                        }}
-                                        className="kimix-sidebar-reveal-action kimix-inline-icon-action kimix-sidebar-reveal-danger text-text-muted"
-                                        style={{ width: 26, height: 26, flexBasis: 26 }}
-                                        title="删除会话"
-                                        aria-label="删除会话"
-                                      >
-                                        <Trash2 size={13} />
                                       </button>
                                     </div>
                                   </div>

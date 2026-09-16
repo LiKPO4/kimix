@@ -448,8 +448,8 @@ describe("UI_STYLES", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const sidebar = readFileSync(resolve(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
 
-    // 6 个既有操作 + v2.21.209 会话删除按钮 = 7。
-    expect(sidebar.match(/kimix-sidebar-reveal-action/g)).toHaveLength(7);
+    // 会话行 2（导出 Markdown/归档）+ 项目行 3；导出调试包与删除已收敛到会话菜单。
+    expect(sidebar.match(/kimix-sidebar-reveal-action/g)).toHaveLength(5);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+\.kimix-sidebar-reveal-action:not\(:hover\):not\(:focus-visible\):not\(:active\)\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.kimix-sidebar-icon-action:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-navigation-action-hover-shadow\);/s);
     expect(css).toMatch(/:root\[data-ui-style-contract="v1"\]\s+:where\([^)]*\.kimix-inline-icon-action[^)]*\)[^{}]*:hover:not\(:disabled\)\s*\{[^}]*box-shadow:\s*var\(--ui-role-control-hover-shadow\);/s);
@@ -460,9 +460,11 @@ describe("UI_STYLES", () => {
 
     expect(css).not.toContain(':not([class*="bg-accent-"])');
     expect(css.match(/:not\(\[class\^="bg-accent-"\]\):not\(\[class\*=" bg-accent-"\]\)/g)).toHaveLength(5);
-    // 危险操作（删除）改用显式 danger 变体类（hover 红色由 index.css 接管，不依赖 Tailwind 任意值类生成）。
-    expect(sidebar).toContain('kimix-sidebar-reveal-action kimix-inline-icon-action kimix-sidebar-reveal-danger text-text-muted');
+    // 危险操作（删除）已从侧栏悬停组移入会话菜单：侧栏不再出现 danger 变体按钮，
+    // 菜单危险项由 SessionToolbar 的 danger 类型渲染；index.css 的 danger 规则保留备用。
+    expect(sidebar).not.toContain('kimix-sidebar-reveal-danger');
     expect(sidebar).not.toContain('hover:bg-accent-danger/10 hover:text-accent-danger');
+    expect(readFileSync(resolve(process.cwd(), "src/components/layout/SessionToolbar.tsx"), "utf8")).toContain('danger: true');
   });
   it("工作区分段外壳按结构消费材质并保持同心圆角", () => {
     const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");

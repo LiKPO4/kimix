@@ -7,24 +7,23 @@ import {
   Clipboard,
   ClipboardCopy,
   Ellipsis,
-  ExternalLink,
   FileText,
   FolderOpen,
   Globe2,
   History,
   Laptop,
   Link,
-  MessageSquarePlus,
   PanelRight,
   PanelRightOpen,
   Pencil,
-  Pin,
   Play,
   Pause,
   RefreshCw,
   Sparkles,
   Square,
   SquareTerminal,
+  Download,
+  Trash2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -42,7 +41,7 @@ import { formatRoomLifecycleOutcomes } from "@/utils/sessionArchive";
 
 export type SessionMenuEntry =
   | { type: "separator" }
-  | { type?: "item"; label: string; hint?: string; icon: LucideIcon; disabled?: boolean; action: () => void | Promise<void> };
+  | { type?: "item"; label: string; hint?: string; icon: LucideIcon; disabled?: boolean; danger?: boolean; action: () => void | Promise<void> };
 
 type LongTaskStage = "drafting" | "planning" | "ready" | "running" | "reviewing" | "paused" | "completed";
 type LongTaskAgent = "executor" | "reviewer";
@@ -340,8 +339,18 @@ export function SessionToolbar({
     Boolean(mutationOwner?.runtimeSessionId)
   );
 
+  // 悬停按钮组的「导出调试包 / 删除」收敛到菜单（悬停组只留导出 Markdown 与归档）。
+  // 动作经窗口事件委托给 Sidebar：导出实现与删除确认弹窗都在那里，避免跨组件搬状态。
+  const requestSessionAction = (kind: "export-archive" | "delete") => {
+    const sessionId = liveCurrentSession?.id;
+    if (!sessionId) {
+      showToast("当前没有对话");
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("kimix:session-action", { detail: { kind, sessionId } }));
+  };
+
   const sessionMenuItems: SessionMenuEntry[] = [
-    { label: "置顶对话", hint: "Ctrl+Alt+P", icon: Pin, disabled: true, action: () => undefined },
     { label: "重命名对话", hint: "Ctrl+Alt+R", icon: Pencil, action: openRenameDialog },
     { label: "归档对话", hint: "Ctrl+Shift+A", icon: Archive, action: archiveCurrentSession },
     { type: "separator" },
@@ -350,12 +359,11 @@ export function SessionToolbar({
     { label: "复制深度链接", hint: "Ctrl+Alt+L", icon: Link, action: () => copyToClipboard(`kimix://session/${liveCurrentSession?.id ?? ""}`, "已复制深度链接") },
     { label: "复制为 Markdown", icon: FileText, action: () => liveCurrentSession ? copyToClipboard(sessionToMarkdown(liveCurrentSession), "已复制 Markdown") : showToast("当前没有对话") },
     { type: "separator" },
-    { label: "打开侧边聊天", icon: MessageSquarePlus, disabled: true, action: () => undefined },
     { label: "派生到本地", icon: Laptop, disabled: !canForkKimiSession, action: forkCurrentSession },
     { label: "会话可视化", icon: History, disabled: !liveCurrentSession || liveCurrentSession.engine !== "kimi-code" || !mutationOwner?.runtimeSessionId, action: openKimiVis },
-    { label: "添加自动化...", icon: History, disabled: true, action: () => undefined },
     { type: "separator" },
-    { label: "在新窗口中打开", icon: ExternalLink, disabled: true, action: () => undefined },
+    { label: "导出 Kimi 调试包", icon: Download, action: () => requestSessionAction("export-archive") },
+    { label: "删除对话", icon: Trash2, danger: true, action: () => requestSessionAction("delete") },
   ];
 
   const handleSessionMenuEntry = (entry: SessionMenuEntry) => {
@@ -494,7 +502,7 @@ export function SessionToolbar({
                       item.disabled
                         ? "cursor-not-allowed"
                         : ""
-                    }`}
+                    } ${item.danger ? "text-accent-danger" : ""}`}
                     style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 9, paddingBottom: 9 }}
                   >
                     <item.icon size={17} className="shrink-0" />
