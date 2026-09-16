@@ -97,6 +97,13 @@ export function ensureLongTaskObserver() {
   }
 }
 
+/** 通用轻量计数器：卡顿归因埋点用（如 completedTurnCache 拒绝原因），仅 perfDiag 开启时累计。 */
+const perfCounts = new Map<string, number>();
+export function notePerfDiagCount(label: string) {
+  if (!isPerfDiagEnabled()) return;
+  perfCounts.set(label, (perfCounts.get(label) ?? 0) + 1);
+}
+
 export function noteRenderTurnBodyRun(hitCache: boolean) {
   if (!isPerfDiagEnabled()) return;
   renderTurnBodyRuns += 1;
@@ -105,6 +112,7 @@ export function noteRenderTurnBodyRun(hitCache: boolean) {
 
 export function getPerfDiagSnapshot() {
   return {
+    counts: Object.fromEntries(perfCounts),
     scrollTopWrites: { ...scrollTopWrites },
     renderTurnBodyRuns,
     renderTurnBodyCacheHits,

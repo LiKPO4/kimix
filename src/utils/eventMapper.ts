@@ -408,6 +408,57 @@ export function mergeAssistantThinkingTextSequence(
   return left;
 }
 
+
+// ============ 包含检测的 8-gram 布隆剪枝 ============
+// alreadyCovered / coveredIndexes 对每段 incoming 都要对全部已有段做 includes；
+// 大段（万字符级）相互 includes 在自然语言文本下 Boyer-Moore 跳步退化、接近
+// O(haystack × needle)——重会话快照重放时这是 mergeAssistant 秒级开销的主项。
+// 必要条件：partText 被任一已有段包含 ⇒ partText 的任意 8-gram 都出现在包含段里。
+// 因此首 8-gram 不在布隆中 ⇒ 绝不可能被包含 ⇒ 跳过全部 includes（无假阴性）。
+const BLOOM_GRAM = 8;
+const BLOOM_HASHES = 3;
+const BLOOM_BITS_PER_ITEM = 16;
+
+function gramHash(text: string, from: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < BLOOM_GRAM; i += 1) {
+    h ^= text.charCodeAt(from + i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+type GramBloom = { bits: Uint32Array; mask: number };
+
+function createGramBloom(normalized: readonly string[]): GramBloom | null {
+  let total = 0;
+  for (const text of normalized) total += Math.max(0, text.length - BLOOM_GRAM + 1);
+  if (total <= 0) return null;
+  const bitCount = Math.max(1024, 1 << Math.ceil(Math.log2(total * BLOOM_BITS_PER_ITEM)));
+  const bits = new Uint32Array(bitCount >>> 5);
+  const mask = bitCount - 1;
+  for (const text of normalized) {
+    for (let from = 0; from + BLOOM_GRAM <= text.length; from += 1) {
+      const h = gramHash(text, from);
+      for (let k = 0; k < BLOOM_HASHES; k += 1) {
+        const bit = (h + k * 0x9e3779b9) & mask;
+        bits[bit >>> 5] |= 1 << (bit & 31);
+      }
+    }
+  }
+  return { bits, mask };
+}
+
+function bloomMaybeHas(bloom: GramBloom, text: string): boolean {
+  if (text.length < BLOOM_GRAM) return true; // 短于 gram 无法判断，回退精确检查
+  const h = gramHash(text, 0);
+  for (let k = 0; k < BLOOM_HASHES; k += 1) {
+    const bit = (h + k * 0x9e3779b9) & bloom.mask;
+    if (!(bloom.bits[bit >>> 5] & (1 << (bit & 31)))) return false;
+  }
+  return true;
+}
+
 type AssistantThinkingPartsIndex = {
   parts: AssistantThinkingPart[];
   normalized: string[];
@@ -483,11 +534,17 @@ function mergeAssistantThinkingPartBatch(
   if (idIndex) {
     for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
   }
+  // 大段 includes 在自然语言文本下 BM 退化接近 O(n×m)，对全部已有段逐个 includes 是
+  // mergeAssistant 秒级开销的主项；已有段足够多时用 8-gram 布隆做必要条件剪枝
+  //（首 8-gram 不在布隆 ⇒ 绝不可能被包含，无假阴性，假阳性仅回退一次精确检查）。
+  // 建造代价 O(Σ已有段长) 每批一次；只有批内 incoming 段数足够多（includes 次数 ×N）
+  // 且已有段数足够多时才划算，否则大段批会建造成本 > 被替代的 includes 成本。
+  const coverBloom = incoming.length >= 8 && parts.length >= 16 ? createGramBloom(normalized) : null;
 
   for (const part of incoming) {
-    const partText = normalizedThinkingPart(part);
-    if (!partText) continue;
-
+    // Same id 查找放在归一化之前：流式重放每事件新建 part 对象，
+    // 开头就全量归一化会让万字符级大段的同 id 更新每批都付 O(段长) 正则——
+    // 这是 mergeAssistant 秒级开销的主项。partText 仅新 id（需要覆盖检查/插入）才算。
     // Same id means a streaming update of the same thought: replace in place
     // only when the incoming text grew, otherwise keep the existing version.
     // 线性扫描代替逐批克隆的 id 索引：逐批克隆 Map 是整链最贵的常数项
@@ -513,22 +570,37 @@ function mergeAssistantThinkingPartBatch(
           text: part.text,
         };
         parts[sameIdIndex] = replacement;
-        normalized[sameIdIndex] = normalizedThinkingPart(replacement);
+        // 流式增长（前缀扩展）时增量归一化：万字符级大段同 id 更新每批都全量
+        // 正则归一化是 mergeAssistant 秒级开销的主项；跨边界空白运行按整体合并
+        // 的口径与全量 collapse 等价（同 buildThinkingBlocks 的增量视图）。
+        if (part.text.startsWith(current.text)) {
+          normalized[sameIdIndex] = appendCollapsedNormalized(
+            normalized[sameIdIndex],
+            collapseForOverlap(part.text.slice(current.text.length)),
+          );
+        } else {
+          normalized[sameIdIndex] = normalizedThinkingPart(replacement);
+        }
         changed = true;
       }
       continue;
     }
 
+    const partText = normalizedThinkingPart(part);
+    if (!partText) continue;
+
     // A fragment already covered by an existing part contributes nothing.
-    let alreadyCovered = false;
-    for (let index = 0; index < parts.length; index += 1) {
-      const itemText = normalized[index];
-      if (itemText.length >= partText.length && itemText.includes(partText)) {
-        alreadyCovered = true;
-        break;
+    if (!coverBloom || bloomMaybeHas(coverBloom, partText)) {
+      let alreadyCovered = false;
+      for (let index = 0; index < parts.length; index += 1) {
+        const itemText = normalized[index];
+        if (itemText.length >= partText.length && itemText.includes(partText)) {
+          alreadyCovered = true;
+          break;
+        }
       }
+      if (alreadyCovered) continue;
     }
-    if (alreadyCovered) continue;
 
     // A full replay supersedes every earlier fragment it covers. Find all
     // covered positions in one pass, then rebuild the arrays and id index once.
@@ -552,11 +624,9 @@ function mergeAssistantThinkingPartBatch(
       };
       parts.splice(insertIndex, 0, replacement);
       normalized.splice(insertIndex, 0, normalizedThinkingPart(replacement));
-      if (idIndex) {
-        // filter + splice 使全部索引移位：重建局部索引（覆盖型重放是罕见分支）。
-        idIndex = new Map();
-        for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
-      }
+      // filter + splice 使全部索引移位：直接作废（后续查找回退线性扫描），
+      // 避免覆盖型分支每段一次 O(P) 重建——插入型批次里这是热路径。
+      idIndex = null;
       changed = true;
       continue;
     }
@@ -578,10 +648,8 @@ function mergeAssistantThinkingPartBatch(
       }
       parts.splice(low, 0, part);
       normalized.splice(low, 0, partText);
-      if (idIndex) {
-        idIndex = new Map();
-        for (let index = 0; index < parts.length; index += 1) idIndex.set(parts[index].id, index);
-      }
+      // 低位插入同样索引移位：作废局部索引。
+      idIndex = null;
     }
     changed = true;
   }

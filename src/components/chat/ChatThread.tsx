@@ -7,7 +7,7 @@ import { normalizePathForComparison } from "@/utils/pathCase";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { useChatRenderCache } from "@/hooks/useChatRenderCache";
 import { useProjectedTimeline } from "@/hooks/useProjectedTimeline";
-import { noteProfilerCommit, noteRenderTurnBodyRun, timeSync } from "@/utils/perfDiag";
+import { notePerfDiagCount, noteProfilerCommit, noteRenderTurnBodyRun, timeSync } from "@/utils/perfDiag";
 import { noteStartupRenderCycle, measureSync as measureStartupSync } from "@/utils/startupProfiler";
 import { useChatViewport } from "@/hooks/useChatViewport";
 import { EmptyState } from "./EmptyState";
@@ -863,16 +863,16 @@ export function buildRenderItems(
     const durationMs = reliableDurations.length > 0
       ? Math.max(...reliableDurations)
       : undefined;
-    const mergedThinkingParts = mergeAssistantThinkingPartsSequential(
+    const mergedThinkingParts = timeSync("renderItems.mergeAssistant.parts", () => mergeAssistantThinkingPartsSequential(
       undefined,
       visible.map((event) => event.thinkingParts),
-    );
+    ));
     // thinking 字符串从 thinkingParts 合并结果派生，消除双轨漂移：
     // live 渲染优先读 thinking，settle 后优先读 thinkingParts，独立合并
     // 会让同一内容在渲染路径切换时"变样"。
     const mergedThinking = mergedThinkingParts?.length
-      ? mergedThinkingParts.map((part) => part.text).join("") || undefined
-      : mergeAssistantThinkingTextSequence(visible.map((event) => event.thinking));
+      ? timeSync("renderItems.mergeAssistant.join", () => mergedThinkingParts.map((part) => part.text).join("")) || undefined
+      : timeSync("renderItems.mergeAssistant.seq", () => mergeAssistantThinkingTextSequence(visible.map((event) => event.thinking)));
     return {
       ...first,
       id: first.agentTurnId || first.roomMessageId
@@ -1306,7 +1306,10 @@ export function buildRenderItems(
     // settled/headerless result on every subsequent render (cached.events
     // identity-match short-circuits renderTurnBody). That is why prior fixes to
     // the settle logic had no effect: the cache bypassed them entirely.
-    if (isLatestTurn && isSessionRunning) return false;
+    if (isLatestTurn && isSessionRunning) {
+      notePerfDiagCount("cacheReject.sessionRunning");
+      return false;
+    }
     const identityEvent = turnEvents.find((event) => event.agentTurnId || event.roomAgentId || event.roomMessageId);
     const roomAgentId = identityEvent?.roomAgentId ?? turnUserEvent?.roomAgentId;
     const roomMessageId = identityEvent?.roomMessageId ?? turnUserEvent?.roomMessageId;
@@ -1315,8 +1318,11 @@ export function buildRenderItems(
       activity,
       { roomAgentId, roomMessageId, agentTurnId },
       isLatestTurn,
-    ))) return false;
-    return !turnEvents.some((event) => (
+    ))) {
+      notePerfDiagCount("cacheReject.activeAgent");
+      return false;
+    }
+    const incomplete = turnEvents.find((event) => (
       (event.type === "assistant_message" && !event.isComplete) ||
       (event.type === "tool_call" && event.status === "running") ||
       (event.type === "subagent" && (event.status === "queued" || event.status === "running" || event.status === "suspended")) ||
@@ -1325,6 +1331,8 @@ export function buildRenderItems(
       (event.type === "steer_message" && (event.status === "sending" || event.status === "accepted")) ||
       (event.type === "compaction" && event.phase === "begin")
     ));
+    if (incomplete) notePerfDiagCount(`cacheReject.incomplete.${incomplete.type}`);
+    return !incomplete;
   };
   const completedTurnCacheKey = (turnEvents: TimelineEvent[], segmentOrdinal: number) => {
     const first = turnEvents[0];
@@ -1352,6 +1360,13 @@ export function buildRenderItems(
     const cacheKey = completedTurnCacheKey(turnEvents, segmentOrdinal);
     usedCompletedTurnCacheKeys.add(cacheKey);
     const cached = completedTurnCache.get(cacheKey);
+    if (cached && !(
+      cached.sessionEngine === sessionEngine &&
+      cached.events.length === turnEvents.length &&
+      cached.events.every((event, index) => event === turnEvents[index])
+    )) {
+      notePerfDiagCount("cacheMiss.identity");
+    }
     if (
       cached &&
       cached.sessionEngine === sessionEngine &&
