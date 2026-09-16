@@ -204,6 +204,7 @@ import type {
   KimiCodeRegenerateTitleResponse,
   KimiCodeLoopControlResponse,
   SaveKimiLoopControlRequest,
+  WindowMaterialInfo,
   KimiCodeResumeSessionRequest,
   KimiCodeSessionRequest,
   KimiCodeSessionResponse,
@@ -484,6 +485,8 @@ const api = {
     ipcRenderer.invoke("kimi-code:regenerateSessionTitle", req),
   getKimiLoopControl: (): Promise<KimiCodeLoopControlResponse> =>
     ipcRenderer.invoke("kimi-code:getLoopControl"),
+  getWindowMaterial: (): Promise<WindowMaterialInfo> =>
+    ipcRenderer.invoke("app:getWindowMaterial"),
   saveKimiLoopControl: (req: SaveKimiLoopControlRequest): Promise<KimiCodeVoidResponse> =>
     ipcRenderer.invoke("kimi-code:saveLoopControl", req),
   reloadKimiCodeSession: (req: KimiCodeSessionRequest): Promise<KimiCodeVoidResponse> =>

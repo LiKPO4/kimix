@@ -1698,6 +1698,19 @@ body {
   clip-path: none;
 }
 
+/* Windows 11 Mica 窗口材质（透明窗口的互斥形态：主进程按设置以
+   transparent:false + backgroundMaterial:'mica' 创建，渲染层消费本属性）。
+   外壳三层改半透明让 DWM 材质透出，主对话区保持不透明以保证可读性；
+   不透明窗口由系统绘制四角圆角，故不启用上面的 CSS 透明壳规则。 */
+:root[data-window-material="mica"] body {
+  background-color: transparent;
+}
+
+:root[data-window-material="mica"] .kimix-app-shell,
+:root[data-window-material="mica"] .kimix-sidebar {
+  background-color: color-mix(in srgb, var(--surface-ground) 74%, transparent);
+}
+
 button,
 input,
 textarea,

@@ -132,6 +132,7 @@ const defaultBrowserPreviewSettings: AppSettings = {
   experimentalKimiSubagentFork: false,
   experimentalKimiTower: false,
   permissionModeReminderDisabled: false,
+  useWindowsMica: false,
   kimiMonthlyQuotaEnabled: false,
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,
@@ -598,6 +599,7 @@ function installBrowserPreviewApi() {
     deleteKimiCodeSession: (): Promise<VoidResponse> => fail("删除 Kimi Code 会话"),
     regenerateKimiSessionTitle: (): Promise<never> => fail("重新生成 Kimi Code 会话标题"),
     getKimiLoopControl: (): Promise<never> => fail("读取 loop_control 配置"),
+    getWindowMaterial: async () => ({ supported: false, enabled: false }),
     saveKimiLoopControl: (): Promise<never> => fail("保存 loop_control 配置"),
     reloadKimiCodeSession: (): Promise<VoidResponse> => fail("重载 Kimi Code 会话"),
     sendKimiCodePrompt: (): Promise<KimiCodePromptResponse> => fail("发送 Kimi Code 消息"),
@@ -801,9 +803,20 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-// Windows 使用透明窗口外壳，body 不铺底色让四角露出桌面（CSS data-transparent-shell 消费）
+// Windows 窗口外壳两态（互斥，均需重启生效）：
+// 默认：透明窗口 + CSS 圆角（body 不铺底色让四角露出桌面，data-transparent-shell 消费）；
+// Mica：不透明无边框窗口 + DWM 材质（系统绘制圆角），外壳各层半透明透出材质
+//（data-window-material 消费）。窗口 transparent 是创建期参数，由主进程按设置决定。
 if (window.api?.platform === "win32") {
-  document.documentElement.setAttribute("data-transparent-shell", "1");
+  void window.api.getWindowMaterial?.().then((material) => {
+    if (material?.enabled) {
+      document.documentElement.setAttribute("data-window-material", "mica");
+    } else {
+      document.documentElement.setAttribute("data-transparent-shell", "1");
+    }
+  }).catch(() => {
+    document.documentElement.setAttribute("data-transparent-shell", "1");
+  });
 }
 
 const rootEl = document.getElementById("root");

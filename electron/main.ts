@@ -2835,6 +2835,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.join(__dirname, "..");
 process.env.APP_ROOT = APP_ROOT;
 const WINDOWS_APP_USER_MODEL_ID = "com.kimix.app";
+
+// Windows 11（build >= 22000）才支持 DWM 背景材质（Mica）。
+function detectWindowsMicaSupport(): boolean {
+  if (process.platform !== "win32") return false;
+  const build = Number.parseInt(os.release().split(".")[2] ?? "", 10);
+  return Number.isFinite(build) && build >= 22000;
+}
+
+// 本次窗口实际启用的材质（窗口创建期决定，运行时不可改；开关切换需重启生效）。
+let activeWindowMaterial: "mica" | "none" = "none";
 const APP_ICON_FILE_NAME = process.platform === "win32" ? "icon.ico" : "icon.png";
 const APP_ICON_PATH = app.isPackaged
   ? path.join(process.resourcesPath, APP_ICON_FILE_NAME)
@@ -4195,6 +4205,11 @@ function createWindow() {
   if (mainWindowIcon.isEmpty()) {
     console.warn(`[window] app icon is empty: ${APP_ICON_PATH}`);
   }
+  // Mica 材质要求窗口不透明（DWM 在窗口背后绘制材质，网页外壳半透明才能透出），
+  // 与现行「透明窗口 + CSS 圆角」方案互斥：开启时改走不透明无边框窗口（四角由
+  // 系统 DWM 绘制），关闭时维持透明壳。窗口 transparent 是创建期参数，切换需重启。
+  const micaEnabled = detectWindowsMicaSupport() && settingsService.loadSettings().useWindowsMica === true;
+  activeWindowMaterial = micaEnabled ? "mica" : "none";
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -4211,8 +4226,9 @@ function createWindow() {
     autoHideMenuBar: true,
     frame: false,
     skipTaskbar: false,
-    transparent: process.platform === "win32" ? true : false,
+    transparent: micaEnabled ? false : process.platform === "win32",
     backgroundColor: "#00000000",
+    ...(micaEnabled ? { backgroundMaterial: "mica" as const } : {}),
     icon: mainWindowIcon,
   });
   if (process.platform === "win32" && app.isPackaged && !mainWindowIcon.isEmpty()) {
@@ -6032,6 +6048,11 @@ ipcMain.handle("kimi-code:deleteSession", async (_, request: unknown) => {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 });
+
+ipcMain.handle("app:getWindowMaterial", () => ({
+  supported: detectWindowsMicaSupport(),
+  enabled: activeWindowMaterial === "mica",
+}));
 
 ipcMain.handle("kimi-code:getLoopControl", async () => {
   try {
@@ -8417,6 +8438,7 @@ const SettingsSchema = z.object({
   experimentalKimiSubagentFork: z.boolean().optional(),
   experimentalKimiTower: z.boolean().optional(),
   permissionModeReminderDisabled: z.boolean().optional(),
+  useWindowsMica: z.boolean().optional(),
   kimiMonthlyQuotaEnabled: z.boolean().optional(),
   thinkingTranslationProvider: z.enum(["off", "local", "azure"]).optional(),
   thinkingTranslationEnabled: z.boolean().optional(),

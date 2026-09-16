@@ -1336,7 +1336,13 @@ export function buildRenderItems(
     if (incomplete) notePerfDiagCount(`cacheReject.incomplete.${incomplete.type}`);
     return !incomplete;
   };
-  const completedTurnCacheKey = (turnEvents: TimelineEvent[], segmentOrdinal: number) => {
+  const completedTurnCacheKey = (
+    turnEvents: TimelineEvent[],
+    segmentOrdinal: number,
+    isLatestTurn: boolean,
+    hasLaterUserBoundary: boolean,
+    hasLaterSteerBoundary: boolean,
+  ) => {
     const first = turnEvents[0];
     const agentTurnId = turnEvents.find((event) => event.agentTurnId)?.agentTurnId;
     const roomAgentId = turnEvents.find((event) => event.roomAgentId)?.roomAgentId;
@@ -1344,7 +1350,12 @@ export function buildRenderItems(
     // 共享 key 时双方每遍渲染都因事件身份校验不命中而互相覆盖，缓存形同虚设
     //（review A5）。段序号取自本遍渲染内同 turnId 的 flush 次序，事件序列
     // 稳定时跨遍一致。
-    return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${segmentOrdinal}:${currentTurnStartedAt ?? first.timestamp}`;
+    // 渲染上下文（isLatestTurn / 两个 boundary 参数）参与 turnSettled 判定
+    //（superseded/live 折叠窗/footer 状态），必须入 key：跨会话保留改为模块级
+    // 单例后缓存长期存活，同一 turn 从「最新轮」变「历史轮」时这些参数会变，
+    // key 不含它们会复用旧上下文的渲染结果（未 settle 样式不刷新）。
+    const context = `${isLatestTurn ? 1 : 0}${hasLaterUserBoundary ? 1 : 0}${hasLaterSteerBoundary ? 1 : 0}`;
+    return `${roomAgentId ?? "primary"}:${agentTurnId ?? first.id}:${segmentOrdinal}:${currentTurnStartedAt ?? first.timestamp}:${context}`;
   };
   const renderCachedTurnBody = (
     turnEvents: TimelineEvent[],
@@ -1359,7 +1370,7 @@ export function buildRenderItems(
       renderTurnBody(turnEvents, turnStartedAt, isLatestTurn, turnUserEvent, hasLaterUserBoundary, hasLaterSteerBoundary, segmentOrdinal);
       return;
     }
-    const cacheKey = completedTurnCacheKey(turnEvents, segmentOrdinal);
+    const cacheKey = completedTurnCacheKey(turnEvents, segmentOrdinal, isLatestTurn, hasLaterUserBoundary, hasLaterSteerBoundary);
     usedCompletedTurnCacheKeys.add(cacheKey);
     const cached = completedTurnCache.get(cacheKey);
     if (cached && !(

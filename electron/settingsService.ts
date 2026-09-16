@@ -47,6 +47,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   experimentalKimiSubagentFork: false,
   experimentalKimiTower: false,
   permissionModeReminderDisabled: false,
+  useWindowsMica: false,
   kimiMonthlyQuotaEnabled: false,
   thinkingTranslationProvider: "off",
   thinkingTranslationIntervalMs: 2500,

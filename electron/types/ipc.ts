@@ -1761,6 +1761,8 @@ export type AppSettings = {
   experimentalKimiTower: boolean;
   /** 设为 true 时向引擎注入 KIMI_CODE_PERMISSION_MODE_REMINDER=0，不向模型上下文注入自动权限模式提醒。 */
   permissionModeReminderDisabled: boolean;
+  /** Windows 11（build>=22000）启用 DWM Mica 窗口材质；窗口 transparent 为创建期参数，切换需重启。 */
+  useWindowsMica: boolean;
   kimiMonthlyQuotaEnabled: boolean;
   thinkingTranslationProvider: ThinkingTranslationProvider;
   /** @deprecated 仅用于迁移 2.21.80 及更早版本的布尔开关。 */
@@ -2166,6 +2168,11 @@ export type KimiCodeForkSessionRequest = {
 export type KimiCodeRenameSessionRequest = {
   sessionId: string;
   title: string;
+};
+
+export type WindowMaterialInfo = {
+  supported: boolean;
+  enabled: boolean;
 };
 
 export type KimiCodeLoopControlResponse =

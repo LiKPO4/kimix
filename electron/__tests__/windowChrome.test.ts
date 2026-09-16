@@ -21,7 +21,11 @@ describe("Windows 主窗口外壳", () => {
     expect(source).toContain("appId: WINDOWS_APP_USER_MODEL_ID,");
     expect(source).toContain("appIconPath: APP_ICON_PATH,");
     expect(source).toContain("appIconIndex: 0,");
-    expect(source).toContain('transparent: process.platform === "win32" ? true : false');
+    // Windows 窗口两态（互斥）：默认透明壳；Mica 开关开启时不透明 + DWM 材质（需重启）。
+    expect(source).toContain('transparent: micaEnabled ? false : process.platform === "win32"');
+    expect(source).toContain("...(micaEnabled ? { backgroundMaterial: \"mica\" as const } : {}),");
+    expect(source).toContain("function detectWindowsMicaSupport(): boolean {");
+    expect(source).toContain("settingsService.loadSettings().useWindowsMica === true");
     expect(source).toContain('backgroundColor: "#00000000"');
     expect(source).not.toContain("setShape");
   });
@@ -32,6 +36,9 @@ describe("Windows 主窗口外壳", () => {
 
     expect(renderer).toContain('setAttribute("data-transparent-shell", "1")');
     expect(css).toMatch(/:root\[data-transparent-shell="1"\]\s+body\s*\{[^}]*background-color:\s*transparent;/s);
+    // Mica 形态分支：属性消费 + 外壳半透明（不透明窗口由系统绘制圆角，不复用透明壳规则）。
+    expect(renderer).toContain('setAttribute("data-window-material", "mica")');
+    expect(css).toMatch(/:root\[data-window-material="mica"\]\s+\.kimix-app-shell[^{]*\{[^}]*color-mix\(in srgb, var\(--surface-ground\)/s);
   });
 
   it("安装包显式携带并嵌入 Windows 图标", () => {

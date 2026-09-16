@@ -716,6 +716,8 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
   const [experimentalSettingsMessage, setExperimentalSettingsMessage] = useState("");
   const [permissionReminderDisabled, setPermissionReminderDisabledState] = useState(false);
   const [permissionReminderSaving, setPermissionReminderSaving] = useState(false);
+  const [windowsMicaSupported, setWindowsMicaSupported] = useState(false);
+  const [windowsMicaEnabled, setWindowsMicaEnabled] = useState(false);
   const [loopControlMaxAttempts, setLoopControlMaxAttempts] = useState<number | null>(null);
   const [loopControlSaving, setLoopControlSaving] = useState(false);
   const [multiAgentRoomUiEnabled, setMultiAgentRoomUiEnabledState] = useState(() => isMultiAgentRoomUiEnabled());
@@ -1354,6 +1356,24 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
     setPermissionReminderDisabledState(Boolean(res.data.permissionModeReminderDisabled));
   };
 
+  const refreshWindowsMicaSetting = async () => {
+    const [materialRes, settingsRes] = await Promise.all([
+      window.api.getWindowMaterial(),
+      window.api.getSettings(),
+    ]);
+    setWindowsMicaSupported(Boolean(materialRes?.supported));
+    if (settingsRes.success) setWindowsMicaEnabled(Boolean(settingsRes.data.useWindowsMica));
+  };
+
+  const saveWindowsMica = async (enabled: boolean) => {
+    setWindowsMicaEnabled(enabled);
+    const res = await window.api.saveSettings({ useWindowsMica: enabled });
+    if (!res.success) {
+      // 保存失败回读校准。
+      void refreshWindowsMicaSetting();
+    }
+  };
+
   const refreshLoopControlSetting = async () => {
     const res = await window.api.getKimiLoopControl();
     if (!res.success) return;
@@ -1706,6 +1726,7 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
       if (!settingsStatusCache.modelConfig) void refreshModelConfig();
       void refreshExperimentalSettings();
       void refreshPermissionReminderSetting();
+      void refreshWindowsMicaSetting();
       void refreshLoopControlSetting();
       void refreshMonthlyQuotaSettings();
       void refreshOfficialArchivedSessions();
@@ -2176,6 +2197,28 @@ export function SettingsPanel({ variant = "modal", onBackToChat }: { variant?: "
                     </div>
                   </div>
                 </div>
+                {windowsMicaSupported && (
+                  <div className="kimix-settings-card" style={{ marginTop: 14, padding: "14px 16px" }}>
+                    <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14 }}>
+                      <button
+                        type="button"
+                        aria-pressed={windowsMicaEnabled}
+                        onClick={() => void saveWindowsMica(!windowsMicaEnabled)}
+                        className="kimix-style-exempt flex min-w-0 items-center text-left"
+                        style={{ gap: 12 }}
+                      >
+                        <SelectionIndicator selected={windowsMicaEnabled} />
+                        <div className="min-w-0 flex-1">
+                          <div className="kimix-settings-permission-label">Windows 11 窗口材质（Mica）</div>
+                          <div className="kimix-settings-permission-desc">窗口背景使用系统 Mica 材质，侧栏与顶栏半透明透出桌面；开启或关闭后需重启 Kimix 生效</div>
+                        </div>
+                      </button>
+                      <span className={`rounded-full text-[11.5px] leading-5 ${windowsMicaEnabled ? "bg-accent-primary text-white" : "bg-[var(--kimix-panel-badge-bg)] text-[var(--kimix-panel-badge-text)]"}`} style={{ height: 24, minWidth: 54, paddingLeft: 10, paddingRight: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {windowsMicaEnabled ? "已开启" : "关闭"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="kimix-settings-section" {...settingsSectionProps("palette", 6)}>
