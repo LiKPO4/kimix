@@ -4,7 +4,8 @@
 
 - 用户反馈 227 截图四角直角。实证链（运行中的 227 实例，窗口化 1282x801）：DWM 属性 SYSTEMBACKDROP_TYPE=2（Mica 生效）、WINDOW_CORNER_PREFERENCE=2（ROUND）；WGC 窗口抓图四角为黑色弧形裁剪区（半径约 8px，逐行递减的弧）；CopyFromScreen 直接抓屏幕像素确认左上角在屏幕上是圆角+系统阴影（放大图 .tmp-corner-tl-zoom.png）。
 - 截图呈直角的两种假象来源：①窗口最大化时 Windows 11 一律不画圆角（资源管理器/VSCode 一致；Kimix 旧 CSS 圆角方案最大化时同样清零，index.css `[data-window-maximized=true]` 规则）；②QQ/微信/Snipaste 等 GDI/PrintWindow 截图抓的是 DWM 合成前的方形帧——屏幕上是圆的，截图里是方的。
-- 结论：无需代码修复；Mica 不透明窗口也无法用 CSS 圆角覆盖最大化场景（会露不透明底色黑块）。验证口径：窗口化状态肉眼看四角，或用 Win+Shift+S 截全屏（经 DWM 合成）。
+- 二次复核（用户重启后新实例，HWND 变更）：DWM 属性不变（Mica=2、ROUND）；CopyFromScreen 抓当前窗口四角并 5 倍放大，四角在屏幕上均为系统圆角+阴影，弧度与同机 Tauri 原生窗口（clipstash）一致。证据图 .tmp-fc-tl/tr/bl/br.png。
+- 结论：圆角已生效；用户实际诉求是「圆角跟随主题 16/20px」而非系统固定 8px。平台硬约束：Mica 要求不透明窗口，圆角只能由 DWM 绘制（仅 8px/4px/直角三档，无自定义半径 API）；CSS 裁圆角会露不透明底色；主题化大圆角与 Mica 互斥（透明壳方案）。用户已拍板：保留 Mica + 系统 8px 圆角，不做代码改动，此议题关闭。
 
 ## 2026-09-16 发版 v2.21.222（已推送 tag，CI 全绿）
 
