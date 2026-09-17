@@ -632,13 +632,109 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     return { visibleSessions: visible, sessionsByProjectPath: byProject };
   }, [currentSession, sessions]);
 
+  // 会话动作事件监听与删除流程必须在所有早返回之前：useRef/useEffect 是 hook，
+  // 放在早返回之后会让 hook 数量随分支切换（折叠态 / settings 视图）变化 → React #300
+  //（222 引入后点设置必崩的根因）。confirmDeleteSession 与删除弹窗变量的定义同样前置，
+  // 供折叠态/settings 分支共用删除确认弹窗。
+  const confirmDeleteSession = async () => {
+    const target = deleteSessionTarget;
+    if (!target || deleteSessionBusy) return;
+    setDeleteSessionBusy(true);
+    const runtimeSessionId = getRuntimeSessionId(target) ?? target.id;
+    const res = await window.api.deleteKimiCodeSession({ sessionId: runtimeSessionId });
+    setDeleteSessionBusy(false);
+    if (!res.success) {
+      toast(`删除失败：${res.error}`);
+      return;
+    }
+    deleteSession(target.id);
+    if (currentSession?.id === target.id) {
+      setCurrentSession(null);
+    }
+    if (runningSessionId === target.id || runningSessionId === target.runtimeSessionId) {
+      setRunningSessionId(null);
+    }
+    setDeleteSessionTarget(null);
+    toast("已删除会话");
+  };
+
+  // SessionToolbar 菜单的会话动作事件（导出调试包 / 删除对话）：实现与确认弹窗都
+  // 在本组件，用事件委托避免跨组件搬状态；ref 持有最新实现，监听只挂一次。
+  const sessionActionHandlerRef = useRef<(detail: { kind: string; sessionId: string }) => void>(() => {});
+  sessionActionHandlerRef.current = (detail) => {
+    const target = useSessionStore.getState().sessions.find((session) => session.id === detail.sessionId)
+      ?? (useAppStore.getState().currentSession?.id === detail.sessionId ? useAppStore.getState().currentSession : null);
+    if (!target) {
+      toast("会话不存在或已删除");
+      return;
+    }
+    if (detail.kind === "export-archive") void exportSessionArchive(target.id, target.title);
+    else if (detail.kind === "delete") setDeleteSessionTarget(target);
+  };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string; sessionId?: string }>).detail;
+      if (!detail?.kind || !detail?.sessionId) return;
+      sessionActionHandlerRef.current({ kind: detail.kind, sessionId: detail.sessionId });
+    };
+    window.addEventListener("kimix:session-action", handler);
+    return () => window.removeEventListener("kimix:session-action", handler);
+  }, []);
+
+  // 删除确认弹窗提取为共享 JSX：折叠态与 settings 视图的早返回分支同样渲染它，
+  // 否则菜单触发删除后弹窗不显示。
+  const deleteConfirmDialog = deleteSessionTarget ? (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
+      style={{ padding: 24 }}
+      onMouseDown={() => {
+        if (!deleteSessionBusy) setDeleteSessionTarget(null);
+      }}
+    >
+      <div
+        className="kimix-modal-card w-full max-w-[400px]"
+        style={{ padding: 22 }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="text-[16px] font-semibold leading-6">删除会话</div>
+        <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px", backgroundColor: "var(--accent-danger-light)" }}>
+          确定删除「{deleteSessionTarget.title}」？这会永久删除官方会话及其全部对话记录，无法恢复。
+        </div>
+        <div className="flex justify-end" style={{ gap: 10, marginTop: 18 }}>
+          <button
+            type="button"
+            onClick={() => setDeleteSessionTarget(null)}
+            disabled={deleteSessionBusy}
+            className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmDeleteSession()}
+            disabled={deleteSessionBusy}
+            className="kimix-icon-text-button is-compact text-accent-red disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deleteSessionBusy ? "删除中..." : "永久删除"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (workspaceView === "settings") {
-    return <SettingsWorkspaceSidebar width={sidebarOpen ? width : 52} collapsed={!sidebarOpen} />;
+    return (
+      <>
+        <SettingsWorkspaceSidebar width={sidebarOpen ? width : 52} collapsed={!sidebarOpen} />
+        {deleteConfirmDialog}
+      </>
+    );
   }
 
   if (!sidebarOpen) {
     return (
-      <aside
+      <>
+        <aside
         className="kimix-sidebar shrink-0 bg-surface-ground"
         // 折叠态右侧还有 AppShell 的 12px layout spacer；把它计入可见窄栏后，
         // 40px 热区应为左 12px + 按钮 40px + 右 spacer 12px，视觉轴才在 64px 中央。
@@ -702,6 +798,8 @@ export function Sidebar({ width = 320 }: SidebarProps) {
           </button>
         </div>
       </aside>
+        {deleteConfirmDialog}
+      </>
     );
   }
 
@@ -773,51 +871,6 @@ export function Sidebar({ width = 320 }: SidebarProps) {
     setCurrentProject(project);
     setExpandedProjectPaths((current) => new Set([...current, normalizeProjectPath(project.path)]));
   };
-
-  const confirmDeleteSession = async () => {
-    const target = deleteSessionTarget;
-    if (!target || deleteSessionBusy) return;
-    setDeleteSessionBusy(true);
-    const runtimeSessionId = getRuntimeSessionId(target) ?? target.id;
-    const res = await window.api.deleteKimiCodeSession({ sessionId: runtimeSessionId });
-    setDeleteSessionBusy(false);
-    if (!res.success) {
-      toast(`删除失败：${res.error}`);
-      return;
-    }
-    deleteSession(target.id);
-    if (currentSession?.id === target.id) {
-      setCurrentSession(null);
-    }
-    if (runningSessionId === target.id || runningSessionId === target.runtimeSessionId) {
-      setRunningSessionId(null);
-    }
-    setDeleteSessionTarget(null);
-    toast("已删除会话");
-  };
-
-  // SessionToolbar 菜单的会话动作事件（导出调试包 / 删除对话）：实现与确认弹窗都
-  // 在本组件，用事件委托避免跨组件搬状态；ref 持有最新实现，监听只挂一次。
-  const sessionActionHandlerRef = useRef<(detail: { kind: string; sessionId: string }) => void>(() => {});
-  sessionActionHandlerRef.current = (detail) => {
-    const target = useSessionStore.getState().sessions.find((session) => session.id === detail.sessionId)
-      ?? (useAppStore.getState().currentSession?.id === detail.sessionId ? useAppStore.getState().currentSession : null);
-    if (!target) {
-      toast("会话不存在或已删除");
-      return;
-    }
-    if (detail.kind === "export-archive") void exportSessionArchive(target.id, target.title);
-    else if (detail.kind === "delete") setDeleteSessionTarget(target);
-  };
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ kind?: string; sessionId?: string }>).detail;
-      if (!detail?.kind || !detail?.sessionId) return;
-      sessionActionHandlerRef.current({ kind: detail.kind, sessionId: detail.sessionId });
-    };
-    window.addEventListener("kimix:session-action", handler);
-    return () => window.removeEventListener("kimix:session-action", handler);
-  }, []);
 
   const selectSession = async (sessionId: string) => {
     const session = visibleSessions.find((s) => s.id === sessionId);
@@ -1343,44 +1396,7 @@ export function Sidebar({ width = 320 }: SidebarProps) {
         </button>
       </div>
       </aside>
-      {deleteSessionTarget && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-[color:var(--kimix-modal-overlay-bg)]"
-          style={{ padding: 24 }}
-          onMouseDown={() => {
-            if (!deleteSessionBusy) setDeleteSessionTarget(null);
-          }}
-        >
-          <div
-            className="kimix-modal-card w-full max-w-[400px]"
-            style={{ padding: 22 }}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="text-[16px] font-semibold leading-6">删除会话</div>
-            <div className="kimix-inset-section text-[13px] leading-6 text-accent-danger" style={{ marginTop: 14, padding: "10px 12px", backgroundColor: "var(--accent-danger-light)" }}>
-              确定删除「{deleteSessionTarget.title}」？这会永久删除官方会话及其全部对话记录，无法恢复。
-            </div>
-            <div className="flex justify-end" style={{ gap: 10, marginTop: 18 }}>
-              <button
-                type="button"
-                onClick={() => setDeleteSessionTarget(null)}
-                disabled={deleteSessionBusy}
-                className="kimix-icon-text-button kimix-muted-action is-compact disabled:cursor-wait disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmDeleteSession()}
-                disabled={deleteSessionBusy}
-                className="kimix-icon-text-button is-compact text-accent-red disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {deleteSessionBusy ? "删除中..." : "永久删除"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {deleteConfirmDialog}
     </>
   );
 }
