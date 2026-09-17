@@ -1714,8 +1714,10 @@ body {
   border-radius: 0;
 }
 
+/* 侧栏/底栏透明继承外壳的半透明底（与顶栏一致）；主内容区（app-shell-main）必须
+   保持不透明——它就是对话区背景，透明会让对话区透出外壳色（226 误改后用户反馈）。
+   不透明底由 main 自身既有规则提供。 */
 :root[data-window-material="mica"] .kimix-sidebar,
-:root[data-window-material="mica"] .kimix-app-shell-main,
 :root[data-window-material="mica"] .kimix-app-shell-footer {
   background-color: transparent;
 }
