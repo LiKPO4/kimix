@@ -1,5 +1,11 @@
 # Kimix 长程任务状态
 
+## 2026-09-17 Mica 四角圆角排查结论：系统圆角已生效，无代码 bug
+
+- 用户反馈 227 截图四角直角。实证链（运行中的 227 实例，窗口化 1282x801）：DWM 属性 SYSTEMBACKDROP_TYPE=2（Mica 生效）、WINDOW_CORNER_PREFERENCE=2（ROUND）；WGC 窗口抓图四角为黑色弧形裁剪区（半径约 8px，逐行递减的弧）；CopyFromScreen 直接抓屏幕像素确认左上角在屏幕上是圆角+系统阴影（放大图 .tmp-corner-tl-zoom.png）。
+- 截图呈直角的两种假象来源：①窗口最大化时 Windows 11 一律不画圆角（资源管理器/VSCode 一致；Kimix 旧 CSS 圆角方案最大化时同样清零，index.css `[data-window-maximized=true]` 规则）；②QQ/微信/Snipaste 等 GDI/PrintWindow 截图抓的是 DWM 合成前的方形帧——屏幕上是圆的，截图里是方的。
+- 结论：无需代码修复；Mica 不透明窗口也无法用 CSS 圆角覆盖最大化场景（会露不透明底色黑块）。验证口径：窗口化状态肉眼看四角，或用 Win+Shift+S 截全屏（经 DWM 合成）。
+
 ## 2026-09-16 发版 v2.21.222（已推送 tag，CI 全绿）
 
 - 覆盖 v2.21.213~222 共 10 个 patch：重会话切换/打开卡顿五层根因链修复（213~218，用户验收「不卡了，很流畅」）、侧栏 hover 反馈统一（219/220）、Windows 11 Mica 窗口材质开关（221）、会话菜单清理与悬停组收敛（222）；218 后的 review 复核修复 completedTurnCache 上下文 key（并入 221 提交）。
