@@ -1,5 +1,12 @@
 # Kimix 长程任务状态
 
+## 2026-09-17 发版 v2.21.227（已推送 tag，CI 全绿）
+
+- 覆盖 223~227：点设置/折叠侧栏 React #300 崩溃修复（225）、Mica 半透明层级归一+对话区恢复不透明（226/227）、错误边界诊断增强（223/224）；release notes 落 docs/release-notes/v2.21.227.md。
+- Release run 35195352277 全绿（validate-knowledge + win/mac/linux + publish-release），产物 17 个，body 正确取自版本 notes。
+- master 与 origin 同步至 eb1a6197；Mica 圆角议题同日关闭（用户拍板保留 Mica + 系统 8px 圆角，平台约束不跟随主题半径）。
+- 遗留：首次进入超大会话一次性 parts 合并 ~2.3s（进程内一次）；根目录 6 个 .tmp-*.py 诊断残留待用户确认清理；官方 0.44.0 发布时重新 vendor。
+
 ## 2026-09-17 Mica 四角圆角排查结论：系统圆角已生效，无代码 bug
 
 - 用户反馈 227 截图四角直角。实证链（运行中的 227 实例，窗口化 1282x801）：DWM 属性 SYSTEMBACKDROP_TYPE=2（Mica 生效）、WINDOW_CORNER_PREFERENCE=2（ROUND）；WGC 窗口抓图四角为黑色弧形裁剪区（半径约 8px，逐行递减的弧）；CopyFromScreen 直接抓屏幕像素确认左上角在屏幕上是圆角+系统阴影（放大图 .tmp-corner-tl-zoom.png）。
