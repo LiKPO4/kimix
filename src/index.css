@@ -1706,9 +1706,18 @@ body {
   background-color: transparent;
 }
 
-:root[data-window-material="mica"] .kimix-app-shell,
-:root[data-window-material="mica"] .kimix-sidebar {
+:root[data-window-material="mica"] .kimix-app-shell {
+  /* 半透明只挂最外层：内层（侧栏/顶栏/底栏）透明继承，避免多层半透明叠加
+     导致顶部菜单栏与侧栏深浅不一；窗口圆角由系统 DWM 绘制，壳自身的 CSS 圆角
+     清零，否则四角会因两套圆角弧度不一致而露出底角。 */
   background-color: color-mix(in srgb, var(--surface-ground) 74%, transparent);
+  border-radius: 0;
+}
+
+:root[data-window-material="mica"] .kimix-sidebar,
+:root[data-window-material="mica"] .kimix-app-shell-main,
+:root[data-window-material="mica"] .kimix-app-shell-footer {
+  background-color: transparent;
 }
 
 button,
